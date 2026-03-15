@@ -1824,9 +1824,9 @@ func TestQALayout_ResourceList_SeparatorLine(t *testing.T) {
 			state.Resources = factory(3)
 
 			view := state.View()
-			// The separator uses "─" (box-drawing horizontal)
-			if !strings.Contains(view.Content, "─") {
-				t.Errorf("ResourceList(%s) should have separator line with '─' characters", rtName)
+			// The separator uses ASCII dashes
+			if !strings.Contains(view.Content, "---") {
+				t.Errorf("ResourceList(%s) should have separator line with '-' characters", rtName)
 			}
 		})
 	}

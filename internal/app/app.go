@@ -35,7 +35,8 @@ const (
 	RegionSelectView
 )
 
-const version = "0.1.0"
+// Version is set by the main package at startup.
+var Version = "0.3.1"
 
 // AppState is the root Bubble Tea model for the a9s application.
 type AppState struct {
@@ -1126,7 +1127,7 @@ func (m AppState) View() tea.View {
 
 // renderHeader renders the top header line.
 func (m AppState) renderHeader() string {
-	headerText := fmt.Sprintf("a9s v%s | profile: %s | %s", version, m.ActiveProfile, m.ActiveRegion)
+	headerText := fmt.Sprintf("a9s v%s | profile: %s | %s", Version, m.ActiveProfile, m.ActiveRegion)
 	if m.Loading {
 		headerText += " [loading...]"
 	}
@@ -1398,7 +1399,7 @@ func (m AppState) renderResourceList() string {
 	// Separator
 	sepVals := make([]string, len(columns))
 	for i, w := range colWidths {
-		sepVals[i] = strings.Repeat("─", w)
+		sepVals[i] = strings.Repeat("-", w)
 	}
 	sepLine := buildRow(sepVals)
 	b.WriteString(hcrop("  ", sepLine))
