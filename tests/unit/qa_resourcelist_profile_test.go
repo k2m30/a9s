@@ -413,7 +413,34 @@ func TestQA_073_SelectProfileSendsProfileSwitchedMsg(t *testing.T) {
 // ===========================================================================
 
 func TestQA_074_SSOExpiredToken(t *testing.T) {
-	t.Skip("QA-074: Requires real AWS SSO session to test expired token behavior")
+	// Test that when APIErrorMsg contains "ExpiredToken", the status message
+	// suggests "aws sso login".
+	state := app.NewAppState("", "us-east-1")
+	state.CurrentView = app.ResourceListView
+	state.CurrentResourceType = "ec2"
+	state.Loading = true
+
+	updated, cmd := state.Update(app.APIErrorMsg{
+		Err:          fmt.Errorf("operation error EC2: DescribeInstances, ExpiredToken: the security token included in the request is expired"),
+		ResourceType: "ec2",
+	})
+	s := updated.(app.AppState)
+
+	if !s.StatusIsError {
+		t.Error("expected StatusIsError=true for expired token error")
+	}
+	if !strings.Contains(s.StatusMessage, "aws sso login") {
+		t.Errorf("expected status message to suggest 'aws sso login', got %q", s.StatusMessage)
+	}
+	if !strings.Contains(s.StatusMessage, "expired") {
+		t.Errorf("expected status message to contain 'expired', got %q", s.StatusMessage)
+	}
+	if s.Loading {
+		t.Error("expected Loading=false after expired token error")
+	}
+	if cmd == nil {
+		t.Error("expected a timer command for auto-clear")
+	}
 }
 
 // ===========================================================================
