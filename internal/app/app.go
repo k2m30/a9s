@@ -86,6 +86,9 @@ type AppState struct {
 	S3Bucket string
 	S3Prefix string
 
+	// Horizontal scroll offset for wide tables
+	HScrollOffset int
+
 	// Profile/Region selector models
 	ProfileSelector views.ProfileSelectModel
 	RegionSelector  views.RegionSelectModel
@@ -573,6 +576,21 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 
+	// Horizontal scroll (h/l or left/right)
+	if key.Matches(msg, m.Keys.ScrollLeft) {
+		if m.HScrollOffset > 0 {
+			m.HScrollOffset -= 4
+			if m.HScrollOffset < 0 {
+				m.HScrollOffset = 0
+			}
+		}
+		return m, nil
+	}
+	if key.Matches(msg, m.Keys.ScrollRight) {
+		m.HScrollOffset += 4
+		return m, nil
+	}
+
 	// Sort by name (N)
 	if key.Matches(msg, m.Keys.SortByName) {
 		m.sortResources("name")
@@ -949,6 +967,7 @@ func (m AppState) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.FilteredResources = nil
 		m.S3Bucket = ""
 		m.S3Prefix = ""
+		m.HScrollOffset = 0
 		m.Loading = true
 		return m, m.fetchResources()
 	}
@@ -1313,7 +1332,7 @@ func (m AppState) renderResourceList() string {
 			}
 		}
 	}
-	// Cap column widths
+	// Cap individual column widths
 	maxColWidth := 40
 	for i := range colWidths {
 		if colWidths[i] > maxColWidth {
@@ -1324,25 +1343,65 @@ func (m AppState) renderResourceList() string {
 		}
 	}
 
-	// Header row
-	b.WriteString("  ")
-	for i, col := range columns {
-		colTitle := padOrTruncate(col.Title, colWidths[i])
-		b.WriteString(colTitle)
-		if i < len(columns)-1 {
-			b.WriteString("  ")
-		}
+	// Clamp horizontal scroll offset
+	totalWidth := 0
+	for _, w := range colWidths {
+		totalWidth += w
 	}
+	totalWidth += (len(columns) - 1) * 2 // gaps
+	maxHScroll := totalWidth - m.Width + 4
+	if maxHScroll < 0 {
+		maxHScroll = 0
+	}
+	if m.HScrollOffset > maxHScroll {
+		m.HScrollOffset = maxHScroll
+	}
+
+	// Build a full-width row from column values
+	buildRow := func(values []string) string {
+		var row strings.Builder
+		for i, val := range values {
+			row.WriteString(padOrTruncate(val, colWidths[i]))
+			if i < len(values)-1 {
+				row.WriteString("  ")
+			}
+		}
+		return row.String()
+	}
+
+	// Apply horizontal scroll: crop a line to the visible window
+	hcrop := func(prefix, line string) string {
+		// prefix (cursor "  " or "> ") is always visible
+		if m.HScrollOffset >= len(line) {
+			return prefix
+		}
+		cropped := line[m.HScrollOffset:]
+		maxVisible := m.Width - len(prefix)
+		if maxVisible <= 0 {
+			return prefix
+		}
+		if len(cropped) > maxVisible {
+			cropped = cropped[:maxVisible]
+		}
+		return prefix + cropped
+	}
+
+	// Header row
+	headerVals := make([]string, len(columns))
+	for i, col := range columns {
+		headerVals[i] = col.Title
+	}
+	headerLine := buildRow(headerVals)
+	b.WriteString(hcrop("  ", headerLine))
 	b.WriteString("\n")
 
 	// Separator
-	b.WriteString("  ")
+	sepVals := make([]string, len(columns))
 	for i, w := range colWidths {
-		b.WriteString(strings.Repeat("─", w))
-		if i < len(colWidths)-1 {
-			b.WriteString("  ")
-		}
+		sepVals[i] = strings.Repeat("─", w)
 	}
+	sepLine := buildRow(sepVals)
+	b.WriteString(hcrop("  ", sepLine))
 	b.WriteString("\n")
 
 	// Viewport: calculate visible window
@@ -1368,17 +1427,12 @@ func (m AppState) renderResourceList() string {
 			cursor = "> "
 		}
 
-		var line strings.Builder
-		line.WriteString(cursor)
+		rowVals := make([]string, len(columns))
 		for j, col := range columns {
-			val := padOrTruncate(r.Fields[col.Key], colWidths[j])
-			line.WriteString(val)
-			if j < len(columns)-1 {
-				line.WriteString("  ")
-			}
+			rowVals[j] = r.Fields[col.Key]
 		}
-
-		row := line.String()
+		rowLine := buildRow(rowVals)
+		row := hcrop(cursor, rowLine)
 		if i == m.SelectedIndex {
 			row = styles.TableCursorStyle.Render(row)
 		}
