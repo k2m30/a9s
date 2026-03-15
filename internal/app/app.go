@@ -36,7 +36,7 @@ const (
 )
 
 // Version is set by the main package at startup.
-var Version = "0.3.2"
+var Version string
 
 // AppState is the root Bubble Tea model for the a9s application.
 type AppState struct {

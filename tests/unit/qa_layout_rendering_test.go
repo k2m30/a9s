@@ -1907,6 +1907,7 @@ func stripANSI(s string) string {
 // ===========================================================================
 
 func TestQALayout_Header_ContainsVersion(t *testing.T) {
+	app.Version = "0.3.2"
 	state := newTestState("prof", "us-east-1", 80, 24)
 	view := state.View()
 	first := firstNonEmptyLine(view.Content)
