@@ -1,0 +1,6 @@
+[default]
+output = json
+
+[profile dev]
+region = eu-west-1
+output = json

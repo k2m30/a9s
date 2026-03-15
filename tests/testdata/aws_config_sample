@@ -1,0 +1,18 @@
+[default]
+region = us-east-1
+output = json
+
+[profile dev]
+region = eu-west-1
+output = json
+
+[profile prod-sso]
+sso_session = my-sso
+sso_account_id = 123456789012
+sso_role_name = AdminRole
+region = us-west-2
+
+[sso-session my-sso]
+sso_start_url = https://my-sso-portal.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
