@@ -1,0 +1,26 @@
+# Go
+*.exe
+*.test
+*.out
+*.prof
+vendor/
+
+# Binary
+a9s
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env*
+
+# Coverage
+coverage.out
+coverage.html
+
+!.claude
