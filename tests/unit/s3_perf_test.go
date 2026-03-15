@@ -2,37 +2,11 @@ package unit
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
-
-type mockFastListBucketsClient struct {
-	count int
-}
-
-func (m *mockFastListBucketsClient) ListBuckets(
-	ctx context.Context,
-	params *s3.ListBucketsInput,
-	optFns ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
-	buckets := make([]s3types.Bucket, m.count)
-	for i := range buckets {
-		name := fmt.Sprintf("bucket-%03d", i)
-		created := time.Now()
-		buckets[i] = s3types.Bucket{
-			Name:         aws.String(name),
-			CreationDate: &created,
-		}
-	}
-	return &s3.ListBucketsOutput{Buckets: buckets}, nil
-}
 
 // FetchS3Buckets should only call ListBuckets — no GetBucketLocation.
 // It should accept only a ListBuckets API, not a location API.

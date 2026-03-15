@@ -1770,20 +1770,6 @@ func TestQA_200_S3ListingGlobalRegardlessOfRegion(t *testing.T) {
 	}
 }
 
-// mockS3ListBucketsAPI implements awsclient.S3ListBucketsAPI for testing.
-type mockS3ListBucketsAPI struct {
-	Output *s3.ListBucketsOutput
-	Err    error
-}
-
-func (m *mockS3ListBucketsAPI) ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
-	return m.Output, m.Err
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
 // ===================================================================
 // Additional: ClearErrorMsg clears error state
 // ===================================================================

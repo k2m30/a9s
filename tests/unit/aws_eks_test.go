@@ -12,40 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockEKSListClustersClient implements awsclient.EKSListClustersAPI for testing.
-type mockEKSListClustersClient struct {
-	output *eks.ListClustersOutput
-	err    error
-}
-
-func (m *mockEKSListClustersClient) ListClusters(
-	ctx context.Context,
-	params *eks.ListClustersInput,
-	optFns ...func(*eks.Options),
-) (*eks.ListClustersOutput, error) {
-	return m.output, m.err
-}
-
-// mockEKSDescribeClusterClient implements awsclient.EKSDescribeClusterAPI for testing.
-type mockEKSDescribeClusterClient struct {
-	outputs map[string]*eks.DescribeClusterOutput
-	err     error
-}
-
-func (m *mockEKSDescribeClusterClient) DescribeCluster(
-	ctx context.Context,
-	params *eks.DescribeClusterInput,
-	optFns ...func(*eks.Options),
-) (*eks.DescribeClusterOutput, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if out, ok := m.outputs[*params.Name]; ok {
-		return out, nil
-	}
-	return nil, fmt.Errorf("cluster %q not found", *params.Name)
-}
-
 // ---------------------------------------------------------------------------
 // T059 - Test EKS two-step fetch (ListClusters + DescribeCluster)
 // ---------------------------------------------------------------------------

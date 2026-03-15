@@ -13,20 +13,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockSecretsManagerClient implements awsclient.SecretsManagerListSecretsAPI for testing.
-type mockSecretsManagerClient struct {
-	output *secretsmanager.ListSecretsOutput
-	err    error
-}
-
-func (m *mockSecretsManagerClient) ListSecrets(
-	ctx context.Context,
-	params *secretsmanager.ListSecretsInput,
-	optFns ...func(*secretsmanager.Options),
-) (*secretsmanager.ListSecretsOutput, error) {
-	return m.output, m.err
-}
-
 // ---------------------------------------------------------------------------
 // T060 - Test SecretsManager ListSecrets response parsing
 // ---------------------------------------------------------------------------
@@ -190,20 +176,6 @@ func TestFetchSecrets_EmptyResponse(t *testing.T) {
 // ---------------------------------------------------------------------------
 // T043 - Test GetSecretValue (RevealSecret)
 // ---------------------------------------------------------------------------
-
-// mockSecretsManagerGetSecretValueClient implements awsclient.SecretsManagerGetSecretValueAPI.
-type mockSecretsManagerGetSecretValueClient struct {
-	output *secretsmanager.GetSecretValueOutput
-	err    error
-}
-
-func (m *mockSecretsManagerGetSecretValueClient) GetSecretValue(
-	ctx context.Context,
-	params *secretsmanager.GetSecretValueInput,
-	optFns ...func(*secretsmanager.Options),
-) (*secretsmanager.GetSecretValueOutput, error) {
-	return m.output, m.err
-}
 
 func TestRevealSecret_ReturnsSecretString(t *testing.T) {
 	mock := &mockSecretsManagerGetSecretValueClient{

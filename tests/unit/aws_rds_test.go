@@ -12,20 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockRDSClient implements awsclient.RDSDescribeDBInstancesAPI for testing.
-type mockRDSClient struct {
-	output *rds.DescribeDBInstancesOutput
-	err    error
-}
-
-func (m *mockRDSClient) DescribeDBInstances(
-	ctx context.Context,
-	params *rds.DescribeDBInstancesInput,
-	optFns ...func(*rds.Options),
-) (*rds.DescribeDBInstancesOutput, error) {
-	return m.output, m.err
-}
-
 // ---------------------------------------------------------------------------
 // T056 - Test RDS response parsing
 // ---------------------------------------------------------------------------

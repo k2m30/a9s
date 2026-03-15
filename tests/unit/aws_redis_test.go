@@ -12,20 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockElastiCacheClient implements awsclient.ElastiCacheDescribeCacheClustersAPI for testing.
-type mockElastiCacheClient struct {
-	output *elasticache.DescribeCacheClustersOutput
-	err    error
-}
-
-func (m *mockElastiCacheClient) DescribeCacheClusters(
-	ctx context.Context,
-	params *elasticache.DescribeCacheClustersInput,
-	optFns ...func(*elasticache.Options),
-) (*elasticache.DescribeCacheClustersOutput, error) {
-	return m.output, m.err
-}
-
 // ---------------------------------------------------------------------------
 // T057 - Test Redis (ElastiCache) response parsing with client-side filtering
 // ---------------------------------------------------------------------------
