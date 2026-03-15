@@ -1,0 +1,17 @@
+[default]
+region = us-east-1
+output = json
+
+[profile dev]
+region = eu-west-1
+output = json
+
+[profile staging]
+region = ap-southeast-2
+output = json
+
+[profile prod-sso]
+sso_session = my-sso
+sso_account_id = 123456789012
+sso_role_name = AdminRole
+region = us-west-2
