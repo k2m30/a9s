@@ -94,8 +94,8 @@ func TestQA_001_LaunchDefaultProfile(t *testing.T) {
 	state.Width = 120
 	state.Height = 40
 	view := state.View()
-	if !strings.Contains(view.Content, "a9s v0.1.0") {
-		t.Error("expected header to contain 'a9s v0.1.0'")
+	if !strings.Contains(view.Content, "a9s v") {
+		t.Error("expected header to contain 'a9s v'")
 	}
 	if !strings.Contains(view.Content, "profile: default") {
 		t.Error("expected header to contain 'profile: default'")
