@@ -154,7 +154,7 @@ func TestResourceList_ShowsColumnHeaders(t *testing.T) {
 			},
 		},
 	}
-	state.Width = 120
+	state.Width = 200 // wide enough for all EC2 columns
 	state.Height = 24
 
 	view := state.View()

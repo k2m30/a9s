@@ -23,6 +23,10 @@ type KeyMap struct {
 	Reveal   key.Binding
 	Copy     key.Binding
 
+	// Horizontal scroll
+	ScrollLeft  key.Binding
+	ScrollRight key.Binding
+
 	// History
 	HistoryBack    key.Binding
 	HistoryForward key.Binding
@@ -94,6 +98,15 @@ func DefaultKeyMap() KeyMap {
 		Copy: key.NewBinding(
 			key.WithKeys("c"),
 			key.WithHelp("c", "copy"),
+		),
+
+		ScrollLeft: key.NewBinding(
+			key.WithKeys("h", "left"),
+			key.WithHelp("h/←", "scroll left"),
+		),
+		ScrollRight: key.NewBinding(
+			key.WithKeys("l", "right"),
+			key.WithHelp("l/→", "scroll right"),
 		),
 
 		HistoryBack: key.NewBinding(
