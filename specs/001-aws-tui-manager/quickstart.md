@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.22 or later
+- Go 1.25 or later (required by Bubble Tea v2)
 - AWS CLI configured with at least one profile
   (`~/.aws/config` and/or `~/.aws/credentials`)
 - Valid AWS credentials for the profile you want to use

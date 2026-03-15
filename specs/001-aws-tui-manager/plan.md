@@ -14,10 +14,13 @@ Single binary distribution, async data loading, no auto-refresh.
 
 ## Technical Context
 
-**Language/Version**: Go 1.22+
+**Language/Version**: Go 1.25+ (required by Bubble Tea v2)
 **Primary Dependencies**: Bubble Tea v2 (charm.land/bubbletea/v2),
 Bubbles v2 (charm.land/bubbles/v2), Lip Gloss v2
-(charm.land/lipgloss/v2), evertras/bubble-table v0.19.2,
+(charm.land/lipgloss/v2), evertras/bubble-table v0.19.2 (used in
+`internal/views/resourcelist.go` as a secondary model; the primary
+resource list rendering in `app.go` uses a custom table renderer
+for tighter control over horizontal scrolling and viewport management),
 aws-sdk-go-v2, gopkg.in/ini.v1, atotto/clipboard
 **Storage**: N/A (read-only, no local storage)
 **Testing**: Go standard `testing` package + teatest
@@ -84,7 +87,7 @@ manual refresh only (Ctrl-R), relies on existing AWS credential chain
   across all 7 resource types.
 - **Error states**: Specific, actionable messages in status bar
   (no generic errors).
-- **Loading states**: Spinner in status bar during all API calls.
+- **Loading states**: `[loading...]` indicator in the header during API calls.
 
 ### V. Performance Requirements — PASS (with adaptations)
 
@@ -125,10 +128,13 @@ cmd/
 
 internal/
 ├── app/
-│   ├── app.go                   # Root model: Init, Update, View, view routing
+│   ├── app.go                   # Root model: Init, Update, View, view routing,
+│   │                            #   custom table renderer (renderResourceList)
 │   ├── keys.go                  # Global KeyMap definitions
-│   ├── styles.go                # Lip Gloss style constants
+│   ├── styles.go                # Style initialization (delegates to styles pkg)
 │   └── messages.go              # Shared message types (resourcesLoaded, apiError, etc.)
+├── styles/
+│   └── styles.go                # Lip Gloss style constants (HeaderStyle, etc.)
 ├── ui/
 │   ├── header.go                # Header component (profile, region, version)
 │   ├── statusbar.go             # Status bar (hints, command input, errors)
@@ -137,10 +143,11 @@ internal/
 │   └── command.go               # Command input mode (: prefix, suggestions)
 ├── views/
 │   ├── mainmenu.go              # Resource type list (main/root view)
-│   ├── resourcelist.go          # Generic resource table view
+│   ├── resourcelist.go          # Generic resource table view (evertras/bubble-table)
 │   ├── detail.go                # Describe view (key-value attributes)
 │   ├── jsonview.go              # Raw JSON view (y key)
 │   ├── reveal.go                # Secret reveal view (x key)
+│   ├── filter.go                # Filter logic (FilterResources helper)
 │   ├── profile.go               # Profile selector (:ctx)
 │   └── region.go                # Region selector (:region)
 ├── aws/
@@ -158,12 +165,13 @@ internal/
 │   └── errors.go                # AWS error classification
 ├── resource/
 │   ├── resource.go              # Resource interface + generic Resource type
-│   └── types.go                 # Per-resource-type column definitions
+│   └── types.go                 # Per-resource-type column definitions + S3ObjectColumns
 └── navigation/
     └── history.go               # Back/forward navigation stack
 
 tests/
-├── unit/
+├── unit/                        # Core test files (many additional QA/edge-case
+│   │                            #   test files exist beyond those listed below)
 │   ├── app_test.go              # Root model update/view tests
 │   ├── aws_ec2_test.go          # EC2 response parsing tests
 │   ├── aws_s3_test.go           # S3 response parsing tests
@@ -175,9 +183,18 @@ tests/
 │   ├── aws_profile_test.go      # Profile enumeration tests
 │   ├── aws_errors_test.go       # Error classification tests
 │   ├── navigation_test.go       # History stack tests
-│   └── filter_test.go           # Filter matching tests
+│   ├── filter_test.go           # Filter matching tests
+│   ├── horizontal_scroll_test.go # Horizontal scroll (h/l) tests
+│   ├── s3_pagination_test.go    # S3 bucket pagination tests
+│   ├── s3_object_pagination_test.go # S3 object pagination tests
+│   ├── s3_navigation_test.go    # S3 drill-down/back navigation tests
+│   ├── mocks_test.go            # Shared mock implementations
+│   └── ...                      # Additional QA, UI, views, layout tests
 ├── integration/
-│   └── tui_test.go              # teatest-based TUI interaction tests
+│   ├── tui_test.go              # teatest-based TUI interaction tests
+│   ├── aws_test.go              # Real AWS integration tests
+│   ├── cli_test.go              # CLI flag/invocation tests
+│   └── clipboard_test.go        # Clipboard integration tests
 └── testdata/
     ├── aws_config_sample         # Sample ~/.aws/config for tests
     └── aws_credentials_sample    # Sample ~/.aws/credentials for tests
@@ -192,6 +209,26 @@ Makefile
 and `internal/` packages. This is the standard Go layout for a
 single-binary CLI application. No need for multi-project structure
 — the app has no separate frontend/backend or API layer.
+
+## Implementation Notes
+
+**Stale response guard**: The `Update` handler for
+`ResourcesLoadedMsg` checks `msg.ResourceType != m.CurrentResourceType`
+and discards stale responses. This prevents data from a previous
+resource type overwriting the current view when the user navigates
+away before an API response arrives.
+
+**Error auto-clear**: API errors are displayed in the status bar and
+automatically cleared after 5 seconds via `tea.Tick` producing a
+`ClearErrorMsg`. If the error state has already been replaced, the
+clear message is a no-op.
+
+**Custom table renderer**: The primary resource list rendering
+(`renderResourceList` in `app.go`) uses a custom table renderer
+rather than evertras/bubble-table's `View()`. This provides direct
+control over horizontal scrolling (`HScrollOffset` adjusted by
+`h`/`l` keys), viewport windowing for large lists, and integrated
+filter display.
 
 ## Complexity Tracking
 
