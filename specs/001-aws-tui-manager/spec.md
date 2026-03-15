@@ -207,7 +207,9 @@ via colon commands and verifying the correct columns and data appear.
 
 1. **Given** the user types `:s3`,
    **When** the S3 buckets view loads,
-   **Then** a table displays with columns: Bucket Name, Region, Creation Date.
+   **Then** a table displays with columns: Bucket Name, Creation Date.
+   (Region is not available in the S3 ListBuckets response; it is only
+   shown in the single-bucket detail view via GetBucketLocation.)
 
 2. **Given** the user types `:ec2`,
    **When** the EC2 view loads,
@@ -290,10 +292,12 @@ via colon commands and verifying the correct columns and data appear.
   `:region` (region list), `:s3`, `:ec2`, `:rds`, `:redis`, `:docdb`,
   `:eks`, `:secrets` (resource type views), `:q` / `:quit` (exit).
 - **FR-006**: Application MUST support k9s-style keybindings: `j`/`k` or
-  arrow keys for cursor movement, `g`/`G` for top/bottom, Enter for
+  arrow keys for cursor movement, `g`/`G` for top/bottom, `h`/`l` or
+  left/right arrows for horizontal table scrolling, Enter for
   select/drill-in, Escape for back/cancel, `d` for describe (detail view),
   `x` for reveal/decode (e.g., secret values as plain text, no confirmation),
-  `c` for copy resource identifier to clipboard, `y` for raw JSON view.
+  `c` for copy resource identifier to clipboard, `y` for raw JSON view,
+  `q` to quit (from main menu) or go back (from other views).
 - **FR-007**: Application MUST support filter mode via `/` with
   real-time text matching across all visible columns.
 - **FR-008**: Application MUST display resources in tabular format with
@@ -318,7 +322,7 @@ via colon commands and verifying the correct columns and data appear.
 - **FR-016**: Application MUST handle API errors gracefully by displaying
   error messages in a status area without crashing or freezing.
 - **FR-017**: Application MUST support column sorting via keyboard
-  shortcuts (e.g., Shift+N for name, Shift+S for status).
+  shortcuts: `N` for name, `S` for status, `A` for age/time.
 - **FR-018**: Application MUST perform API calls asynchronously,
   showing a loading indicator while data is being fetched. Data refresh
   is manual only via `Ctrl-R` (reloads current view). No auto-polling.

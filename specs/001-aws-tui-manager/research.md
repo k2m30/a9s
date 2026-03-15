@@ -28,23 +28,29 @@
 
 ## Decision 2: Enhanced Table Component
 
-**Decision**: evertras/bubble-table v0.19.2
+**Decision**: evertras/bubble-table v0.19.2 (secondary) +
+custom table renderer (primary)
 
 **Rationale**:
-- The built-in `bubbles/table` does NOT support sorting or
-  filtering — both required by FR-007 and FR-017.
-- evertras/bubble-table provides built-in sorting (single and
-  multiple columns, numeric-aware), built-in filtering via `/`,
-  pagination, row selection with j/k navigation, horizontal
-  scrolling, and per-row/cell styling.
-- 562 GitHub stars, actively maintained (latest release Sep 2025).
-- Directly satisfies the k9s-style table interaction model.
+- evertras/bubble-table is used in `internal/views/resourcelist.go`
+  as a `ResourceListModel` providing sorting and row selection.
+- However, the primary resource list rendering in `app.go`
+  (`renderResourceList`) uses a **custom table renderer** for
+  tighter control over horizontal scrolling (`h`/`l` keys with
+  `HScrollOffset`), viewport management, and integration with
+  the app's filter system.
+- Sorting and filtering are implemented directly in `app.go`
+  (`sortResources`, `applyFilter`) rather than using
+  evertras/bubble-table's built-in capabilities.
+- The evertras/bubble-table dependency remains in `go.mod` and
+  is used in the `views` package as a secondary model.
 
 **Alternatives considered**:
 - Built-in bubbles/table: Lacks sorting and filtering. Would
   require implementing both from scratch.
-- Custom table implementation: High effort, low benefit when
-  evertras/bubble-table covers the requirements.
+- Exclusively using evertras/bubble-table: Did not provide
+  sufficient control for custom horizontal scrolling and
+  integrated filter/viewport behavior.
 
 ## Decision 3: AWS SDK
 
@@ -175,7 +181,7 @@ a9s/
 
 ### Pagination
 
-All list operations use the SDK's built-in paginator pattern:
+Most list operations use the SDK's built-in paginator pattern:
 ```
 paginator := service.New<Operation>Paginator(client, input)
 for paginator.HasMorePages() {
@@ -184,9 +190,17 @@ for paginator.HasMorePages() {
 }
 ```
 
-Available paginators: ListBuckets, ListObjectsV2,
-DescribeInstances, DescribeDBInstances, DescribeCacheClusters,
+S3 operations (ListBuckets, ListObjectsV2) use manual
+`ContinuationToken`-based pagination loops instead of SDK
+paginators, checking `ContinuationToken`/`NextContinuationToken`
+and `IsTruncated` to fetch all pages.
+
+Available paginators (SDK-based): DescribeInstances,
+DescribeDBInstances, DescribeCacheClusters,
 DescribeDBClusters (docdb), ListClusters (eks), ListSecrets.
+
+Manual pagination: ListBuckets (via `ContinuationToken`),
+ListObjectsV2 (via `NextContinuationToken` + `IsTruncated`).
 
 Single-item calls (no paginator needed): DescribeCluster (eks),
 GetSecretValue.

@@ -8,7 +8,7 @@ The terminal screen is divided into 4 persistent zones:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ HEADER: a9s v0.1.0 | profile: prod | us-east-1  │
+│ HEADER: a9s v0.3.2 | profile: prod | us-east-1  │
 ├──────────────────────────────────────────────────┤
 │ BREADCRUMBS: main > EC2 > i-abc123               │
 ├──────────────────────────────────────────────────┤
@@ -24,11 +24,11 @@ The terminal screen is divided into 4 persistent zones:
 
 ### Header (1 line)
 
-Fixed at the top. Always visible. Contains:
-- Application name and version (left)
-- Active AWS profile name (center-left)
-- Active AWS region code (center-right)
-- Loading indicator (right, when active)
+Fixed at the top. Always visible. Rendered as a single styled line:
+`a9s v<version> | profile: <name> | <region>`
+
+When loading is in progress, `[loading...]` is appended:
+`a9s v0.3.2 | profile: prod | us-east-1 [loading...]`
 
 ### Breadcrumbs (1 line)
 
@@ -47,8 +47,11 @@ breadcrumbs and status bar. Renders the current view:
 **MainMenu view**: List of resource type names, cursor
 highlight on current selection.
 
-**ResourceList view**: Table with column headers, data rows,
-cursor highlight. Shows row count in bottom-right of table.
+**ResourceList view**: Table with column headers, separator line,
+data rows, and cursor highlight (`> ` prefix on selected row).
+Shows resource count in the title line as `<Type> (<count>)`.
+Supports horizontal scrolling via `h`/`l` keys when the table
+is wider than the terminal.
 
 **Detail/Describe view**: Scrollable key-value pairs showing
 all resource attributes. Keys left-aligned, values right.
@@ -69,11 +72,15 @@ keybindings grouped by category.
 ### Status Bar (1 line)
 
 Fixed at the bottom. Context-dependent content:
-- Normal mode: keybinding hints (e.g., `? help  : command  / filter`)
-- Command mode: `:` prefix + text input with suggestions
-- Filter mode: `/` prefix + filter text + match count
-- Error state: error message (auto-clears after 5 seconds)
-- Loading: spinner + "Loading <resource type>..."
+- **Normal mode**: displays "Ready" or the most recent status message
+- **Command mode**: `:` prefix + text input with auto-completion suggestion
+  for known commands (e.g., typing `:re` shows `:region` as suggestion)
+- **Filter mode**: When first activated (empty filter), displays
+  `/  (type to filter)`. As the user types, displays
+  `/<text> (<matched>/<total>)` — e.g., `/prod (3/50)`.
+- **Error state**: error message in red (auto-clears after 5 seconds
+  via `tea.Tick` + `ClearErrorMsg`)
+- **Loading**: header shows `[loading...]` indicator
 
 ## Color Scheme
 
