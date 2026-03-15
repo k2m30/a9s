@@ -75,107 +75,118 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 
 // FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.
 // It returns folders (CommonPrefixes) and files (Contents) as Resource structs.
+// It paginates using IsTruncated and NextContinuationToken until all pages are fetched.
 func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string) ([]resource.Resource, error) {
-	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(bucket),
-		Prefix:    aws.String(prefix),
-		Delimiter: aws.String("/"),
-	}
-
-	output, err := api.ListObjectsV2(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
 	var resources []resource.Resource
+	var continuationToken *string
 
-	// Add folders (CommonPrefixes) first
-	for _, cp := range output.CommonPrefixes {
-		folderKey := ""
-		if cp.Prefix != nil {
-			folderKey = *cp.Prefix
+	for {
+		input := &s3.ListObjectsV2Input{
+			Bucket:            aws.String(bucket),
+			Prefix:            aws.String(prefix),
+			Delimiter:         aws.String("/"),
+			ContinuationToken: continuationToken,
 		}
 
-		// Build DetailData for folder
-		detail := map[string]string{
-			"Key": folderKey,
+		output, err := api.ListObjectsV2(ctx, input)
+		if err != nil {
+			return nil, err
 		}
 
-		// Build RawJSON for folder
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cp, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
+		// Add folders (CommonPrefixes) first
+		for _, cp := range output.CommonPrefixes {
+			folderKey := ""
+			if cp.Prefix != nil {
+				folderKey = *cp.Prefix
+			}
+
+			// Build DetailData for folder
+			detail := map[string]string{
+				"Key": folderKey,
+			}
+
+			// Build RawJSON for folder
+			rawJSON := ""
+			if jsonBytes, err := json.MarshalIndent(cp, "", "  "); err == nil {
+				rawJSON = string(jsonBytes)
+			}
+
+			r := resource.Resource{
+				ID:     folderKey,
+				Name:   folderKey,
+				Status: "folder",
+				Fields: map[string]string{
+					"key":           folderKey,
+					"size":          "",
+					"last_modified": "",
+					"storage_class": "",
+				},
+				DetailData: detail,
+				RawJSON:    rawJSON,
+			}
+			resources = append(resources, r)
 		}
 
-		r := resource.Resource{
-			ID:     folderKey,
-			Name:   folderKey,
-			Status: "folder",
-			Fields: map[string]string{
-				"key":           folderKey,
-				"size":          "",
-				"last_modified": "",
-				"storage_class": "",
-			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
-		}
-		resources = append(resources, r)
-	}
+		// Add files (Contents)
+		for _, obj := range output.Contents {
+			objKey := ""
+			if obj.Key != nil {
+				objKey = *obj.Key
+			}
 
-	// Add files (Contents)
-	for _, obj := range output.Contents {
-		objKey := ""
-		if obj.Key != nil {
-			objKey = *obj.Key
+			size := ""
+			if obj.Size != nil {
+				size = formatSize(*obj.Size)
+			}
+
+			lastModified := ""
+			if obj.LastModified != nil {
+				lastModified = obj.LastModified.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			storageClass := string(obj.StorageClass)
+
+			etag := ""
+			if obj.ETag != nil {
+				etag = *obj.ETag
+			}
+
+			// Build DetailData for file
+			detail := map[string]string{
+				"Key":           objKey,
+				"Size":          size,
+				"Last Modified": lastModified,
+				"Storage Class": storageClass,
+				"ETag":          etag,
+			}
+
+			// Build RawJSON for file
+			rawJSON := ""
+			if jsonBytes, err := json.MarshalIndent(obj, "", "  "); err == nil {
+				rawJSON = string(jsonBytes)
+			}
+
+			r := resource.Resource{
+				ID:     objKey,
+				Name:   objKey,
+				Status: "file",
+				Fields: map[string]string{
+					"key":           objKey,
+					"size":          size,
+					"last_modified": lastModified,
+					"storage_class": storageClass,
+				},
+				DetailData: detail,
+				RawJSON:    rawJSON,
+			}
+			resources = append(resources, r)
 		}
 
-		size := ""
-		if obj.Size != nil {
-			size = formatSize(*obj.Size)
+		// Check for more pages
+		if output.IsTruncated == nil || !*output.IsTruncated || output.NextContinuationToken == nil {
+			break
 		}
-
-		lastModified := ""
-		if obj.LastModified != nil {
-			lastModified = obj.LastModified.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		storageClass := string(obj.StorageClass)
-
-		etag := ""
-		if obj.ETag != nil {
-			etag = *obj.ETag
-		}
-
-		// Build DetailData for file
-		detail := map[string]string{
-			"Key":           objKey,
-			"Size":          size,
-			"Last Modified": lastModified,
-			"Storage Class": storageClass,
-			"ETag":          etag,
-		}
-
-		// Build RawJSON for file
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(obj, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
-		r := resource.Resource{
-			ID:     objKey,
-			Name:   objKey,
-			Status: "file",
-			Fields: map[string]string{
-				"key":           objKey,
-				"size":          size,
-				"last_modified": lastModified,
-				"storage_class": storageClass,
-			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
-		}
-		resources = append(resources, r)
+		continuationToken = output.NextContinuationToken
 	}
 
 	return resources, nil

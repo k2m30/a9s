@@ -13,20 +13,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockEC2Client implements awsclient.EC2DescribeInstancesAPI for testing.
-type mockEC2Client struct {
-	output *ec2.DescribeInstancesOutput
-	err    error
-}
-
-func (m *mockEC2Client) DescribeInstances(
-	ctx context.Context,
-	params *ec2.DescribeInstancesInput,
-	optFns ...func(*ec2.Options),
-) (*ec2.DescribeInstancesOutput, error) {
-	return m.output, m.err
-}
-
 // ---------------------------------------------------------------------------
 // T021 - Test EC2 response parsing
 // ---------------------------------------------------------------------------

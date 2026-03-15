@@ -14,36 +14,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-type mockS3ListBucketsClient struct {
-	output *s3.ListBucketsOutput
-	err    error
-}
-
-func (m *mockS3ListBucketsClient) ListBuckets(
-	ctx context.Context,
-	params *s3.ListBucketsInput,
-	optFns ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
-	return m.output, m.err
-}
-
-type mockS3ListObjectsV2Client struct {
-	output *s3.ListObjectsV2Output
-	err    error
-}
-
-func (m *mockS3ListObjectsV2Client) ListObjectsV2(
-	ctx context.Context,
-	params *s3.ListObjectsV2Input,
-	optFns ...func(*s3.Options),
-) (*s3.ListObjectsV2Output, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
 // T041 - Test S3 bucket listing
 // ---------------------------------------------------------------------------
 

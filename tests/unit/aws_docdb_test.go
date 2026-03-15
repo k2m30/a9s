@@ -12,20 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/internal/aws"
 )
 
-// mockDocDBClient implements awsclient.DocDBDescribeDBClustersAPI for testing.
-type mockDocDBClient struct {
-	output *docdb.DescribeDBClustersOutput
-	err    error
-}
-
-func (m *mockDocDBClient) DescribeDBClusters(
-	ctx context.Context,
-	params *docdb.DescribeDBClustersInput,
-	optFns ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	return m.output, m.err
-}
-
 // ---------------------------------------------------------------------------
 // T058 - Test DocumentDB response parsing
 // ---------------------------------------------------------------------------

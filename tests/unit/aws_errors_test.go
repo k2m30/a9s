@@ -9,17 +9,6 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-type mockAPIError struct {
-	code    string
-	message string
-	fault   smithy.ErrorFault
-}
-
-func (e *mockAPIError) Error() string            { return e.message }
-func (e *mockAPIError) ErrorCode() string         { return e.code }
-func (e *mockAPIError) ErrorMessage() string      { return e.message }
-func (e *mockAPIError) ErrorFault() smithy.ErrorFault { return e.fault }
-
 func TestClassifyAWSError_NilError(t *testing.T) {
 	code, message, retryable := awsclient.ClassifyAWSError(nil)
 	if code != "" {
