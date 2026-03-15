@@ -39,25 +39,22 @@ func TestProfilePassedToInit(t *testing.T) {
 }
 
 func TestS3FetchUsesCorrectProfile(t *testing.T) {
-	// After InitConnectMsg is processed, Clients should be non-nil
-	// and :s3 should use those clients
+	// After InitConnectMsg is processed, verify the :s3 command flow.
+	// We test this without real AWS credentials by verifying the command
+	// mode and resource type switching, then checking the state after
+	// InitConnectMsg (which may or may not succeed depending on environment).
 	state := app.NewAppState("kvinta.kvinta-dev", "eu-central-1")
 	state.Width = 80
 	state.Height = 24
 
-	// Simulate InitConnectMsg being processed (this tries real AWS)
-	// Skip if no real credentials
+	// Simulate InitConnectMsg being processed (may or may not connect)
 	updated, _ := state.Update(app.InitConnectMsg{
 		Profile: "kvinta.kvinta-dev",
 		Region:  "eu-central-1",
 	})
 	state = updated.(app.AppState)
 
-	if state.Clients == nil {
-		t.Skip("No AWS credentials available for profile kvinta.kvinta-dev")
-	}
-
-	// Now :s3 command
+	// Regardless of whether AWS connected, test the :s3 command flow
 	state.CommandMode = true
 	state.CommandText = "s3"
 	updated, cmd := state.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -66,10 +63,19 @@ func TestS3FetchUsesCorrectProfile(t *testing.T) {
 	if state.CurrentResourceType != "s3" {
 		t.Fatalf("Expected resource type 's3', got %q", state.CurrentResourceType)
 	}
-	if cmd == nil {
-		t.Fatal("Should return fetch command")
+
+	// If Clients is non-nil, we expect a fetch command and Loading=true
+	if state.Clients != nil {
+		if cmd == nil {
+			t.Error("With Clients available, should return fetch command")
+		}
+		if !state.Loading {
+			t.Error("With Clients available, should be loading")
+		}
 	}
-	if !state.Loading {
-		t.Error("Should be loading")
+	// If Clients is nil (no credentials), the app should still be in the right
+	// view without crashing. The fetch command may be nil.
+	if state.CurrentView != app.ResourceListView {
+		t.Errorf("Expected ResourceListView, got %d", state.CurrentView)
 	}
 }

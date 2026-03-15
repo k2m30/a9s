@@ -1,15 +1,21 @@
 package unit
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/k2m30/a9s/internal/app"
+	awsclient "github.com/k2m30/a9s/internal/aws"
 	"github.com/k2m30/a9s/internal/navigation"
 	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/internal/styles"
 	"github.com/k2m30/a9s/internal/views"
 )
 
@@ -1092,14 +1098,72 @@ func TestQA_169_APIThrottlingError(t *testing.T) {
 // QA-170: Invalid profile name error on startup
 // ===================================================================
 func TestQA_170_InvalidProfileNameError(t *testing.T) {
-	t.Skip("requires real AWS config file interaction")
+	// Test that NewAppState with a bogus profile still creates a valid AppState,
+	// and that sending InitConnectMsg with that profile results in either
+	// a successful connection or an error status message.
+	state := app.NewAppState("nonexistent-profile-xyz", "us-east-1")
+
+	if state.ActiveProfile != "nonexistent-profile-xyz" {
+		t.Errorf("expected ActiveProfile 'nonexistent-profile-xyz', got %q", state.ActiveProfile)
+	}
+	if state.CurrentView != app.MainMenuView {
+		t.Errorf("expected MainMenuView, got %d", state.CurrentView)
+	}
+
+	// Sending InitConnectMsg: NewAWSSession may succeed (using default config)
+	// or fail (no such profile). Either way, state must be consistent.
+	updated, _ := state.Update(app.InitConnectMsg{
+		Profile: "nonexistent-profile-xyz",
+		Region:  "us-east-1",
+	})
+	s := updated.(app.AppState)
+
+	if s.Clients != nil {
+		// Connected fine (default profile may have worked) — status should not be error
+		if s.StatusIsError {
+			t.Error("Clients is non-nil but StatusIsError is true")
+		}
+	} else {
+		// Connection failed — status should show an error
+		if !s.StatusIsError {
+			t.Error("Clients is nil but StatusIsError is false; expected an error message")
+		}
+		if !strings.Contains(s.StatusMessage, "AWS config error") {
+			t.Errorf("expected status to contain 'AWS config error', got %q", s.StatusMessage)
+		}
+	}
 }
 
 // ===================================================================
 // QA-171: Region with no support for service
 // ===================================================================
 func TestQA_171_RegionNoServiceSupport(t *testing.T) {
-	t.Skip("requires real AWS API call")
+	// Test that when an APIErrorMsg arrives for a specific service,
+	// the status message shows the error. This simulates a region
+	// that doesn't support a given service.
+	state := app.NewAppState("", "")
+	state.CurrentView = app.ResourceListView
+	state.CurrentResourceType = "docdb"
+	state.Loading = true
+
+	updated, cmd := state.Update(app.APIErrorMsg{
+		Err:          fmt.Errorf("service docdb is not available in region af-south-1"),
+		ResourceType: "docdb",
+	})
+	s := updated.(app.AppState)
+
+	if !s.StatusIsError {
+		t.Error("expected StatusIsError=true after APIErrorMsg")
+	}
+	if !strings.Contains(s.StatusMessage, "docdb") {
+		t.Errorf("expected status message to contain 'docdb', got %q", s.StatusMessage)
+	}
+	if s.Loading {
+		t.Error("expected Loading=false after APIErrorMsg")
+	}
+	if cmd == nil {
+		t.Error("expected a timer command for auto-clear after APIErrorMsg")
+	}
 }
 
 // ===================================================================
@@ -1132,7 +1196,43 @@ func TestQA_172_ConcurrentStaleResponseDiscarded(t *testing.T) {
 // QA-173: InitConnectMsg failure on startup
 // ===================================================================
 func TestQA_173_InitConnectMsgFailure(t *testing.T) {
-	t.Skip("requires real AWS config; InitConnectMsg failure triggers NewAWSSession which needs filesystem")
+	// Test the InitConnectMsg handler. Send InitConnectMsg and verify
+	// state is consistent regardless of whether AWS connection succeeds or fails.
+	state := app.NewAppState("", "us-east-1")
+	state.Width = 80
+	state.Height = 24
+
+	updated, _ := state.Update(app.InitConnectMsg{
+		Profile: "default",
+		Region:  "us-east-1",
+	})
+	s := updated.(app.AppState)
+
+	// Either connection succeeded (Clients != nil, no error) or
+	// failed (Clients == nil, error status).
+	if s.Clients != nil {
+		// Success path
+		if s.StatusIsError {
+			t.Error("Clients is non-nil but StatusIsError is true — inconsistent")
+		}
+		if s.StatusMessage == "" {
+			t.Error("expected a status message after successful connection")
+		}
+	} else {
+		// Failure path
+		if !s.StatusIsError {
+			t.Error("Clients is nil but StatusIsError is false — expected error")
+		}
+		if s.StatusMessage == "" {
+			t.Error("expected a status error message when connection fails")
+		}
+	}
+
+	// View should render without panic
+	view := s.View()
+	if view.Content == "" {
+		t.Error("expected non-empty view content after InitConnectMsg")
+	}
 }
 
 // ===================================================================
@@ -1206,21 +1306,77 @@ func TestQA_177_ResizeUpdatesDimensions(t *testing.T) {
 // QA-178: NO_COLOR environment variable
 // ===================================================================
 func TestQA_178_NoColorEnvVar(t *testing.T) {
-	t.Skip("requires setting NO_COLOR env var and verifying ANSI escape absence; cannot reliably test without process isolation")
+	// Set NO_COLOR and call InitStyles, then verify styles have no ANSI color codes.
+	t.Setenv("NO_COLOR", "1")
+	styles.InitStyles()
+
+	// After InitStyles with NO_COLOR, the HeaderStyle should not contain
+	// color-related rendering. Render a sample string and verify no ANSI escape.
+	rendered := styles.HeaderStyle.Render("test")
+	if strings.Contains(rendered, "\x1b[") {
+		t.Errorf("expected no ANSI escape codes with NO_COLOR=1, but found them in: %q", rendered)
+	}
+
+	// Restore styles for other tests
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.InitStyles()
+	})
 }
 
 // ===================================================================
 // QA-179: Non-256-color terminal
 // ===================================================================
 func TestQA_179_Non256ColorTerminal(t *testing.T) {
-	t.Skip("requires real terminal environment manipulation")
+	// Verify the app doesn't crash with NO_COLOR set (simulating a terminal
+	// without 256-color support). Create an AppState, render View(), no panic = pass.
+	t.Setenv("NO_COLOR", "1")
+	styles.InitStyles()
+
+	state := app.NewAppState("", "us-east-1")
+	state.Width = 80
+	state.Height = 24
+
+	// Should not panic
+	view := state.View()
+	if view.Content == "" {
+		t.Error("expected non-empty view content with NO_COLOR set")
+	}
+
+	// Restore styles for other tests
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.InitStyles()
+	})
 }
 
 // ===================================================================
 // QA-180: SSH session (clipboard may not work)
 // ===================================================================
 func TestQA_180_SSHClipboardFailure(t *testing.T) {
-	t.Skip("requires real clipboard and SSH environment")
+	// Test that pressing 'c' (copy) on a resource detail view doesn't crash,
+	// regardless of clipboard availability. In an SSH session clipboard may
+	// fail, but the app should handle it gracefully.
+	state := app.NewAppState("", "us-east-1")
+	state.CurrentView = app.DetailView
+	state.Detail = views.NewDetailModel("i-abc001", map[string]string{
+		"Instance ID": "i-abc001",
+		"Name":        "test-instance",
+	})
+	state.Width = 80
+	state.Height = 24
+
+	// Press 'c' to attempt copy — should not panic
+	model, _ := state.Update(tea.KeyPressMsg{Code: -1, Text: "c"})
+	s := model.(app.AppState)
+
+	// Verify the state is still consistent — either "Copied" or an error message,
+	// but no crash.
+	_ = s.StatusMessage // just verify it's accessible, no panic
+	view := s.View()
+	if view.Content == "" {
+		t.Error("expected non-empty view content after copy attempt")
+	}
 }
 
 // ===================================================================
@@ -1575,51 +1731,57 @@ func TestQA_194_ViewRendersAfterStateTransitions(t *testing.T) {
 	}
 }
 
-// ===================================================================
-// QA-195: Case-insensitive commands
-// (covered in qa_discrepancies_test.go)
-// ===================================================================
-func TestQA_195_CaseInsensitiveCommands(t *testing.T) {
-	t.Skip("covered in qa_discrepancies_test.go: TestCommandCaseInsensitive_*")
-}
-
-// ===================================================================
-// QA-196: g/G support in scrollable views
-// (covered in qa_discrepancies_test.go)
-// ===================================================================
-func TestQA_196_GoTopBottomInScrollableViews(t *testing.T) {
-	t.Skip("covered in qa_discrepancies_test.go: TestDetailView_GoTopBottom")
-}
-
-// ===================================================================
-// QA-197: g/G support in ProfileSelectView and RegionSelectView
-// (covered in qa_discrepancies_test.go)
-// ===================================================================
-func TestQA_197_GoTopBottomInSelectorViews(t *testing.T) {
-	t.Skip("covered in qa_discrepancies_test.go: TestProfileSelectView_GoTopBottom, TestRegionSelectView_GoTopBottom")
-}
-
-// ===================================================================
-// QA-198: Auto-suggestion rendering
-// (covered in qa_discrepancies_test.go)
-// ===================================================================
-func TestQA_198_AutoSuggestionRendering(t *testing.T) {
-	t.Skip("covered in qa_discrepancies_test.go: TestCommandMode_ShowsAutoSuggestion")
-}
-
-// ===================================================================
-// QA-199: Error auto-clear returns timer cmd
-// (covered in qa_discrepancies_test.go)
-// ===================================================================
-func TestQA_199_ErrorAutoClearTimerCmd(t *testing.T) {
-	t.Skip("covered in qa_discrepancies_test.go: TestErrorAutoClear_ReturnsTimerCmd")
-}
+// QA-195 through QA-199 are covered in qa_discrepancies_test.go and have been removed as duplicates.
 
 // ===================================================================
 // QA-200: S3 listing is global regardless of region
 // ===================================================================
 func TestQA_200_S3ListingGlobalRegardlessOfRegion(t *testing.T) {
-	t.Skip("requires real AWS S3 API call to validate global bucket listing behavior")
+	// Test that FetchS3Buckets returns buckets regardless of what region was set.
+	// The "global" behavior is the S3 API's job — we just verify our code
+	// passes through results from the mock correctly.
+	mockAPI := &mockS3ListBucketsAPI{
+		Output: &s3.ListBucketsOutput{
+			Buckets: []s3types.Bucket{
+				{Name: strPtr("bucket-us-east")},
+				{Name: strPtr("bucket-eu-west")},
+				{Name: strPtr("bucket-ap-southeast")},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchS3Buckets(context.Background(), mockAPI)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(resources) != 3 {
+		t.Fatalf("expected 3 buckets, got %d", len(resources))
+	}
+
+	names := map[string]bool{}
+	for _, r := range resources {
+		names[r.Name] = true
+	}
+	for _, expected := range []string{"bucket-us-east", "bucket-eu-west", "bucket-ap-southeast"} {
+		if !names[expected] {
+			t.Errorf("expected bucket %q in results", expected)
+		}
+	}
+}
+
+// mockS3ListBucketsAPI implements awsclient.S3ListBucketsAPI for testing.
+type mockS3ListBucketsAPI struct {
+	Output *s3.ListBucketsOutput
+	Err    error
+}
+
+func (m *mockS3ListBucketsAPI) ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
+	return m.Output, m.Err
+}
+
+func strPtr(s string) *string {
+	return &s
 }
 
 // ===================================================================
