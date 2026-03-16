@@ -126,7 +126,7 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 	// AWS SDK structs contain unexported fields that cause yaml.Marshal to panic.
 	switch val.Kind() {
 	case reflect.Struct, reflect.Slice, reflect.Map:
-		safe := toSafeValue(val)
+		safe := ToSafeValue(val)
 		out, err := yaml.Marshal(safe)
 		if err != nil {
 			return ""
@@ -137,9 +137,9 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 	return FormatValue(val)
 }
 
-// toSafeValue recursively converts a reflect.Value into a representation
+// ToSafeValue recursively converts a reflect.Value into a representation
 // that only contains exported fields, safe for yaml.Marshal.
-func toSafeValue(val reflect.Value) interface{} {
+func ToSafeValue(val reflect.Value) interface{} {
 	for val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			return nil
@@ -170,7 +170,7 @@ func toSafeValue(val reflect.Value) interface{} {
 					name = n
 				}
 			}
-			m[name] = toSafeValue(fv)
+			m[name] = ToSafeValue(fv)
 		}
 		if len(m) == 0 {
 			return nil
@@ -183,7 +183,7 @@ func toSafeValue(val reflect.Value) interface{} {
 		}
 		result := make([]interface{}, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			result[i] = toSafeValue(val.Index(i))
+			result[i] = ToSafeValue(val.Index(i))
 		}
 		return result
 
@@ -193,7 +193,7 @@ func toSafeValue(val reflect.Value) interface{} {
 		}
 		m := make(map[string]interface{})
 		for _, key := range val.MapKeys() {
-			m[fmt.Sprintf("%v", key.Interface())] = toSafeValue(val.MapIndex(key))
+			m[fmt.Sprintf("%v", key.Interface())] = ToSafeValue(val.MapIndex(key))
 		}
 		return m
 

@@ -8,7 +8,7 @@ views:
     list:
       Bucket Name:
         path: Name
-        width: 45
+        width: 20
       Creation Date:
         path: CreationDate
         width: 22
@@ -21,7 +21,7 @@ views:
     list:
       Key:
         path: Key
-        width: 50
+        width: 20
       Size:
         path: Size
         width: 12

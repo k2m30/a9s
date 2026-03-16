@@ -52,7 +52,6 @@ func InitStyles() {
 		StatusAvailable = lipgloss.NoColor{}
 	} else {
 		HeaderStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#000080")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Bold(true).
 			Padding(0, 1)

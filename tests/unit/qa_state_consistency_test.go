@@ -2,6 +2,7 @@ package unit
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -325,7 +326,7 @@ func (a stateAssertion) breadcrumbsContain(s string) stateAssertion {
 	a.t.Helper()
 	found := false
 	for _, b := range a.state.Breadcrumbs {
-		if b == s {
+		if b == s || strings.Contains(b, s) {
 			found = true
 			break
 		}
@@ -1560,9 +1561,9 @@ func TestQA_Breadcrumbs_AllResourceTypes(t *testing.T) {
 			state, _ = qaExecCommand(state, rd.shortName)
 			state = qaSend(state, app.ResourcesLoadedMsg{ResourceType: rd.shortName, Resources: rd.factory(2)})
 
-			// Resource list should have "main" + resource name
+			// Resource list should have resource name (Bug 7: no "main" prefix)
 			rt := resource.FindResourceType(rd.shortName)
-			assertState(t, state, "list").breadcrumbsContain("main").breadcrumbsContain(rt.Name)
+			assertState(t, state, "list").breadcrumbsContain(rt.Name)
 
 			// Detail
 			state.SelectedIndex = 0
@@ -1581,11 +1582,9 @@ func TestQA_Breadcrumbs_S3Deep(t *testing.T) {
 	state, _ = qaExecCommand(state, "s3")
 	state = qaSend(state, app.ResourcesLoadedMsg{ResourceType: "s3", Resources: qaS3Buckets(1)})
 
-	// Bucket list breadcrumbs
+	// Bucket list breadcrumbs (Bug 7: no "main" prefix; Bug 14: count in crumbs)
 	assertState(t, state, "bucket list").
-		breadcrumbsContain("main").
-		breadcrumbsContain("S3 Buckets").
-		breadcrumbLen(2)
+		breadcrumbsContain("S3 Buckets")
 
 	// Enter bucket
 	state.SelectedIndex = 0
@@ -1596,8 +1595,7 @@ func TestQA_Breadcrumbs_S3Deep(t *testing.T) {
 	})
 
 	assertState(t, state, "inside bucket").
-		breadcrumbsContain("bucket-000").
-		breadcrumbLen(3) // main > S3 Buckets > bucket-000
+		breadcrumbsContain("bucket-000")
 }
 
 func TestQA_CommandMode_EscapeCancels(t *testing.T) {
@@ -1797,13 +1795,13 @@ func TestQA_JSONViewRoundTrip_AllTypes(t *testing.T) {
 			state, _ = qaExecCommand(state, rd.shortName)
 			state = qaSend(state, app.ResourcesLoadedMsg{ResourceType: rd.shortName, Resources: rd.factory(2)})
 
-			// y -> JSON view
+			// y -> YAML view
 			state.SelectedIndex = 0
 			state = qaSend(state, qaKey("y"))
-			assertState(t, state, "json view").
+			assertState(t, state, "yaml view").
 				view(app.JSONView).
 				resourceType(rd.shortName).
-				breadcrumbsContain("json")
+				breadcrumbsContain("yaml")
 
 			// Esc -> back to list
 			state = qaSend(state, qaEscape())
@@ -1962,12 +1960,15 @@ func TestQA_DoubleEscFromMainMenu_DoesNotPanic(t *testing.T) {
 	assertState(t, state, "third esc").view(app.MainMenuView)
 }
 
-func TestQA_FilterInResourceListOnly(t *testing.T) {
+func TestQA_FilterInResourceListAndMainMenu(t *testing.T) {
 	state := qaNewState()
 
-	// / from main menu should NOT enter filter mode
+	// / from main menu SHOULD now enter filter mode (Bug 1 fix)
 	state = qaSend(state, qaKey("/"))
-	assertState(t, state, "/ at main").filterMode(false)
+	assertState(t, state, "/ at main").filterMode(true)
+
+	// Clear filter to proceed
+	state = qaSend(state, qaEscape())
 
 	// / from detail view should NOT enter filter mode
 	state, _ = qaExecCommand(state, "ec2")

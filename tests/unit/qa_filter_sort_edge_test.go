@@ -107,14 +107,15 @@ func TestQA_123_SlashActivatesFilterMode(t *testing.T) {
 // ===================================================================
 // QA-124: / does NOT activate in main menu
 // ===================================================================
-func TestQA_124_SlashNoEffectInMainMenu(t *testing.T) {
+func TestQA_124_SlashActivatesFilterInMainMenu(t *testing.T) {
+	// Bug 1 fix: / should now work on main menu
 	state := app.NewAppState("", "")
 	state.CurrentView = app.MainMenuView
 
 	state = pressKeyFSE(state, "/")
 
-	if state.FilterMode {
-		t.Error("/ should NOT activate FilterMode in MainMenuView")
+	if !state.FilterMode {
+		t.Error("/ SHOULD activate FilterMode in MainMenuView (Bug 1 fix)")
 	}
 }
 
@@ -878,6 +879,7 @@ func TestQA_158_QuestionMarkShowsHelp(t *testing.T) {
 // QA-159: Help shows all keybindings
 // ===================================================================
 func TestQA_159_HelpShowsAllKeybindings(t *testing.T) {
+	// Bug 11: Help is now context-sensitive. Main menu help shows main-menu keys.
 	state := app.NewAppState("", "")
 	state.CurrentView = app.MainMenuView
 	state.ShowHelp = true
@@ -887,11 +889,29 @@ func TestQA_159_HelpShowsAllKeybindings(t *testing.T) {
 	view := state.View()
 	content := view.Content
 
-	requiredKeys := []string{":", "/", "?", "Esc", "[", "]", "Ctrl-R", "Ctrl-C",
-		"Enter", "d", "y", "x", "c", "N", "S", "A"}
+	// Main menu help should contain these keys
+	requiredKeys := []string{":", "/", "?", "Enter", "q"}
 	for _, k := range requiredKeys {
 		if !strings.Contains(content, k) {
-			t.Errorf("Help should contain keybinding %q", k)
+			t.Errorf("Main menu help should contain keybinding %q", k)
+		}
+	}
+
+	// Test list view help has different keys
+	state2 := app.NewAppState("", "")
+	state2.CurrentView = app.ResourceListView
+	state2.CurrentResourceType = "ec2"
+	state2.ShowHelp = true
+	state2.Width = 80
+	state2.Height = 40
+
+	view2 := state2.View()
+	content2 := view2.Content
+
+	listKeys := []string{"d", "y", "x", "c", "N", "S", "A", "Esc", "Ctrl-R"}
+	for _, k := range listKeys {
+		if !strings.Contains(content2, k) {
+			t.Errorf("List view help should contain keybinding %q", k)
 		}
 	}
 }

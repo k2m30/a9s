@@ -8,10 +8,27 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
-// HelpModel holds the dimensions used to render the help overlay.
+// HelpViewType identifies which set of keybindings to show.
+type HelpViewType int
+
+const (
+	// GlobalHelp shows all keybindings (default/fallback).
+	GlobalHelp HelpViewType = iota
+	// MainMenuHelp shows main-menu-specific keys.
+	MainMenuHelp
+	// ListViewHelp shows list-view-specific keys.
+	ListViewHelp
+	// DetailViewHelp shows detail-view-specific keys.
+	DetailViewHelp
+	// JSONViewHelp shows JSON/YAML-view-specific keys.
+	JSONViewHelp
+)
+
+// HelpModel holds the dimensions and context used to render the help overlay.
 type HelpModel struct {
-	Width  int
-	Height int
+	Width    int
+	Height   int
+	ViewType HelpViewType
 }
 
 // NewHelpModel creates a new HelpModel with default dimensions.
@@ -33,48 +50,7 @@ type helpBinding struct {
 
 // View renders the help overlay as a bordered box with keybinding sections.
 func (m HelpModel) View() string {
-	sections := []helpSection{
-		{
-			Title: "Global",
-			Bindings: []helpBinding{
-				{Key: ":", Desc: "command"},
-				{Key: "/", Desc: "filter"},
-				{Key: "?", Desc: "help"},
-				{Key: "Esc", Desc: "back"},
-				{Key: "[", Desc: "history back"},
-				{Key: "]", Desc: "history forward"},
-				{Key: "Ctrl-R", Desc: "refresh"},
-				{Key: "Ctrl-C", Desc: "exit"},
-			},
-		},
-		{
-			Title: "Navigation",
-			Bindings: []helpBinding{
-				{Key: "j/\u2193", Desc: "down"},
-				{Key: "k/\u2191", Desc: "up"},
-				{Key: "g", Desc: "top"},
-				{Key: "G", Desc: "bottom"},
-				{Key: "Enter", Desc: "select"},
-			},
-		},
-		{
-			Title: "Actions",
-			Bindings: []helpBinding{
-				{Key: "d", Desc: "describe"},
-				{Key: "y", Desc: "JSON view"},
-				{Key: "x", Desc: "reveal secret"},
-				{Key: "c", Desc: "copy ID"},
-			},
-		},
-		{
-			Title: "Sorting",
-			Bindings: []helpBinding{
-				{Key: "N", Desc: "by name"},
-				{Key: "S", Desc: "by status"},
-				{Key: "A", Desc: "by age"},
-			},
-		},
-	}
+	sections := m.sectionsForView()
 
 	noColor := os.Getenv("NO_COLOR") != ""
 
@@ -95,7 +71,6 @@ func (m HelpModel) View() string {
 
 	content := b.String()
 
-	// Calculate box width: use a comfortable default, but cap at terminal width
 	boxWidth := 42
 	if m.Width > 0 && boxWidth > m.Width-4 {
 		boxWidth = m.Width - 4
@@ -119,4 +94,163 @@ func (m HelpModel) View() string {
 	}
 
 	return boxStyle.Render(content)
+}
+
+// sectionsForView returns the keybinding sections appropriate for the current view.
+func (m HelpModel) sectionsForView() []helpSection {
+	switch m.ViewType {
+	case MainMenuHelp:
+		return []helpSection{
+			{
+				Title: "Navigation",
+				Bindings: []helpBinding{
+					{Key: "j/\u2193", Desc: "down"},
+					{Key: "k/\u2191", Desc: "up"},
+					{Key: "g", Desc: "top"},
+					{Key: "G", Desc: "bottom"},
+					{Key: "Enter", Desc: "select"},
+					{Key: "/", Desc: "filter"},
+				},
+			},
+			{
+				Title: "Commands",
+				Bindings: []helpBinding{
+					{Key: ":", Desc: "command"},
+					{Key: "?", Desc: "help"},
+					{Key: "q", Desc: "quit"},
+					{Key: "Ctrl-C", Desc: "exit"},
+				},
+			},
+		}
+
+	case ListViewHelp:
+		return []helpSection{
+			{
+				Title: "Navigation",
+				Bindings: []helpBinding{
+					{Key: "j/\u2193", Desc: "down"},
+					{Key: "k/\u2191", Desc: "up"},
+					{Key: "g", Desc: "top"},
+					{Key: "G", Desc: "bottom"},
+					{Key: "h/\u2190", Desc: "scroll left"},
+					{Key: "l/\u2192", Desc: "scroll right"},
+					{Key: "Enter", Desc: "select"},
+					{Key: "Esc", Desc: "back"},
+				},
+			},
+			{
+				Title: "Actions",
+				Bindings: []helpBinding{
+					{Key: "d", Desc: "describe"},
+					{Key: "y", Desc: "YAML view"},
+					{Key: "x", Desc: "reveal secret"},
+					{Key: "c", Desc: "copy ID"},
+					{Key: "/", Desc: "filter"},
+					{Key: ":", Desc: "command"},
+					{Key: "?", Desc: "help"},
+					{Key: "Ctrl-R", Desc: "refresh"},
+				},
+			},
+			{
+				Title: "Sorting",
+				Bindings: []helpBinding{
+					{Key: "N", Desc: "by name"},
+					{Key: "S", Desc: "by status"},
+					{Key: "A", Desc: "by age"},
+				},
+			},
+		}
+
+	case DetailViewHelp:
+		return []helpSection{
+			{
+				Title: "Navigation",
+				Bindings: []helpBinding{
+					{Key: "j/\u2193", Desc: "down"},
+					{Key: "k/\u2191", Desc: "up"},
+					{Key: "g", Desc: "top"},
+					{Key: "G", Desc: "bottom"},
+					{Key: "h/\u2190", Desc: "scroll left"},
+					{Key: "l/\u2192", Desc: "scroll right"},
+					{Key: "Esc", Desc: "back"},
+				},
+			},
+			{
+				Title: "Actions",
+				Bindings: []helpBinding{
+					{Key: "w", Desc: "toggle wrap"},
+					{Key: "c", Desc: "copy detail"},
+					{Key: "?", Desc: "help"},
+				},
+			},
+		}
+
+	case JSONViewHelp:
+		return []helpSection{
+			{
+				Title: "Navigation",
+				Bindings: []helpBinding{
+					{Key: "j/\u2193", Desc: "down"},
+					{Key: "k/\u2191", Desc: "up"},
+					{Key: "g", Desc: "top"},
+					{Key: "G", Desc: "bottom"},
+					{Key: "h/\u2190", Desc: "scroll left"},
+					{Key: "l/\u2192", Desc: "scroll right"},
+					{Key: "Esc", Desc: "back"},
+				},
+			},
+			{
+				Title: "Actions",
+				Bindings: []helpBinding{
+					{Key: "c", Desc: "copy content"},
+					{Key: "?", Desc: "help"},
+				},
+			},
+		}
+
+	default:
+		// GlobalHelp - show everything
+		return []helpSection{
+			{
+				Title: "Global",
+				Bindings: []helpBinding{
+					{Key: ":", Desc: "command"},
+					{Key: "/", Desc: "filter"},
+					{Key: "?", Desc: "help"},
+					{Key: "Esc", Desc: "back"},
+					{Key: "[", Desc: "history back"},
+					{Key: "]", Desc: "history forward"},
+					{Key: "Ctrl-R", Desc: "refresh"},
+					{Key: "Ctrl-C", Desc: "exit"},
+				},
+			},
+			{
+				Title: "Navigation",
+				Bindings: []helpBinding{
+					{Key: "j/\u2193", Desc: "down"},
+					{Key: "k/\u2191", Desc: "up"},
+					{Key: "g", Desc: "top"},
+					{Key: "G", Desc: "bottom"},
+					{Key: "Enter", Desc: "select"},
+				},
+			},
+			{
+				Title: "Actions",
+				Bindings: []helpBinding{
+					{Key: "d", Desc: "describe"},
+					{Key: "y", Desc: "YAML view"},
+					{Key: "x", Desc: "reveal secret"},
+					{Key: "c", Desc: "copy"},
+				},
+			},
+			{
+				Title: "Sorting",
+				Bindings: []helpBinding{
+					{Key: "N", Desc: "by name"},
+					{Key: "S", Desc: "by status"},
+					{Key: "A", Desc: "by age"},
+				},
+			},
+		}
+	}
 }

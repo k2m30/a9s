@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/atotto/clipboard"
+	"gopkg.in/yaml.v3"
 
 	awsclient "github.com/k2m30/a9s/internal/aws"
 	"github.com/k2m30/a9s/internal/config"
@@ -345,8 +348,8 @@ func (m AppState) handleNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Enter filter mode (only for resource list)
-	if key.Matches(msg, m.Keys.Filter) && m.CurrentView == ResourceListView {
+	// Enter filter mode (main menu and resource list)
+	if key.Matches(msg, m.Keys.Filter) && (m.CurrentView == ResourceListView || m.CurrentView == MainMenuView) {
 		m.FilterMode = true
 		m.Filter = ""
 		return m, nil
@@ -405,8 +408,8 @@ func (m AppState) handleNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // handleMainMenuKeys handles keys specific to the main menu view.
 func (m AppState) handleMainMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	allTypes := resource.AllResourceTypes()
-	if len(allTypes) == 0 {
+	menuTypes := m.filteredMenuTypes()
+	if len(menuTypes) == 0 {
 		return m, nil
 	}
 
@@ -417,7 +420,7 @@ func (m AppState) handleMainMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.Matches(msg, m.Keys.Down) {
-		if m.SelectedIndex < len(allTypes)-1 {
+		if m.SelectedIndex < len(menuTypes)-1 {
 			m.SelectedIndex++
 		}
 		return m, nil
@@ -427,18 +430,23 @@ func (m AppState) handleMainMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.Matches(msg, m.Keys.Bottom) {
-		m.SelectedIndex = len(allTypes) - 1
+		m.SelectedIndex = len(menuTypes) - 1
 		return m, nil
 	}
 	if key.Matches(msg, m.Keys.Enter) {
-		rt := allTypes[m.SelectedIndex]
+		if m.SelectedIndex >= len(menuTypes) {
+			return m, nil
+		}
+		rt := menuTypes[m.SelectedIndex]
 		m.pushCurrentView()
 		m.CurrentResourceType = rt.ShortName
 		m.CurrentView = ResourceListView
-		m.Breadcrumbs = []string{"main", rt.Name}
+		m.Breadcrumbs = []string{rt.Name}
 		m.SelectedIndex = 0
 		m.Filter = ""
 		m.FilteredResources = nil
+		m.HScrollOffset = 0
+		m.StatusMessage = ""
 		m.Loading = true
 		return m, m.fetchResources()
 	}
@@ -486,6 +494,8 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 					m.S3Bucket = selected.ID
 					m.S3Prefix = ""
 					m.SelectedIndex = 0
+					m.HScrollOffset = 0
+					m.StatusMessage = ""
 					m.Loading = true
 					return m, m.fetchS3Objects()
 				}
@@ -494,6 +504,8 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 					m.pushCurrentView()
 					m.S3Prefix = selected.ID
 					m.SelectedIndex = 0
+					m.HScrollOffset = 0
+					m.StatusMessage = ""
 					m.Loading = true
 					return m, m.fetchS3Objects()
 				}
@@ -509,13 +521,15 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 				}
 				viewDef := config.GetViewDef(m.ViewConfig, detailType)
 				if selected.RawStruct != nil && len(viewDef.Detail) > 0 {
-					m.Detail = views.NewConfigDetailModel(selected.Name+" - Detail", selected.RawStruct, viewDef.Detail)
+					m.Detail = views.NewConfigDetailModel(selected.Name, selected.RawStruct, viewDef.Detail)
 				} else {
-					m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+					m.Detail = views.NewDetailModel(selected.Name, selected.DetailData)
 				}
 				m.Detail.Width = m.Width
 				m.Detail.Height = m.Height
 				m.CurrentView = DetailView
+				m.HScrollOffset = 0
+				m.StatusMessage = ""
 				m.updateBreadcrumbs()
 			}
 		}
@@ -534,13 +548,15 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 				}
 				viewDef := config.GetViewDef(m.ViewConfig, detailType)
 				if selected.RawStruct != nil && len(viewDef.Detail) > 0 {
-					m.Detail = views.NewConfigDetailModel(selected.Name+" - Detail", selected.RawStruct, viewDef.Detail)
+					m.Detail = views.NewConfigDetailModel(selected.Name, selected.RawStruct, viewDef.Detail)
 				} else {
-					m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+					m.Detail = views.NewDetailModel(selected.Name, selected.DetailData)
 				}
 				m.Detail.Width = m.Width
 				m.Detail.Height = m.Height
 				m.CurrentView = DetailView
+				m.HScrollOffset = 0
+				m.StatusMessage = ""
 				m.updateBreadcrumbs()
 			} else {
 				m.StatusMessage = "No detail data available for this resource"
@@ -550,19 +566,22 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 
-	// JSON view (y)
+	// YAML view (y)
 	if key.Matches(msg, m.Keys.JSON) {
 		if listLen > 0 && m.SelectedIndex < listLen {
 			selected := display[m.SelectedIndex]
-			if selected.RawJSON != "" {
+			yamlContent := resourceToYAML(selected)
+			if yamlContent != "" {
 				m.pushCurrentView()
-				m.JSONData = views.NewJSONView(selected.Name+" - JSON", selected.RawJSON)
+				m.JSONData = views.NewJSONView(selected.Name+" - YAML", yamlContent)
 				m.JSONData.Width = m.Width
 				m.JSONData.Height = m.Height
 				m.CurrentView = JSONView
+				m.HScrollOffset = 0
+				m.StatusMessage = ""
 				m.updateBreadcrumbs()
 			} else {
-				m.StatusMessage = "No JSON data available for this resource"
+				m.StatusMessage = "No data available for this resource"
 				m.StatusIsError = false
 			}
 		}
@@ -617,7 +636,15 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 	if key.Matches(msg, m.Keys.ScrollRight) {
-		m.HScrollOffset += 4
+		maxScroll := m.computeMaxHScroll()
+		newOffset := m.HScrollOffset + 4
+		if newOffset > maxScroll {
+			newOffset = maxScroll
+		}
+		if newOffset < 0 {
+			newOffset = 0
+		}
+		m.HScrollOffset = newOffset
 		return m, nil
 	}
 
@@ -669,10 +696,49 @@ func (m AppState) handleDetailKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.Detail.GoBottom()
 		return m, nil
 	}
+	// Horizontal scroll in detail view
+	if key.Matches(msg, m.Keys.ScrollLeft) {
+		if m.HScrollOffset > 0 {
+			m.HScrollOffset -= 4
+			if m.HScrollOffset < 0 {
+				m.HScrollOffset = 0
+			}
+			m.Detail.HScrollOffset = m.HScrollOffset
+		}
+		return m, nil
+	}
+	if key.Matches(msg, m.Keys.ScrollRight) {
+		if !m.Detail.WrapEnabled {
+			m.HScrollOffset += 4
+			m.Detail.HScrollOffset = m.HScrollOffset
+		}
+		return m, nil
+	}
+	// Wrap toggle (w)
+	if msg.String() == "w" {
+		m.Detail.ToggleWrap()
+		if m.Detail.WrapEnabled {
+			m.HScrollOffset = 0
+		}
+		return m, nil
+	}
+	// Copy detail content (c)
+	if key.Matches(msg, m.Keys.Copy) {
+		content := m.Detail.View()
+		err := clipboard.WriteAll(content)
+		if err != nil {
+			m.StatusMessage = fmt.Sprintf("Copy failed: %v", err)
+			m.StatusIsError = true
+		} else {
+			m.StatusMessage = "Copied detail to clipboard"
+			m.StatusIsError = false
+		}
+		return m, nil
+	}
 	return m, nil
 }
 
-// handleJSONViewKeys handles keys in the JSON view.
+// handleJSONViewKeys handles keys in the JSON/YAML view.
 func (m AppState) handleJSONViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.Keys.Up) {
 		m.JSONData.ScrollUp()
@@ -688,6 +754,32 @@ func (m AppState) handleJSONViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if key.Matches(msg, m.Keys.Bottom) {
 		m.JSONData.GoBottom()
+		return m, nil
+	}
+	// Horizontal scroll
+	if key.Matches(msg, m.Keys.ScrollLeft) {
+		if m.HScrollOffset > 0 {
+			m.HScrollOffset -= 4
+			if m.HScrollOffset < 0 {
+				m.HScrollOffset = 0
+			}
+		}
+		return m, nil
+	}
+	if key.Matches(msg, m.Keys.ScrollRight) {
+		m.HScrollOffset += 4
+		return m, nil
+	}
+	// Copy content (c)
+	if key.Matches(msg, m.Keys.Copy) {
+		err := clipboard.WriteAll(m.JSONData.Content)
+		if err != nil {
+			m.StatusMessage = fmt.Sprintf("Copy failed: %v", err)
+			m.StatusIsError = true
+		} else {
+			m.StatusMessage = "Copied content to clipboard"
+			m.StatusIsError = false
+		}
 		return m, nil
 	}
 	return m, nil
@@ -804,6 +896,8 @@ func (m AppState) goBack() (tea.Model, tea.Cmd) {
 		m.Filter = state.Filter
 		m.S3Bucket = state.S3Bucket
 		m.S3Prefix = state.S3Prefix
+		m.HScrollOffset = 0
+		m.StatusMessage = ""
 		if m.Filter != "" {
 			m.FilteredResources = views.FilterResources(m.Filter, m.Resources)
 		} else {
@@ -837,6 +931,8 @@ func (m AppState) goBack() (tea.Model, tea.Cmd) {
 		m.S3Prefix = ""
 		m.Filter = ""
 		m.FilteredResources = nil
+		m.HScrollOffset = 0
+		m.StatusMessage = ""
 		return m, nil
 	}
 	return m, nil
@@ -856,6 +952,8 @@ func (m AppState) historyForward() (tea.Model, tea.Cmd) {
 		m.SelectedIndex = state.CursorPos
 		m.Filter = state.Filter
 		m.S3Prefix = state.S3Prefix
+		m.HScrollOffset = 0
+		m.StatusMessage = ""
 		if m.Filter != "" {
 			m.FilteredResources = views.FilterResources(m.Filter, m.Resources)
 		} else {
@@ -879,6 +977,8 @@ func (m *AppState) pushCurrentView() {
 }
 
 // updateBreadcrumbs rebuilds breadcrumbs based on current view state.
+// Bug 7: "main" only appears on the main menu. Other views omit it.
+// Bug 14: Resource count is included in breadcrumbs for resource lists.
 func (m *AppState) updateBreadcrumbs() {
 	switch m.CurrentView {
 	case MainMenuView:
@@ -889,11 +989,21 @@ func (m *AppState) updateBreadcrumbs() {
 		if rt != nil {
 			name = rt.Name
 		}
-		crumbs := []string{"main", name}
+		crumbs := []string{name}
 		if m.S3Bucket != "" {
-			crumbs = append(crumbs, m.S3Bucket)
+			bucketCrumb := m.S3Bucket
+			// Add count to the last breadcrumb segment
+			count := len(m.displayResources())
 			if m.S3Prefix != "" {
-				crumbs = append(crumbs, m.S3Prefix)
+				crumbs = append(crumbs, bucketCrumb)
+				crumbs = append(crumbs, fmt.Sprintf("%s (%d)", m.S3Prefix, count))
+			} else {
+				crumbs = append(crumbs, fmt.Sprintf("%s (%d)", bucketCrumb, count))
+			}
+		} else {
+			count := len(m.displayResources())
+			if count > 0 {
+				crumbs = []string{fmt.Sprintf("%s (%d)", name, count)}
 			}
 		}
 		m.Breadcrumbs = crumbs
@@ -903,21 +1013,21 @@ func (m *AppState) updateBreadcrumbs() {
 		if rt != nil {
 			name = rt.Name
 		}
-		m.Breadcrumbs = []string{"main", name, "detail"}
+		m.Breadcrumbs = []string{name, "detail"}
 	case JSONView:
 		rt := resource.FindResourceType(m.CurrentResourceType)
 		name := m.CurrentResourceType
 		if rt != nil {
 			name = rt.Name
 		}
-		m.Breadcrumbs = []string{"main", name, "json"}
+		m.Breadcrumbs = []string{name, "yaml"}
 	case RevealView:
 		rt := resource.FindResourceType(m.CurrentResourceType)
 		name := m.CurrentResourceType
 		if rt != nil {
 			name = rt.Name
 		}
-		m.Breadcrumbs = []string{"main", name, "reveal"}
+		m.Breadcrumbs = []string{name, "reveal"}
 	default:
 		m.Breadcrumbs = []string{"main"}
 	}
@@ -991,13 +1101,14 @@ func (m AppState) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.pushCurrentView()
 		m.CurrentResourceType = rt.ShortName
 		m.CurrentView = ResourceListView
-		m.Breadcrumbs = []string{"main", rt.Name}
+		m.Breadcrumbs = []string{rt.Name}
 		m.SelectedIndex = 0
 		m.Filter = ""
 		m.FilteredResources = nil
 		m.S3Bucket = ""
 		m.S3Prefix = ""
 		m.HScrollOffset = 0
+		m.StatusMessage = ""
 		m.Loading = true
 		return m, m.fetchResources()
 	}
@@ -1132,38 +1243,59 @@ func (m AppState) View() tea.View {
 
 	// Status bar
 	statusBar := m.renderStatusBar()
-	sections = append(sections, statusBar)
 
-	output := lipgloss.JoinVertical(lipgloss.Left, sections...)
+	// Join header + breadcrumbs + content
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
-	// Cap output to terminal height, preserving the last line (status bar)
+	// Pad content to push status bar to the bottom
 	if m.Height > 0 {
-		lines := strings.Split(output, "\n")
-		if len(lines) > m.Height {
-			// Keep first lines (header, breadcrumbs) and last line (status bar)
-			// Trim content lines from the middle
-			lastLine := lines[len(lines)-1]
-			lines = lines[:m.Height-1]
-			lines = append(lines, lastLine)
+		lines := strings.Split(mainContent, "\n")
+		// Reserve 1 line for status bar
+		targetLines := m.Height - 1
+		if len(lines) < targetLines {
+			padding := targetLines - len(lines)
+			for i := 0; i < padding; i++ {
+				lines = append(lines, "")
+			}
+		} else if len(lines) > targetLines {
+			// Trim content to fit, preserving header/breadcrumbs at top
+			lines = lines[:targetLines]
 		}
-		output = strings.Join(lines, "\n")
+		lines = append(lines, statusBar)
+		output := strings.Join(lines, "\n")
+		v := tea.NewView(output)
+		v.AltScreen = true
+		return v
 	}
 
+	// No height set: just append status bar normally
+	sections = append(sections, statusBar)
+	output := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	v := tea.NewView(output)
 	v.AltScreen = true
 	return v
 }
 
-// renderHeader renders the top header line.
+// renderHeader renders the top header line with profile/region on left, version on right.
 func (m AppState) renderHeader() string {
-	headerText := fmt.Sprintf("a9s v%s | profile: %s | %s", Version, m.ActiveProfile, m.ActiveRegion)
+	left := fmt.Sprintf("a9s | profile: %s | %s", m.ActiveProfile, m.ActiveRegion)
 	if m.Loading {
-		headerText += " [loading...]"
+		left += " [loading...]"
 	}
+	right := fmt.Sprintf("v%s", Version)
+
 	if m.Width > 0 {
+		// Pad between left and right to push version to the right edge
+		leftLen := lipgloss.Width(left)
+		rightLen := lipgloss.Width(right)
+		padding := m.Width - leftLen - rightLen - 2 // 2 for Padding(0,1)
+		if padding < 1 {
+			padding = 1
+		}
+		headerText := left + strings.Repeat(" ", padding) + right
 		return styles.HeaderStyle.Width(m.Width).Render(headerText)
 	}
-	return styles.HeaderStyle.Render(headerText)
+	return styles.HeaderStyle.Render(left + "  " + right)
 }
 
 // renderBreadcrumbs renders the breadcrumb navigation line.
@@ -1198,23 +1330,43 @@ func (m AppState) renderContent() string {
 	}
 }
 
+// filteredMenuTypes returns the resource types filtered by the current filter string.
+func (m AppState) filteredMenuTypes() []resource.ResourceTypeDef {
+	allTypes := resource.AllResourceTypes()
+	if m.Filter == "" {
+		return allTypes
+	}
+	q := strings.ToLower(m.Filter)
+	var filtered []resource.ResourceTypeDef
+	for _, rt := range allTypes {
+		if strings.Contains(strings.ToLower(rt.Name), q) || strings.Contains(strings.ToLower(rt.ShortName), q) {
+			filtered = append(filtered, rt)
+		}
+	}
+	return filtered
+}
+
 // renderMainMenu renders the main menu as a list of resource types.
 func (m AppState) renderMainMenu() string {
-	allTypes := resource.AllResourceTypes()
+	menuTypes := m.filteredMenuTypes()
 	var b strings.Builder
 	b.WriteString("\n  AWS Resources\n\n")
 
-	for i, rt := range allTypes {
-		cursor := "  "
-		if i == m.SelectedIndex {
-			cursor = "> "
+	if len(menuTypes) == 0 && m.Filter != "" {
+		b.WriteString(fmt.Sprintf("  No items matching filter: %s\n", m.Filter))
+	} else {
+		for i, rt := range menuTypes {
+			cursor := "  "
+			if i == m.SelectedIndex {
+				cursor = "> "
+			}
+			line := fmt.Sprintf("  %s%s", cursor, rt.Name)
+			if i == m.SelectedIndex {
+				line = styles.TableCursorStyle.Render(line)
+			}
+			b.WriteString(line)
+			b.WriteString("\n")
 		}
-		line := fmt.Sprintf("  %s%s", cursor, rt.Name)
-		if i == m.SelectedIndex {
-			line = styles.TableCursorStyle.Render(line)
-		}
-		b.WriteString(line)
-		b.WriteString("\n")
 	}
 
 	b.WriteString("\n  Press : for commands, ? for help\n")
@@ -1223,14 +1375,21 @@ func (m AppState) renderMainMenu() string {
 
 // applyFilter updates FilteredResources based on the current Filter and Resources.
 // It also resets SelectedIndex to 0 to avoid out-of-bounds cursor positions.
+// For MainMenuView, filtering is handled by filteredMenuTypes() so we just reset the index.
 func (m *AppState) applyFilter() {
+	if m.CurrentView == MainMenuView {
+		m.SelectedIndex = 0
+		return
+	}
 	if m.Filter == "" {
 		m.FilteredResources = nil
 		m.SelectedIndex = 0
+		m.updateBreadcrumbs()
 		return
 	}
 	m.FilteredResources = views.FilterResources(m.Filter, m.Resources)
 	m.SelectedIndex = 0
+	m.updateBreadcrumbs()
 }
 
 // sortResources sorts both Resources and FilteredResources in place by the given
@@ -1365,6 +1524,29 @@ func extractCellValue(r resource.Resource, path string) string {
 	return ""
 }
 
+// resourceToYAML converts a resource to YAML format using its RawStruct if
+// available, falling back to JSON-parsed YAML conversion.
+func resourceToYAML(r resource.Resource) string {
+	if r.RawStruct != nil {
+		safe := fieldpath.ToSafeValue(reflect.ValueOf(r.RawStruct))
+		out, err := yaml.Marshal(safe)
+		if err == nil {
+			return strings.TrimRight(string(out), "\n")
+		}
+	}
+	// Fallback: convert RawJSON to YAML
+	if r.RawJSON != "" {
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(r.RawJSON), &parsed); err == nil {
+			out, err := yaml.Marshal(parsed)
+			if err == nil {
+				return strings.TrimRight(string(out), "\n")
+			}
+		}
+	}
+	return ""
+}
+
 // displayResources returns the resources to display: FilteredResources if a filter
 // is active, otherwise all Resources.
 func (m AppState) displayResources() []resource.Resource {
@@ -1383,6 +1565,59 @@ func padOrTruncate(s string, width int) string {
 		return s[:width-1] + "…"
 	}
 	return s + strings.Repeat(" ", width-len(s))
+}
+
+// computeMaxHScroll calculates the maximum horizontal scroll offset for the
+// current resource list view based on column widths and terminal width.
+func (m AppState) computeMaxHScroll() int {
+	rt := resource.FindResourceType(m.CurrentResourceType)
+	if rt == nil {
+		return 0
+	}
+	display := m.displayResources()
+	useConfigColumns := len(display) > 0 && display[0].RawStruct != nil
+
+	var totalWidth int
+	if useConfigColumns {
+		viewShortName := rt.ShortName
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			viewShortName = "s3_objects"
+		}
+		viewDef := config.GetViewDef(m.ViewConfig, viewShortName)
+		for _, lc := range viewDef.List {
+			w := lc.Width
+			if w < 5 {
+				w = 5
+			}
+			totalWidth += w
+		}
+		totalWidth += (len(viewDef.List) - 1) * 2
+	} else {
+		legacyCols := rt.Columns
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			legacyCols = resource.S3ObjectColumns()
+		}
+		for _, c := range legacyCols {
+			w := c.Width
+			if w == 0 {
+				w = len(c.Title)
+			}
+			if w < 5 {
+				w = 5
+			}
+			if w > 40 {
+				w = 40
+			}
+			totalWidth += w
+		}
+		totalWidth += (len(legacyCols) - 1) * 2
+	}
+
+	maxScroll := totalWidth - m.Width + 4
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	return maxScroll
 }
 
 // renderResourceList renders the resource list view.
@@ -1448,40 +1683,37 @@ func (m AppState) renderResourceList() string {
 		return ""
 	}
 
-	title := rt.Name
-	if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
-		title = "S3: " + m.S3Bucket
-		if m.S3Prefix != "" {
-			title += "/" + m.S3Prefix
-		}
-	}
-
 	var b strings.Builder
+	// No separate title line — count is shown in breadcrumbs (Bug 14)
 
-	// Title with count
-	b.WriteString(fmt.Sprintf("  %s (%d)\n", title, len(display)))
-
-	// Calculate column widths
+	// Calculate column widths: use configured width as fixed (Bug 15).
+	// Only expand based on data when no explicit width is configured.
 	colWidths := make([]int, len(columns))
 	for i, col := range columns {
-		colWidths[i] = len(col.Title)
 		if col.Width > 0 {
+			// Configured width: use it as-is (fixed)
 			colWidths[i] = col.Width
+		} else {
+			// No configured width: start with title width
+			colWidths[i] = len(col.Title)
 		}
 	}
-	// Expand widths based on data
+	// Only expand columns that have NO configured width
 	for _, r := range display {
 		for i, col := range columns {
+			if col.Width > 0 {
+				continue // skip: fixed width from config
+			}
 			val := cellValue(r, col.Path)
 			if len(val) > colWidths[i] {
 				colWidths[i] = len(val)
 			}
 		}
 	}
-	// Cap individual column widths
+	// Cap only non-configured column widths; ensure minimum
 	maxColWidth := 40
 	for i := range colWidths {
-		if colWidths[i] > maxColWidth {
+		if columns[i].Width == 0 && colWidths[i] > maxColWidth {
 			colWidths[i] = maxColWidth
 		}
 		if colWidths[i] < 5 {
@@ -1551,7 +1783,7 @@ func (m AppState) renderResourceList() string {
 	b.WriteString("\n")
 
 	// Viewport: calculate visible window
-	contentHeight := m.Height - 6 // header(1) + breadcrumbs(1) + title(1) + col header(1) + separator(1) + status bar(1)
+	contentHeight := m.Height - 5 // header(1) + breadcrumbs(1) + col header(1) + separator(1) + status bar(1)
 	if contentHeight < 3 {
 		contentHeight = 3
 	}
@@ -1589,11 +1821,23 @@ func (m AppState) renderResourceList() string {
 	return b.String()
 }
 
-// renderHelp renders the help overlay using the ui.HelpModel.
+// renderHelp renders the help overlay using the ui.HelpModel with context-sensitive keys.
 func (m AppState) renderHelp() string {
 	help := ui.NewHelpModel()
 	help.Width = m.Width
 	help.Height = m.Height
+	switch m.CurrentView {
+	case MainMenuView:
+		help.ViewType = ui.MainMenuHelp
+	case ResourceListView:
+		help.ViewType = ui.ListViewHelp
+	case DetailView:
+		help.ViewType = ui.DetailViewHelp
+	case JSONView:
+		help.ViewType = ui.JSONViewHelp
+	default:
+		help.ViewType = ui.GlobalHelp
+	}
 	return help.View()
 }
 

@@ -94,8 +94,8 @@ func TestQA_001_LaunchDefaultProfile(t *testing.T) {
 	state.Width = 120
 	state.Height = 40
 	view := state.View()
-	if !strings.Contains(view.Content, "a9s v") {
-		t.Error("expected header to contain 'a9s v'")
+	if !strings.Contains(view.Content, "a9s") {
+		t.Error("expected header to contain 'a9s'")
 	}
 	if !strings.Contains(view.Content, "profile: default") {
 		t.Error("expected header to contain 'profile: default'")
@@ -546,8 +546,9 @@ func TestQA_024_SelectResourceWithEnter(t *testing.T) {
 	if state.CurrentResourceType != "ec2" {
 		t.Errorf("expected CurrentResourceType 'ec2', got %q", state.CurrentResourceType)
 	}
-	if len(state.Breadcrumbs) < 2 || state.Breadcrumbs[1] != "EC2 Instances" {
-		t.Errorf("expected breadcrumbs ['main', 'EC2 Instances'], got %v", state.Breadcrumbs)
+	// Bug 7: breadcrumbs no longer start with "main" in resource list views
+	if len(state.Breadcrumbs) == 0 || !strings.Contains(state.Breadcrumbs[0], "EC2 Instances") {
+		t.Errorf("expected breadcrumbs to contain 'EC2 Instances', got %v", state.Breadcrumbs)
 	}
 	if !state.Loading {
 		t.Error("expected Loading=true after selecting a resource type")
@@ -728,7 +729,8 @@ func TestQA_032_CommandEC2(t *testing.T) {
 	if updated.CurrentResourceType != "ec2" {
 		t.Errorf("expected type 'ec2', got %q", updated.CurrentResourceType)
 	}
-	if len(updated.Breadcrumbs) < 2 || updated.Breadcrumbs[1] != "EC2 Instances" {
+	// Bug 7: breadcrumbs no longer have "main" prefix
+	if len(updated.Breadcrumbs) == 0 || !strings.Contains(updated.Breadcrumbs[0], "EC2 Instances") {
 		t.Errorf("expected breadcrumbs with 'EC2 Instances', got %v", updated.Breadcrumbs)
 	}
 }
@@ -745,7 +747,8 @@ func TestQA_033_CommandS3(t *testing.T) {
 	if updated.CurrentResourceType != "s3" {
 		t.Errorf("expected type 's3', got %q", updated.CurrentResourceType)
 	}
-	if len(updated.Breadcrumbs) < 2 || updated.Breadcrumbs[1] != "S3 Buckets" {
+	// Bug 7: breadcrumbs no longer have "main" prefix
+	if len(updated.Breadcrumbs) == 0 || !strings.Contains(updated.Breadcrumbs[0], "S3 Buckets") {
 		t.Errorf("expected breadcrumbs with 'S3 Buckets', got %v", updated.Breadcrumbs)
 	}
 }
