@@ -6,7 +6,7 @@
 vendor/
 
 # Binary
-a9s
+/a9s
 
 # IDE
 .vscode/
