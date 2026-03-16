@@ -7,7 +7,12 @@
       "Bash(go*)",
       "Bash(cd*)",
       "Bash(/Users/k2m30/projects/a9s/a9s*)",
-      "Bash(git commit*)"
+      "Bash(git commit*)",
+      "Bash(bash /Users/k2m30/projects/a9s/.specify/*)",
+      "Bash(bash .specify/scripts/*)",
+      "Bash(xxd*)",
+      "Bash(make*)",
+      "Bash(git checkout*)"
     ]
   }
 }
