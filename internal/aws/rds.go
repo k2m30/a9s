@@ -130,6 +130,7 @@ func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]re
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  db,
 		}
 
 		resources = append(resources, r)

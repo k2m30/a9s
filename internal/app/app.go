@@ -15,6 +15,8 @@ import (
 	"github.com/atotto/clipboard"
 
 	awsclient "github.com/k2m30/a9s/internal/aws"
+	"github.com/k2m30/a9s/internal/config"
+	"github.com/k2m30/a9s/internal/fieldpath"
 	"github.com/k2m30/a9s/internal/navigation"
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/styles"
@@ -98,6 +100,9 @@ type AppState struct {
 	Detail   views.DetailModel
 	JSONData views.JSONViewModel
 	Reveal   views.RevealModel
+
+	// Config-driven view definitions (nil means use built-in defaults)
+	ViewConfig *config.ViewsConfig
 }
 
 // NewAppState creates a new AppState with sensible defaults.
@@ -125,12 +130,18 @@ func NewAppStateWithConfig(profile, region, configPath string) AppState {
 		region = awsclient.GetDefaultRegion(configPath, profile)
 	}
 
+	viewCfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v, using defaults\n", err)
+	}
+
 	return AppState{
 		CurrentView:   MainMenuView,
 		ActiveProfile: profile,
 		ActiveRegion:  region,
 		Breadcrumbs:   []string{"main"},
 		Keys:          DefaultKeyMap(),
+		ViewConfig:    viewCfg,
 	}
 }
 
@@ -490,9 +501,18 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 			}
 
 			// Default: open describe view (same as 'd')
-			if selected.DetailData != nil && len(selected.DetailData) > 0 {
+			if selected.DetailData != nil && len(selected.DetailData) > 0 || selected.RawStruct != nil {
 				m.pushCurrentView()
-				m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+				detailType := m.CurrentResourceType
+				if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+					detailType = "s3_objects"
+				}
+				viewDef := config.GetViewDef(m.ViewConfig, detailType)
+				if selected.RawStruct != nil && len(viewDef.Detail) > 0 {
+					m.Detail = views.NewConfigDetailModel(selected.Name+" - Detail", selected.RawStruct, viewDef.Detail)
+				} else {
+					m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+				}
 				m.Detail.Width = m.Width
 				m.Detail.Height = m.Height
 				m.CurrentView = DetailView
@@ -506,9 +526,18 @@ func (m AppState) handleResourceListKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	if key.Matches(msg, m.Keys.Describe) {
 		if listLen > 0 && m.SelectedIndex < listLen {
 			selected := display[m.SelectedIndex]
-			if selected.DetailData != nil && len(selected.DetailData) > 0 {
+			if selected.DetailData != nil && len(selected.DetailData) > 0 || selected.RawStruct != nil {
 				m.pushCurrentView()
-				m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+				detailType := m.CurrentResourceType
+				if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+					detailType = "s3_objects"
+				}
+				viewDef := config.GetViewDef(m.ViewConfig, detailType)
+				if selected.RawStruct != nil && len(viewDef.Detail) > 0 {
+					m.Detail = views.NewConfigDetailModel(selected.Name+" - Detail", selected.RawStruct, viewDef.Detail)
+				} else {
+					m.Detail = views.NewDetailModel(selected.Name+" - Detail", selected.DetailData)
+				}
 				m.Detail.Width = m.Width
 				m.Detail.Height = m.Height
 				m.CurrentView = DetailView
@@ -1205,28 +1234,62 @@ func (m *AppState) applyFilter() {
 }
 
 // sortResources sorts both Resources and FilteredResources in place by the given
-// sort type: "name", "status", or "age". It finds the appropriate field key from
-// the resource type definition columns.
+// sort type: "name", "status", or "age". It finds the appropriate field path from
+// the config-driven view definition columns, falling back to legacy resource type
+// columns when RawStruct is not available.
 func (m *AppState) sortResources(sortType string) {
 	rt := resource.FindResourceType(m.CurrentResourceType)
 	if rt == nil {
 		return
 	}
 
-	var sortKey string
-	switch sortType {
-	case "name":
-		sortKey = findColumnKeyBySubstr(rt.Columns, "name")
-	case "status":
-		sortKey = findColumnKeyBySubstr(rt.Columns, "status")
-		if sortKey == "" {
-			sortKey = findColumnKeyBySubstr(rt.Columns, "state")
+	// Determine whether to use config-driven or legacy column lookup
+	useConfig := len(m.Resources) > 0 && m.Resources[0].RawStruct != nil
+
+	var sortKey string // path (config) or key (legacy)
+	if useConfig {
+		viewShortName := rt.ShortName
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			viewShortName = "s3_objects"
 		}
-	case "age":
-		for _, suffix := range []string{"time", "date", "created", "launch", "accessed", "changed"} {
-			sortKey = findColumnKeyBySubstr(rt.Columns, suffix)
-			if sortKey != "" {
-				break
+		viewDef := config.GetViewDef(m.ViewConfig, viewShortName)
+
+		switch sortType {
+		case "name":
+			sortKey = findColumnPathBySubstr(viewDef.List, "name")
+		case "status":
+			sortKey = findColumnPathBySubstr(viewDef.List, "status")
+			if sortKey == "" {
+				sortKey = findColumnPathBySubstr(viewDef.List, "state")
+			}
+		case "age":
+			for _, suffix := range []string{"time", "date", "created", "launch", "accessed", "changed"} {
+				sortKey = findColumnPathBySubstr(viewDef.List, suffix)
+				if sortKey != "" {
+					break
+				}
+			}
+		}
+	} else {
+		// Legacy: search by old column keys
+		legacyCols := rt.Columns
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			legacyCols = resource.S3ObjectColumns()
+		}
+		switch sortType {
+		case "name":
+			sortKey = findLegacyColumnKeyBySubstr(legacyCols, "name")
+		case "status":
+			sortKey = findLegacyColumnKeyBySubstr(legacyCols, "status")
+			if sortKey == "" {
+				sortKey = findLegacyColumnKeyBySubstr(legacyCols, "state")
+			}
+		case "age":
+			for _, suffix := range []string{"time", "date", "created", "launch", "accessed", "changed"} {
+				sortKey = findLegacyColumnKeyBySubstr(legacyCols, suffix)
+				if sortKey != "" {
+					break
+				}
 			}
 		}
 	}
@@ -1235,6 +1298,12 @@ func (m *AppState) sortResources(sortType string) {
 		// Fall back to sorting by Name field (case-insensitive)
 		sort.Slice(m.Resources, func(i, j int) bool {
 			return strings.ToLower(m.Resources[i].Name) < strings.ToLower(m.Resources[j].Name)
+		})
+	} else if useConfig {
+		sort.Slice(m.Resources, func(i, j int) bool {
+			vi := strings.ToLower(extractCellValue(m.Resources[i], sortKey))
+			vj := strings.ToLower(extractCellValue(m.Resources[j], sortKey))
+			return vi < vj
 		})
 	} else {
 		sort.Slice(m.Resources, func(i, j int) bool {
@@ -1248,13 +1317,49 @@ func (m *AppState) sortResources(sortType string) {
 	}
 }
 
-// findColumnKeyBySubstr returns the key of the first column whose key contains the
-// given substring (case-insensitive). Returns "" if no match is found.
-func findColumnKeyBySubstr(columns []resource.Column, substr string) string {
+// findColumnPathBySubstr returns the Path of the first config column whose Path
+// contains the given substring (case-insensitive). Returns "" if no match is found.
+func findColumnPathBySubstr(columns []config.ListColumn, substr string) string {
+	lower := strings.ToLower(substr)
+	for _, col := range columns {
+		if strings.Contains(strings.ToLower(col.Path), lower) {
+			return col.Path
+		}
+	}
+	return ""
+}
+
+// findLegacyColumnKeyBySubstr returns the Key of the first legacy resource column
+// whose Key contains the given substring (case-insensitive). Returns "" if no match.
+func findLegacyColumnKeyBySubstr(columns []resource.Column, substr string) string {
 	lower := strings.ToLower(substr)
 	for _, col := range columns {
 		if strings.Contains(strings.ToLower(col.Key), lower) {
 			return col.Key
+		}
+	}
+	return ""
+}
+
+// extractCellValue extracts a display value for a resource column.
+// It first tries reflection-based extraction via fieldpath if the resource
+// has a RawStruct. Falls back to the Fields map using case-insensitive key matching.
+func extractCellValue(r resource.Resource, path string) string {
+	if r.RawStruct != nil {
+		val := fieldpath.ExtractScalar(r.RawStruct, path)
+		if val != "" {
+			return val
+		}
+	}
+	// Fallback to Fields map (for backward compat, test resources, and struct
+	// types that lack the requested field — e.g., s3types.CommonPrefix has Prefix
+	// but no Key, while the s3_objects view config uses path "Key").
+	if r.Fields != nil {
+		lowerPath := strings.ToLower(path)
+		for k, v := range r.Fields {
+			if strings.ToLower(k) == lowerPath {
+				return v
+			}
 		}
 	}
 	return ""
@@ -1300,11 +1405,51 @@ func (m AppState) renderResourceList() string {
 		return "\n  Unknown resource type"
 	}
 
-	// Use S3 object columns when inside a bucket
-	columns := rt.Columns
+	// Determine whether to use config-driven columns (RawStruct available)
+	// or legacy columns (Fields-based, for backward compatibility with tests).
+	useConfigColumns := len(display) > 0 && display[0].RawStruct != nil
+
+	// Build unified column descriptors (title, width, key/path)
+	type colDesc struct {
+		Title string
+		Width int
+		Path  string // config path (for fieldpath) or legacy key (for Fields)
+	}
+	var columns []colDesc
+
+	if useConfigColumns {
+		viewShortName := rt.ShortName
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			viewShortName = "s3_objects"
+		}
+		viewDef := config.GetViewDef(m.ViewConfig, viewShortName)
+		for _, lc := range viewDef.List {
+			columns = append(columns, colDesc{Title: lc.Title, Width: lc.Width, Path: lc.Path})
+		}
+	} else {
+		// Legacy path: use resource type columns + Fields map
+		legacyCols := rt.Columns
+		if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
+			legacyCols = resource.S3ObjectColumns()
+		}
+		for _, c := range legacyCols {
+			columns = append(columns, colDesc{Title: c.Title, Width: c.Width, Path: c.Key})
+		}
+	}
+
+	// Helper to extract cell value for a resource
+	cellValue := func(r resource.Resource, path string) string {
+		if useConfigColumns {
+			return extractCellValue(r, path)
+		}
+		if r.Fields != nil {
+			return r.Fields[path]
+		}
+		return ""
+	}
+
 	title := rt.Name
 	if m.CurrentResourceType == "s3" && m.S3Bucket != "" {
-		columns = resource.S3ObjectColumns()
 		title = "S3: " + m.S3Bucket
 		if m.S3Prefix != "" {
 			title += "/" + m.S3Prefix
@@ -1327,7 +1472,7 @@ func (m AppState) renderResourceList() string {
 	// Expand widths based on data
 	for _, r := range display {
 		for i, col := range columns {
-			val := r.Fields[col.Key]
+			val := cellValue(r, col.Path)
 			if len(val) > colWidths[i] {
 				colWidths[i] = len(val)
 			}
@@ -1430,7 +1575,7 @@ func (m AppState) renderResourceList() string {
 
 		rowVals := make([]string, len(columns))
 		for j, col := range columns {
-			rowVals[j] = r.Fields[col.Key]
+			rowVals[j] = cellValue(r, col.Path)
 		}
 		rowLine := buildRow(rowVals)
 		row := hcrop(cursor, rowLine)

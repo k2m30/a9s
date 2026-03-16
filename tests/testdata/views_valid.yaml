@@ -1,0 +1,28 @@
+views:
+  ec2:
+    list:
+      Instance ID:
+        path: instanceId
+        width: 20
+      State:
+        path: state.name
+        width: 12
+      Type:
+        path: instanceType
+        width: 14
+    detail:
+      - instanceId
+      - state
+      - instanceType
+      - placement
+  s3:
+    list:
+      Bucket Name:
+        path: name
+        width: 40
+      Creation Date:
+        path: creationDate
+        width: 22
+    detail:
+      - name
+      - creationDate

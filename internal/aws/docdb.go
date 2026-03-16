@@ -98,6 +98,7 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  cluster,
 		}
 
 		resources = append(resources, r)

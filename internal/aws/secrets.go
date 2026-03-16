@@ -68,6 +68,7 @@ func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]reso
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  secret,
 		}
 
 		resources = append(resources, r)

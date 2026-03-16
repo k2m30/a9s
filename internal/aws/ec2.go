@@ -88,6 +88,7 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 				},
 				DetailData: detail,
 				RawJSON:    rawJSON,
+				RawStruct:  inst,
 			}
 
 			resources = append(resources, r)

@@ -58,6 +58,7 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  bucket,
 		}
 
 		resources = append(resources, r)
@@ -123,6 +124,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 				},
 				DetailData: detail,
 				RawJSON:    rawJSON,
+				RawStruct:  cp,
 			}
 			resources = append(resources, r)
 		}
@@ -178,6 +180,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 				},
 				DetailData: detail,
 				RawJSON:    rawJSON,
+				RawStruct:  obj,
 			}
 			resources = append(resources, r)
 		}
