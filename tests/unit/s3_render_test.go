@@ -26,6 +26,13 @@ func TestS3BucketList_RenderShowsBucketNames(t *testing.T) {
 		{ID: "data-lake", Name: "data-lake", Fields: map[string]string{"name": "data-lake", "creation_date": "2025-03-01"}},
 	}
 
+	// Trigger breadcrumb update via ResourcesLoadedMsg
+	model, _ := state.Update(app.ResourcesLoadedMsg{
+		ResourceType: "s3",
+		Resources:    state.Resources,
+	})
+	state = model.(app.AppState)
+
 	view := state.View()
 	content := view.Content
 
@@ -44,9 +51,9 @@ func TestS3BucketList_RenderShowsBucketNames(t *testing.T) {
 		t.Error("Should show 'Creation Date' column header")
 	}
 
-	// Title
-	if !strings.Contains(content, "S3 Buckets (5)") {
-		t.Error("Should show 'S3 Buckets (5)' title")
+	// Count in breadcrumbs (Bug 14: count shown in breadcrumbs, not title)
+	if !strings.Contains(content, "(5)") {
+		t.Error("Should show '(5)' count in breadcrumbs")
 	}
 }
 

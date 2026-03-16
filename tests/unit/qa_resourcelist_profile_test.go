@@ -212,8 +212,15 @@ func TestQA_068_LargeListRendersWithoutPanic(t *testing.T) {
 	view := state.View()
 	content := view.Content
 
-	// Verify row count is displayed
-	if !strings.Contains(content, "EC2 Instances (150)") {
+	// Bug 14: count now shown in breadcrumbs. Must trigger update.
+	model, _ := state.Update(app.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    state.Resources,
+	})
+	state = model.(app.AppState)
+	view = state.View()
+	content = view.Content
+	if !strings.Contains(content, "(150)") {
 		t.Errorf("Large list should show count (150), got content:\n%s", content)
 	}
 
@@ -243,6 +250,14 @@ func TestQA_069_NarrowTerminalRendersWithoutPanic(t *testing.T) {
 	state.Width = 40
 	state.Height = 20
 
+	// Trigger breadcrumb update
+	model, _ := state.Update(app.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    state.Resources,
+	})
+	state = model.(app.AppState)
+	state.Width = 40
+
 	// Should not panic even though columns are wider than terminal
 	view := state.View()
 	content := view.Content
@@ -251,8 +266,8 @@ func TestQA_069_NarrowTerminalRendersWithoutPanic(t *testing.T) {
 		t.Error("Narrow terminal should still render content, got empty string")
 	}
 
-	// The header text should still be present
-	if !strings.Contains(content, "EC2 Instances") {
+	// The resource type name should be present in breadcrumbs
+	if !strings.Contains(content, "EC2") {
 		t.Error("Narrow terminal should still show resource type name")
 	}
 }
@@ -309,11 +324,18 @@ func TestQA_070_JKNavigationBoundsChecking(t *testing.T) {
 // ===========================================================================
 
 func TestQA_071_RowCountDisplay(t *testing.T) {
-	// Without filter
+	// Without filter: count should appear in breadcrumbs (Bug 14)
 	state := setupResourceListState("ec2", 10)
+	// Trigger breadcrumb update via ResourcesLoadedMsg
+	model, _ := state.Update(app.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    state.Resources,
+	})
+	state = model.(app.AppState)
+
 	view := state.View()
-	if !strings.Contains(view.Content, "EC2 Instances (10)") {
-		t.Errorf("Should display 'EC2 Instances (10)', content:\n%s", view.Content)
+	if !strings.Contains(view.Content, "(10)") {
+		t.Errorf("Should display '(10)' count in breadcrumbs, content:\n%s", view.Content)
 	}
 
 	// With filter -- activate filter mode and type "3"
@@ -328,11 +350,11 @@ func TestQA_071_RowCountDisplay(t *testing.T) {
 	view = state.View()
 	content := view.Content
 
-	// The filtered view should show count in title and filter in status bar
+	// The filtered view should show count in breadcrumbs
 	if state.Filter != "" && len(state.FilteredResources) > 0 {
 		countStr := fmt.Sprintf("(%d)", len(state.FilteredResources))
 		if !strings.Contains(content, countStr) {
-			t.Errorf("Should display filtered count %q in title", countStr)
+			t.Errorf("Should display filtered count %q in breadcrumbs", countStr)
 		}
 	}
 }

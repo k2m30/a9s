@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/internal/app"
 )
 
-const version = "0.4.5"
+const version = "0.5.0"
 
 func main() {
 	var (

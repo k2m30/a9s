@@ -20,6 +20,12 @@ type DetailModel struct {
 	// Config-driven detail fields (nil = use legacy Data/Keys rendering)
 	RawStruct   interface{} // raw AWS SDK struct for reflection
 	DetailPaths []string    // configured dot-notation paths
+
+	// Horizontal scroll support
+	HScrollOffset int
+
+	// Word wrap toggle
+	WrapEnabled bool
 }
 
 // NewDetailModel creates a new DetailModel with sorted keys (legacy mode).
@@ -57,6 +63,33 @@ func (m DetailModel) View() string {
 	return m.viewLegacy()
 }
 
+// wrapLine wraps a line to fit within the given width.
+func wrapLine(line string, width int) []string {
+	if width <= 0 || len(line) <= width {
+		return []string{line}
+	}
+	var wrapped []string
+	for len(line) > width {
+		wrapped = append(wrapped, line[:width])
+		line = line[width:]
+	}
+	if len(line) > 0 {
+		wrapped = append(wrapped, line)
+	}
+	return wrapped
+}
+
+// applyHScroll crops a line by horizontal scroll offset.
+func (m DetailModel) applyHScroll(line string) string {
+	if m.WrapEnabled || m.HScrollOffset <= 0 {
+		return line
+	}
+	if m.HScrollOffset >= len(line) {
+		return ""
+	}
+	return line[m.HScrollOffset:]
+}
+
 // viewConfig renders the config-driven detail view using fieldpath extraction.
 func (m DetailModel) viewConfig() string {
 	var b strings.Builder
@@ -68,7 +101,7 @@ func (m DetailModel) viewConfig() string {
 		return b.String()
 	}
 
-	// Build rendered lines first so we can compute alignment for scalar keys
+	// Build rendered lines first
 	type entry struct {
 		path    string
 		value   string
@@ -82,24 +115,42 @@ func (m DetailModel) viewConfig() string {
 		entries = append(entries, entry{path: path, value: val, isMulti: isMulti})
 	}
 
-	// Find the longest scalar key for alignment
-	maxKeyLen := 0
-	for _, e := range entries {
-		if !e.isMulti && len(e.path) > maxKeyLen {
-			maxKeyLen = len(e.path)
-		}
-	}
-
 	for _, e := range entries {
 		if e.isMulti {
-			// Multi-line (YAML subtree): render header + indented lines
-			b.WriteString(fmt.Sprintf("  %s:\n", e.path))
-			for _, line := range strings.Split(e.value, "\n") {
-				b.WriteString(fmt.Sprintf("    %s\n", line))
+			line := fmt.Sprintf("  %s:", e.path)
+			if m.WrapEnabled && m.Width > 0 {
+				for _, wl := range wrapLine(line, m.Width) {
+					b.WriteString(wl)
+					b.WriteString("\n")
+				}
+			} else {
+				b.WriteString(m.applyHScroll(line))
+				b.WriteString("\n")
+			}
+			for _, subline := range strings.Split(e.value, "\n") {
+				indented := fmt.Sprintf("    %s", subline)
+				if m.WrapEnabled && m.Width > 0 {
+					for _, wl := range wrapLine(indented, m.Width) {
+						b.WriteString(wl)
+						b.WriteString("\n")
+					}
+				} else {
+					b.WriteString(m.applyHScroll(indented))
+					b.WriteString("\n")
+				}
 			}
 		} else {
-			// Scalar: render as key : value
-			b.WriteString(fmt.Sprintf("  %-*s : %s\n", maxKeyLen, e.path, e.value))
+			// Scalar: render as "Key: value" (colon right after key)
+			line := fmt.Sprintf("  %s: %s", e.path, e.value)
+			if m.WrapEnabled && m.Width > 0 {
+				for _, wl := range wrapLine(line, m.Width) {
+					b.WriteString(wl)
+					b.WriteString("\n")
+				}
+			} else {
+				b.WriteString(m.applyHScroll(line))
+				b.WriteString("\n")
+			}
 		}
 	}
 
@@ -117,14 +168,6 @@ func (m DetailModel) viewLegacy() string {
 		return b.String()
 	}
 
-	// Find the longest key for alignment
-	maxKeyLen := 0
-	for _, k := range m.Keys {
-		if len(k) > maxKeyLen {
-			maxKeyLen = len(k)
-		}
-	}
-
 	// Apply scroll offset
 	end := len(m.Keys)
 	start := m.Offset
@@ -135,7 +178,17 @@ func (m DetailModel) viewLegacy() string {
 	for i := start; i < end; i++ {
 		k := m.Keys[i]
 		v := m.Data[k]
-		b.WriteString(fmt.Sprintf("  %-*s : %s\n", maxKeyLen, k, v))
+		// "Key: value" format (colon right after key)
+		line := fmt.Sprintf("  %s: %s", k, v)
+		if m.WrapEnabled && m.Width > 0 {
+			for _, wl := range wrapLine(line, m.Width) {
+				b.WriteString(wl)
+				b.WriteString("\n")
+			}
+		} else {
+			b.WriteString(m.applyHScroll(line))
+			b.WriteString("\n")
+		}
 	}
 
 	return b.String()
@@ -167,4 +220,12 @@ func (m *DetailModel) GoBottom() {
 		max = 0
 	}
 	m.Offset = max
+}
+
+// ToggleWrap toggles word wrap mode and resets horizontal scroll when enabled.
+func (m *DetailModel) ToggleWrap() {
+	m.WrapEnabled = !m.WrapEnabled
+	if m.WrapEnabled {
+		m.HScrollOffset = 0
+	}
 }

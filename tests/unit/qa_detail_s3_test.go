@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -389,12 +388,12 @@ func TestQA094_JSONViewEC2(t *testing.T) {
 		t.Errorf("JSON title should contain resource name, got %q", s.JSONData.Title)
 	}
 	crumbs := strings.Join(s.Breadcrumbs, " > ")
-	if !strings.Contains(crumbs, "json") {
-		t.Errorf("breadcrumbs should contain 'json', got %q", crumbs)
+	if !strings.Contains(crumbs, "yaml") {
+		t.Errorf("breadcrumbs should contain 'yaml', got %q", crumbs)
 	}
 }
 
-// QA-095: JSON content is valid and parseable
+// QA-095: YAML content is valid (Bug 3: y key now produces YAML)
 func TestQA095_JSONIsValid(t *testing.T) {
 	rawJSON := `{"InstanceId":"i-0abc","Tags":[{"Key":"Name","Value":"test"}]}`
 	s := stateWithResources("ec2", []resource.Resource{
@@ -410,10 +409,13 @@ func TestQA095_JSONIsValid(t *testing.T) {
 	if s.CurrentView != app.JSONView {
 		t.Fatalf("expected JSONView")
 	}
-	// The raw JSON stored should be valid
-	var parsed interface{}
-	if err := json.Unmarshal([]byte(s.JSONData.Content), &parsed); err != nil {
-		t.Errorf("JSON content should be valid JSON, parse error: %v", err)
+	// The content should be valid YAML (not JSON)
+	if s.JSONData.Content == "" {
+		t.Fatal("YAML content should not be empty")
+	}
+	// YAML content should not start with '{'
+	if strings.HasPrefix(strings.TrimSpace(s.JSONData.Content), "{") {
+		t.Errorf("y key should produce YAML not JSON")
 	}
 }
 
@@ -496,8 +498,8 @@ func TestQA098_JSONViewNoRawJSON(t *testing.T) {
 	if s.CurrentView != app.ResourceListView {
 		t.Errorf("y with empty RawJSON should stay in ResourceListView, got %d", s.CurrentView)
 	}
-	if !strings.Contains(s.StatusMessage, "No JSON data") {
-		t.Errorf("expected status 'No JSON data...', got %q", s.StatusMessage)
+	if !strings.Contains(s.StatusMessage, "No data available") {
+		t.Errorf("expected status 'No data available...', got %q", s.StatusMessage)
 	}
 }
 

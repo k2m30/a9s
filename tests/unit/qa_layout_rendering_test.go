@@ -1368,8 +1368,8 @@ func TestQALayout_LongContent_ResourceWithLongName(t *testing.T) {
 		}
 	}
 	// But some prefix should be visible
-	// The padOrTruncate caps at maxColWidth=40, so first 39 chars + "..."
-	if !strings.Contains(view.Content, strings.Repeat("a", 30)) {
+	// Bug 15: column widths are now fixed from config (28 for Name), so truncation at 27+ellipsis
+	if !strings.Contains(view.Content, strings.Repeat("a", 20)) {
 		t.Error("Truncated long name should still show a visible prefix")
 	}
 }
@@ -1842,13 +1842,19 @@ func TestQALayout_ResourceList_CountInTitle(t *testing.T) {
 			state := newTestState("", "", 200, 30)
 			state.CurrentView = app.ResourceListView
 			state.CurrentResourceType = rtName
-			state.Breadcrumbs = []string{"main", rtName}
 			factory := resourceFactory[rtName]
-			state.Resources = factory(7)
+			resources := factory(7)
+
+			// Bug 14: count is now shown in breadcrumbs. Trigger via ResourcesLoadedMsg.
+			model, _ := state.Update(app.ResourcesLoadedMsg{
+				ResourceType: rtName,
+				Resources:    resources,
+			})
+			state = model.(app.AppState)
 
 			view := state.View()
 			if !strings.Contains(view.Content, "(7)") {
-				t.Errorf("ResourceList(%s) title should show count (7)", rtName)
+				t.Errorf("ResourceList(%s) breadcrumbs should show count (7)", rtName)
 			}
 		})
 	}

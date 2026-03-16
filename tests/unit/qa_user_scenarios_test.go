@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -348,13 +347,13 @@ func TestScenario1_FindEC2InstanceCheckDetails(t *testing.T) {
 		t.Fatalf("expected JSONView after y, got %d", s.CurrentView)
 	}
 
-	// Step 10: Verify JSON contains valid content
+	// Step 10: Verify YAML contains valid content (Bug 3: y now produces YAML)
 	if s.JSONData.Content == "" {
-		t.Fatal("JSON content should not be empty")
+		t.Fatal("YAML content should not be empty")
 	}
-	var parsed interface{}
-	if err := json.Unmarshal([]byte(s.JSONData.Content), &parsed); err != nil {
-		t.Errorf("JSON content should be valid JSON, got error: %v", err)
+	// YAML content should contain key-value pairs, not JSON braces
+	if strings.HasPrefix(strings.TrimSpace(s.JSONData.Content), "{") {
+		t.Errorf("y key should produce YAML, not JSON")
 	}
 
 	// Step 11: Press Esc -> back to filtered list

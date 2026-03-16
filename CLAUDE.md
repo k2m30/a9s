@@ -1,10 +1,11 @@
 # a9s Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-15
+Auto-generated from all feature plans. Last updated: 2026-03-16
 
 ## Active Technologies
 - Go 1.25+ (go.mod) + Bubble Tea v2, bubble-table, AWS SDK Go v2, `gopkg.in/yaml.v3` (new) (002-configurable-views)
 - YAML config files (filesystem) (002-configurable-views)
+- Go 1.25+ + Bubble Tea v2, lipgloss v2, yaml.v3, clipboard (003-fix-ui-bugs)
 
 - Go 1.22+ + Bubble Tea v2 (charm.land/bubbletea/v2), (001-aws-tui-manager)
 
@@ -26,6 +27,7 @@ tests/
 Go 1.22+: Follow standard conventions
 
 ## Recent Changes
+- 003-fix-ui-bugs: Added Go 1.25+ + Bubble Tea v2, lipgloss v2, yaml.v3, clipboard
 - 002-configurable-views: Added Go 1.25+ (go.mod) + Bubble Tea v2, bubble-table, AWS SDK Go v2, `gopkg.in/yaml.v3` (new)
 
 - 001-aws-tui-manager: Added Go 1.22+ + Bubble Tea v2 (charm.land/bubbletea/v2),

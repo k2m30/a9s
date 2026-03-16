@@ -296,9 +296,8 @@ func TestRenderHeader_Loading(t *testing.T) {
 	if !strings.Contains(out, "a9s") {
 		t.Errorf("loading header should contain app name, got %q", out)
 	}
-	// The spinner character is U+28BE (⣾)
-	if !strings.Contains(out, "\u28BE") {
-		t.Errorf("loading header should contain spinner character, got %q", out)
+	if !strings.Contains(out, "loading") {
+		t.Errorf("loading header should contain loading indicator, got %q", out)
 	}
 }
 
@@ -332,8 +331,8 @@ func TestRenderHeader_ZeroWidth(t *testing.T) {
 
 func TestRenderHeader_LoadingZeroWidth(t *testing.T) {
 	out := ui.RenderHeader("a9s", "1.0", "dev", "us-west-2", true, 0)
-	if !strings.Contains(out, "\u28BE") {
-		t.Errorf("loading header with width=0 should still contain spinner, got %q", out)
+	if !strings.Contains(out, "loading") {
+		t.Errorf("loading header with width=0 should still contain loading indicator, got %q", out)
 	}
 }
 
@@ -545,7 +544,7 @@ func TestHelp_ViewContainsKeybindings(t *testing.T) {
 	bindings := []string{
 		"command", "filter", "help", "back",
 		"down", "up", "top", "bottom", "select",
-		"describe", "JSON view", "reveal secret", "copy ID",
+		"describe", "YAML view", "reveal secret", "copy",
 		"by name", "by status", "by age",
 	}
 	for _, b := range bindings {
