@@ -101,6 +101,7 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  cluster,
 		}
 
 		resources = append(resources, r)

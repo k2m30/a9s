@@ -116,6 +116,7 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 			},
 			DetailData: detail,
 			RawJSON:    rawJSON,
+			RawStruct:  cluster,
 		}
 
 		resources = append(resources, r)

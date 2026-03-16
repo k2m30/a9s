@@ -15,4 +15,6 @@ type Resource struct {
 	RawJSON string
 	// DetailData holds all attributes for the describe view.
 	DetailData map[string]string
+	// RawStruct holds the original AWS SDK typed struct for reflection-based field extraction.
+	RawStruct interface{}
 }

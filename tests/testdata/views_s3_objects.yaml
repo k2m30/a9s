@@ -1,0 +1,15 @@
+views:
+  s3_objects:
+    list:
+      Key:
+        path: key
+        width: 60
+      Size:
+        path: size
+        width: 14
+      Last Modified:
+        path: lastModified
+        width: 24
+      Storage Class:
+        path: storageClass
+        width: 18
