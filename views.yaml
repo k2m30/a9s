@@ -32,8 +32,11 @@ views:
     #        path: StorageClass
     #        width: 16
     detail:
-      - Name
+      - Key
+      - Size
       - LastModified
+      - StorageClass
+      - ETag
       - Owner
 
   ec2:
@@ -71,7 +74,7 @@ views:
       - Platform
       - Tags
 
-  rds:
+  dbi:
     list:
       DB Identifier:
         path: DBInstanceIdentifier
@@ -136,7 +139,7 @@ views:
       - ConfigurationEndpoint
       - PreferredAvailabilityZone
 
-  docdb:
+  dbc:
     list:
       Cluster ID:
         path: DBClusterIdentifier
@@ -217,3 +220,92 @@ views:
       - ARN
       - KmsKeyId
       - Tags
+
+  vpc:
+    list:
+      VPC ID:
+        path: VpcId
+        width: 24
+      CIDR Block:
+        path: CidrBlock
+        width: 18
+      State:
+        path: State
+        width: 12
+      Default:
+        path: IsDefault
+        width: 9
+    detail:
+      - VpcId
+      - CidrBlock
+      - State
+      - IsDefault
+      - InstanceTenancy
+      - DhcpOptionsId
+      - OwnerId
+      - CidrBlockAssociationSet
+      - Ipv6CidrBlockAssociationSet
+      - Tags
+
+  sg:
+    list:
+      Group ID:
+        path: GroupId
+        width: 24
+      Group Name:
+        path: GroupName
+        width: 28
+      VPC ID:
+        path: VpcId
+        width: 24
+      Description:
+        path: Description
+        width: 36
+    detail:
+      - GroupId
+      - GroupName
+      - VpcId
+      - Description
+      - OwnerId
+      - SecurityGroupArn
+      - IpPermissions
+      - IpPermissionsEgress
+      - Tags
+
+  ng:
+    list:
+      Node Group:
+        path: NodegroupName
+        width: 28
+      Cluster:
+        path: ClusterName
+        width: 24
+      Status:
+        path: Status
+        width: 14
+      Instance Types:
+        path: InstanceTypes
+        width: 20
+      Desired:
+        path: ScalingConfig.DesiredSize
+        width: 9
+    detail:
+      - NodegroupName
+      - ClusterName
+      - Status
+      - InstanceTypes
+      - AmiType
+      - CapacityType
+      - DiskSize
+      - ScalingConfig
+      - NodeRole
+      - NodegroupArn
+      - ReleaseVersion
+      - Version
+      - Subnets
+      - LaunchTemplate
+      - Labels
+      - Taints
+      - Tags
+      - Health
+      - CreatedAt

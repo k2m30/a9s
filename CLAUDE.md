@@ -1,19 +1,34 @@
 # a9s Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-16
+Auto-generated from all feature plans. Last updated: 2026-03-18
 
 ## Active Technologies
-- Go 1.25+ (go.mod) + Bubble Tea v2, bubble-table, AWS SDK Go v2, `gopkg.in/yaml.v3` (new) (002-configurable-views)
-- YAML config files (filesystem) (002-configurable-views)
-- Go 1.25+ + Bubble Tea v2, lipgloss v2, yaml.v3, clipboard (003-fix-ui-bugs)
-
-- Go 1.22+ + Bubble Tea v2 (charm.land/bubbletea/v2), (001-aws-tui-manager)
+- Go 1.25+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 
 ## Project Structure
 
 ```text
-src/
+cmd/
+  a9s/           # main binary
+  refgen/        # views_reference.yaml generator
+internal/
+  aws/           # AWS service clients & resource fetchers
+  config/        # YAML config loading
+  fieldpath/     # struct field extraction via reflection
+  resource/      # generic resource model & registry
+  tui/           # root Bubble Tea app model
+    keys/        # key bindings
+    layout/      # frame rendering
+    messages/    # inter-view message types
+    styles/      # Tokyo Night Dark palette
+    views/       # view models (menu, list, detail, yaml, help, etc.)
 tests/
+  unit/          # 1,045+ unit tests
+  integration/   # integration tests
+docs/
+  design/        # visual design spec
+  qa/            # QA user stories
+specs/           # feature specifications
 ```
 
 ## Commands
@@ -24,15 +39,24 @@ tests/
 
 ## Code Style
 
-Go 1.22+: Follow standard conventions
-
-## Recent Changes
-- 003-fix-ui-bugs: Added Go 1.25+ + Bubble Tea v2, lipgloss v2, yaml.v3, clipboard
-- 002-configurable-views: Added Go 1.25+ (go.mod) + Bubble Tea v2, bubble-table, AWS SDK Go v2, `gopkg.in/yaml.v3` (new)
-
-- 001-aws-tui-manager: Added Go 1.22+ + Bubble Tea v2 (charm.land/bubbletea/v2),
+Go 1.25+: Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
+
+## Agents
+
+| Agent | Role |
+|-------|------|
+| `a9s-architect` | Architecture owner — design decisions, component interfaces, message contracts, dependency boundaries |
+| `a9s-coder` | Implementation — writes Go code with TDD, knows BT v2 / Lipgloss v2 / Bubbles v2 APIs |
+| `a9s-tui-reviewer` | Code review — verifies BT v2 correctness, architecture compliance, design spec adherence |
+| `a9s-qa` | QA — writes/runs tests, verifies all 7 resource types, catches regressions |
+| `a9s-qa-stories` | QA stories — generates given/when/then stories from design spec + views.yaml (no implementation knowledge) |
+| `a9s-pm` | Project manager — tracks progress, manages dependencies, verifies gates, coordinates releases |
+| `a9s-integrator` | Integration — cross-package wiring, message flow, entrypoint switching |
+| `a9s-fixtures` | Test fixtures — fetches real AWS data from gobubble-dev via MCP tool |
+| `test-coverage-analyzer` | Test analysis — coverage gaps, test quality, structure assessment |
+| `tui-ux-auditor` | UX review — design guidelines, interaction patterns, k9s comparison |
 
 ## Rules
 

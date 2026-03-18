@@ -27,22 +27,16 @@ func DefaultCredentialsPath() string {
 	return filepath.Join(home, ".aws", "credentials")
 }
 
-// ListProfiles reads the AWS config and credentials files, merges profile names,
-// deduplicates, and returns them sorted. If a file does not exist, it is skipped
-// without error.
+// ListProfiles reads AWS config file profile names, matching `aws configure list-profiles`.
+// Only [profile xxx] sections from ~/.aws/config are included.
+// Credentials-only profiles (in ~/.aws/credentials but not in config) are excluded
+// to match AWS CLI behavior.
 func ListProfiles(configPath, credentialsPath string) ([]string, error) {
 	seen := make(map[string]bool)
 
-	// Parse config file
+	// Parse config file only — matches `aws configure list-profiles` behavior
 	if configPath != "" {
 		if err := parseConfigProfiles(configPath, seen); err != nil {
-			return nil, err
-		}
-	}
-
-	// Parse credentials file
-	if credentialsPath != "" {
-		if err := parseCredentialsProfiles(credentialsPath, seen); err != nil {
 			return nil, err
 		}
 	}

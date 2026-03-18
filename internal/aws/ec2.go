@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -10,6 +11,16 @@ import (
 
 	"github.com/k2m30/a9s/internal/resource"
 )
+
+func init() {
+	resource.Register("ec2", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchEC2Instances(ctx, c.EC2)
+	})
+}
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and converts the
 // response into a slice of generic Resource structs.

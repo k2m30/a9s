@@ -1,0 +1,108 @@
+{
+  "DBClusters": [
+    {
+      "AvailabilityZones": [
+        "us-east-1a",
+        "us-east-1b",
+        "us-east-1c"
+      ],
+      "BackupRetentionPeriod": 7,
+      "DBClusterIdentifier": "test-docdb-cluster",
+      "DBClusterParameterGroup": "default.docdb5.0",
+      "DBSubnetGroup": "docdb-subnet-group",
+      "Status": "available",
+      "EarliestRestorableTime": "2026-03-10T03:11:22.572000+00:00",
+      "Endpoint": "test-docdb-cluster.cluster-abc123def.us-east-1.docdb.amazonaws.com",
+      "ReaderEndpoint": "test-docdb-cluster.cluster-ro-abc123def.us-east-1.docdb.amazonaws.com",
+      "MultiAZ": false,
+      "Engine": "docdb",
+      "EngineVersion": "5.0.0",
+      "LatestRestorableTime": "2026-03-18T01:54:15.778000+00:00",
+      "Port": 27017,
+      "MasterUsername": "hyena",
+      "PreferredBackupWindow": "03:00-04:00",
+      "PreferredMaintenanceWindow": "sun:04:30-sun:05:30",
+      "ReadReplicaIdentifiers": [],
+      "DBClusterMembers": [
+        {
+          "DBInstanceIdentifier": "test-docdb-1",
+          "IsClusterWriter": true,
+          "DBClusterParameterGroupStatus": "in-sync",
+          "PromotionTier": 0
+        }
+      ],
+      "VpcSecurityGroups": [
+        {
+          "VpcSecurityGroupId": "sg-0aa0000000000001a",
+          "Status": "active"
+        }
+      ],
+      "HostedZoneId": "Z31U74G60GD398",
+      "StorageEncrypted": false,
+      "DbClusterResourceId": "cluster-AAABBBCCCDDDEEEFFFGGG01",
+      "DBClusterArn": "arn:aws:rds:us-east-1:123456789012:cluster:test-docdb-cluster",
+      "AssociatedRoles": [],
+      "ClusterCreateTime": "2025-05-18T03:53:33.079000+00:00",
+      "DeletionProtection": true,
+      "NetworkType": "IPV4"
+    },
+    {
+      "AvailabilityZones": [
+        "us-east-1a",
+        "us-east-1b",
+        "us-east-1c"
+      ],
+      "BackupRetentionPeriod": 1,
+      "DBClusterIdentifier": "test-rds-cluster",
+      "DBClusterParameterGroup": "default.aurora-postgresql16",
+      "DBSubnetGroup": "rds-subnet-us-east-1-dev",
+      "Status": "available",
+      "EarliestRestorableTime": "2026-03-17T01:04:28.075000+00:00",
+      "Endpoint": "test-rds-cluster.cluster-abc123def.us-east-1.rds.amazonaws.com",
+      "ReaderEndpoint": "test-rds-cluster.cluster-ro-abc123def.us-east-1.rds.amazonaws.com",
+      "MultiAZ": false,
+      "Engine": "aurora-postgresql",
+      "EngineVersion": "16.8",
+      "LatestRestorableTime": "2026-03-18T01:54:15.987000+00:00",
+      "Port": 5432,
+      "MasterUsername": "chamois",
+      "PreferredBackupWindow": "00:52-01:22",
+      "PreferredMaintenanceWindow": "thu:23:13-thu:23:43",
+      "ReadReplicaIdentifiers": [],
+      "DBClusterMembers": [
+        {
+          "DBInstanceIdentifier": "test-rds-1",
+          "IsClusterWriter": true,
+          "DBClusterParameterGroupStatus": "in-sync",
+          "PromotionTier": 0
+        }
+      ],
+      "VpcSecurityGroups": [
+        {
+          "VpcSecurityGroupId": "sg-0aa0000000000015f",
+          "Status": "active"
+        }
+      ],
+      "HostedZoneId": "Z1TTGA775OQIYO",
+      "StorageEncrypted": false,
+      "DbClusterResourceId": "cluster-AAABBBCCCDDDEEEFFFGGG02",
+      "DBClusterArn": "arn:aws:rds:us-east-1:123456789012:cluster:test-rds-cluster",
+      "AssociatedRoles": [],
+      "ClusterCreateTime": "2025-04-25T11:06:26.766000+00:00",
+      "DeletionProtection": false,
+      "NetworkType": "IPV4"
+    }
+  ],
+  "ResponseMetadata": {
+    "RequestId": "683d6d8b-30a0-4bec-a0ef-57404c72c3cf",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "x-amzn-requestid": "683d6d8b-30a0-4bec-a0ef-57404c72c3cf",
+      "strict-transport-security": "max-age=31536000",
+      "content-type": "text/xml",
+      "content-length": "7429",
+      "date": "Wed, 18 Mar 2026 01:56:39 GMT"
+    },
+    "RetryAttempts": 0
+  }
+}

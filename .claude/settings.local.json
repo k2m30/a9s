@@ -12,7 +12,15 @@
       "Bash(bash .specify/scripts/*)",
       "Bash(xxd*)",
       "Bash(make*)",
-      "Bash(git checkout*)"
+      "Bash(git checkout*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(python3*)",
+      "Bash(git check-ignore*)",
+      "Bash(/Users/k2m30/projects/a9s/.claude/*)",
+      "mcp__aws-api__call_aws",
+      "Bash(tee*)",
+      "Bash(sort*)",
+      "Bash(.specify/scripts/*)"
     ]
   }
 }

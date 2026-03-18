@@ -3,12 +3,23 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/internal/resource"
 )
+
+func init() {
+	resource.Register("secrets", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchSecrets(ctx, c.SecretsManager)
+	})
+}
 
 // FetchSecrets calls the SecretsManager ListSecrets API and converts the
 // response into a slice of generic Resource structs.

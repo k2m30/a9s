@@ -39,7 +39,7 @@ var defaultViews = ViewsConfig{
 				"SecurityGroups", "LaunchTime", "Architecture", "Platform", "Tags",
 			},
 		},
-		"rds": {
+		"dbi": {
 			List: []ListColumn{
 				{Title: "DB Identifier", Path: "DBInstanceIdentifier", Width: 28},
 				{Title: "Engine", Path: "Engine", Width: 12},
@@ -70,7 +70,7 @@ var defaultViews = ViewsConfig{
 				"PreferredAvailabilityZone",
 			},
 		},
-		"docdb": {
+		"dbc": {
 			List: []ListColumn{
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
@@ -108,6 +108,48 @@ var defaultViews = ViewsConfig{
 			Detail: []string{
 				"Name", "Description", "LastAccessedDate", "LastChangedDate",
 				"RotationEnabled", "ARN", "KmsKeyId", "Tags",
+			},
+		},
+		"vpc": {
+			List: []ListColumn{
+				{Title: "VPC ID", Path: "VpcId", Width: 24},
+				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
+				{Title: "State", Path: "State", Width: 12},
+				{Title: "Default", Path: "IsDefault", Width: 9},
+			},
+			Detail: []string{
+				"VpcId", "CidrBlock", "State", "IsDefault",
+				"InstanceTenancy", "DhcpOptionsId", "OwnerId",
+				"CidrBlockAssociationSet", "Ipv6CidrBlockAssociationSet", "Tags",
+			},
+		},
+		"sg": {
+			List: []ListColumn{
+				{Title: "Group ID", Path: "GroupId", Width: 24},
+				{Title: "Group Name", Path: "GroupName", Width: 28},
+				{Title: "VPC ID", Path: "VpcId", Width: 24},
+				{Title: "Description", Path: "Description", Width: 36},
+			},
+			Detail: []string{
+				"GroupId", "GroupName", "VpcId", "Description",
+				"OwnerId", "SecurityGroupArn", "IpPermissions",
+				"IpPermissionsEgress", "Tags",
+			},
+		},
+		"ng": {
+			List: []ListColumn{
+				{Title: "Node Group", Path: "NodegroupName", Width: 28},
+				{Title: "Cluster", Path: "ClusterName", Width: 24},
+				{Title: "Status", Path: "Status", Width: 14},
+				{Title: "Instance Types", Path: "InstanceTypes", Width: 20},
+				{Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
+			},
+			Detail: []string{
+				"NodegroupName", "ClusterName", "Status", "InstanceTypes",
+				"AmiType", "CapacityType", "DiskSize", "ScalingConfig",
+				"NodeRole", "NodegroupArn", "ReleaseVersion", "Version",
+				"Subnets", "LaunchTemplate", "Labels", "Taints",
+				"Tags", "Health", "CreatedAt",
 			},
 		},
 	},

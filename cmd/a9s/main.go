@@ -7,10 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/app"
+	"github.com/k2m30/a9s/internal/tui"
 )
 
-const version = "0.5.0"
+const version = "1.4.1"
 
 func main() {
 	var (
@@ -51,12 +51,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	app.InitStyles()
-	app.Version = version
+	tui.Version = version
 
-	appState := app.NewAppState(profile, region)
+	model := tui.New(profile, region)
 
-	p := tea.NewProgram(appState)
+	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

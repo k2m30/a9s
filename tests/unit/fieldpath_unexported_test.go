@@ -140,7 +140,7 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 	t.Run("DocumentDB Cluster", func(t *testing.T) {
 		cluster := docdbtypes.DBCluster{
 			DBClusterIdentifier: strPtr("docdb-001"),
-			Engine:              strPtr("docdb"),
+			Engine:              strPtr("dbc"),
 			EngineVersion:       strPtr("5.0"),
 			Status:              strPtr("available"),
 			Endpoint:            strPtr("docdb-001.abc.docdb.amazonaws.com"),

@@ -11,6 +11,16 @@ import (
 	"github.com/k2m30/a9s/internal/resource"
 )
 
+func init() {
+	resource.Register("s3", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchS3Buckets(ctx, c.S3)
+	})
+}
+
 // FetchS3Buckets calls the S3 ListBuckets API and returns a slice of
 // generic Resource structs. Region is whatever AWS returns — no extra
 // GetBucketLocation calls (region is a pass-through API parameter).

@@ -1,0 +1,50 @@
+{
+  "DBClusters": [
+    {
+      "AvailabilityZones": ["us-east-1a", "us-east-1b", "us-east-1c"],
+      "BackupRetentionPeriod": 7,
+      "DBClusterIdentifier": "test-docdb-cluster",
+      "DBClusterParameterGroup": "default.docdb5.0",
+      "DBSubnetGroup": "docdb-subnet-group",
+      "Status": "available",
+      "EarliestRestorableTime": "2026-03-10T03:11:22.572000+00:00",
+      "Endpoint": "test-docdb-cluster.cluster-abc123def.us-east-1.docdb.amazonaws.com",
+      "ReaderEndpoint": "test-docdb-cluster.cluster-ro-abc123def.us-east-1.docdb.amazonaws.com",
+      "MultiAZ": false,
+      "Engine": "docdb",
+      "EngineVersion": "5.0.0",
+      "LatestRestorableTime": "2026-03-18T01:55:32.069000+00:00",
+      "Port": 27017,
+      "MasterUsername": "hyena",
+      "PreferredBackupWindow": "03:00-04:00",
+      "PreferredMaintenanceWindow": "sun:04:30-sun:05:30",
+      "ReadReplicaIdentifiers": [],
+      "DBClusterMembers": [
+        {
+          "DBInstanceIdentifier": "test-docdb-1",
+          "IsClusterWriter": true,
+          "DBClusterParameterGroupStatus": "in-sync",
+          "PromotionTier": 0
+        }
+      ],
+      "VpcSecurityGroups": [
+        {
+          "VpcSecurityGroupId": "sg-0aa0000000000001a",
+          "Status": "active"
+        }
+      ],
+      "HostedZoneId": "Z31U74G60GD398",
+      "StorageEncrypted": false,
+      "DbClusterResourceId": "cluster-AAABBBCCCDDDEEEFFFGGG01",
+      "DBClusterArn": "arn:aws:rds:us-east-1:123456789012:cluster:test-docdb-cluster",
+      "AssociatedRoles": [],
+      "ClusterCreateTime": "2025-05-18T03:53:33.079000+00:00",
+      "DeletionProtection": true,
+      "NetworkType": "IPV4"
+    }
+  ],
+  "ResponseMetadata": {
+    "RequestId": "aca821b7-09ce-4395-80f5-8f21a8e0d65b",
+    "HTTPStatusCode": 200
+  }
+}

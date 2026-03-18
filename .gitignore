@@ -5,8 +5,10 @@
 *.prof
 vendor/
 
-# Binary
+# Binaries
 /a9s
+/preview
+/preview_detail
 
 # IDE
 .vscode/
@@ -24,3 +26,7 @@ coverage.out
 coverage.html
 
 !.claude
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# tests/testdata/fixtures/ — sanitized, safe to commit

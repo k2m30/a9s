@@ -10,8 +10,19 @@ import (
 	"github.com/k2m30/a9s/internal/resource"
 )
 
-// FetchDocDBClusters calls the DocumentDB DescribeDBClusters API and converts
+func init() {
+	resource.Register("dbc", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchDocDBClusters(ctx, c.DocDB)
+	})
+}
+
+// FetchDocDBClusters calls the DescribeDBClusters API and converts
 // the response into a slice of generic Resource structs.
+// Returns all DB clusters (Aurora, DocumentDB, Neptune) — no engine filter.
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{})
 	if err != nil {

@@ -51,9 +51,9 @@ var resourceTypes = []ResourceTypeDef{
 		},
 	},
 	{
-		Name:      "RDS Instances",
-		ShortName: "rds",
-		Aliases:   []string{"rds", "databases"},
+		Name:      "DB Instances",
+		ShortName: "dbi",
+		Aliases:   []string{"dbi", "rds", "databases", "db-instances"},
 		Columns: []Column{
 			{Key: "db_identifier", Title: "DB Identifier", Width: 28, Sortable: true},
 			{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
@@ -78,9 +78,9 @@ var resourceTypes = []ResourceTypeDef{
 		},
 	},
 	{
-		Name:      "DocumentDB Clusters",
-		ShortName: "docdb",
-		Aliases:   []string{"docdb", "documentdb"},
+		Name:      "DB Clusters",
+		ShortName: "dbc",
+		Aliases:   []string{"dbc", "docdb", "clusters", "db-clusters"},
 		Columns: []Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 			{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
@@ -111,6 +111,41 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "last_accessed", Title: "Last Accessed", Width: 18, Sortable: true},
 			{Key: "last_changed", Title: "Last Changed", Width: 18, Sortable: true},
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
+		},
+	},
+	{
+		Name:      "VPCs",
+		ShortName: "vpc",
+		Aliases:   []string{"vpc", "vpcs"},
+		Columns: []Column{
+			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
+			{Key: "name", Title: "Name", Width: 28, Sortable: true},
+			{Key: "cidr_block", Title: "CIDR Block", Width: 18, Sortable: true},
+			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
+		},
+	},
+	{
+		Name:      "Security Groups",
+		ShortName: "sg",
+		Aliases:   []string{"sg", "securitygroups", "security-groups"},
+		Columns: []Column{
+			{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
+			{Key: "group_name", Title: "Group Name", Width: 28, Sortable: true},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
+			{Key: "description", Title: "Description", Width: 36, Sortable: false},
+		},
+	},
+	{
+		Name:      "EKS Node Groups",
+		ShortName: "ng",
+		Aliases:   []string{"ng", "nodegroups", "node-groups"},
+		Columns: []Column{
+			{Key: "nodegroup_name", Title: "Node Group", Width: 28, Sortable: true},
+			{Key: "cluster_name", Title: "Cluster", Width: 24, Sortable: true},
+			{Key: "status", Title: "Status", Width: 14, Sortable: true},
+			{Key: "instance_types", Title: "Instance Types", Width: 20, Sortable: false},
+			{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 		},
 	},
 }

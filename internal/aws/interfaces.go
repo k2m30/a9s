@@ -68,3 +68,23 @@ type SecretsManagerListSecretsAPI interface {
 type SecretsManagerGetSecretValueAPI interface {
 	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 }
+
+// EC2DescribeVpcsAPI defines the interface for the EC2 DescribeVpcs operation.
+type EC2DescribeVpcsAPI interface {
+	DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
+}
+
+// EC2DescribeSecurityGroupsAPI defines the interface for the EC2 DescribeSecurityGroups operation.
+type EC2DescribeSecurityGroupsAPI interface {
+	DescribeSecurityGroups(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error)
+}
+
+// EKSListNodegroupsAPI defines the interface for the EKS ListNodegroups operation.
+type EKSListNodegroupsAPI interface {
+	ListNodegroups(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
+}
+
+// EKSDescribeNodegroupAPI defines the interface for the EKS DescribeNodegroup operation.
+type EKSDescribeNodegroupAPI interface {
+	DescribeNodegroup(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
+}

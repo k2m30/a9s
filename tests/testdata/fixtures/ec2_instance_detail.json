@@ -1,0 +1,127 @@
+{
+  "Reservations": [
+    {
+      "ReservationId": "r-0aaa111111111111a",
+      "OwnerId": "123456789012",
+      "RequesterId": "164481579473",
+      "Groups": [],
+      "Instances": [
+        {
+          "Architecture": "x86_64",
+          "BlockDeviceMappings": [
+            {
+              "DeviceName": "/dev/sda1",
+              "Ebs": {
+                "AttachTime": "2025-05-13T22:17:17+00:00",
+                "DeleteOnTermination": true,
+                "Status": "attached",
+                "VolumeId": "vol-0aaa111111111111a",
+                "EbsCardIndex": 0
+              }
+            }
+          ],
+          "ClientToken": "521d4c4dda765c4a38c1d1c076c37e6bc9d67684bba25bef76e3314539f4",
+          "EbsOptimized": false,
+          "EnaSupport": true,
+          "Hypervisor": "xen",
+          "InstanceLifecycle": "spot",
+          "NetworkInterfaces": [
+            {
+              "Association": {
+                "IpOwnerId": "123456789012",
+                "PublicDnsName": "ec2-203-0-113-20.us-east-1.compute.amazonaws.com",
+                "PublicIp": "203.0.113.20"
+              },
+              "Attachment": {
+                "AttachTime": "2025-05-13T22:17:17+00:00",
+                "AttachmentId": "eni-attach-0aaa111111111111a",
+                "DeleteOnTermination": true,
+                "DeviceIndex": 0,
+                "Status": "attached",
+                "NetworkCardIndex": 0
+              },
+              "Description": "",
+              "Groups": [
+                {
+                  "GroupId": "sg-0aa0000000000008b",
+                  "GroupName": "allow-http-https-ssh"
+                }
+              ],
+              "Ipv6Addresses": [],
+              "MacAddress": "06:40:2d:28:8c:fd",
+              "NetworkInterfaceId": "eni-0aaa111111111111a",
+              "OwnerId": "123456789012",
+              "PrivateDnsName": "ip-10-0-48-186.us-east-1.compute.internal",
+              "PrivateIpAddress": "10.0.48.186",
+              "PrivateIpAddresses": [
+                {
+                  "Association": {
+                    "IpOwnerId": "123456789012",
+                    "PublicDnsName": "ec2-203-0-113-20.us-east-1.compute.amazonaws.com",
+                    "PublicIp": "203.0.113.20"
+                  },
+                  "Primary": true,
+                  "PrivateDnsName": "ip-10-0-48-186.us-east-1.compute.internal",
+                  "PrivateIpAddress": "10.0.48.186"
+                }
+              ],
+              "SourceDestCheck": true,
+              "Status": "in-use",
+              "SubnetId": "subnet-0ddd444444444444d",
+              "VpcId": "vpc-0aaa1111bbb2222cc",
+              "InterfaceType": "interface"
+            }
+          ],
+          "RootDeviceName": "/dev/sda1",
+          "RootDeviceType": "ebs",
+          "SecurityGroups": [
+            {
+              "GroupId": "sg-0aa0000000000008b",
+              "GroupName": "allow-http-https-ssh"
+            }
+          ],
+          "SourceDestCheck": true,
+          "SpotInstanceRequestId": "sir-aaa11111",
+          "VirtualizationType": "hvm",
+          "CpuOptions": {
+            "CoreCount": 2,
+            "ThreadsPerCore": 2
+          },
+          "InstanceId": "i-0aaa111111111111a",
+          "ImageId": "ami-0bbb222222222222b",
+          "State": {
+            "Code": 16,
+            "Name": "running"
+          },
+          "PrivateDnsName": "ip-10-0-48-186.us-east-1.compute.internal",
+          "PublicDnsName": "ec2-203-0-113-20.us-east-1.compute.amazonaws.com",
+          "StateTransitionReason": "",
+          "KeyName": "test-key",
+          "AmiLaunchIndex": 0,
+          "ProductCodes": [],
+          "InstanceType": "g4dn.xlarge",
+          "LaunchTime": "2026-02-25T17:03:15+00:00",
+          "Placement": {
+            "AvailabilityZoneId": "use1-az2",
+            "GroupName": "",
+            "Tenancy": "default",
+            "AvailabilityZone": "us-east-1a"
+          },
+          "Monitoring": {
+            "State": "disabled"
+          },
+          "SubnetId": "subnet-0ddd444444444444d",
+          "VpcId": "vpc-0aaa1111bbb2222cc",
+          "PrivateIpAddress": "10.0.48.186",
+          "PublicIpAddress": "203.0.113.20",
+          "PlatformDetails": "Linux/UNIX",
+          "Tags": []
+        }
+      ]
+    }
+  ],
+  "ResponseMetadata": {
+    "RequestId": "6c4317ef-db25-47ef-a30d-af41e205aa22",
+    "HTTPStatusCode": 200
+  }
+}

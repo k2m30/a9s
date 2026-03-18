@@ -128,3 +128,23 @@ func TestFetchDocDBClusters_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+func TestFetchDocDBClusters_NoEngineFilter(t *testing.T) {
+	// DB Clusters should return ALL clusters (no engine filter) — instances vs clusters, not engine-based.
+	mock := &mockDocDBFilterCapture{
+		output: &docdb.DescribeDBClustersOutput{
+			DBClusters: []docdbtypes.DBCluster{},
+		},
+	}
+
+	_, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if mock.capturedInput == nil {
+		t.Fatal("expected DescribeDBClusters to be called with input")
+	}
+	if len(mock.capturedInput.Filters) != 0 {
+		t.Errorf("expected no filters (show all clusters), got %d filters", len(mock.capturedInput.Filters))
+	}
+}

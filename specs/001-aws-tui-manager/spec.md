@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-aws-tui-manager`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Partial
 **Input**: Terminal UI AWS resource manager inspired by k9s, MVP focused on read operations with k9s-style command navigation for browsing AWS resources (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -279,55 +279,55 @@ via colon commands and verifying the correct columns and data appear.
 ### Functional Requirements
 
 - **FR-001**: Application MUST launch as a terminal-based interactive UI
-  that takes over the full terminal window.
+  that takes over the full terminal window. — *Implemented*
 - **FR-002**: Application MUST read AWS profiles from `~/.aws/config`
   and `~/.aws/credentials` and use the default profile on startup
-  (or the profile set via `AWS_PROFILE` environment variable).
+  (or the profile set via `AWS_PROFILE` environment variable). — *Implemented*
 - **FR-003**: Application MUST display a persistent header showing the
-  active AWS profile name, active region, and application name/version.
+  active AWS profile name, active region, and application name/version. — *Implemented*
 - **FR-004**: Application MUST support a colon-command system activated
-  by pressing `:`, with auto-suggestions for known commands.
+  by pressing `:`, with auto-suggestions for known commands. — *Partial: commands work but no auto-suggestions/completion*
 - **FR-005**: Application MUST support these navigation commands:
   `:main` / `:root` (resource types list), `:ctx` (profile list),
   `:region` (region list), `:s3`, `:ec2`, `:rds`, `:redis`, `:docdb`,
-  `:eks`, `:secrets` (resource type views), `:q` / `:quit` (exit).
+  `:eks`, `:secrets` (resource type views), `:q` / `:quit` (exit). — *Implemented*
 - **FR-006**: Application MUST support k9s-style keybindings: `j`/`k` or
   arrow keys for cursor movement, `g`/`G` for top/bottom, `h`/`l` or
   left/right arrows for horizontal table scrolling, Enter for
   select/drill-in, Escape for back/cancel, `d` for describe (detail view),
   `x` for reveal/decode (e.g., secret values as plain text, no confirmation),
-  `c` for copy resource identifier to clipboard, `y` for raw JSON view,
-  `q` to quit (from main menu) or go back (from other views).
+  `c` for copy resource identifier to clipboard, `y` for YAML view,
+  `q` to quit (from main menu) or go back (from other views). — *Partial: `y` shows YAML (not JSON as spec originally said); `[`/`]` history keys not implemented*
 - **FR-007**: Application MUST support filter mode via `/` with
-  real-time text matching across all visible columns.
+  real-time text matching across all visible columns. — *Implemented*
 - **FR-008**: Application MUST display resources in tabular format with
-  columns appropriate to each resource type.
+  columns appropriate to each resource type. — *Implemented*
 - **FR-009**: Application MUST provide a detail view for each resource
-  showing all available attributes in a scrollable format.
+  showing all available attributes in a scrollable format. — *Implemented*
 - **FR-010**: Application MUST support S3 hierarchical browsing — entering
-  a bucket shows objects/prefixes, and users can navigate into prefixes.
+  a bucket shows objects/prefixes, and users can navigate into prefixes. — *Implemented*
 - **FR-011**: Application MUST allow switching AWS profiles via `:ctx`
-  and reload resource views with the new profile's credentials.
+  and reload resource views with the new profile's credentials. — *Implemented*
 - **FR-012**: Application MUST allow switching AWS regions via `:region`.
   The selected region is passed as a parameter to all AWS API calls
   (equivalent to `--region`). The app displays whatever AWS returns
   with no client-side filtering — some APIs (e.g., S3 ListBuckets)
-  return global results regardless of region.
+  return global results regardless of region. — *Implemented*
 - **FR-013**: Application MUST display breadcrumbs showing the current
-  navigation path (e.g., `main > EC2 > i-abc123`).
+  navigation path (e.g., `main > EC2 > i-abc123`). — *Not implemented — uses centered frame titles instead of breadcrumb path*
 - **FR-014**: Application MUST show a help overlay when the user
-  presses `?` listing all available commands and keyboard shortcuts.
+  presses `?` listing all available commands and keyboard shortcuts. — *Implemented*
 - **FR-015**: Application MUST support back/forward navigation history
-  using `[` and `]` keys.
+  using `[` and `]` keys. — *Not implemented — no history stack, only stack-based Escape pop*
 - **FR-016**: Application MUST handle API errors gracefully by displaying
-  error messages in a status area without crashing or freezing.
+  error messages in a status area without crashing or freezing. — *Implemented*
 - **FR-017**: Application MUST support column sorting via keyboard
-  shortcuts: `N` for name, `S` for status, `A` for age/time.
+  shortcuts: `N` for name, `S` for status, `A` for age/time. — *Implemented*
 - **FR-018**: Application MUST perform API calls asynchronously,
   showing a loading indicator while data is being fetched. Data refresh
-  is manual only via `Ctrl-R` (reloads current view). No auto-polling.
+  is manual only via `Ctrl-R` (reloads current view). No auto-polling. — *Implemented*
 - **FR-019**: Application MUST be read-only — no create, update, or
-  delete operations on AWS resources.
+  delete operations on AWS resources. — *Implemented*
 
 ### Key Entities
 
@@ -390,3 +390,31 @@ via colon commands and verifying the correct columns and data appear.
   even while API calls are in progress.
 - **SC-008**: 90% of users familiar with k9s or vim-style navigation
   can complete a resource lookup task on first attempt without help.
+
+## Future Work
+
+- Breadcrumb navigation showing full path (FR-013)
+- Back/forward history navigation with `[`/`]` keys (FR-015)
+- Command auto-suggestions/completion for colon commands (FR-004)
+
+## Related Documents
+
+### Design
+- [TUI Design Specification](../../docs/design/design.md) — Layout, color palette, component specs, wireframes
+
+### QA Stories
+- [01 — Main Menu](../../docs/qa/01-main-menu.md)
+- [02 — S3 Views](../../docs/qa/02-s3-views.md)
+- [03 — EC2 Views](../../docs/qa/03-ec2-views.md)
+- [04 — RDS Views](../../docs/qa/04-rds-views.md)
+- [05 — Redis & DocumentDB Views](../../docs/qa/05-redis-docdb-views.md)
+- [06 — EKS & Secrets Views](../../docs/qa/06-eks-secrets-views.md)
+- [07 — Help, Profile & Region](../../docs/qa/07-help-profile-region.md)
+- [08 — Detail (All Types)](../../docs/qa/08-detail-all-types.md)
+- [09 — YAML (All Types)](../../docs/qa/09-yaml-all-types.md)
+
+### Architecture & Testing
+- [Architecture Review v2](../../docs/architecture-review-v2.md)
+- [Test Suite Report](../../docs/test-suite-report.md)
+- [Rewrite Task Breakdown](../../docs/rewrite-tasks.md)
+- [QA Test Tasks](../../docs/qa/qa-test-tasks.md)
