@@ -1,0 +1,30 @@
+{
+  "Contents": [
+    {
+      "Key": "dev/terraform.tfstate",
+      "LastModified": "2025-10-14T08:49:08+00:00",
+      "ETag": "\"87b8dae36007aca0ca3baeadd39bee15\"",
+      "ChecksumAlgorithm": ["SHA256"],
+      "ChecksumType": "FULL_OBJECT",
+      "Size": 63378,
+      "StorageClass": "STANDARD"
+    }
+  ],
+  "RequestCharged": null,
+  "Prefix": "",
+  "ResponseMetadata": {
+    "RequestId": "VZ623NVB8P9NFEPP",
+    "HostId": "YfuQSBEsb+TDuHPNhiVtk7AEMDcsojIORvdxT3n4BHPNx6XGzwKgELks7rnv21rhMbhoLCf9i3e+Ew4g1P5O0snJiENzPtyJ",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "x-amz-id-2": "YfuQSBEsb+TDuHPNhiVtk7AEMDcsojIORvdxT3n4BHPNx6XGzwKgELks7rnv21rhMbhoLCf9i3e+Ew4g1P5O0snJiENzPtyJ",
+      "x-amz-request-id": "VZ623NVB8P9NFEPP",
+      "date": "Wed, 18 Mar 2026 01:58:06 GMT",
+      "x-amz-bucket-region": "us-east-1",
+      "content-type": "application/xml",
+      "transfer-encoding": "chunked",
+      "server": "AmazonS3"
+    },
+    "RetryAttempts": 0
+  }
+}

@@ -119,7 +119,7 @@ func realisticRedisCacheCluster() elasticachetypes.CacheCluster {
 func realisticDocDBCluster() docdbtypes.DBCluster {
 	return docdbtypes.DBCluster{
 		DBClusterIdentifier: ptrString("docdb-prod-cluster"),
-		Engine:              ptrString("docdb"),
+		Engine:              ptrString("dbc"),
 		EngineVersion:       ptrString("5.0.0"),
 		Status:              ptrString("available"),
 		Endpoint:            ptrString("docdb-prod.cluster-abc123.us-east-1.docdb.amazonaws.com"),
@@ -433,12 +433,12 @@ func TestQA_NilFields_EC2(t *testing.T) {
 }
 
 // ===========================================================================
-// RDS Instances
+// DB Instances
 // ===========================================================================
 
 func TestQA_ListViewColumns_RDS(t *testing.T) {
 	db := realisticRDSInstance()
-	vd := config.DefaultViewDef("rds")
+	vd := config.DefaultViewDef("dbi")
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestQA_ListViewColumns_RDS(t *testing.T) {
 
 func TestQA_DetailViewPaths_RDS(t *testing.T) {
 	db := realisticRDSInstance()
-	vd := config.DefaultViewDef("rds")
+	vd := config.DefaultViewDef("dbi")
 
 	for _, path := range vd.Detail {
 		t.Run(path, func(t *testing.T) {
@@ -491,7 +491,7 @@ func TestQA_NilFields_RDS(t *testing.T) {
 		DBInstanceIdentifier: ptrString("test-db"),
 		DBInstanceStatus:     ptrString("creating"),
 	}
-	vd := config.DefaultViewDef("rds")
+	vd := config.DefaultViewDef("dbi")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
@@ -593,7 +593,7 @@ func TestQA_NilFields_Redis(t *testing.T) {
 
 func TestQA_ListViewColumns_DocDB(t *testing.T) {
 	cluster := realisticDocDBCluster()
-	vd := config.DefaultViewDef("docdb")
+	vd := config.DefaultViewDef("dbc")
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
@@ -625,7 +625,7 @@ func TestQA_ListViewColumns_DocDB(t *testing.T) {
 
 func TestQA_DetailViewPaths_DocDB(t *testing.T) {
 	cluster := realisticDocDBCluster()
-	vd := config.DefaultViewDef("docdb")
+	vd := config.DefaultViewDef("dbc")
 
 	for _, path := range vd.Detail {
 		t.Run(path, func(t *testing.T) {
@@ -649,7 +649,7 @@ func TestQA_NilFields_DocDB(t *testing.T) {
 		DBClusterIdentifier: ptrString("docdb-test"),
 		Status:              ptrString("creating"),
 	}
-	vd := config.DefaultViewDef("docdb")
+	vd := config.DefaultViewDef("dbc")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
@@ -814,7 +814,7 @@ func TestQA_NilFields_Secrets(t *testing.T) {
 // ===========================================================================
 
 func TestQA_AllResourceTypesHaveDefaults(t *testing.T) {
-	resourceTypes := []string{"s3", "s3_objects", "ec2", "rds", "redis", "docdb", "eks", "secrets"}
+	resourceTypes := []string{"s3", "s3_objects", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {

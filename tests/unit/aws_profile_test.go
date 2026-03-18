@@ -55,7 +55,9 @@ func TestListProfiles_ConfigOnly(t *testing.T) {
 	}
 }
 
-func TestListProfiles_CredentialsOnly(t *testing.T) {
+func TestListProfiles_CredentialsOnly_ReturnsEmpty(t *testing.T) {
+	// When only credentials file exists (no config file), no profiles are returned.
+	// This matches `aws configure list-profiles` behavior which reads only config.
 	configPath := filepath.Join("..", "testdata", "nonexistent_config")
 	credentialsPath := filepath.Join("..", "testdata", "aws_credentials_sample")
 
@@ -64,9 +66,8 @@ func TestListProfiles_CredentialsOnly(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	expected := []string{"default", "dev"}
-	if !reflect.DeepEqual(profiles, expected) {
-		t.Errorf("expected profiles %v, got %v", expected, profiles)
+	if len(profiles) != 0 {
+		t.Errorf("expected 0 profiles (credentials-only not included), got %v", profiles)
 	}
 }
 

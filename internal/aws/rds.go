@@ -10,6 +10,16 @@ import (
 	"github.com/k2m30/a9s/internal/resource"
 )
 
+func init() {
+	resource.Register("dbi", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchRDSInstances(ctx, c.RDS)
+	})
+}
+
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the
 // response into a slice of generic Resource structs.
 func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]resource.Resource, error) {

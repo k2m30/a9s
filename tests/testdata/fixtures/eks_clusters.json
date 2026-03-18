@@ -1,0 +1,23 @@
+{
+  "clusters": [
+    "test-cluster-1"
+  ],
+  "ResponseMetadata": {
+    "RequestId": "7c8c0200-ec4d-483d-bc71-131dbee3631b",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "date": "Wed, 18 Mar 2026 01:56:40 GMT",
+      "content-type": "application/json",
+      "content-length": "51",
+      "connection": "keep-alive",
+      "x-amzn-requestid": "7c8c0200-ec4d-483d-bc71-131dbee3631b",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*,Authorization,Date,X-Amz-Date,X-Amz-Security-Token,X-Amz-Target,content-type,x-amz-content-sha256,x-amz-user-agent,x-amzn-platform-id,x-amzn-trace-id",
+      "x-amz-apigw-id": "aZXt0HL1LPEEN-A=",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE,OPTIONS",
+      "access-control-expose-headers": "x-amzn-errortype,x-amzn-errormessage,x-amzn-trace-id,x-amzn-requestid,x-amz-apigw-id,date",
+      "x-amzn-trace-id": "Root=1-69ba0658-7482ed121cd5a2b72801a0e7"
+    },
+    "RetryAttempts": 0
+  }
+}

@@ -177,6 +177,21 @@ func (m *mockDocDBClient) DescribeDBClusters(
 	return m.output, m.err
 }
 
+// mockDocDBFilterCapture captures the input to verify filters are passed.
+type mockDocDBFilterCapture struct {
+	output        *docdb.DescribeDBClustersOutput
+	capturedInput *docdb.DescribeDBClustersInput
+}
+
+func (m *mockDocDBFilterCapture) DescribeDBClusters(
+	ctx context.Context,
+	params *docdb.DescribeDBClustersInput,
+	optFns ...func(*docdb.Options),
+) (*docdb.DescribeDBClustersOutput, error) {
+	m.capturedInput = params
+	return m.output, nil
+}
+
 // ---------------------------------------------------------------------------
 // EKS mocks
 // ---------------------------------------------------------------------------
@@ -245,6 +260,87 @@ func (m *mockSecretsManagerGetSecretValueClient) GetSecretValue(
 	optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.GetSecretValueOutput, error) {
 	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// VPC mocks
+// ---------------------------------------------------------------------------
+
+// mockEC2DescribeVpcsClient implements awsclient.EC2DescribeVpcsAPI for testing.
+type mockEC2DescribeVpcsClient struct {
+	output *ec2.DescribeVpcsOutput
+	err    error
+}
+
+func (m *mockEC2DescribeVpcsClient) DescribeVpcs(
+	ctx context.Context,
+	params *ec2.DescribeVpcsInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.DescribeVpcsOutput, error) {
+	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// Security Groups mocks
+// ---------------------------------------------------------------------------
+
+// mockEC2DescribeSecurityGroupsClient implements awsclient.EC2DescribeSecurityGroupsAPI for testing.
+type mockEC2DescribeSecurityGroupsClient struct {
+	output *ec2.DescribeSecurityGroupsOutput
+	err    error
+}
+
+func (m *mockEC2DescribeSecurityGroupsClient) DescribeSecurityGroups(
+	ctx context.Context,
+	params *ec2.DescribeSecurityGroupsInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.DescribeSecurityGroupsOutput, error) {
+	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// EKS Node Groups mocks
+// ---------------------------------------------------------------------------
+
+// mockEKSListNodegroupsClient implements awsclient.EKSListNodegroupsAPI for testing.
+type mockEKSListNodegroupsClient struct {
+	outputs map[string]*eks.ListNodegroupsOutput // keyed by cluster name
+	err     error
+}
+
+func (m *mockEKSListNodegroupsClient) ListNodegroups(
+	ctx context.Context,
+	params *eks.ListNodegroupsInput,
+	optFns ...func(*eks.Options),
+) (*eks.ListNodegroupsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if out, ok := m.outputs[*params.ClusterName]; ok {
+		return out, nil
+	}
+	return &eks.ListNodegroupsOutput{}, nil
+}
+
+// mockEKSDescribeNodegroupClient implements awsclient.EKSDescribeNodegroupAPI for testing.
+type mockEKSDescribeNodegroupClient struct {
+	outputs map[string]*eks.DescribeNodegroupOutput // keyed by "cluster/nodegroup"
+	err     error
+}
+
+func (m *mockEKSDescribeNodegroupClient) DescribeNodegroup(
+	ctx context.Context,
+	params *eks.DescribeNodegroupInput,
+	optFns ...func(*eks.Options),
+) (*eks.DescribeNodegroupOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	key := *params.ClusterName + "/" + *params.NodegroupName
+	if out, ok := m.outputs[key]; ok {
+		return out, nil
+	}
+	return nil, fmt.Errorf("nodegroup %q not found", key)
 }
 
 // ---------------------------------------------------------------------------

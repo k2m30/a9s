@@ -3,12 +3,23 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 
 	"github.com/k2m30/a9s/internal/resource"
 )
+
+func init() {
+	resource.Register("eks", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchEKSClusters(ctx, c.EKS, c.EKS)
+	})
+}
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names,
 // then DescribeCluster for each name to get full details.

@@ -1,0 +1,17 @@
+{
+  "LocationConstraint": "us-east-1",
+  "ResponseMetadata": {
+    "RequestId": "VZ6EBSZC2P376DMN",
+    "HostId": "nerZGbyy7FG/Klr417122YJFCT2Upfl+3a/Y9d1k++X09r1tVJVJ5H6WqiPBrwJobZqbo6p+57azTqNi2zrWVJWmaspbNG8s",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "x-amz-id-2": "nerZGbyy7FG/Klr417122YJFCT2Upfl+3a/Y9d1k++X09r1tVJVJ5H6WqiPBrwJobZqbo6p+57azTqNi2zrWVJWmaspbNG8s",
+      "x-amz-request-id": "VZ6EBSZC2P376DMN",
+      "date": "Wed, 18 Mar 2026 01:58:06 GMT",
+      "content-type": "application/xml",
+      "transfer-encoding": "chunked",
+      "server": "AmazonS3"
+    },
+    "RetryAttempts": 0
+  }
+}

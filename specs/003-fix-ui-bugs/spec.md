@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-fix-ui-bugs`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Partial
 **Input**: User description: "Fix 15 UI bugs across filter, navigation, scrolling, status line, help, detail view, breadcrumbs, copy, YAML rendering, and config column widths."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -202,25 +202,25 @@ As a user, I want column width changes in `views.yaml` to take effect.
 
 ### Functional Requirements
 
-- **FR-001**: Filter mode (`/` key) MUST work on the main menu view.
-- **FR-002**: Back navigation from S3 bucket/prefix MUST restore the previously selected item index.
-- **FR-003**: The `y` key MUST render resource data as YAML, not JSON.
-- **FR-004**: The `c` key MUST copy resource ID in list view, full detail YAML in detail view.
-- **FR-005**: The status bar MUST always render at the last terminal line.
-- **FR-006**: Status messages MUST clear on navigation change.
-- **FR-007**: Breadcrumbs MUST show "main" only on the main menu.
-- **FR-008**: Breadcrumbs MUST include resource count (e.g., "bucket-name (139)").
-- **FR-009**: The duplicate title line below breadcrumbs MUST be removed.
-- **FR-010**: All views MUST support vertical scrolling.
-- **FR-011**: All views MUST support horizontal scrolling.
-- **FR-012**: Horizontal scroll MUST clamp to content width — no over-scrolling, no dead presses.
-- **FR-013**: Horizontal scroll MUST reset to 0 on navigation change.
-- **FR-014**: Help screen MUST show only keys for the current view.
-- **FR-015**: Header bar MUST have no blue background. Version on the right.
-- **FR-016**: Detail view title MUST not include " - Detail".
-- **FR-017**: Detail view MUST support `w` key to toggle word wrap. Wrap disables horizontal scroll.
-- **FR-018**: Detail view YAML MUST render `Key: value` (colon right after key).
-- **FR-019**: Column widths from `views.yaml` MUST be applied in list view rendering.
+- **FR-001**: Filter mode (`/` key) MUST work on the main menu view. — *Implemented*
+- **FR-002**: Back navigation from S3 bucket/prefix MUST restore the previously selected item index. — *Not implemented: no cursor position stack for S3 back-navigation*
+- **FR-003**: The `y` key MUST render resource data as YAML, not JSON. — *Implemented*
+- **FR-004**: The `c` key MUST copy resource ID in list view, full detail YAML in detail view. — *Implemented*
+- **FR-005**: The status bar MUST always render at the last terminal line. — *Implemented*
+- **FR-006**: Status messages MUST clear on navigation change. — *Partial: flash clears on timeout but not explicitly on view navigation*
+- **FR-007**: Breadcrumbs MUST show "main" only on the main menu. — *Implemented*
+- **FR-008**: Breadcrumbs MUST include resource count (e.g., "bucket-name (139)"). — *Partial: resource list count works, S3 object count format uncertain*
+- **FR-009**: The duplicate title line below breadcrumbs MUST be removed. — *Implemented*
+- **FR-010**: All views MUST support vertical scrolling. — *Implemented*
+- **FR-011**: All views MUST support horizontal scrolling. — *Implemented*
+- **FR-012**: Horizontal scroll MUST clamp to content width — no over-scrolling, no dead presses. — *Partial: left scroll clamped, right scroll can overflow beyond content*
+- **FR-013**: Horizontal scroll MUST reset to 0 on navigation change. — *Not implemented: horizontal scroll offset persists across navigation*
+- **FR-014**: Help screen MUST show only keys for the current view. — *Implemented*
+- **FR-015**: Header bar MUST have no blue background. Version on the right. — *Implemented*
+- **FR-016**: Detail view title MUST not include " - Detail". — *Implemented*
+- **FR-017**: Detail view MUST support `w` key to toggle word wrap. Wrap disables horizontal scroll. — *Implemented*
+- **FR-018**: Detail view YAML MUST render `Key: value` (colon right after key). — *Implemented*
+- **FR-019**: Column widths from `views.yaml` MUST be applied in list view rendering. — *Implemented*
 
 ## Assumptions
 
@@ -239,3 +239,22 @@ As a user, I want column width changes in `views.yaml` to take effect.
 - **SC-003**: Navigation state preserved across all back-navigation paths.
 - **SC-004**: Horizontal scroll never exceeds content bounds.
 - **SC-005**: All existing tests pass with zero regressions.
+
+## Future Work
+
+- S3 back-navigation cursor position restore (FR-002)
+- Horizontal scroll clamping on right boundary (FR-012)
+- Reset horizontal scroll offset on view navigation (FR-013)
+- Clear flash messages explicitly on view navigation (FR-006)
+
+## Related Documents
+
+### Design
+- [Detail View Design](../../docs/design/detail-view.md) — Detail view layout redesign
+
+### QA Stories
+- [11 — Filtering](../../docs/qa/11-filtering.md)
+- [12 — Help Screen](../../docs/qa/12-help-screen.md)
+
+### Architecture
+- [Architecture Audit](../../docs/architecture-audit.md) — Root cause analysis of production bugs
