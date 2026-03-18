@@ -1,0 +1,287 @@
+{
+  "Buckets": [
+    {
+      "Name": "test-app-state",
+      "CreationDate": "2025-06-20T11:35:46+00:00",
+      "BucketArn": "arn:aws:s3:::test-app-state"
+    },
+    {
+      "Name": "cdn-logs.example.com",
+      "CreationDate": "2025-05-12T19:24:13+00:00",
+      "BucketArn": "arn:aws:s3:::cdn-logs.example.com"
+    },
+    {
+      "Name": "cdn-website.example.com",
+      "CreationDate": "2025-05-13T17:36:40+00:00",
+      "BucketArn": "arn:aws:s3:::cdn-website.example.com"
+    },
+    {
+      "Name": "cf-templates-1gm7n7sq5r8tl-us-east-1",
+      "CreationDate": "2025-05-16T16:37:50+00:00",
+      "BucketArn": "arn:aws:s3:::cf-templates-1gm7n7sq5r8tl-us-east-1"
+    },
+    {
+      "Name": "comments-processing-action-dev-state",
+      "CreationDate": "2025-07-08T08:56:39+00:00",
+      "BucketArn": "arn:aws:s3:::comments-processing-action-dev-state"
+    },
+    {
+      "Name": "datalayer-service-dev-state",
+      "CreationDate": "2025-05-21T01:48:17+00:00",
+      "BucketArn": "arn:aws:s3:::datalayer-service-dev-state"
+    },
+    {
+      "Name": "do-not-delete-ssm-diagnosis-123456789012-us-east-1-abc01",
+      "CreationDate": "2025-11-07T08:03:55+00:00",
+      "BucketArn": "arn:aws:s3:::do-not-delete-ssm-diagnosis-123456789012-us-east-1-abc01"
+    },
+    {
+      "Name": "app-ai-dev-state",
+      "CreationDate": "2025-04-23T15:27:36+00:00",
+      "BucketArn": "arn:aws:s3:::app-ai-dev-state"
+    },
+    {
+      "Name": "app-ai-dev-state-tf",
+      "CreationDate": "2025-09-04T09:03:53+00:00",
+      "BucketArn": "arn:aws:s3:::app-ai-dev-state-tf"
+    },
+    {
+      "Name": "app-enterprise-dev-state-tf",
+      "CreationDate": "2025-09-04T09:05:14+00:00",
+      "BucketArn": "arn:aws:s3:::app-enterprise-dev-state-tf"
+    },
+    {
+      "Name": "app-enterprise-storage-dev",
+      "CreationDate": "2025-11-07T06:26:13+00:00",
+      "BucketArn": "arn:aws:s3:::app-enterprise-storage-dev"
+    },
+    {
+      "Name": "app-ai-storage-dev",
+      "CreationDate": "2026-02-23T21:59:00+00:00",
+      "BucketArn": "arn:aws:s3:::app-ai-storage-dev"
+    },
+    {
+      "Name": "app-analytics-dev-state",
+      "CreationDate": "2025-05-20T16:02:08+00:00",
+      "BucketArn": "arn:aws:s3:::app-analytics-dev-state"
+    },
+    {
+      "Name": "app-triton-dev-state",
+      "CreationDate": "2025-04-30T02:17:25+00:00",
+      "BucketArn": "arn:aws:s3:::app-triton-dev-state"
+    },
+    {
+      "Name": "app-triton-storage-dev",
+      "CreationDate": "2025-11-07T10:26:21+00:00",
+      "BucketArn": "arn:aws:s3:::app-triton-storage-dev"
+    },
+    {
+      "Name": "svc-api-dev-state",
+      "CreationDate": "2025-04-29T14:47:31+00:00",
+      "BucketArn": "arn:aws:s3:::svc-api-dev-state"
+    },
+    {
+      "Name": "svc-onboarding-dev-state",
+      "CreationDate": "2025-08-19T13:53:57+00:00",
+      "BucketArn": "arn:aws:s3:::svc-onboarding-dev-state"
+    },
+    {
+      "Name": "svc-social-dev-state",
+      "CreationDate": "2025-07-01T09:38:09+00:00",
+      "BucketArn": "arn:aws:s3:::svc-social-dev-state"
+    },
+    {
+      "Name": "facebook-action-dev-state",
+      "CreationDate": "2025-04-28T20:23:46+00:00",
+      "BucketArn": "arn:aws:s3:::facebook-action-dev-state"
+    },
+    {
+      "Name": "facebook-api-dev-state",
+      "CreationDate": "2025-06-13T12:59:24+00:00",
+      "BucketArn": "arn:aws:s3:::facebook-api-dev-state"
+    },
+    {
+      "Name": "app-fe-enterprise-dev-example-com",
+      "CreationDate": "2025-06-24T10:24:33+00:00",
+      "BucketArn": "arn:aws:s3:::app-fe-enterprise-dev-example-com"
+    },
+    {
+      "Name": "admin-api-dev-state",
+      "CreationDate": "2025-04-29T14:47:29+00:00",
+      "BucketArn": "arn:aws:s3:::admin-api-dev-state"
+    },
+    {
+      "Name": "admin-api-storage-dev",
+      "CreationDate": "2025-11-07T05:00:57+00:00",
+      "BucketArn": "arn:aws:s3:::admin-api-storage-dev"
+    },
+    {
+      "Name": "ci-runner-ubuntu-dist-abc123def456abc",
+      "CreationDate": "2025-11-07T05:17:19+00:00",
+      "BucketArn": "arn:aws:s3:::ci-runner-ubuntu-dist-abc123def456abc"
+    },
+    {
+      "Name": "dev-fileshare",
+      "CreationDate": "2025-03-06T11:49:21+00:00",
+      "BucketArn": "arn:aws:s3:::dev-fileshare"
+    },
+    {
+      "Name": "dev-loki-chunks",
+      "CreationDate": "2025-07-01T13:57:58+00:00",
+      "BucketArn": "arn:aws:s3:::dev-loki-chunks"
+    },
+    {
+      "Name": "platform-env-dev-state",
+      "CreationDate": "2025-08-13T12:10:23+00:00",
+      "BucketArn": "arn:aws:s3:::platform-env-dev-state"
+    },
+    {
+      "Name": "platform-envs-dev-state",
+      "CreationDate": "2025-07-03T07:19:59+00:00",
+      "BucketArn": "arn:aws:s3:::platform-envs-dev-state"
+    },
+    {
+      "Name": "platform-envs-state",
+      "CreationDate": "2025-02-05T14:36:05+00:00",
+      "BucketArn": "arn:aws:s3:::platform-envs-state"
+    },
+    {
+      "Name": "platform-mongodb-backup-gcp",
+      "CreationDate": "2025-09-03T20:00:08+00:00",
+      "BucketArn": "arn:aws:s3:::platform-mongodb-backup-gcp"
+    },
+    {
+      "Name": "image-context-generator-dev-state-tf",
+      "CreationDate": "2026-03-17T12:31:48+00:00",
+      "BucketArn": "arn:aws:s3:::image-context-generator-dev-state-tf"
+    },
+    {
+      "Name": "label-studio-273ebaca-059d-9ccd-2c43-96ffd9132692",
+      "CreationDate": "2025-04-25T15:03:40+00:00",
+      "BucketArn": "arn:aws:s3:::label-studio-273ebaca-059d-9ccd-2c43-96ffd9132692"
+    },
+    {
+      "Name": "llm-toxicity-dev-state-tf",
+      "CreationDate": "2026-01-28T14:49:56+00:00",
+      "BucketArn": "arn:aws:s3:::llm-toxicity-dev-state-tf"
+    },
+    {
+      "Name": "mongodb-database-source",
+      "CreationDate": "2025-05-18T00:49:49+00:00",
+      "BucketArn": "arn:aws:s3:::mongodb-database-source"
+    },
+    {
+      "Name": "media-ai-triton-dev-state",
+      "CreationDate": "2025-04-30T19:14:41+00:00",
+      "BucketArn": "arn:aws:s3:::media-ai-triton-dev-state"
+    },
+    {
+      "Name": "media-ai-triton-storage-dev",
+      "CreationDate": "2025-11-07T08:29:54+00:00",
+      "BucketArn": "arn:aws:s3:::media-ai-triton-storage-dev"
+    },
+    {
+      "Name": "media-mod-dev-state",
+      "CreationDate": "2025-04-28T23:10:21+00:00",
+      "BucketArn": "arn:aws:s3:::media-mod-dev-state"
+    },
+    {
+      "Name": "media-mod-storage-dev",
+      "CreationDate": "2025-11-07T08:57:05+00:00",
+      "BucketArn": "arn:aws:s3:::media-mod-storage-dev"
+    },
+    {
+      "Name": "nlp-toxicity-dev-state-tf",
+      "CreationDate": "2026-01-28T12:56:27+00:00",
+      "BucketArn": "arn:aws:s3:::nlp-toxicity-dev-state-tf"
+    },
+    {
+      "Name": "nlp-toxicity-storage-dev",
+      "CreationDate": "2026-01-28T13:32:04+00:00",
+      "BucketArn": "arn:aws:s3:::nlp-toxicity-storage-dev"
+    },
+    {
+      "Name": "send-mail-action-dev-state",
+      "CreationDate": "2025-05-23T01:51:49+00:00",
+      "BucketArn": "arn:aws:s3:::send-mail-action-dev-state"
+    },
+    {
+      "Name": "slack-action-dev-state",
+      "CreationDate": "2025-04-28T22:59:38+00:00",
+      "BucketArn": "arn:aws:s3:::slack-action-dev-state"
+    },
+    {
+      "Name": "social-profile-scanner-dev-state-tf",
+      "CreationDate": "2026-01-29T10:33:40+00:00",
+      "BucketArn": "arn:aws:s3:::social-profile-scanner-dev-state-tf"
+    },
+    {
+      "Name": "social-profile-scraper-dev-state-tf",
+      "CreationDate": "2026-01-21T10:55:31+00:00",
+      "BucketArn": "arn:aws:s3:::social-profile-scraper-dev-state-tf"
+    },
+    {
+      "Name": "text-analysis-dev-state-tf",
+      "CreationDate": "2025-12-05T14:59:31+00:00",
+      "BucketArn": "arn:aws:s3:::text-analysis-dev-state-tf"
+    },
+    {
+      "Name": "text-analysis-storage-dev",
+      "CreationDate": "2025-12-05T15:01:12+00:00",
+      "BucketArn": "arn:aws:s3:::text-analysis-storage-dev"
+    },
+    {
+      "Name": "text-analyzer-dev-state",
+      "CreationDate": "2025-09-08T09:02:16+00:00",
+      "BucketArn": "arn:aws:s3:::text-analyzer-dev-state"
+    },
+    {
+      "Name": "text-analyzer-dev-storage",
+      "CreationDate": "2026-02-09T13:32:07+00:00",
+      "BucketArn": "arn:aws:s3:::text-analyzer-dev-storage"
+    },
+    {
+      "Name": "text-moderation-consumer-dev-state-tf",
+      "CreationDate": "2026-02-19T11:50:53+00:00",
+      "BucketArn": "arn:aws:s3:::text-moderation-consumer-dev-state-tf"
+    },
+    {
+      "Name": "text-moderation-consumer-storage-dev",
+      "CreationDate": "2026-02-19T11:57:04+00:00",
+      "BucketArn": "arn:aws:s3:::text-moderation-consumer-storage-dev"
+    },
+    {
+      "Name": "upload-gcs-dev-state",
+      "CreationDate": "2025-05-20T16:05:07+00:00",
+      "BucketArn": "arn:aws:s3:::upload-gcs-dev-state"
+    },
+    {
+      "Name": "yammer-action-dev-state",
+      "CreationDate": "2025-04-28T18:02:33+00:00",
+      "BucketArn": "arn:aws:s3:::yammer-action-dev-state"
+    },
+    {
+      "Name": "youtube-action-dev-state",
+      "CreationDate": "2025-05-23T01:51:40+00:00",
+      "BucketArn": "arn:aws:s3:::youtube-action-dev-state"
+    }
+  ],
+  "Owner": {
+    "ID": "f21646813a1792aaf2babef1bfe6325467cd390ddc1a0b29ba348fed35cb1dc7"
+  },
+  "Prefix": null,
+  "ResponseMetadata": {
+    "RequestId": "KGMYTMMJQ00Z6HF1",
+    "HostId": "ot0CkLaSWsxYnraGQ/IcwEAEvnd7w9sIVJ1vLiczTvL++AKgEg+HsplMo/ct+nLJwvs0bxF1nws=",
+    "HTTPStatusCode": 200,
+    "HTTPHeaders": {
+      "x-amz-id-2": "ot0CkLaSWsxYnraGQ/IcwEAEvnd7w9sIVJ1vLiczTvL++AKgEg+HsplMo/ct+nLJwvs0bxF1nws=",
+      "x-amz-request-id": "KGMYTMMJQ00Z6HF1",
+      "date": "Wed, 18 Mar 2026 01:56:35 GMT",
+      "content-type": "application/xml",
+      "transfer-encoding": "chunked",
+      "server": "AmazonS3"
+    },
+    "RetryAttempts": 0
+  }
+}

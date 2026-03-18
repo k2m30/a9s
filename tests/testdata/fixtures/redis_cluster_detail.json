@@ -1,0 +1,58 @@
+{
+  "CacheClusters": [
+    {
+      "CacheClusterId": "test-redis-1",
+      "ClientDownloadLandingPage": "https://console.aws.amazon.com/elasticache/home#client-download:",
+      "CacheNodeType": "cache.t2.micro",
+      "Engine": "redis",
+      "EngineVersion": "7.0.7",
+      "CacheClusterStatus": "available",
+      "NumCacheNodes": 1,
+      "PreferredAvailabilityZone": "us-east-1a",
+      "CacheClusterCreateTime": "2025-05-30T14:09:22.405000+00:00",
+      "PreferredMaintenanceWindow": "sat:03:00-sat:04:00",
+      "PendingModifiedValues": {},
+      "CacheSecurityGroups": [],
+      "CacheParameterGroup": {
+        "CacheParameterGroupName": "default.redis7",
+        "ParameterApplyStatus": "in-sync",
+        "CacheNodeIdsToReboot": []
+      },
+      "CacheSubnetGroupName": "elasticache-subnet-us-east-1-dev",
+      "CacheNodes": [
+        {
+          "CacheNodeId": "0001",
+          "CacheNodeStatus": "available",
+          "CacheNodeCreateTime": "2025-05-30T14:09:22.405000+00:00",
+          "Endpoint": {
+            "Address": "test-redis-1.abc123.0001.use1.cache.amazonaws.com",
+            "Port": 6379
+          },
+          "ParameterGroupStatus": "in-sync",
+          "CustomerAvailabilityZone": "us-east-1a"
+        }
+      ],
+      "AutoMinorVersionUpgrade": true,
+      "SecurityGroups": [
+        {
+          "SecurityGroupId": "sg-0aa0000000000007a",
+          "Status": "active"
+        }
+      ],
+      "SnapshotRetentionLimit": 0,
+      "SnapshotWindow": "00:00-01:00",
+      "AuthTokenEnabled": false,
+      "TransitEncryptionEnabled": false,
+      "AtRestEncryptionEnabled": false,
+      "ARN": "arn:aws:elasticache:us-east-1:123456789012:cluster:test-redis-1",
+      "ReplicationGroupLogDeliveryEnabled": false,
+      "LogDeliveryConfigurations": [],
+      "NetworkType": "ipv4",
+      "IpDiscovery": "ipv4"
+    }
+  ],
+  "ResponseMetadata": {
+    "RequestId": "75824158-026e-4ec6-b7cb-149eb1ff7583",
+    "HTTPStatusCode": 200
+  }
+}

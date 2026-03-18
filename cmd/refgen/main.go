@@ -26,11 +26,14 @@ func main() {
 		{"s3", "s3types.Bucket", reflect.TypeOf(s3types.Bucket{})},
 		{"s3_objects", "s3types.Object", reflect.TypeOf(s3types.Object{})},
 		{"ec2", "ec2types.Instance", reflect.TypeOf(ec2types.Instance{})},
-		{"rds", "rdstypes.DBInstance", reflect.TypeOf(rdstypes.DBInstance{})},
+		{"dbi", "rdstypes.DBInstance", reflect.TypeOf(rdstypes.DBInstance{})},
 		{"redis", "elasticachetypes.CacheCluster", reflect.TypeOf(elasticachetypes.CacheCluster{})},
-		{"docdb", "docdbtypes.DBCluster", reflect.TypeOf(docdbtypes.DBCluster{})},
+		{"dbc", "docdbtypes.DBCluster", reflect.TypeOf(docdbtypes.DBCluster{})},
 		{"eks", "ekstypes.Cluster", reflect.TypeOf(ekstypes.Cluster{})},
 		{"secrets", "smtypes.SecretListEntry", reflect.TypeOf(smtypes.SecretListEntry{})},
+		{"vpc", "ec2types.Vpc", reflect.TypeOf(ec2types.Vpc{})},
+		{"sg", "ec2types.SecurityGroup", reflect.TypeOf(ec2types.SecurityGroup{})},
+		{"ng", "ekstypes.Nodegroup", reflect.TypeOf(ekstypes.Nodegroup{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

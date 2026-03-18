@@ -127,6 +127,9 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 	switch val.Kind() {
 	case reflect.Struct, reflect.Slice, reflect.Map:
 		safe := ToSafeValue(val)
+		if safe == nil {
+			return ""
+		}
 		out, err := yaml.Marshal(safe)
 		if err != nil {
 			return ""
@@ -170,7 +173,10 @@ func ToSafeValue(val reflect.Value) interface{} {
 					name = n
 				}
 			}
-			m[name] = ToSafeValue(fv)
+			sv := ToSafeValue(fv)
+			if sv != nil {
+				m[name] = sv
+			}
 		}
 		if len(m) == 0 {
 			return nil
@@ -181,9 +187,15 @@ func ToSafeValue(val reflect.Value) interface{} {
 		if val.Len() == 0 {
 			return nil
 		}
-		result := make([]interface{}, val.Len())
+		var result []interface{}
 		for i := 0; i < val.Len(); i++ {
-			result[i] = ToSafeValue(val.Index(i))
+			sv := ToSafeValue(val.Index(i))
+			if sv != nil {
+				result = append(result, sv)
+			}
+		}
+		if len(result) == 0 {
+			return nil
 		}
 		return result
 

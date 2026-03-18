@@ -185,7 +185,7 @@ ec2:  # ec2types.Instance
   - VirtualizationType
   - VpcId
 
-rds:  # rdstypes.DBInstance
+dbi:  # rdstypes.DBInstance
   - ActivityStreamEngineNativeAuditFieldsIncluded
   - ActivityStreamKinesisStreamName
   - ActivityStreamKmsKeyId
@@ -414,7 +414,7 @@ redis:  # elasticachetypes.CacheCluster
   - TransitEncryptionEnabled
   - TransitEncryptionMode
 
-docdb:  # docdbtypes.DBCluster
+dbc:  # docdbtypes.DBCluster
   - AssociatedRoles[].RoleArn
   - AssociatedRoles[].Status
   - AvailabilityZones[]
@@ -539,4 +539,139 @@ secrets:  # smtypes.SecretListEntry
   - Tags[].Key
   - Tags[].Value
   - Type
+
+vpc:  # ec2types.Vpc
+  - BlockPublicAccessStates.InternetGatewayBlockMode
+  - CidrBlock
+  - CidrBlockAssociationSet[].AssociationId
+  - CidrBlockAssociationSet[].CidrBlock
+  - CidrBlockAssociationSet[].CidrBlockState.State
+  - CidrBlockAssociationSet[].CidrBlockState.StatusMessage
+  - DhcpOptionsId
+  - EncryptionControl.Mode
+  - EncryptionControl.ResourceExclusions.EgressOnlyInternetGateway.State
+  - EncryptionControl.ResourceExclusions.EgressOnlyInternetGateway.StateMessage
+  - EncryptionControl.ResourceExclusions.ElasticFileSystem.State
+  - EncryptionControl.ResourceExclusions.ElasticFileSystem.StateMessage
+  - EncryptionControl.ResourceExclusions.InternetGateway.State
+  - EncryptionControl.ResourceExclusions.InternetGateway.StateMessage
+  - EncryptionControl.ResourceExclusions.Lambda.State
+  - EncryptionControl.ResourceExclusions.Lambda.StateMessage
+  - EncryptionControl.ResourceExclusions.NatGateway.State
+  - EncryptionControl.ResourceExclusions.NatGateway.StateMessage
+  - EncryptionControl.ResourceExclusions.VirtualPrivateGateway.State
+  - EncryptionControl.ResourceExclusions.VirtualPrivateGateway.StateMessage
+  - EncryptionControl.ResourceExclusions.VpcLattice.State
+  - EncryptionControl.ResourceExclusions.VpcLattice.StateMessage
+  - EncryptionControl.ResourceExclusions.VpcPeering.State
+  - EncryptionControl.ResourceExclusions.VpcPeering.StateMessage
+  - EncryptionControl.State
+  - EncryptionControl.StateMessage
+  - EncryptionControl.Tags[].Key
+  - EncryptionControl.Tags[].Value
+  - EncryptionControl.VpcEncryptionControlId
+  - EncryptionControl.VpcId
+  - InstanceTenancy
+  - Ipv6CidrBlockAssociationSet[].AssociationId
+  - Ipv6CidrBlockAssociationSet[].IpSource
+  - Ipv6CidrBlockAssociationSet[].Ipv6AddressAttribute
+  - Ipv6CidrBlockAssociationSet[].Ipv6CidrBlock
+  - Ipv6CidrBlockAssociationSet[].Ipv6CidrBlockState.State
+  - Ipv6CidrBlockAssociationSet[].Ipv6CidrBlockState.StatusMessage
+  - Ipv6CidrBlockAssociationSet[].Ipv6Pool
+  - Ipv6CidrBlockAssociationSet[].NetworkBorderGroup
+  - IsDefault
+  - OwnerId
+  - State
+  - Tags[].Key
+  - Tags[].Value
+  - VpcId
+
+sg:  # ec2types.SecurityGroup
+  - Description
+  - GroupId
+  - GroupName
+  - IpPermissions[].FromPort
+  - IpPermissions[].IpProtocol
+  - IpPermissions[].IpRanges[].CidrIp
+  - IpPermissions[].IpRanges[].Description
+  - IpPermissions[].Ipv6Ranges[].CidrIpv6
+  - IpPermissions[].Ipv6Ranges[].Description
+  - IpPermissions[].PrefixListIds[].Description
+  - IpPermissions[].PrefixListIds[].PrefixListId
+  - IpPermissions[].ToPort
+  - IpPermissions[].UserIdGroupPairs[].Description
+  - IpPermissions[].UserIdGroupPairs[].GroupId
+  - IpPermissions[].UserIdGroupPairs[].GroupName
+  - IpPermissions[].UserIdGroupPairs[].PeeringStatus
+  - IpPermissions[].UserIdGroupPairs[].UserId
+  - IpPermissions[].UserIdGroupPairs[].VpcId
+  - IpPermissions[].UserIdGroupPairs[].VpcPeeringConnectionId
+  - IpPermissionsEgress[].FromPort
+  - IpPermissionsEgress[].IpProtocol
+  - IpPermissionsEgress[].IpRanges[].CidrIp
+  - IpPermissionsEgress[].IpRanges[].Description
+  - IpPermissionsEgress[].Ipv6Ranges[].CidrIpv6
+  - IpPermissionsEgress[].Ipv6Ranges[].Description
+  - IpPermissionsEgress[].PrefixListIds[].Description
+  - IpPermissionsEgress[].PrefixListIds[].PrefixListId
+  - IpPermissionsEgress[].ToPort
+  - IpPermissionsEgress[].UserIdGroupPairs[].Description
+  - IpPermissionsEgress[].UserIdGroupPairs[].GroupId
+  - IpPermissionsEgress[].UserIdGroupPairs[].GroupName
+  - IpPermissionsEgress[].UserIdGroupPairs[].PeeringStatus
+  - IpPermissionsEgress[].UserIdGroupPairs[].UserId
+  - IpPermissionsEgress[].UserIdGroupPairs[].VpcId
+  - IpPermissionsEgress[].UserIdGroupPairs[].VpcPeeringConnectionId
+  - OwnerId
+  - SecurityGroupArn
+  - Tags[].Key
+  - Tags[].Value
+  - VpcId
+
+ng:  # ekstypes.Nodegroup
+  - AmiType
+  - CapacityType
+  - ClusterName
+  - CreatedAt
+  - DiskSize
+  - Health.Issues[].Code
+  - Health.Issues[].Message
+  - Health.Issues[].ResourceIds[]
+  - InstanceTypes[]
+  - Labels
+  - LaunchTemplate.Id
+  - LaunchTemplate.Name
+  - LaunchTemplate.Version
+  - ModifiedAt
+  - NodeRepairConfig.Enabled
+  - NodeRepairConfig.MaxParallelNodesRepairedCount
+  - NodeRepairConfig.MaxParallelNodesRepairedPercentage
+  - NodeRepairConfig.MaxUnhealthyNodeThresholdCount
+  - NodeRepairConfig.MaxUnhealthyNodeThresholdPercentage
+  - NodeRepairConfig.NodeRepairConfigOverrides[].MinRepairWaitTimeMins
+  - NodeRepairConfig.NodeRepairConfigOverrides[].NodeMonitoringCondition
+  - NodeRepairConfig.NodeRepairConfigOverrides[].NodeUnhealthyReason
+  - NodeRepairConfig.NodeRepairConfigOverrides[].RepairAction
+  - NodeRole
+  - NodegroupArn
+  - NodegroupName
+  - ReleaseVersion
+  - RemoteAccess.Ec2SshKey
+  - RemoteAccess.SourceSecurityGroups[]
+  - Resources.AutoScalingGroups[].Name
+  - Resources.RemoteAccessSecurityGroup
+  - ScalingConfig.DesiredSize
+  - ScalingConfig.MaxSize
+  - ScalingConfig.MinSize
+  - Status
+  - Subnets[]
+  - Tags
+  - Taints[].Effect
+  - Taints[].Key
+  - Taints[].Value
+  - UpdateConfig.MaxUnavailable
+  - UpdateConfig.MaxUnavailablePercentage
+  - UpdateConfig.UpdateStrategy
+  - Version
 

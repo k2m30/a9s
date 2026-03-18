@@ -1,0 +1,73 @@
+{
+  "cluster": {
+    "name": "test-cluster-1",
+    "arn": "arn:aws:eks:us-east-1:123456789012:cluster/test-cluster-1",
+    "createdAt": "2025-02-10T10:59:32.383000+00:00",
+    "version": "1.31",
+    "endpoint": "https://ABCDEF0123456789ABCDEF0123456789.gr7.us-east-1.eks.amazonaws.com",
+    "roleArn": "arn:aws:iam::123456789012:role/test-cluster-1-cluster-20250210105907037300000002",
+    "resourcesVpcConfig": {
+      "subnetIds": [
+        "subnet-0eee555555555555e",
+        "subnet-0fff666666666666f",
+        "subnet-0aaa777777777777a"
+      ],
+      "securityGroupIds": [
+        "sg-0aa0000000000006f",
+        "sg-0aa0000000000012c"
+      ],
+      "clusterSecurityGroupId": "sg-0aa0000000000009c",
+      "vpcId": "vpc-0aaa1111bbb2222cc",
+      "endpointPublicAccess": true,
+      "endpointPrivateAccess": true,
+      "publicAccessCidrs": ["0.0.0.0/0"]
+    },
+    "kubernetesNetworkConfig": {
+      "serviceIpv4Cidr": "172.20.0.0/16",
+      "ipFamily": "ipv4",
+      "elasticLoadBalancing": {"enabled": false}
+    },
+    "logging": {
+      "clusterLogging": [
+        {"types": ["api", "audit", "authenticator"], "enabled": true},
+        {"types": ["controllerManager", "scheduler"], "enabled": false}
+      ]
+    },
+    "identity": {
+      "oidc": {
+        "issuer": "https://oidc.eks.us-east-1.amazonaws.com/id/ABCDEF0123456789ABCDEF0123456789"
+      }
+    },
+    "status": "ACTIVE",
+    "certificateAuthority": {
+      "data": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJQ1gwVWhVYUdrR1F3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TlRBeU1UQXhNRFU1TWpOYUZ3MHpOVEF5TURneE1UQTBNak5hTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUMvbXdkMTh3aFJMOUZ2bmdUM1dJRlQzbWFDV29STVBpcGhCKzFMSFE5VzhKTElUK09EM2lDOFdoYzgKNFBOOUNYSDBOVjBvc0FEWXpKNU82azcyV09mSElYVEQ1aUIwVnQ0NmxnS3F1TEliQVQ1cWc3OVFUN0NJY2lRWApUOUJTYlVjMXJjd2I2VzJ4SVlXTjN2L0k4K2VTcTZ2T09lOFVmTnpaNXFQS1M5QzhDbmVoNi9aRWpQV2prNUorCkdWQ3NnZm16VWJ4MFBjaEYvSjAxVFBVZjhjcGt1c3ZPQlA3VVNWRERqOFE5R1UyQ05IMWpkUDF2cXZjWitJMDcKWDM2OVIyMndjRUg5TXZBS0kyUVBxTFpxSHN2a0JodzZvZzNnRXV6aDhyWGpUYmRielF3N1lDVGdVcGxwTFppRgpuaVZTWFYzY1RTWitQa3BManE5NE41ak1BbmhWQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRTk05QUwwckk0NTlMR2YxazNRQko0cktaR0RqQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQ0VSWGpsVlhtSgpGSzJDaEpHL2Z5RXJ4dTZMaHZ6dEtwclBkNHkxUlBuajJ1QnZpZ1oxY0NhV0wyb2Q2Z2MrY2dGT2UrSVQvdGNWCmpjbmJ6UmY1U2JTbXFaM1dTK3RRdTRGek1yWm1UTXUyMm5kakYyb1diZ1dmN2ZIYmcwUlRwRHlKLzRPWUpXMjMKMHBOSWRmN3lRTXJ5Y1hJT3VYMmJJOHZPY2dUcFdGSWF5d1RRaHpLQXdwdzBtTkVvbUlzSUc3eE8rTDNhUDZqcwpYWlZVYkY5WXl3Zi9ZMGxiYkFhVlZuMEY2Q0hZWU1tb24wRS9TinkzMkd2MFZuTW9IeFFWSDBMMmtJMlAxeC90CnRkVHhGYzRDcHM1NmJJM1I0dzRRN1BHUzU5OS9aV3RyRFZscWJSbjExekxHbkJXeHQyZElWSkZ4VlVaZ0FiL24KSlNYS3luNDRGN2I1Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
+    },
+    "platformVersion": "eks.52",
+    "tags": {
+      "name": "test-cluster-1",
+      "terraform-aws-modules": "eks"
+    },
+    "encryptionConfig": [
+      {
+        "resources": ["secrets"],
+        "provider": {
+          "keyArn": "arn:aws:kms:us-east-1:123456789012:key/ffffffff-aaaa-bbbb-cccc-dddddddddddd"
+        }
+      }
+    ],
+    "accessConfig": {
+      "authenticationMode": "API_AND_CONFIG_MAP"
+    },
+    "upgradePolicy": {
+      "supportType": "EXTENDED"
+    },
+    "deletionProtection": false,
+    "controlPlaneScalingConfig": {
+      "tier": "standard"
+    }
+  },
+  "ResponseMetadata": {
+    "RequestId": "cacefdd7-4e38-4af6-9990-c86c791510d2",
+    "HTTPStatusCode": 200
+  }
+}

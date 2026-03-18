@@ -14,11 +14,14 @@ import (
 var expectedFieldKeys = map[string][]string{
 	"s3":      {"name", "bucket_name", "creation_date"},
 	"ec2":     {"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time"},
-	"rds":     {"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"},
+	"dbi":     {"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"},
 	"redis":   {"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"},
-	"docdb":   {"cluster_id", "engine_version", "status", "instances", "endpoint"},
+	"dbc":   {"cluster_id", "engine_version", "status", "instances", "endpoint"},
 	"eks":     {"cluster_name", "version", "status", "endpoint", "platform_version"},
-	"secrets": {"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"},
+	"secrets":    {"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"},
+	"vpc":        {"vpc_id", "name", "cidr_block", "state", "is_default"},
+	"sg":         {"group_id", "group_name", "vpc_id", "description"},
+	"ng": {"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"},
 }
 
 func TestColumnKeys_MatchFetcherFieldKeys(t *testing.T) {

@@ -17,7 +17,7 @@ Conduct a thorough UI/UX audit of the current a9s TUI application (an AWS resour
 Before reviewing any code, conduct systematic research by reading the codebase and applying your knowledge:
 
 ### 1. TUI Best Practices Research
-- Examine the current codebase structure under `src/` and `tests/`
+- Examine the current codebase structure under `internal/` and `tests/`
 - Document established TUI design patterns from industry leaders: k9s, lazygit, lazydocker, htop, btop, ranger
 - Key areas: navigation paradigms, keybinding conventions, color/theming, information density, responsiveness, accessibility
 - Bubble Tea v2 specific patterns and capabilities

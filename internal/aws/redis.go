@@ -11,6 +11,16 @@ import (
 	"github.com/k2m30/a9s/internal/resource"
 )
 
+func init() {
+	resource.Register("redis", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchRedisClusters(ctx, c.ElastiCache)
+	})
+}
+
 // FetchRedisClusters calls the ElastiCache DescribeCacheClusters API and converts
 // the response into a slice of generic Resource structs.
 // Only clusters with engine "redis" are returned (client-side filter).
