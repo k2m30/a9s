@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchCloudFormationStacks(ctx, c.CloudFormation)
 	})
+	resource.RegisterFieldKeys("cfn", []string{"stack_name", "status", "creation_time", "last_updated", "description"})
 }
 
 // FetchCloudFormationStacks calls the CloudFormation DescribeStacks API and converts the

@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchSSMParameters(ctx, c.SSM)
 	})
+	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description"})
 }
 
 // FetchSSMParameters calls the SSM DescribeParameters API and converts the

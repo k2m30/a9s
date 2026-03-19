@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchRedisClusters(ctx, c.ElastiCache)
 	})
+	resource.RegisterFieldKeys("redis", []string{"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"})
 }
 
 // FetchRedisClusters calls the ElastiCache DescribeCacheClusters API and converts

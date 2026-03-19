@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchSNSTopics(ctx, c.SNS)
 	})
+	resource.RegisterFieldKeys("sns", []string{"topic_arn", "display_name"})
 }
 
 // FetchSNSTopics calls the SNS ListTopics API and converts the

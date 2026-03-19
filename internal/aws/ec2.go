@@ -20,6 +20,7 @@ func init() {
 		}
 		return FetchEC2Instances(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time"})
 }
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and converts the

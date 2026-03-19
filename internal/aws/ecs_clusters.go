@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchECSClusters(ctx, c.ECS, c.ECS)
 	})
+	resource.RegisterFieldKeys("ecs", []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"})
 }
 
 // FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,

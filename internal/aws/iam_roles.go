@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchIAMRoles(ctx, c.IAM)
 	})
+	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description"})
 }
 
 // FetchIAMRoles calls the IAM ListRoles API and converts the

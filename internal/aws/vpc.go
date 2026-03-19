@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchVPCs(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "cidr_block", "state", "is_default"})
 }
 
 // FetchVPCs calls the EC2 DescribeVpcs API and converts the

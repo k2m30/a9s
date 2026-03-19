@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchRouteTables(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("rtb", []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count"})
 }
 
 // FetchRouteTables calls the EC2 DescribeRouteTables API and converts the

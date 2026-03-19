@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchRDSInstances(ctx, c.RDS)
 	})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"})
 }
 
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the

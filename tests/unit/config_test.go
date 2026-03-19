@@ -184,18 +184,15 @@ func TestConfigFallbackDefaults(t *testing.T) {
 
 	// GetViewDef with nil cfg should return defaults
 	ec2 := config.GetViewDef(nil, "ec2")
-	if len(ec2.List) != 7 {
-		t.Fatalf("expected 7 default ec2 columns, got %d", len(ec2.List))
+	expected := config.DefaultViewDef("ec2")
+	if len(ec2.List) != len(expected.List) {
+		t.Fatalf("expected %d default ec2 columns, got %d", len(expected.List), len(ec2.List))
 	}
 
-	// Verify the default column titles match the hardcoded values
-	wantTitles := []string{
-		"Name", "Instance ID", "State", "Type",
-		"Private IP", "Public IP", "Launch Time",
-	}
-	for i, want := range wantTitles {
-		if ec2.List[i].Title != want {
-			t.Errorf("ec2 default column %d: got title %q, want %q", i, ec2.List[i].Title, want)
+	// Verify the column titles match the built-in defaults
+	for i, want := range expected.List {
+		if ec2.List[i].Title != want.Title {
+			t.Errorf("ec2 default column %d: got title %q, want %q", i, ec2.List[i].Title, want.Title)
 		}
 	}
 }
@@ -226,10 +223,11 @@ func TestConfigPartialOverride(t *testing.T) {
 		t.Errorf("s3 col 1: got {%q, %d}, want {\"Created\", 20}", s3.List[1].Title, s3.List[1].Width)
 	}
 
-	// EC2 not in partial config — should fall back to defaults (7 columns)
+	// EC2 not in partial config — should fall back to defaults
 	ec2 := config.GetViewDef(cfg, "ec2")
-	if len(ec2.List) != 7 {
-		t.Fatalf("ec2: expected 7 default columns, got %d", len(ec2.List))
+	expectedEC2 := config.DefaultViewDef("ec2")
+	if len(ec2.List) != len(expectedEC2.List) {
+		t.Fatalf("ec2: expected %d default columns, got %d", len(expectedEC2.List), len(ec2.List))
 	}
 }
 
@@ -368,8 +366,9 @@ func TestConfigInvalidYAML(t *testing.T) {
 
 	// Even after error, GetViewDef with nil config should give defaults
 	ec2 := config.GetViewDef(nil, "ec2")
-	if len(ec2.List) != 7 {
-		t.Fatalf("expected 7 default ec2 columns after error, got %d", len(ec2.List))
+	expected := config.DefaultViewDef("ec2")
+	if len(ec2.List) != len(expected.List) {
+		t.Fatalf("expected %d default ec2 columns after error, got %d", len(expected.List), len(ec2.List))
 	}
 }
 

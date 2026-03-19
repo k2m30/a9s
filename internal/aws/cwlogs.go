@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchCloudWatchLogGroups(ctx, c.CloudWatchLogs)
 	})
+	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time"})
 }
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and converts the

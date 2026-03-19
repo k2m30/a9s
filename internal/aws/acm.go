@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchACMCertificates(ctx, c.ACM)
 	})
+	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use"})
 }
 
 // FetchACMCertificates calls the ACM ListCertificates API and converts the

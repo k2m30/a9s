@@ -20,6 +20,7 @@ func init() {
 		}
 		return FetchSQSQueues(ctx, c.SQS, c.SQS)
 	})
+	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
 }
 
 // FetchSQSQueues performs a two-step fetch: ListQueues to get URLs,

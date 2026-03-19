@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchTargetGroups(ctx, c.ELBv2)
 	})
+	resource.RegisterFieldKeys("tg", []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"})
 }
 
 // FetchTargetGroups calls the ELBv2 DescribeTargetGroups API and converts the

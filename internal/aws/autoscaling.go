@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchAutoScalingGroups(ctx, c.AutoScaling)
 	})
+	resource.RegisterFieldKeys("asg", []string{"asg_name", "min_size", "max_size", "desired", "instances", "status"})
 }
 
 // FetchAutoScalingGroups calls the AutoScaling DescribeAutoScalingGroups API and converts the

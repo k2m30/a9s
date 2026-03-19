@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchSubnets(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("subnet", []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"})
 }
 
 // FetchSubnets calls the EC2 DescribeSubnets API and converts the

@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchECSServices(ctx, c.ECS, c.ECS, c.ECS)
 	})
+	resource.RegisterFieldKeys("ecs-svc", []string{"service_name", "cluster", "status", "desired_count", "running_count", "launch_type"})
 }
 
 // FetchECSServices performs a three-step fetch:

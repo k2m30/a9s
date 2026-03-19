@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchLambdaFunctions(ctx, c.Lambda)
 	})
+	resource.RegisterFieldKeys("lambda", []string{"function_name", "runtime", "memory", "timeout", "handler", "last_modified", "code_size"})
 }
 
 // FetchLambdaFunctions calls the Lambda ListFunctions API and converts the

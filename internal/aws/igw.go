@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchInternetGateways(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state"})
 }
 
 // FetchInternetGateways calls the EC2 DescribeInternetGateways API and converts the

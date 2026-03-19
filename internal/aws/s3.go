@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchS3Buckets(ctx, c.S3)
 	})
+	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
 }
 
 // FetchS3Buckets calls the S3 ListBuckets API and returns a slice of

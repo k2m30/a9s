@@ -20,6 +20,7 @@ func init() {
 		}
 		return FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
 	})
+	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"})
 }
 
 // FetchNodeGroups performs a three-step fetch:

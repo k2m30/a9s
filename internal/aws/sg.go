@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchSecurityGroups(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description"})
 }
 
 // FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and converts

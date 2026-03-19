@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchSecrets(ctx, c.SecretsManager)
 	})
+	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
 }
 
 // FetchSecrets calls the SecretsManager ListSecrets API and converts the

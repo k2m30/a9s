@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchDynamoDBTables(ctx, c.DynamoDB, c.DynamoDB)
 	})
+	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
 }
 
 // FetchDynamoDBTables performs a two-step fetch: ListTables to get names,

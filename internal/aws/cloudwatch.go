@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchCloudWatchAlarms(ctx, c.CloudWatch)
 	})
+	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold"})
 }
 
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and converts the

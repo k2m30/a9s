@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchElasticIPs(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("eip", []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain"})
 }
 
 // FetchElasticIPs calls the EC2 DescribeAddresses API and converts the

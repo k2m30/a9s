@@ -19,6 +19,7 @@ func init() {
 		}
 		return FetchEKSClusters(ctx, c.EKS, c.EKS)
 	})
+	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
 }
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names,

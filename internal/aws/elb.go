@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchLoadBalancers(ctx, c.ELBv2)
 	})
+	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id"})
 }
 
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the

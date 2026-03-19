@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchDocDBClusters(ctx, c.DocDB)
 	})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint"})
 }
 
 // FetchDocDBClusters calls the DescribeDBClusters API and converts

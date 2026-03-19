@@ -18,6 +18,7 @@ func init() {
 		}
 		return FetchNatGateways(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("nat", []string{"nat_gateway_id", "name", "vpc_id", "subnet_id", "state", "public_ip"})
 }
 
 // FetchNatGateways calls the EC2 DescribeNatGateways API and converts the
