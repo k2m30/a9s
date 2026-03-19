@@ -175,6 +175,13 @@ func (m *MainMenuModel) SetFilter(text string) {
 	m.scrollOffset = 0
 }
 
+// GetFilter returns the current filter text.
+func (m *MainMenuModel) GetFilter() string {
+	return m.filterText
+}
+
+
+
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.
 // Requires at least 2 characters to actually filter; single chars are too ambiguous
 // for the short list of resource types.

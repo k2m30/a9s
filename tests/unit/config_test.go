@@ -190,7 +190,7 @@ func TestConfigFallbackDefaults(t *testing.T) {
 
 	// Verify the default column titles match the hardcoded values
 	wantTitles := []string{
-		"Instance ID", "Name", "State", "Type",
+		"Name", "Instance ID", "State", "Type",
 		"Private IP", "Public IP", "Launch Time",
 	}
 	for i, want := range wantTitles {
@@ -248,10 +248,10 @@ func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 		path  string
 		width int
 	}{
-		{"Key", "Key", 50},
+		{"Key", "Key", 36},
 		{"Size", "Size", 12},
-		{"Last Modified", "LastModified", 22},
 		{"Storage Class", "StorageClass", 16},
+		{"Last Modified", "LastModified", 22},
 	}
 	for i, want := range wantCols {
 		got := vd.List[i]
@@ -347,8 +347,8 @@ func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
 		t.Fatalf("expected 4 default s3_objects columns (not in partial config), got %d", len(vd.List))
 	}
 	// Should be default widths
-	if vd.List[0].Width != 50 {
-		t.Errorf("expected default Key width 50, got %d", vd.List[0].Width)
+	if vd.List[0].Width != 36 {
+		t.Errorf("expected default Key width 36, got %d", vd.List[0].Width)
 	}
 }
 
@@ -370,5 +370,61 @@ func TestConfigInvalidYAML(t *testing.T) {
 	ec2 := config.GetViewDef(nil, "ec2")
 	if len(ec2.List) != 7 {
 		t.Fatalf("expected 7 default ec2 columns after error, got %d", len(ec2.List))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test: YAML key field parses into ListColumn.Key
+// ---------------------------------------------------------------------------
+
+func TestConfigYAMLParsing_KeyField(t *testing.T) {
+	yamlData := `
+views:
+  sqs:
+    list:
+      Queue Name:
+        path: QueueUrl
+        width: 36
+      Messages:
+        key: approx_messages
+        width: 10
+      In Flight:
+        key: approx_not_visible
+        width: 10
+    detail:
+      - QueueUrl
+`
+	cfg, err := config.Parse([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	sqs, ok := cfg.Views["sqs"]
+	if !ok {
+		t.Fatal("missing sqs view definition")
+	}
+	if len(sqs.List) != 3 {
+		t.Fatalf("expected 3 columns, got %d", len(sqs.List))
+	}
+
+	// First column: has path, no key
+	if sqs.List[0].Path != "QueueUrl" {
+		t.Errorf("col 0 path: got %q, want %q", sqs.List[0].Path, "QueueUrl")
+	}
+	if sqs.List[0].Key != "" {
+		t.Errorf("col 0 key: got %q, want empty", sqs.List[0].Key)
+	}
+
+	// Second column: has key, no path
+	if sqs.List[1].Key != "approx_messages" {
+		t.Errorf("col 1 key: got %q, want %q", sqs.List[1].Key, "approx_messages")
+	}
+	if sqs.List[1].Path != "" {
+		t.Errorf("col 1 path: got %q, want empty", sqs.List[1].Path)
+	}
+
+	// Third column: has key, no path
+	if sqs.List[2].Key != "approx_not_visible" {
+		t.Errorf("col 2 key: got %q, want %q", sqs.List[2].Key, "approx_not_visible")
 	}
 }

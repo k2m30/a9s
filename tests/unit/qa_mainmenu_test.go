@@ -1330,17 +1330,13 @@ func TestQA_MainMenu_EscInNormalModeIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// The root model's Esc handler in normal mode on main menu (single view):
-	// popView returns false, so it calls tea.Quit. This is actually quit behavior.
-	// But the QA story says Esc on main menu is a no-op. Let's test what actually happens.
+	// Esc on main menu with no filter should be a no-op (NOT quit).
+	// Only q and ctrl+c should quit.
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// The root model tries popView, which fails (only 1 entry), then returns tea.Quit.
-	// So Esc on the main menu actually quits.
-	if cmd == nil {
-		t.Log("Esc on main menu does nothing (returns nil cmd) -- that's a no-op")
+	if cmd != nil {
+		t.Error("Esc on main menu should be a no-op (nil cmd), not quit the app")
 	}
-	// If cmd is non-nil, it quits. This is actual code behavior.
 }
 
 func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {

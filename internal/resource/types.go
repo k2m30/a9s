@@ -119,7 +119,7 @@ var resourceTypes = []ResourceTypeDef{
 		Aliases:   []string{"vpc", "vpcs"},
 		Columns: []Column{
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "cidr_block", Title: "CIDR Block", Width: 18, Sortable: true},
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 			{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
@@ -360,6 +360,7 @@ var resourceTypes = []ResourceTypeDef{
 		Aliases:   []string{"eip", "elastic-ips", "elasticips"},
 		Columns: []Column{
 			{Key: "allocation_id", Title: "Allocation ID", Width: 26, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: true},
 			{Key: "association_id", Title: "Association", Width: 26, Sortable: true},
 			{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},

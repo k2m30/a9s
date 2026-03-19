@@ -29,4 +29,4 @@ coverage.html
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 
-# tests/testdata/fixtures/ — sanitized, safe to commit
+refgen

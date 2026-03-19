@@ -626,6 +626,80 @@ func TestQA_Filter_11_24_DoubleEsc(t *testing.T) {
 	}
 }
 
+// ── 11-24a: Esc clears confirmed filter on resource list ─────────────────────
+// After typing /prod + Enter, filter is confirmed (modeNormal but filter active).
+// Esc should clear the filter, NOT navigate back.
+
+func TestQA_Filter_11_24a_EscClearsConfirmedFilter(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+	m = loadEC2Resources(m, sampleEC2Resources())
+
+	// Apply filter and confirm with Enter
+	m = typeFilter(m, "prod")
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Verify filter is confirmed (not in filter input mode) but still active
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "/prod") {
+		t.Error("after Enter, filter input indicator should be gone from header")
+	}
+	if strings.Contains(plain, "bastion") {
+		t.Error("filter should still be active after Enter - bastion should be hidden")
+	}
+
+	// Now press Esc -- should clear the filter, NOT go back to main menu
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	plain = stripANSI(rootViewContent(m))
+
+	// Should still be on resource list, showing all 10 resources
+	if !strings.Contains(plain, "ec2(10)") {
+		t.Errorf("Esc should clear confirmed filter and show all resources, got: %s", plain)
+	}
+	// Should NOT be back at main menu
+	if strings.Contains(plain, "resource-types") {
+		t.Error("Esc with active filter should clear filter, not navigate back to main menu")
+	}
+}
+
+// ── 11-24b: Esc on main menu should NOT quit ────────────────────────────────
+
+func TestQA_Filter_11_24b_EscOnMainMenuNeverQuits(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Press Esc on main menu -- should NOT quit
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if cmd != nil {
+		t.Error("Esc on main menu should be a no-op (nil cmd), not quit the app")
+	}
+}
+
+// ── 11-24c: Esc clears confirmed filter on main menu ────────────────────────
+
+func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Apply filter and confirm with Enter
+	m = typeFilter(m, "ec2")
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Verify filter is confirmed but active (only EC2 visible)
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "S3 Buckets") {
+		t.Error("confirmed filter should hide S3 Buckets")
+	}
+
+	// Press Esc -- should clear the filter
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	plain = stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "resource-types(30)") {
+		t.Errorf("Esc should clear confirmed filter, showing all 30 types, got: %s", plain)
+	}
+}
+
 // ── 11-25: Very long filter string ──────────────────────────────────────────
 
 func TestQA_Filter_11_25_VeryLongFilterString(t *testing.T) {

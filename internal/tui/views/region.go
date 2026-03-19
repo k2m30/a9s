@@ -123,6 +123,13 @@ func (m *RegionModel) SetFilter(text string) {
 	m.cursor = 0
 }
 
+// GetFilter returns the current filter text.
+func (m *RegionModel) GetFilter() string {
+	return m.filterText
+}
+
+
+
 // applyFilter filters allRegions into filteredRegions.
 func (m *RegionModel) applyFilter() {
 	if m.filterText == "" {

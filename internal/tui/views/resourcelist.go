@@ -299,6 +299,7 @@ func (m ResourceListModel) resolveColumns() []listCol {
 					title: lc.Title,
 					width: lc.Width,
 					path:  lc.Path,
+					key:   lc.Key,
 				}
 			}
 			return cols
@@ -482,6 +483,11 @@ func (m *ResourceListModel) SetFilter(text string) {
 	m.filterText = text
 	m.applyFilter()
 	m.cursor = 0
+}
+
+// GetFilter returns the current filter text.
+func (m *ResourceListModel) GetFilter() string {
+	return m.filterText
 }
 
 // SetSize updates dimensions.

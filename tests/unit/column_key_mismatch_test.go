@@ -39,7 +39,7 @@ var expectedFieldKeys = map[string][]string{
 	"logs":    {"log_group_name", "stored_bytes", "retention_days", "creation_time"},
 	"ssm":     {"name", "type", "version", "last_modified", "description"},
 	"ddb":     {"table_name", "status", "item_count", "size_bytes", "billing_mode"},
-	"eip":     {"allocation_id", "public_ip", "association_id", "instance_id", "domain"},
+	"eip":     {"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain"},
 	"acm":     {"domain_name", "status", "type", "not_after", "in_use"},
 	"asg":     {"asg_name", "min_size", "max_size", "desired", "instances", "status"},
 }

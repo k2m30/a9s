@@ -136,10 +136,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if key.Matches(msg, m.keys.Escape) {
-			if m.popView() {
+			// If active view has a confirmed filter, clear it first
+			if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
+				f.SetFilter("")
 				return m, nil
 			}
-			return m, tea.Quit
+			// Otherwise pop view; no-op on main menu (never quit from Esc)
+			m.popView()
+			return m, nil
 		}
 		if key.Matches(msg, m.keys.Colon) {
 			m.inputMode = modeCommand

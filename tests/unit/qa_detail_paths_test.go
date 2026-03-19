@@ -91,10 +91,12 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 
 			// Every configured detail path should appear as a label in the view
 			for _, path := range vd.Detail {
-				// The path name (or a truncated version) should be visible
+				// The path name (or a truncated version) should be visible.
+				// PadOrTrunc receives "path:" (len+1), truncates to 22 with ellipsis.
+				// So if len(path)+1 > 22 (i.e. len >= 22), the label gets truncated.
 				label := path
-				if len(label) > 22 {
-					label = label[:20] // PadOrTrunc truncates to 22
+				if len(label) >= 22 {
+					label = label[:20] // PadOrTrunc truncates "path:" to 22 visible chars
 				}
 				if !strings.Contains(plain, label) {
 					t.Errorf("detail view for %s missing field %q in output:\n%s",

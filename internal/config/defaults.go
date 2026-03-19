@@ -6,10 +6,10 @@ var defaultViews = ViewsConfig{
 	Views: map[string]ViewDef{
 		"s3_objects": {
 			List: []ListColumn{
-				{Title: "Key", Path: "Key", Width: 50},
+				{Title: "Key", Path: "Key", Width: 36},
 				{Title: "Size", Path: "Size", Width: 12},
-				{Title: "Last Modified", Path: "LastModified", Width: 22},
 				{Title: "Storage Class", Path: "StorageClass", Width: 16},
+				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
 			Detail: []string{
 				"Key", "Size", "LastModified", "StorageClass", "ETag",
@@ -18,15 +18,16 @@ var defaultViews = ViewsConfig{
 		},
 		"s3": {
 			List: []ListColumn{
-				{Title: "Bucket Name", Path: "Name", Width: 40},
+				{Title: "Bucket Name", Path: "Name", Width: 36},
+				{Title: "Region", Path: "BucketRegion", Width: 14},
 				{Title: "Creation Date", Path: "CreationDate", Width: 22},
 			},
-			Detail: []string{"Name", "CreationDate"},
+			Detail: []string{"Name", "BucketArn", "BucketRegion", "CreationDate"},
 		},
 		"ec2": {
 			List: []ListColumn{
+				{Title: "Name", Path: "", Width: 24},
 				{Title: "Instance ID", Path: "InstanceId", Width: 20},
-				{Title: "Name", Path: "Tags", Width: 28},
 				{Title: "State", Path: "State.Name", Width: 12},
 				{Title: "Type", Path: "InstanceType", Width: 14},
 				{Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
@@ -35,8 +36,11 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"InstanceId", "State", "InstanceType", "ImageId",
-				"VpcId", "SubnetId", "PrivateIpAddress", "PublicIpAddress",
-				"SecurityGroups", "LaunchTime", "Architecture", "Platform", "Tags",
+				"KeyName", "Placement",
+				"VpcId", "SubnetId", "PrivateIpAddress", "PrivateDnsName",
+				"PublicIpAddress", "IamInstanceProfile",
+				"SecurityGroups", "EbsOptimized", "MetadataOptions",
+				"LaunchTime", "Architecture", "Platform", "Tags",
 			},
 		},
 		"dbi": {
@@ -50,9 +54,14 @@ var defaultViews = ViewsConfig{
 				{Title: "Multi-AZ", Path: "MultiAZ", Width: 10},
 			},
 			Detail: []string{
-				"DBInstanceIdentifier", "Engine", "EngineVersion", "DBInstanceStatus",
-				"DBInstanceClass", "Endpoint", "MultiAZ", "AllocatedStorage",
-				"StorageType", "AvailabilityZone",
+				"DBInstanceIdentifier", "DBInstanceArn", "Engine", "EngineVersion",
+				"DBInstanceStatus", "DBInstanceClass", "Endpoint", "MultiAZ",
+				"AllocatedStorage", "StorageType", "Iops", "StorageEncrypted",
+				"KmsKeyId", "AvailabilityZone", "PubliclyAccessible",
+				"DBSubnetGroup", "VpcSecurityGroups", "BackupRetentionPeriod",
+				"PreferredMaintenanceWindow", "PreferredBackupWindow",
+				"DeletionProtection", "MasterUsername",
+				"PerformanceInsightsEnabled", "Tags",
 			},
 		},
 		"redis": {
@@ -65,9 +74,13 @@ var defaultViews = ViewsConfig{
 				{Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 			},
 			Detail: []string{
-				"CacheClusterId", "Engine", "EngineVersion", "CacheClusterStatus",
-				"CacheNodeType", "NumCacheNodes", "ConfigurationEndpoint",
-				"PreferredAvailabilityZone",
+				"CacheClusterId", "ARN", "Engine", "EngineVersion",
+				"CacheClusterStatus", "CacheNodeType", "NumCacheNodes",
+				"CacheNodes", "ConfigurationEndpoint", "PreferredAvailabilityZone",
+				"ReplicationGroupId", "CacheSubnetGroupName", "SecurityGroups",
+				"AtRestEncryptionEnabled", "TransitEncryptionEnabled",
+				"AuthTokenEnabled", "SnapshotRetentionLimit",
+				"PreferredMaintenanceWindow",
 			},
 		},
 		"dbc": {
@@ -79,9 +92,11 @@ var defaultViews = ViewsConfig{
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 			},
 			Detail: []string{
-				"DBClusterIdentifier", "Engine", "EngineVersion", "Status",
-				"Endpoint", "ReaderEndpoint", "Port", "StorageEncrypted",
-				"DBClusterMembers",
+				"DBClusterIdentifier", "DBClusterArn", "Engine", "EngineVersion",
+				"Status", "Endpoint", "ReaderEndpoint", "Port", "StorageEncrypted",
+				"KmsKeyId", "DeletionProtection", "DBClusterMembers",
+				"DBSubnetGroup", "VpcSecurityGroups", "BackupRetentionPeriod",
+				"PreferredMaintenanceWindow", "MasterUsername",
 			},
 		},
 		"eks": {
@@ -95,6 +110,7 @@ var defaultViews = ViewsConfig{
 			Detail: []string{
 				"Name", "Version", "Status", "Endpoint",
 				"PlatformVersion", "Arn", "RoleArn", "KubernetesNetworkConfig",
+				"ResourcesVpcConfig", "Logging", "Identity", "CreatedAt", "Tags",
 			},
 		},
 		"secrets": {
@@ -107,12 +123,15 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"Name", "Description", "LastAccessedDate", "LastChangedDate",
-				"RotationEnabled", "ARN", "KmsKeyId", "Tags",
+				"RotationEnabled", "ARN", "KmsKeyId",
+				"CreatedDate", "LastRotatedDate", "RotationLambdaARN",
+				"RotationRules", "PrimaryRegion", "Tags",
 			},
 		},
 		"vpc": {
 			List: []ListColumn{
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
+				{Title: "Name", Path: "", Width: 24},
 				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "Default", Path: "IsDefault", Width: 9},
@@ -155,7 +174,7 @@ var defaultViews = ViewsConfig{
 		"subnet": {
 			List: []ListColumn{
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
-				{Title: "Name", Path: "Tags", Width: 28},
+				{Title: "Name", Path: "", Width: 28},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 				{Title: "AZ", Path: "AvailabilityZone", Width: 14},
@@ -164,17 +183,17 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"SubnetId", "VpcId", "CidrBlock", "AvailabilityZone",
-				"State", "AvailableIpAddressCount", "MapPublicIpOnLaunch",
-				"DefaultForAz", "SubnetArn", "OwnerId", "Tags",
+				"AvailabilityZoneId", "State", "AvailableIpAddressCount",
+				"MapPublicIpOnLaunch", "DefaultForAz", "SubnetArn", "OwnerId", "Tags",
 			},
 		},
 		"rtb": {
 			List: []ListColumn{
 				{Title: "Route Table ID", Path: "RouteTableId", Width: 26},
-				{Title: "Name", Path: "Tags", Width: 28},
+				{Title: "Name", Path: "", Width: 28},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
-				{Title: "Routes", Path: "Routes", Width: 8},
-				{Title: "Assoc.", Path: "Associations", Width: 8},
+				{Title: "Routes", Path: "", Key: "routes_count", Width: 8},
+				{Title: "Assoc.", Path: "", Key: "associations_count", Width: 8},
 			},
 			Detail: []string{
 				"RouteTableId", "VpcId", "Routes", "Associations",
@@ -184,23 +203,24 @@ var defaultViews = ViewsConfig{
 		"nat": {
 			List: []ListColumn{
 				{Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
-				{Title: "Name", Path: "Tags", Width: 24},
+				{Title: "Name", Path: "", Width: 24},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "State", Path: "State", Width: 12},
-				{Title: "Public IP", Path: "NatGatewayAddresses", Width: 16},
+				{Title: "Public IP", Path: "", Key: "public_ip", Width: 16},
 			},
 			Detail: []string{
 				"NatGatewayId", "VpcId", "SubnetId", "State",
-				"ConnectivityType", "NatGatewayAddresses", "CreateTime", "Tags",
+				"ConnectivityType", "NatGatewayAddresses", "CreateTime",
+				"FailureCode", "FailureMessage", "Tags",
 			},
 		},
 		"igw": {
 			List: []ListColumn{
 				{Title: "IGW ID", Path: "InternetGatewayId", Width: 26},
-				{Title: "Name", Path: "Tags", Width: 28},
-				{Title: "VPC ID", Path: "Attachments", Width: 24},
-				{Title: "State", Path: "Attachments", Width: 12},
+				{Title: "Name", Path: "", Width: 28},
+				{Title: "VPC ID", Path: "", Key: "vpc_id", Width: 24},
+				{Title: "State", Path: "", Key: "state", Width: 12},
 			},
 			Detail: []string{
 				"InternetGatewayId", "Attachments", "OwnerId", "Tags",
@@ -212,13 +232,16 @@ var defaultViews = ViewsConfig{
 				{Title: "Runtime", Path: "Runtime", Width: 16},
 				{Title: "Memory", Path: "MemorySize", Width: 8},
 				{Title: "Timeout", Path: "Timeout", Width: 8},
-				{Title: "Handler", Path: "Handler", Width: 30},
+				{Title: "State", Path: "State", Width: 10},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
 			Detail: []string{
 				"FunctionName", "FunctionArn", "Runtime", "Handler",
-				"MemorySize", "Timeout", "CodeSize", "Description",
-				"Role", "PackageType", "Architectures", "LastModified",
+				"MemorySize", "Timeout", "EphemeralStorage", "CodeSize",
+				"Description", "Role", "PackageType", "Architectures",
+				"State", "LastUpdateStatus", "LastUpdateStatusReason",
+				"Environment", "VpcConfig", "DeadLetterConfig",
+				"TracingConfig", "Layers", "LoggingConfig", "LastModified",
 			},
 		},
 		"alarm": {
@@ -231,9 +254,12 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"AlarmName", "AlarmArn", "StateValue", "StateReason",
+				"StateUpdatedTimestamp", "StateTransitionedTimestamp",
 				"MetricName", "Namespace", "Statistic", "Period",
-				"EvaluationPeriods", "Threshold", "ComparisonOperator",
-				"AlarmDescription", "AlarmActions",
+				"EvaluationPeriods", "DatapointsToAlarm", "Threshold",
+				"ComparisonOperator", "TreatMissingData", "Dimensions",
+				"AlarmDescription", "AlarmActions", "OKActions",
+				"InsufficientDataActions", "ActionsEnabled",
 			},
 		},
 		"sns": {
@@ -247,11 +273,11 @@ var defaultViews = ViewsConfig{
 		},
 		"sqs": {
 			List: []ListColumn{
-				{Title: "Queue Name", Path: "QueueUrl", Width: 36},
-				{Title: "Messages", Path: "Attributes", Width: 10},
-				{Title: "In Flight", Path: "Attributes", Width: 10},
-				{Title: "Delay", Path: "Attributes", Width: 8},
-				{Title: "Queue URL", Path: "QueueUrl", Width: 50},
+				{Title: "Queue Name", Path: "", Key: "queue_name", Width: 36},
+				{Title: "Messages", Path: "", Key: "approx_messages", Width: 10},
+				{Title: "In Flight", Path: "", Key: "approx_not_visible", Width: 10},
+				{Title: "Delay", Path: "", Key: "delay_seconds", Width: 8},
+				{Title: "Queue URL", Path: "", Key: "queue_url", Width: 50},
 			},
 			Detail: []string{
 				"QueueUrl", "Attributes",
@@ -260,16 +286,17 @@ var defaultViews = ViewsConfig{
 		"elb": {
 			List: []ListColumn{
 				{Title: "Name", Path: "LoadBalancerName", Width: 32},
-				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "Type", Path: "Type", Width: 12},
 				{Title: "Scheme", Path: "Scheme", Width: 14},
 				{Title: "State", Path: "State.Code", Width: 12},
+				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
 			Detail: []string{
 				"LoadBalancerName", "LoadBalancerArn", "DNSName", "Type",
 				"Scheme", "State", "VpcId", "AvailabilityZones",
-				"SecurityGroups", "IpAddressType", "CreatedTime",
+				"SecurityGroups", "IpAddressType", "CanonicalHostedZoneId",
+				"CreatedTime",
 			},
 		},
 		"tg": {
@@ -283,9 +310,11 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"TargetGroupName", "TargetGroupArn", "Port", "Protocol",
-				"VpcId", "TargetType", "HealthCheckPath", "HealthCheckPort",
-				"HealthCheckProtocol", "HealthCheckIntervalSeconds",
+				"ProtocolVersion", "VpcId", "TargetType", "HealthCheckPath",
+				"HealthCheckPort", "HealthCheckProtocol", "HealthCheckEnabled",
+				"HealthCheckIntervalSeconds", "HealthCheckTimeoutSeconds",
 				"HealthyThresholdCount", "UnhealthyThresholdCount",
+				"Matcher", "LoadBalancerArns",
 			},
 		},
 		"ecs": {
@@ -300,12 +329,13 @@ var defaultViews = ViewsConfig{
 				"ClusterName", "ClusterArn", "Status",
 				"RunningTasksCount", "PendingTasksCount",
 				"ActiveServicesCount", "RegisteredContainerInstancesCount",
+				"CapacityProviders", "DefaultCapacityProviderStrategy",
+				"Settings", "Tags",
 			},
 		},
 		"ecs-svc": {
 			List: []ListColumn{
 				{Title: "Service Name", Path: "ServiceName", Width: 32},
-				{Title: "Cluster", Path: "ClusterArn", Width: 24},
 				{Title: "Status", Path: "Status", Width: 12},
 				{Title: "Desired", Path: "DesiredCount", Width: 9},
 				{Title: "Running", Path: "RunningCount", Width: 9},
@@ -313,8 +343,11 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"ServiceName", "ServiceArn", "ClusterArn", "Status",
-				"DesiredCount", "RunningCount", "LaunchType",
-				"TaskDefinition", "RoleArn", "CreatedAt",
+				"DesiredCount", "RunningCount", "PendingCount", "LaunchType",
+				"TaskDefinition", "DeploymentConfiguration", "Deployments",
+				"NetworkConfiguration", "LoadBalancers", "Events",
+				"PlatformVersion", "SchedulingStrategy", "EnableExecuteCommand",
+				"RoleArn", "CreatedAt", "Tags",
 			},
 		},
 		"cfn": {
@@ -326,15 +359,17 @@ var defaultViews = ViewsConfig{
 				{Title: "Description", Path: "Description", Width: 30},
 			},
 			Detail: []string{
-				"StackName", "StackId", "StackStatus", "StackStatusReason",
-				"CreationTime", "LastUpdatedTime", "Description",
-				"RoleARN", "DriftInformation", "Parameters", "Outputs",
+				"StackName", "StackId", "StackStatus", "DetailedStatus",
+				"StackStatusReason", "CreationTime", "LastUpdatedTime",
+				"DeletionTime", "Description", "RoleARN", "Capabilities",
+				"EnableTerminationProtection", "DriftInformation",
+				"Parameters", "Outputs", "Tags",
 			},
 		},
 		"role": {
 			List: []ListColumn{
 				{Title: "Role Name", Path: "RoleName", Width: 36},
-				{Title: "Role ID", Path: "RoleId", Width: 22},
+				{Title: "Last Used", Path: "RoleLastUsed.LastUsedDate", Width: 22},
 				{Title: "Path", Path: "Path", Width: 20},
 				{Title: "Created", Path: "CreateDate", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},
@@ -342,6 +377,7 @@ var defaultViews = ViewsConfig{
 			Detail: []string{
 				"RoleName", "RoleId", "Arn", "Path",
 				"CreateDate", "Description", "MaxSessionDuration",
+				"RoleLastUsed", "PermissionsBoundary",
 				"AssumeRolePolicyDocument", "Tags",
 			},
 		},
@@ -350,11 +386,14 @@ var defaultViews = ViewsConfig{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
 				{Title: "Size (bytes)", Path: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
+				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Created", Path: "CreationTime", Width: 16},
 			},
 			Detail: []string{
-				"LogGroupName", "Arn", "StoredBytes", "RetentionInDays",
-				"CreationTime", "KmsKeyId", "DataProtectionStatus",
+				"LogGroupName", "LogGroupArn", "LogGroupClass",
+				"StoredBytes", "RetentionInDays", "MetricFilterCount",
+				"DeletionProtectionEnabled", "CreationTime",
+				"KmsKeyId", "DataProtectionStatus",
 			},
 		},
 		"ssm": {
@@ -368,7 +407,7 @@ var defaultViews = ViewsConfig{
 			Detail: []string{
 				"Name", "Type", "Version", "LastModifiedDate",
 				"LastModifiedUser", "Description", "KeyId",
-				"Tier", "DataType",
+				"Tier", "DataType", "AllowedPattern",
 			},
 		},
 		"ddb": {
@@ -382,12 +421,16 @@ var defaultViews = ViewsConfig{
 			Detail: []string{
 				"TableName", "TableArn", "TableId", "TableStatus",
 				"ItemCount", "TableSizeBytes", "BillingModeSummary",
-				"CreationDateTime", "KeySchema", "AttributeDefinitions",
+				"GlobalSecondaryIndexes", "LocalSecondaryIndexes",
+				"ProvisionedThroughput", "DeletionProtectionEnabled",
+				"StreamSpecification", "SSEDescription",
+				"CreationDateTime", "KeySchema", "AttributeDefinitions", "Tags",
 			},
 		},
 		"eip": {
 			List: []ListColumn{
 				{Title: "Allocation ID", Path: "AllocationId", Width: 26},
+				{Title: "Name", Path: "", Width: 24},
 				{Title: "Public IP", Path: "PublicIp", Width: 16},
 				{Title: "Association", Path: "AssociationId", Width: 26},
 				{Title: "Instance", Path: "InstanceId", Width: 20},
@@ -395,7 +438,8 @@ var defaultViews = ViewsConfig{
 			},
 			Detail: []string{
 				"AllocationId", "PublicIp", "AssociationId", "InstanceId",
-				"Domain", "PrivateIpAddress", "NetworkInterfaceId", "Tags",
+				"Domain", "NetworkBorderGroup", "SubnetId",
+				"PrivateIpAddress", "NetworkInterfaceId", "Tags",
 			},
 		},
 		"acm": {
@@ -404,11 +448,12 @@ var defaultViews = ViewsConfig{
 				{Title: "Status", Path: "Status", Width: 14},
 				{Title: "Type", Path: "Type", Width: 14},
 				{Title: "Expires", Path: "NotAfter", Width: 22},
-				{Title: "In Use", Path: "InUseBy", Width: 8},
+				{Title: "In Use", Path: "InUse", Width: 8},
 			},
 			Detail: []string{
-				"DomainName", "CertificateArn", "Status", "Type",
-				"NotBefore", "NotAfter", "InUseBy", "CreatedAt",
+				"DomainName", "CertificateArn", "SubjectAlternativeNameSummaries",
+				"Status", "Type", "NotBefore", "NotAfter",
+				"IssuedAt", "ImportedAt", "InUse", "CreatedAt",
 				"RenewalEligibility", "KeyAlgorithm",
 			},
 		},
@@ -425,7 +470,10 @@ var defaultViews = ViewsConfig{
 				"AutoScalingGroupName", "AutoScalingGroupARN",
 				"MinSize", "MaxSize", "DesiredCapacity",
 				"AvailabilityZones", "LaunchConfigurationName",
-				"HealthCheckType", "CreatedTime", "Tags",
+				"HealthCheckType", "HealthCheckGracePeriod",
+				"TargetGroupARNs", "LoadBalancerNames",
+				"SuspendedProcesses", "TerminationPolicies",
+				"VPCZoneIdentifier", "CreatedTime", "Tags",
 			},
 		},
 	},

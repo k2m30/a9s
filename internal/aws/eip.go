@@ -97,6 +97,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 			Status: domain,
 			Fields: map[string]string{
 				"allocation_id":  allocationID,
+				"name":           name,
 				"public_ip":      publicIP,
 				"association_id": associationID,
 				"instance_id":    instanceID,

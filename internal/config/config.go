@@ -24,6 +24,7 @@ type ViewDef struct {
 type ListColumn struct {
 	Title string `yaml:"-"`
 	Path  string `yaml:"path"`
+	Key   string `yaml:"key"`
 	Width int    `yaml:"width"`
 }
 

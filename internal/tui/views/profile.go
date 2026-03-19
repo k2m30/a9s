@@ -123,6 +123,13 @@ func (m *ProfileModel) SetFilter(text string) {
 	m.cursor = 0
 }
 
+// GetFilter returns the current filter text.
+func (m *ProfileModel) GetFilter() string {
+	return m.filterText
+}
+
+
+
 // applyFilter filters allProfiles into filteredProfiles.
 func (m *ProfileModel) applyFilter() {
 	if m.filterText == "" {

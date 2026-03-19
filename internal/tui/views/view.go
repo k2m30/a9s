@@ -18,4 +18,5 @@ type View interface {
 // implement this. Static views (detail, yaml, help, reveal) do not.
 type Filterable interface {
 	SetFilter(text string)
+	GetFilter() string
 }
