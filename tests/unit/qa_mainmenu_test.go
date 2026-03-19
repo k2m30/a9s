@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui"
 	"github.com/k2m30/a9s/internal/tui/messages"
 )
@@ -19,19 +21,9 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 	m := newRootSizedModel()
 	plain := stripANSI(rootViewContent(m))
 
-	expected := []string{
-		"S3 Buckets",
-		"EC2 Instances",
-		"DB Instances",
-		"ElastiCache Redis",
-		"DB Clusters",
-		"EKS Clusters",
-		"Secrets Manager",
-		"VPCs",
-		"Security Groups",
-		"EKS Node Groups",
-	}
-	for _, name := range expected {
+	allTypes := resource.AllResourceTypes()
+	for _, rt := range allTypes {
+		name := rt.Name
 		if !strings.Contains(plain, name) {
 			t.Errorf("main menu should contain %q, got:\n%s", name, plain)
 		}
@@ -43,9 +35,11 @@ func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 	m := newRootSizedModel()
 	plain := stripANSI(rootViewContent(m))
 
-	// Note: aliases longer than the fixed alias column width (9 chars) get truncated.
-	// :ngups (11 chars) is truncated to :ng, so we check the prefix.
-	aliases := []string{":s3", ":ec2", ":dbi", ":redis", ":dbc", ":eks", ":secrets", ":vpc", ":sg", ":ng"}
+	allTypes := resource.AllResourceTypes()
+	aliases := make([]string, len(allTypes))
+	for i, rt := range allTypes {
+		aliases[i] = ":" + rt.ShortName
+	}
 	for _, alias := range aliases {
 		if !strings.Contains(plain, alias) {
 			t.Errorf("main menu should contain alias %q, got:\n%s", alias, plain)
@@ -119,10 +113,10 @@ func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
 
-	resourceNames := []string{
-		"S3 Buckets", "EC2 Instances", "DB Instances",
-		"ElastiCache Redis", "DB Clusters", "EKS Clusters", "Secrets Manager",
-		"VPCs", "Security Groups", "EKS Node Groups",
+	allTypes := resource.AllResourceTypes()
+	resourceNames := make([]string, len(allTypes))
+	for i, rt := range allTypes {
+		resourceNames[i] = rt.Name
 	}
 	count := 0
 	for _, line := range lines {
@@ -133,8 +127,8 @@ func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 			}
 		}
 	}
-	if count != 10 {
-		t.Errorf("expected exactly 10 resource type rows, got %d", count)
+	if count != len(allTypes) {
+		t.Errorf("expected exactly %d resource type rows, got %d", len(allTypes), count)
 	}
 }
 
@@ -358,7 +352,7 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 
 func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 	// Resource types in order as defined in AllResourceTypes()
-	expectedTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
+	expectedTypes := resource.AllShortNames()
 
 	for i, expected := range expectedTypes {
 		t.Run(expected, func(t *testing.T) {
@@ -1174,8 +1168,9 @@ func TestQA_MainMenu_FrameTitle(t *testing.T) {
 	m := newRootSizedModel()
 
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("frame title should be 'resource-types(10)', got:\n%s", plain)
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	if !strings.Contains(plain, expectedTitle) {
+		t.Errorf("frame title should be %q, got:\n%s", expectedTitle, plain)
 	}
 }
 
@@ -1487,8 +1482,9 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 
 	// Verify all 10 resources still visible and we can navigate
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Error("after resize, frame title should still show resource-types(10)")
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	if !strings.Contains(plain, expectedTitle) {
+		t.Errorf("after resize, frame title should still show %q", expectedTitle)
 	}
 
 	// Cursor should still be at index 2 (RDS)
@@ -1512,6 +1508,108 @@ func TestQA_MainMenu_NoLineExceedsWidth(t *testing.T) {
 		vis := lipglossWidth(line)
 		if vis > 80 {
 			t.Errorf("line %d exceeds terminal width 80: got %d", i, vis)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// K. Viewport Scrolling (small terminal)
+// ---------------------------------------------------------------------------
+
+func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
+	tui.Version = "test"
+	// Height 10: innerSize.h = 7, so only 7 items visible out of 10
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Move cursor to item index 8 (Security Groups, 0-indexed)
+	for i := 0; i < 8; i++ {
+		m, _ = rootApplyMsg(m, rootKeyPress("j"))
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "Security Groups") {
+		t.Errorf("item at cursor (index 8) should be visible after scrolling down, got:\n%s", plain)
+	}
+}
+
+func TestMainMenu_Viewport_BottomKey_LastItemVisible(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Press G to go to bottom
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+
+	plain := stripANSI(rootViewContent(m))
+	allTypes := resource.AllResourceTypes()
+	lastName := allTypes[len(allTypes)-1].Name
+	if !strings.Contains(plain, lastName) {
+		t.Errorf("last item %q should be visible after G key, got:\n%s", lastName, plain)
+	}
+}
+
+func TestMainMenu_Viewport_TopAfterScroll_FirstItemVisible(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Scroll to bottom, then back to top
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+	m, _ = rootApplyMsg(m, rootKeyPress("g"))
+
+	plain := stripANSI(rootViewContent(m))
+	firstName := resource.AllResourceTypes()[0].Name
+	if !strings.Contains(plain, firstName) {
+		t.Errorf("first item %q should be visible after g key, got:\n%s", firstName, plain)
+	}
+}
+
+func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Move to last item
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter on last item should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	allTypes := resource.AllResourceTypes()
+	expected := allTypes[len(allTypes)-1].ShortName
+	if nav.ResourceType != expected {
+		t.Errorf("expected %q after G+Enter, got %q", expected, nav.ResourceType)
+	}
+}
+
+func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
+	tui.Version = "test"
+	// Height 10: innerSize.h = 7, frameHeight-2 = 7 content rows
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// At scroll position 0, the last 3 items should NOT be in the content
+	plain := stripANSI(rootViewContent(m))
+	allTypes := resource.AllResourceTypes()
+	if len(allTypes) <= 7 {
+		t.Skip("need more than 7 resource types to test viewport scrolling")
+	}
+
+	// Items 0-6 should be visible
+	for i := 0; i < 7; i++ {
+		if !strings.Contains(plain, allTypes[i].Name) {
+			t.Errorf("item %d (%s) should be visible at scroll offset 0", i, allTypes[i].Name)
+		}
+	}
+
+	// Items 7+ should NOT be visible (they are below the viewport)
+	for i := 7; i < len(allTypes); i++ {
+		if strings.Contains(plain, allTypes[i].Name) {
+			t.Errorf("item %d (%s) should NOT be visible at scroll offset 0 (viewport is 7 rows)", i, allTypes[i].Name)
 		}
 	}
 }

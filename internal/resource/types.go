@@ -157,6 +157,15 @@ func AllResourceTypes() []ResourceTypeDef {
 	return result
 }
 
+// AllShortNames returns the ShortName of every registered resource type.
+func AllShortNames() []string {
+	names := make([]string, len(resourceTypes))
+	for i, rt := range resourceTypes {
+		names[i] = rt.ShortName
+	}
+	return names
+}
+
 // S3ObjectColumns returns the column definitions used when browsing inside
 // an S3 bucket (objects/prefixes), as opposed to the bucket list columns.
 func S3ObjectColumns() []Column {

@@ -19,6 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/internal/aws"
+	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui"
 	"github.com/k2m30/a9s/internal/tui/messages"
 )
@@ -479,8 +480,7 @@ func TestQA_FetchResources_NilClients(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	// Do NOT inject clients — they remain nil
 
-	resourceTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
-	for _, rt := range resourceTypes {
+	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
 			_, cmd := rootApplyMsg(m, messages.NavigateMsg{
 				Target:       messages.TargetResourceList,
@@ -567,8 +567,7 @@ func TestQA_FetchResources_S3NavigatePrefix(t *testing.T) {
 func TestQA_FetchResources_ViaLoadResourcesMsg(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	resourceTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
-	for _, rt := range resourceTypes {
+	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
 			_, cmd := rootApplyMsg(m, messages.LoadResourcesMsg{
 				ResourceType: rt,

@@ -19,6 +19,7 @@ type MainMenuModel struct {
 	filteredItems []resource.ResourceTypeDef
 	filterText    string
 	cursor        int
+	scrollOffset  int
 	width         int
 	height        int
 	keys          keys.Map
@@ -69,11 +70,21 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 				}
 			}
 		}
+		// Keep cursor visible in the viewport
+		if m.height > 0 {
+			if m.cursor < m.scrollOffset {
+				m.scrollOffset = m.cursor
+			}
+			if m.cursor >= m.scrollOffset+m.height {
+				m.scrollOffset = m.cursor - m.height + 1
+			}
+		}
 	}
 	return m, nil
 }
 
 // View renders the menu items. Caller wraps in RenderFrame.
+// Only items within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
 func (m MainMenuModel) View() string {
 	if len(m.filteredItems) == 0 {
 		return "No resource types"
@@ -82,11 +93,19 @@ func (m MainMenuModel) View() string {
 	// Alias column width: widest alias is ":secrets" = 8, plus trailing pad.
 	const aliasW = 9
 
+	// Calculate visible window
+	start := m.scrollOffset
+	end := len(m.filteredItems)
+	if m.height > 0 && start+m.height < end {
+		end = start + m.height
+	}
+
 	var sb strings.Builder
-	for i, item := range m.filteredItems {
-		if i > 0 {
+	for i := start; i < end; i++ {
+		if i > start {
 			sb.WriteString("\n")
 		}
+		item := m.filteredItems[i]
 
 		aliasStr := ":" + item.ShortName
 		aliasPadded := layout.PadOrTrunc(aliasStr, aliasW)
@@ -148,11 +167,12 @@ func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
 	return m.filteredItems[m.cursor]
 }
 
-// SetFilter applies a filter to the menu items; cursor resets to 0.
+// SetFilter applies a filter to the menu items; cursor and scroll reset to 0.
 func (m *MainMenuModel) SetFilter(text string) {
 	m.filterText = text
 	m.applyFilter()
 	m.cursor = 0
+	m.scrollOffset = 0
 }
 
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.

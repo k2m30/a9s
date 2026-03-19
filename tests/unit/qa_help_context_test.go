@@ -587,7 +587,7 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
-	resourceTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
+	resourceTypes := resource.AllShortNames()
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {

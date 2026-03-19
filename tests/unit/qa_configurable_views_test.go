@@ -14,6 +14,7 @@ import (
 
 	"github.com/k2m30/a9s/internal/config"
 	"github.com/k2m30/a9s/internal/fieldpath"
+	"github.com/k2m30/a9s/internal/resource"
 )
 
 // ===========================================================================
@@ -814,7 +815,7 @@ func TestQA_NilFields_Secrets(t *testing.T) {
 // ===========================================================================
 
 func TestQA_AllResourceTypesHaveDefaults(t *testing.T) {
-	resourceTypes := []string{"s3", "s3_objects", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
+	resourceTypes := append(resource.AllShortNames(), "s3_objects")
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
