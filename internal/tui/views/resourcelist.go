@@ -51,6 +51,12 @@ type ResourceListModel struct {
 	width  int
 	height int
 	keys   keys.Map
+
+	// rowTextCache caches unstyled row text (renderDataRow output) per
+	// filteredResources index. Only the cursor highlight changes between
+	// renders during scrolling — the row text itself is identical.
+	// Invalidated when resources, filter, sort, hScroll, or width change.
+	rowTextCache map[int]string
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -101,6 +107,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		m.loading = false
 		m.allResources = msg.Resources
 		m.applyFilter()
+		m.rowTextCache = nil
 		return m, nil
 
 	case spinner.TickMsg:
@@ -145,9 +152,11 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.ScrollLeft):
 			if m.hScrollOffset > 0 {
 				m.hScrollOffset--
+				m.rowTextCache = nil
 			}
 		case key.Matches(msg, m.keys.ScrollRight):
 			m.hScrollOffset++
+			m.rowTextCache = nil
 		case key.Matches(msg, m.keys.Enter):
 			if r := m.SelectedResource(); r != nil {
 				// S3 bucket list: Enter drills into the bucket
@@ -265,7 +274,16 @@ func (m ResourceListModel) View() string {
 	for i := startRow; i < endRow; i++ {
 		sb.WriteString("\n")
 		r := m.filteredResources[i]
-		rowText := m.renderDataRow(cols, r)
+
+		// Use cached row text when available (cursor movement doesn't invalidate).
+		rowText, ok := m.rowTextCache[i]
+		if !ok {
+			rowText = m.renderDataRow(cols, r)
+			if m.rowTextCache == nil {
+				m.rowTextCache = make(map[int]string)
+			}
+			m.rowTextCache[i] = rowText
+		}
 
 		var styled string
 		if i == m.cursor {
@@ -438,6 +456,7 @@ func (m ResourceListModel) visibleWindow(visibleRows int) (int, int) {
 func (m *ResourceListModel) applySortAndFilter() {
 	m.applyFilter()
 	m.sortFiltered()
+	m.rowTextCache = nil
 }
 
 // sortFiltered sorts filteredResources in place based on current sort settings.
@@ -482,6 +501,7 @@ func (m ResourceListModel) getAgeField(r resource.Resource) string {
 func (m *ResourceListModel) SetFilter(text string) {
 	m.filterText = text
 	m.applyFilter()
+	m.rowTextCache = nil
 	m.cursor = 0
 }
 
@@ -492,6 +512,9 @@ func (m *ResourceListModel) GetFilter() string {
 
 // SetSize updates dimensions.
 func (m *ResourceListModel) SetSize(w, h int) {
+	if m.width != w {
+		m.rowTextCache = nil
+	}
 	m.width = w
 	m.height = h
 }

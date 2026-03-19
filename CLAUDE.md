@@ -66,6 +66,7 @@ Go 1.25+: Follow standard conventions
 | `a9s-fixtures` | Test fixtures from gobubble-dev via AWS MCP | Read/Write/Bash |
 | `test-coverage-analyzer` | Test suite analysis, coverage gaps | Read-only |
 | `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Read + Web |
+| `a9s-devops` | AWS practitioner — resource priorities, feature advice, real workflows | All |
 
 ## Rules
 

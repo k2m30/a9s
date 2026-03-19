@@ -10,17 +10,28 @@ import (
 )
 
 // PadOrTrunc pads s to exactly w visible columns, or truncates with "…".
-// Uses lipgloss.Width for ANSI-aware measurement.
+// Uses a fast path for plain ASCII strings (no ANSI escapes) to avoid
+// lipgloss.Width overhead. Falls back to ANSI-aware measurement otherwise.
 func PadOrTrunc(s string, w int) string {
 	if w <= 0 {
 		return ""
 	}
+	// Fast path: no ANSI escapes → len(s) == visible width for ASCII
+	if !strings.Contains(s, "\x1b") {
+		if len(s) == w {
+			return s
+		}
+		if len(s) > w {
+			return s[:w-1] + "\u2026"
+		}
+		return s + strings.Repeat(" ", w-len(s))
+	}
+	// Slow path: ANSI-aware measurement
 	visible := lipgloss.Width(s)
 	if visible == w {
 		return s
 	}
 	if visible > w {
-		// ANSI-aware truncation with ellipsis tail
 		return ansi.Truncate(s, w, "\u2026")
 	}
 	return s + strings.Repeat(" ", w-visible)
@@ -78,7 +89,8 @@ func CenterTitle(title string, w int) string {
 // If fewer content lines than h-2, pad with empty lines.
 func RenderFrame(lines []string, title string, w, h int) string {
 	borderStyle := lipgloss.NewStyle().Foreground(styles.ColBorder)
-	innerW := w - 2 // space between left │ and right │
+	borderV := borderStyle.Render("\u2502") // render once, reuse for all rows
+	innerW := w - 2                         // space between left │ and right │
 
 	// Top border with centered title
 	topBorder := CenterTitle(title, w)
@@ -103,9 +115,9 @@ func RenderFrame(lines []string, title string, w, h int) string {
 			padded = content
 		}
 
-		sb.WriteString(borderStyle.Render("\u2502"))
+		sb.WriteString(borderV)
 		sb.WriteString(padded)
-		sb.WriteString(borderStyle.Render("\u2502"))
+		sb.WriteString(borderV)
 	}
 
 	// Bottom border
