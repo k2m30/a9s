@@ -25,7 +25,7 @@ func TestContentMainMenu_ViewNonEmpty(t *testing.T) {
 func TestContentMainMenu_ViewContainsAllResourceNames(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(80, 20)
+	m.SetSize(80, 40)
 	out := m.View()
 	for _, rt := range resource.AllResourceTypes() {
 		if !strings.Contains(out, rt.Name) {
@@ -37,7 +37,7 @@ func TestContentMainMenu_ViewContainsAllResourceNames(t *testing.T) {
 func TestContentMainMenu_ViewContainsShortNames(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(120, 20)
+	m.SetSize(120, 40)
 	out := m.View()
 	for _, rt := range resource.AllResourceTypes() {
 		alias := ":" + rt.ShortName
@@ -55,7 +55,7 @@ func TestContentMainMenu_ViewContainsShortNames(t *testing.T) {
 func TestContentMainMenu_ViewHasCorrectLineCount(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(80, 20)
+	m.SetSize(80, 40)
 	out := m.View()
 	lines := strings.Split(out, "\n")
 	expectedTypes := len(resource.AllResourceTypes())

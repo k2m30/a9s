@@ -5,13 +5,26 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
 // EC2DescribeInstancesAPI defines the interface for the EC2 DescribeInstances operation.
@@ -87,4 +100,124 @@ type EKSListNodegroupsAPI interface {
 // EKSDescribeNodegroupAPI defines the interface for the EKS DescribeNodegroup operation.
 type EKSDescribeNodegroupAPI interface {
 	DescribeNodegroup(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
+}
+
+// EC2DescribeSubnetsAPI defines the interface for the EC2 DescribeSubnets operation.
+type EC2DescribeSubnetsAPI interface {
+	DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
+}
+
+// EC2DescribeRouteTablesAPI defines the interface for the EC2 DescribeRouteTables operation.
+type EC2DescribeRouteTablesAPI interface {
+	DescribeRouteTables(ctx context.Context, params *ec2.DescribeRouteTablesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error)
+}
+
+// EC2DescribeNatGatewaysAPI defines the interface for the EC2 DescribeNatGateways operation.
+type EC2DescribeNatGatewaysAPI interface {
+	DescribeNatGateways(ctx context.Context, params *ec2.DescribeNatGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error)
+}
+
+// EC2DescribeInternetGatewaysAPI defines the interface for the EC2 DescribeInternetGateways operation.
+type EC2DescribeInternetGatewaysAPI interface {
+	DescribeInternetGateways(ctx context.Context, params *ec2.DescribeInternetGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error)
+}
+
+// LambdaListFunctionsAPI defines the interface for the Lambda ListFunctions operation.
+type LambdaListFunctionsAPI interface {
+	ListFunctions(ctx context.Context, params *lambda.ListFunctionsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error)
+}
+
+// CloudWatchDescribeAlarmsAPI defines the interface for the CloudWatch DescribeAlarms operation.
+type CloudWatchDescribeAlarmsAPI interface {
+	DescribeAlarms(ctx context.Context, params *cloudwatch.DescribeAlarmsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error)
+}
+
+// SNSListTopicsAPI defines the interface for the SNS ListTopics operation.
+type SNSListTopicsAPI interface {
+	ListTopics(ctx context.Context, params *sns.ListTopicsInput, optFns ...func(*sns.Options)) (*sns.ListTopicsOutput, error)
+}
+
+// SQSListQueuesAPI defines the interface for the SQS ListQueues operation.
+type SQSListQueuesAPI interface {
+	ListQueues(ctx context.Context, params *sqs.ListQueuesInput, optFns ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error)
+}
+
+// SQSGetQueueAttributesAPI defines the interface for the SQS GetQueueAttributes operation.
+type SQSGetQueueAttributesAPI interface {
+	GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error)
+}
+
+// ELBv2DescribeLoadBalancersAPI defines the interface for the ELBv2 DescribeLoadBalancers operation.
+type ELBv2DescribeLoadBalancersAPI interface {
+	DescribeLoadBalancers(ctx context.Context, params *elbv2.DescribeLoadBalancersInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancersOutput, error)
+}
+
+// ELBv2DescribeTargetGroupsAPI defines the interface for the ELBv2 DescribeTargetGroups operation.
+type ELBv2DescribeTargetGroupsAPI interface {
+	DescribeTargetGroups(ctx context.Context, params *elbv2.DescribeTargetGroupsInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeTargetGroupsOutput, error)
+}
+
+// ECSListClustersAPI defines the interface for the ECS ListClusters operation.
+type ECSListClustersAPI interface {
+	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
+}
+
+// ECSDescribeClustersAPI defines the interface for the ECS DescribeClusters operation.
+type ECSDescribeClustersAPI interface {
+	DescribeClusters(ctx context.Context, params *ecs.DescribeClustersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error)
+}
+
+// ECSListServicesAPI defines the interface for the ECS ListServices operation.
+type ECSListServicesAPI interface {
+	ListServices(ctx context.Context, params *ecs.ListServicesInput, optFns ...func(*ecs.Options)) (*ecs.ListServicesOutput, error)
+}
+
+// ECSDescribeServicesAPI defines the interface for the ECS DescribeServices operation.
+type ECSDescribeServicesAPI interface {
+	DescribeServices(ctx context.Context, params *ecs.DescribeServicesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error)
+}
+
+// CFNDescribeStacksAPI defines the interface for the CloudFormation DescribeStacks operation.
+type CFNDescribeStacksAPI interface {
+	DescribeStacks(ctx context.Context, params *cloudformation.DescribeStacksInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStacksOutput, error)
+}
+
+// IAMListRolesAPI defines the interface for the IAM ListRoles operation.
+type IAMListRolesAPI interface {
+	ListRoles(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error)
+}
+
+// CWLogsDescribeLogGroupsAPI defines the interface for the CloudWatchLogs DescribeLogGroups operation.
+type CWLogsDescribeLogGroupsAPI interface {
+	DescribeLogGroups(ctx context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
+}
+
+// SSMDescribeParametersAPI defines the interface for the SSM DescribeParameters operation.
+type SSMDescribeParametersAPI interface {
+	DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
+}
+
+// DDBListTablesAPI defines the interface for the DynamoDB ListTables operation.
+type DDBListTablesAPI interface {
+	ListTables(ctx context.Context, params *dynamodb.ListTablesInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error)
+}
+
+// DDBDescribeTableAPI defines the interface for the DynamoDB DescribeTable operation.
+type DDBDescribeTableAPI interface {
+	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+}
+
+// EC2DescribeAddressesAPI defines the interface for the EC2 DescribeAddresses operation.
+type EC2DescribeAddressesAPI interface {
+	DescribeAddresses(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error)
+}
+
+// ACMListCertificatesAPI defines the interface for the ACM ListCertificates operation.
+type ACMListCertificatesAPI interface {
+	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
+}
+
+// ASGDescribeAutoScalingGroupsAPI defines the interface for the AutoScaling DescribeAutoScalingGroups operation.
+type ASGDescribeAutoScalingGroupsAPI interface {
+	DescribeAutoScalingGroups(ctx context.Context, params *autoscaling.DescribeAutoScalingGroupsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
 }

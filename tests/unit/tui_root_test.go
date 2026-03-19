@@ -14,7 +14,7 @@ import (
 // helper: create a model with a size set so View() actually renders
 func newRootSizedModel() tui.Model {
 	m := tui.New("testprofile", "us-east-1")
-	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	return m
 }
 
@@ -496,9 +496,9 @@ func TestRoot_View_LineCountMatchesHeight(t *testing.T) {
 	m := newRootSizedModel()
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Should be exactly 24 lines (terminal height)
-	if len(lines) != 24 {
-		t.Errorf("expected 24 lines for height 24, got %d", len(lines))
+	// Should be exactly 40 lines (terminal height)
+	if len(lines) != 40 {
+		t.Errorf("expected 40 lines for height 40, got %d", len(lines))
 	}
 }
 

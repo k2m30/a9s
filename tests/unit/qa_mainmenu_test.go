@@ -238,8 +238,8 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("j at bottom should stay on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "asg" {
+		t.Errorf("j at bottom should stay on asg, got %q", nav.ResourceType)
 	}
 }
 
@@ -303,8 +303,8 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("after G, should be at bottom (ng), got %q", nav.ResourceType)
+	if nav.ResourceType != "asg" {
+		t.Errorf("after G, should be at bottom (asg), got %q", nav.ResourceType)
 	}
 }
 
@@ -345,8 +345,8 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("G on last row should stay on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "asg" {
+		t.Errorf("G on last row should stay on asg, got %q", nav.ResourceType)
 	}
 }
 
@@ -1203,9 +1203,9 @@ func TestQA_MainMenu_FrameFillsRemainingHeight(t *testing.T) {
 
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Terminal height is 24, should have exactly 24 lines
-	if len(lines) != 24 {
-		t.Errorf("expected 24 lines total, got %d", len(lines))
+	// Terminal height is 40, should have exactly 40 lines
+	if len(lines) != 40 {
+		t.Errorf("expected 40 lines total, got %d", len(lines))
 	}
 }
 
@@ -1435,8 +1435,8 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "ng" {
-		t.Errorf("after G, g, G, should be on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "asg" {
+		t.Errorf("after G, g, G, should be on asg, got %q", nav.ResourceType)
 	}
 }
 

@@ -96,9 +96,9 @@ func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 	if !strings.Contains(plain, "/ec2") {
 		t.Error("header should show /ec2")
 	}
-	// Frame title should show resource-types(1/10)
-	if !strings.Contains(plain, "resource-types(1/10)") {
-		t.Errorf("frame title should show resource-types(1/10), got: %s", plain)
+	// Frame title should show resource-types(1/30)
+	if !strings.Contains(plain, "resource-types(1/30)") {
+		t.Errorf("frame title should show resource-types(1/30), got: %s", plain)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 	if !strings.Contains(plain, "S3 Buckets") {
 		t.Error("filter 's3' should show S3 Buckets")
 	}
-	if !strings.Contains(plain, "resource-types(1/10)") {
-		t.Errorf("frame title should show resource-types(1/10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/30)") {
+		t.Errorf("frame title should show resource-types(1/30), got: %s", plain)
 	}
 }
 
@@ -134,9 +134,9 @@ func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 			t.Errorf("filter 'xxx' should NOT show %s", name)
 		}
 	}
-	// Frame title should show resource-types(0/10)
-	if !strings.Contains(plain, "resource-types(0/10)") {
-		t.Errorf("frame title should show resource-types(0/10), got: %s", plain)
+	// Frame title should show resource-types(0/30)
+	if !strings.Contains(plain, "resource-types(0/30)") {
+		t.Errorf("frame title should show resource-types(0/30), got: %s", plain)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(1/10)") {
+	if !strings.Contains(plain, "resource-types(1/30)") {
 		t.Fatalf("precondition: filter 'ec2' should show 1/7, got: %s", plain)
 	}
 
@@ -178,8 +178,8 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	plain = stripANSI(rootViewContent(m))
 	// All 7 items should be back
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("after clearing filter, frame should show resource-types(10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(30)") {
+		t.Errorf("after clearing filter, frame should show resource-types(30), got: %s", plain)
 	}
 }
 
@@ -193,9 +193,9 @@ func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 	m = typeFilter(m, "e")
 	plain := stripANSI(rootViewContent(m))
 
-	// Must have format resource-types(N/10) where N < 10
-	if !strings.Contains(plain, "/10)") {
-		t.Errorf("filtered frame title should contain /10) showing filtered count, got: %s", plain)
+	// Must have format resource-types(N/30) where N < 10
+	if !strings.Contains(plain, "/30)") {
+		t.Errorf("filtered frame title should contain /30) showing filtered count, got: %s", plain)
 	}
 }
 
@@ -211,8 +211,8 @@ func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 
 	// All items should reappear
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("after Esc, frame title should be resource-types(10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(30)") {
+		t.Errorf("after Esc, frame title should be resource-types(30), got: %s", plain)
 	}
 	// Header should show ? for help
 	if !strings.Contains(plain, "? for help") {
@@ -342,7 +342,7 @@ func TestQA_Filter_11_14_ResourceList_FrameTitleFilteredCount(t *testing.T) {
 	m = typeFilter(m, "prod")
 	plain := stripANSI(rootViewContent(m))
 
-	// Should show ec2(2/10) -- 2 prod matches out of 10
+	// Should show ec2(2/10) -- 2 prod matches out of 10 EC2 instances
 	if !strings.Contains(plain, "ec2(2/10)") {
 		t.Errorf("frame title should show ec2(2/10), got: %s", plain)
 	}
