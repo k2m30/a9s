@@ -195,14 +195,14 @@ func TestFetchEC2Instances_DetailDataPopulated(t *testing.T) {
 	if r.DetailData["Instance ID"] != "i-detail123" {
 		t.Errorf("DetailData[Instance ID] = %q, want %q", r.DetailData["Instance ID"], "i-detail123")
 	}
-	if r.DetailData["VPC"] == "" {
-		t.Error("DetailData[VPC] must not be empty")
+	if r.DetailData["VPC"] != "vpc-111" {
+		t.Errorf("DetailData[VPC] = %q, want %q", r.DetailData["VPC"], "vpc-111")
 	}
-	if r.DetailData["Subnet"] == "" {
-		t.Error("DetailData[Subnet] must not be empty")
+	if r.DetailData["Subnet"] != "subnet-xyz" {
+		t.Errorf("DetailData[Subnet] = %q, want %q", r.DetailData["Subnet"], "subnet-xyz")
 	}
-	if r.DetailData["AMI"] == "" {
-		t.Error("DetailData[AMI] must not be empty")
+	if r.DetailData["AMI"] != "ami-abc123" {
+		t.Errorf("DetailData[AMI] = %q, want %q", r.DetailData["AMI"], "ami-abc123")
 	}
 }
 

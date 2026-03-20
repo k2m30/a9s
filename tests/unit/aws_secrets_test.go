@@ -79,12 +79,12 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"rotation_enabled\"]: expected %q, got %q", "Yes", r0.Fields["rotation_enabled"])
 	}
 
-	// Verify dates are formatted
-	if r0.Fields["last_accessed"] == "" {
-		t.Error("resource[0].Fields[\"last_accessed\"] should not be empty")
+	// Verify dates are formatted correctly
+	if r0.Fields["last_accessed"] != "2025-03-10" {
+		t.Errorf("resource[0].Fields[\"last_accessed\"] = %q, want %q", r0.Fields["last_accessed"], "2025-03-10")
 	}
-	if r0.Fields["last_changed"] == "" {
-		t.Error("resource[0].Fields[\"last_changed\"] should not be empty")
+	if r0.Fields["last_changed"] != "2025-02-20" {
+		t.Errorf("resource[0].Fields[\"last_changed\"] = %q, want %q", r0.Fields["last_changed"], "2025-02-20")
 	}
 
 	// Verify second secret
@@ -137,8 +137,8 @@ func TestFetchSecrets_DetailDataPopulated(t *testing.T) {
 	if r.DetailData["Description"] != "Prod DB password" {
 		t.Errorf("DetailData[Description] = %q, want %q", r.DetailData["Description"], "Prod DB password")
 	}
-	if r.DetailData["ARN"] == "" {
-		t.Error("DetailData[ARN] must not be empty")
+	if r.DetailData["ARN"] != "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/pass-AbCdEf" {
+		t.Errorf("DetailData[ARN] = %q, want %q", r.DetailData["ARN"], "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/pass-AbCdEf")
 	}
 }
 
