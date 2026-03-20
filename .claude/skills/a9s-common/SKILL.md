@@ -24,6 +24,7 @@ description: Shared rules for all a9s agents — shell rules, package access, bu
 go build -o a9s ./cmd/a9s/                        # build binary
 go test ./tests/unit/ -count=1 -timeout 120s       # run all unit tests
 golangci-lint run ./...                            # lint (MUST pass before any push)
+govulncheck ./...                                  # vulnerability check (MUST pass before any push)
 go run ./cmd/refgen/ > .a9s/views_reference.yaml    # regenerate views reference (after SDK changes)
 ```
 
@@ -33,6 +34,7 @@ Before ANY `git push`, ALL of these must pass locally:
 1. `go build ./...`
 2. `go test ./tests/unit/ -count=1 -timeout 120s`
 3. `golangci-lint run ./...`
+4. `govulncheck ./...`
 
 CI is NOT a debugging tool. Never push to see if CI passes. Fix locally first.
 
