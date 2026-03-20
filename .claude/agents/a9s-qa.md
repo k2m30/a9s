@@ -73,6 +73,7 @@ func TestResourceList_Update_DownMoveCursor(t *testing.T) {
 go test ./tests/unit/ -count=1 -timeout 120s       # all
 go test ./tests/unit/ -run TestResourceList -count=1 -v  # specific
 golangci-lint run ./...                              # lint (must pass before push)
+govulncheck ./...                                    # vuln check (must pass before push)
 ```
 
 ## Rules
