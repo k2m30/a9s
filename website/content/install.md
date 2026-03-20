@@ -1,0 +1,49 @@
+---
+title: "Installation"
+---
+
+## Homebrew (macOS and Linux)
+
+```sh
+brew install k2m30/a9s/a9s
+```
+
+## Go install
+
+```sh
+go install github.com/k2m30/a9s/cmd/a9s@latest
+```
+
+## Download Binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/k2m30/a9s/releases/latest).
+
+Available platforms:
+- **macOS**: Intel (amd64) and Apple Silicon (arm64)
+- **Linux**: amd64 and arm64, plus .deb, .rpm, and .apk packages
+- **Windows**: amd64 and arm64
+
+## Docker
+
+```sh
+docker run --rm -it -v ~/.aws:/root/.aws:ro ghcr.io/k2m30/a9s:latest
+```
+
+## Build from Source
+
+Requires Go 1.25+.
+
+```sh
+git clone https://github.com/k2m30/a9s.git
+cd a9s
+make build
+./a9s
+```
+
+## Verify Signatures
+
+Release checksums are signed with [cosign](https://github.com/sigstore/cosign):
+
+```sh
+cosign verify-blob --signature checksums.txt.sig checksums.txt
+```
