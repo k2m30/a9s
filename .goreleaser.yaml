@@ -88,6 +88,9 @@ dockers_v2:
     tags:
       - "v{{ .Version }}"
       - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
     labels:
       "org.opencontainers.image.description": "Terminal UI AWS Resource Manager"
       "org.opencontainers.image.created": "{{ .Date }}"
