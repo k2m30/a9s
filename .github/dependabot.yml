@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/*"
+      charmbracelet:
+        patterns:
+          - "charm.land/*"
+          - "github.com/charmbracelet/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

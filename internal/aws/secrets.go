@@ -2,11 +2,9 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/internal/resource"
 )
@@ -19,6 +17,7 @@ func init() {
 		}
 		return FetchSecrets(ctx, c.SecretsManager)
 	})
+	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
 }
 
 // FetchSecrets calls the SecretsManager ListSecrets API and converts the
@@ -26,7 +25,7 @@ func init() {
 func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {
 	output, err := api.ListSecrets(ctx, &secretsmanager.ListSecretsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching secrets: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,15 +56,6 @@ func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]reso
 			rotationEnabled = "Yes"
 		}
 
-		// Build DetailData
-		detail := buildSecretDetailData(secret, secretName, description, lastAccessed, lastChanged, rotationEnabled)
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(secret, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     secretName,
 			Name:   secretName,
@@ -77,8 +67,6 @@ func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]reso
 				"last_changed":     lastChanged,
 				"rotation_enabled": rotationEnabled,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  secret,
 		}
 
@@ -88,46 +76,6 @@ func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]reso
 	return resources, nil
 }
 
-func buildSecretDetailData(secret smtypes.SecretListEntry, secretName, description, lastAccessed, lastChanged, rotationEnabled string) map[string]string {
-	detail := map[string]string{
-		"Name":               secretName,
-		"Description":        description,
-		"Last Accessed Date": lastAccessed,
-		"Last Changed Date":  lastChanged,
-		"Rotation Enabled":   rotationEnabled,
-	}
-
-	// ARN
-	if secret.ARN != nil {
-		detail["ARN"] = *secret.ARN
-	} else {
-		detail["ARN"] = ""
-	}
-
-	// Last Rotated Date
-	if secret.LastRotatedDate != nil {
-		detail["Last Rotated Date"] = secret.LastRotatedDate.Format("2006-01-02")
-	} else {
-		detail["Last Rotated Date"] = ""
-	}
-
-	// KMS Key ID
-	if secret.KmsKeyId != nil {
-		detail["KMS Key ID"] = *secret.KmsKeyId
-	} else {
-		detail["KMS Key ID"] = ""
-	}
-
-	// Tags
-	for _, tag := range secret.Tags {
-		if tag.Key != nil && tag.Value != nil {
-			detail["Tag: "+*tag.Key] = *tag.Value
-		}
-	}
-
-	return detail
-}
-
 // RevealSecret calls the SecretsManager GetSecretValue API and returns the
 // secret string value.
 func RevealSecret(ctx context.Context, api SecretsManagerGetSecretValueAPI, secretName string) (string, error) {
@@ -135,7 +83,7 @@ func RevealSecret(ctx context.Context, api SecretsManagerGetSecretValueAPI, secr
 		SecretId: &secretName,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("revealing secret: %w", err)
 	}
 
 	if output.SecretString != nil {

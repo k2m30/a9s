@@ -262,6 +262,65 @@ func TestResourceListView_HorizontalScroll(t *testing.T) {
 	}
 }
 
+func TestResourceListView_HorizontalScroll_ClampsAtLastColumn(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	td := rlTestTypeDef() // 4 columns
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(50, 20) // narrow enough that not all columns fit
+	m, _ = m.Init()
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    rlTestResources(),
+	})
+
+	// Scroll right many times — more than the number of columns
+	for i := 0; i < 20; i++ {
+		m, _ = m.Update(rlKeyPress("l"))
+	}
+
+	out := m.View()
+	// Should still show data, NOT "No resources found"
+	if strings.Contains(out, "No resources found") {
+		t.Error("scrolling right past last column should not show 'No resources found'")
+	}
+	// Should have at least one column header visible
+	// The last column is "Type" — it should be visible at max scroll
+	if !strings.Contains(out, "Type") && !strings.Contains(out, "State") &&
+		!strings.Contains(out, "Name") && !strings.Contains(out, "Instance ID") {
+		t.Errorf("at least one column header should remain visible after max scroll, got:\n%s", out)
+	}
+}
+
+func TestResourceListView_HorizontalScroll_CannotScrollPastEnd(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	td := rlTestTypeDef() // 4 columns
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(200, 20) // wide enough to see ALL columns
+	m, _ = m.Init()
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    rlTestResources(),
+	})
+
+	outBefore := m.View()
+
+	// When all columns already fit, scrolling right should have no effect
+	m, _ = m.Update(rlKeyPress("l"))
+
+	outAfter := m.View()
+	if outBefore != outAfter {
+		t.Error("scrolling right should have no effect when all columns fit in viewport")
+	}
+}
+
 // ===========================================================================
 // Test empty resource list shows appropriate message
 // ===========================================================================

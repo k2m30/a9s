@@ -96,9 +96,9 @@ func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 	if !strings.Contains(plain, "/ec2") {
 		t.Error("header should show /ec2")
 	}
-	// Frame title should show resource-types(1/10)
-	if !strings.Contains(plain, "resource-types(1/10)") {
-		t.Errorf("frame title should show resource-types(1/10), got: %s", plain)
+	// Frame title should show resource-types(1/62)
+	if !strings.Contains(plain, "resource-types(1/62)") {
+		t.Errorf("frame title should show resource-types(1/62), got: %s", plain)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 	if !strings.Contains(plain, "S3 Buckets") {
 		t.Error("filter 's3' should show S3 Buckets")
 	}
-	if !strings.Contains(plain, "resource-types(1/10)") {
-		t.Errorf("frame title should show resource-types(1/10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/62)") {
+		t.Errorf("frame title should show resource-types(1/62), got: %s", plain)
 	}
 }
 
@@ -134,9 +134,9 @@ func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 			t.Errorf("filter 'xxx' should NOT show %s", name)
 		}
 	}
-	// Frame title should show resource-types(0/10)
-	if !strings.Contains(plain, "resource-types(0/10)") {
-		t.Errorf("frame title should show resource-types(0/10), got: %s", plain)
+	// Frame title should show resource-types(0/62)
+	if !strings.Contains(plain, "resource-types(0/62)") {
+		t.Errorf("frame title should show resource-types(0/62), got: %s", plain)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(1/10)") {
+	if !strings.Contains(plain, "resource-types(1/62)") {
 		t.Fatalf("precondition: filter 'ec2' should show 1/7, got: %s", plain)
 	}
 
@@ -178,8 +178,8 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	plain = stripANSI(rootViewContent(m))
 	// All 7 items should be back
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("after clearing filter, frame should show resource-types(10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(62)") {
+		t.Errorf("after clearing filter, frame should show resource-types(62), got: %s", plain)
 	}
 }
 
@@ -193,9 +193,9 @@ func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 	m = typeFilter(m, "e")
 	plain := stripANSI(rootViewContent(m))
 
-	// Must have format resource-types(N/10) where N < 10
-	if !strings.Contains(plain, "/10)") {
-		t.Errorf("filtered frame title should contain /10) showing filtered count, got: %s", plain)
+	// Must have format resource-types(N/62) where N < 10
+	if !strings.Contains(plain, "/62)") {
+		t.Errorf("filtered frame title should contain /62) showing filtered count, got: %s", plain)
 	}
 }
 
@@ -211,8 +211,8 @@ func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 
 	// All items should reappear
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("after Esc, frame title should be resource-types(10), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(62)") {
+		t.Errorf("after Esc, frame title should be resource-types(62), got: %s", plain)
 	}
 	// Header should show ? for help
 	if !strings.Contains(plain, "? for help") {
@@ -342,7 +342,7 @@ func TestQA_Filter_11_14_ResourceList_FrameTitleFilteredCount(t *testing.T) {
 	m = typeFilter(m, "prod")
 	plain := stripANSI(rootViewContent(m))
 
-	// Should show ec2(2/10) -- 2 prod matches out of 10
+	// Should show ec2(2/10) -- 2 prod matches out of 10 EC2 instances
 	if !strings.Contains(plain, "ec2(2/10)") {
 		t.Errorf("frame title should show ec2(2/10), got: %s", plain)
 	}
@@ -623,6 +623,80 @@ func TestQA_Filter_11_24_DoubleEsc(t *testing.T) {
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("second Esc should go back to main menu, got: %s", plain)
+	}
+}
+
+// ── 11-24a: Esc clears confirmed filter on resource list ─────────────────────
+// After typing /prod + Enter, filter is confirmed (modeNormal but filter active).
+// Esc should clear the filter, NOT navigate back.
+
+func TestQA_Filter_11_24a_EscClearsConfirmedFilter(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+	m = loadEC2Resources(m, sampleEC2Resources())
+
+	// Apply filter and confirm with Enter
+	m = typeFilter(m, "prod")
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Verify filter is confirmed (not in filter input mode) but still active
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "/prod") {
+		t.Error("after Enter, filter input indicator should be gone from header")
+	}
+	if strings.Contains(plain, "bastion") {
+		t.Error("filter should still be active after Enter - bastion should be hidden")
+	}
+
+	// Now press Esc -- should clear the filter, NOT go back to main menu
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	plain = stripANSI(rootViewContent(m))
+
+	// Should still be on resource list, showing all 10 resources
+	if !strings.Contains(plain, "ec2(10)") {
+		t.Errorf("Esc should clear confirmed filter and show all resources, got: %s", plain)
+	}
+	// Should NOT be back at main menu
+	if strings.Contains(plain, "resource-types") {
+		t.Error("Esc with active filter should clear filter, not navigate back to main menu")
+	}
+}
+
+// ── 11-24b: Esc on main menu should NOT quit ────────────────────────────────
+
+func TestQA_Filter_11_24b_EscOnMainMenuNeverQuits(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Press Esc on main menu -- should NOT quit
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if cmd != nil {
+		t.Error("Esc on main menu should be a no-op (nil cmd), not quit the app")
+	}
+}
+
+// ── 11-24c: Esc clears confirmed filter on main menu ────────────────────────
+
+func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Apply filter and confirm with Enter
+	m = typeFilter(m, "ec2")
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Verify filter is confirmed but active (only EC2 visible)
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "S3 Buckets") {
+		t.Error("confirmed filter should hide S3 Buckets")
+	}
+
+	// Press Esc -- should clear the filter
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	plain = stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "resource-types(62)") {
+		t.Errorf("Esc should clear confirmed filter, showing all 30 types, got: %s", plain)
 	}
 }
 

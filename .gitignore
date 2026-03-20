@@ -28,5 +28,17 @@ coverage.html
 !.claude
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.claude/settings.local.json
 
-# tests/testdata/fixtures/ — sanitized, safe to commit
+/refgen
+
+# Internal tooling
+specs/
+.specify/
+
+# GoReleaser
+dist/
+
+# VHS generated assets
+assets/*.gif
+assets/*.mp4
