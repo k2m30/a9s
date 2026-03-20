@@ -52,7 +52,10 @@ For EVERY piece of code you write:
 3. **Run tests, confirm they fail** — `go test ./tests/unit/ -run TestXxx -count=1`
 4. **Write implementation** — make the tests pass
 5. **Run ALL tests** — `go test ./tests/unit/ -count=1 -timeout 120s`
-6. **Verify compilation** — `go build ./internal/tui/...`
+6. **Run lint** — `golangci-lint run ./...` — must be 0 issues
+7. **Verify compilation** — `go build ./internal/tui/...`
+
+Steps 5-7 MUST pass locally before any push. CI is not a debugging tool.
 
 ## Architect Handoff Protocol
 

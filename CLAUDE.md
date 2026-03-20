@@ -35,8 +35,13 @@ specs/           # feature specifications
 
 - `go build -o a9s ./cmd/a9s/` — build the binary
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
+- `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
+
+## Prerequisites
+
+- golangci-lint v2.11+ (`brew install golangci-lint`)
 
 ## Code Style
 
@@ -73,5 +78,8 @@ Go 1.25+: Follow standard conventions
 - ALWAYS bump version in `cmd/a9s/main.go` and rebuild binary after ANY code change
 - ALWAYS write failing tests BEFORE writing implementation code (TDD is non-negotiable)
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
+- ALWAYS run `golangci-lint run ./...` AND `go test ./tests/unit/ -count=1 -timeout 120s` locally BEFORE pushing. CI is not a debugging tool.
+- NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment.
+- NEVER make multiple push-and-check cycles. Get it right locally, push once.
 
 <!-- MANUAL ADDITIONS END -->
