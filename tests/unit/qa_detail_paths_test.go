@@ -20,7 +20,7 @@ import (
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 	styles.Reinit() // ensure styles are initialized
 
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
 	if err != nil {
 		t.Fatalf("failed to load views.yaml: %v", err)
 	}

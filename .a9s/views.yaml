@@ -1,7 +1,7 @@
-# a9s view configuration
-# Customize which columns appear in list views and which fields appear in detail views.
-# Paths use AWS SDK Go struct field names (case-insensitive matching).
-# See views_reference.yaml for all available paths.
+# a9s development views.yaml
+# Matches built-in defaults — exists for developer reference.
+# To customize: create ~/.a9s/views.yaml with ONLY the resources you want to override.
+# See views_reference.yaml for all available field paths.
 
 views:
   s3:

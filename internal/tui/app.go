@@ -60,7 +60,8 @@ type Model struct {
 
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
-	pendingRefresh bool // set after profile/region switch to refresh on ClientsReadyMsg
+	pendingRefresh bool  // set after profile/region switch to refresh on ClientsReadyMsg
+	configErr      error // non-nil if views.yaml was found but corrupt
 
 	// headerCache avoids re-computing the header string every render when
 	// profile, region, version, and right-side content haven't changed.
@@ -76,7 +77,7 @@ func New(profile, region string) Model {
 	menu := views.NewMainMenu(k)
 
 	// Load view config synchronously (fast local file read).
-	cfg, _ := config.Load()
+	cfg, cfgErr := config.Load()
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
@@ -88,17 +89,27 @@ func New(profile, region string) Model {
 		stack:      []views.View{&menu},
 		cmdInput:   ti,
 		viewConfig: cfg,
+		configErr:  cfgErr,
 	}
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
 func (m Model) Init() tea.Cmd {
-	return func() tea.Msg {
+	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
 			Profile: m.profile,
 			Region:  m.region,
 		}
 	}
+	if m.configErr != nil {
+		return tea.Batch(connectCmd, func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
+				IsError: true,
+			}
+		})
+	}
+	return connectCmd
 }
 
 // Update implements tea.Model. Routes messages to global handlers or active view.
