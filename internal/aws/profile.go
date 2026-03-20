@@ -93,36 +93,3 @@ func parseConfigProfiles(path string, seen map[string]bool) error {
 	return nil
 }
 
-// parseCredentialsProfiles reads profile names from an AWS credentials file.
-// Bare section names are profile names.
-func parseCredentialsProfiles(path string, seen map[string]bool) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
-	}
-
-	cfg, err := ini.LoadSources(ini.LoadOptions{
-		Insensitive:  false,
-		AllowShadows:  true,
-		Loose:        true,
-		InsensitiveKeys: true,
-	}, path)
-	if err != nil {
-		return err
-	}
-
-	for _, section := range cfg.Sections() {
-		name := section.Name()
-		if name == ini.DefaultSection {
-			continue
-		}
-		if name == "DEFAULT" || name == "default" {
-			seen["default"] = true
-			continue
-		}
-		if name != "" {
-			seen[name] = true
-		}
-	}
-
-	return nil
-}

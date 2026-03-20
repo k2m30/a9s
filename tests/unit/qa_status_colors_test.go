@@ -24,50 +24,6 @@ func statusColorsEqual(a, b color.Color) bool {
 	return r1 == r2 && g1 == g2 && b1 == b2 && a1 == a2
 }
 
-// statusColorModel builds a ResourceListModel loaded with one resource of the
-// given status. NO_COLOR is explicitly unset so ANSI codes are emitted.
-func statusColorModel(t *testing.T, name, status string) views.ResourceListModel {
-	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
-
-	td := resource.ResourceTypeDef{
-		Name:      "EC2 Instances",
-		ShortName: "ec2",
-		Columns: []resource.Column{
-			{Key: "name", Title: "Name", Width: 20},
-			{Key: "state", Title: "State", Width: 14},
-		},
-	}
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 10)
-	m, _ = m.Init()
-
-	res := []resource.Resource{
-		{
-			ID: "i-test", Name: name, Status: status,
-			Fields: map[string]string{
-				"name":  name,
-				"state": status,
-			},
-		},
-	}
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
-		Resources:    res,
-	})
-
-	// Move cursor away from row 0 so the row uses status color, not RowSelected.
-	// Since there is only 1 resource, cursor stays at 0 (selected). To work around
-	// this we add a dummy second resource and move the cursor to it.
-	return m
-}
-
 // multiStatusColorModel builds a model with multiple resources of different
 // statuses, with the cursor NOT on the first row so the first row uses its
 // status color rather than the selection style.

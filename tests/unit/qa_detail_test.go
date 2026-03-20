@@ -1445,7 +1445,7 @@ func TestQA_Detail_ScrollBeforeReady(t *testing.T) {
 	m, _ = m.Update(detailKeyPress("k"))
 	m, _ = m.Update(detailKeyPress("g"))
 	m, _ = m.Update(detailKeyPress("G"))
-	m, _ = m.Update(detailKeyPress("w"))
+	_, _ = m.Update(detailKeyPress("w"))
 }
 
 // ---------------------------------------------------------------------------
