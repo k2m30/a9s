@@ -155,7 +155,7 @@ func (m DetailModel) PlainContent() string {
 		if content[i] == '\x1b' && i+1 < len(content) && content[i+1] == '[' {
 			// Skip until we hit a letter
 			j := i + 2
-			for j < len(content) && !((content[j] >= 'a' && content[j] <= 'z') || (content[j] >= 'A' && content[j] <= 'Z')) {
+			for j < len(content) && (content[j] < 'a' || content[j] > 'z') && (content[j] < 'A' || content[j] > 'Z') {
 				j++
 			}
 			if j < len(content) {
@@ -221,9 +221,8 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 		}
 		// Fallback: try Fields map (case-insensitive key match)
 		if val == "" && len(m.res.Fields) > 0 {
-			pathLower := strings.ToLower(path)
 			for k, v := range m.res.Fields {
-				if strings.ToLower(k) == pathLower {
+				if strings.EqualFold(k, path) {
 					val = v
 					break
 				}

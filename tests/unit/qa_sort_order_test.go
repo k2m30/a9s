@@ -118,27 +118,6 @@ func extractDataNames(rendered string) []string {
 	return names
 }
 
-// extractDataStatuses parses rendered output and returns the status column
-// values in the order they appear.
-func extractDataStatuses(rendered string) []string {
-	knownStatuses := []string{"pending", "running", "stopped", "terminated"}
-	lines := strings.Split(rendered, "\n")
-	var statuses []string
-	for _, line := range lines {
-		plain := stripANSI(line)
-		// Skip the header line
-		if strings.Contains(plain, "State") && strings.Contains(plain, "Name") {
-			continue
-		}
-		for _, status := range knownStatuses {
-			if strings.Contains(plain, status) {
-				statuses = append(statuses, status)
-				break
-			}
-		}
-	}
-	return statuses
-}
 
 // extractDataTimestamps parses rendered output and returns the launch_time
 // column values in the order they appear.
