@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +18,7 @@ func init() {
 		}
 		return FetchRedisClusters(ctx, c.ElastiCache)
 	})
+	resource.RegisterFieldKeys("redis", []string{"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"})
 }
 
 // FetchRedisClusters calls the ElastiCache DescribeCacheClusters API and converts
@@ -29,7 +29,7 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Redis clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -43,11 +43,6 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 		clusterID := ""
 		if cluster.CacheClusterId != nil {
 			clusterID = *cluster.CacheClusterId
-		}
-
-		engineStr := ""
-		if cluster.Engine != nil {
-			engineStr = *cluster.Engine
 		}
 
 		engineVersion := ""
@@ -75,43 +70,6 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 			endpoint = *cluster.ConfigurationEndpoint.Address
 		}
 
-		port := ""
-		if cluster.ConfigurationEndpoint != nil && cluster.ConfigurationEndpoint.Port != nil {
-			port = fmt.Sprintf("%d", *cluster.ConfigurationEndpoint.Port)
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Cluster ID":     clusterID,
-			"Engine":         engineStr,
-			"Engine Version": engineVersion,
-			"Status":         status,
-			"Node Type":      nodeType,
-			"Num Nodes":      nodes,
-			"Endpoint":       endpoint,
-			"Port":           port,
-		}
-
-		// Preferred AZ
-		preferredAZ := ""
-		if cluster.PreferredAvailabilityZone != nil {
-			preferredAZ = *cluster.PreferredAvailabilityZone
-		}
-		detail["Preferred AZ"] = preferredAZ
-
-		// Cache Subnet Group
-		cacheSubnetGroup := ""
-		if cluster.CacheSubnetGroupName != nil {
-			cacheSubnetGroup = *cluster.CacheSubnetGroupName
-		}
-		detail["Cache Subnet Group"] = cacheSubnetGroup
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
@@ -124,8 +82,6 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 				"nodes":          nodes,
 				"endpoint":       endpoint,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cluster,
 		}
 

@@ -3,7 +3,6 @@ package unit
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -136,92 +135,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-SG-002 - Test DetailData populated correctly
-// ---------------------------------------------------------------------------
-
-func TestFetchSecurityGroups_DetailDataPopulated(t *testing.T) {
-	mock := &mockEC2DescribeSecurityGroupsClient{
-		output: &ec2.DescribeSecurityGroupsOutput{
-			SecurityGroups: []ec2types.SecurityGroup{
-				{
-					GroupId:          aws.String("sg-detail123"),
-					GroupName:        aws.String("detail-test-sg"),
-					VpcId:            aws.String("vpc-detail"),
-					Description:      aws.String("A detailed test SG"),
-					OwnerId:          aws.String("111222333444"),
-					SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:111222333444:security-group/sg-detail123"),
-					IpPermissions: []ec2types.IpPermission{
-						{IpProtocol: aws.String("tcp"), FromPort: aws.Int32(80), ToPort: aws.Int32(80)},
-						{IpProtocol: aws.String("tcp"), FromPort: aws.Int32(443), ToPort: aws.Int32(443)},
-						{IpProtocol: aws.String("tcp"), FromPort: aws.Int32(22), ToPort: aws.Int32(22)},
-					},
-					IpPermissionsEgress: []ec2types.IpPermission{
-						{IpProtocol: aws.String("-1")},
-						{IpProtocol: aws.String("tcp"), FromPort: aws.Int32(443), ToPort: aws.Int32(443)},
-					},
-					Tags: []ec2types.Tag{
-						{Key: aws.String("Name"), Value: aws.String("detail-test-sg")},
-						{Key: aws.String("Environment"), Value: aws.String("staging")},
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-
-	// Core fields
-	if r.DetailData["Group ID"] != "sg-detail123" {
-		t.Errorf("DetailData[Group ID] = %q, want %q", r.DetailData["Group ID"], "sg-detail123")
-	}
-	if r.DetailData["Group Name"] != "detail-test-sg" {
-		t.Errorf("DetailData[Group Name] = %q, want %q", r.DetailData["Group Name"], "detail-test-sg")
-	}
-	if r.DetailData["VPC ID"] != "vpc-detail" {
-		t.Errorf("DetailData[VPC ID] = %q, want %q", r.DetailData["VPC ID"], "vpc-detail")
-	}
-	if r.DetailData["Description"] != "A detailed test SG" {
-		t.Errorf("DetailData[Description] = %q, want %q", r.DetailData["Description"], "A detailed test SG")
-	}
-	if r.DetailData["Owner ID"] != "111222333444" {
-		t.Errorf("DetailData[Owner ID] = %q, want %q", r.DetailData["Owner ID"], "111222333444")
-	}
-	if r.DetailData["Security Group ARN"] != "arn:aws:ec2:us-east-1:111222333444:security-group/sg-detail123" {
-		t.Errorf("DetailData[Security Group ARN] = %q, want full ARN", r.DetailData["Security Group ARN"])
-	}
-
-	// Rule counts
-	if r.DetailData["Inbound Rules"] != "3 rules" {
-		t.Errorf("DetailData[Inbound Rules] = %q, want %q", r.DetailData["Inbound Rules"], "3 rules")
-	}
-	if r.DetailData["Outbound Rules"] != "2 rules" {
-		t.Errorf("DetailData[Outbound Rules] = %q, want %q", r.DetailData["Outbound Rules"], "2 rules")
-	}
-
-	// Tags
-	if r.DetailData["Tag: Name"] != "detail-test-sg" {
-		t.Errorf("DetailData[Tag: Name] = %q, want %q", r.DetailData["Tag: Name"], "detail-test-sg")
-	}
-	if r.DetailData["Tag: Environment"] != "staging" {
-		t.Errorf("DetailData[Tag: Environment] = %q, want %q", r.DetailData["Tag: Environment"], "staging")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // T-SG-003 - Test API error handling
 // ---------------------------------------------------------------------------
 
@@ -302,49 +215,9 @@ func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 		t.Errorf("RawStruct.GroupId = %q, want %q", *sg.GroupId, "sg-raw123")
 	}
 
-	// RawJSON must be non-empty
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
-	}
 }
 
-// ---------------------------------------------------------------------------
-// T-SG-006 - Test singular rule count ("1 rule" not "1 rules")
-// ---------------------------------------------------------------------------
-
-func TestFetchSecurityGroups_SingularRuleCount(t *testing.T) {
-	mock := &mockEC2DescribeSecurityGroupsClient{
-		output: &ec2.DescribeSecurityGroupsOutput{
-			SecurityGroups: []ec2types.SecurityGroup{
-				{
-					GroupId:   aws.String("sg-singular"),
-					GroupName: aws.String("singular-test"),
-					VpcId:     aws.String("vpc-test"),
-					IpPermissions: []ec2types.IpPermission{
-						{IpProtocol: aws.String("tcp"), FromPort: aws.Int32(22), ToPort: aws.Int32(22)},
-					},
-					IpPermissionsEgress: []ec2types.IpPermission{},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData["Inbound Rules"] != "1 rule" {
-		t.Errorf("DetailData[Inbound Rules] = %q, want %q", r.DetailData["Inbound Rules"], "1 rule")
-	}
-	if r.DetailData["Outbound Rules"] != "0 rules" {
-		t.Errorf("DetailData[Outbound Rules] = %q, want %q", r.DetailData["Outbound Rules"], "0 rules")
-	}
-}
+// T-SG-006 was testing DetailData singular rule count — removed with DetailData
 
 // ---------------------------------------------------------------------------
 // T-SG-007 - Test nil string fields handled gracefully
@@ -468,25 +341,7 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	if r.Fields["description"] != "EKS node shared security group" {
 		t.Errorf("eks node SG Fields[description]: expected %q, got %q", "EKS node shared security group", r.Fields["description"])
 	}
-	if r.DetailData["Inbound Rules"] != "11 rules" {
-		t.Errorf("eks node SG inbound rules: expected %q, got %q", "11 rules", r.DetailData["Inbound Rules"])
-	}
-	if r.DetailData["Outbound Rules"] != "1 rule" {
-		t.Errorf("eks node SG outbound rules: expected %q, got %q", "1 rule", r.DetailData["Outbound Rules"])
-	}
-	if r.DetailData["Owner ID"] != "123456789012" {
-		t.Errorf("eks node SG Owner ID: expected %q, got %q", "123456789012", r.DetailData["Owner ID"])
-	}
-	if r.DetailData["Security Group ARN"] != "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0aa0000000000005e" {
-		t.Errorf("eks node SG ARN mismatch: got %q", r.DetailData["Security Group ARN"])
-	}
 	// Verify tags on eks node SG (has 4 tags including kubernetes.io/cluster and karpenter.sh/discovery)
-	if r.DetailData["Tag: kubernetes.io/cluster/test-cluster-1"] != "owned" {
-		t.Errorf("eks node SG missing kubernetes tag, got %q", r.DetailData["Tag: kubernetes.io/cluster/test-cluster-1"])
-	}
-	if r.DetailData["Tag: karpenter.sh/discovery"] != "test-cluster-1" {
-		t.Errorf("eks node SG missing karpenter tag, got %q", r.DetailData["Tag: karpenter.sh/discovery"])
-	}
 
 	// --- Verify SG with 0 inbound and 0 outbound rules: default dev-vpc SG ---
 	idx = byID["sg-0aa0000000000014e"]
@@ -494,50 +349,12 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	if rEmpty.Name != "default" {
 		t.Errorf("default dev-vpc SG Name: expected %q, got %q", "default", rEmpty.Name)
 	}
-	if rEmpty.DetailData["Inbound Rules"] != "0 rules" {
-		t.Errorf("default dev-vpc SG inbound: expected %q, got %q", "0 rules", rEmpty.DetailData["Inbound Rules"])
-	}
-	if rEmpty.DetailData["Outbound Rules"] != "0 rules" {
-		t.Errorf("default dev-vpc SG outbound: expected %q, got %q", "0 rules", rEmpty.DetailData["Outbound Rules"])
-	}
-
-	// --- Verify SG with 1 inbound rule (singular): DocumentDB SG ---
-	idx = byID["sg-0aa0000000000001a"]
-	rDocDB := resources[idx]
-	if rDocDB.DetailData["Inbound Rules"] != "1 rule" {
-		t.Errorf("docdb SG inbound: expected %q, got %q", "1 rule", rDocDB.DetailData["Inbound Rules"])
-	}
-	if rDocDB.DetailData["Outbound Rules"] != "1 rule" {
-		t.Errorf("docdb SG outbound: expected %q, got %q", "1 rule", rDocDB.DetailData["Outbound Rules"])
-	}
-	if rDocDB.DetailData["Description"] != "Security group for DocumentDB" {
-		t.Errorf("docdb SG description: expected %q, got %q", "Security group for DocumentDB", rDocDB.DetailData["Description"])
-	}
-	if rDocDB.DetailData["Tag: Name"] != "docdb-sg" {
-		t.Errorf("docdb SG Tag: Name: expected %q, got %q", "docdb-sg", rDocDB.DetailData["Tag: Name"])
-	}
 
 	// --- Verify SG with no tags: msk-sg ---
 	idx = byID["sg-0aa0000000000003c"]
 	rMsk := resources[idx]
 	if rMsk.Name != "msk-sg" {
 		t.Errorf("msk SG Name: expected %q, got %q", "msk-sg", rMsk.Name)
-	}
-	if rMsk.DetailData["Inbound Rules"] != "0 rules" {
-		t.Errorf("msk SG inbound: expected %q, got %q", "0 rules", rMsk.DetailData["Inbound Rules"])
-	}
-	if rMsk.DetailData["Outbound Rules"] != "1 rule" {
-		t.Errorf("msk SG outbound: expected %q, got %q", "1 rule", rMsk.DetailData["Outbound Rules"])
-	}
-
-	// --- Verify SG with 0 inbound and 0 outbound (ci-runner) ---
-	idx = byID["sg-0aa0000000000010a"]
-	rCiRunner := resources[idx]
-	if rCiRunner.DetailData["Inbound Rules"] != "0 rules" {
-		t.Errorf("ci-runner SG inbound: expected %q, got %q", "0 rules", rCiRunner.DetailData["Inbound Rules"])
-	}
-	if rCiRunner.DetailData["Outbound Rules"] != "0 rules" {
-		t.Errorf("ci-runner SG outbound: expected %q, got %q", "0 rules", rCiRunner.DetailData["Outbound Rules"])
 	}
 
 	// --- Verify SG spanning two VPCs ---
@@ -557,13 +374,6 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	for i, r := range resources {
 		if r.Status != "" {
 			t.Errorf("resource[%d].Status should be empty for SGs, got %q", i, r.Status)
-		}
-	}
-
-	// --- Verify all SGs have non-empty RawJSON ---
-	for i, r := range resources {
-		if r.RawJSON == "" {
-			t.Errorf("resource[%d].RawJSON must not be empty", i)
 		}
 	}
 
@@ -608,8 +418,4 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		}
 	}
 
-	// --- Verify RawJSON contains SG ID for a spot-check ---
-	if !strings.Contains(resources[0].RawJSON, "sg-0aa0000000000001a") {
-		t.Errorf("resource[0].RawJSON should contain the SG ID")
-	}
 }

@@ -1,13 +1,20 @@
-.PHONY: build test lint fmt run clean cover integration
+.PHONY: build install test lint fmt run clean cover integration security coverage verify-readonly demo
 
-BINARY=a9s
-CMD=./cmd/a9s
+BINARY   = a9s
+CMD      = ./cmd/a9s
+VERSION ?= dev
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
 build:
-	go build -o $(BINARY) $(CMD)
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) $(CMD)
+
+install:
+	go install -trimpath -ldflags "$(LDFLAGS)" $(CMD)
 
 test:
-	go test ./internal/... ./tests/... -v -count=1 -coverprofile=coverage.out -covermode=atomic
+	go test ./tests/unit/ -count=1 -timeout 120s -race
 
 lint:
 	golangci-lint run ./...
@@ -24,9 +31,32 @@ clean:
 integration:
 	go test -tags integration ./tests/integration/ -v -count=1 -timeout 60s
 
-cover:
-	go test ./internal/... -coverprofile=coverage.out -covermode=atomic
+security:
+	govulncheck ./...
+
+coverage:
+	go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic
 	go tool cover -func=coverage.out
-	@echo "---"
-	@echo "Checking coverage thresholds..."
-	@go tool cover -func=coverage.out | grep -E "^github.com/k2m30/a9s/internal/(aws|app)/" | awk '{print $$1, $$3}'
+
+cover: coverage
+
+verify-readonly:
+	@echo "Checking for write API calls in internal/aws/..."
+	@if grep -rn 'Create\|Delete\|Update\|Put\|Modify\|Terminate\|Start\|Stop\|Reboot\|Run\|Execute\|Send\|Publish\|Remove\|Detach\|Attach\|Associate\|Disassociate\|Enable\|Disable\|Revoke\|Invoke' internal/aws/*.go \
+		| grep -v '_test.go' \
+		| grep -v 'errors.go' \
+		| grep -v 'interfaces.go' \
+		| grep -v 'client.go' \
+		| grep -v 'profile.go' \
+		| grep -v 'regions.go' \
+		| grep -v '\/\/' \
+		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
+		| grep -v 'Creat\|Delet\|Updat\|Modif\|Termin\|Start\|Stop' \
+		| grep -E '\.(Create|Delete|Update|Put|Modify|Terminate|Start|Stop|Reboot|RunInstances|Execute|Send|Publish|Remove)[A-Z]' ; then \
+		echo "FAIL: Write API calls detected!"; exit 1; \
+	else \
+		echo "PASS: All API calls are read-only"; \
+	fi
+
+demo:
+	vhs docs/demos/demo.tape

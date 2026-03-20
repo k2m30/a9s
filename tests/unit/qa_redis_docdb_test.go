@@ -345,16 +345,16 @@ func TestQA_Redis_ListSort(t *testing.T) {
 		Resources:    multiStatusRedisFixtures(),
 	})
 
-	// Sort by status ('S') -- Status column header contains "Status"/"status"
+	// Sort by ID ('I') -- Cluster ID column header contains "id" in the key (cluster_id)
 	// so the sort indicator should appear on that column.
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "S"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
 	out := m.View()
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow in Status column header after pressing S")
+		t.Error("expected sort indicator arrow in Cluster ID column header after pressing I")
 	}
 
-	// Press S again to toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "S"})
+	// Press I again to toggle sort direction
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
 	out2 := m.View()
 	// Sort should still be active (indicator present)
 	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
@@ -1043,15 +1043,15 @@ func TestQA_DocDB_ListSort(t *testing.T) {
 		Resources:    multiStatusDocDBFixtures(),
 	})
 
-	// Sort by status ('S') -- "Status" column matches SortStatus
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "S"})
+	// Sort by ID ('I') -- "Cluster ID" column has key "cluster_id" which contains "id"
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
 	out := m.View()
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow after pressing S for DocumentDB Status column")
+		t.Error("expected sort indicator arrow after pressing I for DocumentDB Cluster ID column")
 	}
 
 	// Toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "S"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
 	out2 := m.View()
 	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
 		t.Error("expected sort indicator to remain after toggling DocumentDB sort direction")

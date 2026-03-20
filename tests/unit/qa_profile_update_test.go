@@ -23,7 +23,7 @@ func profileSpecialKey(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: code}
 }
 
-func newProfileModel() views.ProfileModel {
+func newProfileModel() views.SelectorModel {
 	profiles := []string{"profile-1", "profile-2", "profile-3"}
 	k := keys.Default()
 	m := views.NewProfile(profiles, "profile-2", k)
@@ -232,43 +232,20 @@ func TestQA_ProfileUpdate_EnterAtPosition2(t *testing.T) {
 	}
 }
 
-// PU-10: g/G keys are not handled by ProfileModel (no Top/Bottom binding)
-// ProfileModel only handles Up, Down, Enter. g/G are effectively no-ops.
-func TestQA_ProfileUpdate_GKeysNoOp(t *testing.T) {
+// PU-10: g key goes to top (SelectorModel supports Top via ScrollState)
+func TestQA_ProfileUpdate_GGoesToTop(t *testing.T) {
 	m := newProfileModel()
 
 	// Move cursor to index 1
 	m, _ = m.Update(profileKeyPress("j"))
 
-	// Press g (Top) - not handled by ProfileModel.Update
+	// Press g (Top) — SelectorModel handles this via ScrollState
 	m, cmd := m.Update(profileKeyPress("g"))
 	if cmd != nil {
-		t.Error("g key should not produce a command in ProfileModel")
+		t.Error("g key should not produce a command")
 	}
 
-	// Cursor should still be at index 1
-	_, enterCmd := m.Update(profileSpecialKey(tea.KeyEnter))
-	if enterCmd == nil {
-		t.Fatal("Enter should produce a command")
-	}
-	msg := enterCmd()
-	psm := msg.(messages.ProfileSelectedMsg)
-	if psm.Profile != "profile-2" {
-		t.Errorf("g should be no-op; cursor should stay at profile-2, got %s", psm.Profile)
-	}
-}
-
-// PU-11: G key is not handled by ProfileModel (no Top/Bottom binding)
-func TestQA_ProfileUpdate_ShiftGKeyNoOp(t *testing.T) {
-	m := newProfileModel()
-
-	// Press G (Bottom) - not handled by ProfileModel.Update
-	m, cmd := m.Update(profileKeyPress("G"))
-	if cmd != nil {
-		t.Error("G key should not produce a command in ProfileModel")
-	}
-
-	// Cursor should still be at index 0
+	// Cursor should now be at index 0 (top)
 	_, enterCmd := m.Update(profileSpecialKey(tea.KeyEnter))
 	if enterCmd == nil {
 		t.Fatal("Enter should produce a command")
@@ -276,7 +253,29 @@ func TestQA_ProfileUpdate_ShiftGKeyNoOp(t *testing.T) {
 	msg := enterCmd()
 	psm := msg.(messages.ProfileSelectedMsg)
 	if psm.Profile != "profile-1" {
-		t.Errorf("G should be no-op; cursor should stay at profile-1, got %s", psm.Profile)
+		t.Errorf("g should go to top; expected profile-1, got %s", psm.Profile)
+	}
+}
+
+// PU-11: G key goes to bottom (SelectorModel supports Bottom via ScrollState)
+func TestQA_ProfileUpdate_ShiftGGoesToBottom(t *testing.T) {
+	m := newProfileModel()
+
+	// Press G (Bottom) — SelectorModel handles this via ScrollState
+	m, cmd := m.Update(profileKeyPress("G"))
+	if cmd != nil {
+		t.Error("G key should not produce a command")
+	}
+
+	// Cursor should now be at the last item (profile-3)
+	_, enterCmd := m.Update(profileSpecialKey(tea.KeyEnter))
+	if enterCmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := enterCmd()
+	psm := msg.(messages.ProfileSelectedMsg)
+	if psm.Profile != "profile-3" {
+		t.Errorf("G should go to bottom; expected profile-3, got %s", psm.Profile)
 	}
 }
 
@@ -373,8 +372,8 @@ func TestQA_ProfileUpdate_EmptyProfiles(t *testing.T) {
 	m.SetSize(80, 20)
 
 	view := m.View()
-	if !strings.Contains(view, "No profiles available") {
-		t.Errorf("empty profiles should show 'No profiles available', got: %s", view)
+	if !strings.Contains(view, "No items available") {
+		t.Errorf("empty profiles should show 'No items available', got: %s", view)
 	}
 }
 

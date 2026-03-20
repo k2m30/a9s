@@ -16,16 +16,14 @@ var (
 	_ views.View = (*views.DetailModel)(nil)
 	_ views.View = (*views.YAMLModel)(nil)
 	_ views.View = (*views.RevealModel)(nil)
-	_ views.View = (*views.ProfileModel)(nil)
-	_ views.View = (*views.RegionModel)(nil)
+	_ views.View = (*views.SelectorModel)(nil)
 	_ views.View = (*views.HelpModel)(nil)
 )
 
 var (
 	_ views.Filterable = (*views.MainMenuModel)(nil)
 	_ views.Filterable = (*views.ResourceListModel)(nil)
-	_ views.Filterable = (*views.ProfileModel)(nil)
-	_ views.Filterable = (*views.RegionModel)(nil)
+	_ views.Filterable = (*views.SelectorModel)(nil)
 )
 
 // ── Test: each view satisfies View interface ────────────────────────────────
@@ -84,7 +82,7 @@ func TestViewInterface_ProfileSatisfiesView(t *testing.T) {
 	m := views.NewProfile([]string{"default", "staging"}, "default", k)
 	var v views.View = &m
 	if v.FrameTitle() == "" {
-		t.Error("ProfileModel.FrameTitle() should return non-empty string")
+		t.Error("SelectorModel (profile).FrameTitle() should return non-empty string")
 	}
 }
 
@@ -93,7 +91,7 @@ func TestViewInterface_RegionSatisfiesView(t *testing.T) {
 	m := views.NewRegion([]string{"us-east-1", "eu-west-1"}, "us-east-1", k)
 	var v views.View = &m
 	if v.FrameTitle() == "" {
-		t.Error("RegionModel.FrameTitle() should return non-empty string")
+		t.Error("SelectorModel (region).FrameTitle() should return non-empty string")
 	}
 }
 

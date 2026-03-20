@@ -1,0 +1,1023 @@
+# a9s development views.yaml
+# Matches built-in defaults — exists for developer reference.
+# To customize: create ~/.a9s/views.yaml with ONLY the resources you want to override.
+# See views_reference.yaml for all available field paths.
+
+views:
+  s3:
+    list:
+      Bucket Name:
+        path: Name
+        width: 36
+      Region:
+        path: BucketRegion
+        width: 14
+      Creation Date:
+        path: CreationDate
+        width: 22
+    detail:
+      - Name
+      - BucketArn
+      - BucketRegion
+      - CreationDate
+
+  s3_objects:
+    list:
+      Key:
+        path: Key
+        width: 36
+      Size:
+        path: Size
+        width: 12
+      Storage Class:
+        path: StorageClass
+        width: 16
+      Last Modified:
+        path: LastModified
+        width: 22
+    detail:
+      - Key
+      - Size
+      - LastModified
+      - StorageClass
+      - ETag
+      - Owner
+
+  ec2:
+    list:
+      Name:
+        width: 24
+      Instance ID:
+        path: InstanceId
+        width: 20
+      State:
+        path: State.Name
+        width: 12
+      Type:
+        path: InstanceType
+        width: 14
+      Private IP:
+        path: PrivateIpAddress
+        width: 16
+      Public IP:
+        path: PublicIpAddress
+        width: 16
+      Launch Time:
+        path: LaunchTime
+        width: 22
+    detail:
+      - InstanceId
+      - State
+      - InstanceType
+      - ImageId
+      - KeyName
+      - Placement
+      - VpcId
+      - SubnetId
+      - PrivateIpAddress
+      - PrivateDnsName
+      - PublicIpAddress
+      - IamInstanceProfile
+      - SecurityGroups
+      - EbsOptimized
+      - MetadataOptions
+      - LaunchTime
+      - Architecture
+      - Platform
+      - Tags
+
+  dbi:
+    list:
+      DB Identifier:
+        path: DBInstanceIdentifier
+        width: 28
+      Engine:
+        path: Engine
+        width: 12
+      Version:
+        path: EngineVersion
+        width: 10
+      Status:
+        path: DBInstanceStatus
+        width: 14
+      Class:
+        path: DBInstanceClass
+        width: 16
+      Endpoint:
+        path: Endpoint.Address
+        width: 40
+      Multi-AZ:
+        path: MultiAZ
+        width: 10
+    detail:
+      - DBInstanceIdentifier
+      - DBInstanceArn
+      - Engine
+      - EngineVersion
+      - DBInstanceStatus
+      - DBInstanceClass
+      - Endpoint
+      - MultiAZ
+      - AllocatedStorage
+      - StorageType
+      - Iops
+      - StorageEncrypted
+      - KmsKeyId
+      - AvailabilityZone
+      - PubliclyAccessible
+      - DBSubnetGroup
+      - VpcSecurityGroups
+      - BackupRetentionPeriod
+      - PreferredMaintenanceWindow
+      - PreferredBackupWindow
+      - DeletionProtection
+      - MasterUsername
+      - PerformanceInsightsEnabled
+      - Tags
+
+  redis:
+    list:
+      Cluster ID:
+        path: CacheClusterId
+        width: 28
+      Version:
+        path: EngineVersion
+        width: 10
+      Node Type:
+        path: CacheNodeType
+        width: 18
+      Status:
+        path: CacheClusterStatus
+        width: 14
+      Nodes:
+        path: NumCacheNodes
+        width: 8
+      Endpoint:
+        path: ConfigurationEndpoint.Address
+        width: 40
+    detail:
+      - CacheClusterId
+      - ARN
+      - Engine
+      - EngineVersion
+      - CacheClusterStatus
+      - CacheNodeType
+      - NumCacheNodes
+      - CacheNodes
+      - ConfigurationEndpoint
+      - PreferredAvailabilityZone
+      - ReplicationGroupId
+      - CacheSubnetGroupName
+      - SecurityGroups
+      - AtRestEncryptionEnabled
+      - TransitEncryptionEnabled
+      - AuthTokenEnabled
+      - SnapshotRetentionLimit
+      - PreferredMaintenanceWindow
+
+  dbc:
+    list:
+      Cluster ID:
+        path: DBClusterIdentifier
+        width: 28
+      Version:
+        path: EngineVersion
+        width: 10
+      Status:
+        path: Status
+        width: 14
+      Instances:
+        path: DBClusterMembers
+        width: 10
+      Endpoint:
+        path: Endpoint
+        width: 48
+    detail:
+      - DBClusterIdentifier
+      - DBClusterArn
+      - Engine
+      - EngineVersion
+      - Status
+      - Endpoint
+      - ReaderEndpoint
+      - Port
+      - StorageEncrypted
+      - KmsKeyId
+      - DeletionProtection
+      - DBClusterMembers
+      - DBSubnetGroup
+      - VpcSecurityGroups
+      - BackupRetentionPeriod
+      - PreferredMaintenanceWindow
+      - MasterUsername
+
+  eks:
+    list:
+      Cluster Name:
+        path: Name
+        width: 28
+      Version:
+        path: Version
+        width: 10
+      Status:
+        path: Status
+        width: 14
+      Endpoint:
+        path: Endpoint
+        width: 48
+      Platform Version:
+        path: PlatformVersion
+        width: 18
+    detail:
+      - Name
+      - Version
+      - Status
+      - Endpoint
+      - PlatformVersion
+      - Arn
+      - RoleArn
+      - KubernetesNetworkConfig
+      - ResourcesVpcConfig
+      - Logging
+      - Identity
+      - CreatedAt
+      - Tags
+
+  secrets:
+    list:
+      Secret Name:
+        path: Name
+        width: 36
+      Description:
+        path: Description
+        width: 30
+      Last Accessed:
+        path: LastAccessedDate
+        width: 18
+      Last Changed:
+        path: LastChangedDate
+        width: 18
+      Rotation:
+        path: RotationEnabled
+        width: 10
+    detail:
+      - Name
+      - Description
+      - LastAccessedDate
+      - LastChangedDate
+      - RotationEnabled
+      - ARN
+      - KmsKeyId
+      - CreatedDate
+      - LastRotatedDate
+      - RotationLambdaARN
+      - RotationRules
+      - PrimaryRegion
+      - Tags
+
+  vpc:
+    list:
+      VPC ID:
+        path: VpcId
+        width: 24
+      Name:
+        width: 24
+      CIDR Block:
+        path: CidrBlock
+        width: 18
+      State:
+        path: State
+        width: 12
+      Default:
+        path: IsDefault
+        width: 9
+    detail:
+      - VpcId
+      - CidrBlock
+      - State
+      - IsDefault
+      - InstanceTenancy
+      - DhcpOptionsId
+      - OwnerId
+      - CidrBlockAssociationSet
+      - Ipv6CidrBlockAssociationSet
+      - Tags
+
+  sg:
+    list:
+      Group ID:
+        path: GroupId
+        width: 24
+      Group Name:
+        path: GroupName
+        width: 28
+      VPC ID:
+        path: VpcId
+        width: 24
+      Description:
+        path: Description
+        width: 36
+    detail:
+      - GroupId
+      - GroupName
+      - VpcId
+      - Description
+      - OwnerId
+      - SecurityGroupArn
+      - IpPermissions
+      - IpPermissionsEgress
+      - Tags
+
+  ng:
+    list:
+      Node Group:
+        path: NodegroupName
+        width: 28
+      Cluster:
+        path: ClusterName
+        width: 24
+      Status:
+        path: Status
+        width: 14
+      Instance Types:
+        path: InstanceTypes
+        width: 20
+      Desired:
+        path: ScalingConfig.DesiredSize
+        width: 9
+    detail:
+      - NodegroupName
+      - ClusterName
+      - Status
+      - InstanceTypes
+      - AmiType
+      - CapacityType
+      - DiskSize
+      - ScalingConfig
+      - NodeRole
+      - NodegroupArn
+      - ReleaseVersion
+      - Version
+      - Subnets
+      - LaunchTemplate
+      - Labels
+      - Taints
+      - Tags
+      - Health
+      - CreatedAt
+
+  subnet:
+    list:
+      Subnet ID:
+        path: SubnetId
+        width: 26
+      Name:
+        width: 28
+      VPC ID:
+        path: VpcId
+        width: 24
+      CIDR Block:
+        path: CidrBlock
+        width: 18
+      AZ:
+        path: AvailabilityZone
+        width: 14
+      State:
+        path: State
+        width: 12
+      Available IPs:
+        path: AvailableIpAddressCount
+        width: 14
+    detail:
+      - SubnetId
+      - VpcId
+      - CidrBlock
+      - AvailabilityZone
+      - AvailabilityZoneId
+      - State
+      - AvailableIpAddressCount
+      - MapPublicIpOnLaunch
+      - DefaultForAz
+      - SubnetArn
+      - OwnerId
+      - Tags
+
+  rtb:
+    list:
+      Route Table ID:
+        path: RouteTableId
+        width: 26
+      Name:
+        width: 28
+      VPC ID:
+        path: VpcId
+        width: 24
+      Routes:
+        key: routes_count
+        width: 8
+      Assoc.:
+        key: associations_count
+        width: 8
+    detail:
+      - RouteTableId
+      - VpcId
+      - Routes
+      - Associations
+      - OwnerId
+      - Tags
+
+  nat:
+    list:
+      NAT Gateway ID:
+        path: NatGatewayId
+        width: 26
+      Name:
+        width: 24
+      VPC ID:
+        path: VpcId
+        width: 24
+      Subnet ID:
+        path: SubnetId
+        width: 26
+      State:
+        path: State
+        width: 12
+      Public IP:
+        key: public_ip
+        width: 16
+    detail:
+      - NatGatewayId
+      - VpcId
+      - SubnetId
+      - State
+      - ConnectivityType
+      - NatGatewayAddresses
+      - CreateTime
+      - FailureCode
+      - FailureMessage
+      - Tags
+
+  igw:
+    list:
+      IGW ID:
+        path: InternetGatewayId
+        width: 26
+      Name:
+        width: 28
+      VPC ID:
+        key: vpc_id
+        width: 24
+      State:
+        key: state
+        width: 12
+    detail:
+      - InternetGatewayId
+      - Attachments
+      - OwnerId
+      - Tags
+
+  lambda:
+    list:
+      Function Name:
+        path: FunctionName
+        width: 36
+      Runtime:
+        path: Runtime
+        width: 16
+      Memory:
+        path: MemorySize
+        width: 8
+      Timeout:
+        path: Timeout
+        width: 8
+      State:
+        path: State
+        width: 10
+      Last Modified:
+        path: LastModified
+        width: 22
+    detail:
+      - FunctionName
+      - FunctionArn
+      - Runtime
+      - Handler
+      - MemorySize
+      - Timeout
+      - EphemeralStorage
+      - CodeSize
+      - Description
+      - Role
+      - PackageType
+      - Architectures
+      - State
+      - LastUpdateStatus
+      - LastUpdateStatusReason
+      - Environment
+      - VpcConfig
+      - DeadLetterConfig
+      - TracingConfig
+      - Layers
+      - LoggingConfig
+      - LastModified
+
+  alarm:
+    list:
+      Alarm Name:
+        path: AlarmName
+        width: 36
+      State:
+        path: StateValue
+        width: 12
+      Metric:
+        path: MetricName
+        width: 24
+      Namespace:
+        path: Namespace
+        width: 24
+      Threshold:
+        path: Threshold
+        width: 12
+    detail:
+      - AlarmName
+      - AlarmArn
+      - StateValue
+      - StateReason
+      - StateUpdatedTimestamp
+      - StateTransitionedTimestamp
+      - MetricName
+      - Namespace
+      - Statistic
+      - Period
+      - EvaluationPeriods
+      - DatapointsToAlarm
+      - Threshold
+      - ComparisonOperator
+      - TreatMissingData
+      - Dimensions
+      - AlarmDescription
+      - AlarmActions
+      - OKActions
+      - InsufficientDataActions
+      - ActionsEnabled
+
+  sns:
+    list:
+      Topic Name:
+        path: TopicArn
+        width: 40
+      Topic ARN:
+        path: TopicArn
+        width: 60
+    detail:
+      - TopicArn
+
+  sqs:
+    list:
+      Queue Name:
+        key: queue_name
+        width: 36
+      Messages:
+        key: approx_messages
+        width: 10
+      In Flight:
+        key: approx_not_visible
+        width: 10
+      Delay:
+        key: delay_seconds
+        width: 8
+      Queue URL:
+        key: queue_url
+        width: 50
+    detail:
+      - QueueUrl
+      - Attributes
+
+  elb:
+    list:
+      Name:
+        path: LoadBalancerName
+        width: 32
+      Type:
+        path: Type
+        width: 12
+      Scheme:
+        path: Scheme
+        width: 14
+      State:
+        path: State.Code
+        width: 12
+      DNS Name:
+        path: DNSName
+        width: 48
+      VPC ID:
+        path: VpcId
+        width: 24
+    detail:
+      - LoadBalancerName
+      - LoadBalancerArn
+      - DNSName
+      - Type
+      - Scheme
+      - State
+      - VpcId
+      - AvailabilityZones
+      - SecurityGroups
+      - IpAddressType
+      - CanonicalHostedZoneId
+      - CreatedTime
+
+  tg:
+    list:
+      Target Group:
+        path: TargetGroupName
+        width: 32
+      Port:
+        path: Port
+        width: 8
+      Protocol:
+        path: Protocol
+        width: 10
+      VPC ID:
+        path: VpcId
+        width: 24
+      Target Type:
+        path: TargetType
+        width: 12
+      Health Check:
+        path: HealthCheckPath
+        width: 24
+    detail:
+      - TargetGroupName
+      - TargetGroupArn
+      - Port
+      - Protocol
+      - ProtocolVersion
+      - VpcId
+      - TargetType
+      - HealthCheckPath
+      - HealthCheckPort
+      - HealthCheckProtocol
+      - HealthCheckEnabled
+      - HealthCheckIntervalSeconds
+      - HealthCheckTimeoutSeconds
+      - HealthyThresholdCount
+      - UnhealthyThresholdCount
+      - Matcher
+      - LoadBalancerArns
+
+  ecs:
+    list:
+      Cluster Name:
+        path: ClusterName
+        width: 32
+      Status:
+        path: Status
+        width: 12
+      Running:
+        path: RunningTasksCount
+        width: 9
+      Pending:
+        path: PendingTasksCount
+        width: 9
+      Services:
+        path: ActiveServicesCount
+        width: 10
+    detail:
+      - ClusterName
+      - ClusterArn
+      - Status
+      - RunningTasksCount
+      - PendingTasksCount
+      - ActiveServicesCount
+      - RegisteredContainerInstancesCount
+      - CapacityProviders
+      - DefaultCapacityProviderStrategy
+      - Settings
+      - Tags
+
+  ecs-svc:
+    list:
+      Service Name:
+        path: ServiceName
+        width: 32
+      Status:
+        path: Status
+        width: 12
+      Desired:
+        path: DesiredCount
+        width: 9
+      Running:
+        path: RunningCount
+        width: 9
+      Launch Type:
+        path: LaunchType
+        width: 12
+    detail:
+      - ServiceName
+      - ServiceArn
+      - ClusterArn
+      - Status
+      - DesiredCount
+      - RunningCount
+      - PendingCount
+      - LaunchType
+      - TaskDefinition
+      - DeploymentConfiguration
+      - Deployments
+      - NetworkConfiguration
+      - LoadBalancers
+      - Events
+      - PlatformVersion
+      - SchedulingStrategy
+      - EnableExecuteCommand
+      - RoleArn
+      - CreatedAt
+      - Tags
+
+  cfn:
+    list:
+      Stack Name:
+        path: StackName
+        width: 36
+      Status:
+        path: StackStatus
+        width: 24
+      Created:
+        path: CreationTime
+        width: 22
+      Updated:
+        path: LastUpdatedTime
+        width: 22
+      Description:
+        path: Description
+        width: 30
+    detail:
+      - StackName
+      - StackId
+      - StackStatus
+      - DetailedStatus
+      - StackStatusReason
+      - CreationTime
+      - LastUpdatedTime
+      - DeletionTime
+      - Description
+      - RoleARN
+      - Capabilities
+      - EnableTerminationProtection
+      - DriftInformation
+      - Parameters
+      - Outputs
+      - Tags
+
+  role:
+    list:
+      Role Name:
+        path: RoleName
+        width: 36
+      Last Used:
+        path: RoleLastUsed.LastUsedDate
+        width: 22
+      Path:
+        path: Path
+        width: 20
+      Created:
+        path: CreateDate
+        width: 22
+      Description:
+        path: Description
+        width: 30
+    detail:
+      - RoleName
+      - RoleId
+      - Arn
+      - Path
+      - CreateDate
+      - Description
+      - MaxSessionDuration
+      - RoleLastUsed
+      - PermissionsBoundary
+      - AssumeRolePolicyDocument
+      - Tags
+
+  logs:
+    list:
+      Log Group Name:
+        path: LogGroupName
+        width: 48
+      Size (bytes):
+        path: StoredBytes
+        width: 14
+      Retention:
+        path: RetentionInDays
+        width: 10
+      Metric Filters:
+        path: MetricFilterCount
+        width: 8
+      Created:
+        path: CreationTime
+        width: 16
+    detail:
+      - LogGroupName
+      - LogGroupArn
+      - LogGroupClass
+      - StoredBytes
+      - RetentionInDays
+      - MetricFilterCount
+      - DeletionProtectionEnabled
+      - CreationTime
+      - KmsKeyId
+      - DataProtectionStatus
+
+  ssm:
+    list:
+      Name:
+        path: Name
+        width: 40
+      Type:
+        path: Type
+        width: 14
+      Version:
+        path: Version
+        width: 8
+      Last Modified:
+        path: LastModifiedDate
+        width: 22
+      Description:
+        path: Description
+        width: 30
+    detail:
+      - Name
+      - Type
+      - Version
+      - LastModifiedDate
+      - LastModifiedUser
+      - Description
+      - KeyId
+      - Tier
+      - DataType
+      - AllowedPattern
+
+  ddb:
+    list:
+      Table Name:
+        path: TableName
+        width: 36
+      Status:
+        path: TableStatus
+        width: 12
+      Items:
+        path: ItemCount
+        width: 12
+      Size (bytes):
+        path: TableSizeBytes
+        width: 14
+      Billing:
+        path: BillingModeSummary.BillingMode
+        width: 16
+    detail:
+      - TableName
+      - TableArn
+      - TableId
+      - TableStatus
+      - ItemCount
+      - TableSizeBytes
+      - BillingModeSummary
+      - GlobalSecondaryIndexes
+      - LocalSecondaryIndexes
+      - ProvisionedThroughput
+      - DeletionProtectionEnabled
+      - StreamSpecification
+      - SSEDescription
+      - CreationDateTime
+      - KeySchema
+      - AttributeDefinitions
+      - Tags
+
+  eip:
+    list:
+      Allocation ID:
+        path: AllocationId
+        width: 26
+      Name:
+        width: 24
+      Public IP:
+        path: PublicIp
+        width: 16
+      Association:
+        path: AssociationId
+        width: 26
+      Instance:
+        path: InstanceId
+        width: 20
+      Domain:
+        path: Domain
+        width: 8
+    detail:
+      - AllocationId
+      - PublicIp
+      - AssociationId
+      - InstanceId
+      - Domain
+      - NetworkBorderGroup
+      - SubnetId
+      - PrivateIpAddress
+      - NetworkInterfaceId
+      - Tags
+
+  acm:
+    list:
+      Domain Name:
+        path: DomainName
+        width: 40
+      Status:
+        path: Status
+        width: 14
+      Type:
+        path: Type
+        width: 14
+      Expires:
+        path: NotAfter
+        width: 22
+      In Use:
+        path: InUse
+        width: 8
+    detail:
+      - DomainName
+      - CertificateArn
+      - SubjectAlternativeNameSummaries
+      - Status
+      - Type
+      - NotBefore
+      - NotAfter
+      - IssuedAt
+      - ImportedAt
+      - InUse
+      - CreatedAt
+      - RenewalEligibility
+      - KeyAlgorithm
+
+  asg:
+    list:
+      ASG Name:
+        path: AutoScalingGroupName
+        width: 36
+      Min:
+        path: MinSize
+        width: 6
+      Max:
+        path: MaxSize
+        width: 6
+      Desired:
+        path: DesiredCapacity
+        width: 8
+      Instances:
+        path: Instances
+        width: 10
+      Status:
+        path: Status
+        width: 12
+    detail:
+      - AutoScalingGroupName
+      - AutoScalingGroupARN
+      - MinSize
+      - MaxSize
+      - DesiredCapacity
+      - AvailabilityZones
+      - LaunchConfigurationName
+      - HealthCheckType
+      - HealthCheckGracePeriod
+      - TargetGroupARNs
+      - LoadBalancerNames
+      - SuspendedProcesses
+      - TerminationPolicies
+      - VPCZoneIdentifier
+      - CreatedTime
+      - Tags
+
+  r53_records:
+    list:
+      Name:
+        path: Name
+        width: 40
+      Type:
+        path: Type
+        width: 8
+      TTL:
+        path: TTL
+        width: 8
+      Values:
+        key: values
+        width: 50
+    detail:
+      - Name
+      - Type
+      - TTL
+      - ResourceRecords
+      - AliasTarget
+      - SetIdentifier
+      - Weight
+      - Region
+      - Failover
+      - GeoLocation
+      - HealthCheckId
+      - MultiValueAnswer

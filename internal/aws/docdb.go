@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -18,6 +17,7 @@ func init() {
 		}
 		return FetchDocDBClusters(ctx, c.DocDB)
 	})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint"})
 }
 
 // FetchDocDBClusters calls the DescribeDBClusters API and converts
@@ -26,7 +26,7 @@ func init() {
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching DocumentDB clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -35,11 +35,6 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 		clusterID := ""
 		if cluster.DBClusterIdentifier != nil {
 			clusterID = *cluster.DBClusterIdentifier
-		}
-
-		engineStr := ""
-		if cluster.Engine != nil {
-			engineStr = *cluster.Engine
 		}
 
 		engineVersion := ""
@@ -59,43 +54,6 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 			endpoint = *cluster.Endpoint
 		}
 
-		// Build DetailData
-		detail := map[string]string{
-			"Cluster ID":     clusterID,
-			"Engine":         engineStr,
-			"Engine Version": engineVersion,
-			"Status":         status,
-			"Endpoint":       endpoint,
-			"Instance Count": instances,
-		}
-
-		// Reader Endpoint
-		readerEndpoint := ""
-		if cluster.ReaderEndpoint != nil {
-			readerEndpoint = *cluster.ReaderEndpoint
-		}
-		detail["Reader Endpoint"] = readerEndpoint
-
-		// Port
-		port := ""
-		if cluster.Port != nil {
-			port = fmt.Sprintf("%d", *cluster.Port)
-		}
-		detail["Port"] = port
-
-		// Storage Encrypted
-		storageEncrypted := "No"
-		if cluster.StorageEncrypted != nil && *cluster.StorageEncrypted {
-			storageEncrypted = "Yes"
-		}
-		detail["Storage Encrypted"] = storageEncrypted
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
@@ -107,8 +65,6 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 				"instances":      instances,
 				"endpoint":       endpoint,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cluster,
 		}
 

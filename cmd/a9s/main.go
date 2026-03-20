@@ -7,10 +7,15 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/internal/config"
 	"github.com/k2m30/a9s/internal/tui"
 )
 
-const version = "1.4.1"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	var (
@@ -47,8 +52,13 @@ func main() {
 	}
 
 	if showVersion {
-		fmt.Printf("a9s %s\n", version)
+		fmt.Printf("a9s %s (commit: %s, built: %s)\n", version, commit, date)
 		os.Exit(0)
+	}
+
+	// Ensure config dir exists (non-fatal on failure)
+	if _, err := config.EnsureConfigDir(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
 	tui.Version = version
