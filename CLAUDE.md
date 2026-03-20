@@ -35,7 +35,7 @@ specs/           # feature specifications
 
 - `go build -o a9s ./cmd/a9s/` — build the binary
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
-- `go run ./cmd/refgen/ > views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
+- `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
 
 ## Code Style
