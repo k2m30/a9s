@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -26,7 +25,7 @@ func init() {
 func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeEnvironments(ctx, &elasticbeanstalk.DescribeEnvironmentsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Elastic Beanstalk environments: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -80,12 +79,6 @@ func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]
 			envArn = *env.EnvironmentArn
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(env, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     envID,
 			Name:   envName,
@@ -103,7 +96,6 @@ func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]
 				"date_created":     dateCreated,
 				"environment_arn":  envArn,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: env,
 		}
 

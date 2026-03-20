@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -27,7 +26,7 @@ func init() {
 func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeClusters(ctx, &redshift.DescribeClustersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Redshift clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -73,12 +72,6 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 			createTime = cluster.ClusterCreateTime.Format("2006-01-02 15:04:05")
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
@@ -93,7 +86,6 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 				"master_user": masterUser,
 				"create_time": createTime,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: cluster,
 		}
 

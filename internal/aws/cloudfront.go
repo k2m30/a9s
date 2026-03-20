@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,7 +26,7 @@ func init() {
 func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistributionsAPI) ([]resource.Resource, error) {
 	output, err := api.ListDistributions(ctx, &cloudfront.ListDistributionsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CloudFront distributions: %w", err)
 	}
 
 	if output.DistributionList == nil {
@@ -57,16 +56,6 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 			enabled = "true"
 		}
 
-		comment := ""
-		if dist.Comment != nil {
-			comment = *dist.Comment
-		}
-
-		arn := ""
-		if dist.ARN != nil {
-			arn = *dist.ARN
-		}
-
 		// Extract aliases
 		aliases := ""
 		if dist.Aliases != nil && len(dist.Aliases.Items) > 0 {
@@ -74,32 +63,6 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 		}
 
 		priceClass := string(dist.PriceClass)
-		httpVersion := string(dist.HttpVersion)
-
-		lastModified := ""
-		if dist.LastModifiedTime != nil {
-			lastModified = dist.LastModifiedTime.Format("2006-01-02 15:04:05")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Distribution ID": distID,
-			"Domain Name":     domainName,
-			"Status":          status,
-			"Enabled":         enabled,
-			"Comment":         comment,
-			"ARN":             arn,
-			"Aliases":         aliases,
-			"Price Class":     priceClass,
-			"HTTP Version":    httpVersion,
-			"Last Modified":   lastModified,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(dist, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
 
 		r := resource.Resource{
 			ID:     distID,
@@ -113,8 +76,6 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 				"aliases":         aliases,
 				"price_class":     priceClass,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  dist,
 		}
 

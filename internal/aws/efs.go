@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -26,7 +25,7 @@ func init() {
 func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeFileSystems(ctx, &efs.DescribeFileSystemsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching EFS file systems: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -55,54 +54,6 @@ func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]
 
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
-		arn := ""
-		if fs.FileSystemArn != nil {
-			arn = *fs.FileSystemArn
-		}
-
-		ownerID := ""
-		if fs.OwnerId != nil {
-			ownerID = *fs.OwnerId
-		}
-
-		sizeInBytes := ""
-		if fs.SizeInBytes != nil {
-			sizeInBytes = fmt.Sprintf("%d", fs.SizeInBytes.Value)
-		}
-
-		creationTime := ""
-		if fs.CreationTime != nil {
-			creationTime = fs.CreationTime.Format("2006-01-02 15:04:05")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"File System ID":   fsID,
-			"Name":             name,
-			"Life Cycle State": lifeCycleState,
-			"Performance Mode": performanceMode,
-			"Throughput Mode":  throughputMode,
-			"Encrypted":        encrypted,
-			"Mount Targets":    mountTargets,
-			"ARN":              arn,
-			"Owner ID":         ownerID,
-			"Size In Bytes":    sizeInBytes,
-			"Creation Time":    creationTime,
-		}
-
-		// Tags
-		for _, tag := range fs.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail["Tag: "+*tag.Key] = *tag.Value
-			}
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(fs, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     fsID,
 			Name:   name,
@@ -116,8 +67,6 @@ func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]
 				"encrypted":        encrypted,
 				"mount_targets":    mountTargets,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  fs,
 		}
 

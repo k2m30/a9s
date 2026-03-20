@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
@@ -31,7 +30,7 @@ func FetchOpenSearchDomains(
 ) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListDomainNames(ctx, &opensearch.ListDomainNamesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing OpenSearch domains: %w", err)
 	}
 
 	if len(listOutput.DomainNames) == 0 {
@@ -61,16 +60,6 @@ func FetchOpenSearchDomains(
 			domainName = *domain.DomainName
 		}
 
-		domainID := ""
-		if domain.DomainId != nil {
-			domainID = *domain.DomainId
-		}
-
-		arn := ""
-		if domain.ARN != nil {
-			arn = *domain.ARN
-		}
-
 		engineVersion := ""
 		if domain.EngineVersion != nil {
 			engineVersion = *domain.EngineVersion
@@ -90,23 +79,6 @@ func FetchOpenSearchDomains(
 			}
 		}
 
-		// Build DetailData
-		detail := map[string]string{
-			"Domain Name":    domainName,
-			"Domain ID":      domainID,
-			"ARN":            arn,
-			"Engine Version": engineVersion,
-			"Instance Type":  instanceType,
-			"Instance Count": instanceCount,
-			"Endpoint":       endpoint,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(domain, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
@@ -118,8 +90,6 @@ func FetchOpenSearchDomains(
 				"instance_count": instanceCount,
 				"endpoint":       endpoint,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  domain,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Elastic IPs: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -64,34 +63,6 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 
 		domain := string(addr.Domain)
 
-		detail := map[string]string{
-			"Allocation ID":  allocationID,
-			"Public IP":      publicIP,
-			"Name":           name,
-			"Association ID": associationID,
-			"Instance ID":    instanceID,
-			"Domain":         domain,
-		}
-
-		if addr.PrivateIpAddress != nil {
-			detail["Private IP"] = *addr.PrivateIpAddress
-		}
-
-		if addr.NetworkInterfaceId != nil {
-			detail["Network Interface"] = *addr.NetworkInterfaceId
-		}
-
-		for _, tag := range addr.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(addr, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     allocationID,
 			Name:   name,
@@ -104,8 +75,6 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 				"instance_id":    instanceID,
 				"domain":         domain,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  addr,
 		}
 

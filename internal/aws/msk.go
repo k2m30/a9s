@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
@@ -26,7 +25,7 @@ func init() {
 func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource.Resource, error) {
 	output, err := api.ListClustersV2(ctx, &kafka.ListClustersV2Input{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching MSK clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -37,43 +36,12 @@ func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource
 			clusterName = *cluster.ClusterName
 		}
 
-		clusterArn := ""
-		if cluster.ClusterArn != nil {
-			clusterArn = *cluster.ClusterArn
-		}
-
 		clusterType := string(cluster.ClusterType)
 		state := string(cluster.State)
 
 		version := ""
 		if cluster.CurrentVersion != nil {
 			version = *cluster.CurrentVersion
-		}
-
-		creationTime := ""
-		if cluster.CreationTime != nil {
-			creationTime = cluster.CreationTime.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Cluster Name":    clusterName,
-			"Cluster ARN":     clusterArn,
-			"Cluster Type":    clusterType,
-			"State":           state,
-			"Current Version": version,
-			"Creation Time":   creationTime,
-		}
-
-		// Add tags
-		for k, v := range cluster.Tags {
-			detail["Tag: "+k] = v
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
 		}
 
 		r := resource.Resource{
@@ -86,8 +54,6 @@ func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource
 				"state":        state,
 				"version":      version,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cluster,
 		}
 

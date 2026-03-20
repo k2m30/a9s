@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterfacesAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching network interfaces: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -61,36 +60,6 @@ func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterface
 			privateIP = *eni.PrivateIpAddress
 		}
 
-		detail := map[string]string{
-			"ENI ID":     eniID,
-			"Name":       name,
-			"Status":     status,
-			"Type":       interfaceType,
-			"VPC ID":     vpcID,
-			"Private IP": privateIP,
-		}
-
-		if eni.SubnetId != nil {
-			detail["Subnet ID"] = *eni.SubnetId
-		}
-		if eni.AvailabilityZone != nil {
-			detail["Availability Zone"] = *eni.AvailabilityZone
-		}
-		if eni.Description != nil {
-			detail["Description"] = *eni.Description
-		}
-		if eni.MacAddress != nil {
-			detail["MAC Address"] = *eni.MacAddress
-		}
-		if eni.OwnerId != nil {
-			detail["Owner ID"] = *eni.OwnerId
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(eni, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     eniID,
 			Name:   name,
@@ -103,8 +72,6 @@ func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterface
 				"vpc_id":     vpcID,
 				"private_ip": privateIP,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  eni,
 		}
 

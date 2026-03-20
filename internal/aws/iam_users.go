@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -26,7 +25,7 @@ func init() {
 func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resource, error) {
 	output, err := api.ListUsers(ctx, &iam.ListUsersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching IAM users: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,23 +56,6 @@ func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resourc
 			passwordLastUsed = user.PasswordLastUsed.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		detail := map[string]string{
-			"User Name":          userName,
-			"User ID":            userID,
-			"Path":               path,
-			"Created":            createDate,
-			"Password Last Used": passwordLastUsed,
-		}
-
-		if user.Arn != nil {
-			detail["ARN"] = *user.Arn
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(user, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     userName,
 			Name:   userName,
@@ -85,8 +67,6 @@ func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resourc
 				"create_date":        createDate,
 				"password_last_used": passwordLastUsed,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  user,
 		}
 

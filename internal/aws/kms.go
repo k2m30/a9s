@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -37,7 +36,7 @@ func FetchKMSKeys(
 	// Step 1: List all keys
 	listOutput, err := listKeysAPI.ListKeys(ctx, &kms.ListKeysInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing KMS keys: %w", err)
 	}
 
 	if len(listOutput.Keys) == 0 {
@@ -87,11 +86,6 @@ func FetchKMSKeys(
 			keyID = *meta.KeyId
 		}
 
-		arn := ""
-		if meta.Arn != nil {
-			arn = *meta.Arn
-		}
-
 		description := ""
 		if meta.Description != nil {
 			description = *meta.Description
@@ -99,33 +93,7 @@ func FetchKMSKeys(
 
 		status := string(meta.KeyState)
 
-		keyUsage := string(meta.KeyUsage)
-
 		alias := aliasMap[keyID]
-
-		creationDate := ""
-		if meta.CreationDate != nil {
-			creationDate = meta.CreationDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Key ID":        keyID,
-			"ARN":           arn,
-			"Alias":         alias,
-			"Description":   description,
-			"Status":        status,
-			"Key Usage":     keyUsage,
-			"Key Manager":   string(meta.KeyManager),
-			"Enabled":       fmt.Sprintf("%v", meta.Enabled),
-			"Creation Date": creationDate,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(meta, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
 
 		r := resource.Resource{
 			ID:     keyID,
@@ -137,8 +105,6 @@ func FetchKMSKeys(
 				"status":      status,
 				"description": description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  meta,
 		}
 

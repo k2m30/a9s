@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,7 +26,7 @@ func init() {
 func FetchSNSSubscriptions(ctx context.Context, api SNSListSubscriptionsAPI) ([]resource.Resource, error) {
 	output, err := api.ListSubscriptions(ctx, &sns.ListSubscriptionsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching SNS subscriptions: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -59,22 +58,6 @@ func FetchSNSSubscriptions(ctx context.Context, api SNSListSubscriptionsAPI) ([]
 			topicName = parts[len(parts)-1]
 		}
 
-		detail := map[string]string{
-			"Subscription ARN": subscriptionArn,
-			"Topic ARN":        topicArn,
-			"Protocol":         protocol,
-			"Endpoint":         endpoint,
-		}
-
-		if sub.Owner != nil {
-			detail["Owner"] = *sub.Owner
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(sub, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     subscriptionArn,
 			Name:   topicName,
@@ -85,8 +68,6 @@ func FetchSNSSubscriptions(ctx context.Context, api SNSListSubscriptionsAPI) ([]
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  sub,
 		}
 

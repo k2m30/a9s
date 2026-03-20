@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -26,7 +25,7 @@ func init() {
 func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]resource.Resource, error) {
 	output, err := api.ListCertificates(ctx, &acm.ListCertificatesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching ACM certificates: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -50,37 +49,6 @@ func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]re
 			inUse = "true"
 		}
 
-		detail := map[string]string{
-			"Domain Name": domainName,
-			"Status":      status,
-			"Type":        certType,
-			"Not After":   notAfter,
-			"In Use":      inUse,
-		}
-
-		if cert.CertificateArn != nil {
-			detail["ARN"] = *cert.CertificateArn
-		}
-
-		if cert.NotBefore != nil {
-			detail["Not Before"] = cert.NotBefore.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		if cert.CreatedAt != nil {
-			detail["Created At"] = cert.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		if cert.RenewalEligibility != "" {
-			detail["Renewal Eligibility"] = string(cert.RenewalEligibility)
-		}
-
-		detail["Key Algorithm"] = string(cert.KeyAlgorithm)
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cert, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
@@ -92,8 +60,6 @@ func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]re
 				"not_after":   notAfter,
 				"in_use":      inUse,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cert,
 		}
 

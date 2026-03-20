@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
@@ -26,7 +25,7 @@ func init() {
 func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) ([]resource.Resource, error) {
 	output, err := api.ListPipelines(ctx, &codepipeline.ListPipelinesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CodePipeline pipelines: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,24 +53,6 @@ func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) (
 			version = fmt.Sprintf("%d", *pl.Version)
 		}
 
-		executionMode := string(pl.ExecutionMode)
-
-		// Build DetailData
-		detail := map[string]string{
-			"Name":           name,
-			"Pipeline Type":  pipelineType,
-			"Created":        created,
-			"Updated":        updated,
-			"Version":        version,
-			"Execution Mode": executionMode,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(pl, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -83,8 +64,6 @@ func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) (
 				"updated":       updated,
 				"version":       version,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  pl,
 		}
 

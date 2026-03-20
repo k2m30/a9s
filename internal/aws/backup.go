@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -26,7 +25,7 @@ func init() {
 func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]resource.Resource, error) {
 	output, err := api.ListBackupPlans(ctx, &backup.ListBackupPlansInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Backup plans: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -42,11 +41,6 @@ func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]reso
 			planID = *plan.BackupPlanId
 		}
 
-		planArn := ""
-		if plan.BackupPlanArn != nil {
-			planArn = *plan.BackupPlanArn
-		}
-
 		creationDate := ""
 		if plan.CreationDate != nil {
 			creationDate = plan.CreationDate.Format("2006-01-02T15:04:05Z07:00")
@@ -55,33 +49,6 @@ func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]reso
 		lastExecution := ""
 		if plan.LastExecutionDate != nil {
 			lastExecution = plan.LastExecutionDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		versionID := ""
-		if plan.VersionId != nil {
-			versionID = *plan.VersionId
-		}
-
-		deletionDate := ""
-		if plan.DeletionDate != nil {
-			deletionDate = plan.DeletionDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Plan Name":      planName,
-			"Plan ID":        planID,
-			"Plan ARN":       planArn,
-			"Creation Date":  creationDate,
-			"Last Execution": lastExecution,
-			"Deletion Date":  deletionDate,
-			"Version ID":     versionID,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(plan, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
 		}
 
 		r := resource.Resource{
@@ -94,8 +61,6 @@ func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]reso
 				"creation_date":  creationDate,
 				"last_execution": lastExecution,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  plan,
 		}
 

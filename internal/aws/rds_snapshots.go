@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -26,7 +25,7 @@ func init() {
 func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching RDS snapshots: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -62,33 +61,6 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 			created = snap.SnapshotCreateTime.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		detail := map[string]string{
-			"Snapshot ID": snapshotID,
-			"DB Instance": dbInstance,
-			"Status":      status,
-			"Engine":      engine,
-			"Type":        snapshotType,
-			"Created":     created,
-		}
-
-		if snap.DBSnapshotArn != nil {
-			detail["ARN"] = *snap.DBSnapshotArn
-		}
-		if snap.EngineVersion != nil {
-			detail["Engine Version"] = *snap.EngineVersion
-		}
-		if snap.StorageType != nil {
-			detail["Storage Type"] = *snap.StorageType
-		}
-		if snap.AvailabilityZone != nil {
-			detail["Availability Zone"] = *snap.AvailabilityZone
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(snap, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     snapshotID,
 			Name:   snapshotID,
@@ -101,8 +73,6 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 				"snapshot_type": snapshotType,
 				"created":       created,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  snap,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -27,7 +26,7 @@ func init() {
 func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource, error) {
 	output, err := api.GetJobs(ctx, &glue.GetJobsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Glue jobs: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -72,12 +71,6 @@ func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource
 			commandName = *job.Command.Name
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(job, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     jobName,
 			Name:   jobName,
@@ -93,7 +86,6 @@ func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource
 				"last_modified": lastModified,
 				"command":       commandName,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: job,
 		}
 

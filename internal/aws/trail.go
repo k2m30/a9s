@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
@@ -27,7 +26,7 @@ func init() {
 func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeTrails(ctx, &cloudtrail.DescribeTrailsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CloudTrail trails: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -68,12 +67,6 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			logValidation = "true"
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(trail, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     trailName,
 			Name:   trailName,
@@ -87,7 +80,6 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 				"org_trail":      orgTrail,
 				"log_validation": logValidation,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: trail,
 		}
 

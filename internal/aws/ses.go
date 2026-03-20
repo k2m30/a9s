@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -26,7 +25,7 @@ func init() {
 func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([]resource.Resource, error) {
 	output, err := api.ListEmailIdentities(ctx, &sesv2.ListEmailIdentitiesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching SES identities: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -41,12 +40,6 @@ func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([
 		sendingEnabled := fmt.Sprintf("%t", identity.SendingEnabled)
 		verificationStatus := string(identity.VerificationStatus)
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(identity, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     identityName,
 			Name:   identityName,
@@ -57,7 +50,6 @@ func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([
 				"sending_enabled":     sendingEnabled,
 				"verification_status": verificationStatus,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: identity,
 		}
 

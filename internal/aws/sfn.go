@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
@@ -26,7 +25,7 @@ func init() {
 func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]resource.Resource, error) {
 	output, err := api.ListStateMachines(ctx, &sfn.ListStateMachinesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Step Functions: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -49,20 +48,6 @@ func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]res
 			creationDate = sm.CreationDate.Format("2006-01-02 15:04:05")
 		}
 
-		// Build DetailData
-		detail := map[string]string{
-			"Name":          name,
-			"ARN":           arn,
-			"Type":          smType,
-			"Creation Date": creationDate,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(sm, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -73,8 +58,6 @@ func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]res
 				"type":          smType,
 				"creation_date": creationDate,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  sm,
 		}
 

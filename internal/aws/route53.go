@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -26,7 +25,7 @@ func init() {
 func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]resource.Resource, error) {
 	output, err := api.ListHostedZones(ctx, &route53.ListHostedZonesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Route53 hosted zones: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -58,27 +57,6 @@ func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]res
 			}
 		}
 
-		callerRef := ""
-		if zone.CallerReference != nil {
-			callerRef = *zone.CallerReference
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Zone ID":          zoneID,
-			"Name":             name,
-			"Record Count":     recordCount,
-			"Private Zone":     privateZone,
-			"Comment":          comment,
-			"Caller Reference": callerRef,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(zone, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     zoneID,
 			Name:   name,
@@ -90,8 +68,6 @@ func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]res
 				"private_zone": privateZone,
 				"comment":      comment,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  zone,
 		}
 

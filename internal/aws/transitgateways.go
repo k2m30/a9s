@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching transit gateways: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -60,33 +59,6 @@ func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI
 			description = *tgw.Description
 		}
 
-		detail := map[string]string{
-			"TGW ID":      tgwID,
-			"Name":        name,
-			"State":       state,
-			"Owner":       ownerID,
-			"Description": description,
-		}
-
-		if tgw.TransitGatewayArn != nil {
-			detail["ARN"] = *tgw.TransitGatewayArn
-		}
-		if tgw.CreationTime != nil {
-			detail["Created"] = tgw.CreationTime.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		// Tags
-		for _, tag := range tgw.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(tgw, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     tgwID,
 			Name:   name,
@@ -98,8 +70,6 @@ func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI
 				"owner_id":    ownerID,
 				"description": description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  tgw,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
@@ -26,7 +25,7 @@ func init() {
 func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositoriesAPI) ([]resource.Resource, error) {
 	output, err := api.ListRepositories(ctx, &codeartifact.ListRepositoriesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CodeArtifact repositories: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -67,12 +66,6 @@ func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositorie
 			createdTime = repo.CreatedTime.Format("2006-01-02 15:04:05")
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(repo, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     repoName,
 			Name:   repoName,
@@ -86,7 +79,6 @@ func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositorie
 				"admin_account": adminAccount,
 				"created_time":  createdTime,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: repo,
 		}
 

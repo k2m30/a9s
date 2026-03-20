@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
@@ -27,7 +26,7 @@ func init() {
 func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]resource.Resource, error) {
 	output, err := api.ListStreams(ctx, &kinesis.ListStreamsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Kinesis streams: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -55,12 +54,6 @@ func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]reso
 			streamMode = string(stream.StreamModeDetails.StreamMode)
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(stream, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     streamName,
 			Name:   streamName,
@@ -72,7 +65,6 @@ func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]reso
 				"creation_time": creationTime,
 				"stream_mode":   streamMode,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: stream,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -26,7 +25,7 @@ func init() {
 func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching ECR repositories: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -42,16 +41,6 @@ func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) (
 			uri = *repo.RepositoryUri
 		}
 
-		arn := ""
-		if repo.RepositoryArn != nil {
-			arn = *repo.RepositoryArn
-		}
-
-		registryID := ""
-		if repo.RegistryId != nil {
-			registryID = *repo.RegistryId
-		}
-
 		tagMutability := string(repo.ImageTagMutability)
 
 		scanOnPush := "false"
@@ -62,23 +51,6 @@ func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) (
 		createdAt := ""
 		if repo.CreatedAt != nil {
 			createdAt = repo.CreatedAt.Format("2006-01-02 15:04:05")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Repository Name": repoName,
-			"URI":             uri,
-			"ARN":             arn,
-			"Registry ID":     registryID,
-			"Tag Mutability":  tagMutability,
-			"Scan On Push":    scanOnPush,
-			"Created At":      createdAt,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(repo, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
 		}
 
 		r := resource.Resource{
@@ -92,8 +64,6 @@ func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) (
 				"scan_on_push":    scanOnPush,
 				"created_at":      createdAt,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  repo,
 		}
 

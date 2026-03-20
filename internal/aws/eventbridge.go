@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -26,7 +25,7 @@ func init() {
 func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]resource.Resource, error) {
 	output, err := api.ListRules(ctx, &eventbridge.ListRulesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching EventBridge rules: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -35,11 +34,6 @@ func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]
 		name := ""
 		if rule.Name != nil {
 			name = *rule.Name
-		}
-
-		arn := ""
-		if rule.Arn != nil {
-			arn = *rule.Arn
 		}
 
 		state := string(rule.State)
@@ -59,40 +53,6 @@ func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]
 			schedule = *rule.ScheduleExpression
 		}
 
-		eventPattern := ""
-		if rule.EventPattern != nil {
-			eventPattern = *rule.EventPattern
-		}
-
-		managedBy := ""
-		if rule.ManagedBy != nil {
-			managedBy = *rule.ManagedBy
-		}
-
-		roleArn := ""
-		if rule.RoleArn != nil {
-			roleArn = *rule.RoleArn
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Name":                name,
-			"ARN":                 arn,
-			"State":               state,
-			"Description":         description,
-			"Event Bus":           eventBus,
-			"Schedule Expression": schedule,
-			"Event Pattern":       eventPattern,
-			"Managed By":          managedBy,
-			"Role ARN":            roleArn,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(rule, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -104,8 +64,6 @@ func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]
 				"event_bus":   eventBus,
 				"schedule":    schedule,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  rule,
 		}
 

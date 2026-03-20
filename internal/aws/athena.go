@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/athena"
@@ -26,7 +25,7 @@ func init() {
 func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]resource.Resource, error) {
 	output, err := api.ListWorkGroups(ctx, &athena.ListWorkGroupsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Athena workgroups: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,12 +53,6 @@ func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]
 			engineVersion = *wg.EngineVersion.EffectiveEngineVersion
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(wg, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     wgName,
 			Name:   wgName,
@@ -71,7 +64,6 @@ func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]
 				"creation_time":  creationTime,
 				"engine_version": engineVersion,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: wg,
 		}
 

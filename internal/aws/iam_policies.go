@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -29,7 +28,7 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 		Scope: iamtypes.PolicyScopeTypeLocal,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching IAM policies: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -60,26 +59,6 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 			createDate = policy.CreateDate.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		detail := map[string]string{
-			"Policy Name":      policyName,
-			"Policy ID":        policyID,
-			"Attachment Count": attachmentCount,
-			"Path":             path,
-			"Created":          createDate,
-		}
-
-		if policy.Arn != nil {
-			detail["ARN"] = *policy.Arn
-		}
-		if policy.Description != nil {
-			detail["Description"] = *policy.Description
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(policy, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     policyName,
 			Name:   policyName,
@@ -91,8 +70,6 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 				"path":             path,
 				"create_date":      createDate,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  policy,
 		}
 

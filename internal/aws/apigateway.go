@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
@@ -26,7 +25,7 @@ func init() {
 func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resource.Resource, error) {
 	output, err := api.GetApis(ctx, &apigatewayv2.GetApisInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching API gateways: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,27 +53,6 @@ func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resour
 			description = *item.Description
 		}
 
-		createdDate := ""
-		if item.CreatedDate != nil {
-			createdDate = item.CreatedDate.Format("2006-01-02 15:04:05")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"API ID":       apiID,
-			"Name":         name,
-			"Protocol":     protocol,
-			"Endpoint":     endpoint,
-			"Description":  description,
-			"Created Date": createdDate,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(item, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     apiID,
 			Name:   name,
@@ -86,8 +64,6 @@ func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resour
 				"endpoint":    endpoint,
 				"description": description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  item,
 		}
 

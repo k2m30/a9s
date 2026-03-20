@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -31,7 +30,7 @@ func FetchCodeBuildProjects(
 ) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListProjects(ctx, &codebuild.ListProjectsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing CodeBuild projects: %w", err)
 	}
 
 	if len(listOutput.Projects) == 0 {
@@ -68,38 +67,6 @@ func FetchCodeBuildProjects(
 			lastModified = project.LastModified.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		arn := ""
-		if project.Arn != nil {
-			arn = *project.Arn
-		}
-
-		serviceRole := ""
-		if project.ServiceRole != nil {
-			serviceRole = *project.ServiceRole
-		}
-
-		created := ""
-		if project.Created != nil {
-			created = project.Created.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		// Build DetailData
-		detail := map[string]string{
-			"Project Name": name,
-			"Description":  description,
-			"Source Type":   sourceType,
-			"ARN":           arn,
-			"Service Role":  serviceRole,
-			"Last Modified": lastModified,
-			"Created":       created,
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(project, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -110,8 +77,6 @@ func FetchCodeBuildProjects(
 				"description":   description,
 				"last_modified": lastModified,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  project,
 		}
 

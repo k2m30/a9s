@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -26,7 +25,7 @@ func init() {
 func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resource, error) {
 	output, err := api.ListGroups(ctx, &iam.ListGroupsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching IAM groups: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,19 +56,6 @@ func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resou
 			arn = *group.Arn
 		}
 
-		detail := map[string]string{
-			"Group Name": groupName,
-			"Group ID":   groupID,
-			"ARN":        arn,
-			"Path":       path,
-			"Created":    createDate,
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(group, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     groupName,
 			Name:   groupName,
@@ -81,8 +67,6 @@ func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resou
 				"create_date": createDate,
 				"arn":         arn,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  group,
 		}
 

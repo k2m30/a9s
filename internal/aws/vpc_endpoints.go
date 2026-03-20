@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeVpcEndpoints(ctx, &ec2.DescribeVpcEndpointsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching VPC endpoints: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -50,29 +49,6 @@ func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]r
 			vpcID = *vpce.VpcId
 		}
 
-		detail := map[string]string{
-			"Endpoint ID":  vpceID,
-			"Service Name": serviceName,
-			"Type":         endpointType,
-			"State":        state,
-			"VPC ID":       vpcID,
-		}
-
-		if vpce.CreationTimestamp != nil {
-			detail["Created"] = vpce.CreationTimestamp.Format("2006-01-02T15:04:05Z07:00")
-		}
-		if vpce.OwnerId != nil {
-			detail["Owner ID"] = *vpce.OwnerId
-		}
-		if vpce.PrivateDnsEnabled != nil {
-			detail["Private DNS Enabled"] = fmt.Sprintf("%t", *vpce.PrivateDnsEnabled)
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(vpce, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     vpceID,
 			Name:   serviceName,
@@ -84,8 +60,6 @@ func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]r
 				"state":        state,
 				"vpc_id":       vpcID,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  vpce,
 		}
 

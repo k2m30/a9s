@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -29,7 +28,7 @@ func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.R
 		Scope: wafv2types.ScopeRegional,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching WAF web ACLs: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -60,12 +59,6 @@ func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.R
 			lockToken = *acl.LockToken
 		}
 
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(acl, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     id,
 			Name:   name,
@@ -77,7 +70,6 @@ func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.R
 				"description": description,
 				"lock_token":  lockToken,
 			},
-			RawJSON:   rawJSON,
 			RawStruct: acl,
 		}
 
