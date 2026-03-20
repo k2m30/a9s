@@ -52,7 +52,7 @@ func TestDetailLayout_KeysHaveColon(t *testing.T) {
 func TestDetailLayout_ScalarFieldsInline(t *testing.T) {
 	ensureNoColor(t)
 
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
 	if err != nil {
 		t.Skipf("views.yaml not found: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 			Code: ptrInt32(16),
 		},
 	}
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
 	if err != nil {
 		t.Fatalf("views.yaml not found: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestDetailLayout_EmptySliceShowsDashNotNull(t *testing.T) {
 		SecurityGroups: []ec2types.GroupIdentifier{}, // empty slice — triggers the bug
 		Tags:           []ec2types.Tag{},             // another empty slice
 	}
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
 	if err != nil {
 		t.Fatalf("views.yaml not found: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestDetailLayout_NilSliceShowsDashNotNull(t *testing.T) {
 		},
 		// SecurityGroups and Tags are nil (zero value for slices)
 	}
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
 	if err != nil {
 		t.Fatalf("views.yaml not found: %v", err)
 	}

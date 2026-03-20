@@ -682,7 +682,7 @@ func TestQA_ListRawStruct_S3_RawStructOverridesFields(t *testing.T) {
 func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	ensureNoColor(t)
 
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
 	if err != nil {
 		t.Fatalf("failed to load production views.yaml: %v", err)
 	}
