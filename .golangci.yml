@@ -1,9 +1,10 @@
+version: "2"
+
 linters:
   enable:
     - govet
     - errcheck
     - staticcheck
-    - gosimple
     - unused
     - gosec
     - gocritic
@@ -11,18 +12,18 @@ linters:
     - prealloc
     - noctx
 
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  gosec:
-    excludes:
-      - G104  # unhandled errors in deferred calls
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    gosec:
+      excludes:
+        - G104
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
 
 issues:
   exclude-dirs:
