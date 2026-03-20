@@ -525,28 +525,32 @@ func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
 	m := newRootSizedModel()
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Count non-empty content lines inside the frame (between top and bottom border)
-	// Frame has: header(1) + top border(1) + content(h-3) + bottom border(1)
-	// With 10 resource types and height 24, all should fit in single lines
-	// Count lines containing resource type names
+	// Verify that each resource type name appears on exactly one line (no wrapping).
+	// Check a representative sample of resource types from different categories.
+	sampleNames := []string{
+		"EC2 Instances",
+		"ECS Services",
+		"Lambda Functions",
+		"EKS Clusters",
+		"EKS Node Groups",
+		"Load Balancers",
+		"Security Groups",
+		"VPCs",
+		"DB Instances",
+		"S3 Buckets",
+	}
 	resourceCount := 0
 	for _, line := range lines {
 		plain := stripANSI(line)
-		if strings.Contains(plain, "S3 Buckets") ||
-			strings.Contains(plain, "EC2 Instances") ||
-			strings.Contains(plain, "DB Instances") ||
-			strings.Contains(plain, "ElastiCache") ||
-			strings.Contains(plain, "DB Clusters") ||
-			strings.Contains(plain, "EKS Clusters") ||
-			strings.Contains(plain, "Secrets Manager") ||
-			strings.Contains(plain, "VPCs") ||
-			strings.Contains(plain, "Security Groups") ||
-			strings.Contains(plain, "EKS Node Groups") {
-			resourceCount++
+		for _, name := range sampleNames {
+			if strings.Contains(plain, name) {
+				resourceCount++
+				break
+			}
 		}
 	}
-	if resourceCount != 10 {
-		t.Errorf("expected 10 resource type lines (one per type), got %d — rows may be wrapping", resourceCount)
+	if resourceCount != len(sampleNames) {
+		t.Errorf("expected %d resource type lines (one per type), got %d — rows may be wrapping", len(sampleNames), resourceCount)
 	}
 }
 

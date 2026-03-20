@@ -137,6 +137,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix, "")
 	case messages.APIErrorMsg:
 		return m.handleAPIError(msg)
+	case messages.ResourcesLoadedMsg:
+		m.flash.active = false
+		return m.updateActiveView(msg)
 	}
 	return m.updateActiveView(msg)
 }
@@ -266,6 +269,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
 	m.profile = msg.Profile
+	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.ProfileModel); ok {
 		m.popView()
@@ -273,7 +277,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	flashCmd := func() tea.Msg {
 		return messages.FlashMsg{Text: "Switching to " + msg.Profile + "..."}
 	}
-	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, m.region))
+	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, ""))
 }
 
 // handleRegionSelected switches the AWS region, pops the region selector,

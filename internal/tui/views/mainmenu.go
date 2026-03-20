@@ -59,6 +59,24 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 			if len(m.filteredItems) > 0 {
 				m.cursor = len(m.filteredItems) - 1
 			}
+		case key.Matches(msg, m.keys.PageUp):
+			pageSize := m.height - 1
+			if pageSize < 1 {
+				pageSize = 1
+			}
+			m.cursor -= pageSize
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		case key.Matches(msg, m.keys.PageDown):
+			pageSize := m.height - 1
+			if pageSize < 1 {
+				pageSize = 1
+			}
+			m.cursor += pageSize
+			if m.cursor >= len(m.filteredItems) {
+				m.cursor = max(0, len(m.filteredItems)-1)
+			}
 		case key.Matches(msg, m.keys.Enter):
 			if len(m.filteredItems) > 0 && m.cursor < len(m.filteredItems) {
 				selected := m.filteredItems[m.cursor]
@@ -70,62 +88,114 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 				}
 			}
 		}
-		// Keep cursor visible in the viewport
-		if m.height > 0 {
-			if m.cursor < m.scrollOffset {
-				m.scrollOffset = m.cursor
-			}
-			if m.cursor >= m.scrollOffset+m.height {
-				m.scrollOffset = m.cursor - m.height + 1
-			}
-		}
+		// Keep cursor visible in the viewport using render-line positions.
+		m.adjustScroll()
 	}
 	return m, nil
 }
 
+// adjustScroll ensures the cursor is visible within the viewport, accounting
+// for category header lines that occupy space but are not selectable.
+func (m *MainMenuModel) adjustScroll() {
+	if m.height <= 0 {
+		return
+	}
+	lines := m.buildRenderLines()
+	// Find the render-line index of the cursor.
+	cursorLine := 0
+	for i, rl := range lines {
+		if !rl.isHeader && rl.itemIndex == m.cursor {
+			cursorLine = i
+			break
+		}
+	}
+	if cursorLine < m.scrollOffset {
+		m.scrollOffset = cursorLine
+		// Include the category header above if the cursor is the first item in a group.
+		if m.scrollOffset > 0 && lines[m.scrollOffset-1].isHeader {
+			m.scrollOffset--
+		}
+	}
+	if cursorLine >= m.scrollOffset+m.height {
+		m.scrollOffset = cursorLine - m.height + 1
+	}
+}
+
+// renderLine represents a single line in the menu: either a category header or a selectable item.
+type renderLine struct {
+	isHeader  bool
+	header    string // category name, only set when isHeader is true
+	itemIndex int    // index into filteredItems, only meaningful when isHeader is false
+}
+
+// buildRenderLines builds the flat list of render lines from filteredItems,
+// inserting category headers when the category changes between consecutive items.
+func (m MainMenuModel) buildRenderLines() []renderLine {
+	lines := make([]renderLine, 0, len(m.filteredItems)+12)
+	lastCat := ""
+	for i, item := range m.filteredItems {
+		if item.Category != lastCat {
+			lines = append(lines, renderLine{isHeader: true, header: item.Category})
+			lastCat = item.Category
+		}
+		lines = append(lines, renderLine{itemIndex: i})
+	}
+	return lines
+}
+
 // View renders the menu items. Caller wraps in RenderFrame.
-// Only items within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
+// Only lines within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
 func (m MainMenuModel) View() string {
 	if len(m.filteredItems) == 0 {
 		return "No resource types"
 	}
 
-	// Alias column width: widest alias is ":docdb-snap" = 11, plus trailing pad.
-	const aliasW = 13
+	// Alias column width: widest alias is ":codeartifact" = 13, plus trailing pad.
+	const aliasW = 15
+
+	lines := m.buildRenderLines()
 
 	// Calculate visible window
 	start := m.scrollOffset
-	end := len(m.filteredItems)
+	end := len(lines)
 	if m.height > 0 && start+m.height < end {
 		end = start + m.height
 	}
 
 	var sb strings.Builder
-	for i := start; i < end; i++ {
-		if i > start {
+	for li := start; li < end; li++ {
+		if li > start {
 			sb.WriteString("\n")
 		}
-		item := m.filteredItems[i]
+		rl := lines[li]
+
+		if rl.isHeader {
+			headerText := "  " + rl.header + " "
+			sb.WriteString(styles.DimText.Render(headerText))
+			continue
+		}
+
+		item := m.filteredItems[rl.itemIndex]
 
 		aliasStr := ":" + item.ShortName
 		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
 
-		// Name field fills remaining width: total - 2 leading - aliasW - 5 trailing.
-		nameFieldW := m.width - 2 - aliasW - 5
+		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.
+		nameFieldW := m.width - 4 - aliasW - 3
 		if nameFieldW < 10 {
 			nameFieldW = 10
 		}
 		namePadded := text.PadOrTrunc(item.Name, nameFieldW)
 
-		if i == m.cursor {
+		if rl.itemIndex == m.cursor {
 			// Selected row: full highlight, alias stays dimmed.
 			dimAlias := styles.DimText.Render(aliasPadded)
-			selectedName := "  " + namePadded + " "
+			selectedName := "    " + namePadded + " "
 			line := styles.RowSelected.Width(m.width).Render(selectedName + dimAlias)
 			sb.WriteString(line)
 		} else {
 			dimAlias := styles.DimText.Render(aliasPadded)
-			name := styles.RowNormal.Render("  " + namePadded + " ")
+			name := styles.RowNormal.Render("    " + namePadded + " ")
 			sb.WriteString(name + dimAlias)
 		}
 	}

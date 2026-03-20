@@ -36,6 +36,8 @@ func TestQA_HelpContext_MainMenu_ShowsRelevantKeys(t *testing.T) {
 		"help",       // ? description
 		"ctrl+c",     // force quit
 		"force quit", // ctrl+c description
+		"pgup",       // page up
+		"pgdn",       // page down
 	}
 	for _, key := range mustContain {
 		if !strings.Contains(strings.ToLower(plain), key) {
@@ -59,8 +61,7 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 		"reveal",  // x key description
 		"wrap",    // w key description
 		"refresh", // ctrl+r description
-		"pgup",    // page up
-		"pgdn",    // page down
+		// pgup/pgdn are now shown in main menu help
 		"sort",    // sort keys
 	}
 	for _, text := range mustNotContain {

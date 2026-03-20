@@ -443,24 +443,14 @@ func TestContentReveal_FrameTitle(t *testing.T) {
 func TestContentMainMenu_AllSevenResourceTypes(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(80, 20)
+	// Use a tall viewport so all 62 resource types + category headers fit
+	m.SetSize(80, 100)
 	out := m.View()
 
-	expectedTypes := []string{
-		"S3 Buckets",
-		"EC2 Instances",
-		"DB Instances",
-		"ElastiCache Redis",
-		"DB Clusters",
-		"EKS Clusters",
-		"Secrets Manager",
-		"VPCs",
-		"Security Groups",
-		"EKS Node Groups",
-	}
-	for _, name := range expectedTypes {
-		if !strings.Contains(out, name) {
-			t.Errorf("MainMenu.View() missing resource type %q", name)
+	allTypes := resource.AllResourceTypes()
+	for _, rt := range allTypes {
+		if !strings.Contains(out, rt.Name) {
+			t.Errorf("MainMenu.View() missing resource type %q", rt.Name)
 		}
 	}
 }

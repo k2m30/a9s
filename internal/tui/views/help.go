@@ -174,6 +174,8 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 				{"j/k", "up/down"},
 				{"g", "top"},
 				{"G", "bottom"},
+				{"pgup", "page up"},
+				{"pgdn", "page down"},
 			},
 		},
 		{
