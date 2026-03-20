@@ -31,3 +31,14 @@ coverage.html
 .claude/settings.local.json
 
 /refgen
+
+# Internal tooling
+specs/
+.specify/
+
+# GoReleaser
+dist/
+
+# VHS generated assets
+assets/*.gif
+assets/*.mp4

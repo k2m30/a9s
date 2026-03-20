@@ -11,7 +11,11 @@ import (
 	"github.com/k2m30/a9s/internal/tui"
 )
 
-const version = "2.8.0"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	var (
@@ -48,7 +52,7 @@ func main() {
 	}
 
 	if showVersion {
-		fmt.Printf("a9s %s\n", version)
+		fmt.Printf("a9s %s (commit: %s, built: %s)\n", version, commit, date)
 		os.Exit(0)
 	}
 

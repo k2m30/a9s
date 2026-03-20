@@ -5,12 +5,24 @@ linters:
     - staticcheck
     - gosimple
     - unused
+    - gosec
+    - gocritic
+    - bodyclose
+    - prealloc
+    - noctx
 
 linters-settings:
   govet:
     enable-all: true
     disable:
       - fieldalignment
+  gosec:
+    excludes:
+      - G104  # unhandled errors in deferred calls
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
 
 issues:
   exclude-dirs:
