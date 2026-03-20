@@ -893,6 +893,26 @@ func (m *mockRoute53Client) ListHostedZones(ctx context.Context, params *route53
 	return m.output, m.err
 }
 
+// mockRoute53RecordSetsClient implements awsclient.Route53ListResourceRecordSetsAPI for testing.
+// It supports pagination by returning successive outputs from the outputs slice.
+type mockRoute53RecordSetsClient struct {
+	outputs []*route53.ListResourceRecordSetsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockRoute53RecordSetsClient) ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &route53.ListResourceRecordSetsOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
 // ---------------------------------------------------------------------------
 // API Gateway V2 mocks
 // ---------------------------------------------------------------------------

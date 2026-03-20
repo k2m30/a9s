@@ -12,9 +12,9 @@ import (
 	"github.com/k2m30/a9s/internal/fieldpath"
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/messages"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 )
 
 // SortField identifies the active sort column.
@@ -41,9 +41,11 @@ type ResourceListModel struct {
 	sort    SortField
 	sortAsc bool
 
-	filterText string
-	s3Bucket string // non-empty when showing objects inside a bucket
-	s3Prefix string // non-empty when showing objects under a prefix
+	filterText  string
+	s3Bucket    string // non-empty when showing objects inside a bucket
+	s3Prefix    string // non-empty when showing objects under a prefix
+	r53ZoneId   string // non-empty when showing records inside a hosted zone
+	r53ZoneName string // zone name for display
 
 	loading bool
 	spinner spinner.Model
@@ -92,6 +94,25 @@ func NewS3ObjectsList(bucket string, viewConfig *config.ViewsConfig, k keys.Map,
 		loading:    true,
 		spinner:    sp,
 		keys:       k,
+	}
+}
+
+// NewR53RecordsList creates a ResourceListModel for DNS records inside a Route53 hosted zone.
+func NewR53RecordsList(zoneId, zoneName string, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
+	sp := spinner.New()
+	typeDef := resource.ResourceTypeDef{
+		Name:      zoneName,
+		ShortName: "r53_records",
+		Columns:   resource.R53RecordColumns(),
+	}
+	return ResourceListModel{
+		typeDef:     typeDef,
+		viewConfig:  viewConfig,
+		r53ZoneId:   zoneId,
+		r53ZoneName: zoneName,
+		loading:     true,
+		spinner:     sp,
+		keys:        k,
 	}
 }
 
@@ -159,6 +180,14 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.rowTextCache = nil
 		case key.Matches(msg, m.keys.Enter):
 			if r := m.SelectedResource(); r != nil {
+				// Route53 zone list: Enter drills into the zone's records
+				if m.typeDef.ShortName == "r53" && m.r53ZoneId == "" {
+					zoneId := r.ID
+					zoneName := r.Name
+					return m, func() tea.Msg {
+						return messages.R53EnterZoneMsg{ZoneId: zoneId, ZoneName: zoneName}
+					}
+				}
 				// S3 bucket list: Enter drills into the bucket
 				if m.typeDef.ShortName == "s3" && m.s3Bucket == "" {
 					bucketName := r.ID
@@ -359,7 +388,7 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 	parts := make([]string, len(cols))
 	for i, c := range cols {
 		title := m.colHeaderTitle(c, i)
-		parts[i] = layout.PadOrTrunc(title, c.width)
+		parts[i] = text.PadOrTrunc(title, c.width)
 	}
 	headerText := " " + strings.Join(parts, "  ")
 	return styles.TableHeader.Render(headerText)
@@ -398,7 +427,7 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 	cells := make([]string, len(cols))
 	for i, c := range cols {
 		val := m.extractCellValue(c, r)
-		cells[i] = layout.PadOrTrunc(val, c.width)
+		cells[i] = text.PadOrTrunc(val, c.width)
 	}
 	return " " + strings.Join(cells, "  ")
 }
@@ -561,6 +590,11 @@ func (m ResourceListModel) S3Prefix() string {
 	return m.s3Prefix
 }
 
+// R53ZoneId returns the Route53 hosted zone ID if this view is showing records inside a zone.
+func (m ResourceListModel) R53ZoneId() string {
+	return m.r53ZoneId
+}
+
 // ClearLoading clears the loading state so the view no longer shows a spinner.
 func (m *ResourceListModel) ClearLoading() {
 	m.loading = false
@@ -573,6 +607,9 @@ func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
 	if m.s3Bucket != "" {
 		name = m.s3Bucket
+	}
+	if m.r53ZoneId != "" {
+		name = m.r53ZoneName
 	}
 	if m.loading {
 		return name

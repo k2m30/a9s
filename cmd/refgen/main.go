@@ -99,6 +99,7 @@ func main() {
 		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeOf(docdbtypes.DBClusterSnapshot{})},
 		{"cf", "cftypes.DistributionSummary", reflect.TypeOf(cftypes.DistributionSummary{})},
 		{"r53", "r53types.HostedZone", reflect.TypeOf(r53types.HostedZone{})},
+		{"r53_records", "r53types.ResourceRecordSet", reflect.TypeOf(r53types.ResourceRecordSet{})},
 		{"apigw", "apigwtypes.Api", reflect.TypeOf(apigwtypes.Api{})},
 		{"ecr", "ecrtypes.Repository", reflect.TypeOf(ecrtypes.Repository{})},
 		{"efs", "efstypes.FileSystemDescription", reflect.TypeOf(efstypes.FileSystemDescription{})},

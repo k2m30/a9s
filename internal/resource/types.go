@@ -804,6 +804,17 @@ func S3ObjectColumns() []Column {
 	}
 }
 
+// R53RecordColumns returns the column definitions used when browsing DNS records
+// inside a Route53 hosted zone.
+func R53RecordColumns() []Column {
+	return []Column{
+		{Key: "name", Title: "Name", Width: 40, Sortable: true},
+		{Key: "type", Title: "Type", Width: 8, Sortable: true},
+		{Key: "ttl", Title: "TTL", Width: 8, Sortable: true},
+		{Key: "values", Title: "Values", Width: 50, Sortable: true},
+	}
+}
+
 // FindResourceType looks up a resource type by its ShortName or any of its Aliases.
 // Returns nil if no match is found.
 func FindResourceType(name string) *ResourceTypeDef {

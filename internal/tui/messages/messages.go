@@ -112,3 +112,9 @@ type S3NavigatePrefixMsg struct {
 	Bucket string
 	Prefix string
 }
+
+// R53EnterZoneMsg signals that the user selected a Route53 hosted zone to drill into.
+type R53EnterZoneMsg struct {
+	ZoneId   string
+	ZoneName string
+}

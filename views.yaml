@@ -993,3 +993,31 @@ views:
       - VPCZoneIdentifier
       - CreatedTime
       - Tags
+
+  r53_records:
+    list:
+      Name:
+        path: Name
+        width: 40
+      Type:
+        path: Type
+        width: 8
+      TTL:
+        path: TTL
+        width: 8
+      Values:
+        key: values
+        width: 50
+    detail:
+      - Name
+      - Type
+      - TTL
+      - ResourceRecords
+      - AliasTarget
+      - SetIdentifier
+      - Weight
+      - Region
+      - Failover
+      - GeoLocation
+      - HealthCheckId
+      - MultiValueAnswer

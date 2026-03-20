@@ -311,6 +311,11 @@ type Route53ListHostedZonesAPI interface {
 	ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
 }
 
+// Route53ListResourceRecordSetsAPI defines the interface for the Route53 ListResourceRecordSets operation.
+type Route53ListResourceRecordSetsAPI interface {
+	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
+}
+
 // APIGatewayV2GetApisAPI defines the interface for the API Gateway V2 GetApis operation.
 type APIGatewayV2GetApisAPI interface {
 	GetApis(ctx context.Context, params *apigatewayv2.GetApisInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error)

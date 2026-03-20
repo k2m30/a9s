@@ -664,6 +664,19 @@ var defaultViews = ViewsConfig{
 				"Config", "LinkedService",
 			},
 		},
+		"r53_records": {
+			List: []ListColumn{
+				{Title: "Name", Path: "Name", Width: 40},
+				{Title: "Type", Path: "Type", Width: 8},
+				{Title: "TTL", Path: "TTL", Width: 8},
+				{Title: "Values", Path: "", Key: "values", Width: 50},
+			},
+			Detail: []string{
+				"Name", "Type", "TTL", "ResourceRecords", "AliasTarget",
+				"SetIdentifier", "Weight", "Region", "Failover",
+				"GeoLocation", "HealthCheckId", "MultiValueAnswer",
+			},
+		},
 		"apigw": {
 			List: []ListColumn{
 				{Title: "API ID", Path: "ApiId", Width: 14},
