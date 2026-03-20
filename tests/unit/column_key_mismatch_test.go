@@ -3,32 +3,18 @@ package unit
 import (
 	"testing"
 
+	_ "github.com/k2m30/a9s/internal/aws"
 	"github.com/k2m30/a9s/internal/resource"
 )
 
 // Test that every column Key in every ResourceTypeDef has a corresponding
-// Fields key in the expected fetcher output. This catches mismatches between
+// Fields key registered by the fetcher. This catches mismatches between
 // types.go column definitions and aws/*.go fetcher Fields keys.
-//
-// Known valid Fields keys per resource type (from aws/*.go fetchers):
-var expectedFieldKeys = map[string][]string{
-	"s3":      {"name", "bucket_name", "creation_date"},
-	"ec2":     {"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time"},
-	"dbi":     {"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"},
-	"redis":   {"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"},
-	"dbc":   {"cluster_id", "engine_version", "status", "instances", "endpoint"},
-	"eks":     {"cluster_name", "version", "status", "endpoint", "platform_version"},
-	"secrets":    {"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"},
-	"vpc":        {"vpc_id", "name", "cidr_block", "state", "is_default"},
-	"sg":         {"group_id", "group_name", "vpc_id", "description"},
-	"ng": {"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"},
-}
-
 func TestColumnKeys_MatchFetcherFieldKeys(t *testing.T) {
 	for _, rt := range resource.AllResourceTypes() {
-		validKeys, ok := expectedFieldKeys[rt.ShortName]
-		if !ok {
-			t.Errorf("no expected field keys defined for resource type %q", rt.ShortName)
+		validKeys := resource.GetFieldKeys(rt.ShortName)
+		if validKeys == nil {
+			t.Errorf("no field keys registered for resource type %q — add RegisterFieldKeys in fetcher init()", rt.ShortName)
 			continue
 		}
 

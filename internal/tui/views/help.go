@@ -7,9 +7,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/messages"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 )
 
 // HelpContext identifies which view opened help so keys can be filtered.
@@ -75,7 +75,7 @@ func (m HelpModel) View() string {
 	descStyle := helpDescStyle
 
 	bind := func(k, d string) string {
-		return hkStyle.Render(layout.PadOrTrunc(k, 9)) + descStyle.Render(d)
+		return hkStyle.Render(text.PadOrTrunc(k, 9)) + descStyle.Render(d)
 	}
 
 	groups := m.buildGroups()
@@ -95,7 +95,7 @@ func (m HelpModel) View() string {
 	var catParts []string
 	for i, g := range groups {
 		if i < numCols-1 {
-			catParts = append(catParts, catStyle.Render(layout.PadOrTrunc(g.title, colW)))
+			catParts = append(catParts, catStyle.Render(text.PadOrTrunc(g.title, colW)))
 		} else {
 			catParts = append(catParts, catStyle.Render(g.title))
 		}
@@ -123,7 +123,7 @@ func (m HelpModel) View() string {
 				cell = bind(g.bindings[row].key, g.bindings[row].desc)
 			}
 			if i < numCols-1 {
-				parts = append(parts, layout.PadOrTrunc(cell, colW))
+				parts = append(parts, text.PadOrTrunc(cell, colW))
 			} else {
 				parts = append(parts, cell)
 			}
@@ -174,6 +174,8 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 				{"j/k", "up/down"},
 				{"g", "top"},
 				{"G", "bottom"},
+				{"pgup", "page up"},
+				{"pgdn", "page down"},
 			},
 		},
 		{
@@ -226,8 +228,8 @@ func (m HelpModel) resourceListGroups(secrets bool) []helpGroup {
 		title: "SORT",
 		bindings: []helpBinding{
 			{"N", "sort name"},
-			{"S", "sort status"},
-			{"A", "sort age"},
+			{"I", "sort id"},
+			{"A", "sort date"},
 		},
 	}
 
@@ -258,7 +260,7 @@ func (m HelpModel) detailGroups() []helpGroup {
 			title: "ACTIONS",
 			bindings: []helpBinding{
 				{"y", "yaml"},
-				{"c", "copy id"},
+				{"c", "copy yaml"},
 				{"w", "wrap toggle"},
 			},
 		},

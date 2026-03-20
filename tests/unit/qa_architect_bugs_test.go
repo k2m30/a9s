@@ -85,7 +85,7 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 
 func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	// Load the FULL config (all 8 resource types) — same as production
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
 	if err != nil {
 		t.Skipf("views.yaml not found: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 }
 
 func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
-	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/views.yaml"})
+	cfg, err := config.LoadFrom([]string{"/Users/k2m30/projects/a9s/.a9s/views.yaml"})
 	if err != nil {
 		t.Skipf("views.yaml not found: %v", err)
 	}

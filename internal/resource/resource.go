@@ -11,10 +11,6 @@ type Resource struct {
 	Status string
 	// Fields holds all visible column values by key.
 	Fields map[string]string
-	// RawJSON is the raw JSON representation for JSON view.
-	RawJSON string
-	// DetailData holds all attributes for the describe view.
-	DetailData map[string]string
 	// RawStruct holds the original AWS SDK typed struct for reflection-based field extraction.
 	RawStruct interface{}
 }

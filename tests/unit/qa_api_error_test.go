@@ -154,7 +154,7 @@ func TestQA_APIError_NonAWSError(t *testing.T) {
 
 // TestQA_APIError_AllResourceTypes verifies the handler works for all resource types.
 func TestQA_APIError_AllResourceTypes(t *testing.T) {
-	resourceTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
+	resourceTypes := resource.AllShortNames()
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
@@ -386,9 +386,10 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 // TestBug_S3Refresh_NonS3ResourceUnaffected verifies that refresh on
 // non-S3 resource types is not broken by the S3 fix.
 func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
-	resourceTypes := []string{"ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
-
-	for _, rt := range resourceTypes {
+	for _, rt := range resource.AllShortNames() {
+		if rt == "s3" {
+			continue
+		}
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "test"
 			m := newRootSizedModel()

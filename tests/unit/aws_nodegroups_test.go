@@ -166,146 +166,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	}
 }
 
-func TestFetchNodeGroups_DetailDataPopulated(t *testing.T) {
-	listClustersMock := &mockEKSListClustersClient{
-		output: &eks.ListClustersOutput{
-			Clusters: []string{"prod-cluster"},
-		},
-	}
-
-	listNGMock := &mockEKSListNodegroupsClient{
-		outputs: map[string]*eks.ListNodegroupsOutput{
-			"prod-cluster": {Nodegroups: []string{"ng-main"}},
-		},
-	}
-
-	desiredSize := int32(4)
-	minSize := int32(2)
-	maxSize := int32(10)
-	diskSize := int32(50)
-
-	describeNGMock := &mockEKSDescribeNodegroupClient{
-		outputs: map[string]*eks.DescribeNodegroupOutput{
-			"prod-cluster/ng-main": {
-				Nodegroup: &ekstypes.Nodegroup{
-					NodegroupName: aws.String("ng-main"),
-					ClusterName:   aws.String("prod-cluster"),
-					Status:        ekstypes.NodegroupStatusActive,
-					InstanceTypes: []string{"m5.large"},
-					ScalingConfig: &ekstypes.NodegroupScalingConfig{
-						DesiredSize: &desiredSize,
-						MinSize:     &minSize,
-						MaxSize:     &maxSize,
-					},
-					AmiType:        ekstypes.AMITypesAl2X8664,
-					CapacityType:   ekstypes.CapacityTypesOnDemand,
-					DiskSize:       &diskSize,
-					NodeRole:       aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
-					NodegroupArn:   aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/prod-cluster/ng-main/abc123"),
-					ReleaseVersion: aws.String("1.28.3-20231106"),
-					Version:        aws.String("1.28"),
-					Subnets:        []string{"subnet-aaa", "subnet-bbb"},
-					Labels:         map[string]string{"env": "production", "team": "platform"},
-					Tags:           map[string]string{"Name": "ng-main", "Environment": "prod"},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-
-	// Verify DetailData keys
-	expectedDetailKeys := []string{
-		"Node Group Name",
-		"Cluster Name",
-		"Status",
-		"Instance Types",
-		"AMI Type",
-		"Capacity Type",
-		"Disk Size",
-		"Desired Size",
-		"Min Size",
-		"Max Size",
-		"Node Role",
-		"Node Group ARN",
-		"Release Version",
-		"Kubernetes Version",
-		"Subnets",
-	}
-
-	for _, key := range expectedDetailKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-
-	// Verify specific detail values
-	if r.DetailData["Node Group Name"] != "ng-main" {
-		t.Errorf("DetailData[\"Node Group Name\"]: expected %q, got %q", "ng-main", r.DetailData["Node Group Name"])
-	}
-	if r.DetailData["Cluster Name"] != "prod-cluster" {
-		t.Errorf("DetailData[\"Cluster Name\"]: expected %q, got %q", "prod-cluster", r.DetailData["Cluster Name"])
-	}
-	if r.DetailData["Status"] != "ACTIVE" {
-		t.Errorf("DetailData[\"Status\"]: expected %q, got %q", "ACTIVE", r.DetailData["Status"])
-	}
-	if r.DetailData["AMI Type"] != "AL2_x86_64" {
-		t.Errorf("DetailData[\"AMI Type\"]: expected %q, got %q", "AL2_x86_64", r.DetailData["AMI Type"])
-	}
-	if r.DetailData["Capacity Type"] != "ON_DEMAND" {
-		t.Errorf("DetailData[\"Capacity Type\"]: expected %q, got %q", "ON_DEMAND", r.DetailData["Capacity Type"])
-	}
-	if r.DetailData["Disk Size"] != "50" {
-		t.Errorf("DetailData[\"Disk Size\"]: expected %q, got %q", "50", r.DetailData["Disk Size"])
-	}
-	if r.DetailData["Desired Size"] != "4" {
-		t.Errorf("DetailData[\"Desired Size\"]: expected %q, got %q", "4", r.DetailData["Desired Size"])
-	}
-	if r.DetailData["Min Size"] != "2" {
-		t.Errorf("DetailData[\"Min Size\"]: expected %q, got %q", "2", r.DetailData["Min Size"])
-	}
-	if r.DetailData["Max Size"] != "10" {
-		t.Errorf("DetailData[\"Max Size\"]: expected %q, got %q", "10", r.DetailData["Max Size"])
-	}
-	if r.DetailData["Node Role"] != "arn:aws:iam::123456789012:role/eks-node-role" {
-		t.Errorf("DetailData[\"Node Role\"]: expected %q, got %q", "arn:aws:iam::123456789012:role/eks-node-role", r.DetailData["Node Role"])
-	}
-	if r.DetailData["Subnets"] != "subnet-aaa, subnet-bbb" {
-		t.Errorf("DetailData[\"Subnets\"]: expected %q, got %q", "subnet-aaa, subnet-bbb", r.DetailData["Subnets"])
-	}
-	if r.DetailData["Kubernetes Version"] != "1.28" {
-		t.Errorf("DetailData[\"Kubernetes Version\"]: expected %q, got %q", "1.28", r.DetailData["Kubernetes Version"])
-	}
-	if r.DetailData["Release Version"] != "1.28.3-20231106" {
-		t.Errorf("DetailData[\"Release Version\"]: expected %q, got %q", "1.28.3-20231106", r.DetailData["Release Version"])
-	}
-
-	// Verify labels in DetailData
-	if r.DetailData["Label: env"] != "production" {
-		t.Errorf("DetailData[\"Label: env\"]: expected %q, got %q", "production", r.DetailData["Label: env"])
-	}
-	if r.DetailData["Label: team"] != "platform" {
-		t.Errorf("DetailData[\"Label: team\"]: expected %q, got %q", "platform", r.DetailData["Label: team"])
-	}
-
-	// Verify tags in DetailData
-	if r.DetailData["Tag: Name"] != "ng-main" {
-		t.Errorf("DetailData[\"Tag: Name\"]: expected %q, got %q", "ng-main", r.DetailData["Tag: Name"])
-	}
-	if r.DetailData["Tag: Environment"] != "prod" {
-		t.Errorf("DetailData[\"Tag: Environment\"]: expected %q, got %q", "prod", r.DetailData["Tag: Environment"])
-	}
-}
-
 func TestFetchNodeGroups_ListClustersError(t *testing.T) {
 	listClustersMock := &mockEKSListClustersClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -467,10 +327,6 @@ func TestFetchNodeGroups_RawStructPopulated(t *testing.T) {
 		t.Errorf("RawStruct.NodegroupName: expected %q, got %v", "ng-test", ng.NodegroupName)
 	}
 
-	// Verify RawJSON is populated
-	if r.RawJSON == "" {
-		t.Error("expected RawJSON to be non-empty")
-	}
 }
 
 func TestFetchNodeGroups_NilScalingConfig(t *testing.T) {
@@ -594,47 +450,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Errorf("gpu node group desired_size: expected %q, got %q", "2", gpu.Fields["desired_size"])
 	}
 
-	// DetailData checks for GPU node group
-	if gpu.DetailData["AMI Type"] != "AL2_x86_64_GPU" {
-		t.Errorf("gpu DetailData[AMI Type]: expected %q, got %q", "AL2_x86_64_GPU", gpu.DetailData["AMI Type"])
-	}
-	if gpu.DetailData["Capacity Type"] != "ON_DEMAND" {
-		t.Errorf("gpu DetailData[Capacity Type]: expected %q, got %q", "ON_DEMAND", gpu.DetailData["Capacity Type"])
-	}
-	if gpu.DetailData["Min Size"] != "1" {
-		t.Errorf("gpu DetailData[Min Size]: expected %q, got %q", "1", gpu.DetailData["Min Size"])
-	}
-	if gpu.DetailData["Max Size"] != "3" {
-		t.Errorf("gpu DetailData[Max Size]: expected %q, got %q", "3", gpu.DetailData["Max Size"])
-	}
-	if gpu.DetailData["Kubernetes Version"] != "1.31" {
-		t.Errorf("gpu DetailData[Kubernetes Version]: expected %q, got %q", "1.31", gpu.DetailData["Kubernetes Version"])
-	}
-	if gpu.DetailData["Release Version"] != "1.31.7-20250519" {
-		t.Errorf("gpu DetailData[Release Version]: expected %q, got %q", "1.31.7-20250519", gpu.DetailData["Release Version"])
-	}
-	if gpu.DetailData["Node Group ARN"] != "arn:aws:eks:us-east-1:123456789012:nodegroup/test-cluster-1/gpu-20250101120000000000000001/78cb8e0e-6400-fea1-9939-803bc27e4134" {
-		t.Errorf("gpu DetailData[Node Group ARN] mismatch: got %q", gpu.DetailData["Node Group ARN"])
-	}
-	if gpu.DetailData["Label: group"] != "gpu" {
-		t.Errorf("gpu DetailData[Label: group]: expected %q, got %q", "gpu", gpu.DetailData["Label: group"])
-	}
-	if gpu.DetailData["Tag: Name"] != "gpu" {
-		t.Errorf("gpu DetailData[Tag: Name]: expected %q, got %q", "gpu", gpu.DetailData["Tag: Name"])
-	}
-	// DiskSize should be empty (uses launch template)
-	if gpu.DetailData["Disk Size"] != "" {
-		t.Errorf("gpu DetailData[Disk Size]: expected empty (launch template), got %q", gpu.DetailData["Disk Size"])
-	}
-	// Subnets
-	expectedSubnets := "subnet-0aaa111111111111a, subnet-0bbb222222222222b, subnet-0ccc333333333333c"
-	if gpu.DetailData["Subnets"] != expectedSubnets {
-		t.Errorf("gpu DetailData[Subnets]: expected %q, got %q", expectedSubnets, gpu.DetailData["Subnets"])
-	}
-	// Created At should be populated
-	if gpu.DetailData["Created At"] == "" {
-		t.Error("gpu DetailData[Created At] must not be empty")
-	}
 	// Verify RawStruct contains health issues (real CREATE_FAILED data)
 	gpuRaw, ok := gpu.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
@@ -666,18 +481,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Errorf("kafka node group desired_size: expected %q, got %q", "3", kafka.Fields["desired_size"])
 	}
 	// Fixed-size cluster: min=max=desired=3
-	if kafka.DetailData["Min Size"] != "3" {
-		t.Errorf("kafka DetailData[Min Size]: expected %q, got %q", "3", kafka.DetailData["Min Size"])
-	}
-	if kafka.DetailData["Max Size"] != "3" {
-		t.Errorf("kafka DetailData[Max Size]: expected %q, got %q", "3", kafka.DetailData["Max Size"])
-	}
-	if kafka.DetailData["Label: group"] != "kafka" {
-		t.Errorf("kafka DetailData[Label: group]: expected %q, got %q", "kafka", kafka.DetailData["Label: group"])
-	}
-	if kafka.DetailData["Tag: Name"] != "kafka" {
-		t.Errorf("kafka DetailData[Tag: Name]: expected %q, got %q", "kafka", kafka.DetailData["Tag: Name"])
-	}
 	// Verify taint is preserved in RawStruct
 	kafkaRaw, ok := kafka.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
@@ -712,24 +515,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	if system.Fields["desired_size"] != "2" {
 		t.Errorf("system desired_size: expected %q, got %q", "2", system.Fields["desired_size"])
 	}
-	if system.DetailData["Min Size"] != "2" {
-		t.Errorf("system DetailData[Min Size]: expected %q, got %q", "2", system.DetailData["Min Size"])
-	}
-	if system.DetailData["Max Size"] != "3" {
-		t.Errorf("system DetailData[Max Size]: expected %q, got %q", "3", system.DetailData["Max Size"])
-	}
-	if system.DetailData["AMI Type"] != "AL2023_x86_64_STANDARD" {
-		t.Errorf("system DetailData[AMI Type]: expected %q, got %q", "AL2023_x86_64_STANDARD", system.DetailData["AMI Type"])
-	}
-	if system.DetailData["Label: karpenter.sh/controller"] != "true" {
-		t.Errorf("system missing karpenter label, got %q", system.DetailData["Label: karpenter.sh/controller"])
-	}
-	if system.DetailData["Label: group"] != "system" {
-		t.Errorf("system DetailData[Label: group]: expected %q, got %q", "system", system.DetailData["Label: group"])
-	}
-	if system.DetailData["Tag: Name"] != "system" {
-		t.Errorf("system DetailData[Tag: Name]: expected %q, got %q", "system", system.DetailData["Tag: Name"])
-	}
 	// system has no taints
 	systemRaw, ok := system.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
@@ -756,33 +541,14 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 				t.Errorf("resource[%d].Fields missing key %q", i, key)
 			}
 		}
-		// RawJSON must be populated
-		if r.RawJSON == "" {
-			t.Errorf("resource[%d].RawJSON must not be empty", i)
-		}
 		// RawStruct must be non-nil
 		if r.RawStruct == nil {
 			t.Errorf("resource[%d].RawStruct must not be nil", i)
 		}
 		// All share same Kubernetes version 1.31
-		if r.DetailData["Kubernetes Version"] != "1.31" {
-			t.Errorf("resource[%d].DetailData[Kubernetes Version]: expected %q, got %q", i, "1.31", r.DetailData["Kubernetes Version"])
-		}
 		// All share same release version
-		if r.DetailData["Release Version"] != "1.31.7-20250519" {
-			t.Errorf("resource[%d].DetailData[Release Version]: expected %q, got %q", i, "1.31.7-20250519", r.DetailData["Release Version"])
-		}
 		// All are ON_DEMAND capacity type
-		if r.DetailData["Capacity Type"] != "ON_DEMAND" {
-			t.Errorf("resource[%d].DetailData[Capacity Type]: expected %q, got %q", i, "ON_DEMAND", r.DetailData["Capacity Type"])
-		}
 		// All share the same 3 subnets
-		if r.DetailData["Subnets"] != expectedSubnets {
-			t.Errorf("resource[%d].DetailData[Subnets]: expected %q, got %q", i, expectedSubnets, r.DetailData["Subnets"])
-		}
 		// All have Tag: name = test-cluster-1
-		if r.DetailData["Tag: name"] != "test-cluster-1" {
-			t.Errorf("resource[%d].DetailData[Tag: name]: expected %q, got %q", i, "test-cluster-1", r.DetailData["Tag: name"])
-		}
 	}
 }

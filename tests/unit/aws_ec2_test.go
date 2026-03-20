@@ -149,63 +149,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	}
 }
 
-func TestFetchEC2Instances_DetailDataPopulated(t *testing.T) {
-	mock := &mockEC2Client{
-		output: &ec2.DescribeInstancesOutput{
-			Reservations: []ec2types.Reservation{
-				{
-					Instances: []ec2types.Instance{
-						{
-							InstanceId:       aws.String("i-detail123"),
-							InstanceType:     ec2types.InstanceTypeT3Medium,
-							State:            &ec2types.InstanceState{Name: ec2types.InstanceStateNameRunning},
-							PrivateIpAddress: aws.String("10.0.1.1"),
-							PublicIpAddress:  aws.String("54.1.2.3"),
-							LaunchTime:       aws.Time(time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)),
-							ImageId:          aws.String("ami-abc123"),
-							SubnetId:         aws.String("subnet-xyz"),
-							VpcId:            aws.String("vpc-111"),
-							Tags: []ec2types.Tag{
-								{Key: aws.String("Name"), Value: aws.String("detail-test")},
-								{Key: aws.String("Environment"), Value: aws.String("prod")},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	// Should contain fields beyond what's in the table columns
-	if r.DetailData["Instance ID"] != "i-detail123" {
-		t.Errorf("DetailData[Instance ID] = %q, want %q", r.DetailData["Instance ID"], "i-detail123")
-	}
-	if r.DetailData["VPC"] == "" {
-		t.Error("DetailData[VPC] must not be empty")
-	}
-	if r.DetailData["Subnet"] == "" {
-		t.Error("DetailData[Subnet] must not be empty")
-	}
-	if r.DetailData["AMI"] == "" {
-		t.Error("DetailData[AMI] must not be empty")
-	}
-}
-
 func TestFetchEC2Instances_ErrorResponse(t *testing.T) {
 	mock := &mockEC2Client{
 		output: nil,

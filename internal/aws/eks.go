@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +18,7 @@ func init() {
 		}
 		return FetchEKSClusters(ctx, c.EKS, c.EKS)
 	})
+	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
 }
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names,
@@ -26,7 +26,7 @@ func init() {
 func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeAPI EKSDescribeClusterAPI) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListClusters(ctx, &eks.ListClustersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing EKS clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -36,7 +36,7 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 			Name: aws.String(clusterName),
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("describing EKS cluster %s: %w", clusterName, err)
 		}
 
 		cluster := descOutput.Cluster
@@ -63,42 +63,6 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 			platformVersion = *cluster.PlatformVersion
 		}
 
-		// Build DetailData
-		detail := map[string]string{
-			"Cluster Name":     name,
-			"Version":          version,
-			"Status":           status,
-			"Endpoint":         endpoint,
-			"Platform Version": platformVersion,
-		}
-
-		// ARN
-		arn := ""
-		if cluster.Arn != nil {
-			arn = *cluster.Arn
-		}
-		detail["ARN"] = arn
-
-		// Role ARN
-		roleARN := ""
-		if cluster.RoleArn != nil {
-			roleARN = *cluster.RoleArn
-		}
-		detail["Role ARN"] = roleARN
-
-		// Kubernetes Network Config
-		if cluster.KubernetesNetworkConfig != nil && cluster.KubernetesNetworkConfig.ServiceIpv4Cidr != nil {
-			detail["Kubernetes Network Config"] = *cluster.KubernetesNetworkConfig.ServiceIpv4Cidr
-		} else {
-			detail["Kubernetes Network Config"] = ""
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -110,8 +74,6 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 				"endpoint":         endpoint,
 				"platform_version": platformVersion,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cluster,
 		}
 

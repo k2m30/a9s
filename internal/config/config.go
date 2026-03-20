@@ -24,6 +24,7 @@ type ViewDef struct {
 type ListColumn struct {
 	Title string `yaml:"-"`
 	Path  string `yaml:"path"`
+	Key   string `yaml:"key"`
 	Width int    `yaml:"width"`
 }
 
@@ -83,9 +84,8 @@ func parseListColumns(node *yaml.Node) ([]ListColumn, error) {
 
 // Load discovers and loads the first views.yaml found in the standard
 // lookup chain:
-//  1. ./views.yaml (current working directory)
-//  2. $A9S_CONFIG_FOLDER/views.yaml
-//  3. ~/.a9s/views.yaml
+//  1. .a9s/views.yaml (per-project override in CWD)
+//  2. ConfigDir()/views.yaml (env var or ~/.a9s/)
 //
 // Returns (nil, nil) when no config file is found.
 func Load() (*ViewsConfig, error) {
@@ -149,21 +149,55 @@ func GetViewDef(cfg *ViewsConfig, shortName string) ViewDef {
 	return def
 }
 
+// ConfigDir returns the resolved a9s config directory path.
+// Resolution order:
+//  1. $A9S_CONFIG_FOLDER (if set and non-empty)
+//  2. ~/.a9s/
+//
+// Returns empty string only if $HOME cannot be determined and $A9S_CONFIG_FOLDER is not set.
+func ConfigDir() string {
+	if folder := os.Getenv("A9S_CONFIG_FOLDER"); folder != "" {
+		return folder
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".a9s")
+	}
+	return ""
+}
+
+// EnsureConfigDir ensures the config directory exists, creating it if needed.
+// Returns the resolved config directory path.
+// Returns an error if the directory cannot be created.
+func EnsureConfigDir() (string, error) {
+	dir := ConfigDir()
+	if dir == "" {
+		return "", fmt.Errorf("cannot determine config directory: $HOME not set and $A9S_CONFIG_FOLDER not set")
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", fmt.Errorf("creating config directory %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// ConfigFilePath returns the full path to a file within the config directory.
+// Returns empty string if the config directory cannot be determined.
+func ConfigFilePath(filename string) string {
+	if dir := ConfigDir(); dir != "" {
+		return filepath.Join(dir, filename)
+	}
+	return ""
+}
+
 // lookupPaths returns the ordered list of candidate config file paths.
 func lookupPaths() []string {
 	var paths []string
 
-	// 1. Current working directory
-	paths = append(paths, "views.yaml")
+	// 1. CWD .a9s/ directory (per-project overrides, mirrors ~/.a9s/ pattern)
+	paths = append(paths, filepath.Join(".a9s", "views.yaml"))
 
-	// 2. $A9S_CONFIG_FOLDER
-	if folder := os.Getenv("A9S_CONFIG_FOLDER"); folder != "" {
-		paths = append(paths, filepath.Join(folder, "views.yaml"))
-	}
-
-	// 3. ~/.a9s/
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".a9s", "views.yaml"))
+	// 2. Resolved config directory (env var or ~/.a9s/)
+	if dir := ConfigDir(); dir != "" {
+		paths = append(paths, filepath.Join(dir, "views.yaml"))
 	}
 
 	return paths

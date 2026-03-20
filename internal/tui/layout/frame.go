@@ -9,23 +9,6 @@ import (
 	"github.com/k2m30/a9s/internal/tui/styles"
 )
 
-// PadOrTrunc pads s to exactly w visible columns, or truncates with "…".
-// Uses lipgloss.Width for ANSI-aware measurement.
-func PadOrTrunc(s string, w int) string {
-	if w <= 0 {
-		return ""
-	}
-	visible := lipgloss.Width(s)
-	if visible == w {
-		return s
-	}
-	if visible > w {
-		// ANSI-aware truncation with ellipsis tail
-		return ansi.Truncate(s, w, "\u2026")
-	}
-	return s + strings.Repeat(" ", w-visible)
-}
-
 // CenterTitle returns the top border line with title centered between corners.
 //
 //	┌─── title ───┐
@@ -78,7 +61,8 @@ func CenterTitle(title string, w int) string {
 // If fewer content lines than h-2, pad with empty lines.
 func RenderFrame(lines []string, title string, w, h int) string {
 	borderStyle := lipgloss.NewStyle().Foreground(styles.ColBorder)
-	innerW := w - 2 // space between left │ and right │
+	borderV := borderStyle.Render("\u2502") // render once, reuse for all rows
+	innerW := w - 2                         // space between left │ and right │
 
 	// Top border with centered title
 	topBorder := CenterTitle(title, w)
@@ -103,12 +87,49 @@ func RenderFrame(lines []string, title string, w, h int) string {
 			padded = content
 		}
 
-		sb.WriteString(borderStyle.Render("\u2502"))
+		sb.WriteString(borderV)
 		sb.WriteString(padded)
-		sb.WriteString(borderStyle.Render("\u2502"))
+		sb.WriteString(borderV)
 	}
 
 	// Bottom border
+	sb.WriteString("\n")
+	sb.WriteString(borderStyle.Render("\u2514" + strings.Repeat("\u2500", w-2) + "\u2518"))
+
+	return sb.String()
+}
+
+// RenderFramePrepadded is like RenderFrame but assumes all content lines are
+// already padded to innerW (w-2). This avoids the per-line lipgloss.Width()
+// call, which is the most expensive operation in RenderFrame.
+// Empty/missing lines are still padded with spaces to innerW.
+func RenderFramePrepadded(lines []string, title string, w, h int) string {
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ColBorder)
+	borderV := borderStyle.Render("\u2502")
+	innerW := w - 2
+
+	topBorder := CenterTitle(title, w)
+
+	emptyPad := strings.Repeat(" ", innerW)
+
+	var sb strings.Builder
+	sb.WriteString(topBorder)
+
+	contentRows := h - 2
+	for i := 0; i < contentRows; i++ {
+		sb.WriteString("\n")
+		var padded string
+		if i < len(lines) {
+			padded = lines[i]
+		} else {
+			padded = emptyPad
+		}
+
+		sb.WriteString(borderV)
+		sb.WriteString(padded)
+		sb.WriteString(borderV)
+	}
+
 	sb.WriteString("\n")
 	sb.WriteString(borderStyle.Render("\u2514" + strings.Repeat("\u2500", w-2) + "\u2518"))
 

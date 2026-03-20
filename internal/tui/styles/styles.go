@@ -32,24 +32,19 @@ func NoColorActive() bool {
 	return ok && val != ""
 }
 
+// rowColorCache maps lowercase status strings to pre-built styles.
+var rowColorCache map[string]lipgloss.Style
+
 // RowColorStyle returns a style for a full row based on resource status.
+// Uses a pre-built cache to avoid allocating new styles on every call.
 func RowColorStyle(status string) lipgloss.Style {
 	if NoColorActive() {
 		return lipgloss.NewStyle()
 	}
-	s := strings.ToLower(status)
-	switch {
-	case s == "running" || s == "available" || s == "active" || s == "in-use":
-		return lipgloss.NewStyle().Foreground(ColRunning)
-	case s == "stopped" || s == "failed" || s == "error" || s == "deleting" || s == "deleted":
-		return lipgloss.NewStyle().Foreground(ColStopped)
-	case s == "pending" || s == "creating" || s == "modifying" || s == "updating":
-		return lipgloss.NewStyle().Foreground(ColPending)
-	case s == "terminated" || s == "shutting-down":
-		return lipgloss.NewStyle().Foreground(ColTerminated)
-	default:
-		return lipgloss.NewStyle().Foreground(ColHeaderFg)
+	if s, ok := rowColorCache[strings.ToLower(status)]; ok {
+		return s
 	}
+	return lipgloss.NewStyle().Foreground(ColHeaderFg)
 }
 
 func init() {
@@ -78,9 +73,29 @@ func initStyles() {
 	FilterActive = lipgloss.Style{}
 	DimText = lipgloss.Style{}
 	SpinnerStyle = lipgloss.Style{}
+	rowColorCache = nil
 
 	if NoColorActive() {
 		return
+	}
+
+	// Pre-build row color styles by status string.
+	rowColorCache = map[string]lipgloss.Style{
+		"running":      lipgloss.NewStyle().Foreground(ColRunning),
+		"available":    lipgloss.NewStyle().Foreground(ColRunning),
+		"active":       lipgloss.NewStyle().Foreground(ColRunning),
+		"in-use":       lipgloss.NewStyle().Foreground(ColRunning),
+		"stopped":      lipgloss.NewStyle().Foreground(ColStopped),
+		"failed":       lipgloss.NewStyle().Foreground(ColStopped),
+		"error":        lipgloss.NewStyle().Foreground(ColStopped),
+		"deleting":     lipgloss.NewStyle().Foreground(ColStopped),
+		"deleted":      lipgloss.NewStyle().Foreground(ColStopped),
+		"pending":      lipgloss.NewStyle().Foreground(ColPending),
+		"creating":     lipgloss.NewStyle().Foreground(ColPending),
+		"modifying":    lipgloss.NewStyle().Foreground(ColPending),
+		"updating":     lipgloss.NewStyle().Foreground(ColPending),
+		"terminated":   lipgloss.NewStyle().Foreground(ColTerminated),
+		"shutting-down": lipgloss.NewStyle().Foreground(ColTerminated),
 	}
 
 	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)

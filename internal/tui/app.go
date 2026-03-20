@@ -60,7 +60,13 @@ type Model struct {
 
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
-	pendingRefresh bool // set after profile/region switch to refresh on ClientsReadyMsg
+	pendingRefresh bool  // set after profile/region switch to refresh on ClientsReadyMsg
+	configErr      error // non-nil if views.yaml was found but corrupt
+
+	// headerCache avoids re-computing the header string every render when
+	// profile, region, version, and right-side content haven't changed.
+	headerCache    string
+	headerCacheKey string
 }
 
 // New constructs the initial Model.
@@ -71,7 +77,7 @@ func New(profile, region string) Model {
 	menu := views.NewMainMenu(k)
 
 	// Load view config synchronously (fast local file read).
-	cfg, _ := config.Load()
+	cfg, cfgErr := config.Load()
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
@@ -83,215 +89,288 @@ func New(profile, region string) Model {
 		stack:      []views.View{&menu},
 		cmdInput:   ti,
 		viewConfig: cfg,
+		configErr:  cfgErr,
 	}
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
 func (m Model) Init() tea.Cmd {
-	return func() tea.Msg {
+	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
 			Profile: m.profile,
 			Region:  m.region,
 		}
 	}
+	if m.configErr != nil {
+		return tea.Batch(connectCmd, func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
+				IsError: true,
+			}
+		})
+	}
+	return connectCmd
 }
 
 // Update implements tea.Model. Routes messages to global handlers or active view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.propagateSize()
 		return m, nil
-
 	case tea.KeyMsg:
-		// Global keys handled before delegation
-		if key.Matches(msg, m.keys.ForceQuit) {
-			return m, tea.Quit
-		}
+		return m.handleKeyMsg(msg)
+	case messages.NavigateMsg:
+		return m.handleNavigate(msg)
+	case messages.PopViewMsg:
+		m.popView()
+		return m, nil
+	case messages.FlashMsg:
+		return m.handleFlash(msg)
+	case messages.ClearFlashMsg:
+		return m.handleClearFlash(msg)
+	case messages.InitConnectMsg:
+		return m, m.connectAWS(msg.Profile, msg.Region)
+	case messages.ClientsReadyMsg:
+		return m.handleClientsReady(msg)
+	case messages.ProfileSelectedMsg:
+		return m.handleProfileSelected(msg)
+	case messages.RegionSelectedMsg:
+		return m.handleRegionSelected(msg)
+	case profilesLoadedMsg:
+		return m.handleProfilesLoaded(msg)
+	case messages.SecretRevealedMsg:
+		return m.handleSecretRevealed(msg)
+	case messages.S3EnterBucketMsg:
+		return m.handleS3EnterBucket(msg)
+	case messages.S3NavigatePrefixMsg:
+		return m.handleS3NavigatePrefix(msg)
+	case messages.R53EnterZoneMsg:
+		return m.handleR53EnterZone(msg)
+	case messages.LoadResourcesMsg:
+		return m, m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix, "")
+	case messages.APIErrorMsg:
+		return m.handleAPIError(msg)
+	case messages.ResourcesLoadedMsg:
+		m.flash.active = false
+		return m.updateActiveView(msg)
+	}
+	return m.updateActiveView(msg)
+}
 
-		// Handle input modes
-		switch m.inputMode {
-		case modeFilter:
-			return m.updateFilterMode(msg)
-		case modeCommand:
-			return m.updateCommandMode(msg)
-		}
+// handleKeyMsg processes all keyboard input: force-quit, input modes, global
+// keys, then falls through to the active view.
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Global keys handled before delegation
+	if key.Matches(msg, m.keys.ForceQuit) {
+		return m, tea.Quit
+	}
 
-		// Global keys in normal mode
-		if key.Matches(msg, m.keys.Help) {
-			// If already on help, let the help view handle it (closes help)
-			if _, ok := m.activeView().(*views.HelpModel); ok {
-				return m.updateActiveView(msg)
-			}
-			ctx := m.helpContext()
-			help := views.NewHelp(m.keys, ctx)
-			help.SetSize(m.innerSize())
-			m.pushView(&help)
+	// Handle input modes
+	switch m.inputMode {
+	case modeFilter:
+		return m.updateFilterMode(msg)
+	case modeCommand:
+		return m.updateCommandMode(msg)
+	}
+
+	// Global keys in normal mode
+	if key.Matches(msg, m.keys.Help) {
+		// If already on help, let the help view handle it (closes help)
+		if _, ok := m.activeView().(*views.HelpModel); ok {
+			return m.updateActiveView(msg)
+		}
+		ctx := m.helpContext()
+		help := views.NewHelp(m.keys, ctx)
+		help.SetSize(m.innerSize())
+		m.pushView(&help)
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+	if key.Matches(msg, m.keys.Escape) {
+		// If active view has a confirmed filter, clear it first
+		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
+			f.SetFilter("")
 			return m, nil
 		}
-		if key.Matches(msg, m.keys.Quit) {
-			return m, tea.Quit
-		}
-		if key.Matches(msg, m.keys.Escape) {
-			if m.popView() {
-				return m, nil
-			}
-			return m, tea.Quit
-		}
-		if key.Matches(msg, m.keys.Colon) {
-			m.inputMode = modeCommand
+		// Otherwise pop view; no-op on main menu (never quit from Esc)
+		m.popView()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Colon) {
+		m.inputMode = modeCommand
+		m.cmdInput.Reset()
+		m.cmdInput.Focus()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Filter) {
+		// Only activate filter mode on filterable views
+		if _, ok := m.activeView().(views.Filterable); ok {
+			m.inputMode = modeFilter
 			m.cmdInput.Reset()
 			m.cmdInput.Focus()
 			return m, nil
 		}
-		if key.Matches(msg, m.keys.Filter) {
-			// Only activate filter mode on filterable views
-			if _, ok := m.activeView().(views.Filterable); ok {
-				m.inputMode = modeFilter
-				m.cmdInput.Reset()
-				m.cmdInput.Focus()
-				return m, nil
-			}
-			// On static views (detail, yaml, help, reveal), ignore /
-			// (help handles it via its own Update which sends PopViewMsg)
-		}
+		// On static views (detail, yaml, help, reveal), ignore /
+		// (help handles it via its own Update which sends PopViewMsg)
+	}
 
-		// Copy (c) — context-dependent clipboard copy
-		if key.Matches(msg, m.keys.Copy) {
-			return m.handleCopy()
-		}
+	// Copy (c) — context-dependent clipboard copy
+	if key.Matches(msg, m.keys.Copy) {
+		return m.handleCopy()
+	}
 
-		// Refresh (ctrl+r) — re-fetch resources in resource list
-		if key.Matches(msg, m.keys.Refresh) {
-			return m.handleRefresh()
-		}
+	// Refresh (ctrl+r) — re-fetch resources in resource list
+	if key.Matches(msg, m.keys.Refresh) {
+		return m.handleRefresh()
+	}
 
-		// Reveal (x) — reveal secret value (only for secrets)
-		if key.Matches(msg, m.keys.Reveal) {
-			return m.handleReveal()
-		}
-
-	case messages.NavigateMsg:
-		return m.handleNavigate(msg)
-
-	case messages.PopViewMsg:
-		m.popView()
-		return m, nil
-
-	case messages.FlashMsg:
-		newGen := m.flash.gen + 1
-		m.flash = flashState{text: msg.Text, isError: msg.IsError, active: true, gen: newGen}
-		gen := m.flash.gen
-		return m, tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
-			return messages.ClearFlashMsg{Gen: gen}
-		})
-
-	case messages.ClearFlashMsg:
-		if msg.Gen == m.flash.gen {
-			m.flash.active = false
-		}
-		return m, nil
-
-	case messages.InitConnectMsg:
-		return m, m.connectAWS(msg.Profile, msg.Region)
-
-	case messages.ClientsReadyMsg:
-		if msg.Err != nil {
-			m.flash = flashState{text: msg.Err.Error(), isError: true, active: true}
-			m.pendingRefresh = false
-			return m, nil
-		}
-		if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
-			m.clients = clients
-		}
-		if m.region == "" {
-			configPath := awsclient.DefaultConfigPath()
-			m.region = awsclient.GetDefaultRegion(configPath, m.profile)
-		}
-		if m.pendingRefresh {
-			m.pendingRefresh = false
-			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-				rt := rl.ResourceType()
-				m.flash = flashState{text: "Connected. Refreshing...", active: true}
-				return m, m.fetchResources(rt, "", "")
-			}
-		}
-		return m, nil
-
-	case messages.ProfileSelectedMsg:
-		m.profile = msg.Profile
-		m.pendingRefresh = true
-		if _, ok := m.activeView().(*views.ProfileModel); ok {
-			m.popView()
-		}
-		flashCmd := func() tea.Msg {
-			return messages.FlashMsg{Text: "Switching to " + msg.Profile + "..."}
-		}
-		return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, m.region))
-
-	case messages.RegionSelectedMsg:
-		m.region = msg.Region
-		m.pendingRefresh = true
-		if _, ok := m.activeView().(*views.RegionModel); ok {
-			m.popView()
-		}
-		flashCmd := func() tea.Msg {
-			return messages.FlashMsg{Text: "Switching to " + msg.Region + "..."}
-		}
-		return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region))
-
-	case profilesLoadedMsg:
-		p := views.NewProfile(msg.profiles, m.profile, m.keys)
-		p.SetSize(m.innerSize())
-		m.pushView(&p)
-		return m, nil
-
-	case messages.SecretRevealedMsg:
-		if msg.Err != nil {
-			m.flash = flashState{text: "reveal failed: " + msg.Err.Error(), isError: true, active: true}
-			return m, nil
-		}
-		rv := views.NewReveal(msg.SecretName, msg.Value, m.keys)
-		rv.SetSize(m.innerSize())
-		m.pushView(&rv)
-		return m, nil
-
-	case messages.S3EnterBucketMsg:
-		rl := views.NewS3ObjectsList(msg.BucketName, m.viewConfig, m.keys)
-		rl.SetSize(m.innerSize())
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
-		return m, tea.Batch(initCmd, m.fetchResources("s3", msg.BucketName, ""))
-
-	case messages.S3NavigatePrefixMsg:
-		rl := views.NewS3ObjectsList(msg.Bucket, m.viewConfig, m.keys, msg.Prefix)
-		rl.SetSize(m.innerSize())
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
-		return m, tea.Batch(initCmd, m.fetchResources("s3", msg.Bucket, msg.Prefix))
-
-	case messages.LoadResourcesMsg:
-		return m, m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix)
-
-	case messages.APIErrorMsg:
-		code, message, _ := awsclient.ClassifyAWSError(msg.Err)
-		var flashText string
-		if code != "" && code != "Unknown" {
-			flashText = fmt.Sprintf("[%s] %s", code, message)
-		} else {
-			flashText = msg.Err.Error()
-		}
-		m.flash = flashState{text: flashText, isError: true, active: true}
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			rl.ClearLoading()
-		}
-		return m, nil
+	// Reveal (x) — reveal secret value (only for secrets)
+	if key.Matches(msg, m.keys.Reveal) {
+		return m.handleReveal()
 	}
 
 	return m.updateActiveView(msg)
+}
+
+// handleFlash sets the flash message and schedules its auto-clear.
+func (m Model) handleFlash(msg messages.FlashMsg) (tea.Model, tea.Cmd) {
+	newGen := m.flash.gen + 1
+	m.flash = flashState{text: msg.Text, isError: msg.IsError, active: true, gen: newGen}
+	gen := m.flash.gen
+	return m, tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
+		return messages.ClearFlashMsg{Gen: gen}
+	})
+}
+
+// handleClearFlash clears the flash if the generation matches (not stale).
+func (m Model) handleClearFlash(msg messages.ClearFlashMsg) (tea.Model, tea.Cmd) {
+	if msg.Gen == m.flash.gen {
+		m.flash.active = false
+	}
+	return m, nil
+}
+
+// handleClientsReady stores the new AWS clients and optionally triggers a
+// pending refresh (after profile/region switch).
+func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true}
+		m.pendingRefresh = false
+		return m, nil
+	}
+	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
+		m.clients = clients
+	}
+	if m.region == "" {
+		configPath := awsclient.DefaultConfigPath()
+		m.region = awsclient.GetDefaultRegion(configPath, m.profile)
+	}
+	if m.pendingRefresh {
+		m.pendingRefresh = false
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			rt := rl.ResourceType()
+			m.flash = flashState{text: "Connected. Refreshing...", active: true}
+			return m, m.fetchResources(rt, "", "", "")
+		}
+	}
+	return m, nil
+}
+
+// handleProfileSelected switches the AWS profile, pops the profile selector,
+// and reconnects.
+func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
+	m.profile = msg.Profile
+	m.region = "" // clear so handleClientsReady resolves the new profile's default region
+	m.pendingRefresh = true
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
+		m.popView()
+	}
+	flashCmd := func() tea.Msg {
+		return messages.FlashMsg{Text: "Switching to " + msg.Profile + "..."}
+	}
+	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, ""))
+}
+
+// handleRegionSelected switches the AWS region, pops the region selector,
+// and reconnects.
+func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
+	m.region = msg.Region
+	m.pendingRefresh = true
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
+		m.popView()
+	}
+	flashCmd := func() tea.Msg {
+		return messages.FlashMsg{Text: "Switching to " + msg.Region + "..."}
+	}
+	return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region))
+}
+
+// handleProfilesLoaded pushes the profile selector view onto the stack.
+func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) {
+	p := views.NewProfile(msg.profiles, m.profile, m.keys)
+	p.SetSize(m.innerSize())
+	m.pushView(&p)
+	return m, nil
+}
+
+// handleSecretRevealed pushes the secret reveal view or flashes an error.
+func (m Model) handleSecretRevealed(msg messages.SecretRevealedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.flash = flashState{text: "reveal failed: " + msg.Err.Error(), isError: true, active: true}
+		return m, nil
+	}
+	rv := views.NewReveal(msg.SecretName, msg.Value, m.keys)
+	rv.SetSize(m.innerSize())
+	m.pushView(&rv)
+	return m, nil
+}
+
+// handleS3EnterBucket pushes an S3 objects list for the given bucket.
+func (m Model) handleS3EnterBucket(msg messages.S3EnterBucketMsg) (tea.Model, tea.Cmd) {
+	rl := views.NewS3ObjectsList(msg.BucketName, m.viewConfig, m.keys)
+	rl.SetSize(m.innerSize())
+	rl, initCmd := rl.Init()
+	m.pushView(&rl)
+	return m, tea.Batch(initCmd, m.fetchResources("s3", msg.BucketName, "", ""))
+}
+
+// handleS3NavigatePrefix pushes an S3 objects list for a prefix within a bucket.
+func (m Model) handleS3NavigatePrefix(msg messages.S3NavigatePrefixMsg) (tea.Model, tea.Cmd) {
+	rl := views.NewS3ObjectsList(msg.Bucket, m.viewConfig, m.keys, msg.Prefix)
+	rl.SetSize(m.innerSize())
+	rl, initCmd := rl.Init()
+	m.pushView(&rl)
+	return m, tea.Batch(initCmd, m.fetchResources("s3", msg.Bucket, msg.Prefix, ""))
+}
+
+// handleR53EnterZone pushes a DNS records list for the given hosted zone.
+func (m Model) handleR53EnterZone(msg messages.R53EnterZoneMsg) (tea.Model, tea.Cmd) {
+	rl := views.NewR53RecordsList(msg.ZoneId, msg.ZoneName, m.viewConfig, m.keys)
+	rl.SetSize(m.innerSize())
+	rl, initCmd := rl.Init()
+	m.pushView(&rl)
+	return m, tea.Batch(initCmd, m.fetchResources("r53_records", "", "", msg.ZoneId))
+}
+
+// handleAPIError shows a flash error and clears loading state on the resource list.
+func (m Model) handleAPIError(msg messages.APIErrorMsg) (tea.Model, tea.Cmd) {
+	code, message, _ := awsclient.ClassifyAWSError(msg.Err)
+	var flashText string
+	if code != "" && code != "Unknown" {
+		flashText = fmt.Sprintf("[%s] %s", code, message)
+	} else {
+		flashText = msg.Err.Error()
+	}
+	m.flash = flashState{text: flashText, isError: true, active: true}
+	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+		rl.ClearLoading()
+	}
+	return m, nil
 }
 
 // View implements tea.Model. Composes header + frame around active view content.
@@ -315,13 +394,21 @@ func (m Model) View() tea.View {
 
 	headerProfile := m.profile
 	headerRegion := m.region
-	if _, ok := active.(*views.RegionModel); ok {
-		headerRegion = "..."
+	if sel, ok := active.(*views.SelectorModel); ok {
+		if sel.Title() == "aws-regions" {
+			headerRegion = "..."
+		} else if sel.Title() == "aws-profiles" {
+			headerProfile = "..."
+		}
 	}
-	if _, ok := active.(*views.ProfileModel); ok {
-		headerProfile = "..."
+	rightContent := m.headerRight()
+	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + fmt.Sprintf("%d", m.width)
+	header := m.headerCache
+	if cacheKey != m.headerCacheKey {
+		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent)
+		m.headerCache = header
+		m.headerCacheKey = cacheKey
 	}
-	header := layout.RenderHeader(headerProfile, headerRegion, Version, m.width, m.headerRight())
 
 	content := active.View()
 	var lines []string
@@ -393,7 +480,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
-		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType, "", ""))
+		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType, "", "", ""))
 
 	case messages.TargetDetail:
 		if msg.Resource == nil {
@@ -475,11 +562,7 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd
-	case *views.ProfileModel:
-		updated, cmd := v.Update(msg)
-		m.stack[len(m.stack)-1] = &updated
-		return m, cmd
-	case *views.RegionModel:
+	case *views.SelectorModel:
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd
@@ -580,9 +663,9 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 }
 
 // fetchResources returns a tea.Cmd that calls the appropriate AWS fetcher.
-// Uses the resource registry for standard fetchers; S3 objects are a special
-// case because they require bucket/prefix parameters.
-func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix string) tea.Cmd {
+// Uses the resource registry for standard fetchers; S3 objects and R53 records
+// are special cases because they require additional parameters.
+func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId string) tea.Cmd {
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -600,6 +683,8 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix string) tea.Cmd 
 		// and don't map to a single registry entry.
 		if resourceType == "s3" && s3Bucket != "" {
 			resources, err = awsclient.FetchS3Objects(ctx, clients.S3, s3Bucket, s3Prefix)
+		} else if resourceType == "r53_records" && r53ZoneId != "" {
+			resources, err = awsclient.FetchR53Records(ctx, clients.Route53, r53ZoneId)
 		} else {
 			fetcher := resource.GetFetcher(resourceType)
 			if fetcher == nil {
@@ -682,11 +767,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rt := rl.ResourceType()
 	s3Bucket := rl.S3Bucket()
 	s3Prefix := rl.S3Prefix()
+	r53ZoneId := rl.R53ZoneId()
 	if s3Bucket != "" && rt == "s3_objects" {
 		rt = "s3"
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-	return m, m.fetchResources(rt, s3Bucket, s3Prefix)
+	return m, m.fetchResources(rt, s3Bucket, s3Prefix, r53ZoneId)
 }
 
 // handleReveal fetches a secret value (only for secrets resource type).

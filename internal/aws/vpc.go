@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -18,6 +17,7 @@ func init() {
 		}
 		return FetchVPCs(ctx, c.EC2)
 	})
+	resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "cidr_block", "state", "is_default"})
 }
 
 // FetchVPCs calls the EC2 DescribeVpcs API and converts the
@@ -25,7 +25,7 @@ func init() {
 func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeVpcs(ctx, &ec2.DescribeVpcsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching VPCs: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -63,45 +63,6 @@ func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource
 			isDefault = "true"
 		}
 
-		// Build DetailData
-		detail := map[string]string{
-			"VPC ID":     vpcID,
-			"Name":       name,
-			"CIDR Block": cidrBlock,
-			"State":      state,
-			"Is Default": isDefault,
-		}
-
-		// DHCP Options ID
-		if vpc.DhcpOptionsId != nil {
-			detail["DHCP Options ID"] = *vpc.DhcpOptionsId
-		} else {
-			detail["DHCP Options ID"] = ""
-		}
-
-		// Instance Tenancy
-		detail["Instance Tenancy"] = string(vpc.InstanceTenancy)
-
-		// Owner ID
-		if vpc.OwnerId != nil {
-			detail["Owner ID"] = *vpc.OwnerId
-		} else {
-			detail["Owner ID"] = ""
-		}
-
-		// Tags
-		for _, tag := range vpc.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		// Build RawJSON
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(vpc, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     vpcID,
 			Name:   name,
@@ -113,8 +74,6 @@ func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource
 				"state":      state,
 				"is_default": isDefault,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  vpc,
 		}
 

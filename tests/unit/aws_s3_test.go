@@ -45,8 +45,8 @@ func TestFetchS3Buckets_ParsesMultipleBuckets(t *testing.T) {
 	if r0.Fields["name"] != "my-data-bucket" {
 		t.Errorf("resource[0].Fields[\"name\"]: expected %q, got %q", "my-data-bucket", r0.Fields["name"])
 	}
-	if r0.Fields["creation_date"] == "" {
-		t.Error("resource[0].Fields[\"creation_date\"] should not be empty")
+	if r0.Fields["creation_date"] != "2025-01-15T10:30:00Z" {
+		t.Errorf("resource[0].Fields[\"creation_date\"] = %q, want %q", r0.Fields["creation_date"], "2025-01-15T10:30:00Z")
 	}
 }
 

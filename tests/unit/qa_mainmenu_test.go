@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui"
 	"github.com/k2m30/a9s/internal/tui/messages"
 )
@@ -16,22 +18,14 @@ import (
 
 func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
-	expected := []string{
-		"S3 Buckets",
-		"EC2 Instances",
-		"DB Instances",
-		"ElastiCache Redis",
-		"DB Clusters",
-		"EKS Clusters",
-		"Secrets Manager",
-		"VPCs",
-		"Security Groups",
-		"EKS Node Groups",
-	}
-	for _, name := range expected {
+	allTypes := resource.AllResourceTypes()
+	for _, rt := range allTypes {
+		name := rt.Name
 		if !strings.Contains(plain, name) {
 			t.Errorf("main menu should contain %q, got:\n%s", name, plain)
 		}
@@ -40,12 +34,16 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 
 func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
-	// Note: aliases longer than the fixed alias column width (9 chars) get truncated.
-	// :ngups (11 chars) is truncated to :ng, so we check the prefix.
-	aliases := []string{":s3", ":ec2", ":dbi", ":redis", ":dbc", ":eks", ":secrets", ":vpc", ":sg", ":ng"}
+	allTypes := resource.AllResourceTypes()
+	aliases := make([]string, len(allTypes))
+	for i, rt := range allTypes {
+		aliases[i] = ":" + rt.ShortName
+	}
 	for _, alias := range aliases {
 		if !strings.Contains(plain, alias) {
 			t.Errorf("main menu should contain alias %q, got:\n%s", alias, plain)
@@ -63,16 +61,16 @@ func TestQA_MainMenu_DisplayNameAndAliasOnSameRow(t *testing.T) {
 		name  string
 		alias string
 	}{
-		{"S3 Buckets", ":s3"},
 		{"EC2 Instances", ":ec2"},
-		{"DB Instances", ":dbi"},
-		{"ElastiCache Redis", ":redis"},
-		{"DB Clusters", ":dbc"},
+		{"ECS Services", ":ecs-svc"},
+		{"ECS Clusters", ":ecs"},
+		{"Lambda Functions", ":lambda"},
 		{"EKS Clusters", ":eks"},
-		{"Secrets Manager", ":secrets"},
-		{"VPCs", ":vpc"},
+		{"EKS Node Groups", ":ng"},
+		{"Load Balancers", ":elb"},
 		{"Security Groups", ":sg"},
-		{"EKS Node Groups", ":ng"}, // truncated from :ngups due to fixed alias column width
+		{"VPCs", ":vpc"},
+		{"S3 Buckets", ":s3"},
 	}
 
 	for _, pair := range pairs {
@@ -96,33 +94,35 @@ func TestQA_MainMenu_FirstRowSelectedByDefault(t *testing.T) {
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
 
-	// S3 Buckets is the first resource type in AllResourceTypes()
+	// EC2 Instances is the first resource type in AllResourceTypes()
 	// The selected row should have different rendering (ANSI sequences for bold/bg)
 	// than non-selected rows. We verify by checking raw content (with ANSI) for
-	// S3 Buckets line having background styling (escape codes present).
+	// EC2 Instances line having background styling (escape codes present).
 	for _, line := range lines {
 		plain := stripANSI(line)
-		if strings.Contains(plain, "S3 Buckets") {
+		if strings.Contains(plain, "EC2 Instances") {
 			// Selected row should have ANSI styling that differs from raw text
 			if line == plain {
-				t.Error("first row (S3 Buckets) should have ANSI styling (selected highlight)")
+				t.Error("first row (EC2 Instances) should have ANSI styling (selected highlight)")
 			}
 			return
 		}
 	}
-	t.Error("S3 Buckets not found in rendered output")
+	t.Error("EC2 Instances not found in rendered output")
 }
 
 func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
 
-	resourceNames := []string{
-		"S3 Buckets", "EC2 Instances", "DB Instances",
-		"ElastiCache Redis", "DB Clusters", "EKS Clusters", "Secrets Manager",
-		"VPCs", "Security Groups", "EKS Node Groups",
+	allTypes := resource.AllResourceTypes()
+	resourceNames := make([]string, len(allTypes))
+	for i, rt := range allTypes {
+		resourceNames[i] = rt.Name
 	}
 	count := 0
 	for _, line := range lines {
@@ -133,8 +133,8 @@ func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 			}
 		}
 	}
-	if count != 10 {
-		t.Errorf("expected exactly 10 resource type rows, got %d", count)
+	if count != len(allTypes) {
+		t.Errorf("expected exactly %d resource type rows, got %d", len(allTypes), count)
 	}
 }
 
@@ -146,7 +146,7 @@ func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Default cursor is on S3 Buckets (index 0). Press j to move to EC2 (index 1).
+	// Default cursor is on EC2 Instances (index 0). Press j to move to ECS Services (index 1).
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
 	// Now press Enter to confirm which item is selected.
@@ -159,8 +159,8 @@ func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ec2" {
-		t.Errorf("after j, selected should be ec2, got %q", nav.ResourceType)
+	if nav.ResourceType != "ecs-svc" {
+		t.Errorf("after j, selected should be ecs-svc, got %q", nav.ResourceType)
 	}
 }
 
@@ -179,8 +179,8 @@ func TestQA_MainMenu_MoveDownWithDownArrow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ec2" {
-		t.Errorf("after down arrow, selected should be ec2, got %q", nav.ResourceType)
+	if nav.ResourceType != "ecs-svc" {
+		t.Errorf("after down arrow, selected should be ecs-svc, got %q", nav.ResourceType)
 	}
 }
 
@@ -201,8 +201,8 @@ func TestQA_MainMenu_MoveUpWithK(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("after j then k, selected should be s3, got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("after j then k, selected should be ec2, got %q", nav.ResourceType)
 	}
 }
 
@@ -222,8 +222,8 @@ func TestQA_MainMenu_MoveUpWithUpArrow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("after down then up, selected should be s3, got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("after down then up, selected should be ec2, got %q", nav.ResourceType)
 	}
 }
 
@@ -231,7 +231,7 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Press G to go to bottom (EKS Node Groups), then j should stay at bottom
+	// Press G to go to bottom (SES Identities), then j should stay at bottom
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
@@ -244,8 +244,136 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("j at bottom should stay on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "ses" {
+		t.Errorf("j at bottom should stay on ses, got %q", nav.ResourceType)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// B2. Page Up / Page Down
+// ---------------------------------------------------------------------------
+
+func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Press PageDown — cursor should jump past the first few items
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgDown))
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	// Cursor should NOT still be on ec2 (index 0)
+	if nav.ResourceType == "ec2" {
+		t.Error("after PageDown, cursor should have moved past ec2")
+	}
+}
+
+func TestQA_MainMenu_PageUpMovesMultipleItems(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Go to bottom, then PageUp — cursor should NOT be on the last item
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgUp))
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	if nav.ResourceType == "ses" {
+		t.Error("after PageUp from bottom, cursor should have moved up from ses")
+	}
+}
+
+func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Press PageDown many times — should clamp at last item
+	for i := 0; i < 20; i++ {
+		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgDown))
+	}
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	if nav.ResourceType != "ses" {
+		t.Errorf("repeated PageDown should end on ses, got %q", nav.ResourceType)
+	}
+}
+
+func TestQA_MainMenu_PageUpClampsAtTop(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Move down a bit, then PageUp many times — should clamp at first item
+	for i := 0; i < 5; i++ {
+		m, _ = rootApplyMsg(m, rootKeyPress("j"))
+	}
+	for i := 0; i < 20; i++ {
+		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgUp))
+	}
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("repeated PageUp should end on ec2, got %q", nav.ResourceType)
+	}
+}
+
+func TestQA_MainMenu_CtrlD_PageDown(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Ctrl+D should work as PageDown
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	if nav.ResourceType == "ec2" {
+		t.Error("after Ctrl+D, cursor should have moved past ec2")
+	}
+}
+
+func TestQA_MainMenu_CtrlU_PageUp(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Go to bottom, then Ctrl+U should work as PageUp
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	if nav.ResourceType == "ses" {
+		t.Error("after Ctrl+U from bottom, cursor should have moved up from ses")
 	}
 }
 
@@ -265,8 +393,8 @@ func TestQA_MainMenu_CursorStopsAtTop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("k at top should stay on s3, got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("k at top should stay on ec2, got %q", nav.ResourceType)
 	}
 }
 
@@ -289,8 +417,8 @@ func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("after g, should be at top (s3), got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("after g, should be at top (ec2), got %q", nav.ResourceType)
 	}
 }
 
@@ -309,8 +437,8 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("after G, should be at bottom (ng), got %q", nav.ResourceType)
+	if nav.ResourceType != "ses" {
+		t.Errorf("after G, should be at bottom (ses), got %q", nav.ResourceType)
 	}
 }
 
@@ -330,8 +458,8 @@ func TestQA_MainMenu_GOnFirstRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("g on first row should stay on s3, got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("g on first row should stay on ec2, got %q", nav.ResourceType)
 	}
 }
 
@@ -351,14 +479,14 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ng" {
-		t.Errorf("G on last row should stay on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "ses" {
+		t.Errorf("G on last row should stay on ses, got %q", nav.ResourceType)
 	}
 }
 
 func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 	// Resource types in order as defined in AllResourceTypes()
-	expectedTypes := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
+	expectedTypes := resource.AllShortNames()
 
 	for i, expected := range expectedTypes {
 		t.Run(expected, func(t *testing.T) {
@@ -394,7 +522,7 @@ func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Press j 5 times -> should land on index 5 (EKS Clusters)
+	// Press j 5 times -> should land on index 5 (Auto Scaling Groups)
 	for i := 0; i < 5; i++ {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
@@ -408,8 +536,8 @@ func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "eks" {
-		t.Errorf("after 5 j presses, should be on eks, got %q", nav.ResourceType)
+	if nav.ResourceType != "asg" {
+		t.Errorf("after 5 j presses, should be on asg, got %q", nav.ResourceType)
 	}
 }
 
@@ -428,8 +556,8 @@ func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "s3" {
-		t.Errorf("after j*4 then g, should be at s3, got %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("after j*4 then g, should be at ec2, got %q", nav.ResourceType)
 	}
 }
 
@@ -1174,8 +1302,9 @@ func TestQA_MainMenu_FrameTitle(t *testing.T) {
 	m := newRootSizedModel()
 
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Errorf("frame title should be 'resource-types(10)', got:\n%s", plain)
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	if !strings.Contains(plain, expectedTitle) {
+		t.Errorf("frame title should be %q, got:\n%s", expectedTitle, plain)
 	}
 }
 
@@ -1208,9 +1337,9 @@ func TestQA_MainMenu_FrameFillsRemainingHeight(t *testing.T) {
 
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Terminal height is 24, should have exactly 24 lines
-	if len(lines) != 24 {
-		t.Errorf("expected 24 lines total, got %d", len(lines))
+	// Terminal height is 40, should have exactly 40 lines
+	if len(lines) != 40 {
+		t.Errorf("expected 40 lines total, got %d", len(lines))
 	}
 }
 
@@ -1335,17 +1464,13 @@ func TestQA_MainMenu_EscInNormalModeIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// The root model's Esc handler in normal mode on main menu (single view):
-	// popView returns false, so it calls tea.Quit. This is actually quit behavior.
-	// But the QA story says Esc on main menu is a no-op. Let's test what actually happens.
+	// Esc on main menu with no filter should be a no-op (NOT quit).
+	// Only q and ctrl+c should quit.
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// The root model tries popView, which fails (only 1 entry), then returns tea.Quit.
-	// So Esc on the main menu actually quits.
-	if cmd == nil {
-		t.Log("Esc on main menu does nothing (returns nil cmd) -- that's a no-op")
+	if cmd != nil {
+		t.Error("Esc on main menu should be a no-op (nil cmd), not quit the app")
 	}
-	// If cmd is non-nil, it quits. This is actual code behavior.
 }
 
 func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
@@ -1440,8 +1565,8 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "ng" {
-		t.Errorf("after G, g, G, should be on ng, got %q", nav.ResourceType)
+	if nav.ResourceType != "ses" {
+		t.Errorf("after G, g, G, should be on ses, got %q", nav.ResourceType)
 	}
 }
 
@@ -1487,19 +1612,20 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 
 	// Verify all 10 resources still visible and we can navigate
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(10)") {
-		t.Error("after resize, frame title should still show resource-types(10)")
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	if !strings.Contains(plain, expectedTitle) {
+		t.Errorf("after resize, frame title should still show %q", expectedTitle)
 	}
 
-	// Cursor should still be at index 2 (RDS)
+	// Cursor should still be at index 2 (ECS Clusters)
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd == nil {
 		t.Fatal("Enter should produce a command after resize")
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "dbi" {
-		t.Errorf("cursor should remain at rds after resize, got %q", nav.ResourceType)
+	if nav.ResourceType != "ecs" {
+		t.Errorf("cursor should remain at ecs after resize, got %q", nav.ResourceType)
 	}
 }
 
@@ -1513,5 +1639,320 @@ func TestQA_MainMenu_NoLineExceedsWidth(t *testing.T) {
 		if vis > 80 {
 			t.Errorf("line %d exceeds terminal width 80: got %d", i, vis)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// K. Viewport Scrolling (small terminal)
+// ---------------------------------------------------------------------------
+
+func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
+	tui.Version = "test"
+	// Height 10: innerSize.h = 7, so only 7 render lines visible
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Move cursor to item index 8 (EKS Node Groups, 0-indexed)
+	for i := 0; i < 8; i++ {
+		m, _ = rootApplyMsg(m, rootKeyPress("j"))
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "EKS Node Groups") {
+		t.Errorf("item at cursor (index 8) should be visible after scrolling down, got:\n%s", plain)
+	}
+}
+
+func TestMainMenu_Viewport_BottomKey_LastItemVisible(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Press G to go to bottom
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+
+	plain := stripANSI(rootViewContent(m))
+	allTypes := resource.AllResourceTypes()
+	lastName := allTypes[len(allTypes)-1].Name
+	if !strings.Contains(plain, lastName) {
+		t.Errorf("last item %q should be visible after G key, got:\n%s", lastName, plain)
+	}
+}
+
+func TestMainMenu_Viewport_TopAfterScroll_FirstItemVisible(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Scroll to bottom, then back to top
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+	m, _ = rootApplyMsg(m, rootKeyPress("g"))
+
+	plain := stripANSI(rootViewContent(m))
+	firstName := resource.AllResourceTypes()[0].Name
+	if !strings.Contains(plain, firstName) {
+		t.Errorf("first item %q should be visible after g key, got:\n%s", firstName, plain)
+	}
+}
+
+func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
+	tui.Version = "test"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Move to last item
+	m, _ = rootApplyMsg(m, rootKeyPress("G"))
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter on last item should produce a command")
+	}
+	msg := cmd()
+	nav := msg.(messages.NavigateMsg)
+	allTypes := resource.AllResourceTypes()
+	expected := allTypes[len(allTypes)-1].ShortName
+	if nav.ResourceType != expected {
+		t.Errorf("expected %q after G+Enter, got %q", expected, nav.ResourceType)
+	}
+}
+
+func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
+	tui.Version = "test"
+	// Height 10: innerSize.h = 7, so 7 render lines visible.
+	// With category headers, the first 7 lines are:
+	//   COMPUTE (header), EC2, ECS Services, ECS Clusters, ECS Tasks, Lambda, ASG
+	// So items 0-5 (6 items) are visible, item 6+ not visible.
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	plain := stripANSI(rootViewContent(m))
+	allTypes := resource.AllResourceTypes()
+
+	// Items 0-5 should be visible (EC2 through ASG)
+	for i := 0; i < 6; i++ {
+		if !strings.Contains(plain, allTypes[i].Name) {
+			t.Errorf("item %d (%s) should be visible at scroll offset 0", i, allTypes[i].Name)
+		}
+	}
+
+	// Item 6+ should NOT be visible (they are below the viewport)
+	for i := 7; i < len(allTypes); i++ {
+		if strings.Contains(plain, allTypes[i].Name) {
+			t.Errorf("item %d (%s) should NOT be visible at scroll offset 0 (viewport is 7 render lines)", i, allTypes[i].Name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// L. Category Headers
+// ---------------------------------------------------------------------------
+
+func TestQA_MainMenu_CategoryHeadersVisible(t *testing.T) {
+	tui.Version = "1.0.2"
+	// Use a tall terminal so all items are visible
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
+	plain := stripANSI(rootViewContent(m))
+
+	expectedCategories := []string{
+		"COMPUTE",
+		"CONTAINERS",
+		"NETWORKING",
+		"DATABASES & STORAGE",
+		"MONITORING",
+		"MESSAGING",
+		"SECRETS & CONFIG",
+		"DNS & CDN",
+		"SECURITY & IAM",
+		"CI/CD",
+		"DATA & ANALYTICS",
+		"BACKUP",
+	}
+	for _, cat := range expectedCategories {
+		if !strings.Contains(plain, cat) {
+			t.Errorf("main menu should contain category header %q", cat)
+		}
+	}
+}
+
+func TestQA_MainMenu_CategoryHeadersNotSelectable(t *testing.T) {
+	tui.Version = "1.0.2"
+	m := newRootSizedModel()
+
+	// Press Enter on the first item — should be EC2 Instances, not COMPUTE header
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should produce a navigate command")
+	}
+	msg := cmd()
+	nav, ok := msg.(messages.NavigateMsg)
+	if !ok {
+		t.Fatalf("expected NavigateMsg, got %T", msg)
+	}
+	if nav.ResourceType != "ec2" {
+		t.Errorf("first selectable item should be ec2, got %q", nav.ResourceType)
+	}
+}
+
+func TestQA_MainMenu_CategoryHeaderAppearsBeforeFirstItem(t *testing.T) {
+	tui.Version = "1.0.2"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
+	plain := stripANSI(rootViewContent(m))
+	lines := strings.Split(plain, "\n")
+
+	// COMPUTE header should appear before EC2 Instances
+	computeLine := -1
+	ec2Line := -1
+	for i, line := range lines {
+		if strings.Contains(line, "COMPUTE") && !strings.Contains(line, "EC2") {
+			if computeLine == -1 {
+				computeLine = i
+			}
+		}
+		if strings.Contains(line, "EC2 Instances") {
+			ec2Line = i
+			break
+		}
+	}
+
+	if computeLine == -1 {
+		t.Fatal("COMPUTE header not found in output")
+	}
+	if ec2Line == -1 {
+		t.Fatal("EC2 Instances not found in output")
+	}
+	if computeLine >= ec2Line {
+		t.Errorf("COMPUTE header (line %d) should appear before EC2 Instances (line %d)", computeLine, ec2Line)
+	}
+}
+
+func TestQA_MainMenu_AllResourceTypesHaveCategory(t *testing.T) {
+	allTypes := resource.AllResourceTypes()
+	for _, rt := range allTypes {
+		if rt.Category == "" {
+			t.Errorf("resource type %q (%s) is missing a Category", rt.Name, rt.ShortName)
+		}
+	}
+}
+
+func TestQA_MainMenu_CategoryOrderMatchesSpec(t *testing.T) {
+	allTypes := resource.AllResourceTypes()
+
+	// Verify the category order matches the spec
+	expectedOrder := []string{
+		"COMPUTE",
+		"CONTAINERS",
+		"NETWORKING",
+		"DATABASES & STORAGE",
+		"MONITORING",
+		"MESSAGING",
+		"SECRETS & CONFIG",
+		"DNS & CDN",
+		"SECURITY & IAM",
+		"CI/CD",
+		"DATA & ANALYTICS",
+		"BACKUP",
+	}
+
+	seen := make([]string, 0)
+	lastCat := ""
+	for _, rt := range allTypes {
+		if rt.Category != lastCat {
+			seen = append(seen, rt.Category)
+			lastCat = rt.Category
+		}
+	}
+
+	if len(seen) != len(expectedOrder) {
+		t.Fatalf("expected %d categories, got %d: %v", len(expectedOrder), len(seen), seen)
+	}
+	for i, cat := range expectedOrder {
+		if seen[i] != cat {
+			t.Errorf("category at position %d should be %q, got %q", i, cat, seen[i])
+		}
+	}
+}
+
+func TestQA_MainMenu_FirstItemIsEC2(t *testing.T) {
+	allTypes := resource.AllResourceTypes()
+	if allTypes[0].ShortName != "ec2" {
+		t.Errorf("first resource type should be ec2, got %q", allTypes[0].ShortName)
+	}
+}
+
+func TestQA_MainMenu_LastItemIsSES(t *testing.T) {
+	allTypes := resource.AllResourceTypes()
+	last := allTypes[len(allTypes)-1]
+	if last.ShortName != "ses" {
+		t.Errorf("last resource type should be ses, got %q", last.ShortName)
+	}
+}
+
+func TestQA_MainMenu_FilterHidesCategoriesWithNoMatches(t *testing.T) {
+	tui.Version = "1.0.2"
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
+
+	// Enter filter mode and type "ec2" (matches only EC2 Instances)
+	m, _ = rootApplyMsg(m, rootKeyPress("/"))
+	for _, ch := range "ec2" {
+		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	// COMPUTE should be visible (EC2 is in COMPUTE)
+	if !strings.Contains(plain, "COMPUTE") {
+		t.Error("COMPUTE category should be visible when EC2 matches filter")
+	}
+	// NETWORKING should NOT be visible (no networking items match "ec2")
+	if strings.Contains(plain, "NETWORKING") {
+		t.Error("NETWORKING category should be hidden when no items match filter 'ec2'")
+	}
+}
+
+func TestQA_MainMenu_FirstHeaderVisibleAfterScrollDownAndBackUp(t *testing.T) {
+	tui.Version = "test"
+	// Small viewport so scrolling is required
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
+
+	// Scroll down past the first header
+	for i := 0; i < 10; i++ {
+		m, _ = rootApplyMsg(m, rootKeyPress("j"))
+	}
+
+	// Now scroll all the way back up to the first item
+	m, _ = rootApplyMsg(m, rootKeyPress("g"))
+
+	plain := stripANSI(rootViewContent(m))
+	// The COMPUTE header (render line 0) must be visible when cursor is on EC2 (item 0)
+	if !strings.Contains(plain, "COMPUTE") {
+		t.Errorf("COMPUTE header should be visible after scrolling back to top, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "EC2 Instances") {
+		t.Errorf("EC2 Instances should be visible after scrolling back to top, got:\n%s", plain)
+	}
+}
+
+func TestQA_MainMenu_ScrollAccountsForHeaders(t *testing.T) {
+	tui.Version = "test"
+	// Small viewport: only 5 content lines
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 8})
+
+	// Navigate to item index 7 (EKS Clusters, first CONTAINERS item)
+	for i := 0; i < 7; i++ {
+		m, _ = rootApplyMsg(m, rootKeyPress("j"))
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	// EKS Clusters should be visible
+	if !strings.Contains(plain, "EKS Clusters") {
+		t.Errorf("EKS Clusters should be visible after scrolling, got:\n%s", plain)
+	}
+	// CONTAINERS header should also be visible since it precedes EKS Clusters
+	if !strings.Contains(plain, "CONTAINERS") {
+		t.Errorf("CONTAINERS header should be visible when EKS Clusters is visible, got:\n%s", plain)
 	}
 }

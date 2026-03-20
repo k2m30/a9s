@@ -36,6 +36,7 @@ specs/           # feature specifications
 - `go build -o a9s ./cmd/a9s/` — build the binary
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
 - `go run ./cmd/refgen/ > views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
+- `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
 
 ## Code Style
 
@@ -43,25 +44,34 @@ Go 1.25+: Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
 
+## Skills
+
+| Skill | Scope | Usage |
+|-------|-------|-------|
+| `a9s-common` | All agents | Shell rules, package access rules, build/test commands |
+| `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
+| `a9s-add-resource` | Coder + QA (on-demand) | 12-step blueprint for adding new AWS resource types (fetcher + view-layer tests) |
+
 ## Agents
 
-| Agent | Role |
-|-------|------|
-| `a9s-architect` | Architecture owner — design decisions, component interfaces, message contracts, dependency boundaries |
-| `a9s-coder` | Implementation — writes Go code with TDD, knows BT v2 / Lipgloss v2 / Bubbles v2 APIs |
-| `a9s-tui-reviewer` | Code review — verifies BT v2 correctness, architecture compliance, design spec adherence |
-| `a9s-qa` | QA — writes/runs tests, verifies all 7 resource types, catches regressions |
-| `a9s-qa-stories` | QA stories — generates given/when/then stories from design spec + views.yaml (no implementation knowledge) |
-| `a9s-pm` | Project manager — tracks progress, manages dependencies, verifies gates, coordinates releases |
-| `a9s-integrator` | Integration — cross-package wiring, message flow, entrypoint switching |
-| `a9s-fixtures` | Test fixtures — fetches real AWS data from gobubble-dev via MCP tool |
-| `test-coverage-analyzer` | Test analysis — coverage gaps, test quality, structure assessment |
-| `tui-ux-auditor` | UX review — design guidelines, interaction patterns, k9s comparison |
+| Agent | Role | Tools |
+|-------|------|-------|
+| `a9s-architect` | Architecture + resource type specs | Read-only |
+| `a9s-coder` | Implementation — views, fetchers, resource types (TDD) | All |
+| `a9s-tui-reviewer` | Code review — BT v2 correctness, design compliance | Read-only |
+| `a9s-qa` | Writes test code for all resource types | All |
+| `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Read/Glob/Grep |
+| `a9s-pm` | Progress tracking, dependency management, releases | Read-only |
+| `a9s-integrator` | Cross-package wiring, message flow, app.go | All |
+| `a9s-fixtures` | Test fixtures from gobubble-dev via AWS MCP | Read/Write/Bash |
+| `test-coverage-analyzer` | Test suite analysis, coverage gaps | Read-only |
+| `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Read + Web |
+| `a9s-devops` | AWS practitioner — resource priorities, feature advice, real workflows | All |
 
 ## Rules
 
 - ALWAYS bump version in `cmd/a9s/main.go` and rebuild binary after ANY code change
 - ALWAYS write failing tests BEFORE writing implementation code (TDD is non-negotiable)
-- ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager), not just one
+- ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 
 <!-- MANUAL ADDITIONS END -->

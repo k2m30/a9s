@@ -8,9 +8,9 @@ import (
 
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/messages"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 )
 
 // MainMenuModel displays the resource type selection list.
@@ -18,10 +18,15 @@ type MainMenuModel struct {
 	allItems      []resource.ResourceTypeDef
 	filteredItems []resource.ResourceTypeDef
 	filterText    string
-	cursor        int
+	scroll        ScrollState
+	scrollOffset  int
 	width         int
 	height        int
 	keys          keys.Map
+
+	// renderLinesCache caches the flat list of render lines (category headers + items).
+	// Invalidated when filteredItems changes (in applyFilter, SetFilter).
+	renderLinesCache []renderLine
 }
 
 // NewMainMenu returns an initialized MainMenuModel with all resource types.
@@ -30,6 +35,7 @@ func NewMainMenu(k keys.Map) MainMenuModel {
 	return MainMenuModel{
 		allItems:      all,
 		filteredItems: all,
+		scroll:        NewScrollState(len(all)),
 		keys:          k,
 	}
 }
@@ -45,22 +51,29 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Up):
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			m.scroll.Up()
 		case key.Matches(msg, m.keys.Down):
-			if m.cursor < len(m.filteredItems)-1 {
-				m.cursor++
-			}
+			m.scroll.Down()
 		case key.Matches(msg, m.keys.Top):
-			m.cursor = 0
+			m.scroll.Top()
 		case key.Matches(msg, m.keys.Bottom):
-			if len(m.filteredItems) > 0 {
-				m.cursor = len(m.filteredItems) - 1
+			m.scroll.Bottom()
+		case key.Matches(msg, m.keys.PageUp):
+			pageSize := m.height - 1
+			if pageSize < 1 {
+				pageSize = 1
 			}
+			m.scroll.PageUp(pageSize)
+		case key.Matches(msg, m.keys.PageDown):
+			pageSize := m.height - 1
+			if pageSize < 1 {
+				pageSize = 1
+			}
+			m.scroll.PageDown(pageSize)
 		case key.Matches(msg, m.keys.Enter):
-			if len(m.filteredItems) > 0 && m.cursor < len(m.filteredItems) {
-				selected := m.filteredItems[m.cursor]
+			c := m.scroll.Cursor()
+			if len(m.filteredItems) > 0 && c < len(m.filteredItems) {
+				selected := m.filteredItems[c]
 				return m, func() tea.Msg {
 					return messages.NavigateMsg{
 						Target:       messages.TargetResourceList,
@@ -69,44 +82,119 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 				}
 			}
 		}
+		// Keep cursor visible in the viewport using render-line positions.
+		m.adjustScroll()
 	}
 	return m, nil
 }
 
+// adjustScroll ensures the cursor is visible within the viewport, accounting
+// for category header lines that occupy space but are not selectable.
+func (m *MainMenuModel) adjustScroll() {
+	if m.height <= 0 {
+		return
+	}
+	lines := m.buildRenderLines()
+	// Find the render-line index of the cursor.
+	cursorLine := 0
+	for i, rl := range lines {
+		if !rl.isHeader && rl.itemIndex == m.scroll.Cursor() {
+			cursorLine = i
+			break
+		}
+	}
+	if cursorLine < m.scrollOffset {
+		m.scrollOffset = cursorLine
+		// Include the category header above if the cursor is the first item in a group.
+		if m.scrollOffset > 0 && lines[m.scrollOffset-1].isHeader {
+			m.scrollOffset--
+		}
+	}
+	if cursorLine >= m.scrollOffset+m.height {
+		m.scrollOffset = cursorLine - m.height + 1
+	}
+}
+
+// renderLine represents a single line in the menu: either a category header or a selectable item.
+type renderLine struct {
+	isHeader  bool
+	header    string // category name, only set when isHeader is true
+	itemIndex int    // index into filteredItems, only meaningful when isHeader is false
+}
+
+// buildRenderLines builds the flat list of render lines from filteredItems,
+// inserting category headers when the category changes between consecutive items.
+// Results are cached in renderLinesCache until filteredItems changes.
+func (m *MainMenuModel) buildRenderLines() []renderLine {
+	if m.renderLinesCache != nil {
+		return m.renderLinesCache
+	}
+	lines := make([]renderLine, 0, len(m.filteredItems)+12)
+	lastCat := ""
+	for i, item := range m.filteredItems {
+		if item.Category != lastCat {
+			lines = append(lines, renderLine{isHeader: true, header: item.Category})
+			lastCat = item.Category
+		}
+		lines = append(lines, renderLine{itemIndex: i})
+	}
+	m.renderLinesCache = lines
+	return lines
+}
+
 // View renders the menu items. Caller wraps in RenderFrame.
+// Only lines within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
 func (m MainMenuModel) View() string {
 	if len(m.filteredItems) == 0 {
 		return "No resource types"
 	}
 
-	// Alias column width: widest alias is ":secrets" = 8, plus trailing pad.
-	const aliasW = 9
+	// Alias column width: widest alias is ":codeartifact" = 13, plus trailing pad.
+	const aliasW = 15
+
+	lines := m.buildRenderLines()
+
+	// Calculate visible window
+	start := m.scrollOffset
+	end := len(lines)
+	if m.height > 0 && start+m.height < end {
+		end = start + m.height
+	}
 
 	var sb strings.Builder
-	for i, item := range m.filteredItems {
-		if i > 0 {
+	for li := start; li < end; li++ {
+		if li > start {
 			sb.WriteString("\n")
 		}
+		rl := lines[li]
+
+		if rl.isHeader {
+			headerText := "  " + rl.header + " "
+			sb.WriteString(styles.DimText.Render(headerText))
+			continue
+		}
+
+		item := m.filteredItems[rl.itemIndex]
 
 		aliasStr := ":" + item.ShortName
-		aliasPadded := layout.PadOrTrunc(aliasStr, aliasW)
+		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
 
-		// Name field fills remaining width: total - 2 leading - aliasW - 5 trailing.
-		nameFieldW := m.width - 2 - aliasW - 5
+		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.
+		nameFieldW := m.width - 4 - aliasW - 3
 		if nameFieldW < 10 {
 			nameFieldW = 10
 		}
-		namePadded := layout.PadOrTrunc(item.Name, nameFieldW)
+		namePadded := text.PadOrTrunc(item.Name, nameFieldW)
 
-		if i == m.cursor {
+		if rl.itemIndex == m.scroll.Cursor() {
 			// Selected row: full highlight, alias stays dimmed.
 			dimAlias := styles.DimText.Render(aliasPadded)
-			selectedName := "  " + namePadded + " "
+			selectedName := "    " + namePadded + " "
 			line := styles.RowSelected.Width(m.width).Render(selectedName + dimAlias)
 			sb.WriteString(line)
 		} else {
 			dimAlias := styles.DimText.Render(aliasPadded)
-			name := styles.RowNormal.Render("  " + namePadded + " ")
+			name := styles.RowNormal.Render("    " + namePadded + " ")
 			sb.WriteString(name + dimAlias)
 		}
 	}
@@ -145,22 +233,33 @@ func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
 	if len(m.filteredItems) == 0 {
 		return resource.ResourceTypeDef{}
 	}
-	return m.filteredItems[m.cursor]
+	return m.filteredItems[m.scroll.Cursor()]
 }
 
-// SetFilter applies a filter to the menu items; cursor resets to 0.
+// SetFilter applies a filter to the menu items; cursor and scroll reset to 0.
 func (m *MainMenuModel) SetFilter(text string) {
 	m.filterText = text
+	m.renderLinesCache = nil
 	m.applyFilter()
-	m.cursor = 0
+	m.scroll.SetCursor(0)
+	m.scrollOffset = 0
 }
+
+// GetFilter returns the current filter text.
+func (m *MainMenuModel) GetFilter() string {
+	return m.filterText
+}
+
+
 
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.
 // Requires at least 2 characters to actually filter; single chars are too ambiguous
 // for the short list of resource types.
 func (m *MainMenuModel) applyFilter() {
+	m.renderLinesCache = nil
 	if len(m.filterText) < 2 {
 		m.filteredItems = m.allItems
+		m.scroll.SetTotal(len(m.filteredItems))
 		return
 	}
 	q := strings.ToLower(m.filterText)
@@ -172,4 +271,5 @@ func (m *MainMenuModel) applyFilter() {
 		}
 	}
 	m.filteredItems = result
+	m.scroll.SetTotal(len(m.filteredItems))
 }

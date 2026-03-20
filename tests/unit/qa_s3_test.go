@@ -972,7 +972,7 @@ func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// S3 is the first item in the main menu, press Enter
+	// EC2 is the first item in the main menu, press Enter
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
@@ -987,8 +987,8 @@ func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	if nav.Target != messages.TargetResourceList {
 		t.Errorf("should navigate to TargetResourceList, got: %d", nav.Target)
 	}
-	if nav.ResourceType != "s3" {
-		t.Errorf("first menu item should be S3, got: %q", nav.ResourceType)
+	if nav.ResourceType != "ec2" {
+		t.Errorf("first menu item should be EC2, got: %q", nav.ResourceType)
 	}
 }
 

@@ -11,6 +11,10 @@ type Fetcher func(ctx context.Context, clients interface{}) ([]Resource, error)
 // registry maps resource short names to their fetcher functions.
 var registry = map[string]Fetcher{}
 
+// fieldKeyRegistry maps resource short names to their valid Fields keys.
+// Populated by RegisterFieldKeys calls in each aws/*.go init().
+var fieldKeyRegistry = map[string][]string{}
+
 // Register adds a fetcher for the given resource short name.
 // Called from init() in each aws/*.go file.
 func Register(shortName string, f Fetcher) {
@@ -26,4 +30,16 @@ func Unregister(shortName string) {
 // or nil if no fetcher is registered.
 func GetFetcher(shortName string) Fetcher {
 	return registry[shortName]
+}
+
+// RegisterFieldKeys records the valid Fields keys for a resource type.
+// Called from init() in each aws/*.go file alongside Register.
+func RegisterFieldKeys(shortName string, keys []string) {
+	fieldKeyRegistry[shortName] = keys
+}
+
+// GetFieldKeys returns the registered Fields keys for the given resource type,
+// or nil if none are registered.
+func GetFieldKeys(shortName string) []string {
+	return fieldKeyRegistry[shortName]
 }
