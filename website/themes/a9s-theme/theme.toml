@@ -1,0 +1,6 @@
+name = "a9s-theme"
+license = "GPL-3.0-or-later"
+description = "Custom theme for a9s project website"
+
+[author]
+  name = "k2m30"

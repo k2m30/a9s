@@ -1,0 +1,7 @@
+baseURL = 'https://k2m30.github.io/a9s/'
+languageCode = 'en-us'
+title = 'a9s — Terminal UI for AWS'
+theme = 'a9s-theme'
+
+[params]
+  description = 'Terminal UI AWS Resource Manager — browse, inspect, and manage 60+ AWS resource types'

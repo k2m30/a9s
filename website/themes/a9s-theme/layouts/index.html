@@ -1,0 +1,49 @@
+{{ define "main" }}
+<div class="hero">
+  <h2>a9s</h2>
+  <p class="tagline">Terminal UI for AWS — like k9s, but for your cloud</p>
+  <p>Browse, inspect, and manage 62 AWS resource types from your terminal. Read-only by design. No telemetry.</p>
+  <div class="install-box"><span>$</span> brew install k2m30/a9s/a9s</div>
+  <div class="stats">
+    <div class="stat"><div class="number">62</div><div class="label">AWS Resource Types</div></div>
+    <div class="stat"><div class="number">12</div><div class="label">Service Categories</div></div>
+    <div class="stat"><div class="number">1045+</div><div class="label">Unit Tests</div></div>
+  </div>
+</div>
+<div class="container">
+  <div class="demo">
+    <!-- TODO: Replace with actual demo GIF -->
+    Demo GIF will appear here once generated with VHS
+  </div>
+  <div class="features">
+    <div class="feature">
+      <h3>Read-Only by Design</h3>
+      <p>a9s never makes write calls to AWS. Safe to use in production environments. Enforced by CI.</p>
+    </div>
+    <div class="feature">
+      <h3>Vim-Style Navigation</h3>
+      <p>j/k to move, Enter to open, Esc to go back, / to filter. Feels like home.</p>
+    </div>
+    <div class="feature">
+      <h3>62 Resource Types</h3>
+      <p>EC2, S3, RDS, Lambda, EKS, DynamoDB, SQS, IAM, VPC, and 50+ more. Organized by category.</p>
+    </div>
+    <div class="feature">
+      <h3>YAML Detail View</h3>
+      <p>Press y on any resource to see the full AWS API response as formatted YAML.</p>
+    </div>
+    <div class="feature">
+      <h3>Multi-Profile & Region</h3>
+      <p>Switch AWS profiles and regions on the fly. Works with SSO and standard credentials.</p>
+    </div>
+    <div class="feature">
+      <h3>Zero Config</h3>
+      <p>Uses your existing AWS credentials. Just run a9s and start browsing.</p>
+    </div>
+  </div>
+  <div class="cta">
+    <a href="{{ "install/" | relURL }}" class="btn">Install a9s</a>
+    <a href="https://github.com/k2m30/a9s" class="btn secondary">View on GitHub</a>
+  </div>
+</div>
+{{ end }}
