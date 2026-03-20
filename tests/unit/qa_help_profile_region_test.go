@@ -305,7 +305,7 @@ func TestQA_Profile_FrameTitle(t *testing.T) {
 	// We need to simulate this through the public API. Let's use the internal message route.
 
 	// Navigate to profile - the handleNavigate creates a fetchProfiles cmd
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetProfile})
+	_, cmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetProfile})
 
 	if cmd == nil {
 		t.Fatal("NavigateMsg for profile should return a fetchProfiles cmd")
@@ -332,7 +332,7 @@ func TestQA_Profile_ListShowsProfiles(t *testing.T) {
 	for _, r := range "ctx" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
-	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
 	if cmd == nil {
 		t.Fatal(":ctx should produce a cmd")

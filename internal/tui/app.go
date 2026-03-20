@@ -132,7 +132,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
-		return m, m.connectAWS(msg.Profile, msg.Region)
+		cmd := m.connectAWS(msg.Profile, msg.Region)
+		return m, cmd
 	case messages.ClientsReadyMsg:
 		return m.handleClientsReady(msg)
 	case messages.ProfileSelectedMsg:
@@ -150,7 +151,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.R53EnterZoneMsg:
 		return m.handleR53EnterZone(msg)
 	case messages.LoadResourcesMsg:
-		return m, m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix, "")
+		cmd := m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix, "")
+		return m, cmd
 	case messages.APIErrorMsg:
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoadedMsg:
@@ -275,7 +277,8 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
-			return m, m.fetchResources(rt, "", "", "")
+			cmd := m.fetchResources(rt, "", "", "")
+			return m, cmd
 		}
 	}
 	return m, nil
@@ -514,7 +517,8 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case messages.TargetProfile:
-		return m, m.fetchProfiles()
+		cmd := m.fetchProfiles()
+		return m, cmd
 
 	case messages.TargetRegion:
 		regions := awsclient.AllRegions()
@@ -531,7 +535,8 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if msg.Resource == nil {
 			return m, nil
 		}
-		return m, m.fetchSecretValue(msg.Resource.ID)
+		cmd := m.fetchSecretValue(msg.Resource.ID)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -681,11 +686,12 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId strin
 
 		// S3 objects are a special case: they need bucket/prefix params
 		// and don't map to a single registry entry.
-		if resourceType == "s3" && s3Bucket != "" {
+		switch {
+		case resourceType == "s3" && s3Bucket != "":
 			resources, err = awsclient.FetchS3Objects(ctx, clients.S3, s3Bucket, s3Prefix)
-		} else if resourceType == "r53_records" && r53ZoneId != "" {
+		case resourceType == "r53_records" && r53ZoneId != "":
 			resources, err = awsclient.FetchR53Records(ctx, clients.Route53, r53ZoneId)
-		} else {
+		default:
 			fetcher := resource.GetFetcher(resourceType)
 			if fetcher == nil {
 				return messages.APIErrorMsg{
@@ -772,7 +778,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		rt = "s3"
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-	return m, m.fetchResources(rt, s3Bucket, s3Prefix, r53ZoneId)
+	cmd := m.fetchResources(rt, s3Bucket, s3Prefix, r53ZoneId)
+	return m, cmd
 }
 
 // handleReveal fetches a secret value (only for secrets resource type).
@@ -788,7 +795,8 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	if r == nil {
 		return m, nil
 	}
-	return m, m.fetchSecretValue(r.ID)
+	cmd := m.fetchSecretValue(r.ID)
+	return m, cmd
 }
 
 func copyToClipboard(content, successLabel string) tea.Cmd {
