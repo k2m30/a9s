@@ -22,7 +22,7 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 		{ID: "i-0abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-0abc123"}},
 	}})
 
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd == nil {
 		t.Fatal("c on resource list should return a copy command")
 	}
@@ -61,7 +61,7 @@ func TestQA_Copy_Detail_CopiesYAML(t *testing.T) {
 	}
 
 	// Press c on detail view — should copy YAML, same as YAML view
-	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
+	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd == nil {
 		t.Fatal("c on detail view should return a copy command")
 	}
@@ -100,7 +100,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
+	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd == nil {
 		t.Fatal("c on YAML view should return a copy command")
 	}
@@ -118,7 +118,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 
 func TestQA_Copy_MainMenu_NoOp(t *testing.T) {
 	m := newRootSizedModel()
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd != nil {
 		t.Error("c on main menu should be no-op (nil cmd)")
 	}
@@ -152,7 +152,7 @@ func TestQA_Copy_AllResourceTypes(t *testing.T) {
 				ResourceType: tt.name,
 				Resources:    []resource.Resource{{ID: tt.id, Name: tt.id, Fields: map[string]string{"name": tt.id}}},
 			})
-			m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
+			_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 			if cmd == nil {
 				t.Errorf("c on %s list should return a command", tt.name)
 				return

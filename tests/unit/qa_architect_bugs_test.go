@@ -40,7 +40,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: objects})
 	// Press Enter on the folder — should navigate into prefix, NOT show detail
-	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on folder should return a command to navigate into prefix")
 	}
@@ -65,7 +65,7 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
 	// Press d (describe) — should show detail, NOT enter bucket
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
 	if cmd == nil {
 		t.Fatal("d key should return a command")
 	}

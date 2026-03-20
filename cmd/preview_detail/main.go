@@ -270,11 +270,12 @@ func renderRuler(w int) string {
 	// Columns 1-based, showing every 5th position
 	ruler := " "
 	for i := 2; i <= w-2; i++ {
-		if i%10 == 0 {
+		switch {
+		case i%10 == 0:
 			ruler += fmt.Sprintf("%d", (i/10)%10)
-		} else if i%5 == 0 {
+		case i%5 == 0:
 			ruler += "┊"
-		} else {
+		default:
 			ruler += "·"
 		}
 	}
