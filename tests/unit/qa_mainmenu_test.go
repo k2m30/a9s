@@ -18,7 +18,9 @@ import (
 
 func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
 	allTypes := resource.AllResourceTypes()
@@ -32,7 +34,9 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 
 func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
 	allTypes := resource.AllResourceTypes()
@@ -109,7 +113,9 @@ func TestQA_MainMenu_FirstRowSelectedByDefault(t *testing.T) {
 
 func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	// Use a tall terminal so all resource types are visible without scrolling
+	m := tui.New("testprofile", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
 
@@ -238,8 +244,8 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "asg" {
-		t.Errorf("j at bottom should stay on asg, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("j at bottom should stay on backup, got %q", nav.ResourceType)
 	}
 }
 
@@ -303,8 +309,8 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "asg" {
-		t.Errorf("after G, should be at bottom (asg), got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("after G, should be at bottom (backup), got %q", nav.ResourceType)
 	}
 }
 
@@ -345,8 +351,8 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "asg" {
-		t.Errorf("G on last row should stay on asg, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("G on last row should stay on backup, got %q", nav.ResourceType)
 	}
 }
 
@@ -1431,8 +1437,8 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "asg" {
-		t.Errorf("after G, g, G, should be on asg, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("after G, g, G, should be on backup, got %q", nav.ResourceType)
 	}
 }
 

@@ -25,7 +25,7 @@ func TestContentMainMenu_ViewNonEmpty(t *testing.T) {
 func TestContentMainMenu_ViewContainsAllResourceNames(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(80, 40)
+	m.SetSize(80, 80)
 	out := m.View()
 	for _, rt := range resource.AllResourceTypes() {
 		if !strings.Contains(out, rt.Name) {
@@ -37,14 +37,14 @@ func TestContentMainMenu_ViewContainsAllResourceNames(t *testing.T) {
 func TestContentMainMenu_ViewContainsShortNames(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(120, 40)
+	m.SetSize(120, 80)
 	out := m.View()
 	for _, rt := range resource.AllResourceTypes() {
 		alias := ":" + rt.ShortName
-		// The alias column is 9 chars wide; aliases longer than that get truncated.
+		// The alias column is 13 chars wide; aliases longer than that get truncated.
 		// Check for the prefix that fits within the column.
-		if len(alias) > 9 {
-			alias = alias[:8] // check prefix that fits
+		if len(alias) > 13 {
+			alias = alias[:12] // check prefix that fits
 		}
 		if !strings.Contains(out, alias) {
 			t.Errorf("MainMenu.View() missing short name prefix %q for type %q", alias, rt.ShortName)
@@ -55,7 +55,7 @@ func TestContentMainMenu_ViewContainsShortNames(t *testing.T) {
 func TestContentMainMenu_ViewHasCorrectLineCount(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	m.SetSize(80, 40)
+	m.SetSize(80, 80)
 	out := m.View()
 	lines := strings.Split(out, "\n")
 	expectedTypes := len(resource.AllResourceTypes())

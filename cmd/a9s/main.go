@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/internal/tui"
 )
 
-const version = "2.1.2"
+const version = "2.2.0"
 
 func main() {
 	var (

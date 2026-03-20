@@ -90,8 +90,8 @@ func (m MainMenuModel) View() string {
 		return "No resource types"
 	}
 
-	// Alias column width: widest alias is ":secrets" = 8, plus trailing pad.
-	const aliasW = 9
+	// Alias column width: widest alias is ":docdb-snap" = 11, plus trailing pad.
+	const aliasW = 13
 
 	// Calculate visible window
 	start := m.scrollOffset

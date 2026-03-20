@@ -9,25 +9,47 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
+	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/efs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/kafka"
+	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/redshift"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -113,7 +135,15 @@ func serviceRouter(req *http.Request) (int, string) {
 	}
 
 	// DocumentDB uses the RDS endpoint — must check BEFORE RDS handler.
-	// DocumentDB SDK sends DescribeDBClusters action to rds.* endpoint.
+	// DocumentDB SDK sends DescribeDBClusters and DescribeDBClusterSnapshots to rds.* endpoint.
+	if strings.Contains(host, "rds.") && strings.Contains(bodyStr, "DescribeDBClusterSnapshots") {
+		return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<DescribeDBClusterSnapshotsResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/">
+  <DescribeDBClusterSnapshotsResult>
+    <DBClusterSnapshots/>
+  </DescribeDBClusterSnapshotsResult>
+</DescribeDBClusterSnapshotsResponse>`
+	}
 	if strings.Contains(host, "rds.") && strings.Contains(bodyStr, "DescribeDBClusters") {
 		return 200, `<?xml version="1.0" encoding="UTF-8"?>
 <DescribeDBClustersResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/">
@@ -130,6 +160,14 @@ func serviceRouter(req *http.Request) (int, string) {
 	}
 
 	// RDS (AWS Query) — must come AFTER DocumentDB check above
+	if strings.Contains(host, "rds.") && strings.Contains(bodyStr, "DescribeDBSnapshots") {
+		return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<DescribeDBSnapshotsResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/">
+  <DescribeDBSnapshotsResult>
+    <DBSnapshots/>
+  </DescribeDBSnapshotsResult>
+</DescribeDBSnapshotsResponse>`
+	}
 	if strings.Contains(host, "rds.") {
 		return 200, `<?xml version="1.0" encoding="UTF-8"?>
 <DescribeDBInstancesResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/">
@@ -204,6 +242,14 @@ func serviceRouter(req *http.Request) (int, string) {
 
 	// SNS (AWS Query XML)
 	if strings.Contains(host, "sns.") {
+		if strings.Contains(bodyStr, "Action=ListSubscriptions") {
+			return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<ListSubscriptionsResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
+  <ListSubscriptionsResult>
+    <Subscriptions/>
+  </ListSubscriptionsResult>
+</ListSubscriptionsResponse>`
+		}
 		return 200, `<?xml version="1.0" encoding="UTF-8"?>
 <ListTopicsResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
   <ListTopicsResult>
@@ -259,6 +305,30 @@ func serviceRouter(req *http.Request) (int, string) {
 
 	// IAM (AWS Query XML)
 	if strings.Contains(host, "iam.") {
+		if strings.Contains(bodyStr, "Action=ListPolicies") {
+			return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<ListPoliciesResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <ListPoliciesResult>
+    <Policies/>
+  </ListPoliciesResult>
+</ListPoliciesResponse>`
+		}
+		if strings.Contains(bodyStr, "Action=ListUsers") {
+			return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<ListUsersResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <ListUsersResult>
+    <Users/>
+  </ListUsersResult>
+</ListUsersResponse>`
+		}
+		if strings.Contains(bodyStr, "Action=ListGroups") {
+			return 200, `<?xml version="1.0" encoding="UTF-8"?>
+<ListGroupsResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <ListGroupsResult>
+    <Groups/>
+  </ListGroupsResult>
+</ListGroupsResponse>`
+		}
 		return 200, `<?xml version="1.0" encoding="UTF-8"?>
 <ListRolesResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
   <ListRolesResult>
@@ -316,26 +386,48 @@ func buildMockClients(t *testing.T) *awsclient.ServiceClients {
 	}
 
 	return &awsclient.ServiceClients{
-		EC2:            ec2.NewFromConfig(cfg),
-		S3:             s3.NewFromConfig(cfg, func(o *s3.Options) { o.UsePathStyle = true }),
-		RDS:            rds.NewFromConfig(cfg),
-		ElastiCache:    elasticache.NewFromConfig(cfg),
-		DocDB:          docdb.NewFromConfig(cfg),
-		EKS:            eks.NewFromConfig(cfg),
-		SecretsManager: secretsmanager.NewFromConfig(cfg),
-		Lambda:         lambda.NewFromConfig(cfg),
-		CloudWatch:     cloudwatch.NewFromConfig(cfg),
-		SNS:            sns.NewFromConfig(cfg),
-		SQS:            sqs.NewFromConfig(cfg),
-		ELBv2:          elbv2.NewFromConfig(cfg),
-		ECS:            ecs.NewFromConfig(cfg),
-		CloudFormation: cloudformation.NewFromConfig(cfg),
-		IAM:            iam.NewFromConfig(cfg),
-		CloudWatchLogs: cloudwatchlogs.NewFromConfig(cfg),
-		SSM:            ssm.NewFromConfig(cfg),
-		DynamoDB:       dynamodb.NewFromConfig(cfg),
-		ACM:            acm.NewFromConfig(cfg),
-		AutoScaling:    autoscaling.NewFromConfig(cfg),
+		EC2:              ec2.NewFromConfig(cfg),
+		S3:               s3.NewFromConfig(cfg, func(o *s3.Options) { o.UsePathStyle = true }),
+		RDS:              rds.NewFromConfig(cfg),
+		ElastiCache:      elasticache.NewFromConfig(cfg),
+		DocDB:            docdb.NewFromConfig(cfg),
+		EKS:              eks.NewFromConfig(cfg),
+		SecretsManager:   secretsmanager.NewFromConfig(cfg),
+		Lambda:           lambda.NewFromConfig(cfg),
+		CloudWatch:       cloudwatch.NewFromConfig(cfg),
+		SNS:              sns.NewFromConfig(cfg),
+		SQS:              sqs.NewFromConfig(cfg),
+		ELBv2:            elbv2.NewFromConfig(cfg),
+		ECS:              ecs.NewFromConfig(cfg),
+		CloudFormation:   cloudformation.NewFromConfig(cfg),
+		IAM:              iam.NewFromConfig(cfg),
+		CloudWatchLogs:   cloudwatchlogs.NewFromConfig(cfg),
+		SSM:              ssm.NewFromConfig(cfg),
+		DynamoDB:         dynamodb.NewFromConfig(cfg),
+		ACM:              acm.NewFromConfig(cfg),
+		AutoScaling:      autoscaling.NewFromConfig(cfg),
+		CloudFront:       cloudfront.NewFromConfig(cfg),
+		Route53:          route53.NewFromConfig(cfg),
+		APIGatewayV2:     apigatewayv2.NewFromConfig(cfg),
+		ECR:              ecr.NewFromConfig(cfg),
+		EFS:              efs.NewFromConfig(cfg),
+		EventBridge:      eventbridge.NewFromConfig(cfg),
+		SFN:              sfn.NewFromConfig(cfg),
+		CodePipeline:     codepipeline.NewFromConfig(cfg),
+		Kinesis:          kinesis.NewFromConfig(cfg),
+		WAFv2:            wafv2.NewFromConfig(cfg),
+		Glue:             glue.NewFromConfig(cfg),
+		ElasticBeanstalk: elasticbeanstalk.NewFromConfig(cfg),
+		SESv2:            sesv2.NewFromConfig(cfg),
+		Redshift:         redshift.NewFromConfig(cfg),
+		CloudTrail:       cloudtrail.NewFromConfig(cfg),
+		Athena:           athena.NewFromConfig(cfg),
+		CodeArtifact:     codeartifact.NewFromConfig(cfg),
+		CodeBuild:        codebuild.NewFromConfig(cfg),
+		OpenSearch:       opensearch.NewFromConfig(cfg),
+		KMS:              kms.NewFromConfig(cfg),
+		MSK:              kafka.NewFromConfig(cfg),
+		Backup:           backup.NewFromConfig(cfg),
 	}
 }
 
