@@ -41,10 +41,6 @@ var (
 	colYAMLNum  = lipgloss.Color("#ff9e64")
 	colYAMLBool = lipgloss.Color("#bb9af7")
 
-	colKeyFg  = lipgloss.Color("#7aa2f7")
-	colKeyBg  = lipgloss.Color("#24283b")
-	colHintFg = lipgloss.Color("#565f89")
-
 	colHelpKey = lipgloss.Color("#9ece6a")
 	colHelpCat = lipgloss.Color("#e0af68")
 
@@ -70,15 +66,6 @@ func padOrTrunc(s string, w int) string {
 	return s + strings.Repeat(" ", w-vis)
 }
 
-func keyHint(key, desc string) string {
-	k := lipgloss.NewStyle().
-		Foreground(colKeyFg).
-		Background(colKeyBg).
-		Bold(true).
-		Render("<" + key + ">")
-	d := lipgloss.NewStyle().Foreground(colHintFg).Render(desc)
-	return k + d
-}
 
 // ── Header ────────────────────────────────────────────────────────────────────
 // One unframed line:

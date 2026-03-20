@@ -1029,8 +1029,8 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 	if strings.Contains(plain, "<nil>") {
 		t.Error("Detail for creating instance should not show '<nil>'")
 	}
-	if strings.Contains(plain, "creating-db") {
-		// Good: identifier is present.
+	if !strings.Contains(plain, "creating-db") {
+		t.Error("Detail for creating instance should show 'creating-db'")
 	}
 }
 

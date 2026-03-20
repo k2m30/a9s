@@ -891,13 +891,12 @@ func R53RecordColumns() []Column {
 // FindResourceType looks up a resource type by its ShortName or any of its Aliases.
 // Returns nil if no match is found.
 func FindResourceType(name string) *ResourceTypeDef {
-	lower := strings.ToLower(name)
 	for i := range resourceTypes {
-		if strings.ToLower(resourceTypes[i].ShortName) == lower {
+		if strings.EqualFold(resourceTypes[i].ShortName, name) {
 			return &resourceTypes[i]
 		}
 		for _, alias := range resourceTypes[i].Aliases {
-			if strings.ToLower(alias) == lower {
+			if strings.EqualFold(alias, name) {
 				return &resourceTypes[i]
 			}
 		}

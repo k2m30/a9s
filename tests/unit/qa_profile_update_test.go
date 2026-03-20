@@ -58,7 +58,7 @@ func TestQA_ProfileUpdate_JMovesDown(t *testing.T) {
 	m, _ = m.Update(profileKeyPress("j"))
 
 	// Press Enter at index 2 to verify cursor is at profile-3
-	m, cmd := m.Update(profileSpecialKey(tea.KeyEnter))
+	_, cmd := m.Update(profileSpecialKey(tea.KeyEnter))
 	if cmd == nil {
 		t.Fatal("Enter should produce a command")
 	}

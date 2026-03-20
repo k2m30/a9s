@@ -125,16 +125,6 @@ func (m *mockFastListBucketsClient) ListBuckets(
 	return &s3.ListBucketsOutput{Buckets: buckets}, nil
 }
 
-// mockS3ListBucketsAPI implements awsclient.S3ListBucketsAPI with exported fields.
-type mockS3ListBucketsAPI struct {
-	Output *s3.ListBucketsOutput
-	Err    error
-}
-
-func (m *mockS3ListBucketsAPI) ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
-	return m.Output, m.Err
-}
-
 // strPtr returns a pointer to the given string.
 func strPtr(s string) *string {
 	return &s

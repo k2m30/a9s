@@ -325,7 +325,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: prefixObjects})
 
 	// Press Ctrl+R to refresh
-	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("Ctrl+R inside prefix should return a command to refresh")
 	}
@@ -367,7 +367,7 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
 
 	// Press Ctrl+R to refresh at bucket level
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("Ctrl+R at bucket list level should return a command")
 	}
@@ -405,7 +405,7 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 				},
 			})
 
-			m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+			_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 			if cmd == nil {
 				t.Fatalf("[%s] Ctrl+R should return a command", rt)
 			}

@@ -251,12 +251,11 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 	if cmd != nil {
 		// Execute to check it's not a reveal command
 		msg := cmd()
-		switch msg.(type) {
+		switch msg := msg.(type) {
 		case messages.SecretRevealedMsg:
 			t.Error("pressing 'x' on non-secrets resource should not trigger reveal")
 		case messages.NavigateMsg:
-			nm := msg.(messages.NavigateMsg)
-			if nm.Target == messages.TargetReveal {
+			if msg.Target == messages.TargetReveal {
 				t.Error("pressing 'x' on non-secrets resource should not navigate to reveal")
 			}
 		}

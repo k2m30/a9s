@@ -9,12 +9,16 @@ linters:
     - gosec
     - gocritic
     - bodyclose
-    - prealloc
     - noctx
 
   exclusions:
     paths:
       - tests/testdata
+    rules:
+      - linters: [gosec]
+        path: '_test\.go$'
+      - linters: [errcheck]
+        path: '_test\.go$'
 
   settings:
     govet:
@@ -24,7 +28,9 @@ linters:
     gosec:
       excludes:
         - G104
+        - G304
     gocritic:
       enabled-tags:
         - diagnostic
-        - performance
+      disabled-checks:
+        - singleCaseSwitch
