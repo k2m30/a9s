@@ -30,15 +30,6 @@ func s3BucketTypeDef() resource.ResourceTypeDef {
 	}
 }
 
-// s3ObjectTypeDef returns the S3 objects type definition used inside a bucket.
-func s3ObjectTypeDef(bucket string) resource.ResourceTypeDef {
-	return resource.ResourceTypeDef{
-		Name:      bucket,
-		ShortName: "s3_objects",
-		Columns:   resource.S3ObjectColumns(),
-	}
-}
-
 // s3LoadedBucketModel creates a root TUI model navigated to S3 with buckets loaded.
 func s3LoadedBucketModel() tui.Model {
 	tui.Version = "0.6.0"
@@ -62,7 +53,7 @@ func s3LoadedObjectModel() tui.Model {
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
-		m, cmd = rootApplyMsg(m, msg)
+		m, _ = rootApplyMsg(m, msg)
 	}
 	// Load objects
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
@@ -920,7 +911,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
-		m, cmd = rootApplyMsg(m, msg)
+		m, _ = rootApplyMsg(m, msg)
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
 		ResourceType: "s3",

@@ -184,11 +184,9 @@ func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
 		for _, subCmd := range batch {
 			if subCmd != nil {
 				subMsg := subCmd()
-				if subMsg != nil {
-					// Only process FlashMsg, skip connectAWS (would need real AWS)
-					if _, isFlash := subMsg.(messages.FlashMsg); isFlash {
-						m, _ = rootApplyMsg(m, subMsg)
-					}
+				// Only process FlashMsg, skip connectAWS (would need real AWS)
+				if _, isFlash := subMsg.(messages.FlashMsg); isFlash {
+					m, _ = rootApplyMsg(m, subMsg)
 				}
 			}
 		}
