@@ -7,6 +7,7 @@
 [![Release](https://img.shields.io/github/v/release/k2m30/a9s)](https://github.com/k2m30/a9s/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Downloads](https://img.shields.io/github/downloads/k2m30/a9s/total)](https://github.com/k2m30/a9s/releases)
+[![codecov](https://codecov.io/gh/k2m30/a9s/graph/badge.svg)](https://codecov.io/gh/k2m30/a9s)
 
 <!-- TODO: Replace with actual demo GIF once generated with VHS -->
 <!-- ![a9s demo](assets/demo.gif) -->
@@ -58,7 +59,7 @@ cosign verify-blob --signature checksums.txt.sig checksums.txt
 ### Docker
 
 ```sh
-docker run --rm -it -v ~/.aws:/root/.aws:ro ghcr.io/k2m30/a9s:latest
+docker run --rm -it -v ~/.aws:/home/a9s/.aws:ro ghcr.io/k2m30/a9s:latest
 ```
 
 ### Build from source
@@ -74,9 +75,10 @@ Requires Go 1.25+.
 
 ## Quick Start
 
-1. Make sure you have [AWS credentials configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) (`~/.aws/credentials` or environment variables)
-2. Run `a9s` (or `a9s -p myprofile` to use a specific profile)
-3. Navigate the menu, select a resource type, browse your infrastructure
+a9s uses the standard [AWS credential chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). Any of these work:
+- Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+- AWS config files (`~/.aws/config`, `~/.aws/credentials`)
+- EC2 instance metadata / ECS task role / SSO
 
 ```sh
 a9s                       # use default profile
@@ -148,6 +150,20 @@ a9s --version             # print version
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
 
+## Commands
+
+Press `:` to enter command mode, then type a command:
+
+| Command | Action |
+|---------|--------|
+| `:q` / `:quit` | Exit a9s |
+| `:ctx` / `:profile` | Switch AWS profile |
+| `:region` | Switch AWS region |
+| `:help` | Show help |
+| `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
+
+All resource shortnames from the Supported AWS Services table work as commands.
+
 ## Configuration
 
 a9s stores configuration in `~/.a9s/config.yaml`. AWS profiles and regions are read from your standard AWS configuration (`~/.aws/config` and `~/.aws/credentials`).
@@ -175,7 +191,7 @@ a9s is read-only by design and never makes mutating AWS API calls. See [SECURITY
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE) for the full text.
+GPL-3.0-or-later. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
