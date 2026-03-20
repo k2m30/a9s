@@ -12,6 +12,10 @@ linters:
     - prealloc
     - noctx
 
+  exclusions:
+    paths:
+      - tests/testdata
+
   settings:
     govet:
       enable-all: true
@@ -24,7 +28,3 @@ linters:
       enabled-tags:
         - diagnostic
         - performance
-
-issues:
-  exclude-dirs:
-    - tests/testdata
