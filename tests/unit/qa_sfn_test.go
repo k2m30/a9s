@@ -80,39 +80,6 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchStepFunctions_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockSFNClient{
-		output: &sfn.ListStateMachinesOutput{
-			StateMachines: []sfntypes.StateMachineListItem{
-				{
-					Name:            aws.String("detail-sm"),
-					StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:detail-sm"),
-					Type:            sfntypes.StateMachineTypeStandard,
-					CreationDate:    &now,
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Name", "ARN", "Type", "Creation Date"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchStepFunctions_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockSFNClient{
@@ -143,9 +110,6 @@ func TestFetchStepFunctions_RawStructPopulated(t *testing.T) {
 	}
 	if sm.Name == nil || *sm.Name != "raw-sm" {
 		t.Errorf("RawStruct.Name: expected %q", "raw-sm")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

@@ -96,41 +96,6 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchECRRepositories_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockECRClient{
-		output: &ecr.DescribeRepositoriesOutput{
-			Repositories: []ecrtypes.Repository{
-				{
-					RepositoryName: aws.String("detail-repo"),
-					RepositoryUri:  aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/detail-repo"),
-					RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/detail-repo"),
-					RegistryId:     aws.String("123456789012"),
-					CreatedAt:      &now,
-					ImageTagMutability: ecrtypes.ImageTagMutabilityMutable,
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Repository Name", "URI", "ARN", "Registry ID", "Tag Mutability"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchECRRepositories_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockECRClient{
@@ -161,9 +126,6 @@ func TestFetchECRRepositories_RawStructPopulated(t *testing.T) {
 	}
 	if repo.RepositoryName == nil || *repo.RepositoryName != "raw-repo" {
 		t.Errorf("RawStruct.RepositoryName: expected %q", "raw-repo")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

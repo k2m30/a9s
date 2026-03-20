@@ -50,7 +50,7 @@ Go 1.25+: Follow standard conventions
 |-------|-------|-------|
 | `a9s-common` | All agents | Shell rules, package access rules, build/test commands |
 | `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
-| `a9s-add-resource` | Coder + QA (on-demand) | 9-file blueprint for adding new AWS resource types |
+| `a9s-add-resource` | Coder + QA (on-demand) | 12-step blueprint for adding new AWS resource types (fetcher + view-layer tests) |
 
 ## Agents
 

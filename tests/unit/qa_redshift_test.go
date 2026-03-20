@@ -85,9 +85,6 @@ func TestFetchRedshiftClusters_ParsesMultipleClusters(t *testing.T) {
 	if r.RawStruct == nil {
 		t.Error("expected RawStruct to be set")
 	}
-	if r.RawJSON == "" {
-		t.Error("expected RawJSON to be non-empty")
-	}
 
 	// Second cluster
 	r2 := resources[1]

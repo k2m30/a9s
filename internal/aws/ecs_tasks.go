@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -35,7 +34,7 @@ func FetchECSTasks(
 ) ([]resource.Resource, error) {
 	listOutput, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing ECS clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -45,7 +44,7 @@ func FetchECSTasks(
 			Cluster: aws.String(clusterArn),
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("listing ECS tasks: %w", err)
 		}
 
 		if len(taskListOutput.TaskArns) == 0 {
@@ -57,7 +56,7 @@ func FetchECSTasks(
 			Tasks:   taskListOutput.TaskArns,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("describing ECS tasks: %w", err)
 		}
 
 		for _, task := range descOutput.Tasks {
@@ -95,40 +94,6 @@ func FetchECSTasks(
 				memory = *task.Memory
 			}
 
-			detail := map[string]string{
-				"Task ID":         taskID,
-				"Cluster":         clusterName,
-				"Status":          status,
-				"Task Definition": taskDefinition,
-				"Launch Type":     launchType,
-				"CPU":             cpu,
-				"Memory":          memory,
-			}
-
-			if task.TaskArn != nil {
-				detail["ARN"] = *task.TaskArn
-			}
-			if task.DesiredStatus != nil {
-				detail["Desired Status"] = *task.DesiredStatus
-			}
-			if task.Group != nil {
-				detail["Group"] = *task.Group
-			}
-			if task.StartedAt != nil {
-				detail["Started At"] = task.StartedAt.Format("2006-01-02T15:04:05Z07:00")
-			}
-			if task.StoppedAt != nil {
-				detail["Stopped At"] = task.StoppedAt.Format("2006-01-02T15:04:05Z07:00")
-			}
-			if task.StoppedReason != nil {
-				detail["Stopped Reason"] = *task.StoppedReason
-			}
-
-			rawJSON := ""
-			if jsonBytes, err := json.MarshalIndent(task, "", "  "); err == nil {
-				rawJSON = string(jsonBytes)
-			}
-
 			r := resource.Resource{
 				ID:     taskID,
 				Name:   taskID,
@@ -142,8 +107,6 @@ func FetchECSTasks(
 					"cpu":             cpu,
 					"memory":          memory,
 				},
-				DetailData: detail,
-				RawJSON:    rawJSON,
 				RawStruct:  task,
 			}
 

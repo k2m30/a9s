@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -26,7 +25,7 @@ func init() {
 func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeParameters(ctx, &ssm.DescribeParametersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching SSM parameters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,33 +53,6 @@ func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]re
 			description = *param.Description
 		}
 
-		detail := map[string]string{
-			"Name":          paramName,
-			"Type":          paramType,
-			"Version":       version,
-			"Last Modified": lastModified,
-			"Description":   description,
-		}
-
-		if param.LastModifiedUser != nil {
-			detail["Last Modified By"] = *param.LastModifiedUser
-		}
-
-		if param.KeyId != nil {
-			detail["KMS Key ID"] = *param.KeyId
-		}
-
-		detail["Tier"] = string(param.Tier)
-		detail["Data Type"] = ""
-		if param.DataType != nil {
-			detail["Data Type"] = *param.DataType
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(param, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     paramName,
 			Name:   paramName,
@@ -92,8 +64,6 @@ func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]re
 				"last_modified": lastModified,
 				"description":   description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  param,
 		}
 

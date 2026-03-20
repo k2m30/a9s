@@ -101,60 +101,6 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 	}
 }
 
-func TestFetchSQSQueues_DetailDataPopulated(t *testing.T) {
-	listMock := &mockSQSListQueuesClient{
-		output: &sqs.ListQueuesOutput{
-			QueueUrls: []string{
-				"https://sqs.us-east-1.amazonaws.com/123456789012/detail-test-queue",
-			},
-		},
-	}
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{
-			"https://sqs.us-east-1.amazonaws.com/123456789012/detail-test-queue": {
-				Attributes: map[string]string{
-					"ApproximateNumberOfMessages":           "7",
-					"ApproximateNumberOfMessagesNotVisible": "1",
-					"DelaySeconds":                          "5",
-					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:detail-test-queue",
-					"VisibilityTimeout":                     "30",
-					"MaximumMessageSize":                    "262144",
-					"MessageRetentionPeriod":                "345600",
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	if r.DetailData["Queue Name"] != "detail-test-queue" {
-		t.Errorf("DetailData[\"Queue Name\"] = %q, want %q", r.DetailData["Queue Name"], "detail-test-queue")
-	}
-	if r.DetailData["ARN"] != "arn:aws:sqs:us-east-1:123456789012:detail-test-queue" {
-		t.Errorf("DetailData[\"ARN\"] = %q, want %q",
-			r.DetailData["ARN"], "arn:aws:sqs:us-east-1:123456789012:detail-test-queue")
-	}
-	if r.DetailData["Visibility Timeout"] != "30" {
-		t.Errorf("DetailData[\"Visibility Timeout\"] = %q, want %q", r.DetailData["Visibility Timeout"], "30")
-	}
-	if r.DetailData["Retention Period"] != "345600" {
-		t.Errorf("DetailData[\"Retention Period\"] = %q, want %q", r.DetailData["Retention Period"], "345600")
-	}
-}
-
 func TestFetchSQSQueues_ErrorOnList(t *testing.T) {
 	listMock := &mockSQSListQueuesClient{
 		output: nil,

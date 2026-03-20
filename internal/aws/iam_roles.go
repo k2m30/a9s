@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -26,7 +25,7 @@ func init() {
 func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resource, error) {
 	output, err := api.ListRoles(ctx, &iam.ListRolesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching IAM roles: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,27 +56,6 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 			description = *role.Description
 		}
 
-		detail := map[string]string{
-			"Role Name":   roleName,
-			"Role ID":     roleID,
-			"Path":        path,
-			"Create Date": createDate,
-			"Description": description,
-		}
-
-		if role.Arn != nil {
-			detail["ARN"] = *role.Arn
-		}
-
-		if role.MaxSessionDuration != nil {
-			detail["Max Session Duration"] = fmt.Sprintf("%d", *role.MaxSessionDuration)
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(role, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     roleName,
 			Name:   roleName,
@@ -89,8 +67,6 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 				"create_date": createDate,
 				"description": description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  role,
 		}
 

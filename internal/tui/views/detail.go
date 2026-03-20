@@ -13,9 +13,9 @@ import (
 	"github.com/k2m30/a9s/internal/fieldpath"
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/messages"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 
 	"gopkg.in/yaml.v3"
 )
@@ -175,7 +175,7 @@ func (m DetailModel) renderContent() string {
 	const keyW = 22
 
 	kv := func(key, val string) string {
-		return " " + styles.DetailKey.Render(layout.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
+		return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
 	}
 
 	// Try config-driven rendering.

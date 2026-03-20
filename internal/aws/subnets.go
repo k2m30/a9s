@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching subnets: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -69,43 +68,6 @@ func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Re
 			availableIPs = fmt.Sprintf("%d", *subnet.AvailableIpAddressCount)
 		}
 
-		detail := map[string]string{
-			"Subnet ID":         subnetID,
-			"Name":              name,
-			"VPC ID":            vpcID,
-			"CIDR Block":        cidrBlock,
-			"Availability Zone": az,
-			"State":             state,
-			"Available IPs":     availableIPs,
-		}
-
-		if subnet.MapPublicIpOnLaunch != nil {
-			detail["Map Public IP"] = fmt.Sprintf("%t", *subnet.MapPublicIpOnLaunch)
-		}
-
-		if subnet.DefaultForAz != nil {
-			detail["Default for AZ"] = fmt.Sprintf("%t", *subnet.DefaultForAz)
-		}
-
-		if subnet.OwnerId != nil {
-			detail["Owner ID"] = *subnet.OwnerId
-		}
-
-		if subnet.SubnetArn != nil {
-			detail["ARN"] = *subnet.SubnetArn
-		}
-
-		for _, tag := range subnet.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(subnet, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     subnetID,
 			Name:   name,
@@ -119,8 +81,6 @@ func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Re
 				"state":             state,
 				"available_ips":     availableIPs,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  subnet,
 		}
 

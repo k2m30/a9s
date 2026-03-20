@@ -8,9 +8,9 @@ import (
 
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/messages"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 )
 
 // MainMenuModel displays the resource type selection list.
@@ -108,14 +108,14 @@ func (m MainMenuModel) View() string {
 		item := m.filteredItems[i]
 
 		aliasStr := ":" + item.ShortName
-		aliasPadded := layout.PadOrTrunc(aliasStr, aliasW)
+		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
 
 		// Name field fills remaining width: total - 2 leading - aliasW - 5 trailing.
 		nameFieldW := m.width - 2 - aliasW - 5
 		if nameFieldW < 10 {
 			nameFieldW = 10
 		}
-		namePadded := layout.PadOrTrunc(item.Name, nameFieldW)
+		namePadded := text.PadOrTrunc(item.Name, nameFieldW)
 
 		if i == m.cursor {
 			// Selected row: full highlight, alias stays dimmed.

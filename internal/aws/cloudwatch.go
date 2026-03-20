@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
@@ -26,7 +25,7 @@ func init() {
 func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeAlarms(ctx, &cloudwatch.DescribeAlarmsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CloudWatch alarms: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,43 +53,6 @@ func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI)
 			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
 		}
 
-		comparison := string(alarm.ComparisonOperator)
-
-		detail := map[string]string{
-			"Alarm Name":  alarmName,
-			"State":       stateValue,
-			"Metric Name": metricName,
-			"Namespace":   namespace,
-			"Threshold":   threshold,
-			"Comparison":  comparison,
-			"Statistic":   string(alarm.Statistic),
-		}
-
-		if alarm.AlarmArn != nil {
-			detail["ARN"] = *alarm.AlarmArn
-		}
-
-		if alarm.AlarmDescription != nil {
-			detail["Description"] = *alarm.AlarmDescription
-		}
-
-		if alarm.Period != nil {
-			detail["Period"] = fmt.Sprintf("%d", *alarm.Period)
-		}
-
-		if alarm.EvaluationPeriods != nil {
-			detail["Evaluation Periods"] = fmt.Sprintf("%d", *alarm.EvaluationPeriods)
-		}
-
-		if alarm.StateReason != nil {
-			detail["State Reason"] = *alarm.StateReason
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(alarm, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     alarmName,
 			Name:   alarmName,
@@ -102,8 +64,6 @@ func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI)
 				"namespace":   namespace,
 				"threshold":   threshold,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  alarm,
 		}
 

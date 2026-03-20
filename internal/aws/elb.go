@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -26,7 +25,7 @@ func init() {
 func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching load balancers: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -55,34 +54,6 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 			vpcID = *lb.VpcId
 		}
 
-		detail := map[string]string{
-			"Name":     lbName,
-			"DNS Name": dnsName,
-			"Type":     lbType,
-			"Scheme":   scheme,
-			"State":    state,
-			"VPC ID":   vpcID,
-		}
-
-		if lb.LoadBalancerArn != nil {
-			detail["ARN"] = *lb.LoadBalancerArn
-		}
-
-		if lb.CanonicalHostedZoneId != nil {
-			detail["Hosted Zone ID"] = *lb.CanonicalHostedZoneId
-		}
-
-		if lb.CreatedTime != nil {
-			detail["Created Time"] = lb.CreatedTime.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		detail["IP Address Type"] = string(lb.IpAddressType)
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(lb, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     lbName,
 			Name:   lbName,
@@ -95,8 +66,6 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 				"state":    state,
 				"vpc_id":   vpcID,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  lb,
 		}
 

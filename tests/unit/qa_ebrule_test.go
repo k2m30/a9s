@@ -88,40 +88,6 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchEventBridgeRules_DetailData(t *testing.T) {
-	mock := &mockEventBridgeClient{
-		output: &eventbridge.ListRulesOutput{
-			Rules: []ebtypes.Rule{
-				{
-					Name:               aws.String("detail-rule"),
-					Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/detail-rule"),
-					State:              ebtypes.RuleStateEnabled,
-					Description:        aws.String("Detail test"),
-					ScheduleExpression: aws.String("cron(0 12 * * ? *)"),
-					EventBusName:       aws.String("default"),
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Name", "ARN", "State", "Description", "Event Bus", "Schedule Expression"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchEventBridgeRules_RawStructPopulated(t *testing.T) {
 	mock := &mockEventBridgeClient{
 		output: &eventbridge.ListRulesOutput{
@@ -151,9 +117,6 @@ func TestFetchEventBridgeRules_RawStructPopulated(t *testing.T) {
 	}
 	if rule.Name == nil || *rule.Name != "raw-rule" {
 		t.Errorf("RawStruct.Name: expected %q", "raw-rule")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

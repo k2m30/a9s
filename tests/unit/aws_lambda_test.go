@@ -121,59 +121,6 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	}
 }
 
-func TestFetchLambdaFunctions_DetailDataPopulated(t *testing.T) {
-	mock := &mockLambdaListFunctionsClient{
-		output: &lambda.ListFunctionsOutput{
-			Functions: []lambdatypes.FunctionConfiguration{
-				{
-					FunctionName: aws.String("detail-test-function"),
-					Runtime:      lambdatypes.RuntimeNodejs20x,
-					MemorySize:   aws.Int32(512),
-					Timeout:      aws.Int32(15),
-					Handler:      aws.String("index.handler"),
-					LastModified: aws.String("2025-03-01T08:00:00.000+0000"),
-					CodeSize:     2097152,
-					FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:detail-test-function"),
-					Role:         aws.String("arn:aws:iam::123456789012:role/lambda-role"),
-					Description:  aws.String("Detail test function"),
-					PackageType:  lambdatypes.PackageTypeZip,
-					Architectures: []lambdatypes.Architecture{
-						lambdatypes.ArchitectureX8664,
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchLambdaFunctions(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	if r.DetailData["Function Name"] != "detail-test-function" {
-		t.Errorf("DetailData[\"Function Name\"] = %q, want %q", r.DetailData["Function Name"], "detail-test-function")
-	}
-	if r.DetailData["ARN"] == "" {
-		t.Error("DetailData[\"ARN\"] must not be empty")
-	}
-	if r.DetailData["Role"] == "" {
-		t.Error("DetailData[\"Role\"] must not be empty")
-	}
-	if r.DetailData["Description"] != "Detail test function" {
-		t.Errorf("DetailData[\"Description\"] = %q, want %q", r.DetailData["Description"], "Detail test function")
-	}
-}
-
 func TestFetchLambdaFunctions_ErrorResponse(t *testing.T) {
 	mock := &mockLambdaListFunctionsClient{
 		output: nil,

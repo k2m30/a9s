@@ -77,9 +77,6 @@ func TestFetchGlueJobs_ParsesMultipleJobs(t *testing.T) {
 	if r.RawStruct == nil {
 		t.Error("expected RawStruct to be set")
 	}
-	if r.RawJSON == "" {
-		t.Error("expected RawJSON to be non-empty")
-	}
 }
 
 func TestFetchGlueJobs_EmptyResponse(t *testing.T) {

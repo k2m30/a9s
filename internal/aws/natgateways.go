@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeNatGateways(ctx, &ec2.DescribeNatGatewaysInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching NAT gateways: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -67,33 +66,6 @@ func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]res
 			}
 		}
 
-		connectivityType := string(nat.ConnectivityType)
-
-		detail := map[string]string{
-			"NAT Gateway ID":    natID,
-			"Name":              name,
-			"VPC ID":            vpcID,
-			"Subnet ID":         subnetID,
-			"State":             state,
-			"Public IP":         publicIP,
-			"Connectivity Type": connectivityType,
-		}
-
-		if nat.CreateTime != nil {
-			detail["Create Time"] = nat.CreateTime.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		for _, tag := range nat.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(nat, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     natID,
 			Name:   name,
@@ -106,8 +78,6 @@ func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]res
 				"state":          state,
 				"public_ip":      publicIP,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  nat,
 		}
 

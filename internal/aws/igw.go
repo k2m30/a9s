@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeInternetGateways(ctx, &ec2.DescribeInternetGatewaysInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching internet gateways: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,28 +56,6 @@ func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysA
 			state = string(igw.Attachments[0].State)
 		}
 
-		detail := map[string]string{
-			"Internet Gateway ID": igwID,
-			"Name":                name,
-			"VPC ID":              vpcID,
-			"State":               state,
-		}
-
-		if igw.OwnerId != nil {
-			detail["Owner ID"] = *igw.OwnerId
-		}
-
-		for _, tag := range igw.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(igw, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     igwID,
 			Name:   name,
@@ -89,8 +66,6 @@ func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysA
 				"vpc_id": vpcID,
 				"state":  state,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  igw,
 		}
 

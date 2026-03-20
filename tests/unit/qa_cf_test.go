@@ -118,62 +118,6 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchCloudFrontDistributions_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
-			DistributionList: &cftypes.DistributionList{
-				Items: []cftypes.DistributionSummary{
-					{
-						Id:               aws.String("EDETAIL123"),
-						DomainName:       aws.String("detail.cloudfront.net"),
-						Status:           aws.String("Deployed"),
-						Enabled:          aws.Bool(true),
-						Comment:          aws.String("Detail test"),
-						LastModifiedTime: &now,
-						ARN:              aws.String("arn:aws:cloudfront::123456789012:distribution/EDETAIL123"),
-						Aliases: &cftypes.Aliases{
-							Quantity: aws.Int32(0),
-						},
-						Origins: &cftypes.Origins{
-							Quantity: aws.Int32(1),
-						},
-						PriceClass:  cftypes.PriceClassPriceClassAll,
-						HttpVersion: cftypes.HttpVersionHttp2,
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchCloudFrontDistributions(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Distribution ID", "Domain Name", "Status", "Enabled", "Comment", "ARN"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-
-	if r.DetailData["Distribution ID"] != "EDETAIL123" {
-		t.Errorf("DetailData[\"Distribution ID\"] = %q, want %q", r.DetailData["Distribution ID"], "EDETAIL123")
-	}
-	if r.DetailData["Comment"] != "Detail test" {
-		t.Errorf("DetailData[\"Comment\"] = %q, want %q", r.DetailData["Comment"], "Detail test")
-	}
-}
-
 func TestFetchCloudFrontDistributions_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockCloudFrontClient{
@@ -213,9 +157,6 @@ func TestFetchCloudFrontDistributions_RawStructPopulated(t *testing.T) {
 	}
 	if dist.Id == nil || *dist.Id != "ERAW123" {
 		t.Errorf("RawStruct.Id: expected %q", "ERAW123")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

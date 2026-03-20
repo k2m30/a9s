@@ -116,48 +116,6 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchEFSFileSystems_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockEFSClient{
-		output: &efs.DescribeFileSystemsOutput{
-			FileSystems: []efstypes.FileSystemDescription{
-				{
-					FileSystemId:        aws.String("fs-detail123"),
-					FileSystemArn:       aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-detail123"),
-					CreationTime:        &now,
-					CreationToken:       aws.String("token-detail"),
-					LifeCycleState:      efstypes.LifeCycleStateAvailable,
-					Name:                aws.String("detail-fs"),
-					NumberOfMountTargets: 2,
-					OwnerId:             aws.String("123456789012"),
-					PerformanceMode:     efstypes.PerformanceModeGeneralPurpose,
-					ThroughputMode:      efstypes.ThroughputModeBursting,
-					Encrypted:           aws.Bool(true),
-					SizeInBytes:         &efstypes.FileSystemSize{Value: int64(500)},
-					Tags:                []efstypes.Tag{},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchEFSFileSystems(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"File System ID", "Name", "Life Cycle State", "Performance Mode", "Throughput Mode", "Encrypted", "ARN", "Owner ID"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchEFSFileSystems_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockEFSClient{
@@ -193,9 +151,6 @@ func TestFetchEFSFileSystems_RawStructPopulated(t *testing.T) {
 	}
 	if fs.FileSystemId == nil || *fs.FileSystemId != "fs-raw123" {
 		t.Errorf("RawStruct.FileSystemId: expected %q", "fs-raw123")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

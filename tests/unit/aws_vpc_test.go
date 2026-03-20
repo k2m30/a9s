@@ -112,77 +112,6 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 	}
 }
 
-func TestFetchVPCs_DetailDataPopulated(t *testing.T) {
-	mock := &mockEC2DescribeVpcsClient{
-		output: &ec2.DescribeVpcsOutput{
-			Vpcs: []ec2types.Vpc{
-				{
-					VpcId:           aws.String("vpc-detail123"),
-					CidrBlock:       aws.String("10.0.0.0/16"),
-					State:           ec2types.VpcStateAvailable,
-					IsDefault:       aws.Bool(false),
-					DhcpOptionsId:   aws.String("dopt-abc123"),
-					InstanceTenancy: ec2types.TenancyDefault,
-					OwnerId:         aws.String("123456789012"),
-					Tags: []ec2types.Tag{
-						{Key: aws.String("Name"), Value: aws.String("detail-test")},
-						{Key: aws.String("Environment"), Value: aws.String("staging")},
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchVPCs(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-
-	// Verify expected detail keys
-	expectedKeys := []string{
-		"VPC ID", "Name", "CIDR Block", "State", "Is Default",
-		"DHCP Options ID", "Instance Tenancy", "Owner ID",
-	}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-
-	// Verify specific values
-	if r.DetailData["VPC ID"] != "vpc-detail123" {
-		t.Errorf("DetailData[\"VPC ID\"] = %q, want %q", r.DetailData["VPC ID"], "vpc-detail123")
-	}
-	if r.DetailData["DHCP Options ID"] != "dopt-abc123" {
-		t.Errorf("DetailData[\"DHCP Options ID\"] = %q, want %q", r.DetailData["DHCP Options ID"], "dopt-abc123")
-	}
-	if r.DetailData["Instance Tenancy"] != "default" {
-		t.Errorf("DetailData[\"Instance Tenancy\"] = %q, want %q", r.DetailData["Instance Tenancy"], "default")
-	}
-	if r.DetailData["Owner ID"] != "123456789012" {
-		t.Errorf("DetailData[\"Owner ID\"] = %q, want %q", r.DetailData["Owner ID"], "123456789012")
-	}
-
-	// Verify tags appear in DetailData
-	if r.DetailData["Tag: Name"] != "detail-test" {
-		t.Errorf("DetailData[\"Tag: Name\"] = %q, want %q", r.DetailData["Tag: Name"], "detail-test")
-	}
-	if r.DetailData["Tag: Environment"] != "staging" {
-		t.Errorf("DetailData[\"Tag: Environment\"] = %q, want %q", r.DetailData["Tag: Environment"], "staging")
-	}
-}
-
 func TestFetchVPCs_ErrorResponse(t *testing.T) {
 	mock := &mockEC2DescribeVpcsClient{
 		output: nil,
@@ -252,10 +181,6 @@ func TestFetchVPCs_RawStructPopulated(t *testing.T) {
 		t.Errorf("RawStruct.VpcId: expected %q, got %v", "vpc-raw123", vpc.VpcId)
 	}
 
-	// Verify RawJSON is populated
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -303,23 +228,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"is_default\"]: expected %q, got %q", "false", r0.Fields["is_default"])
 	}
 
-	// DetailData assertions for VPC 1
-	if r0.DetailData["VPC ID"] != "vpc-0aaa1111bbb2222cc" {
-		t.Errorf("resource[0].DetailData[\"VPC ID\"]: expected %q, got %q", "vpc-0aaa1111bbb2222cc", r0.DetailData["VPC ID"])
-	}
-	if r0.DetailData["DHCP Options ID"] != "dopt-0aaa111111111111a" {
-		t.Errorf("resource[0].DetailData[\"DHCP Options ID\"]: expected %q, got %q", "dopt-0aaa111111111111a", r0.DetailData["DHCP Options ID"])
-	}
-	if r0.DetailData["Instance Tenancy"] != "default" {
-		t.Errorf("resource[0].DetailData[\"Instance Tenancy\"]: expected %q, got %q", "default", r0.DetailData["Instance Tenancy"])
-	}
-	if r0.DetailData["Owner ID"] != "123456789012" {
-		t.Errorf("resource[0].DetailData[\"Owner ID\"]: expected %q, got %q", "123456789012", r0.DetailData["Owner ID"])
-	}
-	if r0.DetailData["Tag: Name"] != "dev-vpc" {
-		t.Errorf("resource[0].DetailData[\"Tag: Name\"]: expected %q, got %q", "dev-vpc", r0.DetailData["Tag: Name"])
-	}
-
 	// RawStruct verification for VPC 1
 	if r0.RawStruct == nil {
 		t.Fatal("resource[0].RawStruct must not be nil")
@@ -333,11 +241,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	}
 	if vpc0.CidrBlockAssociationSet[0].CidrBlock == nil || *vpc0.CidrBlockAssociationSet[0].CidrBlock != "10.0.0.0/16" {
 		t.Errorf("resource[0].RawStruct.CidrBlockAssociationSet[0].CidrBlock: expected %q", "10.0.0.0/16")
-	}
-
-	// RawJSON must be populated
-	if r0.RawJSON == "" {
-		t.Error("resource[0].RawJSON must not be empty")
 	}
 
 	// --- VPC 2: default VPC (172.31.0.0/16, no Name tag) ---
@@ -357,9 +260,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	if r1.Fields["is_default"] != "true" {
 		t.Errorf("resource[1].Fields[\"is_default\"]: expected %q, got %q", "true", r1.Fields["is_default"])
 	}
-	if r1.DetailData["Owner ID"] != "123456789012" {
-		t.Errorf("resource[1].DetailData[\"Owner ID\"]: expected %q, got %q", "123456789012", r1.DetailData["Owner ID"])
-	}
 
 	// Verify the default VPC has an empty Tags slice (Tags exist but Name tag absent)
 	vpc1, ok := r1.RawStruct.(ec2types.Vpc)
@@ -371,8 +271,4 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	}
 
 	// Verify DHCP Options ID is shared between both VPCs
-	if r0.DetailData["DHCP Options ID"] != r1.DetailData["DHCP Options ID"] {
-		t.Errorf("both VPCs should share the same DHCP Options ID, got %q and %q",
-			r0.DetailData["DHCP Options ID"], r1.DetailData["DHCP Options ID"])
-	}
 }

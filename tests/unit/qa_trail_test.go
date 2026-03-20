@@ -77,9 +77,6 @@ func TestFetchCloudTrailTrails_ParsesMultipleTrails(t *testing.T) {
 	if r.RawStruct == nil {
 		t.Error("expected RawStruct to be set")
 	}
-	if r.RawJSON == "" {
-		t.Error("expected RawJSON to be non-empty")
-	}
 
 	// Second trail
 	r2 := resources[1]

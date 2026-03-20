@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +33,7 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 			ContinuationToken: continuationToken,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetching S3 buckets: %w", err)
 		}
 
 		for _, bucket := range output.Buckets {
@@ -48,16 +47,6 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 			creationDate = bucket.CreationDate.Format("2006-01-02T15:04:05Z07:00")
 		}
 
-		detail := map[string]string{
-			"Bucket Name":   bucketName,
-			"Creation Date": creationDate,
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(bucket, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     bucketName,
 			Name:   bucketName,
@@ -67,8 +56,6 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 				"bucket_name":   bucketName,
 				"creation_date": creationDate,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  bucket,
 		}
 
@@ -102,7 +89,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 
 		output, err := api.ListObjectsV2(ctx, input)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetching S3 objects: %w", err)
 		}
 
 		// Add folders (CommonPrefixes) first
@@ -110,17 +97,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 			folderKey := ""
 			if cp.Prefix != nil {
 				folderKey = *cp.Prefix
-			}
-
-			// Build DetailData for folder
-			detail := map[string]string{
-				"Key": folderKey,
-			}
-
-			// Build RawJSON for folder
-			rawJSON := ""
-			if jsonBytes, err := json.MarshalIndent(cp, "", "  "); err == nil {
-				rawJSON = string(jsonBytes)
 			}
 
 			r := resource.Resource{
@@ -133,8 +109,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 					"last_modified": "",
 					"storage_class": "",
 				},
-				DetailData: detail,
-				RawJSON:    rawJSON,
 				RawStruct:  cp,
 			}
 			resources = append(resources, r)
@@ -159,26 +133,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 
 			storageClass := string(obj.StorageClass)
 
-			etag := ""
-			if obj.ETag != nil {
-				etag = *obj.ETag
-			}
-
-			// Build DetailData for file
-			detail := map[string]string{
-				"Key":           objKey,
-				"Size":          size,
-				"Last Modified": lastModified,
-				"Storage Class": storageClass,
-				"ETag":          etag,
-			}
-
-			// Build RawJSON for file
-			rawJSON := ""
-			if jsonBytes, err := json.MarshalIndent(obj, "", "  "); err == nil {
-				rawJSON = string(jsonBytes)
-			}
-
 			r := resource.Resource{
 				ID:     objKey,
 				Name:   objKey,
@@ -189,8 +143,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 					"last_modified": lastModified,
 					"storage_class": storageClass,
 				},
-				DetailData: detail,
-				RawJSON:    rawJSON,
 				RawStruct:  obj,
 			}
 			resources = append(resources, r)

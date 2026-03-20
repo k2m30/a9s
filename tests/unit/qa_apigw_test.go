@@ -84,41 +84,6 @@ func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchAPIGateways_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockAPIGatewayV2Client{
-		output: &apigatewayv2.GetApisOutput{
-			Items: []apigwtypes.Api{
-				{
-					ApiId:        aws.String("detail123"),
-					Name:         aws.String("detail-api"),
-					ProtocolType: apigwtypes.ProtocolTypeHttp,
-					ApiEndpoint:  aws.String("https://detail123.execute-api.us-east-1.amazonaws.com"),
-					Description:  aws.String("Detail test"),
-					CreatedDate:  &now,
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"API ID", "Name", "Protocol", "Endpoint", "Description"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchAPIGateways_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockAPIGatewayV2Client{
@@ -149,9 +114,6 @@ func TestFetchAPIGateways_RawStructPopulated(t *testing.T) {
 	}
 	if api.ApiId == nil || *api.ApiId != "raw123" {
 		t.Errorf("RawStruct.ApiId: expected %q", "raw123")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

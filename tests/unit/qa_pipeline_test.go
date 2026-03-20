@@ -84,41 +84,6 @@ func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchCodePipelines_DetailData(t *testing.T) {
-	now := time.Now()
-	mock := &mockCodePipelineClient{
-		output: &codepipeline.ListPipelinesOutput{
-			Pipelines: []cptypes.PipelineSummary{
-				{
-					Name:          aws.String("detail-pipeline"),
-					PipelineType:  cptypes.PipelineTypeV2,
-					Created:       &now,
-					Updated:       &now,
-					Version:       aws.Int32(1),
-					ExecutionMode: cptypes.ExecutionModeSuperseded,
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchCodePipelines(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Name", "Pipeline Type", "Created", "Updated", "Version", "Execution Mode"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchCodePipelines_RawStructPopulated(t *testing.T) {
 	now := time.Now()
 	mock := &mockCodePipelineClient{
@@ -149,9 +114,6 @@ func TestFetchCodePipelines_RawStructPopulated(t *testing.T) {
 	}
 	if pl.Name == nil || *pl.Name != "raw-pipeline" {
 		t.Errorf("RawStruct.Name: expected %q", "raw-pipeline")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

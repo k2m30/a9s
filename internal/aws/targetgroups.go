@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -26,7 +25,7 @@ func init() {
 func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching target groups: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -56,42 +55,6 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 			healthCheckPath = *tg.HealthCheckPath
 		}
 
-		detail := map[string]string{
-			"Target Group Name": tgName,
-			"Port":              port,
-			"Protocol":          protocol,
-			"VPC ID":            vpcID,
-			"Target Type":       targetType,
-			"Health Check Path": healthCheckPath,
-		}
-
-		if tg.TargetGroupArn != nil {
-			detail["ARN"] = *tg.TargetGroupArn
-		}
-
-		if tg.HealthCheckPort != nil {
-			detail["Health Check Port"] = *tg.HealthCheckPort
-		}
-
-		detail["Health Check Protocol"] = string(tg.HealthCheckProtocol)
-
-		if tg.HealthCheckIntervalSeconds != nil {
-			detail["Health Check Interval"] = fmt.Sprintf("%d", *tg.HealthCheckIntervalSeconds)
-		}
-
-		if tg.HealthyThresholdCount != nil {
-			detail["Healthy Threshold"] = fmt.Sprintf("%d", *tg.HealthyThresholdCount)
-		}
-
-		if tg.UnhealthyThresholdCount != nil {
-			detail["Unhealthy Threshold"] = fmt.Sprintf("%d", *tg.UnhealthyThresholdCount)
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(tg, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     tgName,
 			Name:   tgName,
@@ -104,8 +67,6 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 				"target_type":       targetType,
 				"health_check_path": healthCheckPath,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  tg,
 		}
 

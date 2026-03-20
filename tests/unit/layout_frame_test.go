@@ -8,12 +8,13 @@ import (
 
 	"github.com/k2m30/a9s/internal/tui/layout"
 	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/internal/tui/text"
 )
 
 // ── PadOrTrunc tests ─────────────────────────────────────────────────────────
 
 func TestPadOrTrunc_PadsShortString(t *testing.T) {
-	got := layout.PadOrTrunc("hello", 10)
+	got := text.PadOrTrunc("hello", 10)
 	if lipgloss.Width(got) != 10 {
 		t.Errorf("expected visible width 10, got %d", lipgloss.Width(got))
 	}
@@ -23,14 +24,14 @@ func TestPadOrTrunc_PadsShortString(t *testing.T) {
 }
 
 func TestPadOrTrunc_ExactWidth(t *testing.T) {
-	got := layout.PadOrTrunc("hello", 5)
+	got := text.PadOrTrunc("hello", 5)
 	if got != "hello" {
 		t.Errorf("expected %q, got %q", "hello", got)
 	}
 }
 
 func TestPadOrTrunc_TruncatesLongString(t *testing.T) {
-	got := layout.PadOrTrunc("hello world", 6)
+	got := text.PadOrTrunc("hello world", 6)
 	vis := lipgloss.Width(got)
 	if vis != 6 {
 		t.Errorf("expected visible width 6, got %d for %q", vis, got)
@@ -42,21 +43,21 @@ func TestPadOrTrunc_TruncatesLongString(t *testing.T) {
 }
 
 func TestPadOrTrunc_WidthZero(t *testing.T) {
-	got := layout.PadOrTrunc("hello", 0)
+	got := text.PadOrTrunc("hello", 0)
 	if got != "" {
 		t.Errorf("expected empty string for w=0, got %q", got)
 	}
 }
 
 func TestPadOrTrunc_WidthNegative(t *testing.T) {
-	got := layout.PadOrTrunc("hello", -1)
+	got := text.PadOrTrunc("hello", -1)
 	if got != "" {
 		t.Errorf("expected empty string for w=-1, got %q", got)
 	}
 }
 
 func TestPadOrTrunc_WidthOne(t *testing.T) {
-	got := layout.PadOrTrunc("hello", 1)
+	got := text.PadOrTrunc("hello", 1)
 	vis := lipgloss.Width(got)
 	if vis != 1 {
 		t.Errorf("expected visible width 1, got %d for %q", vis, got)
@@ -64,7 +65,7 @@ func TestPadOrTrunc_WidthOne(t *testing.T) {
 }
 
 func TestPadOrTrunc_EmptyString(t *testing.T) {
-	got := layout.PadOrTrunc("", 5)
+	got := text.PadOrTrunc("", 5)
 	if lipgloss.Width(got) != 5 {
 		t.Errorf("expected visible width 5, got %d", lipgloss.Width(got))
 	}
@@ -75,7 +76,7 @@ func TestPadOrTrunc_EmptyString(t *testing.T) {
 
 func TestPadOrTrunc_ANSIStyled(t *testing.T) {
 	styled := lipgloss.NewStyle().Foreground(styles.ColAccent).Render("hello")
-	got := layout.PadOrTrunc(styled, 10)
+	got := text.PadOrTrunc(styled, 10)
 	vis := lipgloss.Width(got)
 	if vis != 10 {
 		t.Errorf("expected visible width 10, got %d", vis)

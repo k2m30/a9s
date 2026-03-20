@@ -77,41 +77,6 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 	}
 }
 
-func TestFetchSNSTopics_DetailDataPopulated(t *testing.T) {
-	mock := &mockSNSListTopicsClient{
-		output: &sns.ListTopicsOutput{
-			Topics: []snstypes.Topic{
-				{
-					TopicArn: strPtr("arn:aws:sns:us-east-1:123456789012:detail-test-topic"),
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchSNSTopics(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	if r.DetailData["Topic ARN"] != "arn:aws:sns:us-east-1:123456789012:detail-test-topic" {
-		t.Errorf("DetailData[\"Topic ARN\"] = %q, want %q",
-			r.DetailData["Topic ARN"], "arn:aws:sns:us-east-1:123456789012:detail-test-topic")
-	}
-	if r.DetailData["Display Name"] != "detail-test-topic" {
-		t.Errorf("DetailData[\"Display Name\"] = %q, want %q", r.DetailData["Display Name"], "detail-test-topic")
-	}
-}
-
 func TestFetchSNSTopics_ErrorResponse(t *testing.T) {
 	mock := &mockSNSListTopicsClient{
 		output: nil,

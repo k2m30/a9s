@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -26,7 +25,7 @@ func init() {
 func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListClusters(ctx, &ecs.ListClustersInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing ECS clusters: %w", err)
 	}
 
 	if len(listOutput.ClusterArns) == 0 {
@@ -37,7 +36,7 @@ func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeA
 		Clusters: listOutput.ClusterArns,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("describing ECS clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -57,24 +56,6 @@ func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeA
 		pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
 		servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
 
-		detail := map[string]string{
-			"Cluster Name":     clusterName,
-			"Status":           status,
-			"Running Tasks":    runningTasks,
-			"Pending Tasks":    pendingTasks,
-			"Active Services":  servicesCount,
-			"Registered Instances": fmt.Sprintf("%d", cluster.RegisteredContainerInstancesCount),
-		}
-
-		if cluster.ClusterArn != nil {
-			detail["ARN"] = *cluster.ClusterArn
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(cluster, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     clusterName,
 			Name:   clusterName,
@@ -86,8 +67,6 @@ func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeA
 				"pending_tasks":  pendingTasks,
 				"services_count": servicesCount,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  cluster,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -28,7 +27,7 @@ func init() {
 func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListQueues(ctx, &sqs.ListQueuesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing SQS queues: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -41,7 +40,7 @@ func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGe
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
 		}
 
 		attrs := attrOutput.Attributes
@@ -56,42 +55,6 @@ func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGe
 		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
 		delaySeconds := attrs["DelaySeconds"]
 
-		detail := map[string]string{
-			"Queue Name":              queueName,
-			"Queue URL":               queueURL,
-			"Approximate Messages":    approxMessages,
-			"Messages Not Visible":    approxNotVisible,
-			"Delay Seconds":           delaySeconds,
-		}
-
-		if v, ok := attrs["QueueArn"]; ok {
-			detail["ARN"] = v
-		}
-		if v, ok := attrs["VisibilityTimeout"]; ok {
-			detail["Visibility Timeout"] = v
-		}
-		if v, ok := attrs["MaximumMessageSize"]; ok {
-			detail["Max Message Size"] = v
-		}
-		if v, ok := attrs["MessageRetentionPeriod"]; ok {
-			detail["Retention Period"] = v
-		}
-		if v, ok := attrs["CreatedTimestamp"]; ok {
-			detail["Created"] = v
-		}
-		if v, ok := attrs["RedrivePolicy"]; ok {
-			detail["Redrive Policy"] = v
-		}
-
-		rawJSON := ""
-		raw := map[string]interface{}{
-			"QueueUrl":   queueURL,
-			"Attributes": attrs,
-		}
-		if jsonBytes, err := json.MarshalIndent(raw, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     queueName,
 			Name:   queueName,
@@ -103,8 +66,6 @@ func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGe
 				"approx_not_visible": approxNotVisible,
 				"delay_seconds":      delaySeconds,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  fmt.Sprintf("%v", attrs),
 		}
 

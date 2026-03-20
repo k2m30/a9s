@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,7 +26,7 @@ func init() {
 func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
 	listOutput, err := listAPI.ListTables(ctx, &dynamodb.ListTablesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing DynamoDB tables: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -64,31 +63,6 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 			billingMode = string(table.BillingModeSummary.BillingMode)
 		}
 
-		detail := map[string]string{
-			"Table Name":   name,
-			"Status":       status,
-			"Item Count":   itemCount,
-			"Size (bytes)": sizeBytes,
-			"Billing Mode": billingMode,
-		}
-
-		if table.TableArn != nil {
-			detail["ARN"] = *table.TableArn
-		}
-
-		if table.CreationDateTime != nil {
-			detail["Created"] = table.CreationDateTime.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		if table.TableId != nil {
-			detail["Table ID"] = *table.TableId
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(table, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -100,8 +74,6 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 				"size_bytes":   sizeBytes,
 				"billing_mode": billingMode,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  table,
 		}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,7 +26,7 @@ func init() {
 func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {
 	output, err := api.ListTopics(ctx, &sns.ListTopicsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching SNS topics: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -44,16 +43,6 @@ func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resou
 			displayName = parts[len(parts)-1]
 		}
 
-		detail := map[string]string{
-			"Topic ARN":    topicArn,
-			"Display Name": displayName,
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(topic, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     topicArn,
 			Name:   displayName,
@@ -62,8 +51,6 @@ func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resou
 				"topic_arn":    topicArn,
 				"display_name": displayName,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  topic,
 		}
 

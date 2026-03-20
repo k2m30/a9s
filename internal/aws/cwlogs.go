@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -26,7 +25,7 @@ func init() {
 func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CloudWatch log groups: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -52,28 +51,6 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 			creationTime = fmt.Sprintf("%d", *lg.CreationTime)
 		}
 
-		detail := map[string]string{
-			"Log Group Name":  logGroupName,
-			"Stored Bytes":    storedBytes,
-			"Retention (days)": retentionDays,
-			"Creation Time":   creationTime,
-		}
-
-		if lg.Arn != nil {
-			detail["ARN"] = *lg.Arn
-		}
-
-		if lg.KmsKeyId != nil {
-			detail["KMS Key ID"] = *lg.KmsKeyId
-		}
-
-		detail["Data Protection"] = string(lg.DataProtectionStatus)
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(lg, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     logGroupName,
 			Name:   logGroupName,
@@ -84,8 +61,6 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 				"retention_days": retentionDays,
 				"creation_time":  creationTime,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  lg,
 		}
 

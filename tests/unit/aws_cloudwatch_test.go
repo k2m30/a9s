@@ -114,63 +114,6 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	}
 }
 
-func TestFetchCloudWatchAlarms_DetailDataPopulated(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsClient{
-		output: &cloudwatch.DescribeAlarmsOutput{
-			MetricAlarms: []cwtypes.MetricAlarm{
-				{
-					AlarmName:          aws.String("detail-alarm"),
-					StateValue:         cwtypes.StateValueOk,
-					MetricName:         aws.String("NetworkIn"),
-					Namespace:          aws.String("AWS/EC2"),
-					Threshold:          float64Ptr(50.0),
-					ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
-					Statistic:          cwtypes.StatisticAverage,
-					AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:detail-alarm"),
-					AlarmDescription:   aws.String("Detail test alarm"),
-					Period:             aws.Int32(120),
-					EvaluationPeriods:  aws.Int32(3),
-					StateReason:        aws.String("OK: no threshold crossed"),
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchCloudWatchAlarms(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	if r.DetailData["Alarm Name"] != "detail-alarm" {
-		t.Errorf("DetailData[\"Alarm Name\"] = %q, want %q", r.DetailData["Alarm Name"], "detail-alarm")
-	}
-	if r.DetailData["ARN"] == "" {
-		t.Error("DetailData[\"ARN\"] must not be empty")
-	}
-	if r.DetailData["Description"] != "Detail test alarm" {
-		t.Errorf("DetailData[\"Description\"] = %q, want %q", r.DetailData["Description"], "Detail test alarm")
-	}
-	if r.DetailData["Period"] != "120" {
-		t.Errorf("DetailData[\"Period\"] = %q, want %q", r.DetailData["Period"], "120")
-	}
-	if r.DetailData["Evaluation Periods"] != "3" {
-		t.Errorf("DetailData[\"Evaluation Periods\"] = %q, want %q", r.DetailData["Evaluation Periods"], "3")
-	}
-	if r.DetailData["State Reason"] != "OK: no threshold crossed" {
-		t.Errorf("DetailData[\"State Reason\"] = %q, want %q", r.DetailData["State Reason"], "OK: no threshold crossed")
-	}
-}
-
 func TestFetchCloudWatchAlarms_ErrorResponse(t *testing.T) {
 	mock := &mockCloudWatchDescribeAlarmsClient{
 		output: nil,

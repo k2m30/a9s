@@ -97,51 +97,6 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 	}
 }
 
-func TestFetchSecrets_DetailDataPopulated(t *testing.T) {
-	lastAccessed := time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC)
-	lastChanged := time.Date(2025, 2, 20, 14, 30, 0, 0, time.UTC)
-
-	mock := &mockSecretsManagerClient{
-		output: &secretsmanager.ListSecretsOutput{
-			SecretList: []smtypes.SecretListEntry{
-				{
-					Name:             aws.String("prod/db/pass"),
-					Description:      aws.String("Prod DB password"),
-					ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/pass-AbCdEf"),
-					LastAccessedDate: &lastAccessed,
-					LastChangedDate:  &lastChanged,
-					RotationEnabled:  aws.Bool(true),
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchSecrets(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-	if len(r.DetailData) == 0 {
-		t.Fatal("DetailData must not be empty")
-	}
-	if r.DetailData["Name"] != "prod/db/pass" {
-		t.Errorf("DetailData[Name] = %q, want %q", r.DetailData["Name"], "prod/db/pass")
-	}
-	if r.DetailData["Description"] != "Prod DB password" {
-		t.Errorf("DetailData[Description] = %q, want %q", r.DetailData["Description"], "Prod DB password")
-	}
-	if r.DetailData["ARN"] != "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/pass-AbCdEf" {
-		t.Errorf("DetailData[ARN] = %q, want %q", r.DetailData["ARN"], "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/pass-AbCdEf")
-	}
-}
-
 func TestFetchSecrets_ErrorResponse(t *testing.T) {
 	mock := &mockSecretsManagerClient{
 		output: nil,

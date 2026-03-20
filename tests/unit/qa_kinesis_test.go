@@ -78,10 +78,6 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Verify RawJSON is set
-	if r.RawJSON == "" {
-		t.Error("expected RawJSON to be non-empty")
-	}
 }
 
 func TestFetchKinesisStreams_EmptyResponse(t *testing.T) {

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -26,7 +25,7 @@ func init() {
 func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]resource.Resource, error) {
 	output, err := api.ListFunctions(ctx, &lambda.ListFunctionsInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching Lambda functions: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -64,39 +63,6 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 			codeSize = fmt.Sprintf("%d", fn.CodeSize)
 		}
 
-		detail := map[string]string{
-			"Function Name": functionName,
-			"Runtime":       runtime,
-			"Memory (MB)":   memory,
-			"Timeout (s)":   timeout,
-			"Handler":       handler,
-			"Last Modified": lastModified,
-			"Code Size":     codeSize,
-		}
-
-		if fn.FunctionArn != nil {
-			detail["ARN"] = *fn.FunctionArn
-		}
-
-		if fn.Role != nil {
-			detail["Role"] = *fn.Role
-		}
-
-		if fn.Description != nil {
-			detail["Description"] = *fn.Description
-		}
-
-		detail["Package Type"] = string(fn.PackageType)
-		detail["Architecture"] = ""
-		if len(fn.Architectures) > 0 {
-			detail["Architecture"] = string(fn.Architectures[0])
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(fn, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     functionName,
 			Name:   functionName,
@@ -110,8 +76,6 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 				"last_modified": lastModified,
 				"code_size":     codeSize,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  fn,
 		}
 

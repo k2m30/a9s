@@ -9,34 +9,6 @@ import (
 	"github.com/k2m30/a9s/internal/tui/styles"
 )
 
-// PadOrTrunc pads s to exactly w visible columns, or truncates with "…".
-// Uses a fast path for plain ASCII strings (no ANSI escapes) to avoid
-// lipgloss.Width overhead. Falls back to ANSI-aware measurement otherwise.
-func PadOrTrunc(s string, w int) string {
-	if w <= 0 {
-		return ""
-	}
-	// Fast path: no ANSI escapes → len(s) == visible width for ASCII
-	if !strings.Contains(s, "\x1b") {
-		if len(s) == w {
-			return s
-		}
-		if len(s) > w {
-			return s[:w-1] + "\u2026"
-		}
-		return s + strings.Repeat(" ", w-len(s))
-	}
-	// Slow path: ANSI-aware measurement
-	visible := lipgloss.Width(s)
-	if visible == w {
-		return s
-	}
-	if visible > w {
-		return ansi.Truncate(s, w, "\u2026")
-	}
-	return s + strings.Repeat(" ", w-visible)
-}
-
 // CenterTitle returns the top border line with title centered between corners.
 //
 //	┌─── title ───┐

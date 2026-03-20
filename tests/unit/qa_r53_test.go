@@ -92,45 +92,6 @@ func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 	}
 }
 
-func TestFetchHostedZones_DetailData(t *testing.T) {
-	mock := &mockRoute53Client{
-		output: &route53.ListHostedZonesOutput{
-			HostedZones: []r53types.HostedZone{
-				{
-					Id:                     aws.String("/hostedzone/ZDETAIL123"),
-					Name:                   aws.String("detail.example.com."),
-					CallerReference:        aws.String("ref-detail"),
-					ResourceRecordSetCount: aws.Int64(10),
-					Config: &r53types.HostedZoneConfig{
-						Comment:     aws.String("Detail test"),
-						PrivateZone: false,
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-
-	r := resources[0]
-	if r.DetailData == nil {
-		t.Fatal("DetailData must not be nil")
-	}
-
-	expectedKeys := []string{"Zone ID", "Name", "Record Count", "Private Zone", "Comment", "Caller Reference"}
-	for _, key := range expectedKeys {
-		if _, ok := r.DetailData[key]; !ok {
-			t.Errorf("DetailData missing key %q", key)
-		}
-	}
-}
-
 func TestFetchHostedZones_RawStructPopulated(t *testing.T) {
 	mock := &mockRoute53Client{
 		output: &route53.ListHostedZonesOutput{
@@ -159,9 +120,6 @@ func TestFetchHostedZones_RawStructPopulated(t *testing.T) {
 	}
 	if zone.Id == nil || *zone.Id != "/hostedzone/ZRAW123" {
 		t.Errorf("RawStruct.Id: expected %q", "/hostedzone/ZRAW123")
-	}
-	if r.RawJSON == "" {
-		t.Error("RawJSON must not be empty")
 	}
 }
 

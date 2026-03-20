@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -26,7 +25,7 @@ func init() {
 func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching route tables: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -64,30 +63,6 @@ func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]res
 			}
 		}
 
-		detail := map[string]string{
-			"Route Table ID": rtbID,
-			"Name":           name,
-			"VPC ID":         vpcID,
-			"Routes":         routesCount,
-			"Associations":   associationsCount,
-			"Main":           isMain,
-		}
-
-		if rtb.OwnerId != nil {
-			detail["Owner ID"] = *rtb.OwnerId
-		}
-
-		for _, tag := range rtb.Tags {
-			if tag.Key != nil && tag.Value != nil {
-				detail[fmt.Sprintf("Tag: %s", *tag.Key)] = *tag.Value
-			}
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(rtb, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     rtbID,
 			Name:   name,
@@ -99,8 +74,6 @@ func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]res
 				"routes_count":      routesCount,
 				"associations_count": associationsCount,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  rtb,
 		}
 

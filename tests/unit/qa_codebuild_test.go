@@ -100,10 +100,6 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		t.Error("resource[0].RawStruct should not be nil")
 	}
 
-	// Verify RawJSON is non-empty
-	if r0.RawJSON == "" {
-		t.Error("resource[0].RawJSON should not be empty")
-	}
 }
 
 func TestFetchCodeBuildProjects_ListError(t *testing.T) {

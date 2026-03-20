@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -26,7 +25,7 @@ func init() {
 func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching CloudFormation stacks: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -54,39 +53,6 @@ func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([
 			description = *stack.Description
 		}
 
-		detail := map[string]string{
-			"Stack Name":    stackName,
-			"Status":        status,
-			"Creation Time": creationTime,
-			"Last Updated":  lastUpdated,
-			"Description":   description,
-		}
-
-		if stack.StackId != nil {
-			detail["Stack ID"] = *stack.StackId
-		}
-
-		if stack.StackStatusReason != nil {
-			detail["Status Reason"] = *stack.StackStatusReason
-		}
-
-		if stack.RoleARN != nil {
-			detail["Role ARN"] = *stack.RoleARN
-		}
-
-		if stack.ParentId != nil {
-			detail["Parent Stack"] = *stack.ParentId
-		}
-
-		if stack.DriftInformation != nil {
-			detail["Drift Status"] = string(stack.DriftInformation.StackDriftStatus)
-		}
-
-		rawJSON := ""
-		if jsonBytes, err := json.MarshalIndent(stack, "", "  "); err == nil {
-			rawJSON = string(jsonBytes)
-		}
-
 		r := resource.Resource{
 			ID:     stackName,
 			Name:   stackName,
@@ -98,8 +64,6 @@ func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([
 				"last_updated":  lastUpdated,
 				"description":   description,
 			},
-			DetailData: detail,
-			RawJSON:    rawJSON,
 			RawStruct:  stack,
 		}
 

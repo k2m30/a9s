@@ -1,12 +1,15 @@
 ---
 name: a9s-add-resource
-description: Blueprint for adding a new AWS resource type to a9s — 9-file checklist with templates
+description: Blueprint for adding a new AWS resource type to a9s — 12-step checklist with templates (fetcher, types, config, tests, view-layer tests)
 disable-model-invocation: true
 ---
 
 # Adding a New AWS Resource Type
 
-Follow this exact 9-file checklist for each new resource type. Use EC2 as the canonical example.
+Follow this exact 12-step checklist for each new resource type. Use EC2 as the canonical example.
+
+Steps 1-8: Implementation. Step 9: Fetcher tests. Steps 10-12: View-layer tests (detail, YAML, list).
+**Skipping steps 10-12 is the #1 cause of test coverage gaps.**
 
 ## Prerequisites
 
@@ -321,7 +324,7 @@ func (m *mock{TypeName}Client) {APICall}(
 }
 ```
 
-### 9. Tests: `tests/unit/aws_{shortname}_test.go` (NEW FILE)
+### 9. Fetcher tests: `tests/unit/aws_{shortname}_test.go` (NEW FILE)
 
 Write tests covering:
 - Happy path: fetcher returns correct resources with expected fields
@@ -330,6 +333,181 @@ Write tests covering:
 - Field extraction: all column keys populated correctly
 - RawJSON: valid JSON marshaled
 - RawStruct: original SDK struct preserved
+
+**CRITICAL — use exact mock value assertions, NOT `== ""`:**
+
+```go
+// BAD — weak assertion, caught by coverage analysis as a gap:
+if r.DetailData["VPC"] == "" {
+    t.Error("DetailData[VPC] must not be empty")
+}
+
+// GOOD — exact mock value comparison:
+if r.DetailData["VPC"] != "vpc-111" {
+    t.Errorf("DetailData[VPC] = %q, want %q", r.DetailData["VPC"], "vpc-111")
+}
+```
+
+Every mock sets specific values (e.g., `VpcId: aws.String("vpc-111")`). The test MUST assert the exact value extracted by the fetcher, not just that it's non-empty. This catches mapping bugs where the wrong field is read.
+
+---
+
+### 10. Detail view tests: `tests/unit/qa_detail_new_types_test.go` (APPEND — package `unit_test`)
+
+**Pattern file:** `tests/unit/qa_detail_test.go`
+**Helpers:** `tests/unit/helpers_external_test.go` (`buildResource`, `configForType`, `newDetailModel`, `ensureNoColor`)
+
+Add 3 tests per resource type:
+
+```go
+// 1. realistic SDK struct builder
+func realistic{TypeName}() {service}types.{SDKType} {
+    return {service}types.{SDKType}{
+        {Field1}: ptrString("value1"),
+        {Field2}: ptrString("value2"),
+        // populate all fields used by DefaultViewDef detail paths
+    }
+}
+
+// 2. ViewContainsExpectedFields — verify config-driven detail rendering
+func TestQA_Detail_{TypeName}_ViewContainsExpectedFields(t *testing.T) {
+    ensureNoColor(t)
+    raw := realistic{TypeName}()
+    res := buildResource("test-id", "test-name", raw)
+    cfg := configForType("{shortname}")
+    m := newDetailModel(res, "{shortname}", cfg)
+    view := m.View()
+    if !strings.Contains(view, "value1") {
+        t.Errorf("{TypeName} detail should contain {Field1}, got:\n%s", view)
+    }
+}
+
+// 3. NilFields — zero-value SDK struct must not panic
+func TestQA_Detail_{TypeName}_NilFields(t *testing.T) {
+    ensureNoColor(t)
+    raw := {service}types.{SDKType}{} // all nil/zero
+    res := buildResource("empty", "empty", raw)
+    cfg := configForType("{shortname}")
+    m := newDetailModel(res, "{shortname}", cfg)
+    view := m.View()
+    if view == "" {
+        t.Error("detail view should not be empty with nil {TypeName} fields")
+    }
+}
+
+// 4. FrameTitle — verify it returns the resource name
+func TestQA_Detail_{TypeName}_FrameTitle(t *testing.T) {
+    raw := realistic{TypeName}()
+    res := buildResource("test-id", "test-name", raw)
+    cfg := configForType("{shortname}")
+    m := newDetailModel(res, "{shortname}", cfg)
+    if m.FrameTitle() != "test-name" {
+        t.Errorf("FrameTitle = %q, want %q", m.FrameTitle(), "test-name")
+    }
+}
+```
+
+**For types without SDK structs** (e.g., SQS uses attribute maps, ECS uses ARN strings):
+use `buildResourceWithFields` and pass `nil` for RawStruct. The detail view falls back to Fields rendering.
+
+### 11. YAML view tests: `tests/unit/qa_yaml_new_types_test.go` (APPEND — package `unit`)
+
+**Pattern file:** `tests/unit/qa_yaml_test.go`
+**Helpers:** `yamlView()` and `yamlModel()` from `qa_yaml_test.go`
+
+Add 3 tests per resource type + a fixture function:
+
+```go
+// Fixture returning []resource.Resource with Fields map
+func fixture{TypeName}() []resource.Resource {
+    return []resource.Resource{{
+        ID: "test-id", Name: "test-name", Status: "active",
+        Fields: map[string]string{
+            "key1": "value1",
+            "key2": "value2",
+            // all column keys from types.go
+        },
+    }}
+}
+
+// 1. ViewContainsFields — all field keys and values rendered
+func TestQA_YAML_{TypeName}_ViewContainsFields(t *testing.T) {
+    items := fixture{TypeName}()
+    for _, item := range items {
+        out := yamlView(t, item, 120, 40)
+        for k, v := range item.Fields {
+            if !strings.Contains(out, k) {
+                t.Errorf("{TypeName} YAML missing key %q", k)
+            }
+            if v != "" && !strings.Contains(out, v) {
+                t.Errorf("{TypeName} YAML missing value %q", v)
+            }
+        }
+    }
+}
+
+// 2. FrameTitle — "yaml" in title
+func TestQA_YAML_{TypeName}_FrameTitle(t *testing.T) {
+    items := fixture{TypeName}()
+    m := yamlModel(items[0], 120, 40)
+    title := m.FrameTitle()
+    if !strings.Contains(title, "yaml") {
+        t.Errorf("FrameTitle() = %q, want 'yaml' in title", title)
+    }
+}
+
+// 3. RawContentUncolored — no ANSI escape codes in plain content
+func TestQA_YAML_{TypeName}_RawContentUncolored(t *testing.T) {
+    items := fixture{TypeName}()
+    m := yamlModel(items[0], 120, 40)
+    raw := m.RawContent()
+    if strings.Contains(raw, "\x1b[") {
+        t.Error("{TypeName} RawContent() contains ANSI codes")
+    }
+}
+```
+
+### 12. List RawStruct test: `tests/unit/qa_list_rawstruct_test.go` (APPEND — package `unit_test`)
+
+**Pattern file:** `tests/unit/qa_list_rawstruct_test.go` (see `TestQA_ListRawStruct_EC2`)
+**Helper:** `newListModel()` from the same file
+
+Add 1 test per resource type (skip types without SDK structs):
+
+```go
+func TestQA_ListRawStruct_{TypeName}(t *testing.T) {
+    ensureNoColor(t)
+    cfg := configForType("{shortname}")
+
+    raw := realistic{TypeName}() // from step 10's builder
+    res := resource.Resource{
+        ID: "test-id", Name: "test-name", Status: "active",
+        Fields: map[string]string{
+            "key1": "value1", // matching types.go column keys
+        },
+        RawStruct: raw,
+    }
+
+    view := newListModel(t, "{shortname}", cfg, []resource.Resource{res})
+
+    // Verify SDK struct field values appear in list output
+    if !strings.Contains(view, "value1") {
+        t.Errorf("{TypeName} list should contain value1 from RawStruct, got:\n%s", view)
+    }
+}
+```
+
+**Note:** The `realistic{TypeName}()` function from step 10 is reused here. Both files are in package `unit_test`, so they share builders.
+
+---
+
+## Why Steps 10-12 Matter
+
+Coverage analysis found these gaps when steps 10-12 were missing:
+- **22+ types with zero view-layer tests** — detail/YAML rendering was never verified
+- **NilFields panics go undetected** — zero-value SDK structs can crash `fieldpath.ExtractSubtree`
+- **Config-driven paths not exercised** — list columns from `defaults.go` might reference non-existent struct fields
+- **Cross-cutting tests only covered types with explicit test functions** — adding RawStruct tests ensures the new type is exercised end-to-end
 
 ## Post-Implementation Steps
 
