@@ -72,6 +72,7 @@ func TestResourceList_Update_DownMoveCursor(t *testing.T) {
 ```bash
 go test ./tests/unit/ -count=1 -timeout 120s       # all
 go test ./tests/unit/ -run TestResourceList -count=1 -v  # specific
+golangci-lint run ./...                              # lint (must pass before push)
 ```
 
 ## Rules
@@ -82,3 +83,5 @@ go test ./tests/unit/ -run TestResourceList -count=1 -v  # specific
 - Tests go in `tests/unit/` package `unit`
 - Use descriptive test names: `TestResourceList_View_StatusColorRunning`
 - When a test fails, report the exact failure message and file:line
+- ALWAYS run `golangci-lint run ./...` after writing tests — test code gets linted too
+- If a test intentionally discards return values (e.g. crash-verification), use `//nolint:ineffassign,staticcheck // reason` on that line

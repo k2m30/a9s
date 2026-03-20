@@ -23,8 +23,26 @@ description: Shared rules for all a9s agents — shell rules, package access, bu
 ```
 go build -o a9s ./cmd/a9s/                        # build binary
 go test ./tests/unit/ -count=1 -timeout 120s       # run all unit tests
-go run ./cmd/refgen/ > views_reference.yaml        # regenerate views reference (after SDK changes)
+golangci-lint run ./...                            # lint (MUST pass before any push)
+go run ./cmd/refgen/ > .a9s/views_reference.yaml    # regenerate views reference (after SDK changes)
 ```
+
+## Pre-Push Checklist (MANDATORY)
+
+Before ANY `git push`, ALL of these must pass locally:
+1. `go build ./...`
+2. `go test ./tests/unit/ -count=1 -timeout 120s`
+3. `golangci-lint run ./...`
+
+CI is NOT a debugging tool. Never push to see if CI passes. Fix locally first.
+
+## Lint Fix Rules
+
+- NEVER delete code just to satisfy a linter. Understand the code's purpose first.
+- Dead code (genuinely unused, no callers) → remove it.
+- Intentionally unused (crash-verification tests, scaffolding) → `//nolint:lintername // reason`
+- If a linter rule produces widespread false positives → disable the rule in `.golangci.yml`, not per-line.
+- NEVER blindly iterate (change `m` → `_` → `_, _`). Read the surrounding context, understand the intent, fix it right the first time.
 
 ## Version Bumping
 
