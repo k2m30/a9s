@@ -432,7 +432,7 @@ func TestConfigDir_DefaultsToHomeDir(t *testing.T) {
 		t.Errorf("ConfigDir() = %q, expected it to start with home dir %q", dir, home)
 	}
 
-	wantSuffix := filepath.Join(".a9s")
+	wantSuffix := ".a9s"
 	if !strings.HasSuffix(dir, wantSuffix) {
 		t.Errorf("ConfigDir() = %q, expected it to end with %q", dir, wantSuffix)
 	}

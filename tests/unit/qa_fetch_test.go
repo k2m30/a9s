@@ -522,7 +522,7 @@ func TestQA_FetchResources_S3Objects(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
 	// S3 objects are fetched via S3EnterBucketMsg
-	m, cmd := rootApplyMsg(m, messages.S3EnterBucketMsg{BucketName: "test-bucket"})
+	_, cmd := rootApplyMsg(m, messages.S3EnterBucketMsg{BucketName: "test-bucket"})
 	if cmd == nil {
 		t.Fatal("entering S3 bucket should return a command")
 	}
@@ -765,7 +765,7 @@ func TestQA_FetchResources_UnsupportedResourceType(t *testing.T) {
 func TestQA_FetchResources_S3NavigatePrefix(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	m, cmd := rootApplyMsg(m, messages.S3NavigatePrefixMsg{
+	_, cmd := rootApplyMsg(m, messages.S3NavigatePrefixMsg{
 		Bucket: "test-bucket",
 		Prefix: "some/prefix/",
 	})
