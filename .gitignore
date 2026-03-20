@@ -36,6 +36,9 @@ coverage.html
 specs/
 .specify/
 
+# Generated reference (dev-time only)
+views_reference.yaml
+
 # GoReleaser
 dist/
 
