@@ -90,7 +90,7 @@ func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
 	}
 
 	// Simulate successful reconnect
-	m, cmd = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
+	_, cmd = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
 	if cmd == nil {
 		t.Error("After ClientsReadyMsg following region switch, should return a fetch command to refresh")
 	}
@@ -123,7 +123,7 @@ func TestBug_ProfileList_MatchesAWSCLI(t *testing.T) {
 	// This returns a NavigateMsg for TargetProfile
 	if cmd != nil {
 		msg := cmd()
-		m, cmd = rootApplyMsg(m, msg)
+		m, cmd = rootApplyMsg(m, msg) //nolint:ineffassign,staticcheck // verify flow doesn't panic
 		// This triggers fetchProfiles which returns profilesLoadedMsg
 		// We can't easily test the actual profile list without filesystem access
 		// but we verify the flow doesn't crash
@@ -143,11 +143,12 @@ func TestBug_RegionShownInHeader(t *testing.T) {
 
 	// Header format: "a9s vX.Y.Z  profile:region"
 	// With empty region, it should show a default (e.g. "us-east-1") not "test-dev:"
-	if strings.Contains(plain, "test-dev:us-east-1") || strings.Contains(plain, "test-dev:eu-") {
+	switch {
+	case strings.Contains(plain, "test-dev:us-east-1") || strings.Contains(plain, "test-dev:eu-"):
 		// Good — region is resolved
-	} else if strings.HasSuffix(strings.TrimSpace(strings.Split(plain, "\n")[0]), ":") {
+	case strings.HasSuffix(strings.TrimSpace(strings.Split(plain, "\n")[0]), ":"):
 		t.Error("header shows empty region — should resolve default region from AWS config")
-	} else if !strings.Contains(plain, ":") {
+	case !strings.Contains(plain, ":"):
 		t.Error("header missing profile:region separator")
 	}
 }
