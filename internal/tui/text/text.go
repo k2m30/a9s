@@ -14,8 +14,9 @@ func PadOrTrunc(s string, w int) string {
 	if w <= 0 {
 		return ""
 	}
-	// Fast path: no ANSI escapes -> len(s) == visible width for ASCII
-	if !strings.Contains(s, "\x1b") {
+	// Fast path: pure ASCII without ANSI escapes -> len(s) == visible width.
+	// Any multi-byte rune (len != rune count) or ANSI escape falls through.
+	if len(s) == len([]rune(s)) && !strings.Contains(s, "\x1b") {
 		if len(s) == w {
 			return s
 		}

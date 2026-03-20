@@ -61,6 +61,11 @@ type Model struct {
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
 	pendingRefresh bool // set after profile/region switch to refresh on ClientsReadyMsg
+
+	// headerCache avoids re-computing the header string every render when
+	// profile, region, version, and right-side content haven't changed.
+	headerCache    string
+	headerCacheKey string
 }
 
 // New constructs the initial Model.
@@ -271,7 +276,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.pendingRefresh = true
-	if _, ok := m.activeView().(*views.ProfileModel); ok {
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
 	}
 	flashCmd := func() tea.Msg {
@@ -285,7 +290,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
 	m.region = msg.Region
 	m.pendingRefresh = true
-	if _, ok := m.activeView().(*views.RegionModel); ok {
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
 	}
 	flashCmd := func() tea.Msg {
@@ -378,13 +383,21 @@ func (m Model) View() tea.View {
 
 	headerProfile := m.profile
 	headerRegion := m.region
-	if _, ok := active.(*views.RegionModel); ok {
-		headerRegion = "..."
+	if sel, ok := active.(*views.SelectorModel); ok {
+		if sel.Title() == "aws-regions" {
+			headerRegion = "..."
+		} else if sel.Title() == "aws-profiles" {
+			headerProfile = "..."
+		}
 	}
-	if _, ok := active.(*views.ProfileModel); ok {
-		headerProfile = "..."
+	rightContent := m.headerRight()
+	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + fmt.Sprintf("%d", m.width)
+	header := m.headerCache
+	if cacheKey != m.headerCacheKey {
+		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent)
+		m.headerCache = header
+		m.headerCacheKey = cacheKey
 	}
-	header := layout.RenderHeader(headerProfile, headerRegion, Version, m.width, m.headerRight())
 
 	content := active.View()
 	var lines []string
@@ -538,11 +551,7 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd
-	case *views.ProfileModel:
-		updated, cmd := v.Update(msg)
-		m.stack[len(m.stack)-1] = &updated
-		return m, cmd
-	case *views.RegionModel:
+	case *views.SelectorModel:
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd

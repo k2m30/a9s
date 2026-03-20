@@ -350,16 +350,16 @@ func TestQA_EC2_A7_2_SortByNameDescending(t *testing.T) {
 	}
 }
 
-func TestQA_EC2_A7_3_SortByStatusAscending(t *testing.T) {
+func TestQA_EC2_A7_3_SortByIDAscending(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press S to sort by status ascending
-	m, _ = rootApplyMsg(m, rootKeyPress("S"))
+	// Press I to sort by ID ascending
+	m, _ = rootApplyMsg(m, rootKeyPress("I"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "State\u2191") {
-		t.Error("A.7.3: State column header should show ascending indicator")
+	if !strings.Contains(plain, "Instance ID\u2191") {
+		t.Error("A.7.3: Instance ID column header should show ascending indicator")
 	}
 }
 
@@ -379,9 +379,9 @@ func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
 func TestQA_EC2_A7_7_SortIndicatorExactlyOneColumn(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Sort by name first, then switch to status
+	// Sort by name first, then switch to ID
 	m, _ = rootApplyMsg(m, rootKeyPress("N"))
-	m, _ = rootApplyMsg(m, rootKeyPress("S"))
+	m, _ = rootApplyMsg(m, rootKeyPress("I"))
 
 	plain := stripANSI(rootViewContent(m))
 

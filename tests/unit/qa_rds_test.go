@@ -611,24 +611,25 @@ func TestQA_RDS_Sort_ByNameDescending(t *testing.T) {
 	}
 }
 
-func TestQA_RDS_Sort_ByStatus(t *testing.T) {
+func TestQA_RDS_Sort_ByID(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Press 'S' for sort by status.
-	m, _ = m.Update(rdsKeyPress("S"))
+	// Press 'I' for sort by ID.
+	m, _ = m.Update(rdsKeyPress("I"))
 	out := m.View()
 
-	// Status column header matches "Status" title so indicator should appear.
+	// DB Identifier column key is "db_identifier" which contains "id",
+	// so the sort indicator should appear on that column.
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator after pressing S")
+		t.Error("expected sort indicator after pressing I")
 	}
 }
 
 func TestQA_RDS_Sort_IndicatorOnlyOneColumn(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Sort by status (which matches the "Status" column title).
-	m, _ = m.Update(rdsKeyPress("S"))
+	// Sort by ID (which matches the "DB Identifier" column key containing "id").
+	m, _ = m.Update(rdsKeyPress("I"))
 	out := m.View()
 	plain := stripANSI(out)
 	lines := strings.Split(plain, "\n")

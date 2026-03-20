@@ -228,8 +228,8 @@ func (m HelpModel) resourceListGroups(secrets bool) []helpGroup {
 		title: "SORT",
 		bindings: []helpBinding{
 			{"N", "sort name"},
-			{"S", "sort status"},
-			{"A", "sort age"},
+			{"I", "sort id"},
+			{"A", "sort date"},
 		},
 	}
 
@@ -260,7 +260,7 @@ func (m HelpModel) detailGroups() []helpGroup {
 			title: "ACTIONS",
 			bindings: []helpBinding{
 				{"y", "yaml"},
-				{"c", "copy id"},
+				{"c", "copy yaml"},
 				{"w", "wrap toggle"},
 			},
 		},

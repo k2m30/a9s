@@ -424,6 +424,62 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HC-09: HELP TEXT MATCHES ACTUAL BEHAVIOR
+// ═══════════════════════════════════════════════════════════════════════════
+
+func TestQA_HelpContext_DetailView_CopySaysYAML(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:   messages.TargetDetail,
+		Resource: res,
+	})
+
+	m, _ = rootApplyMsg(m, rootKeyPress("?"))
+	plain := stripANSI(rootViewContent(m))
+	plainLower := strings.ToLower(plain)
+
+	// Detail view c key copies YAML, not ID — help should say "copy yaml"
+	if strings.Contains(plainLower, "copy id") {
+		t.Errorf("HC-09: detail help should say 'copy yaml' not 'copy id', got:\n%s", plain)
+	}
+	if !strings.Contains(plainLower, "copy yaml") {
+		t.Errorf("HC-09: detail help should contain 'copy yaml', got:\n%s", plain)
+	}
+}
+
+func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+	m, _ = rootApplyMsg(m, rootKeyPress("?"))
+	plain := stripANSI(rootViewContent(m))
+	plainLower := strings.ToLower(plain)
+
+	// Sort by age is confusing — should say "sort date" or "sort created"
+	if strings.Contains(plainLower, "sort age") {
+		t.Errorf("HC-09: sort label should say 'sort date' not 'sort age', got:\n%s", plain)
+	}
+	if !strings.Contains(plainLower, "sort date") {
+		t.Errorf("HC-09: resource list help should contain 'sort date', got:\n%s", plain)
+	}
+
+	// Sort by status was replaced with sort by id
+	if strings.Contains(plainLower, "sort status") {
+		t.Errorf("HC-09: sort label should say 'sort id' not 'sort status', got:\n%s", plain)
+	}
+	if !strings.Contains(plainLower, "sort id") {
+		t.Errorf("HC-09: resource list help should contain 'sort id', got:\n%s", plain)
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // HC-10: FRAME TITLE
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -14,7 +14,7 @@ type View interface {
 }
 
 // Filterable is an optional interface for views that support filtering.
-// Only navigable list views (main menu, resource list, profile, region)
+// Only navigable list views (main menu, resource list, selector)
 // implement this. Static views (detail, yaml, help, reveal) do not.
 type Filterable interface {
 	SetFilter(text string)

@@ -24,6 +24,7 @@ func sortTestTypeDef() resource.ResourceTypeDef {
 		ShortName: "ec2",
 		Aliases:   []string{"ec2"},
 		Columns: []resource.Column{
+			{Key: "instance_id", Title: "Instance ID", Width: 14},
 			{Key: "name", Title: "Name", Width: 20},
 			{Key: "state", Title: "State", Width: 14},
 			{Key: "launch_time", Title: "Launch Time", Width: 24},
@@ -39,35 +40,35 @@ func sortTestResources() []resource.Resource {
 		{
 			ID: "i-001", Name: "echo", Status: "terminated",
 			Fields: map[string]string{
-				"name": "echo", "state": "terminated",
+				"instance_id": "i-001", "name": "echo", "state": "terminated",
 				"launch_time": "2026-01-05T00:00:00Z",
 			},
 		},
 		{
 			ID: "i-002", Name: "alpha", Status: "running",
 			Fields: map[string]string{
-				"name": "alpha", "state": "running",
+				"instance_id": "i-002", "name": "alpha", "state": "running",
 				"launch_time": "2026-01-01T00:00:00Z",
 			},
 		},
 		{
 			ID: "i-003", Name: "delta", Status: "stopped",
 			Fields: map[string]string{
-				"name": "delta", "state": "stopped",
+				"instance_id": "i-003", "name": "delta", "state": "stopped",
 				"launch_time": "2026-01-04T00:00:00Z",
 			},
 		},
 		{
 			ID: "i-004", Name: "bravo", Status: "pending",
 			Fields: map[string]string{
-				"name": "bravo", "state": "pending",
+				"instance_id": "i-004", "name": "bravo", "state": "pending",
 				"launch_time": "2026-01-02T00:00:00Z",
 			},
 		},
 		{
 			ID: "i-005", Name: "charlie", Status: "running",
 			Fields: map[string]string{
-				"name": "charlie", "state": "running",
+				"instance_id": "i-005", "name": "charlie", "state": "running",
 				"launch_time": "2026-01-03T00:00:00Z",
 			},
 		},
@@ -162,6 +163,28 @@ func extractDataTimestamps(rendered string) []string {
 	return timestamps
 }
 
+// extractDataIDs parses the rendered output and returns the instance ID
+// values in the order they appear, skipping the header row.
+func extractDataIDs(rendered string) []string {
+	knownIDs := []string{"i-001", "i-002", "i-003", "i-004", "i-005"}
+	lines := strings.Split(rendered, "\n")
+	var ids []string
+	for _, line := range lines {
+		plain := stripANSI(line)
+		// Skip the header line
+		if strings.Contains(plain, "Instance ID") && strings.Contains(plain, "Name") {
+			continue
+		}
+		for _, id := range knownIDs {
+			if strings.Contains(plain, id) {
+				ids = append(ids, id)
+				break
+			}
+		}
+	}
+	return ids
+}
+
 // ===========================================================================
 // Issue 1: Sort by Name tests — verify actual data order
 // ===========================================================================
@@ -208,51 +231,46 @@ func TestQA_SortOrder_NameDescending(t *testing.T) {
 }
 
 // ===========================================================================
-// Sort by Status tests — verify actual data order
+// Sort by ID tests — verify actual data order
 // ===========================================================================
 
-func TestQA_SortOrder_StatusAscending(t *testing.T) {
+func TestQA_SortOrder_IDAscending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press S to sort by status ascending
-	m, _ = m.Update(rlKeyPress("S"))
+	// Press I to sort by ID ascending
+	m, _ = m.Update(rlKeyPress("I"))
 
 	rendered := m.View()
-	statuses := extractDataStatuses(rendered)
+	ids := extractDataIDs(rendered)
 
-	// Ascending alphabetical: pending < running < stopped < terminated
-	if len(statuses) != 5 {
-		t.Fatalf("expected 5 status entries, got %d: %v", len(statuses), statuses)
+	expected := []string{"i-001", "i-002", "i-003", "i-004", "i-005"}
+	if len(ids) != len(expected) {
+		t.Fatalf("expected %d IDs, got %d: %v", len(expected), len(ids), ids)
 	}
-
-	// Verify sorted order: each status should be <= the next
-	for i := 0; i < len(statuses)-1; i++ {
-		if statuses[i] > statuses[i+1] {
-			t.Errorf("status at position %d (%q) should be <= position %d (%q); full order: %v",
-				i, statuses[i], i+1, statuses[i+1], statuses)
+	for i, id := range expected {
+		if ids[i] != id {
+			t.Errorf("position %d: expected %q, got %q (full order: %v)", i, id, ids[i], ids)
 		}
 	}
 }
 
-func TestQA_SortOrder_StatusDescending(t *testing.T) {
+func TestQA_SortOrder_IDDescending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press S twice: ascending then descending
-	m, _ = m.Update(rlKeyPress("S"))
-	m, _ = m.Update(rlKeyPress("S"))
+	// Press I twice: ascending then descending
+	m, _ = m.Update(rlKeyPress("I"))
+	m, _ = m.Update(rlKeyPress("I"))
 
 	rendered := m.View()
-	statuses := extractDataStatuses(rendered)
+	ids := extractDataIDs(rendered)
 
-	if len(statuses) != 5 {
-		t.Fatalf("expected 5 status entries, got %d: %v", len(statuses), statuses)
+	expected := []string{"i-005", "i-004", "i-003", "i-002", "i-001"}
+	if len(ids) != len(expected) {
+		t.Fatalf("expected %d IDs, got %d: %v", len(expected), len(ids), ids)
 	}
-
-	// Verify descending order: each status should be >= the next
-	for i := 0; i < len(statuses)-1; i++ {
-		if statuses[i] < statuses[i+1] {
-			t.Errorf("status at position %d (%q) should be >= position %d (%q); full order: %v",
-				i, statuses[i], i+1, statuses[i+1], statuses)
+	for i, id := range expected {
+		if ids[i] != id {
+			t.Errorf("position %d: expected %q, got %q (full order: %v)", i, id, ids[i], ids)
 		}
 	}
 }
@@ -377,20 +395,20 @@ func TestQA_SortOrder_SwitchFieldResetsToAscending(t *testing.T) {
 	m, _ = m.Update(rlKeyPress("N"))
 	m, _ = m.Update(rlKeyPress("N"))
 
-	// Now switch to status sort — should be ascending
-	m, _ = m.Update(rlKeyPress("S"))
+	// Now switch to ID sort — should be ascending
+	m, _ = m.Update(rlKeyPress("I"))
 
 	rendered := m.View()
-	statuses := extractDataStatuses(rendered)
+	ids := extractDataIDs(rendered)
 
-	if len(statuses) < 2 {
-		t.Fatal("expected at least 2 status entries")
+	if len(ids) < 2 {
+		t.Fatal("expected at least 2 ID entries")
 	}
 
-	// First status should be alphabetically smallest (ascending)
-	for i := 0; i < len(statuses)-1; i++ {
-		if statuses[i] > statuses[i+1] {
-			t.Errorf("after switching to status sort, should be ascending: got %v", statuses)
+	// IDs should be in ascending order
+	for i := 0; i < len(ids)-1; i++ {
+		if ids[i] > ids[i+1] {
+			t.Errorf("after switching to ID sort, should be ascending: got %v", ids)
 			break
 		}
 	}

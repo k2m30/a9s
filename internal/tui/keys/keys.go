@@ -32,9 +32,9 @@ type Map struct {
 	ScrollRight key.Binding
 
 	// Sort
-	SortByName   key.Binding
-	SortByStatus key.Binding
-	SortByAge    key.Binding
+	SortByName key.Binding
+	SortByID   key.Binding
+	SortByAge  key.Binding
 
 	// Pagination
 	PageUp   key.Binding
@@ -70,9 +70,9 @@ func Default() Map {
 		ScrollLeft:  key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "scroll left")),
 		ScrollRight: key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "scroll right")),
 
-		SortByName:   key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
-		SortByStatus: key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sort status")),
-		SortByAge:    key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "sort age")),
+		SortByName: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
+		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),
+		SortByAge:  key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "sort date")),
 
 		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up")),
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down")),

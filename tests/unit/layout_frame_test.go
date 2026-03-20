@@ -83,6 +83,32 @@ func TestPadOrTrunc_ANSIStyled(t *testing.T) {
 	}
 }
 
+func TestPadOrTrunc_UnicodeArrow(t *testing.T) {
+	// Sort indicator arrows are multi-byte UTF-8 but single display column.
+	// PadOrTrunc must produce correct visible width, not byte length.
+	got := text.PadOrTrunc("Name\u2191", 10) // "Name↑" = 5 display cols
+	vis := lipgloss.Width(got)
+	if vis != 10 {
+		t.Errorf("expected visible width 10 for %q, got %d (len=%d)", got, vis, len(got))
+	}
+}
+
+func TestPadOrTrunc_UnicodeExactWidth(t *testing.T) {
+	got := text.PadOrTrunc("Name\u2193", 5) // "Name↓" = 5 display cols, exact fit
+	vis := lipgloss.Width(got)
+	if vis != 5 {
+		t.Errorf("expected visible width 5 for %q, got %d", got, vis)
+	}
+}
+
+func TestPadOrTrunc_UnicodeTruncate(t *testing.T) {
+	got := text.PadOrTrunc("LongName\u2191", 6) // "LongName↑" = 9 display cols, truncate to 6
+	vis := lipgloss.Width(got)
+	if vis != 6 {
+		t.Errorf("expected visible width 6 for %q, got %d", got, vis)
+	}
+}
+
 // ── CenterTitle tests ────────────────────────────────────────────────────────
 
 func TestLayoutCenterTitle_EmptyTitle(t *testing.T) {
@@ -314,5 +340,99 @@ func TestLayoutRenderHeader_LeftRightSeparation(t *testing.T) {
 	}
 	if rightIdx <= leftIdx {
 		t.Errorf("right content should appear after left content")
+	}
+}
+
+// ── RenderFramePrepadded tests ────────────────────────────────────────────
+
+func TestLayoutRenderFramePrepadded_BasicBox(t *testing.T) {
+	// Pre-pad lines to innerW = 20-2 = 18
+	innerW := 18
+	line1 := "hello" + strings.Repeat(" ", innerW-5)
+	line2 := "world" + strings.Repeat(" ", innerW-5)
+	lines := []string{line1, line2}
+	got := layout.RenderFramePrepadded(lines, "test", 20, 6)
+	outLines := strings.Split(got, "\n")
+
+	if len(outLines) != 6 {
+		t.Errorf("expected 6 lines, got %d", len(outLines))
+	}
+
+	for i, line := range outLines {
+		vis := lipgloss.Width(line)
+		if vis != 20 {
+			t.Errorf("line %d: expected visible width 20, got %d: %q", i, vis, line)
+		}
+	}
+}
+
+func TestLayoutRenderFramePrepadded_MatchesRenderFrame(t *testing.T) {
+	// Pre-pad content to innerW = 40-2 = 38
+	innerW := 38
+	rawLines := []string{"short", "a longer content line here"}
+	paddedLines := make([]string, len(rawLines))
+	for i, line := range rawLines {
+		visW := lipgloss.Width(line)
+		if visW < innerW {
+			paddedLines[i] = line + strings.Repeat(" ", innerW-visW)
+		} else {
+			paddedLines[i] = line
+		}
+	}
+
+	got1 := layout.RenderFrame(rawLines, "My Title", 40, 8)
+	got2 := layout.RenderFramePrepadded(paddedLines, "My Title", 40, 8)
+
+	if got1 != got2 {
+		t.Errorf("RenderFramePrepadded should produce identical output to RenderFrame when content is pre-padded")
+	}
+}
+
+func TestLayoutRenderFramePrepadded_EmptyLines(t *testing.T) {
+	got := layout.RenderFramePrepadded(nil, "test", 20, 5)
+	outLines := strings.Split(got, "\n")
+
+	if len(outLines) != 5 {
+		t.Errorf("expected 5 lines, got %d", len(outLines))
+	}
+
+	for i, line := range outLines {
+		vis := lipgloss.Width(line)
+		if vis != 20 {
+			t.Errorf("line %d: expected visible width 20, got %d", i, vis)
+		}
+	}
+}
+
+func TestLayoutRenderFramePrepadded_BorderChars(t *testing.T) {
+	innerW := 8
+	line := "x" + strings.Repeat(" ", innerW-1)
+	got := layout.RenderFramePrepadded([]string{line}, "", 10, 4)
+	outLines := strings.Split(got, "\n")
+
+	topPlain := stripANSI(outLines[0])
+	if !strings.HasPrefix(topPlain, "\u250c") {
+		t.Errorf("top border should start with corner char")
+	}
+	if !strings.HasSuffix(topPlain, "\u2510") {
+		t.Errorf("top border should end with corner char")
+	}
+
+	bottomPlain := stripANSI(outLines[len(outLines)-1])
+	if !strings.HasPrefix(bottomPlain, "\u2514") {
+		t.Errorf("bottom border should start with corner char")
+	}
+	if !strings.HasSuffix(bottomPlain, "\u2518") {
+		t.Errorf("bottom border should end with corner char")
+	}
+
+	for i := 1; i < len(outLines)-1; i++ {
+		plain := stripANSI(outLines[i])
+		if !strings.HasPrefix(plain, "\u2502") {
+			t.Errorf("line %d should start with side border", i)
+		}
+		if !strings.HasSuffix(plain, "\u2502") {
+			t.Errorf("line %d should end with side border", i)
+		}
 	}
 }
