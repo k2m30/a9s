@@ -20,7 +20,7 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.3.0
+          version: v2.11.3
 
   test:
     name: Test (${{ matrix.os }})
@@ -35,12 +35,16 @@ jobs:
           go-version-file: go.mod
       - name: Install clipboard utilities
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y xclip
+        run: sudo apt-get install -y xclip xvfb
       - name: Run tests
+        if: matrix.os != 'ubuntu-latest'
         run: go test ./tests/unit/ -count=1 -timeout 120s -race
+      - name: Run tests (with virtual display)
+        if: matrix.os == 'ubuntu-latest'
+        run: xvfb-run go test ./tests/unit/ -count=1 -timeout 120s -race
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
-        run: go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic
+        run: xvfb-run go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
