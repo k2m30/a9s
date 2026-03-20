@@ -20,7 +20,8 @@
       "mcp__aws-api__call_aws",
       "Bash(tee*)",
       "Bash(sort*)",
-      "Bash(.specify/scripts/*)"
+      "Bash(.specify/scripts/*)",
+      "Bash(go test*)"
     ]
   }
 }
