@@ -18,20 +18,10 @@ func DefaultConfigPath() string {
 	return filepath.Join(home, ".aws", "config")
 }
 
-// DefaultCredentialsPath returns the default AWS credentials file path (~/.aws/credentials).
-func DefaultCredentialsPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join("~", ".aws", "credentials")
-	}
-	return filepath.Join(home, ".aws", "credentials")
-}
-
 // ListProfiles reads AWS config file profile names, matching `aws configure list-profiles`.
 // Only [profile xxx] sections from ~/.aws/config are included.
-// Credentials-only profiles (in ~/.aws/credentials but not in config) are excluded
-// to match AWS CLI behavior.
-func ListProfiles(configPath, credentialsPath string) ([]string, error) {
+// a9s never reads ~/.aws/credentials — credential handling is delegated entirely to the AWS SDK.
+func ListProfiles(configPath string) ([]string, error) {
 	seen := make(map[string]bool)
 
 	// Parse config file only — matches `aws configure list-profiles` behavior
