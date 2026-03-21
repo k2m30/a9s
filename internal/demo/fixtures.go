@@ -25,11 +25,13 @@ var r53RecordData = map[string]func() []resource.Resource{}
 
 // demoData maps resource short names to fixture generator functions.
 // Each call returns a fresh slice (no shared global state).
-var demoData = map[string]func() []resource.Resource{
-	"s3":     s3Buckets,
-	"lambda": lambdaFunctions,
-	"dbi":    rdsInstances,
-	// "ec2" is added in fixtures_compute.go init()
+// Generators are registered via init() in each fixtures_*.go category file.
+var demoData = map[string]func() []resource.Resource{}
+
+func init() {
+	demoData["s3"] = s3Buckets
+	demoData["lambda"] = lambdaFunctions
+	demoData["dbi"] = rdsInstances
 }
 
 // GetResources returns fixture data for the given resource type.
