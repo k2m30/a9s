@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/internal/config"
+	"github.com/k2m30/a9s/internal/demo"
 	"github.com/k2m30/a9s/internal/tui"
 )
 
@@ -23,6 +24,7 @@ func main() {
 		region      string
 		showVersion bool
 		showHelp    bool
+		demoMode    bool
 	)
 
 	flag.StringVar(&profile, "profile", "", "AWS profile to use")
@@ -33,6 +35,8 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "Print version and exit (shorthand)")
 	flag.BoolVar(&showHelp, "help", false, "Print help and exit")
 	flag.BoolVar(&showHelp, "h", false, "Print help and exit (shorthand)")
+	flag.BoolVar(&demoMode, "demo", false, "Run with synthetic demo data (no AWS credentials needed)")
+	flag.BoolVar(&demoMode, "d", false, "Run with synthetic demo data (shorthand)")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -40,6 +44,7 @@ func main() {
 		fmt.Println("Usage: a9s [flags]")
 		fmt.Println("  -p, --profile  AWS profile to use")
 		fmt.Println("  -r, --region   AWS region override")
+		fmt.Println("  -d, --demo     Run with synthetic demo data (no AWS credentials needed)")
 		fmt.Println("  -v, --version  Print version and exit")
 		fmt.Println("  -h, --help     Print this help")
 	}
@@ -61,9 +66,18 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
+	if demoMode {
+		if profile == "" {
+			profile = demo.DemoProfile
+		}
+		if region == "" {
+			region = demo.DemoRegion
+		}
+	}
+
 	tui.Version = version
 
-	model := tui.New(profile, region)
+	model := tui.New(profile, region, tui.WithDemo(demoMode))
 
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
