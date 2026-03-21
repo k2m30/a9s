@@ -72,6 +72,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
   - `views` -> `keys`, `messages`, `styles`, `fieldpath`, `config`, `resource`
   - `messages` -> `resource` only
   - `layout` -> `styles` only
+  - `text` -> stdlib + lipgloss + `charmbracelet/x/ansi` only
   - `styles` -> stdlib + lipgloss only
 - [ ] `views` never imports `layout` (root composes frame around view content)
 - [ ] `views` never imports `app` (communicate via messages only)
@@ -161,10 +162,10 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Resource Model
-- [ ] `resource.Resource` has `ID`, `Name`, `Status`, `RawObject interface{}`, `Fields map[string]string`
+- [ ] `resource.Resource` has `ID`, `Name`, `Status`, `RawStruct interface{}`, `Fields map[string]string`
 - [ ] `Fields` is the primary data source for list columns — populated by fetchers
-- [ ] `RawObject` holds the original AWS SDK struct for detail/YAML views
-- [ ] `fieldpath` extracts nested fields from `RawObject` via reflection paths
+- [ ] `RawStruct` holds the original AWS SDK struct for detail/YAML views
+- [ ] `fieldpath` extracts nested fields from `RawStruct` via reflection paths
 - [ ] `FindResourceType()` matches by `ShortName` or any alias (case-insensitive)
 
 ---
@@ -289,7 +290,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] `govet` enabled (with `fieldalignment` disabled)
 - [ ] `errcheck` enabled
 - [ ] `staticcheck` enabled
-- [ ] `gosimple` enabled
+- [ ] `gosimple` enabled (implicit via `staticcheck` in golangci-lint v2)
 - [ ] `unused` enabled
 - [ ] CI runs `go test` and `go build` on push/PR
 
