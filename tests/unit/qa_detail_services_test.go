@@ -15,6 +15,7 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
@@ -226,6 +227,17 @@ func realisticIAMGroup() iamtypes.Group {
 		Arn:        ptrString("arn:aws:iam::123456789012:group/developers"),
 		Path:       ptrString("/"),
 		CreateDate: ptrTime(svcTestTime),
+	}
+}
+
+// realisticSESIdentity returns an sesv2types.IdentityInfo matching the type
+// produced by internal/aws/ses.go FetchSESIdentities.
+func realisticSESIdentity() sesv2types.IdentityInfo {
+	return sesv2types.IdentityInfo{
+		IdentityName:       ptrString("example.com"),
+		IdentityType:       sesv2types.IdentityTypeDomain,
+		SendingEnabled:     true,
+		VerificationStatus: sesv2types.VerificationStatusSuccess,
 	}
 }
 
