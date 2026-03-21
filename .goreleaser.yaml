@@ -1,7 +1,8 @@
 version: 2
 
 builds:
-  - main: ./cmd/a9s
+  - id: a9s
+    main: ./cmd/a9s
     binary: a9s
     env:
       - CGO_ENABLED=0
@@ -56,7 +57,9 @@ signs:
       - ${artifact}
 
 dockers_v2:
-  - images:
+  - ids:
+      - a9s
+    images:
       - "ghcr.io/k2m30/a9s"
     tags:
       - "v{{ .Version }}"
