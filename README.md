@@ -9,8 +9,7 @@
 [![Downloads](https://img.shields.io/github/downloads/k2m30/a9s/total)](https://github.com/k2m30/a9s/releases)
 [![codecov](https://codecov.io/gh/k2m30/a9s/graph/badge.svg)](https://codecov.io/gh/k2m30/a9s)
 
-<!-- TODO: Replace with actual demo GIF once generated with VHS -->
-<!-- ![a9s demo](assets/demo.gif) -->
+![a9s demo](docs/demos/demo.gif)
 
 Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
 

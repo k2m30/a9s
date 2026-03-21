@@ -42,10 +42,6 @@ views_reference.yaml
 # GoReleaser
 dist/
 
-# VHS generated assets
-assets/*.gif
-assets/*.mp4
-
 # Hugo build output
 website/public/
 website/.hugo_build.lock

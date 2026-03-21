@@ -35,8 +35,6 @@ The shell/launch command is never shown — recording begins inside the app.
 | 7.0s | Press `Down` x2 | Cursor moves down rows |
 | 8.0s | Type `/web` | Filter narrows to instances matching "web" |
 | 9.5s | Press `Esc` | Clear filter, full list back |
-| 10.5s | Press `N` | Sort by name — rows reorder |
-| 12.0s | Press `Right` x2 | Horizontal scroll — reveals Launch Time, VPC ID |
 
 ### Act 3: EC2 Detail + YAML (13-20s)
 
@@ -78,13 +76,11 @@ The shell/launch command is never shown — recording begins inside the app.
 2. **Arrow key navigation** — Down/Up/Left/Right + Enter/Esc (vim keys also work but not shown)
 3. **Status colors** — green/red/yellow for resource states
 4. **Filtering** — `/web` narrows results in real-time
-5. **Sorting** — `N` reorders by name
-6. **Horizontal scroll** — Right arrow reveals hidden columns
-7. **Detail view** — structured key-value display
-8. **YAML view** — syntax-colored full API response
-9. **S3 drill-down** — bucket → objects hierarchy
-10. **Command mode** — `:s3`, `:lambda`, `:rds` to jump anywhere
-11. **Multi-resource** — EC2, S3, Lambda, RDS in one session
+5. **Detail view** — structured key-value display
+6. **YAML view** — syntax-colored full API response
+7. **S3 drill-down** — bucket → objects hierarchy
+8. **Command mode** — `:s3`, `:lambda`, `:rds` to jump anywhere
+9. **Multi-resource** — EC2, S3, Lambda, RDS in one session
 
 ## Resources Shown
 
