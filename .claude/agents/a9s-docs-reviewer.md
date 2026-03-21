@@ -48,10 +48,19 @@ You are a documentation reviewer for the a9s project at /Users/k2m30/projects/a9
 - Verify version numbers in headers match git tags
 - Verify comparison links at bottom are correct URLs
 
-### 5. Website Content (if exists)
+### 5. Website Content
 
 - Check `website/content/` pages for consistency with README
-- Verify install instructions match README
+- Verify install instructions match README (Docker volume path, Go version, cosign command)
+- Verify docs page key bindings match README key bindings tables
+- Verify docs page commands section matches README commands section
+- Verify resources page matches `internal/resource/types.go` (same as README check)
+- Verify Go version in install page, README, and CONTRIBUTING.md all match go.mod
+
+### 6. CI Path Filtering
+
+- Verify docs-only PRs (*.md, docs/, website/, specs/, .claude/) do NOT trigger CI
+- Verify code PRs DO trigger full CI (lint, test, build, security, verify-readonly, install-test)
 
 ## Output
 
