@@ -1,0 +1,15 @@
+views:
+  r53_records:
+    list:
+      Name:
+        path: Name
+        width: 50
+      Type:
+        path: Type
+        width: 10
+      TTL:
+        path: TTL
+        width: 10
+      Values:
+        key: values
+        width: 60
