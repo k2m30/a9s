@@ -38,6 +38,22 @@ Before ANY `git push`, ALL of these must pass locally:
 
 CI is NOT a debugging tool. Never push to see if CI passes. Fix locally first.
 
+**Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT trigger CI.
+The pre-push checklist is only required when Go source code, go.mod, go.sum, .golangci.yml, Makefile,
+Dockerfile, .goreleaser.yaml, or .github/workflows/ files are modified.
+
+## CI Path Filtering
+
+CI and CodeQL workflows skip docs-only changes via `paths-ignore`. The website has its own deploy workflow
+triggered by `website/**` changes. Release workflow triggers only on `v*` tags.
+
+| Workflow | Trigger |
+|----------|---------|
+| CI (lint, test, build, security, verify-readonly, install-test) | Code changes to main or PRs |
+| CodeQL | Code changes to main or PRs, plus weekly schedule |
+| Deploy Website | `website/**` changes pushed to main |
+| Release (GoReleaser) | `v*` tag push only |
+
 ## Lint Fix Rules
 
 - NEVER delete code just to satisfy a linter. Understand the code's purpose first.
@@ -45,6 +61,16 @@ CI is NOT a debugging tool. Never push to see if CI passes. Fix locally first.
 - Intentionally unused (crash-verification tests, scaffolding) → `//nolint:lintername // reason`
 - If a linter rule produces widespread false positives → disable the rule in `.golangci.yml`, not per-line.
 - NEVER blindly iterate (change `m` → `_` → `_, _`). Read the surrounding context, understand the intent, fix it right the first time.
+
+## Docs Sync Rule
+
+When code changes affect any of the following, you MUST update README.md AND the website (`website/content/`) in the same PR:
+- Resource types added/removed/renamed → update README services table + `website/content/resources.md`
+- Key bindings added/removed/changed → update README key bindings tables + `website/content/docs/_index.md`
+- Commands added/removed/changed → update README commands table + `website/content/docs/_index.md`
+- CLI flags changed → update README Quick Start + `website/content/install.md`
+- Install methods changed → update README Installation + `website/content/install.md`
+- Go version bumped → update README, CONTRIBUTING.md, `website/content/install.md`
 
 ## Version Bumping
 
