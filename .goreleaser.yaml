@@ -90,7 +90,6 @@ dockers_v2:
       - latest
     platforms:
       - linux/amd64
-      - linux/arm64
     labels:
       "org.opencontainers.image.description": "Terminal UI AWS Resource Manager"
       "org.opencontainers.image.created": "{{ .Date }}"
@@ -101,4 +100,4 @@ dockers_v2:
       "org.opencontainers.image.licenses": "GPL-3.0-or-later"
 
 release:
-  discussion_category_name: Releases
+  prerelease: auto

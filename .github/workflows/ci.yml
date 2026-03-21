@@ -1,15 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - 'website/**'
-      - 'specs/**'
-      - '.claude/**'
-      - 'LICENSE'
   pull_request:
     branches: [main]
     paths-ignore:
