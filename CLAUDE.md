@@ -86,5 +86,8 @@ Go 1.26+: Follow standard conventions
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - ALWAYS update README.md AND website content when code changes affect resource types, key bindings, commands, CLI flags, or install methods. Same PR.
+- BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
+- BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
+- BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
 
 <!-- MANUAL ADDITIONS END -->

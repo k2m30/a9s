@@ -38,6 +38,11 @@ Before ANY `git push`, ALL of these must pass locally:
 
 CI is NOT a debugging tool. Never push to see if CI passes. Fix locally first.
 
+**Before pushing, also run these agents:**
+5. `a9s-consistency-checker` — verify code/docs/website alignment (must be all PASS, no FAIL)
+6. `test-coverage-analyzer` — check for test coverage gaps
+7. `a9s-architect` — verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
+
 **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT trigger CI.
 The pre-push checklist is only required when Go source code, go.mod, go.sum, .golangci.yml, Makefile,
 Dockerfile, .goreleaser.yaml, or .github/workflows/ files are modified.
