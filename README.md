@@ -12,7 +12,7 @@
 <!-- TODO: Replace with actual demo GIF once generated with VHS -->
 <!-- ![a9s demo](assets/demo.gif) -->
 
-Browse, inspect, and manage 60+ AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
+Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
 
 **Read-only by design.** a9s never makes write calls to AWS. Safe to use in production.
 
@@ -94,7 +94,7 @@ a9s --version             # print version
 | **Compute** | EC2 Instances, ECS Services, ECS Clusters, ECS Tasks, Lambda Functions, Auto Scaling Groups, Elastic Beanstalk |
 | **Containers** | EKS Clusters, EKS Node Groups |
 | **Networking** | Load Balancers, Target Groups, Security Groups, VPCs, Subnets, Route Tables, NAT Gateways, Internet Gateways, Elastic IPs, VPC Endpoints, Transit Gateways, Network Interfaces |
-| **Databases & Storage** | RDS Instances, S3 Buckets, ElastiCache Redis, DocumentDB Clusters, DynamoDB Tables, OpenSearch Domains, Redshift Clusters, EFS File Systems, RDS Snapshots, DocDB Snapshots |
+| **Databases & Storage** | DB Instances, S3 Buckets, ElastiCache Redis, DB Clusters, DynamoDB Tables, OpenSearch Domains, Redshift Clusters, EFS File Systems, RDS Snapshots, DocDB Snapshots |
 | **Monitoring** | CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails |
 | **Messaging** | SQS Queues, SNS Topics, SNS Subscriptions, EventBridge Rules, Kinesis Streams, MSK Clusters, Step Functions |
 | **Secrets & Config** | Secrets Manager, SSM Parameters, KMS Keys |
@@ -134,6 +134,7 @@ a9s --version             # print version
 | `?` | Help |
 | `Ctrl+R` | Refresh |
 | `w` | Toggle line wrap (in YAML view) |
+| `Tab` | Autocomplete (in command mode) |
 
 ### Sorting
 
