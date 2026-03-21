@@ -71,7 +71,7 @@ make build
 ./a9s
 ```
 
-Requires Go 1.25+.
+Requires Go 1.26+.
 
 ## Quick Start
 
