@@ -15,18 +15,9 @@ import (
 func skipIfNoAWSConfig(t *testing.T) {
 	t.Helper()
 	configPath := awsclient.DefaultConfigPath()
-	credentialsPath := awsclient.DefaultCredentialsPath()
 
-	configExists := false
-	if _, err := os.Stat(configPath); err == nil {
-		configExists = true
-	}
-	credsExists := false
-	if _, err := os.Stat(credentialsPath); err == nil {
-		credsExists = true
-	}
-	if !configExists && !credsExists {
-		t.Skip("no AWS config or credentials files found; skipping real AWS test")
+	if _, err := os.Stat(configPath); err != nil {
+		t.Skip("no AWS config file found; skipping real AWS test")
 	}
 }
 
@@ -175,7 +166,7 @@ func TestQA_200_S3ListingGlobalRegardlessOfRegion(t *testing.T) {
 func TestIntegration_ListProfilesReal(t *testing.T) {
 	skipIfNoAWSConfig(t)
 
-	profiles, err := awsclient.ListProfiles(awsclient.DefaultConfigPath(), awsclient.DefaultCredentialsPath())
+	profiles, err := awsclient.ListProfiles(awsclient.DefaultConfigPath())
 	if err != nil {
 		t.Fatalf("ListProfiles failed: %v", err)
 	}

@@ -16,7 +16,11 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 **Read-only by design.** a9s never makes write calls to AWS. Safe to use in production.
 
+**No credential storage.** a9s never reads `~/.aws/credentials`. Authentication is delegated entirely to the AWS SDK's credential chain.
+
 **No telemetry.** a9s never phones home.
+
+**Try without AWS.** Run `a9s --demo` to explore the full UI with synthetic data — no AWS account needed.
 
 ## Features
 
@@ -56,10 +60,12 @@ Verify the signature (optional):
 cosign verify-blob --signature checksums.txt.sig checksums.txt
 ```
 
-### Docker
+### Docker (demo)
+
+Try a9s without installing — runs in demo mode with synthetic data:
 
 ```sh
-docker run --rm -it -v ~/.aws:/home/a9s/.aws:ro ghcr.io/k2m30/a9s:latest
+docker run --rm -it ghcr.io/k2m30/a9s:latest --demo
 ```
 
 ### Build from source
