@@ -89,10 +89,10 @@ func TestGetResources_S3(t *testing.T) {
 		t.Fatal("GetResources(\"s3\") returned empty slice; expected non-empty")
 	}
 
-	// S3 is Fields-only (no RawStruct).
+	// Every S3 resource must have non-nil RawStruct (s3types.Bucket).
 	for i, r := range resources {
-		if r.RawStruct != nil {
-			t.Errorf("resource[%d] (%s): RawStruct should be nil for S3 (Fields-only)", i, r.ID)
+		if r.RawStruct == nil {
+			t.Errorf("resource[%d] (%s): RawStruct is nil; S3 fixtures must populate RawStruct", i, r.ID)
 		}
 	}
 
