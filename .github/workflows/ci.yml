@@ -3,13 +3,13 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - 'website/**'
-      - 'specs/**'
-      - '.claude/**'
-      - 'LICENSE'
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yml'
+      - 'Makefile'
+      - '.github/workflows/ci.yml'
 
 permissions:
   contents: read
@@ -44,12 +44,9 @@ jobs:
       - name: Run tests
         if: matrix.os != 'ubuntu-latest'
         run: go test ./tests/unit/ -count=1 -timeout 120s -race
-      - name: Run tests (with virtual display)
-        if: matrix.os == 'ubuntu-latest'
-        run: xvfb-run go test ./tests/unit/ -count=1 -timeout 120s -race
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
-        run: xvfb-run go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic
+        run: xvfb-run go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic -timeout 120s -race
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
@@ -70,6 +67,11 @@ jobs:
         run: go build -trimpath -o a9s ./cmd/a9s/
       - name: Verify binary
         run: ./a9s --version
+      - name: Validate goreleaser config
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: check
 
   security:
     name: Security
@@ -91,21 +93,3 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for write API calls
         run: make verify-readonly
-
-  install-test:
-    name: Install Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Test go install
-        run: go install ./cmd/a9s/
-      - name: Verify installed binary
-        run: a9s --version
-      - name: Validate goreleaser config
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          version: "~> v2"
-          args: check
