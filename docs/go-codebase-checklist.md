@@ -4,6 +4,65 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ---
 
+## Design Principles
+
+### KISS (Keep It Simple, Stupid)
+- [ ] No abstraction without a concrete second use case — three similar lines > a premature helper
+- [ ] No configuration for things that have one correct value
+- [ ] No generics unless the type constraint eliminates real duplication across 3+ call sites
+- [ ] Control flow is linear and obvious — no clever tricks, no callback chains
+- [ ] A new contributor can understand any file in under 5 minutes
+
+### DRY (Don't Repeat Yourself)
+- [ ] Shared logic extracted only when identical code appears in 3+ places (not 2)
+- [ ] Extracted helpers live as close to their callers as possible (same package > utility package)
+- [ ] Test helpers live in `tests/unit/helpers_*.go` — not duplicated across test files
+- [ ] AWS fetchers follow a consistent pattern but are NOT generated or abstracted into a framework — each is a straightforward function
+- [ ] Style constants defined once in `styles/palette.go` — never inline hex strings
+
+### YAGNI (You Aren't Gonna Need It)
+- [ ] No feature flags, plugin systems, or extension points that aren't actively used
+- [ ] No interfaces defined before they have 2+ implementations or a mock requirement
+- [ ] No backward-compatibility shims for removed features — delete cleanly
+- [ ] No configuration options for behavior nobody has asked to customize
+- [ ] `views.yaml` overrides exist because users need them — not because they might someday
+
+### TDA (Tell, Don't Ask)
+- [ ] Views receive messages and act — they don't query the root model for state
+- [ ] `Update()` returns commands — callers don't inspect model fields to decide what to do next
+- [ ] AWS fetchers receive clients and return resources — they don't reach into global state
+- [ ] `NavigateMsg` tells the root where to go — views don't ask "what view am I?"
+- [ ] Flash messages tell the root what to display — views don't read flash state directly
+
+### SOLID
+
+**Single Responsibility:**
+- [ ] Each view handles one screen (list, detail, YAML, help, profile, region, reveal)
+- [ ] Each fetcher handles one AWS resource type
+- [ ] `app.go` is the only file that knows about the view stack and routing
+- [ ] `messages/` is data definitions only — no behavior
+
+**Open/Closed:**
+- [ ] New resource types added by creating a fetcher file + registering — no existing code modified
+- [ ] New views added by implementing the `View` interface + adding a message case in `app.go`
+- [ ] Styles extensible via `views.yaml` without touching Go code
+
+**Liskov Substitution:**
+- [ ] All views satisfy the `View` interface — root model treats them uniformly via the view stack
+- [ ] All AWS fetchers satisfy the `FetchFunc` signature — registry dispatches without type knowledge
+
+**Interface Segregation:**
+- [ ] AWS interfaces are single-method — mocks implement exactly what they test
+- [ ] `View` interface is minimal (5 methods) — no view is forced to implement unused capabilities
+- [ ] `Filterable` is opt-in — only views that support filtering implement it
+
+**Dependency Inversion:**
+- [ ] Views depend on `messages` and `keys` (abstractions) — not on `app` (concrete root)
+- [ ] Fetchers depend on SDK interfaces — not on concrete SDK clients
+- [ ] Root model depends on `View` interface — not on concrete view types (except in the type switch, which is an accepted Bubble Tea pattern)
+
+---
+
 ## Package Design
 - [ ] Package name describes what it provides, not what it does (`resource` not `resourceutils`)
 - [ ] No circular imports between packages
