@@ -82,7 +82,7 @@ Requires Go 1.26+.
 
 a9s uses the standard [AWS credential chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). Any of these work:
 - Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
-- AWS config files (`~/.aws/config`, `~/.aws/credentials`)
+- AWS config file (`~/.aws/config`) — a9s never reads `~/.aws/credentials`
 - EC2 instance metadata / ECS task role / SSO
 
 ```sh
@@ -172,7 +172,7 @@ All resource shortnames from the Supported AWS Services table work as commands.
 
 ## Configuration
 
-a9s stores configuration in `~/.a9s/config.yaml`. AWS profiles and regions are read from your standard AWS configuration (`~/.aws/config` and `~/.aws/credentials`).
+a9s stores view configuration in `~/.a9s/views.yaml` (optional — sensible defaults are built-in). AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
 
 ## AWS Permissions
 
