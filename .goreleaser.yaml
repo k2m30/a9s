@@ -5,6 +5,7 @@ builds:
     binary: a9s
     env:
       - CGO_ENABLED=0
+      - GOFLAGS=-buildvcs=false
     flags:
       - -trimpath
     ldflags:
@@ -15,7 +16,6 @@ builds:
     goos:
       - linux
       - darwin
-      - windows
     goarch:
       - amd64
       - arm64
@@ -24,21 +24,6 @@ archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-
-nfpms:
-  - vendor: k2m30
-    homepage: https://github.com/k2m30/a9s
-    maintainer: a9s contributors
-    description: Terminal UI AWS Resource Manager
-    license: GPL-3.0-or-later
-    formats:
-      - deb
-      - rpm
-      - apk
 
 homebrew_casks:
   - repository:
@@ -60,9 +45,6 @@ changelog:
       - "^test:"
       - "^chore:"
 
-sboms:
-  - artifacts: archive
-
 signs:
   - cmd: cosign
     artifacts: checksum
@@ -71,15 +53,6 @@ signs:
       - sign-blob
       - --yes
       - --output-signature=${signature}
-      - ${artifact}
-
-docker_signs:
-  - cmd: cosign
-    artifacts: manifests
-    output: true
-    args:
-      - sign
-      - --yes
       - ${artifact}
 
 dockers_v2:
@@ -98,6 +71,15 @@ dockers_v2:
       "org.opencontainers.image.version": "{{ .Version }}"
       "org.opencontainers.image.source": "{{ .GitURL }}"
       "org.opencontainers.image.licenses": "GPL-3.0-or-later"
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - sign
+      - --yes
+      - ${artifact}
 
 release:
   prerelease: auto
