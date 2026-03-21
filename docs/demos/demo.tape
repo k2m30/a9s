@@ -1,63 +1,105 @@
-# VHS demo script for a9s
+# a9s demo recording — loopable GIF
 # Run: vhs docs/demos/demo.tape
-# Requires: vhs (brew install vhs), a9s binary, valid AWS credentials
+# Requires: vhs, ./a9s binary built
 
-Output assets/demo.gif
-Set Theme "Tokyo Night"
-Set FontSize 14
-Set Width 1400
-Set Height 800
-Set Padding 20
-Set TypingSpeed 80ms
-Set Shell zsh
+Output docs/demos/demo.gif
 
-# Launch a9s
-Type "a9s"
+Set Shell bash
+Set FontSize 18
+Set Width 1200
+Set Height 500
+Set Padding 10
+Set TypingSpeed 500ms
+Set Framerate 5
+Set Theme "TokyoNight"
+
+# Launch a9s in demo mode (hidden)
+Hide
+Type "./a9s --demo"
 Enter
-Sleep 3s
+Sleep 1s
+Show
 
-# Navigate through menu categories
-Down 3
+# ── Act 1: Main Menu ──
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+
+# ── Act 2: EC2 List View ──
+Up
+Sleep 300ms
+Up
+Sleep 300ms
+Up
+Sleep 300ms
+
+Enter
+Sleep 2s
+
+# Browse rows
+Down
+Sleep 300ms
+Down
+Sleep 600ms
+
+# Filter by "web"
+Type "/web"
+Sleep 2s
+
+Escape
+Sleep 800ms
+
+# ── Act 3: EC2 Detail + YAML ──
+Type "d"
+Sleep 2s
+
+# Scroll detail
+Down
+Sleep 200ms
+Down
+Sleep 200ms
+Down
+Sleep 800ms
+
+# YAML view
+Type "y"
+Sleep 2s
+
+# Back: YAML → detail → list → menu
+Escape
 Sleep 500ms
-Down 2
+Escape
 Sleep 500ms
+Escape
+Sleep 800ms
 
-# Select a resource type
+# ── Act 4: S3 Drill-Down ──
+Type ":s3"
 Enter
 Sleep 2s
 
-# Scroll through resource list
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-
-# Open YAML detail view
+# Enter first bucket
 Enter
 Sleep 2s
 
-# Scroll in detail view
-Down 5
-Sleep 1s
-
-# Go back
+# Back: objects → buckets → menu
 Escape
-Sleep 1s
+Sleep 500ms
+Escape
+Sleep 800ms
 
-# Switch region
-Type "R"
+# ── Act 5: Quick Tour ──
+Type ":lambda"
+Enter
 Sleep 2s
 
-# Go back to menu
-Escape
-Sleep 1s
-
-# Show help
-Type "?"
+Type ":rds"
+Enter
 Sleep 2s
 
-# Close help
+# Back to main menu (loop point)
 Escape
-Sleep 1s
+Sleep 2s

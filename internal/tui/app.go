@@ -734,7 +734,7 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 // are special cases because they require additional parameters.
 func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId string) tea.Cmd {
 	if m.demoMode {
-		return m.fetchDemoResources(resourceType, s3Bucket)
+		return m.fetchDemoResources(resourceType, s3Bucket, r53ZoneId)
 	}
 	clients := m.clients
 	return func() tea.Msg {
@@ -776,11 +776,22 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId strin
 
 // fetchDemoResources returns a tea.Cmd that provides synthetic fixture data
 // instead of calling AWS APIs. Maintains the async message contract.
-func (m *Model) fetchDemoResources(resourceType, s3Bucket string) tea.Cmd {
+func (m *Model) fetchDemoResources(resourceType, s3Bucket, r53ZoneId string) tea.Cmd {
 	return func() tea.Msg {
 		// S3 object drill-down
 		if s3Bucket != "" {
 			resources, ok := demo.GetS3Objects(s3Bucket, "")
+			if !ok {
+				resources = nil
+			}
+			return messages.ResourcesLoadedMsg{
+				ResourceType: resourceType,
+				Resources:    resources,
+			}
+		}
+		// R53 records drill-down
+		if r53ZoneId != "" {
+			resources, ok := demo.GetR53Records(r53ZoneId)
 			if !ok {
 				resources = nil
 			}
