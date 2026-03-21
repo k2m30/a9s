@@ -2,35 +2,32 @@
 
 This document outlines the planned direction for a9s. Priorities may shift based on community feedback.
 
-Track progress on the [GitHub Projects board](https://github.com/k2m30/a9s/projects).
+## Already Implemented
+
+- **62 AWS resource types** across 12 categories
+- **Search and filter** -- `/` to filter resource lists by name
+- **Sort columns** -- `N`/`I`/`A` to sort by name, ID, or date
+- **Customizable columns** -- `~/.a9s/views.yaml` overrides which fields are displayed per resource type
+- **Multi-account** -- works out of the box via assume-role in `~/.aws/config`
+- **Demo mode** -- `--demo` flag runs the full UI with synthetic data, no AWS needed
 
 ## Short-Term
 
-- **More AWS resource types** -- Cognito, AppSync, CloudWatch Alarms, Config Rules, GuardDuty, Inspector, Lightsail, MediaConvert, Neptune, QuickSight, Redshift Serverless, SageMaker, Transfer Family
-- **Search and filter** -- filter resource lists by name, tag, or status
-- **Sort columns** -- click/key to sort by any column
-- **Customizable columns** -- choose which fields to display per resource type
-
-## Medium-Term
-
 - **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default)
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
-- **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
-- **Multi-account** -- browse resources across AWS accounts (via assume-role)
-- **Tag editor** -- view and edit resource tags inline
-- **Bookmarks** -- save frequently accessed resources for quick access
+- **Themes** -- additional color themes beyond Tokyo Night Dark
 
 ## Long-Term
 
-- **Plugin system** -- user-defined resource types and actions via Go plugins or YAML
-- **Custom views** -- user-defined table layouts and detail views
+- **More AWS resource types** -- Cognito, AppSync, Config Rules, GuardDuty, Neptune, SageMaker, and more
+- **Tag editor** -- view and edit resource tags inline
+- **Bookmarks** -- save frequently accessed resources for quick access
 - **Live tail** -- stream CloudWatch Logs in a split pane
-- **Notifications** -- alert on resource state changes (instance stopped, alarm triggered)
-- **SSO integration** -- native AWS SSO / Identity Center support
-- **Themes** -- additional color themes beyond Tokyo Night Dark
+- **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
 
 ## Non-Goals
 
+- **Plugin system** -- adds complexity without clear value; new resource types are easy to add via PR
 - **Terraform/IaC integration** -- a9s is a viewer, not a provisioning tool
 - **Telemetry or analytics** -- a9s will never phone home
 - **Web UI** -- terminal-first, always
