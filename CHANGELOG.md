@@ -7,89 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Version now injected via build-time ldflags (no longer hardcoded)
-- Expanded linter configuration with gosec, gocritic, bodyclose, prealloc, noctx
-- Enhanced Makefile with security scanning, coverage, and read-only API verification
-
 ### Added
+- `--demo` mode with synthetic fixtures for all 62 resource types (no AWS credentials needed)
+- Demo GIF embedded in README and website
+- Credential hardening: app never reads `~/.aws/credentials`
 - GPL-3.0-or-later license
 - Full README with features, installation, key bindings, and service catalog
-- CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md
+- CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md, ROADMAP.md
 - GitHub Actions CI pipeline (lint, test, build, security, read-only verification)
 - CodeQL security scanning
 - GoReleaser configuration for multi-platform releases
 - Homebrew tap (k2m30/homebrew-a9s)
-- Docker image (ghcr.io/k2m30/a9s)
-- Cosign binary signing
+- Docker image (ghcr.io/k2m30/a9s) running in demo mode
+- Cosign binary signing and SBOMs
 - Dependabot configuration for Go modules and GitHub Actions
 - Issue templates and PR template
 - Stale issue/PR automation
-
-## [2.8.0] - 2025-03-18
-
-### Added
-- Config directory management with `ConfigDir` / `EnsureConfigDir`
-
-## [2.7.0] - 2025-03-18
+- Hugo website with landing page, install guide, and docs
+- S3 drill-down into bucket objects (demo mode)
+- Route 53 drill-down into zone records (demo mode)
 
 ### Changed
-- Extracted shared view primitives, added render caching for performance
+- Version now injected via build-time ldflags (no longer hardcoded)
+- Expanded linter configuration with gosec, gocritic, bodyclose, noctx
+- Enhanced Makefile with security scanning, coverage, and read-only API verification
+- Bumped Go to 1.26.1 (resolved 14 stdlib CVEs)
+- golangci-lint v2 config migration
 
-## [2.5.3] - 2025-03-17
-
-### Added
-- Grouped menu by category (Compute, Storage, Database, Network, Security, etc.)
-
-### Fixed
-- Profile switch region handling
-- Stale flash message after profile change
-
-## [2.4.0] - 2025-03-16
-
-### Added
-- Route53 DNS records drill-down view
-
-## [2.2.1] - 2025-03-15
-
-### Added
-- 330 view-layer tests covering all 52 resource types
-
-## [2.2.0] - 2025-03-15
-
-### Added
-- 32 new AWS resource types (ACM, API Gateway, Athena, Auto Scaling, Backup, CloudFront, CodeArtifact, CodeBuild, CodePipeline, ECR, EFS, EIP, ENI, EventBridge, Glue, IAM Groups/Policies/Users, KMS, Kinesis, MSK, OpenSearch, RDS Snapshots, DocumentDB Snapshots, Redshift, Route53, SES, Step Functions, SNS Subscriptions, Transit Gateways, VPC Endpoints, WAF, CloudTrail)
-
-## [2.1.2] - 2025-03-14
+## [0.5.0] - 2026-03-16
 
 ### Fixed
-- UI lag on fast arrow-key scrolling
+- 15 UI bugs: filter, navigation, YAML, scroll, help, header, detail views
 
-## [2.1.0] - 2025-03-14
+## [0.4.5] - 2026-03-16
+
+### Added
+- Configurable views via YAML config (`~/.a9s/views.yaml`)
+
+## [0.3.2] - 2026-03-15
+
+### Added
+- Horizontal scroll for wide tables
+- 517 comprehensive QA tests
+- CI pipeline
+- Consolidated mock infrastructure
 
 ### Fixed
-- Escape key behavior
-- Broken columns
-- Views usability overhaul
+- Layout, navigation, and S3 bugs
+- Unicode separator, duplicate version constant
 
-## [2.0.0] - 2025-03-13
-
-### Added
-- 20 new AWS resource types (CloudFormation, CloudWatch, CloudWatch Logs, DynamoDB, ECS Clusters/Services/Tasks, ELB, IAM Roles, IGW, Lambda, NAT Gateways, Route Tables, SNS, SQS, SSM, Subnets, Target Groups)
-
-## [1.5.0] - 2025-03-12
+## [0.3.0] - 2026-03-15
 
 ### Added
-- Menu viewport scrolling
-- Parametrized tests for scaling
+- Horizontal scroll for wide tables
+- Removed all skipped tests
 
-## [1.4.1] - 2025-03-11
+## [0.2.0] - 2026-03-15
 
 ### Added
-- Complete TUI rewrite
-- VPC, Security Groups, Node Groups resource types
+- 517 QA tests covering layout, navigation, S3 bugs
 
-## [1.0.0] - 2025-03-08
+### Fixed
+- Layout and navigation bugs
+- S3 view issues
+
+## [0.1.0] - 2026-03-15
 
 ### Added
 - Initial release
@@ -100,16 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clipboard support
 - Help overlay
 
-[Unreleased]: https://github.com/k2m30/a9s/compare/v2.8.0...HEAD
-[2.8.0]: https://github.com/k2m30/a9s/compare/v2.7.0...v2.8.0
-[2.7.0]: https://github.com/k2m30/a9s/compare/v2.5.3...v2.7.0
-[2.5.3]: https://github.com/k2m30/a9s/compare/v2.4.0...v2.5.3
-[2.4.0]: https://github.com/k2m30/a9s/compare/v2.2.1...v2.4.0
-[2.2.1]: https://github.com/k2m30/a9s/compare/v2.2.0...v2.2.1
-[2.2.0]: https://github.com/k2m30/a9s/compare/v2.1.2...v2.2.0
-[2.1.2]: https://github.com/k2m30/a9s/compare/v2.1.0...v2.1.2
-[2.1.0]: https://github.com/k2m30/a9s/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/k2m30/a9s/compare/v1.5.0...v2.0.0
-[1.5.0]: https://github.com/k2m30/a9s/compare/v1.4.1...v1.5.0
-[1.4.1]: https://github.com/k2m30/a9s/compare/v1.0.0...v1.4.1
-[1.0.0]: https://github.com/k2m30/a9s/releases/tag/v1.0.0
+[Unreleased]: https://github.com/k2m30/a9s/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/k2m30/a9s/compare/v0.4.5...v0.5.0
+[0.4.5]: https://github.com/k2m30/a9s/compare/v0.3.2...v0.4.5
+[0.3.2]: https://github.com/k2m30/a9s/releases/tag/v0.3.2

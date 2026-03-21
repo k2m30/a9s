@@ -42,7 +42,7 @@ cover: coverage
 
 verify-readonly:
 	@echo "Checking for write API calls in internal/aws/..."
-	@if grep -rn 'Create\|Delete\|Update\|Put\|Modify\|Terminate\|Start\|Stop\|Reboot\|Run\|Execute\|Send\|Publish\|Remove\|Detach\|Attach\|Associate\|Disassociate\|Enable\|Disable\|Revoke\|Invoke' internal/aws/*.go \
+	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z]' internal/aws/*.go \
 		| grep -v '_test.go' \
 		| grep -v 'errors.go' \
 		| grep -v 'interfaces.go' \
@@ -51,8 +51,7 @@ verify-readonly:
 		| grep -v 'regions.go' \
 		| grep -v '\/\/' \
 		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
-		| grep -v 'Creat\|Delet\|Updat\|Modif\|Termin\|Start\|Stop' \
-		| grep -E '\.(Create|Delete|Update|Put|Modify|Terminate|Start|Stop|Reboot|RunInstances|Execute|Send|Publish|Remove)[A-Z]' ; then \
+		| grep -v 'CreateDate\|StartRecord\|StartTime\|StopTime' ; then \
 		echo "FAIL: Write API calls detected!"; exit 1; \
 	else \
 		echo "PASS: All API calls are read-only"; \

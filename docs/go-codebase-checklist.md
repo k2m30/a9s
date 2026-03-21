@@ -216,9 +216,10 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## init() Functions
 - [ ] `init()` in `internal/aws/*.go` is acceptable — registers fetchers in the resource registry
+- [ ] `init()` in `internal/demo/*.go` is acceptable — registers fixture generators in the demo data map
 - [ ] `init()` in `internal/tui/styles/` is acceptable — initializes computed style values
-- [ ] No other `init()` functions exist outside these two locations
-- [ ] Each `init()` is a single `resource.Register()` call — no complex logic
+- [ ] No other `init()` functions exist outside these three locations
+- [ ] Each `init()` contains only simple registrations — no complex logic
 
 ---
 
