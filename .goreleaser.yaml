@@ -56,33 +56,5 @@ signs:
       - --output-signature=${signature}
       - ${artifact}
 
-dockers_v2:
-  - ids:
-      - a9s
-    images:
-      - "ghcr.io/k2m30/a9s"
-    tags:
-      - "v{{ .Version }}"
-      - latest
-    platforms:
-      - linux/amd64
-    labels:
-      "org.opencontainers.image.description": "Terminal UI AWS Resource Manager"
-      "org.opencontainers.image.created": "{{ .Date }}"
-      "org.opencontainers.image.name": "{{ .ProjectName }}"
-      "org.opencontainers.image.revision": "{{ .FullCommit }}"
-      "org.opencontainers.image.version": "{{ .Version }}"
-      "org.opencontainers.image.source": "{{ .GitURL }}"
-      "org.opencontainers.image.licenses": "GPL-3.0-or-later"
-
-docker_signs:
-  - cmd: cosign
-    artifacts: manifests
-    output: true
-    args:
-      - sign
-      - --yes
-      - ${artifact}
-
 release:
   prerelease: auto
