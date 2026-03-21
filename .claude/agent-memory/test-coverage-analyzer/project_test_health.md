@@ -1,25 +1,31 @@
 ---
 name: Test Suite Health Assessment
-description: Comprehensive test coverage analysis (2,887 test runs, 1,732 func Test*, 120 files) - critical gap in 34 skipped Redis/DocDB tests, RawStruct list coverage limited to original 7 types
+description: Comprehensive test coverage analysis (3,002 test runs, 1,763 func Test*, 129 files) - R53 records drill-down untested at TUI level, --demo CLI integration test missing
 type: project
 ---
 
-a9s test suite assessed 2026-03-21: 1,732 top-level test functions producing 2,887 test runs (including subtests), 46,806 lines of test code across 120 unit test files + 5 integration test files. All tests pass in 5.0s. 59 tests skip at runtime (34 in qa_redis_docdb_test.go).
+a9s test suite assessed 2026-03-21: 1,763 top-level test functions producing 3,002 test runs (including subtests), 48,471 lines of test code across 129 unit test files + 5 integration test files. All tests pass (1,762 PASS, 0 FAIL) in 4.0s. Only 5 tests skip at runtime (down from 59 previously).
 
 **Critical gaps identified:**
-- 34 tests in qa_redis_docdb_test.go SKIP because fixtureRedisClusters() and fixtureDocDBClusters() lack RawStruct. These are fully-written tests that never execute -- highest ROI fix.
-- qa_list_rawstruct_test.go covers only 7 original types (EC2, S3, RDS, Redis, DocDB, EKS, Secrets). 55 newer types lack RawStruct list-view verification.
-- Profile loading pipeline (fetchProfiles, parseCredentialsProfiles) remains under-tested.
-- Status color tests verify ANSI presence, not correct hex color values.
-- client.go (session construction) has zero unit tests.
+- R53 records TUI drill-down (R53EnterZoneMsg -> handleR53EnterZone -> NewR53RecordsList) has zero test coverage at the app.go level. S3 drill-down (S3EnterBucketMsg) is thoroughly tested (8+ tests), but the analogous R53 flow has none.
+- No `--demo` CLI integration test in tests/integration/. The binary flag exists but is never tested end-to-end.
+- demo.GetR53Records() is never called from any test file -- the R53 record fixture data quality is untested.
+- r53_records config defaults (defaults.go:667) have no config_test.go coverage (unlike s3_objects which has full coverage).
+- client.go (NewAWSSession, CreateServiceClients) has zero unit tests -- only integration-level smoke tests.
 
-**What improved since 2026-03-18:**
-- Test count grew from 915 to 1,732 func Test* (2,887 total runs).
-- All 62+ fetchers now have unit tests (was mostly covered, now 100%).
-- qa_list_rawstruct_test.go added (879 lines) to address the list-view RawStruct blind spot for the original 7 types.
-- Detail/YAML tests expanded significantly with ec2_family, services, and v220 variants.
-- Wave 2 resource types (VPC, SG, Node Groups) have excellent test depth.
+**What improved since previous assessment (2026-03-21 earlier):**
+- Redis/DocDB fixture skips resolved: 0 fixture-related skips remain (was 34). fixtureRedisClusters()/fixtureDocDBClusters() now return data.
+- Test count grew from 1,732 to 1,763 func Test* (3,002 total runs, was 2,887).
+- qa_list_rawstruct_test.go now covers ALL 62 resource types in TestQA_ListRawStruct_AllTypes (was only 7 original types).
+- Skips dropped from 59 to 5.
 
-**Why:** The test suite looks comprehensive by count but has a systematic blind spot: Redis/DocDB tests skip silently, and list-view column extraction from SDK structs is only verified for the original resource types.
+**Remaining 5 skips:**
+1. TestQA_FetchResources_ViaLoadResourcesMsg/alarm -- specific fetch mock issue
+2. TestQA_Profile_FrameTitle -- intentional (filesystem-dependent)
+3. TestQA_ListViewColumns_EC2/Name -- configurable view column mismatch
+4. TestQA_DetailViewPaths_RDS/Tags -- struct field name mismatch (TagList)
+5. TestDetailPaths_AllConfiguredFieldsRendered/sqs -- no fixture available
 
-**How to apply:** When assessing coverage, count skips separately from passes. When adding new resource types, ensure list-view tests use RawStruct, not just Fields maps.
+**Why:** The suite has excellent breadth (62 resource types covered) but a systematic gap around the R53 records sub-resource feature added recently, and demo mode CLI integration testing.
+
+**How to apply:** When reviewing R53 or demo-mode changes, note that TUI-level drill-down and CLI integration paths are untested. Prioritize adding R53EnterZoneMsg tests mirroring the S3EnterBucketMsg pattern.
