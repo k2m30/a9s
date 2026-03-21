@@ -13,7 +13,6 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Short-Term
 
-- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default)
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
 - **Themes** -- additional color themes beyond Tokyo Night Dark
 
@@ -24,6 +23,10 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Bookmarks** -- save frequently accessed resources for quick access
 - **Live tail** -- stream CloudWatch Logs in a split pane
 - **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
+
+## Future (after project maturity, 10k+ stars)
+
+- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
 
 ## Non-Goals
 
