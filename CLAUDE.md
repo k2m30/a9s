@@ -75,6 +75,7 @@ Go 1.26+: Follow standard conventions
 | `test-coverage-analyzer` | Test suite analysis, coverage gaps | Read-only |
 | `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Read + Web |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice, real workflows | All |
+| `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Read-only |
 
 ## Rules
 
