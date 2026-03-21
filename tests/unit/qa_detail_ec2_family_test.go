@@ -326,8 +326,25 @@ func realisticSNSSubscription() snstypes.Subscription {
 	}
 }
 
+// realisticManagedPolicyDetail is deprecated; use realisticIAMPolicy instead.
+// Kept for backward compatibility with TestQA_Detail_Policy_NilFields which
+// uses iamtypes.ManagedPolicyDetail{} directly.
 func realisticManagedPolicyDetail() iamtypes.ManagedPolicyDetail {
 	return iamtypes.ManagedPolicyDetail{
+		PolicyName:      ptrString("ReadOnlyAccess"),
+		PolicyId:        ptrString("ANPAI1234567890EXAMPLE"),
+		Arn:             ptrString("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),
+		Path:            ptrString("/"),
+		AttachmentCount: ptrInt32(5),
+		CreateDate:      ptrTime(testTime),
+		Description:     ptrString("Provides read-only access"),
+	}
+}
+
+// realisticIAMPolicy returns an iamtypes.Policy matching the type produced by
+// internal/aws/iam_policies.go FetchIAMPolicies (which uses ListPolicies API).
+func realisticIAMPolicy() iamtypes.Policy {
+	return iamtypes.Policy{
 		PolicyName:      ptrString("ReadOnlyAccess"),
 		PolicyId:        ptrString("ANPAI1234567890EXAMPLE"),
 		Arn:             ptrString("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),

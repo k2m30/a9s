@@ -1,6 +1,12 @@
 package unit
 
-import "github.com/k2m30/a9s/internal/resource"
+import (
+	"github.com/aws/aws-sdk-go-v2/aws"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+
+	"github.com/k2m30/a9s/internal/resource"
+)
 
 // fixtureS3Buckets returns sanitized S3 bucket data for testing.
 // Source: sanitized from real AWS data (5 buckets shown).
@@ -219,6 +225,15 @@ func fixtureRedisClusters() []resource.Resource {
 				"nodes":          "1",
 				"endpoint":       "",
 			},
+			RawStruct: elasticachetypes.CacheCluster{
+				CacheClusterId:     aws.String("test-redis-1"),
+				Engine:             aws.String("redis"),
+				EngineVersion:      aws.String("7.0.7"),
+				CacheNodeType:      aws.String("cache.t2.micro"),
+				CacheClusterStatus: aws.String("available"),
+				NumCacheNodes:      aws.Int32(1),
+				// ConfigurationEndpoint is nil (matches empty endpoint in Fields)
+			},
 		},
 	}
 }
@@ -238,6 +253,15 @@ func fixtureDocDBClusters() []resource.Resource {
 				"instances":      "1",
 				"endpoint":       "test-docdb-cluster.cluster-abc123def.us-east-1.docdb.amazonaws.com",
 			},
+			RawStruct: docdbtypes.DBCluster{
+				DBClusterIdentifier: aws.String("test-docdb-cluster"),
+				EngineVersion:       aws.String("5.0.0"),
+				Status:              aws.String("available"),
+				Endpoint:            aws.String("test-docdb-cluster.cluster-abc123def.us-east-1.docdb.amazonaws.com"),
+				DBClusterMembers: []docdbtypes.DBClusterMember{
+					{DBInstanceIdentifier: aws.String("test-docdb-instance-1"), IsClusterWriter: aws.Bool(true)},
+				},
+			},
 		},
 		{
 			ID:     "test-rds-cluster",
@@ -249,6 +273,15 @@ func fixtureDocDBClusters() []resource.Resource {
 				"status":         "available",
 				"instances":      "1",
 				"endpoint":       "test-rds-cluster.cluster-abc123def.us-east-1.rds.amazonaws.com",
+			},
+			RawStruct: docdbtypes.DBCluster{
+				DBClusterIdentifier: aws.String("test-rds-cluster"),
+				EngineVersion:       aws.String("16.8"),
+				Status:              aws.String("available"),
+				Endpoint:            aws.String("test-rds-cluster.cluster-abc123def.us-east-1.rds.amazonaws.com"),
+				DBClusterMembers: []docdbtypes.DBClusterMember{
+					{DBInstanceIdentifier: aws.String("test-rds-instance-1"), IsClusterWriter: aws.Bool(true)},
+				},
 			},
 		},
 	}

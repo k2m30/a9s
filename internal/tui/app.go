@@ -14,6 +14,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/internal/aws"
 	"github.com/k2m30/a9s/internal/config"
+	"github.com/k2m30/a9s/internal/demo"
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui/keys"
 	"github.com/k2m30/a9s/internal/tui/layout"
@@ -67,10 +68,22 @@ type Model struct {
 	// profile, region, version, and right-side content haven't changed.
 	headerCache    string
 	headerCacheKey string
+
+	demoMode bool
+}
+
+// Option configures the root Model.
+type Option func(*Model)
+
+// WithDemo enables demo mode with synthetic fixture data.
+func WithDemo(enabled bool) Option {
+	return func(m *Model) {
+		m.demoMode = enabled
+	}
 }
 
 // New constructs the initial Model.
-func New(profile, region string) Model {
+func New(profile, region string, opts ...Option) Model {
 	ti := textinput.New()
 	k := keys.Default()
 
@@ -82,7 +95,7 @@ func New(profile, region string) Model {
 		cfg = config.DefaultConfig()
 	}
 
-	return Model{
+	m := Model{
 		profile:    profile,
 		region:     region,
 		keys:       k,
@@ -91,10 +104,30 @@ func New(profile, region string) Model {
 		viewConfig: cfg,
 		configErr:  cfgErr,
 	}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
 func (m Model) Init() tea.Cmd {
+	if m.demoMode {
+		// No AWS connection needed. Send ClientsReadyMsg with nil clients
+		// so the app transitions to "ready" state without AWS credentials.
+		demoCmd := func() tea.Msg {
+			return messages.ClientsReadyMsg{}
+		}
+		if m.configErr != nil {
+			return tea.Batch(demoCmd, func() tea.Msg {
+				return messages.FlashMsg{
+					Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
+					IsError: true,
+				}
+			})
+		}
+		return demoCmd
+	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
 			Profile: m.profile,
@@ -268,7 +301,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
 	}
-	if m.region == "" {
+	if m.region == "" && !m.demoMode {
 		configPath := awsclient.DefaultConfigPath()
 		m.region = awsclient.GetDefaultRegion(configPath, m.profile)
 	}
@@ -517,10 +550,20 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case messages.TargetProfile:
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Profile switching disabled in demo mode", IsError: true}
+			}
+		}
 		cmd := m.fetchProfiles()
 		return m, cmd
 
 	case messages.TargetRegion:
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Region switching disabled in demo mode", IsError: true}
+			}
+		}
 		regions := awsclient.AllRegions()
 		regionCodes := make([]string, len(regions))
 		for i, r := range regions {
@@ -636,10 +679,20 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	case "q", "quit":
 		return m, tea.Quit
 	case "ctx", "profile":
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Profile switching disabled in demo mode", IsError: true}
+			}
+		}
 		return m, func() tea.Msg {
 			return messages.NavigateMsg{Target: messages.TargetProfile}
 		}
 	case "region":
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Region switching disabled in demo mode", IsError: true}
+			}
+		}
 		return m, func() tea.Msg {
 			return messages.NavigateMsg{Target: messages.TargetRegion}
 		}
@@ -671,6 +724,9 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 // Uses the resource registry for standard fetchers; S3 objects and R53 records
 // are special cases because they require additional parameters.
 func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId string) tea.Cmd {
+	if m.demoMode {
+		return m.fetchDemoResources(resourceType, s3Bucket)
+	}
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -706,6 +762,35 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId strin
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
 		return messages.ResourcesLoadedMsg{ResourceType: resourceType, Resources: resources}
+	}
+}
+
+// fetchDemoResources returns a tea.Cmd that provides synthetic fixture data
+// instead of calling AWS APIs. Maintains the async message contract.
+func (m *Model) fetchDemoResources(resourceType, s3Bucket string) tea.Cmd {
+	return func() tea.Msg {
+		// S3 object drill-down
+		if s3Bucket != "" {
+			resources, ok := demo.GetS3Objects(s3Bucket, "")
+			if !ok {
+				resources = nil
+			}
+			return messages.ResourcesLoadedMsg{
+				ResourceType: resourceType,
+				Resources:    resources,
+			}
+		}
+		// Standard resource fetch — resolve alias to canonical short name
+		canonicalType := resourceType
+		rt := resource.FindResourceType(resourceType)
+		if rt != nil {
+			canonicalType = rt.ShortName
+		}
+		resources, _ := demo.GetResources(canonicalType)
+		return messages.ResourcesLoadedMsg{
+			ResourceType: resourceType,
+			Resources:    resources,
+		}
 	}
 }
 
@@ -784,6 +869,11 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 
 // handleReveal fetches a secret value (only for secrets resource type).
 func (m Model) handleReveal() (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Secret reveal disabled in demo mode", IsError: true}
+		}
+	}
 	rl, ok := m.activeView().(*views.ResourceListModel)
 	if !ok {
 		return m, nil

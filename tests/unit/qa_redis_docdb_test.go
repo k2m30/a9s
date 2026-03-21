@@ -7,6 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+
 	"github.com/k2m30/a9s/internal/resource"
 	"github.com/k2m30/a9s/internal/tui"
 	"github.com/k2m30/a9s/internal/tui/keys"
@@ -79,6 +83,13 @@ func multiStatusRedisFixtures() []resource.Resource {
 				"node_type": "cache.t2.micro", "status": "available",
 				"nodes": "1", "endpoint": "",
 			},
+			RawStruct: elasticachetypes.CacheCluster{
+				CacheClusterId:     aws.String("redis-available"),
+				EngineVersion:      aws.String("7.0.7"),
+				CacheNodeType:      aws.String("cache.t2.micro"),
+				CacheClusterStatus: aws.String("available"),
+				NumCacheNodes:      aws.Int32(1),
+			},
 		},
 		{
 			ID: "redis-creating", Name: "redis-creating", Status: "creating",
@@ -87,6 +98,13 @@ func multiStatusRedisFixtures() []resource.Resource {
 				"node_type": "cache.t2.micro", "status": "creating",
 				"nodes": "1", "endpoint": "",
 			},
+			RawStruct: elasticachetypes.CacheCluster{
+				CacheClusterId:     aws.String("redis-creating"),
+				EngineVersion:      aws.String("7.0.7"),
+				CacheNodeType:      aws.String("cache.t2.micro"),
+				CacheClusterStatus: aws.String("creating"),
+				NumCacheNodes:      aws.Int32(1),
+			},
 		},
 		{
 			ID: "redis-deleting", Name: "redis-deleting", Status: "deleting",
@@ -94,6 +112,13 @@ func multiStatusRedisFixtures() []resource.Resource {
 				"cluster_id": "redis-deleting", "engine_version": "7.0.7",
 				"node_type": "cache.t2.micro", "status": "deleting",
 				"nodes": "1", "endpoint": "",
+			},
+			RawStruct: elasticachetypes.CacheCluster{
+				CacheClusterId:     aws.String("redis-deleting"),
+				EngineVersion:      aws.String("7.0.7"),
+				CacheNodeType:      aws.String("cache.t2.micro"),
+				CacheClusterStatus: aws.String("deleting"),
+				NumCacheNodes:      aws.Int32(1),
 			},
 		},
 	}
@@ -109,6 +134,16 @@ func multiStatusDocDBFixtures() []resource.Resource {
 				"status": "available", "instances": "2",
 				"endpoint": "docdb-available.cluster-abc.docdb.amazonaws.com",
 			},
+			RawStruct: docdbtypes.DBCluster{
+				DBClusterIdentifier: aws.String("docdb-available"),
+				EngineVersion:       aws.String("5.0.0"),
+				Status:              aws.String("available"),
+				Endpoint:            aws.String("docdb-available.cluster-abc.docdb.amazonaws.com"),
+				DBClusterMembers: []docdbtypes.DBClusterMember{
+					{DBInstanceIdentifier: aws.String("docdb-available-inst-1"), IsClusterWriter: aws.Bool(true)},
+					{DBInstanceIdentifier: aws.String("docdb-available-inst-2"), IsClusterWriter: aws.Bool(false)},
+				},
+			},
 		},
 		{
 			ID: "docdb-creating", Name: "docdb-creating", Status: "creating",
@@ -117,6 +152,11 @@ func multiStatusDocDBFixtures() []resource.Resource {
 				"status": "creating", "instances": "0",
 				"endpoint": "",
 			},
+			RawStruct: docdbtypes.DBCluster{
+				DBClusterIdentifier: aws.String("docdb-creating"),
+				EngineVersion:       aws.String("5.0.0"),
+				Status:              aws.String("creating"),
+			},
 		},
 		{
 			ID: "docdb-deleting", Name: "docdb-deleting", Status: "deleting",
@@ -124,6 +164,15 @@ func multiStatusDocDBFixtures() []resource.Resource {
 				"cluster_id": "docdb-deleting", "engine_version": "5.0.0",
 				"status": "deleting", "instances": "1",
 				"endpoint": "docdb-deleting.cluster-abc.docdb.amazonaws.com",
+			},
+			RawStruct: docdbtypes.DBCluster{
+				DBClusterIdentifier: aws.String("docdb-deleting"),
+				EngineVersion:       aws.String("5.0.0"),
+				Status:              aws.String("deleting"),
+				Endpoint:            aws.String("docdb-deleting.cluster-abc.docdb.amazonaws.com"),
+				DBClusterMembers: []docdbtypes.DBClusterMember{
+					{DBInstanceIdentifier: aws.String("docdb-deleting-inst-1"), IsClusterWriter: aws.Bool(true)},
+				},
 			},
 		},
 	}
@@ -513,16 +562,18 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 		t.Fatal("Redis YAML view returned empty or initializing")
 	}
 
-	// YAML view renders from Fields map when no RawStruct is set
-	for key, val := range res.Fields {
-		if val == "" {
-			continue
-		}
+	// YAML view renders from RawStruct (SDK struct field names) when RawStruct is set
+	expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+	for _, key := range expectedKeys {
 		if !strings.Contains(out, key) {
-			t.Errorf("Redis YAML view missing key %q", key)
+			t.Errorf("Redis YAML view missing SDK struct key %q", key)
 		}
+	}
+	// Values from the RawStruct should appear
+	expectedValues := []string{"test-redis-1", "7.0.7", "cache.t2.micro", "available"}
+	for _, val := range expectedValues {
 		if !strings.Contains(out, val) {
-			t.Errorf("Redis YAML view missing value %q for key %q", val, key)
+			t.Errorf("Redis YAML view missing value %q", val)
 		}
 	}
 }
@@ -564,10 +615,11 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 		t.Fatal("Redis YAML RawContent() returned empty string")
 	}
 
-	// RawContent should contain the field keys in YAML format
-	for key := range res.Fields {
+	// RawContent renders from RawStruct (SDK struct field names)
+	expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+	for _, key := range expectedKeys {
 		if !strings.Contains(raw, key) {
-			t.Errorf("Redis YAML RawContent missing key %q", key)
+			t.Errorf("Redis YAML RawContent missing SDK struct key %q", key)
 		}
 	}
 }
@@ -1187,15 +1239,18 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 		t.Fatal("DocumentDB YAML view returned empty or initializing")
 	}
 
-	for key, val := range res.Fields {
-		if val == "" {
-			continue
-		}
+	// YAML view renders from RawStruct (SDK struct field names) when RawStruct is set
+	expectedKeys := []string{"DBClusterIdentifier", "EngineVersion", "Status", "Endpoint", "DBClusterMembers"}
+	for _, key := range expectedKeys {
 		if !strings.Contains(out, key) {
-			t.Errorf("DocumentDB YAML view missing key %q", key)
+			t.Errorf("DocumentDB YAML view missing SDK struct key %q", key)
 		}
+	}
+	// Values from the RawStruct should appear
+	expectedValues := []string{"test-docdb-cluster", "5.0.0", "available"}
+	for _, val := range expectedValues {
 		if !strings.Contains(out, val) {
-			t.Errorf("DocumentDB YAML view missing value %q for key %q", val, key)
+			t.Errorf("DocumentDB YAML view missing value %q", val)
 		}
 	}
 }
@@ -1237,9 +1292,11 @@ func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 		t.Fatal("DocumentDB YAML RawContent() returned empty string")
 	}
 
-	for key := range res.Fields {
+	// RawContent renders from RawStruct (SDK struct field names)
+	expectedKeys := []string{"DBClusterIdentifier", "EngineVersion", "Status", "Endpoint", "DBClusterMembers"}
+	for _, key := range expectedKeys {
 		if !strings.Contains(raw, key) {
-			t.Errorf("DocumentDB YAML RawContent missing key %q", key)
+			t.Errorf("DocumentDB YAML RawContent missing SDK struct key %q", key)
 		}
 	}
 }

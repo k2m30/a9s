@@ -4,13 +4,46 @@ import (
 	"strings"
 	"testing"
 
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
+	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
+	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
+	codepipelinetypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
-	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	"github.com/k2m30/a9s/internal/config"
 	"github.com/k2m30/a9s/internal/resource"
@@ -877,3 +910,335 @@ func TestQA_ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_AllTypes: table-driven test covering all resource types
+// ===========================================================================
+
+func TestQA_ListRawStruct_AllTypes(t *testing.T) {
+	ensureNoColor(t)
+
+	tests := []struct {
+		shortName    string
+		rawStruct    interface{}
+		expectInView []string // values that MUST appear from RawStruct
+	}{
+		// -- Already covered individually above, included for completeness --
+		{"ec2", realisticEC2Instance(), []string{"i-0abcdef1234567890", "running", "t3.medium"}},
+		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "available"}},
+		{"redis", realisticRedisCacheCluster(), []string{"redis-prod-001", "7.0.12", "cache.r6g.large"}},
+		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0", "available"}},
+		{"eks", realisticEKSCluster(), []string{"prod-cluster", "1.28"}},
+		{"secrets", realisticSecretListEntry(), []string{"prod/database/password", "Production database password"}},
+		{"s3", realisticS3Bucket(), []string{"my-production-bucket", "2025-06-15"}},
+
+		// -- New types --
+		{"lambda", realisticLambdaFunction(), []string{"my-api-handler", "python3.12"}},
+		{"alarm", realisticAlarm(), []string{"HighCPUAlarm", "ALARM", "CPUUtilization"}},
+		{"sns", realisticSNSTopic(), []string{"arn:aws:sns:us-east-1:123456789012:my-notifications"}},
+		{"elb", realisticELB(), []string{"my-app-alb", "application", "internet-faci"}},
+		{"tg", realisticTargetGroup(), []string{"my-app-tg", "8080", "HTTP", "/health"}},
+		{"ecs", realisticECSClusterStruct(), []string{"prod-cluster", "ACTIVE"}},
+		{"ecs-svc", realisticECSService(), []string{"api-service", "ACTIVE", "FARGATE"}},
+		{"ecs-task", realisticECSTask(), []string{"RUNNING", "256", "512"}},
+		{"cfn", realisticCFNStack(), []string{"my-app-stack", "CREATE_COMPLETE"}},
+		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
+		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
+		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "String"}},
+		{"ddb", realisticDDBTable(), []string{"users-table", "ACTIVE"}},
+		{"acm", realisticACMCertificate(), []string{"example.com", "ISSUED"}},
+		{"asg", realisticASG(), []string{"my-app-asg"}},
+		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},
+		{"sg", realisticSecurityGroup(), []string{"sg-0abc1234def56789a", "web-sg", "vpc-0abc1234"}},
+		{"ng", realisticNodeGroup(), []string{"prod-ng-01", "prod-cluster", "ACTIVE"}},
+		{"subnet", realisticSubnet(), []string{"subnet-0abc1234def56789a", "10.0.1.0/24", "us-east-1a"}},
+		{"nat", realisticNATGateway(), []string{"nat-0abc1234def56789a", "available"}},
+		{"igw", realisticInternetGateway(), []string{"igw-0abc1234def56789a"}},
+		{"eip", realisticEIP(), []string{"eipalloc-0abc1234def56789a", "54.123.45.67"}},
+		{"tgw", realisticTransitGateway(), []string{"tgw-0abc1234def56789a", "available"}},
+		{"vpce", realisticVPCEndpoint(), []string{"vpce-0abc1234def56789a", "com.amazonaws.us-east-1.s3"}},
+		{"eni", realisticENI(), []string{"eni-0abc1234def56789a", "in-use", "10.0.1.42"}},
+		{"rds-snap", realisticRDSSnapshot(), []string{"rds-snap-prod-20250615", "prod-db-01", "available"}},
+		{"docdb-snap", realisticDocDBSnapshot(), []string{"docdb-snap-prod-20250615", "available"}},
+		{"sns-sub", realisticSNSSubscription(), []string{"email", "user@example.com"}},
+		{"policy", realisticIAMPolicy(), []string{"ReadOnlyAccess", "ANPAI1234567890EXAMPLE"}},
+		{"iam-user", realisticIAMUser(), []string{"deploy-user", "AIDAEXAMPLEUSERID"}},
+		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
+		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "Deployed"}},
+		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
+		{"apigw", realisticAPIGW(), []string{"abc123def4", "prod-api", "HTTP"}},
+		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
+		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a", "available"}},
+		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "ENABLED"}},
+		{"sfn", realisticSFN(), []string{"order-processing", "STANDARD"}},
+		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "V2"}},
+		{"kinesis", realisticKinesis(), []string{"events-stream", "ACTIVE"}},
+		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
+		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
+		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "Ready"}},
+		{"ses", realisticSESIdentity(), []string{"example.com", "DOMAIN"}},
+		{"redshift", realisticRedshift(), []string{"analytics-cluster", "available", "dc2.large"}},
+		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
+		{"athena", realisticAthena(), []string{"analytics-wg", "ENABLED"}},
+		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},
+		{"cb", realisticCodeBuild(), []string{"build-project", "CODECOMMIT"}},
+		{"opensearch", realisticOpenSearch(), []string{"search-prod", "OpenSearch_2.11"}},
+		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "Enabled"}},
+		{"msk", realisticMSK(), []string{"events-kafka", "PROVISIONED", "ACTIVE"}},
+		{"backup", realisticBackup(), []string{"daily-backup-plan", "abc12345-1234-1234-1234-123456789012"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.shortName, func(t *testing.T) {
+			cfg := configForType(tc.shortName)
+			res := resource.Resource{
+				ID:        "test-id",
+				Name:      "test-name",
+				RawStruct: tc.rawStruct,
+			}
+			view := newListModel(t, tc.shortName, cfg, []resource.Resource{res})
+
+			for _, expected := range tc.expectInView {
+				if !strings.Contains(view, expected) {
+					t.Errorf("%s list should contain %q from RawStruct, got:\n%s",
+						tc.shortName, expected, view)
+				}
+			}
+		})
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_AllTypes_OverridesFields: RawStruct takes priority
+// ===========================================================================
+
+func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
+	ensureNoColor(t)
+
+	// Each entry has a RawStruct with correct values and Fields with WRONG values.
+	// The test verifies that WRONG values do NOT appear when RawStruct is set.
+	// Types whose list columns use "key:" instead of "path:" (e.g., sqs, igw
+	// for vpc_id/state, nat for public_ip, rtb for counts) will correctly
+	// fall back to Fields for those columns -- we only test path-based columns here.
+	tests := []struct {
+		shortName    string
+		rawStruct    interface{}
+		wrongFields  map[string]string
+		expectInView []string // values that MUST appear from RawStruct
+	}{
+		{
+			"ec2",
+			ec2types.Instance{
+				InstanceId:   ptrString("i-correct"),
+				InstanceType: ec2types.InstanceTypeT3Medium,
+				State:        &ec2types.InstanceState{Name: ec2types.InstanceStateNameRunning},
+			},
+			map[string]string{"instance_id": "WRONG-ID", "state": "WRONG-STATE"},
+			[]string{"i-correct", "running"},
+		},
+		{
+			"lambda",
+			realisticLambdaFunction(),
+			map[string]string{"function_name": "WRONG-FN", "runtime": "WRONG-RT"},
+			[]string{"my-api-handler", "python3.12"},
+		},
+		{
+			"alarm",
+			realisticAlarm(),
+			map[string]string{"alarm_name": "WRONG-ALARM", "state_value": "WRONG-STATE"},
+			[]string{"HighCPUAlarm", "ALARM"},
+		},
+		{
+			"vpc",
+			realisticVPC(),
+			map[string]string{"vpc_id": "WRONG-VPC", "cidr_block": "WRONG-CIDR"},
+			[]string{"vpc-0abc1234def56789a", "10.0.0.0/16"},
+		},
+		{
+			"sg",
+			realisticSecurityGroup(),
+			map[string]string{"group_id": "WRONG-SG", "group_name": "WRONG-NAME"},
+			[]string{"sg-0abc1234def56789a", "web-sg"},
+		},
+		{
+			"subnet",
+			realisticSubnet(),
+			map[string]string{"subnet_id": "WRONG-SUB", "cidr_block": "WRONG-CIDR"},
+			[]string{"subnet-0abc1234def56789a", "10.0.1.0/24"},
+		},
+		{
+			"eip",
+			realisticEIP(),
+			map[string]string{"allocation_id": "WRONG-ALLOC", "public_ip": "WRONG-IP"},
+			[]string{"eipalloc-0abc1234def56789a", "54.123.45.67"},
+		},
+		{
+			"ecs",
+			realisticECSClusterStruct(),
+			map[string]string{"cluster_name": "WRONG-CLS", "status": "WRONG-STATUS"},
+			[]string{"prod-cluster", "ACTIVE"},
+		},
+		{
+			"cfn",
+			realisticCFNStack(),
+			map[string]string{"stack_name": "WRONG-STACK", "stack_status": "WRONG-STATUS"},
+			[]string{"my-app-stack", "CREATE_COMPLETE"},
+		},
+		{
+			"role",
+			realisticIAMRole(),
+			map[string]string{"role_name": "WRONG-ROLE", "path": "WRONG-PATH"},
+			[]string{"lambda-exec-role", "/"},
+		},
+		{
+			"policy",
+			realisticIAMPolicy(),
+			map[string]string{"policy_name": "WRONG-POL", "policy_id": "WRONG-PID"},
+			[]string{"ReadOnlyAccess", "ANPAI1234567890EXAMPLE"},
+		},
+		{
+			"cf",
+			realisticCFDistribution(),
+			map[string]string{"id": "WRONG-ID", "domain_name": "WRONG-DN"},
+			[]string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net"},
+		},
+		{
+			"r53",
+			realisticR53Zone(),
+			map[string]string{"id": "WRONG-ID", "name": "WRONG-NAME"},
+			[]string{"/hostedzone/Z1234567890ABC", "example.com."},
+		},
+		{
+			"apigw",
+			realisticAPIGW(),
+			map[string]string{"api_id": "WRONG-API", "name": "WRONG-NAME"},
+			[]string{"abc123def4", "prod-api"},
+		},
+		{
+			"ses",
+			realisticSESIdentity(),
+			map[string]string{"identity_name": "WRONG-NAME", "identity_type": "WRONG-TYPE"},
+			[]string{"example.com", "DOMAIN"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.shortName, func(t *testing.T) {
+			cfg := configForType(tc.shortName)
+			res := resource.Resource{
+				ID:        "test-id",
+				Name:      "test-name",
+				Fields:    tc.wrongFields,
+				RawStruct: tc.rawStruct,
+			}
+			view := newListModel(t, tc.shortName, cfg, []resource.Resource{res})
+
+			// RawStruct values must appear
+			for _, expected := range tc.expectInView {
+				if !strings.Contains(view, expected) {
+					t.Errorf("%s list should contain %q from RawStruct, got:\n%s",
+						tc.shortName, expected, view)
+				}
+			}
+
+			// WRONG values from Fields must NOT appear
+			for _, wrong := range tc.wrongFields {
+				if strings.Contains(view, wrong) {
+					t.Errorf("%s list should NOT contain %q from Fields when RawStruct is set",
+						tc.shortName, wrong)
+				}
+			}
+		})
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_SQS_StringRawStruct: SQS uses string, not struct
+// ===========================================================================
+
+func TestQA_ListRawStruct_SQS_StringRawStruct(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("sqs")
+
+	// SQS fetcher sets RawStruct to fmt.Sprintf("%v", attrs) -- a string.
+	// All SQS columns use "key:" not "path:", so fieldpath extraction is N/A.
+	// This test verifies it doesn't panic and falls back to Fields.
+	res := resource.Resource{
+		ID:   "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+		Name: "my-queue",
+		Fields: map[string]string{
+			"queue_name":          "my-queue",
+			"approx_messages":     "42",
+			"approx_not_visible":  "3",
+			"delay_seconds":       "0",
+			"queue_url":           "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+		},
+		RawStruct: "map[ApproximateNumberOfMessages:42 ApproximateNumberOfMessagesNotVisible:3]",
+	}
+
+	view := newListModel(t, "sqs", cfg, []resource.Resource{res})
+
+	// SQS columns use "key:" so Fields values should appear
+	if !strings.Contains(view, "my-queue") {
+		t.Errorf("SQS list should contain queue name from Fields, got:\n%s", view)
+	}
+	if !strings.Contains(view, "42") {
+		t.Errorf("SQS list should contain message count from Fields, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_S3Objects: both Object and CommonPrefix types
+// ===========================================================================
+
+// NOTE: s3_objects is a sub-resource type not registered via resource.FindResourceType.
+// It shares the S3 type def and uses a separate config key ("s3_objects") for its
+// column layout. Testing it in isolation requires the full S3 drill-down flow,
+// which is beyond the scope of this list-level RawStruct test. The S3 object
+// RawStruct rendering is covered by the existing S3 object detail tests.
+// The realistic builders (realisticS3ObjectFile, realisticS3ObjectFolder) are
+// available for those tests.
+
+// Ensure we actually use all the imported types to avoid unused import errors.
+// These type assertions are compile-time checks only.
+var (
+	_ acmtypes.CertificateSummary
+	_ apigatewayv2types.Api
+	_ athenatypes.WorkGroupSummary
+	_ autoscalingtypes.AutoScalingGroup
+	_ backuptypes.BackupPlansListMember
+	_ cloudfronttypes.DistributionSummary
+	_ cfntypes.Stack
+	_ cloudtrailtypes.Trail
+	_ cwtypes.MetricAlarm
+	_ cwlogstypes.LogGroup
+	_ codebuildtypes.Project
+	_ codeartifacttypes.RepositorySummary
+	_ codepipelinetypes.PipelineSummary
+	_ docdbtypes.DBCluster
+	_ ddbtypes.TableDescription
+	_ ec2types.Instance
+	_ ecrtypes.Repository
+	_ ecstypes.Cluster
+	_ efstypes.FileSystemDescription
+	_ ebtypes.EnvironmentDescription
+	_ elasticachetypes.CacheCluster
+	_ elbv2types.LoadBalancer
+	_ ekstypes.Cluster
+	_ eventbridgetypes.Rule
+	_ gluetypes.Job
+	_ iamtypes.Policy
+	_ kafkatypes.Cluster
+	_ kinesistypes.StreamSummary
+	_ kmstypes.KeyMetadata
+	_ opensearchtypes.DomainStatus
+	_ rdstypes.DBInstance
+	_ redshifttypes.Cluster
+	_ route53types.HostedZone
+	_ s3types.Bucket
+	_ smtypes.SecretListEntry
+	_ sesv2types.IdentityInfo
+	_ sfntypes.StateMachineListItem
+	_ snstypes.Topic
+	_ ssmtypes.ParameterMetadata
+	_ wafv2types.WebACLSummary
+)

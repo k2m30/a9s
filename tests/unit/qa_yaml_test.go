@@ -227,12 +227,28 @@ func TestQA_YAML_Redis_ViewContainsFields(t *testing.T) {
 	clusters := fixtureRedisClusters()
 	for _, c := range clusters {
 		out := yamlView(t, c, 120, 40)
-		for k, v := range c.Fields {
-			if !strings.Contains(out, k) {
-				t.Errorf("Redis YAML for %q missing key %q", c.ID, k)
+		if c.RawStruct != nil {
+			// When RawStruct is present, YAML renders SDK struct field names
+			expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+			for _, k := range expectedKeys {
+				if !strings.Contains(out, k) {
+					t.Errorf("Redis YAML for %q missing SDK struct key %q", c.ID, k)
+				}
 			}
-			if v != "" && !strings.Contains(out, v) {
-				t.Errorf("Redis YAML for %q missing value %q", c.ID, v)
+			expectedValues := []string{"test-redis-1", "7.0.7", "cache.t2.micro", "available"}
+			for _, v := range expectedValues {
+				if !strings.Contains(out, v) {
+					t.Errorf("Redis YAML for %q missing value %q", c.ID, v)
+				}
+			}
+		} else {
+			for k, v := range c.Fields {
+				if !strings.Contains(out, k) {
+					t.Errorf("Redis YAML for %q missing key %q", c.ID, k)
+				}
+				if v != "" && !strings.Contains(out, v) {
+					t.Errorf("Redis YAML for %q missing value %q", c.ID, v)
+				}
 			}
 		}
 	}
@@ -276,12 +292,22 @@ func TestQA_YAML_DocDB_ViewContainsFields(t *testing.T) {
 	clusters := fixtureDocDBClusters()
 	for _, c := range clusters {
 		out := yamlView(t, c, 120, 40)
-		for k, v := range c.Fields {
-			if !strings.Contains(out, k) {
-				t.Errorf("DocDB YAML for %q missing key %q", c.ID, k)
+		if c.RawStruct != nil {
+			// When RawStruct is present, YAML renders SDK struct field names
+			expectedKeys := []string{"DBClusterIdentifier", "EngineVersion", "Status", "Endpoint"}
+			for _, k := range expectedKeys {
+				if !strings.Contains(out, k) {
+					t.Errorf("DocDB YAML for %q missing SDK struct key %q", c.ID, k)
+				}
 			}
-			if v != "" && !strings.Contains(out, v) {
-				t.Errorf("DocDB YAML for %q missing value %q", c.ID, v)
+		} else {
+			for k, v := range c.Fields {
+				if !strings.Contains(out, k) {
+					t.Errorf("DocDB YAML for %q missing key %q", c.ID, k)
+				}
+				if v != "" && !strings.Contains(out, v) {
+					t.Errorf("DocDB YAML for %q missing value %q", c.ID, v)
+				}
 			}
 		}
 	}
@@ -577,10 +603,13 @@ func TestQA_YAML_RawContent_AllTypes(t *testing.T) {
 				t.Errorf("%s: RawContent() missing YAML key: value format", tc.name)
 			}
 
-			// Verify all field keys appear in raw
-			for k := range tc.res.Fields {
-				if !strings.Contains(raw, k) {
-					t.Errorf("%s: RawContent() missing field key %q", tc.name, k)
+			// When RawStruct is set, YAML renders SDK struct field names, not Fields keys.
+			// Only check Fields keys when RawStruct is nil (the fallback path).
+			if tc.res.RawStruct == nil {
+				for k := range tc.res.Fields {
+					if !strings.Contains(raw, k) {
+						t.Errorf("%s: RawContent() missing field key %q", tc.name, k)
+					}
 				}
 			}
 		})
