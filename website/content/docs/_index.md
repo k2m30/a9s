@@ -31,12 +31,13 @@ title: "Documentation"
 |-----|--------|
 | `d` | Detail view |
 | `y` | YAML view |
-| `c` | Copy resource ID |
+| `x` | Reveal (expand) |
+| `c` | Copy resource ID to clipboard |
 | `/` | Filter |
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
-| `w` | Toggle wrap |
+| `w` | Toggle line wrap (in YAML view) |
 
 ### Sorting
 
@@ -46,12 +47,36 @@ title: "Documentation"
 | `I` | Sort by ID |
 | `A` | Sort by date |
 
+### General
+
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `Ctrl+C` | Force quit |
+
+## Commands
+
+Press `:` to enter command mode, then type a command:
+
+| Command | Action |
+|---------|--------|
+| `:q` / `:quit` | Exit a9s |
+| `:ctx` / `:profile` | Switch AWS profile |
+| `:region` | Switch AWS region |
+| `:help` | Show help |
+| `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
+
+All resource shortnames from the [Resources](/a9s/resources/) page work as commands.
+
 ## Configuration
 
-a9s reads your standard AWS configuration from `~/.aws/config` and `~/.aws/credentials`.
-
-Application config is stored in `~/.a9s/config.yaml`.
+a9s stores configuration in `~/.a9s/config.yaml`. AWS profiles and regions are read from your standard AWS configuration (`~/.aws/config` and `~/.aws/credentials`).
 
 ## AWS Permissions
 
-a9s uses read-only API calls exclusively. The `ReadOnlyAccess` managed policy provides sufficient access. a9s gracefully handles permission errors for services you don't have access to.
+a9s uses **read-only** AWS API calls exclusively. The following managed policies provide sufficient access:
+
+- `ReadOnlyAccess` (broad read-only access to all services)
+- Or individual service policies like `AmazonEC2ReadOnlyAccess`, `AmazonS3ReadOnlyAccess`, etc.
+
+a9s will gracefully handle permission errors -- resources you don't have access to will show an error message instead of crashing.
