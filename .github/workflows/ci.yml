@@ -3,8 +3,22 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'website/**'
+      - 'specs/**'
+      - '.claude/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'website/**'
+      - 'specs/**'
+      - '.claude/**'
+      - 'LICENSE'
 
 permissions:
   contents: read
@@ -69,7 +83,6 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -101,7 +114,7 @@ jobs:
       - name: Verify installed binary
         run: a9s --version
       - name: Validate goreleaser config
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: check
