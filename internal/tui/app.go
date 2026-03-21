@@ -165,6 +165,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
+		if m.demoMode {
+			return m, nil
+		}
 		cmd := m.connectAWS(msg.Profile, msg.Region)
 		return m, cmd
 	case messages.ClientsReadyMsg:
@@ -320,6 +323,9 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // handleProfileSelected switches the AWS profile, pops the profile selector,
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, nil
+	}
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.pendingRefresh = true
@@ -335,6 +341,9 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // handleRegionSelected switches the AWS region, pops the region selector,
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, nil
+	}
 	m.region = msg.Region
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.SelectorModel); ok {
@@ -797,8 +806,7 @@ func (m *Model) fetchDemoResources(resourceType, s3Bucket string) tea.Cmd {
 func (m *Model) fetchProfiles() tea.Cmd {
 	return func() tea.Msg {
 		configPath := awsclient.DefaultConfigPath()
-		credPath := awsclient.DefaultCredentialsPath()
-		profiles, err := awsclient.ListProfiles(configPath, credPath)
+		profiles, err := awsclient.ListProfiles(configPath)
 		if err != nil {
 			return messages.FlashMsg{Text: "failed to list profiles: " + err.Error(), IsError: true}
 		}
