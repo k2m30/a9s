@@ -14,9 +14,8 @@ import (
 
 func TestListProfiles_SampleFiles(t *testing.T) {
 	configPath := filepath.Join("..", "testdata", "aws_config_sample")
-	credentialsPath := filepath.Join("..", "testdata", "aws_credentials_sample")
 
-	profiles, err := awsclient.ListProfiles(configPath, credentialsPath)
+	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -29,9 +28,8 @@ func TestListProfiles_SampleFiles(t *testing.T) {
 
 func TestListProfiles_MissingConfigFile(t *testing.T) {
 	configPath := filepath.Join("..", "testdata", "nonexistent_config")
-	credentialsPath := filepath.Join("..", "testdata", "nonexistent_credentials")
 
-	profiles, err := awsclient.ListProfiles(configPath, credentialsPath)
+	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
 		t.Fatalf("expected no error for missing files, got %v", err)
 	}
@@ -42,9 +40,8 @@ func TestListProfiles_MissingConfigFile(t *testing.T) {
 
 func TestListProfiles_ConfigOnly(t *testing.T) {
 	configPath := filepath.Join("..", "testdata", "aws_config_sample")
-	credentialsPath := filepath.Join("..", "testdata", "nonexistent_credentials")
 
-	profiles, err := awsclient.ListProfiles(configPath, credentialsPath)
+	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -55,19 +52,19 @@ func TestListProfiles_ConfigOnly(t *testing.T) {
 	}
 }
 
-func TestListProfiles_CredentialsOnly_ReturnsEmpty(t *testing.T) {
-	// When only credentials file exists (no config file), no profiles are returned.
-	// This matches `aws configure list-profiles` behavior which reads only config.
+func TestListProfiles_CredentialsFileNeverRead(t *testing.T) {
+	// a9s never reads ~/.aws/credentials — only ~/.aws/config for profile names.
+	// Credential handling is delegated entirely to the AWS SDK.
+	// This test verifies ListProfiles has no credentials path parameter.
 	configPath := filepath.Join("..", "testdata", "nonexistent_config")
-	credentialsPath := filepath.Join("..", "testdata", "aws_credentials_sample")
 
-	profiles, err := awsclient.ListProfiles(configPath, credentialsPath)
+	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	if len(profiles) != 0 {
-		t.Errorf("expected 0 profiles (credentials-only not included), got %v", profiles)
+		t.Errorf("expected 0 profiles, got %v", profiles)
 	}
 }
 

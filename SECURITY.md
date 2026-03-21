@@ -7,6 +7,17 @@ to AWS (no Create, Delete, Update, Put, Modify, Terminate, Start, Stop, or
 Reboot operations). This is enforced by a CI check that scans all AWS fetcher
 code for write API calls and fails the build if any are detected.
 
+## No Credential File Access
+
+a9s **never** reads `~/.aws/credentials` or any credential files directly.
+All authentication is delegated to the AWS SDK's credential provider chain,
+which handles credentials in memory without exposing them to application code.
+The a9s binary has no code paths that open, parse, or log credential files.
+
+The official Docker image runs in `--demo` mode by default and contains no
+AWS credentials. Even if credentials are mounted into the container, demo
+mode bypasses all AWS API calls.
+
 ## Supported Versions
 
 | Version | Supported |
