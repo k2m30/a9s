@@ -50,8 +50,11 @@ Use conventional commit format:
 
 ```
 cmd/a9s/           main binary
+cmd/refgen/        views_reference.yaml generator
 internal/aws/      AWS service clients and resource fetchers (read-only)
 internal/config/   YAML config loading
+internal/demo/     synthetic fixture data for --demo mode
+internal/fieldpath/ struct field extraction via reflection
 internal/resource/ generic resource model and registry
 internal/tui/      Bubble Tea views, keys, layout, styles, messages
 tests/unit/        unit tests (1,045+)
