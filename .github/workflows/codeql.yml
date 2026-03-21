@@ -3,13 +3,10 @@ name: CodeQL
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - 'website/**'
-      - 'specs/**'
-      - '.claude/**'
-      - 'LICENSE'
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
   schedule:
     - cron: "0 6 * * 1"  # Weekly on Monday at 06:00 UTC
 
