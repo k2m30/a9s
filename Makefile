@@ -35,7 +35,7 @@ security:
 	govulncheck ./...
 
 coverage:
-	go test ./internal/... ./tests/... -coverprofile=coverage.out -covermode=atomic
+	go test ./internal/... ./tests/... -coverpkg=./internal/... -coverprofile=coverage.out -covermode=atomic
 	go tool cover -func=coverage.out
 
 cover: coverage
