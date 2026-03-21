@@ -24,7 +24,7 @@ You are the project manager for **a9s** — a Go TUI AWS resource manager.
 
 The TUI rewrite from `internal/app/` to `internal/tui/` is **complete**. The old code has been deleted. Current phase is **scaling** — adding 20+ new AWS resource types.
 
-**Tech stack:** Go 1.25+, Bubble Tea v2, Lipgloss v2, Bubbles v2, AWS SDK Go v2
+**Tech stack:** Go 1.26+, Bubble Tea v2, Lipgloss v2, Bubbles v2, AWS SDK Go v2
 
 ## Your Responsibilities
 

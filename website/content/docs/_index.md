@@ -38,6 +38,7 @@ title: "Documentation"
 | `?` | Help |
 | `Ctrl+R` | Refresh |
 | `w` | Toggle line wrap (in YAML view) |
+| `Tab` | Autocomplete (in command mode) |
 
 ### Sorting
 
