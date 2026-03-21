@@ -20,6 +20,8 @@ func init() {
 
 	// Register R53 record fixtures for sub-resource drill-down.
 	r53RecordData["/hostedzone/Z0123456789ABCDEFGHIJ"] = r53RecordsAcmeCorp
+	r53RecordData["/hostedzone/Z1234567890ABCDEFGHIJ"] = r53RecordsInternal
+	r53RecordData["/hostedzone/Z2345678901ABCDEFGHIJ"] = r53RecordsStaging
 }
 
 // route53Zones returns demo Route53 hosted zone fixtures.
@@ -197,6 +199,23 @@ func r53RecordsAcmeCorp() []resource.Resource {
 				},
 			},
 		},
+	}
+}
+
+func r53RecordsInternal() []resource.Resource {
+	return []resource.Resource{
+		{ID: "internal.acme.local.|A", Name: "internal.acme.local.", Status: "A", Fields: map[string]string{"name": "internal.acme.local.", "type": "A", "ttl": "300", "values": "10.0.1.100"}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("internal.acme.local."), Type: r53types.RRTypeA, TTL: aws.Int64(300), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("10.0.1.100")}}}},
+		{ID: "db.internal.acme.local.|CNAME", Name: "db.internal.acme.local.", Status: "CNAME", Fields: map[string]string{"name": "db.internal.acme.local.", "type": "CNAME", "ttl": "60", "values": "prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("db.internal.acme.local."), Type: r53types.RRTypeCname, TTL: aws.Int64(60), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com.")}}}},
+		{ID: "redis.internal.acme.local.|CNAME", Name: "redis.internal.acme.local.", Status: "CNAME", Fields: map[string]string{"name": "redis.internal.acme.local.", "type": "CNAME", "ttl": "60", "values": "acme-prod-redis.abc123.0001.use1.cache.amazonaws.com."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("redis.internal.acme.local."), Type: r53types.RRTypeCname, TTL: aws.Int64(60), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("acme-prod-redis.abc123.0001.use1.cache.amazonaws.com.")}}}},
+		{ID: "internal.acme.local.|NS", Name: "internal.acme.local.", Status: "NS", Fields: map[string]string{"name": "internal.acme.local.", "type": "NS", "ttl": "172800", "values": "ns-512.awsdns-00.net., ns-1024.awsdns-00.org."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("internal.acme.local."), Type: r53types.RRTypeNs, TTL: aws.Int64(172800), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("ns-512.awsdns-00.net.")}, {Value: aws.String("ns-1024.awsdns-00.org.")}}}},
+	}
+}
+
+func r53RecordsStaging() []resource.Resource {
+	return []resource.Resource{
+		{ID: "staging.acme-corp.com.|A", Name: "staging.acme-corp.com.", Status: "A", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "A", "ttl": "", "values": "ALIAS: acme-staging-alb-987654321.us-east-1.elb.amazonaws.com."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeA, AliasTarget: &r53types.AliasTarget{DNSName: aws.String("acme-staging-alb-987654321.us-east-1.elb.amazonaws.com."), HostedZoneId: aws.String("Z35SXDOTRQ7X7K"), EvaluateTargetHealth: true}}},
+		{ID: "staging.acme-corp.com.|NS", Name: "staging.acme-corp.com.", Status: "NS", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "NS", "ttl": "172800", "values": "ns-777.awsdns-33.net., ns-888.awsdns-44.org."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeNs, TTL: aws.Int64(172800), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("ns-777.awsdns-33.net.")}, {Value: aws.String("ns-888.awsdns-44.org.")}}}},
+		{ID: "staging.acme-corp.com.|SOA", Name: "staging.acme-corp.com.", Status: "SOA", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "SOA", "ttl": "900", "values": "ns-777.awsdns-33.net. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeSoa, TTL: aws.Int64(900), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("ns-777.awsdns-33.net. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400")}}}},
 	}
 }
 
