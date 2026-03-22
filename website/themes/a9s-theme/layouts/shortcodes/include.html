@@ -1,0 +1,1 @@
+{{ with resources.Get (printf "shared/%s" (.Get 0)) }}{{ .Content | markdownify }}{{ end }}
