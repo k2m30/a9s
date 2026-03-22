@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -263,6 +264,20 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 }
 
 // ── View config loading tests ───────────────────────────────────────────────
+
+func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
+	// When no profile is specified (empty string), the header should show "default"
+	m := tui.New("", "us-east-1")
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// Simulate AWS connection completing
+	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Err: nil})
+
+	rendered := stripANSI(rootViewContent(m))
+	if !strings.Contains(rendered, "default") {
+		t.Errorf("header should show 'default' when profile is empty, got: %s", rendered)
+	}
+}
 
 func TestWiring_ViewConfigLoadedOnClientsReady(t *testing.T) {
 	m := newRootSizedModel()

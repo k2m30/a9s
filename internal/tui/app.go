@@ -304,6 +304,9 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
 	}
+	if m.profile == "" && !m.demoMode {
+		m.profile = "default"
+	}
 	if m.region == "" && !m.demoMode {
 		configPath := awsclient.DefaultConfigPath()
 		m.region = awsclient.GetDefaultRegion(configPath, m.profile)

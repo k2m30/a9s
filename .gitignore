@@ -35,6 +35,7 @@ coverage.html
 # Internal tooling
 specs/
 .specify/
+release-local.sh
 
 # Generated reference (dev-time only)
 views_reference.yaml
