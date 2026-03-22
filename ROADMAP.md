@@ -15,18 +15,18 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
 - **Themes** -- additional color themes beyond Tokyo Night Dark
+- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). Gated on project maturity (10k+ stars). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
+
+## Medium-Term
+
+- **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
+- **Live tail** -- stream CloudWatch Logs in a split pane
 
 ## Long-Term
 
 - **More AWS resource types** -- Cognito, AppSync, Config Rules, GuardDuty, Neptune, SageMaker, and more
 - **Tag editor** -- view and edit resource tags inline
 - **Bookmarks** -- save frequently accessed resources for quick access
-- **Live tail** -- stream CloudWatch Logs in a split pane
-- **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
-
-## Future (after project maturity, 10k+ stars)
-
-- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
 
 ## Non-Goals
 
