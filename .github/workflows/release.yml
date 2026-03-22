@@ -11,32 +11,82 @@ permissions:
   id-token: write
 
 jobs:
-  binaries:
-    name: Build & Publish Binaries
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v} -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o a9s ./cmd/a9s/
+
+      - name: Create archive
+        run: tar czf a9s_${GITHUB_REF_NAME#v}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz a9s
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: a9s_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: a9s_*.tar.gz
+
+  publish:
+    name: Publish Release
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          go-version-file: go.mod
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: cd dist && sha256sum *.tar.gz > checksums.txt
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+      - name: Sign checksums
+        run: cosign sign-blob --yes --output-signature dist/checksums.txt.sig dist/checksums.txt
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "$GITHUB_REF_NAME" | head -1)
+          echo "## Changes" > changelog.md
+          git log --oneline ${PREV_TAG}..${GITHUB_REF_NAME} --no-decorate | grep -v "^$" >> changelog.md || echo "First release" >> changelog.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          version: "~> v2"
-          args: release --clean --skip=docker
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          body_path: changelog.md
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/checksums.txt.sig
 
   docker:
-    name: Build & Push Docker Image
+    name: Docker Image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
