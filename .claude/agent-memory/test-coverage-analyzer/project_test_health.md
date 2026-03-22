@@ -1,31 +1,36 @@
 ---
 name: Test Suite Health Assessment
-description: Comprehensive test coverage analysis (3,002 test runs, 1,763 func Test*, 129 files) - R53 records drill-down untested at TUI level, --demo CLI integration test missing
+description: Comprehensive test coverage analysis (3,058 test runs, 1,813 func Test*, 132 files, 93.5% statement coverage) - buildinfo covered at 85.7%, CI path filter gap for Dockerfile/.goreleaser.yaml
 type: project
 ---
 
-a9s test suite assessed 2026-03-21: 1,763 top-level test functions producing 3,002 test runs (including subtests), 48,471 lines of test code across 129 unit test files + 5 integration test files. All tests pass (1,762 PASS, 0 FAIL) in 4.0s. Only 5 tests skip at runtime (down from 59 previously).
+a9s test suite assessed 2026-03-22: 1,813 top-level test functions producing 3,058 test runs (including subtests), ~49,800 lines of test code across 132 unit test files + 5 integration test files. All tests pass (0 FAIL) in ~5.3s. Only 1 top-level skip (TestQA_Profile_FrameTitle) + 4 sub-test skips. Overall instrumented statement coverage: 93.5% across all internal packages.
 
-**Critical gaps identified:**
-- R53 records TUI drill-down (R53EnterZoneMsg -> handleR53EnterZone -> NewR53RecordsList) has zero test coverage at the app.go level. S3 drill-down (S3EnterBucketMsg) is thoroughly tested (8+ tests), but the analogous R53 flow has none.
-- No `--demo` CLI integration test in tests/integration/. The binary flag exists but is never tested end-to-end.
-- demo.GetR53Records() is never called from any test file -- the R53 record fixture data quality is untested.
-- r53_records config defaults (defaults.go:667) have no config_test.go coverage (unlike s3_objects which has full coverage).
-- client.go (NewAWSSession, CreateServiceClients) has zero unit tests -- only integration-level smoke tests.
+**Buildinfo package (new):**
+- `internal/buildinfo/buildinfo.go` has 85.7% coverage from unit tests in `tests/unit/version_test.go` (3 tests).
+- Uncovered branch: the `return info.Main.Version` path at line 13 (only reachable when binary installed via `go install` with tagged module -- cannot be unit tested).
+- The ldflags flow (goreleaser, Makefile, release.yml all inject `main.version`, `main.commit`, `main.date`) is consistent with `main.go` var declarations.
 
-**What improved since previous assessment (2026-03-21 earlier):**
-- Redis/DocDB fixture skips resolved: 0 fixture-related skips remain (was 34). fixtureRedisClusters()/fixtureDocDBClusters() now return data.
-- Test count grew from 1,732 to 1,763 func Test* (3,002 total runs, was 2,887).
-- qa_list_rawstruct_test.go now covers ALL 62 resource types in TestQA_ListRawStruct_AllTypes (was only 7 original types).
-- Skips dropped from 59 to 5.
+**CI/Infrastructure gaps:**
+- CI workflow triggers on `pull_request` only -- direct pushes to main skip CI entirely (was `push` + `pull_request` previously).
+- CI `paths` filter does NOT include `Dockerfile`, `.goreleaser.yaml`, or `.github/workflows/release.yml`. Changes to these files never trigger CI, even on PRs.
+- CLAUDE.md mentions an `install-test` CI job that does not exist in ci.yml.
+- Integration test `TestQA_012_VersionFlag` has a potentially flawed assertion: checks `strings.Contains(output, ".")` but when built without ldflags the output is "a9s dev (commit: none, built: unknown)" which contains no dots. (Behind integration build tag, so not routinely run.)
 
-**Remaining 5 skips:**
-1. TestQA_FetchResources_ViaLoadResourcesMsg/alarm -- specific fetch mock issue
-2. TestQA_Profile_FrameTitle -- intentional (filesystem-dependent)
-3. TestQA_ListViewColumns_EC2/Name -- configurable view column mismatch
-4. TestQA_DetailViewPaths_RDS/Tags -- struct field name mismatch (TagList)
-5. TestDetailPaths_AllConfiguredFieldsRendered/sqs -- no fixture available
+**Gaps closed since last assessment (2026-03-21):**
+- R53 records config defaults: 6 new tests in `qa_r53_records_config_test.go` -- fully covered.
+- R53 records TUI drill-down: 41 test functions in `qa_r53_records_test.go` covering R53EnterZoneMsg at view and root model levels.
+- demo.GetR53Records(): now thoroughly tested (14+ call sites in tests).
+- Skips reduced from 5 to 1 top-level + 4 sub-test skips (same 5 total, but previously reported as 5 separate skips).
+- Test count grew from 1,763 to 1,813 func Test* (3,058 total runs, was 3,002).
 
-**Why:** The suite has excellent breadth (62 resource types covered) but a systematic gap around the R53 records sub-resource feature added recently, and demo mode CLI integration testing.
+**Remaining 0% coverage functions (11 total):**
+1. `CreateServiceClients` (client.go:115) -- integration-only, needs real AWS config
+2. `s3ObjWebapp`, `s3ObjMLTraining`, `s3ObjTerraform`, `s3ObjCloudtrail`, `s3ObjBackups` (demo/fixtures.go) -- 5 S3 object fixture helpers that are registered but never fetched in any test
+3. `handleProfilesLoaded` (app.go:359) -- profile loading pipeline, no unit test
+4. `PlainContent` (detail.go:149) -- clipboard-related method
+5. `Init` methods for help, mainmenu, yaml views -- no-ops per BT v2 pattern, not tested
 
-**How to apply:** When reviewing R53 or demo-mode changes, note that TUI-level drill-down and CLI integration paths are untested. Prioritize adding R53EnterZoneMsg tests mirroring the S3EnterBucketMsg pattern.
+**Why:** The suite is in excellent health at 93.5% coverage with strong breadth. The buildinfo package is adequately covered. The primary risk is in CI infrastructure: Dockerfile and goreleaser changes can silently break releases.
+
+**How to apply:** When reviewing release/infrastructure changes, note that CI does not validate them. The --demo CLI integration test is still missing. The 5 uncovered S3 object fixture helpers represent mild risk (data quality of 5 S3 buckets' demo objects is untested).
