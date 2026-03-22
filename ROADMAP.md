@@ -13,6 +13,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Short-Term
 
+- **Child views** -- drill-down screens for resources that contain sub-entities (e.g., Lambda → invocations, CloudWatch Log Groups → log streams, ECS clusters → services/tasks, IAM groups → users). Design docs in `docs/design/child-views/`.
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
 - **Themes** -- additional color themes beyond Tokyo Night Dark
 - **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). Gated on project maturity (10k+ stars). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
