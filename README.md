@@ -46,18 +46,12 @@ brew install k2m30/a9s/a9s
 ### Go install
 
 ```sh
-go install github.com/k2m30/a9s/cmd/a9s@latest
+go install github.com/k2m30/a9s/v3/cmd/a9s@latest
 ```
 
 ### Download binary
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/k2m30/a9s/releases/latest).
-
-Verify the signature (optional):
-
-```sh
-cosign verify-blob --signature checksums.txt.sig checksums.txt
-```
 
 ### Docker
 
