@@ -15,8 +15,8 @@ Profile listing reads only `~/.aws/config`. However, the AWS SDK's credential
 provider chain (which a9s uses for authentication) may read credential files
 internally when resolving access keys. a9s has no control over this SDK behavior.
 
-The official Docker image runs in `--demo` mode by default and makes no AWS
-API calls.
+The official Docker image runs in normal mode by default. Pass `--demo` to
+run with synthetic data and no AWS API calls.
 
 ## Supported Versions
 
