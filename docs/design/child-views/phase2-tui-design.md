@@ -45,8 +45,18 @@ One wireframe per view, same notation as `design.md` sections 4.1–4.8. Realist
 - Pagination notes if relevant
 - Latency warnings if applicable (e.g., CloudWatch GetLogEvents can be slow for large groups)
 
-#### 5. Nested children (if applicable)
-If this child view itself has children (e.g., Lambda invocations → log events), describe each level with the same 4 items above. Each nesting level = separate design file + separate GitHub issue.
+#### 5. Help screen
+Every child view gets its own context-sensitive help screen (shown via `?`). Design a help wireframe that lists:
+- All inherited key bindings that apply to this view (navigation, filter, sort, detail, YAML, copy, etc.)
+- Any **new key bindings** specific to this child view (e.g., `L` to jump to logs for a Lambda invocation)
+- Organized in the same multi-column layout as the main help screen (see `design.md` section 3.6)
+
+Even if a child view adds no new keys, it still needs a help screen — the available actions may differ from the parent (e.g., a child list may not support sort, or may have an extra drill-down key).
+
+**Note on `c` (copy):** The `c` key copies the most useful content to clipboard. What it copies should be context-specific to the child view — it could be an ID, a name, or the actual content (e.g., a log line, a DNS record value, a policy document). Specify what `c` copies for each child view.
+
+#### 6. Nested children (if applicable)
+If this child view itself has children (e.g., Lambda invocations → log events), describe each level with the same 5 items above. Each nesting level = separate design file + separate GitHub issue.
 
 ### Output files
 
@@ -89,6 +99,7 @@ For every child view screen (including nested children as separate issues), crea
   - [ ] Columns: {list}
   - [ ] Esc returns to {parent} list
   - [ ] views.yaml entry added
+  - [ ] Help screen (`?`) shows correct key bindings for this view
   - [ ] Read-only — no write API calls
 
   ## Dependencies
@@ -99,6 +110,6 @@ For every child view screen (including nested children as separate issues), crea
 
 - **Inherit everything**: colors, borders, key bindings, status-to-color mapping — all come from `design.md`. Do not re-specify them.
 - **views.yaml is the spec**: the column layout and detail fields are the core design artifact. Wireframes illustrate them.
-- **4–6 columns max**: terminal space is precious. Additional data is in detail (d) and YAML (y) views.
+- **4–8 columns max**: terminal space is precious. Additional data is in detail (d) and YAML (y) views.
 - **No new chrome**: no sidebars, split panes, tabs. The view stack (list → detail/YAML/child) is the only navigation model.
 - **Realistic data**: wireframes use plausible AWS resource names, IDs, timestamps.
