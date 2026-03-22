@@ -3,11 +3,11 @@ package views
 import (
 	"strings"
 
-	"github.com/k2m30/a9s/internal/config"
-	"github.com/k2m30/a9s/internal/fieldpath"
-	"github.com/k2m30/a9s/internal/resource"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/text"
+	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // listCol is a resolved column definition for rendering.

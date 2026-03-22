@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // float64Ptr returns a pointer to the given float64 value.

@@ -3,8 +3,8 @@ package unit
 import (
 	"testing"
 
-	_ "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/internal/resource"
+	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // Test that every column Key in every ResourceTypeDef has a corresponding

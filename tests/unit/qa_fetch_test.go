@@ -53,10 +53,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/internal/resource"
-	"github.com/k2m30/a9s/internal/tui"
-	"github.com/k2m30/a9s/internal/tui/messages"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // ---------------------------------------------------------------------------

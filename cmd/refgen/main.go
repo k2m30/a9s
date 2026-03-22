@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/k2m30/a9s/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"

@@ -8,9 +8,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/app"
-	awsclient "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/internal/views"
+	"github.com/k2m30/a9s/v3/internal/app"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/views"
 )
 
 // Helper functions for key simulation.

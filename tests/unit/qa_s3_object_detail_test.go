@@ -6,8 +6,8 @@ import (
 
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	"github.com/k2m30/a9s/internal/config"
-	"github.com/k2m30/a9s/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 )
 
 // TestQA_S3ObjectsHasDetailDefaults verifies s3_objects has detail paths defined.

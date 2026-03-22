@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 func int64Ptr(v int64) *int64 { return &v }

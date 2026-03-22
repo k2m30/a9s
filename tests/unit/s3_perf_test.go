@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // FetchS3Buckets should only call ListBuckets — no GetBucketLocation.
