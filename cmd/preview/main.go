@@ -661,6 +661,176 @@ func renderYAMLView() string {
 	return sb.String()
 }
 
+// ── VIEW 7: Lambda Function Code — Normal (Python handler) ──────────────────
+
+func renderLambdaCodeNormal() string {
+	const w = 88
+
+	lineNumStyle := lipgloss.NewStyle().Foreground(colDim)
+	pipeStyle := lipgloss.NewStyle().Foreground(colSep)
+	codeStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+
+	sourceLines := []string{
+		"import json",
+		"import boto3",
+		"from datetime import datetime",
+		"",
+		"s3 = boto3.client('s3')",
+		"dynamodb = boto3.resource('dynamodb')",
+		"",
+		"def process(event, context):",
+		`    """Process incoming payment events."""`,
+		"    order_id = event['detail']['order_id']",
+		"    amount = event['detail']['amount']",
+		"    currency = event['detail']['currency']",
+		"",
+		"    # Validate payment details",
+		"    if amount <= 0:",
+		`        raise ValueError(f"Invalid amount: {amount}")`,
+		"",
+		"    # Call Stripe API",
+		"    stripe_client = boto3.client('secretsmanager')",
+		"    api_key = stripe_client.get_secret_value(",
+	}
+
+	pipe := pipeStyle.Render(" \u2502 ")
+
+	var lines []string
+	for i, src := range sourceLines {
+		num := fmt.Sprintf("%2d", i+1)
+		numRendered := lineNumStyle.Render(num)
+		codeRendered := codeStyle.Render(src)
+		lines = append(lines, " "+numRendered+pipe+codeRendered)
+	}
+
+	lines = append(lines,
+		lipgloss.NewStyle().Foreground(colDim).Render("    · · · (scroll for more)"))
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.5.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "lambda-code \u2014 payment-processor/handler.py", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 7b: Lambda Function Code — Container Image Lambda ──────────────────
+
+func renderLambdaCodeContainerImage() string {
+	const w = 88
+
+	msgStyle := lipgloss.NewStyle().Foreground(colPending).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(colDim)
+	valStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, " "+msgStyle.Render("Container image Lambda \u2014 source code not viewable"))
+	lines = append(lines, "")
+	lines = append(lines, " "+labelStyle.Render("Package type:  ")+valStyle.Render("Image"))
+	lines = append(lines, " "+labelStyle.Render("Image URI:     ")+valStyle.Render("123456789012.dkr.ecr.us-east-1.amazonaws.com/payment:latest"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.5.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "lambda-code \u2014 payment-processor", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 7c: Lambda Function Code — Package Too Large ───────────────────────
+
+func renderLambdaCodeTooLarge() string {
+	const w = 88
+
+	msgStyle := lipgloss.NewStyle().Foreground(colPending).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(colDim)
+	valStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+	sizeStyle := lipgloss.NewStyle().Foreground(colError)
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, " "+msgStyle.Render("Package too large for inline viewing (23.4 MB)"))
+	lines = append(lines, "")
+	lines = append(lines, " "+labelStyle.Render("Handler:   ")+valStyle.Render("handler.process"))
+	lines = append(lines, " "+labelStyle.Render("Runtime:   ")+valStyle.Render("python3.12"))
+	lines = append(lines, " "+labelStyle.Render("Code size: ")+sizeStyle.Render("23.4 MB")+valStyle.Render(" (limit: 5 MB)"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.5.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "lambda-code \u2014 payment-processor", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 7d: Lambda Function Code — Help Screen ────────────────────────────
+
+func renderLambdaCodeHelp() string {
+	const w = 84
+
+	catStyle := lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
+	hkStyle := lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+
+	bind := func(k, d string) string {
+		return hkStyle.Render(padOrTrunc(k, 9)) + descStyle.Render(d)
+	}
+
+	colW := 20
+	catRow := catStyle.Render(padOrTrunc("FUNCTION CODE", colW)) +
+		catStyle.Render(padOrTrunc("GENERAL", colW)) +
+		catStyle.Render(padOrTrunc("NAVIGATION", colW)) +
+		catStyle.Render("HOTKEYS")
+
+	type bindRow struct {
+		c1, c2, c3, c4 string
+	}
+	bindRows := []bindRow{
+		{bind("<esc>", "Back  "), bind("<ctrl-r>", "Refresh  "), bind("<j>", "Down      "), bind("<?>", "Help")},
+		{bind("<c>", "Copy  "), "", bind("<k>", "Up        "), bind("<:>", "Command")},
+		{bind("<w>", "Wrap  "), "", bind("<g>", "Top       "), ""},
+		{"", "", bind("<G>", "Bottom    "), ""},
+		{"", "", bind("<pgup/dn>", "Page      "), ""},
+	}
+
+	var lines []string
+	lines = append(lines, " "+catRow)
+	lines = append(lines, "")
+
+	for _, row := range bindRows {
+		c1 := padOrTrunc(row.c1, colW)
+		c2 := padOrTrunc(row.c2, colW)
+		c3 := padOrTrunc(row.c3, colW)
+		c4 := row.c4
+		lines = append(lines, " "+c1+c2+c3+c4)
+	}
+
+	lines = append(lines, "")
+	lines = append(lines,
+		lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top,
+			lipgloss.NewStyle().Foreground(colDim).Render("Press any key to close")))
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.5.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Help", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -684,4 +854,16 @@ func main() {
 
 	fmt.Println(divider("VIEW 6: YAML View"))
 	fmt.Println(renderYAMLView())
+
+	fmt.Println(divider("VIEW 7: Lambda Code — Python Handler"))
+	fmt.Println(renderLambdaCodeNormal())
+
+	fmt.Println(divider("VIEW 7b: Lambda Code — Container Image"))
+	fmt.Println(renderLambdaCodeContainerImage())
+
+	fmt.Println(divider("VIEW 7c: Lambda Code — Package Too Large"))
+	fmt.Println(renderLambdaCodeTooLarge())
+
+	fmt.Println(divider("VIEW 7d: Lambda Code — Help Screen"))
+	fmt.Println(renderLambdaCodeHelp())
 }

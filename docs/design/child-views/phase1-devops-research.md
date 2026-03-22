@@ -14,6 +14,16 @@ a9s is a read-only AWS TUI tool (like k9s for Kubernetes). It currently supports
 
 Read both design docs to understand what a child view looks like in practice.
 
+## Examples of what we're looking for
+
+These illustrate the depth and style of thinking expected:
+
+- **Lambda** → recent invocations list → check their logs → check code/output for a specific invocation. A multi-level drill-down where each level answers a different question.
+- **CloudWatch Log Groups** → drill down to see actual log streams and log events for the group. The parent list shows metadata; the child shows the data itself.
+- **IAM Groups** → drill down to see users in a group. The parent shows group metadata; the child reveals membership — a completely different entity type.
+
+Not every resource needs this. Most are fine with detail/YAML views. The question is: does drilling down reveal a **different entity type** that helps with real operational tasks?
+
 ## Your Task
 
 For each of the 62 implemented resource types listed below, evaluate whether a custom child view would deliver meaningful value to a DevOps/SRE/Platform engineer during **real daily operational work**.
