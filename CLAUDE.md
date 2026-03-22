@@ -50,8 +50,6 @@ specs/           # feature specifications
 
 Go 1.26+: Follow standard conventions
 
-<!-- MANUAL ADDITIONS START -->
-
 ## Skills
 
 | Skill | Scope | Usage |
@@ -83,11 +81,19 @@ Go 1.26+: Follow standard conventions
 - ALWAYS write failing tests BEFORE writing implementation code (TDD is non-negotiable)
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
-- NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment.
+- NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
-- ALWAYS update README.md AND website content when code changes affect resource types, key bindings, commands, CLI flags, or install methods. Same PR.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
 - BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
 - BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
+- **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require the pre-push checklist.
 
-<!-- MANUAL ADDITIONS END -->
+## Docs Sync Rule
+
+When code changes affect any of the following, update README.md AND `website/content/` in the same PR:
+- Resource types added/removed/renamed → README services table + `website/content/resources.md`
+- Key bindings added/removed/changed → README key bindings tables + `website/content/docs/_index.md`
+- Commands added/removed/changed → README commands table + `website/content/docs/_index.md`
+- CLI flags changed → README Quick Start + `website/content/install.md`
+- Install methods changed → README Installation + `website/content/install.md`
+- Go version bumped → README, CONTRIBUTING.md, `website/content/install.md`

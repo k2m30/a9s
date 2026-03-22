@@ -1,4 +1,4 @@
-.PHONY: build install test lint fmt run clean cover integration security coverage verify-readonly demo
+.PHONY: build install test lint fmt run clean cover integration security coverage verify-readonly demo readme check-readme
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -59,3 +59,12 @@ verify-readonly:
 
 demo:
 	vhs docs/demos/demo.tape
+
+readme:
+	@scripts/generate-readme.sh > README.md
+	@echo "README.md regenerated from docs/shared/ snippets"
+
+check-readme:
+	@scripts/generate-readme.sh > /tmp/readme-check.md
+	@diff -q README.md /tmp/readme-check.md > /dev/null 2>&1 || (echo "FAIL: README.md is out of sync — run 'make readme'" && exit 1)
+	@echo "PASS: README.md is in sync with docs/shared/"
