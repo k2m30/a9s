@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/buildinfo"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -17,6 +18,10 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
+
+func init() {
+	version = buildinfo.ResolveVersion(version)
+}
 
 func main() {
 	var (
