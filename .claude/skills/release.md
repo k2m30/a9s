@@ -40,7 +40,7 @@ Calculate the next version based on user's choice.
 4. Push the tag: `git push origin vX.Y.Z`
 5. Monitor the release workflow: `gh run watch` on the Release workflow
 6. Verify release artifacts: `gh release view vX.Y.Z`
-7. Verify Homebrew formula updated: `gh api repos/k2m30/homebrew-a9s/contents/Casks`
+7. Verify Homebrew formula updated: `gh api repos/k2m30/homebrew-a9s/contents/Formula`
 
 ## Post-Release
 

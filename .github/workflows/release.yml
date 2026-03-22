@@ -8,114 +8,48 @@ on:
 permissions:
   contents: write
   packages: write
-  id-token: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Build binary
-        run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v} -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o a9s ./cmd/a9s/
-
-      - name: Create archive
-        run: tar czf a9s_${GITHUB_REF_NAME#v}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz a9s
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: a9s_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: a9s_*.tar.gz
-
-  publish:
-    name: Publish Release
-    needs: build
+  release:
+    name: Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-go@v5
         with:
-          path: dist
-          merge-multiple: true
-
-      - name: Generate checksums
-        run: cd dist && sha256sum *.tar.gz > checksums.txt
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Sign checksums
-        run: cosign sign-blob --yes --output-signature dist/checksums.txt.sig dist/checksums.txt
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "$GITHUB_REF_NAME" | head -1)
-          echo "## Changes" > changelog.md
-          git log --oneline ${PREV_TAG}..${GITHUB_REF_NAME} --no-decorate | grep -v "^$" >> changelog.md || echo "First release" >> changelog.md
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+          go-version-file: go.mod
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
         with:
-          body_path: changelog.md
-          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          files: |
-            dist/*.tar.gz
-            dist/checksums.txt
-            dist/checksums.txt.sig
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
   docker:
     name: Docker Image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
       - name: Build binaries
         run: |
           LDFLAGS="-s -w -X main.version=${GITHUB_REF_NAME#v} -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o build/linux-amd64/a9s ./cmd/a9s/
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o build/linux-arm64/a9s ./cmd/a9s/
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
@@ -124,15 +58,3 @@ jobs:
           tags: |
             ghcr.io/k2m30/a9s:${{ github.ref_name }}
             ghcr.io/k2m30/a9s:latest
-          labels: |
-            org.opencontainers.image.description=Terminal UI AWS Resource Manager
-            org.opencontainers.image.version=${{ github.ref_name }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/k2m30/a9s
-            org.opencontainers.image.licenses=GPL-3.0-or-later
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Sign Docker image
-        run: cosign sign --yes ghcr.io/k2m30/a9s:${{ github.ref_name }}

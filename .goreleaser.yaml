@@ -1,12 +1,15 @@
 version: 2
 
+before:
+  hooks:
+    - go mod download
+
 builds:
   - id: a9s
     main: ./cmd/a9s
     binary: a9s
     env:
       - CGO_ENABLED=0
-      - GOFLAGS=-buildvcs=false
     flags:
       - -trimpath
     ldflags:
@@ -26,14 +29,17 @@ archives:
     formats:
       - tar.gz
 
-homebrew_casks:
+brews:
   - repository:
       owner: k2m30
       name: homebrew-a9s
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: https://github.com/k2m30/a9s
     description: Terminal UI AWS Resource Manager
     license: GPL-3.0-or-later
+    test: |
+      system "#{bin}/a9s", "--version"
 
 checksum:
   name_template: checksums.txt
@@ -45,16 +51,6 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
-
-signs:
-  - cmd: cosign
-    artifacts: checksum
-    output: true
-    args:
-      - sign-blob
-      - --yes
-      - --output-signature=${signature}
-      - ${artifact}
 
 release:
   prerelease: auto
