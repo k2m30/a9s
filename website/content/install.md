@@ -20,8 +20,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 Available platforms:
 - **macOS**: Intel (amd64) and Apple Silicon (arm64)
-- **Linux**: amd64 and arm64, plus .deb, .rpm, and .apk packages
-- **Windows**: amd64 and arm64
+- **Linux**: amd64 and arm64
 
 Verify the signature (optional):
 
@@ -29,12 +28,14 @@ Verify the signature (optional):
 cosign verify-blob --signature checksums.txt.sig checksums.txt
 ```
 
-## Docker (demo)
-
-Try a9s without installing — runs in demo mode with synthetic data:
+## Docker
 
 ```sh
+# Demo mode (no AWS credentials needed)
 docker run --rm -it ghcr.io/k2m30/a9s:latest --demo
+
+# Real AWS access
+docker run --rm -it -v ~/.aws/config:/home/a9s/.aws/config:ro ghcr.io/k2m30/a9s:latest
 ```
 
 ## Build from Source
