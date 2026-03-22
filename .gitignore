@@ -42,6 +42,7 @@ views_reference.yaml
 
 # GoReleaser
 dist/
+build/
 
 # Hugo build output
 website/public/
