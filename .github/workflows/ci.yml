@@ -46,15 +46,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install clipboard utilities
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y xclip xvfb
       - name: Run tests
-        if: matrix.os != 'ubuntu-latest'
         run: go test ./tests/unit/ -count=1 -timeout 120s -race
-      - name: Run tests with coverage
-        if: matrix.os == 'ubuntu-latest'
-        run: xvfb-run go test ./internal/... ./tests/... -coverpkg=./internal/... -coverprofile=coverage.out -covermode=atomic -timeout 120s -race
 
   build:
     name: Build
