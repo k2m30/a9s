@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/k2m30/a9s/internal/app"
+	"github.com/k2m30/a9s/v3/internal/app"
 )
 
 // ansiEscapePattern matches ANSI escape sequences (CSI sequences).

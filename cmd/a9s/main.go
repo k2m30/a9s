@@ -7,9 +7,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/config"
-	"github.com/k2m30/a9s/internal/demo"
-	"github.com/k2m30/a9s/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 var (

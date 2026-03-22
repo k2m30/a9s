@@ -1,7 +1,7 @@
 package messages
 
 import (
-	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ViewTarget identifies a destination view for NavigateMsg.

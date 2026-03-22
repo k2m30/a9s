@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // ---------------------------------------------------------------------------

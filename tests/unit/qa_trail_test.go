@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // ---------------------------------------------------------------------------

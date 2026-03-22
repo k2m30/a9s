@@ -11,7 +11,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // DemoRegion is the synthetic region displayed in demo mode.

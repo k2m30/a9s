@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/internal/resource"
-	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/messages"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ===========================================================================

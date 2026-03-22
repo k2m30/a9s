@@ -5,7 +5,7 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
-	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // fixtureS3Buckets returns sanitized S3 bucket data for testing.

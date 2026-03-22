@@ -6,9 +6,9 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/internal/tui/layout"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/text"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // ── PadOrTrunc tests ─────────────────────────────────────────────────────────
