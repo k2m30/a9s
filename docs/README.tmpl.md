@@ -37,60 +37,11 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 ## Installation
 
-### Homebrew (macOS and Linux)
-
-```sh
-brew install k2m30/a9s/a9s
-```
-
-### Go install
-
-```sh
-go install github.com/k2m30/a9s/v3/cmd/a9s@latest
-```
-
-### Download binary
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/k2m30/a9s/releases/latest).
-
-Available platforms:
-- **macOS**: Intel (amd64) and Apple Silicon (arm64)
-- **Linux**: amd64 and arm64
-
-### Docker
-
-```sh
-# Demo mode (no AWS credentials needed)
-docker run --rm -it ghcr.io/k2m30/a9s:latest --demo
-
-# Real AWS access
-docker run --rm -it -v ~/.aws/config:/home/a9s/.aws/config:ro ghcr.io/k2m30/a9s:latest
-```
-
-### Build from source
-
-Requires Go 1.26+.
-
-```sh
-git clone https://github.com/k2m30/a9s.git
-cd a9s
-make build
-./a9s
-```
+<!-- INCLUDE: install.md -->
 
 ## Quick Start
 
-a9s uses the standard [AWS credential chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). Any of these work:
-- Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
-- AWS config file (`~/.aws/config`) — a9s never reads `~/.aws/credentials`
-- EC2 instance metadata / ECS task role / SSO
-
-```sh
-a9s                       # use default profile
-a9s -p production         # use a specific profile
-a9s -r eu-west-1          # override region
-a9s --version             # print version
-```
+<!-- INCLUDE: quickstart.md -->
 
 ## Supported AWS Services
 
@@ -111,77 +62,19 @@ a9s --version             # print version
 
 ## Key Bindings
 
-### Navigation
-
-| Key | Action |
-|-----|--------|
-| `j` / `Down` | Move down |
-| `k` / `Up` | Move up |
-| `g` | Go to top |
-| `G` | Go to bottom |
-| `Enter` | Open / select |
-| `Esc` | Back / close |
-| `h` / `Left` | Scroll left |
-| `l` / `Right` | Scroll right |
-| `PgUp` / `Ctrl+U` | Page up |
-| `PgDn` / `Ctrl+D` | Page down |
-
-### Actions
-
-| Key | Action |
-|-----|--------|
-| `d` | Detail view |
-| `y` | YAML view |
-| `x` | Reveal (expand) |
-| `c` | Copy resource ID to clipboard |
-| `/` | Filter |
-| `:` | Command mode |
-| `?` | Help |
-| `Ctrl+R` | Refresh |
-| `w` | Toggle line wrap (in YAML view) |
-| `Tab` | Autocomplete (in command mode) |
-
-### Sorting
-
-| Key | Action |
-|-----|--------|
-| `N` | Sort by name |
-| `I` | Sort by ID |
-| `A` | Sort by date |
-
-### General
-
-| Key | Action |
-|-----|--------|
-| `q` | Quit |
-| `Ctrl+C` | Force quit |
+<!-- INCLUDE: keybindings.md -->
 
 ## Commands
 
-Press `:` to enter command mode, then type a command:
-
-| Command | Action |
-|---------|--------|
-| `:q` / `:quit` | Exit a9s |
-| `:ctx` / `:profile` | Switch AWS profile |
-| `:region` | Switch AWS region |
-| `:help` | Show help |
-| `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
-
-All resource short names work as commands.
+<!-- INCLUDE: commands.md -->
 
 ## Configuration
 
-a9s stores view configuration in `~/.a9s/views.yaml` (optional — sensible defaults are built-in). AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
+<!-- INCLUDE: config.md -->
 
 ## AWS Permissions
 
-a9s uses **read-only** AWS API calls exclusively. The following managed policies provide sufficient access:
-
-- `ReadOnlyAccess` (broad read-only access to all services)
-- Or individual service policies like `AmazonEC2ReadOnlyAccess`, `AmazonS3ReadOnlyAccess`, etc.
-
-a9s will gracefully handle permission errors -- resources you don't have access to will show an error message instead of crashing.
+<!-- INCLUDE: permissions.md -->
 
 ## Roadmap
 

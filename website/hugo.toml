@@ -5,3 +5,14 @@ theme = 'a9s-theme'
 
 [params]
   description = 'Terminal UI AWS Resource Manager — browse, inspect, and manage 60+ AWS resource types'
+
+[module]
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "static"
+    target = "static"
+  [[module.mounts]]
+    source = "../docs/shared"
+    target = "assets/shared"
