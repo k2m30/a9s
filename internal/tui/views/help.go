@@ -6,10 +6,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/messages"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/text"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // HelpContext identifies which view opened help so keys can be filtered.

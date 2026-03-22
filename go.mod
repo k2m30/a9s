@@ -1,4 +1,4 @@
-module github.com/k2m30/a9s
+module github.com/k2m30/a9s/v3
 
 go 1.26.1
 

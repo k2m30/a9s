@@ -4,8 +4,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // RevealModel displays a secret value with a persistent red header warning.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/internal/config"
+	"github.com/k2m30/a9s/v3/internal/config"
 )
 
 // testdataPath returns the absolute path to a file inside tests/testdata/.

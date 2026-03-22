@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------

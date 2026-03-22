@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // CenterTitle returns the top border line with title centered between corners.

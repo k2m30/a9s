@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/internal/config"
-	"github.com/k2m30/a9s/internal/fieldpath"
-	"github.com/k2m30/a9s/internal/resource"
-	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // TestDetailPaths_AllConfiguredFieldsRendered verifies that EVERY detail path

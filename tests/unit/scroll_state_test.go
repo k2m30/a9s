@@ -3,7 +3,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ---------------------------------------------------------------------------

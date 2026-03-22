@@ -9,7 +9,7 @@ import (
 
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
-	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {

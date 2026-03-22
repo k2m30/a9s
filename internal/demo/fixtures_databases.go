@@ -10,7 +10,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
-	"github.com/k2m30/a9s/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {

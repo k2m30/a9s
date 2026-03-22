@@ -12,15 +12,15 @@ import (
 
 	"github.com/atotto/clipboard"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/internal/config"
-	"github.com/k2m30/a9s/internal/demo"
-	"github.com/k2m30/a9s/internal/resource"
-	"github.com/k2m30/a9s/internal/tui/keys"
-	"github.com/k2m30/a9s/internal/tui/layout"
-	"github.com/k2m30/a9s/internal/tui/messages"
-	"github.com/k2m30/a9s/internal/tui/styles"
-	"github.com/k2m30/a9s/internal/tui/views"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // Version is set by cmd/a9s/main.go.

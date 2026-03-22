@@ -3,7 +3,7 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/internal/config"
+	"github.com/k2m30/a9s/v3/internal/config"
 )
 
 // ===========================================================================

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/k2m30/a9s/internal/aws"
-	demo "github.com/k2m30/a9s/internal/demo"
-	"github.com/k2m30/a9s/internal/fieldpath"
-	"github.com/k2m30/a9s/internal/resource"
+	_ "github.com/k2m30/a9s/v3/internal/aws"
+	demo "github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"gopkg.in/yaml.v3"
 )
 

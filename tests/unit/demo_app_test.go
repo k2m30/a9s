@@ -5,8 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/internal/tui"
-	"github.com/k2m30/a9s/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	awsclient "github.com/k2m30/a9s/internal/aws"
-	"github.com/k2m30/a9s/tests/testdata"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
 // ---------------------------------------------------------------------------
