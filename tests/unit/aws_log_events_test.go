@@ -402,3 +402,21 @@ func TestLogEventColumns(t *testing.T) {
 		}
 	})
 }
+
+// TestFetchLogEvents_NewestFirst verifies that log events are fetched
+// newest-first (StartFromHead=false) so the most recent activity appears
+// at the top of the list during incidents.
+func TestFetchLogEvents_NewestFirst(t *testing.T) {
+	mock := &mockCWLogsGetLogEventsClient{
+		output: &cloudwatchlogs.GetLogEventsOutput{},
+	}
+
+	_, _ = awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/test", "stream-1")
+
+	if mock.lastInput == nil {
+		t.Fatal("expected GetLogEvents to be called")
+	}
+	if mock.lastInput.StartFromHead == nil || *mock.lastInput.StartFromHead != false {
+		t.Errorf("StartFromHead should be false (newest first), got %v", mock.lastInput.StartFromHead)
+	}
+}

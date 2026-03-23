@@ -1254,11 +1254,13 @@ func (m *mockCWLogsDescribeLogStreamsClient) DescribeLogStreams(ctx context.Cont
 
 // mockCWLogsGetLogEventsClient implements awsclient.CWLogsGetLogEventsAPI.
 type mockCWLogsGetLogEventsClient struct {
-	output *cloudwatchlogs.GetLogEventsOutput
-	err    error
+	output    *cloudwatchlogs.GetLogEventsOutput
+	err       error
+	lastInput *cloudwatchlogs.GetLogEventsInput
 }
 
 func (m *mockCWLogsGetLogEventsClient) GetLogEvents(ctx context.Context, params *cloudwatchlogs.GetLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetLogEventsOutput, error) {
+	m.lastInput = params
 	return m.output, m.err
 }
 
