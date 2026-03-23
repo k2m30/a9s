@@ -176,3 +176,38 @@ func TestQA_Detail_TargetHealth_NilFields(t *testing.T) {
 		t.Error("TargetHealth detail should not be empty even with nil fields")
 	}
 }
+
+// TestQA_Detail_LongFieldNames verifies that detail view field names are not
+// truncated. Field names like "Target.AvailabilityZone" and
+// "HealthCheckIntervalSeconds" must be fully visible.
+func TestQA_Detail_LongFieldNames(t *testing.T) {
+	ensureNoColor(t)
+	port := int32(80)
+	thd := elbtypes.TargetHealthDescription{
+		Target: &elbtypes.TargetDescription{
+			Id:               ptrString("10.10.19.75"),
+			Port:             &port,
+			AvailabilityZone: ptrString("eu-west-2b"),
+		},
+		TargetHealth: &elbtypes.TargetHealth{
+			State:       elbtypes.TargetHealthStateEnumHealthy,
+			Description: ptrString("Target is healthy"),
+		},
+	}
+	res := buildResource("10.10.19.75", "10.10.19.75", thd)
+	cfg := detailConfigForType("tg_health")
+	m := newDetailModel(res, "tg_health", cfg)
+
+	view := m.View()
+	// Long field names must NOT be truncated with ellipsis
+	longNames := []string{
+		"Target.AvailabilityZone:",
+		"TargetHealth.State:",
+		"TargetHealth.Description:",
+	}
+	for _, name := range longNames {
+		if !strings.Contains(view, name) {
+			t.Errorf("detail view should show full field name %q without truncation:\n%s", name, view)
+		}
+	}
+}
