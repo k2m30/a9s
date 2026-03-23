@@ -521,8 +521,12 @@ func TestQA_FetchResources_S3Buckets(t *testing.T) {
 func TestQA_FetchResources_S3Objects(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	// S3 objects are fetched via S3EnterBucketMsg
-	_, cmd := rootApplyMsg(m, messages.S3EnterBucketMsg{BucketName: "test-bucket"})
+	// S3 objects are fetched via EnterChildViewMsg
+	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "s3_objects",
+		ParentContext: map[string]string{"bucket": "test-bucket"},
+		DisplayName:   "test-bucket",
+	})
 	if cmd == nil {
 		t.Fatal("entering S3 bucket should return a command")
 	}
@@ -537,8 +541,8 @@ func TestQA_FetchResources_S3Objects(t *testing.T) {
 	if rl == nil {
 		t.Fatal("s3 objects fetch should return ResourcesLoadedMsg")
 	}
-	if rl.ResourceType != "s3" {
-		t.Errorf("expected ResourceType 's3', got %q", rl.ResourceType)
+	if rl.ResourceType != "s3_objects" {
+		t.Errorf("expected ResourceType 's3_objects', got %q", rl.ResourceType)
 	}
 }
 
@@ -759,18 +763,19 @@ func TestQA_FetchResources_UnsupportedResourceType(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test: S3 objects via S3NavigatePrefixMsg
+// Test: S3 objects via EnterChildViewMsg with prefix
 // ---------------------------------------------------------------------------
 
 func TestQA_FetchResources_S3NavigatePrefix(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.S3NavigatePrefixMsg{
-		Bucket: "test-bucket",
-		Prefix: "some/prefix/",
+	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "s3_objects",
+		ParentContext: map[string]string{"bucket": "test-bucket", "prefix": "some/prefix/"},
+		DisplayName:   "test-bucket",
 	})
 	if cmd == nil {
-		t.Fatal("S3NavigatePrefixMsg should return a command")
+		t.Fatal("EnterChildViewMsg for S3 prefix should return a command")
 	}
 
 	msgs := executeBatchCmd(cmd)
@@ -783,8 +788,8 @@ func TestQA_FetchResources_S3NavigatePrefix(t *testing.T) {
 	if rl == nil {
 		t.Fatal("s3 prefix navigation should return ResourcesLoadedMsg")
 	}
-	if rl.ResourceType != "s3" {
-		t.Errorf("expected ResourceType 's3', got %q", rl.ResourceType)
+	if rl.ResourceType != "s3_objects" {
+		t.Errorf("expected ResourceType 's3_objects', got %q", rl.ResourceType)
 	}
 }
 

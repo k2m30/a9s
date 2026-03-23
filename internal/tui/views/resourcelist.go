@@ -28,11 +28,9 @@ type ResourceListModel struct {
 	sort    SortField
 	sortAsc bool
 
-	filterText  string
-	s3Bucket    string // non-empty when showing objects inside a bucket
-	s3Prefix    string // non-empty when showing objects under a prefix
-	r53ZoneId   string // non-empty when showing records inside a hosted zone
-	r53ZoneName string // zone name for display
+	filterText    string
+	parentContext map[string]string // context from parent view for child fetchers
+	displayName   string           // custom display name for frame title
 
 	loading bool
 	spinner spinner.Model
@@ -66,46 +64,19 @@ func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsC
 	}
 }
 
-// NewS3ObjectsList creates a ResourceListModel for objects inside an S3 bucket.
-// prefix is optional; pass "" for the root of the bucket.
-func NewS3ObjectsList(bucket string, viewConfig *config.ViewsConfig, k keys.Map, prefix ...string) ResourceListModel {
+// NewChildResourceList creates a ResourceListModel for a child resource type.
+// parentCtx provides parameters from the parent view (e.g., bucket name, zone ID).
+// displayName is used for the frame title instead of the type's ShortName.
+func NewChildResourceList(childType resource.ResourceTypeDef, parentCtx map[string]string, displayName string, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
 	sp := spinner.New()
-	typeDef := resource.ResourceTypeDef{
-		Name:      bucket,
-		ShortName: "s3_objects",
-		Columns:   resource.S3ObjectColumns(),
-	}
-	pfx := ""
-	if len(prefix) > 0 {
-		pfx = prefix[0]
-	}
 	return ResourceListModel{
-		typeDef:    typeDef,
-		viewConfig: viewConfig,
-		s3Bucket:   bucket,
-		s3Prefix:   pfx,
-		loading:    true,
-		spinner:    sp,
-		keys:       k,
-	}
-}
-
-// NewR53RecordsList creates a ResourceListModel for DNS records inside a Route53 hosted zone.
-func NewR53RecordsList(zoneId, zoneName string, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
-	sp := spinner.New()
-	typeDef := resource.ResourceTypeDef{
-		Name:      zoneName,
-		ShortName: "r53_records",
-		Columns:   resource.R53RecordColumns(),
-	}
-	return ResourceListModel{
-		typeDef:     typeDef,
-		viewConfig:  viewConfig,
-		r53ZoneId:   zoneId,
-		r53ZoneName: zoneName,
-		loading:     true,
-		spinner:     sp,
-		keys:        k,
+		typeDef:       childType,
+		viewConfig:    viewConfig,
+		parentContext: parentCtx,
+		displayName:   displayName,
+		loading:       true,
+		spinner:       sp,
+		keys:          k,
 	}
 }
 
@@ -175,30 +146,11 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.Enter):
 			if r := m.SelectedResource(); r != nil {
-				// Route53 zone list: Enter drills into the zone's records
-				if m.typeDef.ShortName == "r53" && m.r53ZoneId == "" {
-					zoneId := r.ID
-					zoneName := r.Name
-					return m, func() tea.Msg {
-						return messages.R53EnterZoneMsg{ZoneId: zoneId, ZoneName: zoneName}
-					}
+				// Data-driven child view routing
+				if updated, cmd := m.handleChildKey("enter", r); cmd != nil {
+					return updated, cmd
 				}
-				// S3 bucket list: Enter drills into the bucket
-				if m.typeDef.ShortName == "s3" && m.s3Bucket == "" {
-					bucketName := r.ID
-					return m, func() tea.Msg {
-						return messages.S3EnterBucketMsg{BucketName: bucketName}
-					}
-				}
-				// S3 object list: Enter on folder navigates into prefix
-				if m.s3Bucket != "" && r.Status == "folder" {
-					bucket := m.s3Bucket
-					prefix := r.ID
-					return m, func() tea.Msg {
-						return messages.S3NavigatePrefixMsg{Bucket: bucket, Prefix: prefix}
-					}
-				}
-				// Default: open detail view
+				// No child matched — default to detail view
 				return m, func() tea.Msg {
 					return messages.NavigateMsg{
 						Target:   messages.TargetDetail,
@@ -249,6 +201,30 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sortAsc = true
 			}
 			m.applySortAndFilter()
+		case key.Matches(msg, m.keys.Events):
+			if r := m.SelectedResource(); r != nil {
+				if updated, cmd := m.handleChildKey("e", r); cmd != nil {
+					return updated, cmd
+				}
+			}
+		case key.Matches(msg, m.keys.Logs):
+			if r := m.SelectedResource(); r != nil {
+				if updated, cmd := m.handleChildKey("L", r); cmd != nil {
+					return updated, cmd
+				}
+			}
+		case key.Matches(msg, m.keys.Resources):
+			if r := m.SelectedResource(); r != nil {
+				if updated, cmd := m.handleChildKey("r", r); cmd != nil {
+					return updated, cmd
+				}
+			}
+		case key.Matches(msg, m.keys.Source):
+			if r := m.SelectedResource(); r != nil {
+				if updated, cmd := m.handleChildKey("s", r); cmd != nil {
+					return updated, cmd
+				}
+			}
 		}
 		// Invalidate styled row cache for old and new cursor positions.
 		if oldCursor != m.scroll.Cursor() {
@@ -396,21 +372,63 @@ func (m ResourceListModel) ResourceType() string {
 	return m.typeDef.ShortName
 }
 
-// S3Bucket returns the S3 bucket name if this view is showing objects inside a bucket.
-// Returns "" for non-S3 views or the bucket list.
-func (m ResourceListModel) S3Bucket() string {
-	return m.s3Bucket
+// ParentContext returns the parent context map, or nil for top-level lists.
+func (m ResourceListModel) ParentContext() map[string]string {
+	return m.parentContext
 }
 
-// S3Prefix returns the last-used S3 prefix for this view.
-// Returns "" when not applicable.
-func (m ResourceListModel) S3Prefix() string {
-	return m.s3Prefix
+// handleChildKey iterates through the typeDef's Children looking for a match
+// on keyName. If found, checks DrillCondition, builds context, and returns
+// an EnterChildViewMsg command. Returns the model and nil cmd if no child matched.
+func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) (ResourceListModel, tea.Cmd) {
+	for _, child := range m.typeDef.Children {
+		if child.Key != keyName {
+			continue
+		}
+		// Check drill condition
+		if child.DrillCondition != nil && !child.DrillCondition(*r) {
+			continue
+		}
+		// Build context and create message
+		ctx := m.buildChildContext(child, r)
+		displayName := ctx[child.DisplayNameKey]
+		childType := child.ChildType
+
+		return m, func() tea.Msg {
+			return messages.EnterChildViewMsg{
+				ChildType:     childType,
+				ParentContext: ctx,
+				DisplayName:   displayName,
+			}
+		}
+	}
+	return m, nil
 }
 
-// R53ZoneId returns the Route53 hosted zone ID if this view is showing records inside a zone.
-func (m ResourceListModel) R53ZoneId() string {
-	return m.r53ZoneId
+// buildChildContext resolves ContextKeys for a ChildViewDef given the selected resource.
+// Resolution rules:
+//   - "ID"         → r.ID
+//   - "Name"       → r.Name
+//   - "@parent.x"  → m.parentContext["x"]
+//   - anything else → r.Fields[key]
+func (m ResourceListModel) buildChildContext(child resource.ChildViewDef, r *resource.Resource) map[string]string {
+	ctx := make(map[string]string, len(child.ContextKeys))
+	for param, source := range child.ContextKeys {
+		switch {
+		case source == "ID":
+			ctx[param] = r.ID
+		case source == "Name":
+			ctx[param] = r.Name
+		case strings.HasPrefix(source, "@parent."):
+			parentKey := strings.TrimPrefix(source, "@parent.")
+			if m.parentContext != nil {
+				ctx[param] = m.parentContext[parentKey]
+			}
+		default:
+			ctx[param] = r.Fields[source]
+		}
+	}
+	return ctx
 }
 
 // ClearLoading clears the loading state so the view no longer shows a spinner.
@@ -419,15 +437,12 @@ func (m *ResourceListModel) ClearLoading() {
 }
 
 // FrameTitle returns e.g. "ec2-instances(42)" or "ec2-instances(3/42)" when filtered.
-// For S3 objects, shows the bucket name.
+// For child views with a display name, shows that name instead of the short name.
 // During loading, returns just the name without count.
 func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
-	if m.s3Bucket != "" {
-		name = m.s3Bucket
-	}
-	if m.r53ZoneId != "" {
-		name = m.r53ZoneName
+	if m.displayName != "" {
+		name = m.displayName
 	}
 	if m.loading {
 		return name

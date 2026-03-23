@@ -75,6 +75,34 @@ func GetR53Records(zoneID string) ([]resource.Resource, bool) {
 	return gen(), true
 }
 
+// childDemoData maps child type short names to fixture generator functions.
+// Each generator receives a parentCtx with parameters from the parent view.
+var childDemoData = map[string]func(parentCtx map[string]string) []resource.Resource{
+	"s3_objects": func(parentCtx map[string]string) []resource.Resource {
+		resources, _ := GetS3Objects(parentCtx["bucket"], parentCtx["prefix"])
+		return resources
+	},
+	"r53_records": func(parentCtx map[string]string) []resource.Resource {
+		resources, _ := GetR53Records(parentCtx["zone_id"])
+		return resources
+	},
+}
+
+// RegisterChildDemo registers a child demo data generator for the given child type.
+func RegisterChildDemo(childType string, gen func(parentCtx map[string]string) []resource.Resource) {
+	childDemoData[childType] = gen
+}
+
+// GetChildResources returns fixture data for a child view given its type and parent context.
+// Returns nil, false if the child type has no demo data.
+func GetChildResources(childType string, parentCtx map[string]string) ([]resource.Resource, bool) {
+	gen, ok := childDemoData[childType]
+	if !ok {
+		return nil, false
+	}
+	return gen(parentCtx), true
+}
+
 // mustParseTime parses a time string in RFC3339 format or panics.
 func mustParseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)

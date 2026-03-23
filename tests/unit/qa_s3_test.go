@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -27,6 +28,12 @@ func s3BucketTypeDef() resource.ResourceTypeDef {
 			{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 			{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
 		},
+		Children: []resource.ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "ID"},
+			DisplayNameKey: "bucket",
+		}},
 	}
 }
 
@@ -80,11 +87,23 @@ func s3RLBucketModel() views.ResourceListModel {
 // s3RLObjectModel creates a standalone ResourceListModel for S3 objects inside a bucket.
 func s3RLObjectModel(bucket string) views.ResourceListModel {
 	k := keys.Default()
-	m := views.NewS3ObjectsList(bucket, nil, k)
+	childDef := resource.ResourceTypeDef{
+		Name:      "S3 Objects",
+		ShortName: "s3_objects",
+		Columns:   resource.S3ObjectColumns(),
+		Children: []resource.ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
+			DisplayNameKey: "bucket",
+			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+		}},
+	}
+	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
-		ResourceType: "s3",
+		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
 	return m
@@ -93,6 +112,25 @@ func s3RLObjectModel(bucket string) views.ResourceListModel {
 // s3KeyPress creates a tea.KeyPressMsg for a printable character.
 func s3KeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
+}
+
+// newS3ObjectsList creates a ResourceListModel for S3 objects inside a bucket,
+// using the generic NewChildResourceList constructor.
+func newS3ObjectsList(bucket string, viewConfig *config.ViewsConfig, k keys.Map) views.ResourceListModel {
+	childDef := resource.ResourceTypeDef{
+		Name:      "S3 Objects",
+		ShortName: "s3_objects",
+		Columns:   resource.S3ObjectColumns(),
+		Children: []resource.ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
+			DisplayNameKey: "bucket",
+			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+		}},
+	}
+	parentCtx := map[string]string{"bucket": bucket}
+	return views.NewChildResourceList(childDef, parentCtx, bucket, viewConfig, k)
 }
 
 // ===========================================================================
@@ -412,7 +450,7 @@ func TestQA_S3_A7_FilterClear_RestoresAllRows(t *testing.T) {
 
 // A.8 Enter Key (Drill Into Bucket)
 
-func TestQA_S3_A8_1_EnterOnBucket_SendsS3EnterBucketMsg(t *testing.T) {
+func TestQA_S3_A8_1_EnterOnBucket_SendsEnterChildViewMsg(t *testing.T) {
 	m := s3RLBucketModel()
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -421,14 +459,17 @@ func TestQA_S3_A8_1_EnterOnBucket_SendsS3EnterBucketMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	bucketMsg, ok := msg.(messages.S3EnterBucketMsg)
+	childMsg, ok := msg.(messages.EnterChildViewMsg)
 	if !ok {
-		t.Fatalf("Enter on S3 bucket should produce S3EnterBucketMsg, got %T", msg)
+		t.Fatalf("Enter on S3 bucket should produce EnterChildViewMsg, got %T", msg)
 	}
 
 	expected := fixtureS3Buckets()[0].ID
-	if bucketMsg.BucketName != expected {
-		t.Errorf("S3EnterBucketMsg.BucketName should be %q, got %q", expected, bucketMsg.BucketName)
+	if childMsg.ParentContext["bucket"] != expected {
+		t.Errorf("EnterChildViewMsg.ParentContext[bucket] should be %q, got %q", expected, childMsg.ParentContext["bucket"])
+	}
+	if childMsg.ChildType != "s3_objects" {
+		t.Errorf("EnterChildViewMsg.ChildType should be 's3_objects', got %q", childMsg.ChildType)
 	}
 }
 
@@ -445,6 +486,10 @@ func TestQA_S3_A8_2_EnterOnBucket_DoesNotSendTargetDetail(t *testing.T) {
 		if nav.Target == messages.TargetDetail {
 			t.Error("Enter on S3 bucket must NOT send TargetDetail NavigateMsg (it should drill into objects)")
 		}
+	}
+	// Verify it's EnterChildViewMsg
+	if _, ok := msg.(messages.EnterChildViewMsg); !ok {
+		t.Errorf("Enter on S3 bucket should produce EnterChildViewMsg, got %T", msg)
 	}
 }
 
@@ -471,7 +516,7 @@ func TestQA_S3_A13_Escape_ReturnsToMainMenu(t *testing.T) {
 
 func TestQA_S3_B1_1_ObjectList_LoadingShowsSpinner(t *testing.T) {
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-app-state", nil, k)
+	m := newS3ObjectsList("test-app-state", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
@@ -494,7 +539,7 @@ func TestQA_S3_B1_2_ObjectList_AfterLoad_ShowsData(t *testing.T) {
 
 func TestQA_S3_B2_1_ObjectList_EmptyBucket(t *testing.T) {
 	k := keys.Default()
-	m := views.NewS3ObjectsList("empty-bucket", nil, k)
+	m := newS3ObjectsList("empty-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -594,7 +639,7 @@ func TestQA_S3_B7_1_ObjectList_JKNavigation(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-bucket", nil, k)
+	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
@@ -653,7 +698,7 @@ func TestQA_S3_B9_1_ObjectList_FilterByKey(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-bucket", nil, k)
+	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
@@ -687,7 +732,7 @@ func TestQA_S3_B10_1_ObjectList_SortByName(t *testing.T) {
 		{ID: "middle.txt", Name: "middle.txt", Fields: map[string]string{"key": "middle.txt", "size": "3 KB", "last_modified": "2025-01-03"}},
 	}
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-bucket", nil, k)
+	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
@@ -715,7 +760,7 @@ func TestQA_S3_B10_2_ObjectList_SortByAge(t *testing.T) {
 		{ID: "mid.txt", Name: "mid.txt", Fields: map[string]string{"key": "mid.txt", "size": "3 KB", "last_modified": "2025-02-10"}},
 	}
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-bucket", nil, k)
+	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
@@ -783,25 +828,24 @@ func TestQA_S3_B14_1_Escape_FromObjects_DoesNotReturnToMainMenu(t *testing.T) {
 // C. S3 Detail View
 // ===========================================================================
 
-// C.1 Bucket Detail (via d from bucket list -- note: current implementation
-// uses Enter/d for drill-into on S3, so d also triggers S3EnterBucketMsg)
+// C.1 Bucket Detail (via d from bucket list — d always opens detail view)
 
 func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
 	m := s3RLBucketModel()
 
-	// The 'd' key in the current implementation is handled the same as Enter
-	// for S3 buckets. Verify the behavior.
+	// The 'd' key always opens the detail view (never drills into S3).
 	_, cmd := m.Update(s3KeyPress("d"))
 	if cmd == nil {
 		t.Fatal("d key on S3 bucket should produce a command")
 	}
 
 	msg := cmd()
-	// For S3 buckets, both Enter and d produce S3EnterBucketMsg
-	_, isBucketMsg := msg.(messages.S3EnterBucketMsg)
-	_, isNavMsg := msg.(messages.NavigateMsg)
-	if !isBucketMsg && !isNavMsg {
-		t.Fatalf("d on S3 bucket should produce S3EnterBucketMsg or NavigateMsg, got %T", msg)
+	nav, ok := msg.(messages.NavigateMsg)
+	if !ok {
+		t.Fatalf("d on S3 bucket should produce NavigateMsg for detail, got %T", msg)
+	}
+	if nav.Target != messages.TargetDetail {
+		t.Errorf("d on S3 bucket should navigate to detail, got target: %d", nav.Target)
 	}
 }
 
@@ -1147,7 +1191,7 @@ func TestQA_S3_ObjectList_ResourceType(t *testing.T) {
 
 func TestQA_S3_ObjectList_HorizontalScroll(t *testing.T) {
 	k := keys.Default()
-	m := views.NewS3ObjectsList("test-bucket", nil, k)
+	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(50, 20) // narrow width to trigger horizontal scroll
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -1233,19 +1277,23 @@ func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 	}
 }
 
-// Test the S3EnterBucketMsg is processed correctly by root model
+// Test the EnterChildViewMsg for S3 is processed correctly by root model
 
-func TestQA_S3_EnterBucketMsg_CreatesObjectListView(t *testing.T) {
+func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Simulate S3EnterBucketMsg directly
-	m, _ = rootApplyMsg(m, messages.S3EnterBucketMsg{BucketName: "test-app-state"})
+	// Simulate EnterChildViewMsg for S3 objects
+	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "s3_objects",
+		ParentContext: map[string]string{"bucket": "test-app-state"},
+		DisplayName:   "test-app-state",
+	})
 
 	plain := stripANSI(rootViewContent(m))
 	// Should show loading state for the bucket or the bucket name in the frame
 	if !strings.Contains(plain, "test-app-state") {
-		t.Errorf("S3EnterBucketMsg should create object list view with bucket name, got: %s", plain[:min(300, len(plain))])
+		t.Errorf("EnterChildViewMsg should create object list view with bucket name, got: %s", plain[:min(300, len(plain))])
 	}
 }
 

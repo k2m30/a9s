@@ -249,21 +249,21 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 
 	// Execute the returned command and check the message.
 	msg := cmd()
-	// The refresh command should fetch S3 objects for the bucket (type "s3" with bucket param),
-	// NOT an unsupported resource type like "s3_objects" with empty bucket.
-	// Since we have no real AWS clients, it returns APIErrorMsg.
+	// The refresh command should fetch S3 objects for the bucket using the child
+	// fetcher ("s3_objects" type with parent context). Since we have no real AWS
+	// clients, it returns APIErrorMsg.
 	switch msg := msg.(type) {
 	case messages.APIErrorMsg:
-		// Must NOT get "unsupported resource type: s3_objects" -- that means bucket was lost
-		if strings.Contains(msg.Err.Error(), "unsupported resource type") {
-			t.Errorf("refresh inside bucket should fetch s3 objects, not unsupported type; err: %v", msg.Err)
+		// Must NOT get "unsupported child type: s3_objects" -- that means fetcher was not found
+		if strings.Contains(msg.Err.Error(), "unsupported child type") {
+			t.Errorf("refresh inside bucket should find s3_objects child fetcher; err: %v", msg.Err)
 		}
-		if msg.ResourceType != "s3" {
-			t.Errorf("refresh should fetch resource type 's3', got %q", msg.ResourceType)
+		if msg.ResourceType != "s3_objects" {
+			t.Errorf("refresh should fetch resource type 's3_objects', got %q", msg.ResourceType)
 		}
 	case messages.ResourcesLoadedMsg:
-		if msg.ResourceType != "s3" {
-			t.Errorf("refresh should load s3, got resource type %q", msg.ResourceType)
+		if msg.ResourceType != "s3_objects" {
+			t.Errorf("refresh should load s3_objects, got resource type %q", msg.ResourceType)
 		}
 	default:
 		t.Logf("refresh returned message type %T", msg)
@@ -330,20 +330,20 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 		t.Fatal("Ctrl+R inside prefix should return a command to refresh")
 	}
 
-	// The refresh should fetch S3 objects for the correct bucket (type "s3" with bucket param),
-	// NOT "s3_objects" with empty bucket.
+	// The refresh should fetch S3 objects for the correct bucket using the child
+	// fetcher ("s3_objects" type with parent context containing bucket+prefix).
 	msg := cmd()
 	switch msg := msg.(type) {
 	case messages.APIErrorMsg:
-		if strings.Contains(msg.Err.Error(), "unsupported resource type") {
-			t.Errorf("refresh inside prefix should fetch s3 objects, not unsupported type; err: %v", msg.Err)
+		if strings.Contains(msg.Err.Error(), "unsupported child type") {
+			t.Errorf("refresh inside prefix should find s3_objects child fetcher; err: %v", msg.Err)
 		}
-		if msg.ResourceType != "s3" {
-			t.Errorf("refresh inside prefix should fetch resource type 's3', got %q", msg.ResourceType)
+		if msg.ResourceType != "s3_objects" {
+			t.Errorf("refresh inside prefix should fetch resource type 's3_objects', got %q", msg.ResourceType)
 		}
 	case messages.ResourcesLoadedMsg:
-		if msg.ResourceType != "s3" {
-			t.Errorf("refresh inside prefix should load s3, got resource type %q", msg.ResourceType)
+		if msg.ResourceType != "s3_objects" {
+			t.Errorf("refresh inside prefix should load s3_objects, got resource type %q", msg.ResourceType)
 		}
 	default:
 		t.Logf("refresh returned message type %T", msg)
