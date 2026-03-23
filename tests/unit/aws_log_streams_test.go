@@ -478,3 +478,44 @@ func TestLogStreamColumns(t *testing.T) {
 		}
 	})
 }
+
+// TestFetchLogStreams_MaxResults verifies that the fetcher stops after a
+// reasonable number of results instead of loading all streams from a log
+// group with thousands of entries.
+func TestFetchLogStreams_MaxResults(t *testing.T) {
+	// Build a mock that returns 20 pages of 50 streams each (1000 total).
+	// The fetcher should stop well before exhausting all pages.
+	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
+	for page := 0; page < 20; page++ {
+		var streams []cwlogstypes.LogStream
+		for i := 0; i < 50; i++ {
+			streams = append(streams, cwlogstypes.LogStream{
+				LogStreamName:      aws.String(fmt.Sprintf("stream-p%d-s%d", page, i)),
+				LastEventTimestamp: aws.Int64(1711065600000),
+			})
+		}
+		out := &cloudwatchlogs.DescribeLogStreamsOutput{
+			LogStreams: streams,
+		}
+		if page < 19 {
+			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		}
+		outputs = append(outputs, out)
+	}
+
+	mock := &mockCWLogsDescribeLogStreamsClient{outputs: outputs}
+	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/huge-group")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Should cap at a reasonable limit (e.g., 500) instead of loading all 1000
+	if len(resources) > 500 {
+		t.Errorf("expected <= 500 resources (capped), got %d — fetcher should limit pagination", len(resources))
+	}
+
+	// Should still return a meaningful number of results
+	if len(resources) < 50 {
+		t.Errorf("expected at least 50 resources, got %d", len(resources))
+	}
+}
