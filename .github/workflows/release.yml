@@ -32,7 +32,6 @@ jobs:
 
   docker:
     name: Docker Image
-    needs: release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +50,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/setup-qemu-action@v4
+      - name: Extract semver components
+        id: semver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          MAJOR="${TAG%%.*}"
+          MINOR="${TAG%.*}"
+          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "minor=${MINOR}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -59,4 +66,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/k2m30/a9s:${{ github.ref_name }}
+            ghcr.io/k2m30/a9s:${{ steps.semver.outputs.minor }}
+            ghcr.io/k2m30/a9s:${{ steps.semver.outputs.major }}
             ghcr.io/k2m30/a9s:latest
