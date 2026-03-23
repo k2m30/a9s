@@ -180,14 +180,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleProfilesLoaded(msg)
 	case messages.SecretRevealedMsg:
 		return m.handleSecretRevealed(msg)
-	case messages.S3EnterBucketMsg:
-		return m.handleS3EnterBucket(msg)
-	case messages.S3NavigatePrefixMsg:
-		return m.handleS3NavigatePrefix(msg)
-	case messages.R53EnterZoneMsg:
-		return m.handleR53EnterZone(msg)
+	case messages.EnterChildViewMsg:
+		return m.handleEnterChildView(msg)
 	case messages.LoadResourcesMsg:
-		cmd := m.fetchResources(msg.ResourceType, msg.S3Bucket, msg.S3Prefix, "")
+		var cmd tea.Cmd
+		if len(msg.ParentContext) > 0 {
+			cmd = m.fetchChildResources(msg.ResourceType, msg.ParentContext)
+		} else {
+			cmd = m.fetchResources(msg.ResourceType)
+		}
 		return m, cmd
 	case messages.APIErrorMsg:
 		return m.handleAPIError(msg)
@@ -316,7 +317,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
-			cmd := m.fetchResources(rt, "", "", "")
+			cmd := m.fetchResources(rt)
 			return m, cmd
 		}
 	}
@@ -378,31 +379,21 @@ func (m Model) handleSecretRevealed(msg messages.SecretRevealedMsg) (tea.Model, 
 	return m, nil
 }
 
-// handleS3EnterBucket pushes an S3 objects list for the given bucket.
-func (m Model) handleS3EnterBucket(msg messages.S3EnterBucketMsg) (tea.Model, tea.Cmd) {
-	rl := views.NewS3ObjectsList(msg.BucketName, m.viewConfig, m.keys)
+// handleEnterChildView creates a child resource list view and kicks off a fetch
+// using the child type registry. This is the generic handler for all child views.
+func (m Model) handleEnterChildView(msg messages.EnterChildViewMsg) (tea.Model, tea.Cmd) {
+	childTypeDef := resource.GetChildType(msg.ChildType)
+	if childTypeDef == nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: fmt.Sprintf("unknown child type: %s", msg.ChildType), IsError: true}
+		}
+	}
+	rl := views.NewChildResourceList(*childTypeDef, msg.ParentContext, msg.DisplayName, m.viewConfig, m.keys)
 	rl.SetSize(m.innerSize())
 	rl, initCmd := rl.Init()
 	m.pushView(&rl)
-	return m, tea.Batch(initCmd, m.fetchResources("s3", msg.BucketName, "", ""))
-}
-
-// handleS3NavigatePrefix pushes an S3 objects list for a prefix within a bucket.
-func (m Model) handleS3NavigatePrefix(msg messages.S3NavigatePrefixMsg) (tea.Model, tea.Cmd) {
-	rl := views.NewS3ObjectsList(msg.Bucket, m.viewConfig, m.keys, msg.Prefix)
-	rl.SetSize(m.innerSize())
-	rl, initCmd := rl.Init()
-	m.pushView(&rl)
-	return m, tea.Batch(initCmd, m.fetchResources("s3", msg.Bucket, msg.Prefix, ""))
-}
-
-// handleR53EnterZone pushes a DNS records list for the given hosted zone.
-func (m Model) handleR53EnterZone(msg messages.R53EnterZoneMsg) (tea.Model, tea.Cmd) {
-	rl := views.NewR53RecordsList(msg.ZoneId, msg.ZoneName, m.viewConfig, m.keys)
-	rl.SetSize(m.innerSize())
-	rl, initCmd := rl.Init()
-	m.pushView(&rl)
-	return m, tea.Batch(initCmd, m.fetchResources("r53_records", "", "", msg.ZoneId))
+	fetchCmd := m.fetchChildResources(msg.ChildType, msg.ParentContext)
+	return m, tea.Batch(initCmd, fetchCmd)
 }
 
 // handleAPIError shows a flash error and clears loading state on the resource list.
@@ -528,7 +519,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
-		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType, "", "", ""))
+		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
 
 	case messages.TargetDetail:
 		if msg.Resource == nil {
@@ -732,12 +723,12 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	}
 }
 
-// fetchResources returns a tea.Cmd that calls the appropriate AWS fetcher.
-// Uses the resource registry for standard fetchers; S3 objects and R53 records
-// are special cases because they require additional parameters.
-func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId string) tea.Cmd {
+// fetchResources returns a tea.Cmd that calls the appropriate AWS fetcher
+// using the resource registry. Child resource types (S3 objects, R53 records)
+// are handled by fetchChildResources instead.
+func (m *Model) fetchResources(resourceType string) tea.Cmd {
 	if m.demoMode {
-		return m.fetchDemoResources(resourceType, s3Bucket, r53ZoneId)
+		return m.fetchDemoResources(resourceType)
 	}
 	clients := m.clients
 	return func() tea.Msg {
@@ -749,27 +740,14 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId strin
 		}
 
 		ctx := context.Background()
-		var resources []resource.Resource
-		var err error
-
-		// S3 objects are a special case: they need bucket/prefix params
-		// and don't map to a single registry entry.
-		switch {
-		case resourceType == "s3" && s3Bucket != "":
-			resources, err = awsclient.FetchS3Objects(ctx, clients.S3, s3Bucket, s3Prefix)
-		case resourceType == "r53_records" && r53ZoneId != "":
-			resources, err = awsclient.FetchR53Records(ctx, clients.Route53, r53ZoneId)
-		default:
-			fetcher := resource.GetFetcher(resourceType)
-			if fetcher == nil {
-				return messages.APIErrorMsg{
-					ResourceType: resourceType,
-					Err:          fmt.Errorf("unsupported resource type: %s", resourceType),
-				}
+		fetcher := resource.GetFetcher(resourceType)
+		if fetcher == nil {
+			return messages.APIErrorMsg{
+				ResourceType: resourceType,
+				Err:          fmt.Errorf("unsupported resource type: %s", resourceType),
 			}
-			resources, err = fetcher(ctx, clients)
 		}
-
+		resources, err := fetcher(ctx, clients)
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
@@ -777,33 +755,58 @@ func (m *Model) fetchResources(resourceType, s3Bucket, s3Prefix, r53ZoneId strin
 	}
 }
 
+// fetchChildResources returns a tea.Cmd that calls the appropriate child fetcher.
+// Uses the child fetcher registry to look up the fetcher by child type name.
+func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
+	if m.demoMode {
+		return m.fetchDemoChildResources(childType, parentCtx)
+	}
+	clients := m.clients
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.APIErrorMsg{
+				ResourceType: childType,
+				Err:          fmt.Errorf("AWS clients not initialized"),
+			}
+		}
+
+		fetcher := resource.GetChildFetcher(childType)
+		if fetcher == nil {
+			return messages.APIErrorMsg{
+				ResourceType: childType,
+				Err:          fmt.Errorf("unsupported child type: %s", childType),
+			}
+		}
+
+		ctx := context.Background()
+		pc := resource.ParentContext(parentCtx)
+		resources, err := fetcher(ctx, clients, pc)
+		if err != nil {
+			return messages.APIErrorMsg{ResourceType: childType, Err: err}
+		}
+		return messages.ResourcesLoadedMsg{ResourceType: childType, Resources: resources}
+	}
+}
+
+// fetchDemoChildResources returns synthetic fixture data for child views in demo mode.
+func (m *Model) fetchDemoChildResources(childType string, parentCtx map[string]string) tea.Cmd {
+	return func() tea.Msg {
+		resources, ok := demo.GetChildResources(childType, parentCtx)
+		if !ok {
+			resources = nil
+		}
+		return messages.ResourcesLoadedMsg{
+			ResourceType: childType,
+			Resources:    resources,
+		}
+	}
+}
+
 // fetchDemoResources returns a tea.Cmd that provides synthetic fixture data
 // instead of calling AWS APIs. Maintains the async message contract.
-func (m *Model) fetchDemoResources(resourceType, s3Bucket, r53ZoneId string) tea.Cmd {
+func (m *Model) fetchDemoResources(resourceType string) tea.Cmd {
 	return func() tea.Msg {
-		// S3 object drill-down
-		if s3Bucket != "" {
-			resources, ok := demo.GetS3Objects(s3Bucket, "")
-			if !ok {
-				resources = nil
-			}
-			return messages.ResourcesLoadedMsg{
-				ResourceType: resourceType,
-				Resources:    resources,
-			}
-		}
-		// R53 records drill-down
-		if r53ZoneId != "" {
-			resources, ok := demo.GetR53Records(r53ZoneId)
-			if !ok {
-				resources = nil
-			}
-			return messages.ResourcesLoadedMsg{
-				ResourceType: resourceType,
-				Resources:    resources,
-			}
-		}
-		// Standard resource fetch — resolve alias to canonical short name
+		// Resolve alias to canonical short name
 		canonicalType := resourceType
 		rt := resource.FindResourceType(resourceType)
 		if rt != nil {
@@ -878,14 +881,16 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	rt := rl.ResourceType()
-	s3Bucket := rl.S3Bucket()
-	s3Prefix := rl.S3Prefix()
-	r53ZoneId := rl.R53ZoneId()
-	if s3Bucket != "" && rt == "s3_objects" {
-		rt = "s3"
-	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-	cmd := m.fetchResources(rt, s3Bucket, s3Prefix, r53ZoneId)
+
+	// If the view has a parent context, it's a child view — use child fetch path.
+	if pc := rl.ParentContext(); pc != nil {
+		cmd := m.fetchChildResources(rt, pc)
+		return m, cmd
+	}
+
+	// Top-level resource list — fetch via registry.
+	cmd := m.fetchResources(rt)
 	return m, cmd
 }
 

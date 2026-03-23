@@ -19,6 +19,27 @@ func init() {
 		return FetchS3Buckets(ctx, c.S3)
 	})
 	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
+
+	// Register S3 objects as a child type with its own fetcher.
+	resource.RegisterChildFetcher("s3_objects", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"])
+	})
+	resource.RegisterChildType(resource.ResourceTypeDef{
+		Name:      "S3 Objects",
+		ShortName: "s3_objects",
+		Columns:   resource.S3ObjectColumns(),
+		Children: []resource.ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
+			DisplayNameKey: "bucket",
+			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+		}},
+	})
 }
 
 // FetchS3Buckets calls the S3 ListBuckets API and returns a slice of

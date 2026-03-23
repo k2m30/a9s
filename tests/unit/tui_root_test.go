@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -565,9 +566,9 @@ func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
-	// Press Enter on the bucket — returns a cmd that produces S3EnterBucketMsg
+	// Press Enter on the bucket — returns a cmd that produces EnterChildViewMsg
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	// Execute the cmd to get the S3EnterBucketMsg and process it
+	// Execute the cmd to get the EnterChildViewMsg and process it
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
@@ -609,5 +610,123 @@ func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 	// Frame title should show s3(1) — back to bucket list
 	if !strings.Contains(plain, "s3(1)") && !strings.Contains(plain, "my-bucket") {
 		t.Errorf("Escape from objects should return to bucket list, got: %s", plain[:min(200, len(plain))])
+	}
+}
+
+// ── Test 1: Unknown child type at root model level ──────────────────────────
+
+func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Send EnterChildViewMsg with a child type that is not registered
+	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "nonexistent_type",
+		ParentContext: map[string]string{"id": "test"},
+		DisplayName:   "test",
+	})
+
+	if cmd == nil {
+		t.Fatal("EnterChildViewMsg with unknown child type should return a command")
+	}
+
+	// Execute the returned cmd — should produce a FlashMsg error
+	msg := cmd()
+	flashMsg, ok := msg.(messages.FlashMsg)
+	if !ok {
+		t.Fatalf("expected FlashMsg, got %T", msg)
+	}
+	if !flashMsg.IsError {
+		t.Error("FlashMsg.IsError should be true for unknown child type")
+	}
+	if !strings.Contains(flashMsg.Text, "unknown child type") {
+		t.Errorf("FlashMsg.Text should contain 'unknown child type', got %q", flashMsg.Text)
+	}
+}
+
+// ── Test 2: Nil clients for child fetches ───────────────────────────────────
+
+func TestRoot_EnterChildView_NilClients(t *testing.T) {
+	tui.Version = "0.6.0"
+	// Register a temporary child type so handleEnterChildView passes the lookup
+	testChildType := "test_nil_clients_child"
+	resource.RegisterChildType(resource.ResourceTypeDef{
+		Name:      "Test Nil Clients Child",
+		ShortName: testChildType,
+		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
+	})
+	resource.RegisterChildFetcher(testChildType, func(_ context.Context, clients interface{}, _ resource.ParentContext) ([]resource.Resource, error) {
+		// This should not be reached if clients are nil — the model checks first
+		return nil, nil
+	})
+	defer resource.UnregisterChildType(testChildType)
+	defer resource.UnregisterChildFetcher(testChildType)
+
+	// Create model WITHOUT demo mode and WITHOUT clients (clients == nil)
+	m := newRootSizedModel()
+
+	// Send EnterChildViewMsg — handleEnterChildView will push a view and call fetchChildResources
+	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     testChildType,
+		ParentContext: map[string]string{"bucket": "test"},
+		DisplayName:   "test",
+	})
+
+	if cmd == nil {
+		t.Fatal("EnterChildViewMsg should return a command (batch of init + fetch)")
+	}
+
+	// Extract the APIErrorMsg from the batch — fetchChildResources should detect nil clients
+	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
+		_, ok := msg.(messages.APIErrorMsg)
+		return ok
+	})
+
+	apiErr, ok := msg.(messages.APIErrorMsg)
+	if !ok {
+		t.Fatalf("expected APIErrorMsg from nil clients fetch, got %T", msg)
+	}
+	if !strings.Contains(apiErr.Err.Error(), "not initialized") {
+		t.Errorf("APIErrorMsg.Err should contain 'not initialized', got %q", apiErr.Err.Error())
+	}
+}
+
+// ── Test 4: Nil ParentContext in EnterChildViewMsg ──────────────────────────
+
+func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
+	tui.Version = "0.6.0"
+	// Register a temporary child type
+	testChildType := "test_nil_ctx"
+	resource.RegisterChildType(resource.ResourceTypeDef{
+		Name:      "Test Nil Ctx",
+		ShortName: testChildType,
+		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
+	})
+	resource.RegisterChildFetcher(testChildType, func(_ context.Context, _ interface{}, _ resource.ParentContext) ([]resource.Resource, error) {
+		return nil, nil
+	})
+	defer resource.UnregisterChildType(testChildType)
+	defer resource.UnregisterChildFetcher(testChildType)
+
+	// Create model in demo mode so we don't need real AWS clients
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// Send EnterChildViewMsg with nil ParentContext — must not panic
+	m, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     testChildType,
+		ParentContext: nil,
+		DisplayName:   "test",
+	})
+
+	// Verify no panic occurred and the view was pushed
+	content := rootViewContent(m)
+	if content == "" {
+		t.Error("View() should return non-empty content after entering child view")
+	}
+
+	// Execute returned cmd if any (should not panic)
+	if cmd != nil {
+		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic on execution
 	}
 }

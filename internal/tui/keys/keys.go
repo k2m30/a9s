@@ -31,6 +31,12 @@ type Map struct {
 	ScrollLeft  key.Binding
 	ScrollRight key.Binding
 
+	// Child-view triggers
+	Events    key.Binding
+	Logs      key.Binding
+	Resources key.Binding
+	Source    key.Binding
+
 	// Sort
 	SortByName key.Binding
 	SortByID   key.Binding
@@ -69,6 +75,11 @@ func Default() Map {
 		Copy:        key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy id")),
 		ScrollLeft:  key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "scroll left")),
 		ScrollRight: key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "scroll right")),
+
+		Events:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "events")),
+		Logs:      key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "logs")),
+		Resources: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resources")),
+		Source:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "source")),
 
 		SortByName: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
 		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),

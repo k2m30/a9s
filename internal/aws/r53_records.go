@@ -13,6 +13,20 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("r53_records", []string{"name", "type", "ttl", "values"})
+
+	// Register R53 records as a child type with its own fetcher.
+	resource.RegisterChildFetcher("r53_records", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"])
+	})
+	resource.RegisterChildType(resource.ResourceTypeDef{
+		Name:      "R53 Records",
+		ShortName: "r53_records",
+		Columns:   resource.R53RecordColumns(),
+	})
 }
 
 // FetchR53Records calls the Route53 ListResourceRecordSets API for a given

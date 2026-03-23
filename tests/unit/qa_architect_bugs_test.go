@@ -45,13 +45,15 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 		t.Fatal("Enter on folder should return a command to navigate into prefix")
 	}
 	msg := cmd()
-	// Should be S3NavigatePrefixMsg, not NavigateMsg{TargetDetail}
-	if _, ok := msg.(messages.S3NavigatePrefixMsg); !ok {
-		if nav, ok := msg.(messages.NavigateMsg); ok && nav.Target == messages.TargetDetail {
-			t.Error("Enter on S3 folder must navigate into prefix, not show detail view")
-		} else {
-			t.Errorf("Enter on S3 folder should send S3NavigatePrefixMsg, got %T", msg)
+	// Should be EnterChildViewMsg (data-driven child nav), not NavigateMsg{TargetDetail}
+	if childMsg, ok := msg.(messages.EnterChildViewMsg); ok {
+		if childMsg.ChildType != "s3_objects" {
+			t.Errorf("EnterChildViewMsg.ChildType should be 's3_objects', got %q", childMsg.ChildType)
 		}
+	} else if nav, ok := msg.(messages.NavigateMsg); ok && nav.Target == messages.TargetDetail {
+		t.Error("Enter on S3 folder must navigate into prefix, not show detail view")
+	} else {
+		t.Errorf("Enter on S3 folder should send EnterChildViewMsg, got %T", msg)
 	}
 }
 
@@ -70,8 +72,8 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 		t.Fatal("d key should return a command")
 	}
 	msg := cmd()
-	// Should be NavigateMsg{TargetDetail}, NOT S3EnterBucketMsg
-	if _, ok := msg.(messages.S3EnterBucketMsg); ok {
+	// Should be NavigateMsg{TargetDetail}, NOT EnterChildViewMsg
+	if _, ok := msg.(messages.EnterChildViewMsg); ok {
 		t.Error("d key on S3 bucket must show detail view, not drill into bucket")
 	}
 	if nav, ok := msg.(messages.NavigateMsg); ok {

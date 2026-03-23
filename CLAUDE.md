@@ -1,6 +1,6 @@
 # a9s Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-18
+Auto-generated from all feature plans. Last updated: 2026-03-23
 
 ## Active Technologies
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
@@ -12,21 +12,23 @@ cmd/
   a9s/           # main binary
   refgen/        # views_reference.yaml generator
 internal/
-  aws/           # AWS service clients & resource fetchers
+  aws/           # AWS service clients & resource fetchers (top-level + child)
+  buildinfo/     # version resolution from ldflags / go install
   config/        # YAML config loading
+  demo/          # synthetic fixture data for demo mode
   fieldpath/     # struct field extraction via reflection
-  resource/      # generic resource model & registry
+  resource/      # generic resource model, registry, child-view definitions
   tui/           # root Bubble Tea app model
-    keys/        # key bindings
+    keys/        # key bindings (including child-view triggers: e, L, r, s)
     layout/      # frame rendering
-    messages/    # inter-view message types
+    messages/    # inter-view message types (NavigateMsg, EnterChildViewMsg, etc.)
     styles/      # Tokyo Night Dark palette
     views/       # view models (menu, list, detail, yaml, help, etc.)
 tests/
-  unit/          # 1,045+ unit tests
+  unit/          # 1,850+ unit tests
   integration/   # integration tests
 docs/
-  design/        # visual design spec
+  design/        # visual design spec (incl. child-views/ with 21 specs)
   qa/            # QA user stories
 specs/           # feature specifications
 ```
@@ -57,6 +59,7 @@ Go 1.26+: Follow standard conventions
 | `a9s-common` | All agents | Shell rules, package access rules, build/test commands |
 | `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
 | `a9s-add-resource` | Coder + QA (on-demand) | 12-step blueprint for adding new AWS resource types (fetcher + view-layer tests) |
+| `a9s-add-child-view` | Coder + QA (on-demand) | Step-by-step blueprint for adding child views (child fetcher + type registration + parent wiring + tests) |
 
 ## Agents
 
@@ -75,9 +78,29 @@ Go 1.26+: Follow standard conventions
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice, real workflows | All |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Read-only |
 
+## Child-View Architecture
+
+Parent→child navigation is data-driven via `ChildViewDef` on `ResourceTypeDef`:
+
+```go
+type ChildViewDef struct {
+    ChildType      string            // child ShortName (e.g., "s3_objects")
+    Key            string            // trigger key: "enter", "e", "L", "r", "s"
+    ContextKeys    map[string]string // parent resource → child fetcher params
+    DisplayNameKey string            // context key for frame title
+    DrillCondition func(Resource) bool // optional filter (e.g., S3 folders only)
+}
+```
+
+Adding a new child view requires NO changes to `app.go`, `messages.go`, or `resourcelist.go`. See the `a9s-add-child-view` skill for the full checklist.
+
+Key registries: `resource.RegisterChildType()`, `resource.RegisterChildFetcher()`, `demo.RegisterChildDemo()`.
+
+ContextKeys resolution: `"ID"` → Resource.ID, `"Name"` → Resource.Name, `"@parent.x"` → inherited from parent context, else → Resource.Fields[key].
+
 ## Rules
 
-- ALWAYS bump version in `cmd/a9s/main.go` and rebuild binary after ANY code change
+- ALWAYS rebuild binary (`go build -o a9s ./cmd/a9s/`) after ANY code change — version is resolved at build time via `internal/buildinfo`
 - ALWAYS write failing tests BEFORE writing implementation code (TDD is non-negotiable)
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
