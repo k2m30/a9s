@@ -54,3 +54,5 @@ changelog:
 
 release:
   prerelease: auto
+  header: |
+    {{ .Env.RELEASE_NOTES }}
