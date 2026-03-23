@@ -21,6 +21,19 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Load release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          FILE="releases/${TAG}.md"
+          if [ -f "$FILE" ]; then
+            # Use delimiter to handle multiline
+            echo "RELEASE_NOTES<<ENDOFNOTES" >> "$GITHUB_ENV"
+            cat "$FILE" >> "$GITHUB_ENV"
+            echo "ENDOFNOTES" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_NOTES=" >> "$GITHUB_ENV"
+          fi
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -29,6 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
 
   docker:
     name: Docker Image
