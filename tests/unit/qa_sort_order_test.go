@@ -432,3 +432,89 @@ func TestQA_SortOrder_IndicatorMatchesActualOrder(t *testing.T) {
 		t.Errorf("descending sort indicator shown but data not descending: first name = %q", names[0])
 	}
 }
+
+// ===========================================================================
+// Bug fix: Sort by Age must work for child view fields like "last_event"
+// that don't contain "time" or "date" in their key names.
+// ===========================================================================
+
+// logStreamSortTypeDef builds a log-streams-like type def for sort testing.
+func logStreamSortTypeDef() resource.ResourceTypeDef {
+	return resource.ResourceTypeDef{
+		Name:      "Log Streams",
+		ShortName: "log_streams",
+		Columns: []resource.Column{
+			{Key: "stream_name", Title: "Stream Name", Width: 48},
+			{Key: "last_event", Title: "Last Event", Width: 22},
+			{Key: "first_event", Title: "First Event", Width: 22},
+			{Key: "stored_bytes", Title: "Size", Width: 12},
+		},
+	}
+}
+
+func logStreamSortResources() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID: "stream-c", Name: "stream-c", Status: "",
+			Fields: map[string]string{
+				"stream_name": "stream-c", "last_event": "2026-03-22 02:47",
+				"first_event": "2026-03-22 01:00", "stored_bytes": "14 KB",
+			},
+		},
+		{
+			ID: "stream-a", Name: "stream-a", Status: "",
+			Fields: map[string]string{
+				"stream_name": "stream-a", "last_event": "2026-03-20 10:00",
+				"first_event": "2026-03-20 09:00", "stored_bytes": "8 KB",
+			},
+		},
+		{
+			ID: "stream-b", Name: "stream-b", Status: "",
+			Fields: map[string]string{
+				"stream_name": "stream-b", "last_event": "2026-03-21 15:30",
+				"first_event": "2026-03-21 14:00", "stored_bytes": "22 KB",
+			},
+		},
+	}
+}
+
+func TestQA_SortOrder_LogStreams_AgeSortWorks(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.Reinit()
+	})
+
+	td := logStreamSortTypeDef()
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(200, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "log_streams",
+		Resources:    logStreamSortResources(),
+	})
+
+	// Press A to sort by age ascending (oldest first)
+	m, _ = m.Update(rlKeyPress("A"))
+
+	rendered := m.View()
+	plain := stripANSI(rendered)
+
+	// Verify that sort by age actually reorders:
+	// stream-a (2026-03-20) should come before stream-b (2026-03-21)
+	// which should come before stream-c (2026-03-22) in ascending order
+	idxA := strings.Index(plain, "stream-a")
+	idxB := strings.Index(plain, "stream-b")
+	idxC := strings.Index(plain, "stream-c")
+
+	if idxA < 0 || idxB < 0 || idxC < 0 {
+		t.Fatalf("could not find all stream names in rendered output:\n%s", plain)
+	}
+
+	if idxA > idxB || idxB > idxC {
+		t.Errorf("age ascending sort failed for log streams: stream-a@%d, stream-b@%d, stream-c@%d — fields like 'last_event' must be recognized as time fields",
+			idxA, idxB, idxC)
+	}
+}
