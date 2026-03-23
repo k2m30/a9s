@@ -154,3 +154,44 @@ func TestFetchTargetGroups_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+// TestFetchTargetGroups_FieldsContainARN verifies that the target group ARN
+// is available in Fields so child views can use it for API calls.
+// DescribeTargetHealth requires the full ARN, not just the name.
+func TestFetchTargetGroups_FieldsContainARN(t *testing.T) {
+	port80 := int32(80)
+	mock := &mockELBv2DescribeTargetGroupsClient{
+		output: &elbv2.DescribeTargetGroupsOutput{
+			TargetGroups: []elbv2types.TargetGroup{
+				{
+					TargetGroupName: aws.String("api-prod-tg"),
+					TargetGroupArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/1234567890abcdef"),
+					Port:            &port80,
+					Protocol:        elbv2types.ProtocolEnumHttp,
+					VpcId:           aws.String("vpc-abc123"),
+					TargetType:      elbv2types.TargetTypeEnumInstance,
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchTargetGroups(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	r := resources[0]
+
+	// The ARN must be in Fields so child views (tg_health) can pass it to DescribeTargetHealth
+	arn := r.Fields["target_group_arn"]
+	if arn == "" {
+		t.Fatal("Fields[\"target_group_arn\"] is empty — child view DescribeTargetHealth needs the full ARN")
+	}
+	expectedARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/1234567890abcdef"
+	if arn != expectedARN {
+		t.Errorf("Fields[\"target_group_arn\"]: expected %q, got %q", expectedARN, arn)
+	}
+}
