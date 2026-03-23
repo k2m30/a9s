@@ -963,7 +963,7 @@ var defaultViews = ViewsConfig{
 				{Title: "Message", Path: "", Key: "message", Width: 120},
 			},
 			Detail: []string{
-				"Timestamp", "Message", "IngestionTime",
+				"Timestamp", "Message", "IngestionTime", "EventId",
 			},
 		},
 		"tg_health": {
