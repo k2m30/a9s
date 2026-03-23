@@ -589,3 +589,54 @@ func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
 		t.Error("pressing Up once should change the view — cursor appears stuck after pressing Down past end")
 	}
 }
+
+// ===========================================================================
+// Bug: narrow screen drops wide columns entirely instead of shrinking them.
+// Log events with Timestamp (22) + Message (120) on a 80-col terminal
+// should show both columns, with Message shrunk to fill remaining space.
+// ===========================================================================
+
+func TestResourceList_NarrowScreen_ShowsAllColumns(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	td := resource.ResourceTypeDef{
+		Name:      "Log Events",
+		ShortName: "log_events",
+		Columns: []resource.Column{
+			{Key: "timestamp", Title: "Timestamp", Width: 22},
+			{Key: "message", Title: "Message", Width: 120},
+		},
+	}
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(80, 20) // narrow terminal — 80 cols can't fit 22+120
+
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "log_events",
+		Resources: []resource.Resource{
+			{
+				ID: "evt-1", Name: "test event",
+				Fields: map[string]string{
+					"timestamp": "2025-07-25 16:05",
+					"message":   "Downloading snowflake_connector_python-3.2.1",
+				},
+			},
+		},
+	})
+
+	view := stripANSI(m.View())
+
+	// Both columns should be visible
+	if !strings.Contains(view, "Timestamp") {
+		t.Errorf("Timestamp header should be visible on narrow screen:\n%s", view)
+	}
+	if !strings.Contains(view, "Message") {
+		t.Errorf("Message header should be visible on narrow screen (shrunk to fit):\n%s", view)
+	}
+	// Message content should be visible (even if truncated)
+	if !strings.Contains(view, "Downloading") || !strings.Contains(view, "snowflake") {
+		t.Errorf("Message content should be visible (truncated) on narrow screen:\n%s", view)
+	}
+}
