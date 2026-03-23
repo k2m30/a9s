@@ -14,6 +14,11 @@ func PadOrTrunc(s string, w int) string {
 	if w <= 0 {
 		return ""
 	}
+	// Strip newlines/carriage returns — multi-line values would break
+	// row rendering by adding extra terminal lines to a single table row.
+	if strings.ContainsAny(s, "\n\r") {
+		s = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(s)
+	}
 	// Fast path: pure ASCII without ANSI escapes -> len(s) == visible width.
 	// Any multi-byte rune (len != rune count) or ANSI escape falls through.
 	if len(s) == len([]rune(s)) && !strings.Contains(s, "\x1b") {

@@ -109,6 +109,36 @@ func TestPadOrTrunc_UnicodeTruncate(t *testing.T) {
 	}
 }
 
+// TestPadOrTrunc_NewlinesStripped verifies that embedded newlines in the input
+// are replaced with spaces. Log messages often contain \n (stack traces,
+// multi-line output). If newlines leak through, a single "row" renders as
+// multiple terminal lines, breaking scroll behavior.
+func TestPadOrTrunc_NewlinesStripped(t *testing.T) {
+	got := text.PadOrTrunc("line1\nline2\nline3", 20)
+	if strings.Contains(got, "\n") {
+		t.Errorf("PadOrTrunc output must not contain newlines, got: %q", got)
+	}
+	vis := lipgloss.Width(got)
+	if vis != 20 {
+		t.Errorf("expected visible width 20, got %d", vis)
+	}
+}
+
+func TestPadOrTrunc_NewlinesInLongString(t *testing.T) {
+	// A message with embedded newlines that exceeds the column width
+	got := text.PadOrTrunc("ERROR: something failed\nTraceback:\n  File app.py, line 42", 30)
+	if strings.Contains(got, "\n") {
+		t.Errorf("PadOrTrunc output must not contain newlines, got: %q", got)
+	}
+}
+
+func TestPadOrTrunc_CarriageReturnStripped(t *testing.T) {
+	got := text.PadOrTrunc("line1\r\nline2", 20)
+	if strings.Contains(got, "\r") || strings.Contains(got, "\n") {
+		t.Errorf("PadOrTrunc output must not contain CR/LF, got: %q", got)
+	}
+}
+
 // ── CenterTitle tests ────────────────────────────────────────────────────────
 
 func TestLayoutCenterTitle_EmptyTitle(t *testing.T) {
