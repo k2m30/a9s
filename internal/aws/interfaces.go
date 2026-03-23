@@ -451,3 +451,8 @@ type CWLogsDescribeLogStreamsAPI interface {
 type CWLogsGetLogEventsAPI interface {
 	GetLogEvents(ctx context.Context, params *cloudwatchlogs.GetLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetLogEventsOutput, error)
 }
+
+// ELBv2DescribeTargetHealthAPI defines the interface for the ELBv2 DescribeTargetHealth operation.
+type ELBv2DescribeTargetHealthAPI interface {
+	DescribeTargetHealth(ctx context.Context, params *elbv2.DescribeTargetHealthInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeTargetHealthOutput, error)
+}

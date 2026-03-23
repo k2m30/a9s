@@ -111,3 +111,58 @@ func TestQA_YAML_LogEvents_RawContentUncolored(t *testing.T) {
 		t.Error("LogEvents RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// Target Health YAML view fixtures
+// ===========================================================================
+
+func fixtureTargetHealth() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "i-0abc1234def56789a",
+			Name:   "i-0abc1234def56789a",
+			Status: "unhealthy",
+			Fields: map[string]string{
+				"target_id":   "i-0abc1234def56789a",
+				"port":        "8080",
+				"az":          "us-east-1a",
+				"health":      "unhealthy",
+				"reason":      "Target.FailedHealthChecks",
+				"description": "Health checks failed with 503",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Target Health YAML tests
+// ===========================================================================
+
+func TestQA_YAML_TargetHealth_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureTargetHealth() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("TargetHealth YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("TargetHealth YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_TargetHealth_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureTargetHealth()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("TargetHealth FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_TargetHealth_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureTargetHealth()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("TargetHealth RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

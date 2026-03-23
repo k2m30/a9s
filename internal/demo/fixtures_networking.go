@@ -37,6 +37,10 @@ func init() {
 	demoData["vpce"] = vpceFixtures
 	demoData["tgw"] = tgwFixtures
 	demoData["eni"] = eniFixtures
+
+	RegisterChildDemo("tg_health", func(parentCtx map[string]string) []resource.Resource {
+		return tgHealthFixtures(parentCtx["target_group_arn"])
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -1594,6 +1598,123 @@ func eniFixtures() []resource.Resource {
 				OwnerId:            aws.String("123456789012"),
 				RequesterManaged:   aws.Bool(false),
 				SourceDestCheck:    aws.Bool(true),
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Target Health (elbv2types.TargetHealthDescription) — child of Target Groups
+// Fields: target_id, port, az, health, reason, description
+// ---------------------------------------------------------------------------
+
+func tgHealthFixtures(_ string) []resource.Resource {
+	port80 := int32(80)
+	port443 := int32(443)
+	port8080 := int32(8080)
+	port3000 := int32(3000)
+
+	return []resource.Resource{
+		{
+			ID:     "i-0abc1234def56789a",
+			Name:   "i-0abc1234def56789a",
+			Status: "healthy",
+			Fields: map[string]string{
+				"target_id":   "i-0abc1234def56789a",
+				"port":        "80",
+				"az":          "us-east-1a",
+				"health":      "healthy",
+				"reason":      "",
+				"description": "Health checks passed",
+			},
+			RawStruct: elbv2types.TargetHealthDescription{
+				Target: &elbv2types.TargetDescription{
+					Id:               aws.String("i-0abc1234def56789a"),
+					Port:             &port80,
+					AvailabilityZone: aws.String("us-east-1a"),
+				},
+				TargetHealth: &elbv2types.TargetHealth{
+					State:       elbv2types.TargetHealthStateEnumHealthy,
+					Description: aws.String("Health checks passed"),
+				},
+				HealthCheckPort: aws.String("80"),
+			},
+		},
+		{
+			ID:     "i-0bcd2345efg67890b",
+			Name:   "i-0bcd2345efg67890b",
+			Status: "healthy",
+			Fields: map[string]string{
+				"target_id":   "i-0bcd2345efg67890b",
+				"port":        "443",
+				"az":          "us-east-1b",
+				"health":      "healthy",
+				"reason":      "",
+				"description": "Health checks passed",
+			},
+			RawStruct: elbv2types.TargetHealthDescription{
+				Target: &elbv2types.TargetDescription{
+					Id:               aws.String("i-0bcd2345efg67890b"),
+					Port:             &port443,
+					AvailabilityZone: aws.String("us-east-1b"),
+				},
+				TargetHealth: &elbv2types.TargetHealth{
+					State:       elbv2types.TargetHealthStateEnumHealthy,
+					Description: aws.String("Health checks passed"),
+				},
+				HealthCheckPort: aws.String("443"),
+			},
+		},
+		{
+			ID:     "i-0cde3456fgh78901c",
+			Name:   "i-0cde3456fgh78901c",
+			Status: "unhealthy",
+			Fields: map[string]string{
+				"target_id":   "i-0cde3456fgh78901c",
+				"port":        "8080",
+				"az":          "us-east-1c",
+				"health":      "unhealthy",
+				"reason":      "Target.FailedHealthChecks",
+				"description": "Health checks failed with 503",
+			},
+			RawStruct: elbv2types.TargetHealthDescription{
+				Target: &elbv2types.TargetDescription{
+					Id:               aws.String("i-0cde3456fgh78901c"),
+					Port:             &port8080,
+					AvailabilityZone: aws.String("us-east-1c"),
+				},
+				TargetHealth: &elbv2types.TargetHealth{
+					State:       elbv2types.TargetHealthStateEnumUnhealthy,
+					Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
+					Description: aws.String("Health checks failed with 503"),
+				},
+				HealthCheckPort: aws.String("8080"),
+			},
+		},
+		{
+			ID:     "i-0def4567ghi89012d",
+			Name:   "i-0def4567ghi89012d",
+			Status: "draining",
+			Fields: map[string]string{
+				"target_id":   "i-0def4567ghi89012d",
+				"port":        "3000",
+				"az":          "us-east-1a",
+				"health":      "draining",
+				"reason":      "Target.DeregistrationInProgress",
+				"description": "Target deregistration in progress",
+			},
+			RawStruct: elbv2types.TargetHealthDescription{
+				Target: &elbv2types.TargetDescription{
+					Id:               aws.String("i-0def4567ghi89012d"),
+					Port:             &port3000,
+					AvailabilityZone: aws.String("us-east-1a"),
+				},
+				TargetHealth: &elbv2types.TargetHealth{
+					State:       elbv2types.TargetHealthStateEnumDraining,
+					Reason:      elbv2types.TargetHealthReasonEnumDeregistrationInProgress,
+					Description: aws.String("Target deregistration in progress"),
+				},
+				HealthCheckPort: aws.String("3000"),
 			},
 		},
 	}

@@ -209,6 +209,12 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "target_type", Title: "Target Type", Width: 12, Sortable: true},
 			{Key: "health_check_path", Title: "Health Check", Width: 24, Sortable: false},
 		},
+		Children: []ChildViewDef{{
+			ChildType:      "tg_health",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"target_group_arn": "ID"},
+			DisplayNameKey: "target_group_arn",
+		}},
 	},
 	{
 		Name:      "Security Groups",
@@ -949,6 +955,19 @@ func LogEventColumns() []Column {
 	return []Column{
 		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
 		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+	}
+}
+
+// TargetHealthColumns returns the column definitions for target health entries
+// within an ELBv2 Target Group.
+func TargetHealthColumns() []Column {
+	return []Column{
+		{Key: "target_id", Title: "Target ID", Width: 24, Sortable: true},
+		{Key: "port", Title: "Port", Width: 8, Sortable: true},
+		{Key: "az", Title: "AZ", Width: 14, Sortable: true},
+		{Key: "health", Title: "Health", Width: 14, Sortable: true},
+		{Key: "reason", Title: "Reason", Width: 28, Sortable: true},
+		{Key: "description", Title: "Description", Width: 36, Sortable: true},
 	}
 }
 
