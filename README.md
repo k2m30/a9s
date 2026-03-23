@@ -24,6 +24,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 ## Features
 
 - **62 AWS resource types** across 12 service categories
+- **Child view drill-downs** — press Enter to explore nested resources (Log Streams → Log Events, Target Group → Target Health, S3 → Objects, R53 → Records)
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
 - Multi-profile and multi-region support
@@ -31,9 +32,10 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Column sorting by name, ID, or date
 - Filter/search within resource lists
 - Horizontal scrolling for wide tables
+- Human-readable formatting (timestamps, byte sizes)
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 1,800+ unit tests
+- 1,900+ unit tests
 
 ## Installation
 
@@ -155,6 +157,18 @@ a9s --version             # print version
 |-----|--------|
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
+
+## Child Views (Drill-Downs)
+
+Press `Enter` on a resource to explore its nested children. Press `Esc` to go back.
+
+| Parent | Child View | Key | Description |
+|--------|-----------|-----|-------------|
+| S3 Buckets | Objects | `Enter` | Browse bucket contents, drill into folders |
+| Route 53 Zones | DNS Records | `Enter` | View A, CNAME, MX, and other record types |
+| Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
+| Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
+| Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
 
 ## Commands
 
