@@ -814,7 +814,7 @@ views:
         path: MetricFilterCount
         width: 8
       Created:
-        path: CreationTime
+        key: creation_time
         width: 16
     detail:
       - LogGroupName
@@ -1033,9 +1033,6 @@ views:
       First Event:
         key: first_event
         width: 22
-      Size:
-        key: stored_bytes
-        width: 12
     detail:
       - LogStreamName
       - Arn
@@ -1043,7 +1040,6 @@ views:
       - FirstEventTimestamp
       - LastEventTimestamp
       - LastIngestionTime
-      - StoredBytes
       - UploadSequenceToken
 
   log_events:

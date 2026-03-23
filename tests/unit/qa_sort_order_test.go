@@ -447,7 +447,6 @@ func logStreamSortTypeDef() resource.ResourceTypeDef {
 			{Key: "stream_name", Title: "Stream Name", Width: 48},
 			{Key: "last_event", Title: "Last Event", Width: 22},
 			{Key: "first_event", Title: "First Event", Width: 22},
-			{Key: "stored_bytes", Title: "Size", Width: 12},
 		},
 	}
 }
@@ -458,21 +457,21 @@ func logStreamSortResources() []resource.Resource {
 			ID: "stream-c", Name: "stream-c", Status: "",
 			Fields: map[string]string{
 				"stream_name": "stream-c", "last_event": "2026-03-22 02:47",
-				"first_event": "2026-03-22 01:00", "stored_bytes": "14 KB",
+				"first_event": "2026-03-22 01:00",
 			},
 		},
 		{
 			ID: "stream-a", Name: "stream-a", Status: "",
 			Fields: map[string]string{
 				"stream_name": "stream-a", "last_event": "2026-03-20 10:00",
-				"first_event": "2026-03-20 09:00", "stored_bytes": "8 KB",
+				"first_event": "2026-03-20 09:00",
 			},
 		},
 		{
 			ID: "stream-b", Name: "stream-b", Status: "",
 			Fields: map[string]string{
 				"stream_name": "stream-b", "last_event": "2026-03-21 15:30",
-				"first_event": "2026-03-21 14:00", "stored_bytes": "22 KB",
+				"first_event": "2026-03-21 14:00",
 			},
 		},
 	}

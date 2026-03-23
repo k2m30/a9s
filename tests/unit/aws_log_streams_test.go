@@ -79,9 +79,6 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 		if r.Fields["stream_name"] != "stream-alpha" {
 			t.Errorf("Fields[stream_name]: expected %q, got %q", "stream-alpha", r.Fields["stream_name"])
 		}
-		if r.Fields["stored_bytes"] == "" {
-			t.Error("Fields[stored_bytes] should not be empty for 14336 bytes")
-		}
 	})
 
 	t.Run("stream_alpha_RawStruct", func(t *testing.T) {
@@ -112,7 +109,7 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 
 	// Verify all streams have required fields
 	t.Run("required_fields_present", func(t *testing.T) {
-		requiredFields := []string{"stream_name", "last_event", "first_event", "stored_bytes"}
+		requiredFields := []string{"stream_name", "last_event", "first_event"}
 		for i, r := range resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
@@ -274,61 +271,6 @@ func TestFetchLogStreams_TimestampFormatting(t *testing.T) {
 	})
 }
 
-// TestFetchLogStreams_SizeFormatting verifies that byte counts are correctly
-// formatted into human-readable sizes.
-func TestFetchLogStreams_SizeFormatting(t *testing.T) {
-	mock := &mockCWLogsDescribeLogStreamsClient{
-		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
-			{
-				LogStreams: []cwlogstypes.LogStream{
-					{
-						LogStreamName: aws.String("size-14kb"),
-						StoredBytes:   aws.Int64(14336),
-					},
-					{
-						LogStreamName: aws.String("size-2.3mb"),
-						StoredBytes:   aws.Int64(2415919),
-					},
-					{
-						LogStreamName: aws.String("size-0"),
-						StoredBytes:   aws.Int64(0),
-					},
-				},
-			},
-		},
-	}
-
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/sizes")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
-	}
-
-	t.Run("14KB", func(t *testing.T) {
-		got := resources[0].Fields["stored_bytes"]
-		if got != "14 KB" {
-			t.Errorf("14336 bytes: expected %q, got %q", "14 KB", got)
-		}
-	})
-
-	t.Run("2.3MB", func(t *testing.T) {
-		got := resources[1].Fields["stored_bytes"]
-		if got != "2.3 MB" {
-			t.Errorf("2415919 bytes: expected %q, got %q", "2.3 MB", got)
-		}
-	})
-
-	t.Run("0B", func(t *testing.T) {
-		got := resources[2].Fields["stored_bytes"]
-		if got != "0 B" {
-			t.Errorf("0 bytes: expected %q, got %q", "0 B", got)
-		}
-	})
-}
-
 // TestFetchLogStreams_NilFields verifies that a stream with nil optional fields
 // (LastEventTimestamp, FirstEventTimestamp, StoredBytes) does not panic and
 // produces empty strings for those fields.
@@ -375,12 +317,6 @@ func TestFetchLogStreams_NilFields(t *testing.T) {
 		}
 	})
 
-	t.Run("stored_bytes_empty_or_zero", func(t *testing.T) {
-		val := r.Fields["stored_bytes"]
-		if val != "" && val != "0 B" {
-			t.Errorf("Fields[stored_bytes]: expected empty or %q, got %q", "0 B", val)
-		}
-	})
 }
 
 // TestFetchLogStreams_RawStruct verifies that RawStruct is the original
@@ -434,23 +370,18 @@ func TestFetchLogStreams_RawStruct(t *testing.T) {
 		}
 	})
 
-	t.Run("StoredBytes_preserved", func(t *testing.T) {
-		if raw.StoredBytes == nil || *raw.StoredBytes != 4096 { //nolint:staticcheck // StoredBytes is deprecated in SDK but still returned and tested
-			t.Errorf("RawStruct.StoredBytes not preserved correctly")
-		}
-	})
 }
 
 // TestLogStreamColumns verifies that LogStreamColumns returns the expected
-// columns with the correct keys: stream_name, last_event, first_event, stored_bytes.
+// 3 columns with the correct keys: stream_name, last_event, first_event.
 func TestLogStreamColumns(t *testing.T) {
 	cols := resource.LogStreamColumns()
 
-	expectedKeys := []string{"stream_name", "last_event", "first_event", "stored_bytes"}
+	expectedKeys := []string{"stream_name", "last_event", "first_event"}
 
 	t.Run("column_count", func(t *testing.T) {
-		if len(cols) != 4 {
-			t.Fatalf("expected 4 columns, got %d", len(cols))
+		if len(cols) != 3 {
+			t.Fatalf("expected 3 columns, got %d", len(cols))
 		}
 	})
 

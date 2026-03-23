@@ -18,10 +18,9 @@ func fixtureLogStreams() []resource.Resource {
 			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
 			Status: "",
 			Fields: map[string]string{
-				"stream_name":  "2024/03/22/[$LATEST]abcdef1234567890",
-				"last_event":   "2024-03-23 00:00",
-				"first_event":  "2024-03-22 00:00",
-				"stored_bytes": "14 KB",
+				"stream_name": "2024/03/22/[$LATEST]abcdef1234567890",
+				"last_event":  "2024-03-23 00:00",
+				"first_event": "2024-03-22 00:00",
 			},
 		},
 	}
