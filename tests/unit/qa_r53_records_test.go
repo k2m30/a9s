@@ -40,6 +40,12 @@ func r53ZoneTypeDef() resource.ResourceTypeDef {
 			{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 			{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
 		},
+		Children: []resource.ChildViewDef{{
+			ChildType:      "r53_records",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"zone_id": "ID", "zone_name": "Name"},
+			DisplayNameKey: "zone_name",
+		}},
 	}
 }
 
@@ -182,10 +188,22 @@ func r53RLZoneModel() views.ResourceListModel {
 	return m
 }
 
+// newR53RecordsList creates a ResourceListModel for R53 records inside a zone,
+// using the generic NewChildResourceList constructor.
+func newR53RecordsList(zoneId, zoneName string, viewConfig *config.ViewsConfig, k keys.Map) views.ResourceListModel {
+	childDef := resource.ResourceTypeDef{
+		Name:      "R53 Records",
+		ShortName: "r53_records",
+		Columns:   resource.R53RecordColumns(),
+	}
+	parentCtx := map[string]string{"zone_id": zoneId, "zone_name": zoneName}
+	return views.NewChildResourceList(childDef, parentCtx, zoneName, viewConfig, k)
+}
+
 // r53RLRecordModel creates a standalone ResourceListModel for R53 records inside a zone.
 func r53RLRecordModel(zoneId, zoneName string) views.ResourceListModel {
 	k := keys.Default()
-	m := views.NewR53RecordsList(zoneId, zoneName, nil, k)
+	m := newR53RecordsList(zoneId, zoneName, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -300,7 +318,7 @@ func TestQA_R53_A3_2_ZoneList_ShowsZoneData(t *testing.T) {
 
 // A.4 Enter Key (Drill Into Zone)
 
-func TestQA_R53_A4_1_EnterOnZone_SendsR53EnterZoneMsg(t *testing.T) {
+func TestQA_R53_A4_1_EnterOnZone_SendsEnterChildViewMsg(t *testing.T) {
 	m := r53RLZoneModel()
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -309,21 +327,24 @@ func TestQA_R53_A4_1_EnterOnZone_SendsR53EnterZoneMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	zoneMsg, ok := msg.(messages.R53EnterZoneMsg)
+	childMsg, ok := msg.(messages.EnterChildViewMsg)
 	if !ok {
-		t.Fatalf("Enter on R53 zone should produce R53EnterZoneMsg, got %T", msg)
+		t.Fatalf("Enter on R53 zone should produce EnterChildViewMsg, got %T", msg)
 	}
 
 	expected := fixtureR53Zones()[0]
-	if zoneMsg.ZoneId != expected.ID {
-		t.Errorf("R53EnterZoneMsg.ZoneId should be %q, got %q", expected.ID, zoneMsg.ZoneId)
+	if childMsg.ParentContext["zone_id"] != expected.ID {
+		t.Errorf("EnterChildViewMsg.ParentContext[zone_id] should be %q, got %q", expected.ID, childMsg.ParentContext["zone_id"])
 	}
-	if zoneMsg.ZoneName != expected.Name {
-		t.Errorf("R53EnterZoneMsg.ZoneName should be %q, got %q", expected.Name, zoneMsg.ZoneName)
+	if childMsg.ParentContext["zone_name"] != expected.Name {
+		t.Errorf("EnterChildViewMsg.ParentContext[zone_name] should be %q, got %q", expected.Name, childMsg.ParentContext["zone_name"])
+	}
+	if childMsg.ChildType != "r53_records" {
+		t.Errorf("EnterChildViewMsg.ChildType should be 'r53_records', got %q", childMsg.ChildType)
 	}
 }
 
-func TestQA_R53_A4_2_EnterOnSecondZone_SendsCorrectZoneMsg(t *testing.T) {
+func TestQA_R53_A4_2_EnterOnSecondZone_SendsCorrectChildViewMsg(t *testing.T) {
 	m := r53RLZoneModel()
 
 	// Move cursor down to the second zone
@@ -335,17 +356,17 @@ func TestQA_R53_A4_2_EnterOnSecondZone_SendsCorrectZoneMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	zoneMsg, ok := msg.(messages.R53EnterZoneMsg)
+	childMsg, ok := msg.(messages.EnterChildViewMsg)
 	if !ok {
-		t.Fatalf("Enter on second zone should produce R53EnterZoneMsg, got %T", msg)
+		t.Fatalf("Enter on second zone should produce EnterChildViewMsg, got %T", msg)
 	}
 
 	expected := fixtureR53Zones()[1]
-	if zoneMsg.ZoneId != expected.ID {
-		t.Errorf("R53EnterZoneMsg.ZoneId should be %q, got %q", expected.ID, zoneMsg.ZoneId)
+	if childMsg.ParentContext["zone_id"] != expected.ID {
+		t.Errorf("EnterChildViewMsg.ParentContext[zone_id] should be %q, got %q", expected.ID, childMsg.ParentContext["zone_id"])
 	}
-	if zoneMsg.ZoneName != expected.Name {
-		t.Errorf("R53EnterZoneMsg.ZoneName should be %q, got %q", expected.Name, zoneMsg.ZoneName)
+	if childMsg.ParentContext["zone_name"] != expected.Name {
+		t.Errorf("EnterChildViewMsg.ParentContext[zone_name] should be %q, got %q", expected.Name, childMsg.ParentContext["zone_name"])
 	}
 }
 
@@ -357,7 +378,7 @@ func TestQA_R53_A4_2_EnterOnSecondZone_SendsCorrectZoneMsg(t *testing.T) {
 
 func TestQA_R53_B1_1_RecordList_LoadingShowsSpinner(t *testing.T) {
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/ZTEST", "example.com.", nil, k)
+	m := newR53RecordsList("/hostedzone/ZTEST", "example.com.", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
@@ -380,7 +401,7 @@ func TestQA_R53_B1_2_RecordList_AfterLoad_ShowsData(t *testing.T) {
 
 func TestQA_R53_B2_1_RecordList_EmptyZone(t *testing.T) {
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/ZEMPTY", "empty-zone.com.", nil, k)
+	m := newR53RecordsList("/hostedzone/ZEMPTY", "empty-zone.com.", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -445,8 +466,9 @@ func TestQA_R53_B4_2_RecordList_FrameTitleShowsCount(t *testing.T) {
 
 func TestQA_R53_B4_3_RecordList_ZoneId_Accessor(t *testing.T) {
 	m := r53RLRecordModel("/hostedzone/ZTEST", "acme-corp.com.")
-	if m.R53ZoneId() != "/hostedzone/ZTEST" {
-		t.Errorf("R53ZoneId() should return %q, got %q", "/hostedzone/ZTEST", m.R53ZoneId())
+	pc := m.ParentContext()
+	if pc == nil || pc["zone_id"] != "/hostedzone/ZTEST" {
+		t.Errorf("ParentContext()[zone_id] should return %q, got %q", "/hostedzone/ZTEST", pc["zone_id"])
 	}
 }
 
@@ -500,34 +522,36 @@ func TestQA_R53_B6_1_YKeyOnRecord_SendsYAMLNavigateMsg(t *testing.T) {
 }
 
 // ===========================================================================
-// C. R53EnterZoneMsg Root Model Integration (mirrors S3EnterBucketMsg tests)
+// C. EnterChildViewMsg Root Model Integration for R53
 // ===========================================================================
 
-func TestQA_R53_C1_EnterZoneMsg_CreatesRecordListView(t *testing.T) {
+func TestQA_R53_C1_EnterChildViewMsg_CreatesRecordListView(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := r53LoadedZoneModel()
 
-	// Simulate R53EnterZoneMsg directly
-	m, _ = rootApplyMsg(m, messages.R53EnterZoneMsg{
-		ZoneId:   "/hostedzone/Z0123456789ABCDEFGHIJ",
-		ZoneName: "acme-corp.com.",
+	// Simulate EnterChildViewMsg for R53 records
+	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "r53_records",
+		ParentContext: map[string]string{"zone_id": "/hostedzone/Z0123456789ABCDEFGHIJ", "zone_name": "acme-corp.com."},
+		DisplayName:   "acme-corp.com.",
 	})
 
 	plain := stripANSI(rootViewContent(m))
 	// Should show loading state for the zone or the zone name in the frame
 	if !strings.Contains(plain, "acme-corp.com.") {
-		t.Errorf("R53EnterZoneMsg should create record list view with zone name, got: %s", plain[:min(300, len(plain))])
+		t.Errorf("EnterChildViewMsg should create record list view with zone name, got: %s", plain[:min(300, len(plain))])
 	}
 }
 
-func TestQA_R53_C2_EnterZoneMsg_RecordsLoaded_ShowsRecords(t *testing.T) {
+func TestQA_R53_C2_EnterChildViewMsg_RecordsLoaded_ShowsRecords(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := r53LoadedZoneModel()
 
-	// Send R53EnterZoneMsg
-	m, _ = rootApplyMsg(m, messages.R53EnterZoneMsg{
-		ZoneId:   "/hostedzone/Z0123456789ABCDEFGHIJ",
-		ZoneName: "acme-corp.com.",
+	// Send EnterChildViewMsg for R53 records
+	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+		ChildType:     "r53_records",
+		ParentContext: map[string]string{"zone_id": "/hostedzone/Z0123456789ABCDEFGHIJ", "zone_name": "acme-corp.com."},
+		DisplayName:   "acme-corp.com.",
 	})
 
 	// Load records
@@ -734,13 +758,14 @@ func TestQA_R53_E2_DemoMode_FetchR53RecordsDrillDown(t *testing.T) {
 	})
 	m, _ = m.Update(msg)
 
-	// Drill into first zone via R53EnterZoneMsg
-	_, cmd = m.Update(messages.R53EnterZoneMsg{
-		ZoneId:   "/hostedzone/Z0123456789ABCDEFGHIJ",
-		ZoneName: "acme-corp.com.",
+	// Drill into first zone via EnterChildViewMsg
+	_, cmd = m.Update(messages.EnterChildViewMsg{
+		ChildType:     "r53_records",
+		ParentContext: map[string]string{"zone_id": "/hostedzone/Z0123456789ABCDEFGHIJ", "zone_name": "acme-corp.com."},
+		DisplayName:   "acme-corp.com.",
 	})
 	if cmd == nil {
-		t.Fatal("R53EnterZoneMsg returned nil cmd; expected a fetch command")
+		t.Fatal("EnterChildViewMsg returned nil cmd; expected a fetch command")
 	}
 
 	// The cmd should produce a ResourcesLoadedMsg with R53 record fixtures
@@ -775,12 +800,13 @@ func TestQA_R53_E3_DemoMode_UnknownZone_EmptyRecords(t *testing.T) {
 	m, _ = m.Update(msg)
 
 	// Drill into unknown zone
-	_, cmd = m.Update(messages.R53EnterZoneMsg{
-		ZoneId:   "/hostedzone/ZUNKNOWN",
-		ZoneName: "unknown.com.",
+	_, cmd = m.Update(messages.EnterChildViewMsg{
+		ChildType:     "r53_records",
+		ParentContext: map[string]string{"zone_id": "/hostedzone/ZUNKNOWN", "zone_name": "unknown.com."},
+		DisplayName:   "unknown.com.",
 	})
 	if cmd == nil {
-		t.Fatal("R53EnterZoneMsg for unknown zone returned nil cmd")
+		t.Fatal("EnterChildViewMsg for unknown zone returned nil cmd")
 	}
 
 	msg2 := extractMsg(t, cmd, func(msg tea.Msg) bool {
@@ -1034,34 +1060,35 @@ func TestDemoR53Records_RawStructFieldConsistency(t *testing.T) {
 }
 
 // ===========================================================================
-// GAP 4: NewR53RecordsList constructor tests
+// GAP 4: NewChildResourceList constructor tests for R53 records
 // ===========================================================================
 
 func TestNewR53RecordsList_TypeDef(t *testing.T) {
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
+	m := newR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
 	m.SetSize(120, 20)
 
 	title := m.FrameTitle()
 	// During loading, should show zone name (not "r53_records")
 	if title != "test.com." {
-		t.Errorf("NewR53RecordsList FrameTitle during loading should be 'test.com.', got: %q", title)
+		t.Errorf("NewChildResourceList FrameTitle during loading should be 'test.com.', got: %q", title)
 	}
 }
 
-func TestNewR53RecordsList_R53ZoneId(t *testing.T) {
+func TestNewR53RecordsList_ParentContext_ZoneId(t *testing.T) {
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/ZTEST123", "test.com.", nil, k)
+	m := newR53RecordsList("/hostedzone/ZTEST123", "test.com.", nil, k)
 	m.SetSize(120, 20)
 
-	if m.R53ZoneId() != "/hostedzone/ZTEST123" {
-		t.Errorf("R53ZoneId() should be %q, got %q", "/hostedzone/ZTEST123", m.R53ZoneId())
+	pc := m.ParentContext()
+	if pc == nil || pc["zone_id"] != "/hostedzone/ZTEST123" {
+		t.Errorf("ParentContext()[zone_id] should be %q, got %q", "/hostedzone/ZTEST123", pc["zone_id"])
 	}
 }
 
 func TestNewR53RecordsList_ColumnsMatch(t *testing.T) {
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
+	m := newR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -1090,7 +1117,7 @@ func TestNewR53RecordsList_MultipleTerminalSizes(t *testing.T) {
 	for _, sz := range sizes {
 		t.Run(fmt.Sprintf("w=%d_h=%d", sz.w, sz.h), func(t *testing.T) {
 				k := keys.Default()
-				m := views.NewR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
+				m := newR53RecordsList("/hostedzone/ZTEST", "test.com.", nil, k)
 				m.SetSize(sz.w, sz.h)
 				m, _ = m.Init()
 				m, _ = m.Update(messages.ResourcesLoadedMsg{
@@ -1154,7 +1181,7 @@ func TestDemoRender_R53RecordsListShowsData(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewR53RecordsList("/hostedzone/Z0123456789ABCDEFGHIJ", "acme-corp.com.", cfg, k)
+	m := newR53RecordsList("/hostedzone/Z0123456789ABCDEFGHIJ", "acme-corp.com.", cfg, k)
 	m.SetSize(120, 30)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{

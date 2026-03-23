@@ -87,11 +87,20 @@ type ClientsReadyMsg struct {
 	Err     error
 }
 
+// EnterChildViewMsg signals that the user has triggered a child view navigation.
+// The root model uses ChildType to look up the child type definition and fetcher,
+// ParentContext to provide parameters to the child fetcher, and DisplayName
+// for the child view's frame title.
+type EnterChildViewMsg struct {
+	ChildType     string
+	ParentContext map[string]string
+	DisplayName   string
+}
+
 // LoadResourcesMsg triggers an async fetch of resources for a given type.
 type LoadResourcesMsg struct {
-	ResourceType string
-	S3Bucket     string
-	S3Prefix     string
+	ResourceType  string
+	ParentContext map[string]string
 }
 
 // RevealSecretMsg triggers an async fetch of a secret's value.
@@ -102,19 +111,3 @@ type RevealSecretMsg struct {
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
 
-// S3EnterBucketMsg signals that the user selected an S3 bucket to drill into.
-type S3EnterBucketMsg struct {
-	BucketName string
-}
-
-// S3NavigatePrefixMsg signals navigation to a new prefix within an S3 bucket.
-type S3NavigatePrefixMsg struct {
-	Bucket string
-	Prefix string
-}
-
-// R53EnterZoneMsg signals that the user selected a Route53 hosted zone to drill into.
-type R53EnterZoneMsg struct {
-	ZoneId   string
-	ZoneName string
-}

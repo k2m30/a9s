@@ -14,6 +14,29 @@ type Column struct {
 	Sortable bool
 }
 
+// ChildViewDef describes a child view that can be drilled into from a parent
+// resource list. Used to make child-view navigation data-driven instead of
+// hardcoded per resource type.
+type ChildViewDef struct {
+	// ChildType is the registered child type short name (e.g., "s3_objects").
+	ChildType string
+	// Key is the trigger key name (e.g., "enter", "e", "L").
+	Key string
+	// ContextKeys maps child-fetcher parameter names to source expressions:
+	//   "ID"         → parent resource's ID
+	//   "Name"       → parent resource's Name
+	//   "@parent.x"  → value from the parent view's ParentContext["x"]
+	//   anything else → parent resource's Fields[key]
+	ContextKeys map[string]string
+	// DisplayNameKey is the context key whose value becomes the child view's
+	// display name (frame title). For example "bucket" shows the bucket name.
+	DisplayNameKey string
+	// DrillCondition is an optional predicate. When non-nil, the child view
+	// is only entered if the predicate returns true for the selected resource.
+	// A nil DrillCondition means always drill.
+	DrillCondition func(Resource) bool
+}
+
 // ResourceTypeDef defines a category of AWS resources the app can browse.
 type ResourceTypeDef struct {
 	// Name is the display name (e.g., "EC2 Instances").
@@ -26,6 +49,9 @@ type ResourceTypeDef struct {
 	Category string
 	// Columns are the table columns for list view.
 	Columns []Column
+	// Children defines child views that can be drilled into from this resource
+	// type's list view. Each entry maps a key press to a child type navigation.
+	Children []ChildViewDef
 }
 
 var resourceTypes = []ResourceTypeDef{
@@ -342,6 +368,12 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 			{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
 		},
+		Children: []ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "ID"},
+			DisplayNameKey: "bucket",
+		}},
 	},
 	{
 		Name:      "ElastiCache Redis",
@@ -628,6 +660,12 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 			{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
 		},
+		Children: []ChildViewDef{{
+			ChildType:      "r53_records",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"zone_id": "ID", "zone_name": "Name"},
+			DisplayNameKey: "zone_name",
+		}},
 	},
 	{
 		Name:      "CloudFront Distributions",
