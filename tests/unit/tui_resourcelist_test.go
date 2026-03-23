@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -471,5 +472,120 @@ func TestResourceListView_NoSeparatorBelowHeaders(t *testing.T) {
 		if allDash && len(stripped) > 5 {
 			t.Errorf("found what looks like a separator row: %q", stripped)
 		}
+	}
+}
+
+// ===========================================================================
+// Bug: pressing Down past last item should NOT move cursor off-screen.
+// After pressing Down 10 times past the end, pressing Up once should
+// immediately show the previous item (not require 10 Ups to return).
+// ===========================================================================
+
+func TestResourceList_DownPastEnd_CursorStaysAtLast(t *testing.T) {
+	m := rlLoadedModel(t) // 5 resources, height 20
+
+	// Move to last item
+	m, _ = m.Update(rlKeyPress("G")) // jump to bottom
+
+	// Verify we're at the last item
+	view1 := stripANSI(m.View())
+	if !strings.Contains(view1, "legacy-app") {
+		t.Fatalf("after G, should see last item 'legacy-app' in view")
+	}
+
+	// Press Down 10 times past the end
+	for i := 0; i < 10; i++ {
+		m, _ = m.Update(rlKeyPress("j"))
+	}
+
+	// View should still show the last item highlighted
+	view2 := stripANSI(m.View())
+	if !strings.Contains(view2, "legacy-app") {
+		t.Errorf("after 10x Down past end, last item should still be visible:\n%s", view2)
+	}
+
+	// Now press Up ONCE — should immediately show the previous item
+	m, _ = m.Update(rlKeyPress("k"))
+	view3 := stripANSI(m.View())
+
+	// After one Up from the last item, "bastion" (second-to-last) should
+	// be where the cursor is. Verify it's visible.
+	if !strings.Contains(view3, "bastion") {
+		t.Errorf("after 1x Up from last item, should see 'bastion':\n%s", view3)
+	}
+
+	// The critical check: view should be DIFFERENT from the "at end" view
+	// because the cursor moved. If pressing Up doesn't change the view,
+	// the cursor was stuck somewhere invisible.
+	if view3 == view2 {
+		t.Error("pressing Up once from last position should change the view (cursor should move to previous item)")
+	}
+}
+
+// TestResourceList_DownPastEnd_ManyItems tests the same bug with more items
+// than fit on screen, which requires actual scrolling.
+func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	td := resource.ResourceTypeDef{
+		Name:      "Log Streams",
+		ShortName: "log_streams",
+		Columns: []resource.Column{
+			{Key: "stream_name", Title: "Stream Name", Width: 48},
+			{Key: "last_event", Title: "Last Event", Width: 22},
+		},
+	}
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 15) // Only 14 data rows visible (15 minus header)
+
+	// Create 30 resources — more than fit on screen
+	var resources []resource.Resource
+	for i := 0; i < 30; i++ {
+		resources = append(resources, resource.Resource{
+			ID: fmt.Sprintf("stream-%02d", i), Name: fmt.Sprintf("stream-%02d", i),
+			Fields: map[string]string{
+				"stream_name": fmt.Sprintf("stream-%02d", i),
+				"last_event":  fmt.Sprintf("2026-03-%02d 12:00", i+1),
+			},
+		})
+	}
+
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "log_streams",
+		Resources:    resources,
+	})
+
+	// Jump to bottom (last item = stream-29)
+	m, _ = m.Update(rlKeyPress("G"))
+
+	viewAtEnd := stripANSI(m.View())
+	if !strings.Contains(viewAtEnd, "stream-29") {
+		t.Fatalf("after G, last item 'stream-29' should be visible:\n%s", viewAtEnd)
+	}
+
+	// Press Down 10 more times past the end
+	for i := 0; i < 10; i++ {
+		m, _ = m.Update(rlKeyPress("j"))
+	}
+
+	viewAfterExtraDown := stripANSI(m.View())
+	if !strings.Contains(viewAfterExtraDown, "stream-29") {
+		t.Errorf("after 10x Down past end, last item should still be visible:\n%s", viewAfterExtraDown)
+	}
+
+	// Press Up ONCE — cursor should move to stream-28
+	m, _ = m.Update(rlKeyPress("k"))
+	viewAfterOneUp := stripANSI(m.View())
+
+	if !strings.Contains(viewAfterOneUp, "stream-28") {
+		t.Errorf("after 1x Up, stream-28 should be visible:\n%s", viewAfterOneUp)
+	}
+
+	// View must change — if it doesn't, cursor is stuck
+	if viewAfterOneUp == viewAfterExtraDown {
+		t.Error("pressing Up once should change the view — cursor appears stuck after pressing Down past end")
 	}
 }
