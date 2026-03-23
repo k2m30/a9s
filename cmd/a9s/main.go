@@ -21,6 +21,8 @@ var (
 
 func init() {
 	version = buildinfo.ResolveVersion(version)
+	commit = buildinfo.ResolveCommit(commit)
+	date = buildinfo.ResolveDate(date)
 }
 
 func main() {
@@ -62,7 +64,11 @@ func main() {
 	}
 
 	if showVersion {
-		fmt.Printf("a9s %s (commit: %s, built: %s)\n", version, commit, date)
+		if commit != "none" && date != "unknown" {
+			fmt.Printf("a9s %s (commit: %s, built: %s)\n", version, commit, date)
+		} else {
+			fmt.Printf("a9s %s\n", version)
+		}
 		os.Exit(0)
 	}
 
