@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("log_events", []string{"timestamp", "message", "ingestion_time"})
+	resource.RegisterFieldKeys("log_events", []string{"timestamp", "message", "ingestion_time", "event_id"})
 
 	resource.RegisterChildFetcher("log_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
 		c, ok := clients.(*ServiceClients)
@@ -81,6 +81,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 				"timestamp":      ts,
 				"message":        message,
 				"ingestion_time": ingestionTime,
+				"event_id":       id,
 			},
 			RawStruct: event,
 		}
