@@ -13,6 +13,13 @@ func init() {
 	demoData["alarm"] = cloudwatchAlarmFixtures
 	demoData["logs"] = cloudwatchLogGroupFixtures
 	demoData["trail"] = cloudtrailFixtures
+
+	RegisterChildDemo("log_streams", func(parentCtx map[string]string) []resource.Resource {
+		return logStreamFixtures(parentCtx["log_group_name"])
+	})
+	RegisterChildDemo("log_events", func(parentCtx map[string]string) []resource.Resource {
+		return logEventFixtures(parentCtx["log_group_name"], parentCtx["log_stream_name"])
+	})
 }
 
 // cloudwatchAlarmFixtures returns demo CloudWatch alarm fixtures.
@@ -252,6 +259,150 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 				Arn:          aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
 				StoredBytes:  aws.Int64(10737418240),
 				CreationTime: aws.Int64(1688169600000),
+			},
+		},
+	}
+}
+
+// logStreamFixtures returns demo log stream fixtures for any log group.
+func logStreamFixtures(_ string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "2024/03/22/[$LATEST]abcdef1234567890",
+			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
+			Status: "",
+			Fields: map[string]string{
+				"stream_name":  "2024/03/22/[$LATEST]abcdef1234567890",
+				"last_event":   "2024-03-23 00:00",
+				"first_event":  "2024-03-22 00:00",
+				"stored_bytes": "14 KB",
+			},
+			RawStruct: cwlogstypes.LogStream{
+				LogStreamName:       aws.String("2024/03/22/[$LATEST]abcdef1234567890"),
+				Arn:                 aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api:log-stream:2024/03/22/[$LATEST]abcdef1234567890"),
+				FirstEventTimestamp: aws.Int64(1711065600000),
+				LastEventTimestamp:  aws.Int64(1711152000000),
+				StoredBytes:         aws.Int64(14336),
+				CreationTime:        aws.Int64(1711060000000),
+			},
+		},
+		{
+			ID:     "2024/03/21/[$LATEST]fedcba0987654321",
+			Name:   "2024/03/21/[$LATEST]fedcba0987654321",
+			Status: "",
+			Fields: map[string]string{
+				"stream_name":  "2024/03/21/[$LATEST]fedcba0987654321",
+				"last_event":   "2024-03-21 23:59",
+				"first_event":  "2024-03-21 00:00",
+				"stored_bytes": "2.3 MB",
+			},
+			RawStruct: cwlogstypes.LogStream{
+				LogStreamName:       aws.String("2024/03/21/[$LATEST]fedcba0987654321"),
+				Arn:                 aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api:log-stream:2024/03/21/[$LATEST]fedcba0987654321"),
+				FirstEventTimestamp: aws.Int64(1710979200000),
+				LastEventTimestamp:  aws.Int64(1711065540000),
+				StoredBytes:         aws.Int64(2415919),
+				CreationTime:        aws.Int64(1710975000000),
+			},
+		},
+		{
+			ID:     "2024/03/20/[$LATEST]1122334455667788",
+			Name:   "2024/03/20/[$LATEST]1122334455667788",
+			Status: "",
+			Fields: map[string]string{
+				"stream_name":  "2024/03/20/[$LATEST]1122334455667788",
+				"last_event":   "2024-03-20 18:30",
+				"first_event":  "2024-03-20 06:00",
+				"stored_bytes": "512 KB",
+			},
+			RawStruct: cwlogstypes.LogStream{
+				LogStreamName:       aws.String("2024/03/20/[$LATEST]1122334455667788"),
+				Arn:                 aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api:log-stream:2024/03/20/[$LATEST]1122334455667788"),
+				FirstEventTimestamp: aws.Int64(1710914400000),
+				LastEventTimestamp:  aws.Int64(1710959400000),
+				StoredBytes:         aws.Int64(524288),
+				CreationTime:        aws.Int64(1710910000000),
+			},
+		},
+	}
+}
+
+// logEventFixtures returns demo log event fixtures for any log stream.
+func logEventFixtures(_, _ string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-1711065600000-0",
+			Name:   "START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST",
+			Status: "META",
+			Fields: map[string]string{
+				"timestamp":      "2024-03-22 00:00",
+				"message":        "START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST",
+				"ingestion_time": "2024-03-22 00:00",
+			},
+			RawStruct: cwlogstypes.OutputLogEvent{
+				Timestamp:     aws.Int64(1711065600000),
+				Message:       aws.String("START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST"),
+				IngestionTime: aws.Int64(1711065601000),
+			},
+		},
+		{
+			ID:     "evt-1711065601000-1",
+			Name:   "INFO Initializing database connection pool",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":      "2024-03-22 00:00",
+				"message":        "INFO Initializing database connection pool",
+				"ingestion_time": "2024-03-22 00:00",
+			},
+			RawStruct: cwlogstypes.OutputLogEvent{
+				Timestamp:     aws.Int64(1711065601000),
+				Message:       aws.String("INFO Initializing database connection pool"),
+				IngestionTime: aws.Int64(1711065602000),
+			},
+		},
+		{
+			ID:     "evt-1711065610000-2",
+			Name:   "ERROR Failed to connect to database: connection refused",
+			Status: "ERROR",
+			Fields: map[string]string{
+				"timestamp":      "2024-03-22 00:00",
+				"message":        "ERROR Failed to connect to database: connection refused",
+				"ingestion_time": "2024-03-22 00:00",
+			},
+			RawStruct: cwlogstypes.OutputLogEvent{
+				Timestamp:     aws.Int64(1711065610000),
+				Message:       aws.String("ERROR Failed to connect to database: connection refused"),
+				IngestionTime: aws.Int64(1711065611000),
+			},
+		},
+		{
+			ID:     "evt-1711065620000-3",
+			Name:   "WARN Retrying connection attempt 2/3",
+			Status: "WARN",
+			Fields: map[string]string{
+				"timestamp":      "2024-03-22 00:00",
+				"message":        "WARN Retrying connection attempt 2/3",
+				"ingestion_time": "2024-03-22 00:00",
+			},
+			RawStruct: cwlogstypes.OutputLogEvent{
+				Timestamp:     aws.Int64(1711065620000),
+				Message:       aws.String("WARN Retrying connection attempt 2/3"),
+				IngestionTime: aws.Int64(1711065621000),
+			},
+		},
+		{
+			ID:     "evt-1711065700000-4",
+			Name:   "REPORT RequestId: a1b2c3d4 Duration: 1523.45 ms Billed Duration: 1524 ms Memory",
+			Status: "REPORT",
+			Fields: map[string]string{
+				"timestamp":      "2024-03-22 00:01",
+				"message":        "REPORT RequestId: a1b2c3d4 Duration: 1523.45 ms Billed Duration: 1524 ms Memory Size: 256 MB Max Memory Used: 128 MB",
+				"ingestion_time": "2024-03-22 00:01",
+			},
+			RawStruct: cwlogstypes.OutputLogEvent{
+				Timestamp:     aws.Int64(1711065700000),
+				Message:       aws.String("REPORT RequestId: a1b2c3d4 Duration: 1523.45 ms Billed Duration: 1524 ms Memory Size: 256 MB Max Memory Used: 128 MB"),
+				IngestionTime: aws.Int64(1711065701000),
 			},
 		},
 	}

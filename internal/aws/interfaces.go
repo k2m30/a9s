@@ -439,3 +439,15 @@ type MSKListClustersV2API interface {
 type BackupListBackupPlansAPI interface {
 	ListBackupPlans(ctx context.Context, params *backup.ListBackupPlansInput, optFns ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error)
 }
+
+// --- Child view interfaces ---
+
+// CWLogsDescribeLogStreamsAPI defines the interface for the CloudWatchLogs DescribeLogStreams operation.
+type CWLogsDescribeLogStreamsAPI interface {
+	DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
+}
+
+// CWLogsGetLogEventsAPI defines the interface for the CloudWatchLogs GetLogEvents operation.
+type CWLogsGetLogEventsAPI interface {
+	GetLogEvents(ctx context.Context, params *cloudwatchlogs.GetLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetLogEventsOutput, error)
+}

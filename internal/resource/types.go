@@ -510,6 +510,12 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
 			{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 		},
+		Children: []ChildViewDef{{
+			ChildType:      "log_streams",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"log_group_name": "Name"},
+			DisplayNameKey: "log_group_name",
+		}},
 	},
 	{
 		Name:      "CloudTrail Trails",
@@ -923,6 +929,26 @@ func R53RecordColumns() []Column {
 		{Key: "type", Title: "Type", Width: 8, Sortable: true},
 		{Key: "ttl", Title: "TTL", Width: 8, Sortable: true},
 		{Key: "values", Title: "Values", Width: 50, Sortable: true},
+	}
+}
+
+// LogStreamColumns returns the column definitions for log streams within a
+// CloudWatch Log Group.
+func LogStreamColumns() []Column {
+	return []Column{
+		{Key: "stream_name", Title: "Stream Name", Width: 48, Sortable: true},
+		{Key: "last_event", Title: "Last Event", Width: 22, Sortable: true},
+		{Key: "first_event", Title: "First Event", Width: 22, Sortable: true},
+		{Key: "stored_bytes", Title: "Size", Width: 12, Sortable: true},
+	}
+}
+
+// LogEventColumns returns the column definitions for log events within a
+// CloudWatch Log Stream.
+func LogEventColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "message", Title: "Message", Width: 120, Sortable: true},
 	}
 }
 
