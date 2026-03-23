@@ -547,6 +547,16 @@ func (m *mockELBv2DescribeTargetGroupsClient) DescribeTargetGroups(ctx context.C
 	return m.output, m.err
 }
 
+// mockELBv2DescribeTargetHealthClient implements awsclient.ELBv2DescribeTargetHealthAPI.
+type mockELBv2DescribeTargetHealthClient struct {
+	output *elbv2.DescribeTargetHealthOutput
+	err    error
+}
+
+func (m *mockELBv2DescribeTargetHealthClient) DescribeTargetHealth(ctx context.Context, params *elbv2.DescribeTargetHealthInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeTargetHealthOutput, error) {
+	return m.output, m.err
+}
+
 // ---------------------------------------------------------------------------
 // ECS mocks
 // ---------------------------------------------------------------------------
