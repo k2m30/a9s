@@ -1028,13 +1028,13 @@ views:
         path: LogStreamName
         width: 48
       Last Event:
-        path: LastEventTimestamp
+        key: last_event
         width: 22
       First Event:
-        path: FirstEventTimestamp
+        key: first_event
         width: 22
       Size:
-        path: StoredBytes
+        key: stored_bytes
         width: 12
     detail:
       - LogStreamName
@@ -1049,10 +1049,10 @@ views:
   log_events:
     list:
       Timestamp:
-        path: Timestamp
+        key: timestamp
         width: 22
       Message:
-        path: Message
+        key: message
         width: 120
     detail:
       - Timestamp
