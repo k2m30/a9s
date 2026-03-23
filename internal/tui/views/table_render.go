@@ -50,15 +50,25 @@ func (m ResourceListModel) resolveColumns() []listCol {
 }
 
 // fitColumns hides rightmost columns that don't fit in the available width.
+// If a column doesn't fit at full width but there's enough remaining space
+// (at least 10 chars), it's included with a reduced width instead of dropped.
 func (m ResourceListModel) fitColumns(cols []listCol) []listCol {
 	if m.width <= 0 {
 		return cols
 	}
+	const minColWidth = 10
 	usedWidth := 1 // leading space
 	var fit []listCol
 	for _, c := range cols {
 		needed := c.width + 2 // column width + 2-space gap
 		if usedWidth+needed > m.width && len(fit) > 0 {
+			// Column doesn't fit at full width. Try shrinking it.
+			remaining := m.width - usedWidth - 2 // available minus gap
+			if remaining >= minColWidth {
+				shrunk := c
+				shrunk.width = remaining
+				fit = append(fit, shrunk)
+			}
 			break
 		}
 		usedWidth += needed
