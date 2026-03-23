@@ -71,8 +71,8 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	if r0.Fields["log_group_name"] != "/aws/lambda/prod-processor" {
 		t.Errorf("resource[0].Fields[\"log_group_name\"]: expected %q, got %q", "/aws/lambda/prod-processor", r0.Fields["log_group_name"])
 	}
-	if r0.Fields["stored_bytes"] != "1048576" {
-		t.Errorf("resource[0].Fields[\"stored_bytes\"]: expected %q, got %q", "1048576", r0.Fields["stored_bytes"])
+	if r0.Fields["stored_bytes"] != "1 MB" {
+		t.Errorf("resource[0].Fields[\"stored_bytes\"]: expected %q, got %q", "1 MB", r0.Fields["stored_bytes"])
 	}
 	if r0.Fields["retention_days"] != "30" {
 		t.Errorf("resource[0].Fields[\"retention_days\"]: expected %q, got %q", "30", r0.Fields["retention_days"])
@@ -86,8 +86,8 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	if r1.ID != "/aws/ecs/staging-service" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "/aws/ecs/staging-service", r1.ID)
 	}
-	if r1.Fields["stored_bytes"] != "524288" {
-		t.Errorf("resource[1].Fields[\"stored_bytes\"]: expected %q, got %q", "524288", r1.Fields["stored_bytes"])
+	if r1.Fields["stored_bytes"] != "512 KB" {
+		t.Errorf("resource[1].Fields[\"stored_bytes\"]: expected %q, got %q", "512 KB", r1.Fields["stored_bytes"])
 	}
 	if r1.Fields["retention_days"] != "7" {
 		t.Errorf("resource[1].Fields[\"retention_days\"]: expected %q, got %q", "7", r1.Fields["retention_days"])

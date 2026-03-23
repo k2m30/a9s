@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -48,6 +50,8 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 	for {
 		input := &cloudwatchlogs.DescribeLogStreamsInput{
 			LogGroupName: &logGroupName,
+			OrderBy:      cwlogstypes.OrderByLastEventTime,
+			Descending:   aws.Bool(true),
 			NextToken:    nextToken,
 		}
 
@@ -139,3 +143,4 @@ func formatFloat(v float64) string {
 	}
 	return fmt.Sprintf("%.1f", v)
 }
+

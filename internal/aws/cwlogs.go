@@ -38,7 +38,7 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 
 		storedBytes := ""
 		if lg.StoredBytes != nil {
-			storedBytes = fmt.Sprintf("%d", *lg.StoredBytes)
+			storedBytes = formatBytes(*lg.StoredBytes)
 		}
 
 		retentionDays := ""
