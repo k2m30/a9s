@@ -1021,3 +1021,40 @@ views:
       - GeoLocation
       - HealthCheckId
       - MultiValueAnswer
+
+  log_streams:
+    list:
+      Stream Name:
+        path: LogStreamName
+        width: 48
+      Last Event:
+        path: LastEventTimestamp
+        width: 22
+      First Event:
+        path: FirstEventTimestamp
+        width: 22
+      Size:
+        path: StoredBytes
+        width: 12
+    detail:
+      - LogStreamName
+      - Arn
+      - CreationTime
+      - FirstEventTimestamp
+      - LastEventTimestamp
+      - LastIngestionTime
+      - StoredBytes
+      - UploadSequenceToken
+
+  log_events:
+    list:
+      Timestamp:
+        path: Timestamp
+        width: 22
+      Message:
+        path: Message
+        width: 120
+    detail:
+      - Timestamp
+      - Message
+      - IngestionTime

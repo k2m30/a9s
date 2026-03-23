@@ -1215,6 +1215,43 @@ func (m *mockBackupListBackupPlansClient) ListBackupPlans(ctx context.Context, p
 	return m.output, m.err
 }
 
+// ---------------------------------------------------------------------------
+// CloudWatch Logs Streams mocks (child of Log Groups)
+// ---------------------------------------------------------------------------
+
+// mockCWLogsDescribeLogStreamsClient implements awsclient.CWLogsDescribeLogStreamsAPI.
+type mockCWLogsDescribeLogStreamsClient struct {
+	outputs []*cloudwatchlogs.DescribeLogStreamsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCWLogsDescribeLogStreamsClient) DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &cloudwatchlogs.DescribeLogStreamsOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// CloudWatch Logs Events mocks (child of Log Streams)
+// ---------------------------------------------------------------------------
+
+// mockCWLogsGetLogEventsClient implements awsclient.CWLogsGetLogEventsAPI.
+type mockCWLogsGetLogEventsClient struct {
+	output *cloudwatchlogs.GetLogEventsOutput
+	err    error
+}
+
+func (m *mockCWLogsGetLogEventsClient) GetLogEvents(ctx context.Context, params *cloudwatchlogs.GetLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetLogEventsOutput, error) {
+	return m.output, m.err
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

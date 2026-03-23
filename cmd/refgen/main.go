@@ -120,6 +120,8 @@ func main() {
 		{"kms", "kmstypes.KeyMetadata", reflect.TypeOf(kmstypes.KeyMetadata{})},
 		{"msk", "kafkatypes.Cluster", reflect.TypeOf(kafkatypes.Cluster{})},
 		{"backup", "backuptypes.BackupPlansListMember", reflect.TypeOf(backuptypes.BackupPlansListMember{})},
+		{"log_streams", "cwlogstypes.LogStream", reflect.TypeOf(cwlogstypes.LogStream{})},
+		{"log_events", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
 	}
 
 	fmt.Println("# views_reference.yaml")
