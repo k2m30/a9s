@@ -417,7 +417,7 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "table_name", Title: "Table Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			{Key: "item_count", Title: "Items", Width: 12, Sortable: true},
-			{Key: "size_bytes", Title: "Size (bytes)", Width: 14, Sortable: true},
+			{Key: "size_bytes", Title: "Size", Width: 14, Sortable: true},
 			{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 		},
 	},
@@ -512,7 +512,7 @@ var resourceTypes = []ResourceTypeDef{
 		Category:  "MONITORING",
 		Columns: []Column{
 			{Key: "log_group_name", Title: "Log Group Name", Width: 48, Sortable: true},
-			{Key: "stored_bytes", Title: "Size (bytes)", Width: 14, Sortable: true},
+			{Key: "stored_bytes", Title: "Size", Width: 14, Sortable: true},
 			{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
 			{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 		},
