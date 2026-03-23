@@ -25,7 +25,7 @@ internal/
     styles/      # Tokyo Night Dark palette
     views/       # view models (menu, list, detail, yaml, help, etc.)
 tests/
-  unit/          # 1,850+ unit tests
+  unit/          # 1,900+ unit tests
   integration/   # integration tests
 docs/
   design/        # visual design spec (incl. child-views/ with 21 specs)

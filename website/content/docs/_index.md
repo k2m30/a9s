@@ -12,6 +12,18 @@ title: "Documentation"
 
 {{< include "keybindings.md" >}}
 
+## Child Views (Drill-Downs)
+
+Press `Enter` on a resource to explore its nested children. Press `Esc` to go back.
+
+| Parent | Child View | Key | Description |
+|--------|-----------|-----|-------------|
+| S3 Buckets | Objects | `Enter` | Browse bucket contents, drill into folders |
+| Route 53 Zones | DNS Records | `Enter` | View A, CNAME, MX, and other record types |
+| Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
+| Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
+| Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
+
 ## Commands
 
 {{< include "commands.md" >}}
