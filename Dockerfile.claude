@@ -1,0 +1,115 @@
+# Dockerfile.claude — Sandboxed Claude Code environment for a9s
+#
+# Build:
+#   docker build -f Dockerfile.claude \
+#     --build-arg DEV_UID=501 \
+#     --build-arg DEV_GID=20 \
+#     -t a9s-claude .
+#
+# Rebuild (no cache):
+#   docker build -f Dockerfile.claude \
+#     --build-arg DEV_UID=501 \
+#     --build-arg DEV_GID=20 \
+#     --no-cache \
+#     -t a9s-claude .
+#
+# Run:
+#   ./run-claude.sh
+#
+# With AWS credentials:
+#   Add: -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION
+
+# ── Stage 1: Go toolchain + cached modules ──────────────────────────
+FROM golang:1.26-bookworm AS go-base
+
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+
+RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest \
+    && go install golang.org/x/vuln/cmd/govulncheck@latest \
+    && go install golang.org/x/tools/gopls@latest
+
+# ── Stage 2: Final image ────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+ARG DEV_UID=501
+ARG DEV_GID=20
+
+# System packages + zsh + gh + Node.js (for npx-based MCP plugins)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    less \
+    git \
+    gh \
+    procps \
+    sudo \
+    jq \
+    unzip \
+    gnupg2 \
+    ca-certificates \
+    curl \
+    zsh \
+    fzf \
+    nodejs \
+    npm \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Non-root user (UID/GID match host for volume permissions) ───────
+RUN groupadd -g ${DEV_GID} dev 2>/dev/null || true \
+    && useradd -m -u ${DEV_UID} -g ${DEV_GID} -s /bin/zsh dev \
+    && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev
+
+# ── Go toolchain ────────────────────────────────────────────────────
+COPY --from=go-base /usr/local/go /usr/local/go
+COPY --from=go-base /go/bin/golangci-lint /usr/local/bin/golangci-lint
+COPY --from=go-base /go/bin/govulncheck /usr/local/bin/govulncheck
+COPY --from=go-base /go/bin/gopls /usr/local/bin/gopls
+COPY --from=go-base /go/pkg/mod /home/dev/go/pkg/mod
+
+ENV GOPATH="/home/dev/go"
+ENV PATH="/usr/local/go/bin:/home/dev/go/bin:${PATH}"
+
+RUN chown -R ${DEV_UID}:${DEV_GID} /home/dev/go
+
+# ── Claude Code CLI (native installer) ──────────────────────────────
+USER dev
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# ── AWS CLI v2 (needs root) ─────────────────────────────────────────
+USER root
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "$ARCH" = "arm64" ]; then AWSARCH="aarch64"; else AWSARCH="x86_64"; fi \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWSARCH}.zip" -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# ── Playwright system deps (for browser MCP plugin) ─────────────────
+RUN npx -y playwright install-deps chromium
+
+# ── Shell setup ──────────────────────────────────────────────────────
+USER dev
+ENV SHELL=/bin/zsh
+ENV PATH="/home/dev/.local/bin:${PATH}"
+
+# Pre-install npx-based MCP servers so first run is fast
+RUN npx -y @playwright/mcp@latest --help 2>/dev/null || true
+RUN npx -y @upstash/context7-mcp --help 2>/dev/null || true
+
+RUN mkdir -p /home/dev/.claude /home/dev/.ssh
+
+# ── Workspace ────────────────────────────────────────────────────────
+WORKDIR /workspace
+
+# Volume mounts at runtime (see run-claude.sh):
+#   -v $(pwd):/workspace             → project files, CLAUDE.md, .claude/agents, skills
+#   -v ~/.gitconfig:...              → git identity
+#   -v ~/.ssh:...                    → git push/pull over SSH
+#   -v ~/.claude/...                 → config (ro) + sessions/history/plugins (rw)
+#   -v ~/.zshrc:...                  → shell aliases, env vars, PATH
+
+# ── Entrypoint ───────────────────────────────────────────────────────
+# --dangerously-skip-permissions is safe — the container IS the sandbox.
+# Auto-updates handled by the native installer.
+ENTRYPOINT ["claude", "--dangerously-skip-permissions"]
