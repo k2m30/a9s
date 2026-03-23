@@ -22,3 +22,38 @@ func ResolveVersion(v string) string {
 	}
 	return v
 }
+
+// ResolveCommit returns the commit hash. If c is already set by ldflags
+// (not "none" or ""), returns it. Otherwise reads vcs.revision from build info.
+func ResolveCommit(c string) string {
+	if c != "none" && c != "" {
+		return c
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, s := range info.Settings {
+			if s.Key == "vcs.revision" && s.Value != "" {
+				if len(s.Value) > 12 {
+					return s.Value[:12]
+				}
+				return s.Value
+			}
+		}
+	}
+	return c
+}
+
+// ResolveDate returns the build date. If d is already set by ldflags
+// (not "unknown" or ""), returns it. Otherwise reads vcs.time from build info.
+func ResolveDate(d string) string {
+	if d != "unknown" && d != "" {
+		return d
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, s := range info.Settings {
+			if s.Key == "vcs.time" && s.Value != "" {
+				return s.Value
+			}
+		}
+	}
+	return d
+}
