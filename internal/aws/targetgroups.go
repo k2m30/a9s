@@ -55,12 +55,18 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 			healthCheckPath = *tg.HealthCheckPath
 		}
 
+		tgArn := ""
+		if tg.TargetGroupArn != nil {
+			tgArn = *tg.TargetGroupArn
+		}
+
 		r := resource.Resource{
 			ID:     tgName,
 			Name:   tgName,
 			Status: "",
 			Fields: map[string]string{
 				"target_group_name": tgName,
+				"target_group_arn":  tgArn,
 				"port":              port,
 				"protocol":          protocol,
 				"vpc_id":            vpcID,

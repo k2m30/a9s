@@ -212,8 +212,8 @@ var resourceTypes = []ResourceTypeDef{
 		Children: []ChildViewDef{{
 			ChildType:      "tg_health",
 			Key:            "enter",
-			ContextKeys:    map[string]string{"target_group_arn": "ID"},
-			DisplayNameKey: "target_group_arn",
+			ContextKeys:    map[string]string{"target_group_arn": "target_group_arn"},
+			DisplayNameKey: "Name",
 		}},
 	},
 	{
