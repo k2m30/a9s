@@ -172,16 +172,17 @@ func (m DetailModel) PlainContent() string {
 
 // renderContent builds the styled key-value lines from the resource.
 func (m DetailModel) renderContent() string {
-	const keyW = 22
-
-	kv := func(key, val string) string {
-		return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
-	}
-
 	// Try config-driven rendering.
 	if m.viewConfig != nil {
-		if lines := m.renderFromConfig(kv); len(lines) > 0 {
-			return strings.Join(lines, "\n")
+		vd := config.GetViewDef(m.viewConfig, m.resourceType)
+		if len(vd.Detail) > 0 {
+			keyW := computeKeyWidth(vd.Detail)
+			kv := func(key, val string) string {
+				return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
+			}
+			if lines := m.renderFromConfig(kv); len(lines) > 0 {
+				return strings.Join(lines, "\n")
+			}
 		}
 	}
 
@@ -197,11 +198,27 @@ func (m DetailModel) renderContent() string {
 	}
 	sort.Strings(fieldKeys)
 
+	keyW := computeKeyWidth(fieldKeys)
+	kv := func(key, val string) string {
+		return " " + styles.DetailKey.Render(text.PadOrTrunc(key+":", keyW)) + styles.DetailVal.Render(val)
+	}
+
 	var lines []string
 	for _, k := range fieldKeys {
 		lines = append(lines, kv(k, m.res.Fields[k]))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// computeKeyWidth returns the width needed for the key column: longest key + 1 (for colon), minimum 22.
+func computeKeyWidth(keys []string) int {
+	w := 22
+	for _, k := range keys {
+		if len(k)+1 > w {
+			w = len(k) + 1
+		}
+	}
+	return w
 }
 
 // renderFromConfig looks up the correct ViewDef by resource type and renders detail lines.
