@@ -52,8 +52,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fzf \
     nodejs \
     npm \
+    locales \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# ── Locale ───────────────────────────────────────────────────────────
+RUN sed -i '/en_US.UTF-8/s/^# //' /etc/locale.gen \
+    && locale-gen
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # ── Non-root user (UID/GID match host for volume permissions) ───────
 RUN groupadd -g ${DEV_GID} dev 2>/dev/null || true \
@@ -88,10 +95,15 @@ RUN ARCH=$(dpkg --print-architecture) \
 # ── Playwright system deps (for browser MCP plugin) ─────────────────
 RUN npx -y playwright install-deps chromium
 
+# ── Entrypoint script (needs root for /usr/local/bin) ────────────────
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # ── Shell setup ──────────────────────────────────────────────────────
 USER dev
 ENV SHELL=/bin/zsh
 ENV PATH="/home/dev/.local/bin:${PATH}"
+ENV DEVCONTAINER=true
 
 # Pre-install npx-based MCP servers so first run is fast
 RUN npx -y @playwright/mcp@latest --help 2>/dev/null || true
@@ -110,6 +122,7 @@ WORKDIR /workspace
 #   -v ~/.zshrc:...                  → shell aliases, env vars, PATH
 
 # ── Entrypoint ───────────────────────────────────────────────────────
-# --dangerously-skip-permissions is safe — the container IS the sandbox.
+# The entrypoint script pre-accepts the workspace trust dialog so the
+# bypass-permissions confirmation doesn't block the interactive session.
 # Auto-updates handled by the native installer.
-ENTRYPOINT ["claude", "--dangerously-skip-permissions"]
+ENTRYPOINT ["docker-entrypoint.sh"]
