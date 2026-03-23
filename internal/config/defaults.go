@@ -947,9 +947,9 @@ var defaultViews = ViewsConfig{
 		"log_streams": {
 			List: []ListColumn{
 				{Title: "Stream Name", Path: "LogStreamName", Width: 48},
-				{Title: "Last Event", Path: "LastEventTimestamp", Width: 22},
-				{Title: "First Event", Path: "FirstEventTimestamp", Width: 22},
-				{Title: "Size", Path: "StoredBytes", Width: 12},
+				{Title: "Last Event", Path: "", Key: "last_event", Width: 22},
+				{Title: "First Event", Path: "", Key: "first_event", Width: 22},
+				{Title: "Size", Path: "", Key: "stored_bytes", Width: 12},
 			},
 			Detail: []string{
 				"LogStreamName", "Arn", "CreationTime",
@@ -959,8 +959,8 @@ var defaultViews = ViewsConfig{
 		},
 		"log_events": {
 			List: []ListColumn{
-				{Title: "Timestamp", Path: "Timestamp", Width: 22},
-				{Title: "Message", Path: "Message", Width: 120},
+				{Title: "Timestamp", Path: "", Key: "timestamp", Width: 22},
+				{Title: "Message", Path: "", Key: "message", Width: 120},
 			},
 			Detail: []string{
 				"Timestamp", "Message", "IngestionTime",
