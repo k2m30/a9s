@@ -44,11 +44,15 @@ func (m *ResourceListModel) sortFiltered() {
 }
 
 // getAgeField extracts the time-related field for age sorting.
+// Matches field keys containing common time-related substrings:
+// time, date, launch, creation, event, start, timestamp.
 func (m ResourceListModel) getAgeField(r resource.Resource) string {
 	for k, v := range r.Fields {
 		kl := strings.ToLower(k)
 		if strings.Contains(kl, "time") || strings.Contains(kl, "date") ||
-			strings.Contains(kl, "launch") || strings.Contains(kl, "creation") {
+			strings.Contains(kl, "launch") || strings.Contains(kl, "creation") ||
+			strings.Contains(kl, "event") || strings.Contains(kl, "start") ||
+			strings.Contains(kl, "timestamp") {
 			return v
 		}
 	}

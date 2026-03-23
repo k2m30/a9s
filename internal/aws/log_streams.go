@@ -33,9 +33,14 @@ func init() {
 	})
 }
 
+// maxLogStreams is the maximum number of log streams to fetch per log group.
+// Large log groups can have thousands of streams; loading all of them is slow
+// and rarely useful since streams are ordered by most-recent-event-first.
+const maxLogStreams = 500
+
 // FetchLogStreams calls the CloudWatchLogs DescribeLogStreams API for a given
 // log group and converts the response into a slice of generic Resource structs.
-// It paginates via NextToken.
+// It paginates via NextToken, capped at maxLogStreams results.
 func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string) ([]resource.Resource, error) {
 	var resources []resource.Resource
 	var nextToken *string
@@ -88,7 +93,7 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 			resources = append(resources, r)
 		}
 
-		if output.NextToken == nil {
+		if output.NextToken == nil || len(resources) >= maxLogStreams {
 			break
 		}
 		nextToken = output.NextToken
