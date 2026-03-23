@@ -384,7 +384,7 @@ var defaultViews = ViewsConfig{
 		"logs": {
 			List: []ListColumn{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
-				{Title: "Size (bytes)", Path: "StoredBytes", Width: 14},
+				{Title: "Size", Path: "", Key: "stored_bytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
@@ -415,7 +415,7 @@ var defaultViews = ViewsConfig{
 				{Title: "Table Name", Path: "TableName", Width: 36},
 				{Title: "Status", Path: "TableStatus", Width: 12},
 				{Title: "Items", Path: "ItemCount", Width: 12},
-				{Title: "Size (bytes)", Path: "TableSizeBytes", Width: 14},
+				{Title: "Size", Path: "", Key: "size_bytes", Width: 14},
 				{Title: "Billing", Path: "BillingModeSummary.BillingMode", Width: 16},
 			},
 			Detail: []string{

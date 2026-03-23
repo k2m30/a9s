@@ -99,8 +99,8 @@ func TestFetchDynamoDBTables_ParsesMultipleTables(t *testing.T) {
 	if r0.Fields["item_count"] != "15000" {
 		t.Errorf("resource[0].Fields[\"item_count\"]: expected %q, got %q", "15000", r0.Fields["item_count"])
 	}
-	if r0.Fields["size_bytes"] != "5242880" {
-		t.Errorf("resource[0].Fields[\"size_bytes\"]: expected %q, got %q", "5242880", r0.Fields["size_bytes"])
+	if r0.Fields["size_bytes"] != "5 MB" {
+		t.Errorf("resource[0].Fields[\"size_bytes\"]: expected %q, got %q", "5 MB", r0.Fields["size_bytes"])
 	}
 	if r0.Fields["billing_mode"] != "PAY_PER_REQUEST" {
 		t.Errorf("resource[0].Fields[\"billing_mode\"]: expected %q, got %q", "PAY_PER_REQUEST", r0.Fields["billing_mode"])
