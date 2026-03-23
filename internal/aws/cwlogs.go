@@ -48,7 +48,7 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 
 		creationTime := ""
 		if lg.CreationTime != nil {
-			creationTime = fmt.Sprintf("%d", *lg.CreationTime)
+			creationTime = formatEpochMillis(*lg.CreationTime)
 		}
 
 		r := resource.Resource{
