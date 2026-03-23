@@ -804,8 +804,8 @@ views:
       Log Group Name:
         path: LogGroupName
         width: 48
-      Size (bytes):
-        path: StoredBytes
+      Size:
+        key: stored_bytes
         width: 14
       Retention:
         path: RetentionInDays
@@ -868,8 +868,8 @@ views:
       Items:
         path: ItemCount
         width: 12
-      Size (bytes):
-        path: TableSizeBytes
+      Size:
+        key: size_bytes
         width: 14
       Billing:
         path: BillingModeSummary.BillingMode

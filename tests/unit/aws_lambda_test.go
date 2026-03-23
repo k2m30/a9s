@@ -104,8 +104,8 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	if r0.Fields["last_modified"] != "2025-01-15T10:00:00.000+0000" {
 		t.Errorf("resource[0].Fields[\"last_modified\"]: expected %q, got %q", "2025-01-15T10:00:00.000+0000", r0.Fields["last_modified"])
 	}
-	if r0.Fields["code_size"] != "5242880" {
-		t.Errorf("resource[0].Fields[\"code_size\"]: expected %q, got %q", "5242880", r0.Fields["code_size"])
+	if r0.Fields["code_size"] != "5 MB" {
+		t.Errorf("resource[0].Fields[\"code_size\"]: expected %q, got %q", "5 MB", r0.Fields["code_size"])
 	}
 
 	// Verify second function

@@ -55,7 +55,7 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 
 		sizeBytes := ""
 		if table.TableSizeBytes != nil {
-			sizeBytes = fmt.Sprintf("%d", *table.TableSizeBytes)
+			sizeBytes = formatBytes(*table.TableSizeBytes)
 		}
 
 		billingMode := ""

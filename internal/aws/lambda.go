@@ -60,7 +60,7 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 
 		codeSize := ""
 		if fn.CodeSize != 0 {
-			codeSize = fmt.Sprintf("%d", fn.CodeSize)
+			codeSize = formatBytes(fn.CodeSize)
 		}
 
 		r := resource.Resource{
