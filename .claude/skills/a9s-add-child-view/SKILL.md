@@ -1,386 +1,206 @@
 ---
 name: a9s-add-child-view
-description: Blueprint for adding a new child view to a9s — step-by-step checklist with templates (child fetcher, child type registration, parent wiring, tests)
+description: Blueprint for adding a new child view to a9s — 3-phase workflow (architect → tests → implement) with exact file manifests and hard-won lessons
 disable-model-invocation: true
 ---
 
 # Adding a New Child View
 
-Follow this checklist for each new child view. The generic child-view architecture handles all navigation, key dispatch, and message routing automatically.
+**Workflow: Architect → Tests → Implement. Never skip or reorder.**
 
-Steps 1-8: Implementation. Steps 9-11: Tests.
-**Skipping test steps is the #1 cause of regressions.**
+## Phase 1: Architect Spec (a9s-architect agent)
 
-## Prerequisites
+The architect reads the design spec and parent fetcher, then produces an **exact file manifest** for the QA and coder agents. This prevents context drain — downstream agents receive only the manifest, not the full design spec.
 
-You MUST have a resource spec from the architect with:
-- Parent ShortName (e.g., `tg`, `ecs-svc`, `cfn`)
-- Child ShortName (e.g., `tg_health`, `ecs_tasks`, `cfn_events`)
-- Trigger key (`enter`, `e`, `L`, `r`, `s`)
-- AWS API call(s)
-- Context keys: what parameters the child fetcher needs from the parent resource
-- List columns (field keys, titles, widths)
-- Detail paths
-- Pattern: A, B, C, or D (see below)
+### Architect must determine:
 
-## Pattern Variants
+1. **Parent analysis** — read `internal/aws/{parent}.go`:
+   - What is `Resource.ID`? (often a name, NOT an ARN)
+   - What Fields keys exist? Does the parent store the ARN? If not, add it.
+   - Which `ServiceClients` field is needed? Already exists?
 
-### Decision Tree
+2. **ContextKeys mapping** — the #1 source of bugs:
+   - If the child API needs an ARN, the parent MUST have the ARN in Fields
+   - `"ID"` → `Resource.ID` (often a name — verify!)
+   - `"Name"` → `Resource.Name`
+   - `"field_key"` → `Resource.Fields["field_key"]`
+   - `"@parent.x"` → inherited from parent context (Pattern C nesting)
+   - **Write a test** that verifies the parent fetcher populates the required field
 
-1. **How many child views does the parent have?**
-   - ONE child → **Pattern A** (Single Child). Trigger key is always `enter`.
-   - MULTIPLE children → **Pattern B** (Multi-Child). One gets `enter`, others get `e`/`L`/`r`/`s`.
-2. **Does the child view itself have children?**
-   - YES → **Pattern C** (Level-2 Nested). The child's `RegisterChildType` includes its own `Children` slice.
-3. **Does the child fetcher call a different AWS service than the parent?**
-   - YES → **Pattern D** (Cross-Service). The fetcher resolves a log group/stream from parent metadata, then queries CloudWatch Logs.
+3. **Field formatting rules** (apply to ALL fields):
+   - `*int64` epoch-ms timestamps → use `formatEpochMillis()` in fetcher, `key:` in config
+   - `*int64` byte counts → use `formatBytes()` in fetcher, `key:` in config
+   - String SDK fields → can use `path:` in config (reads from RawStruct directly)
+   - Computed/formatted fields → MUST use `key:` in config (reads from Fields map)
+   - **Never use `path:` for timestamps or byte counts** — they show raw numbers
 
-Patterns combine: a cross-service level-2 nested view is Pattern C+D.
+4. **File manifest** — exact list of files to CREATE/EDIT/APPEND with specific content
 
-### Pattern A: Single Child (most common)
-- Parent has 1 child. `Enter` on parent drills into child.
-- Examples: Target Group Health, ASG Scaling Activities, Alarm History, ECR Images
+### Architect output format:
 
-### Pattern B: Multi-Child Parent
-- Parent has 2+ children with different trigger keys.
-- Examples:
-  - ECS Services: `Enter`→Tasks, `e`→Events, `L`→Logs
-  - CFN Stacks: `Enter`→Events, `r`→Resources
-  - Lambda: `Enter`→Invocations, `s`→Code
-- Each child gets its own `ChildViewDef` entry in the parent's `Children` slice.
+```
+CHILD VIEW SPEC: {child_shortname}
+Parent: {parent_shortname} | Pattern: {A/B/C/D} | Key: {enter/e/L/r/s}
+API: {service}:{APICall} with {ParentParam}
+Client field: c.{ServiceField} (exists: yes/no)
 
-### Pattern C: Level-2 Nested
-- Child view itself has children (grandchild navigation).
-- Examples:
-  - Log Streams → Log Events (grandchild of Log Groups)
-  - Lambda Invocations → Log Lines
-  - ELB Listeners → Listener Rules
-  - SFN Executions → Execution History
-  - CodeBuild Builds → Build Logs
-- The child's `RegisterChildType` includes `Children: []ChildViewDef{...}`
-- Uses `@parent.` prefix in ContextKeys to carry context through nesting levels.
+CONTEXT KEYS:
+  {context_key} ← Fields["{field_key}"] (verified: parent stores ARN at line N)
 
-### Pattern D: Cross-Service
-- Child fetcher calls a different AWS service than the parent.
-- Examples:
-  - Lambda → Invocations (uses CloudWatch Logs, not Lambda API)
-  - ECS Services → Container Logs (uses CloudWatch Logs via task definition)
-  - CodeBuild → Build Logs (uses CloudWatch Logs)
-- May need multiple AWS API interfaces.
-- Typically involves a resolution step (e.g., look up log group from parent metadata).
+COLUMNS (all use key: in config):
+  {key} | {Title} | {width} | formatter: {none/formatEpochMillis/formatBytes}
 
-## Checklist
+DETAIL PATHS:
+  {Path1}, {Path2}, ... (longest: {N} chars → keyW will auto-size)
 
-### 1. Child Fetcher: `internal/aws/{child_type}.go` (NEW FILE)
+FILES TO CREATE:
+  internal/aws/{child_type}.go
+  tests/unit/aws_{child_type}_test.go
 
-```go
-package aws
-
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-
-    "github.com/aws/aws-sdk-go-v2/service/{service}"
-    {service}types "github.com/aws/aws-sdk-go-v2/service/{service}/types"
-
-    "github.com/k2m30/a9s/v3/internal/resource"
-)
-
-func init() {
-    resource.RegisterChildFetcher("{child_shortname}", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
-        c, ok := clients.(*ServiceClients)
-        if !ok || c == nil {
-            return nil, fmt.Errorf("AWS clients not initialized")
-        }
-        return Fetch{ChildTypeName}(ctx, c.{ServiceField}, parentCtx["{context_key}"])
-    })
-
-    resource.RegisterChildType(resource.ResourceTypeDef{
-        Name:      "{Child Display Name}",
-        ShortName: "{child_shortname}",
-        Columns:   {ChildTypeName}Columns(),
-        // For Pattern C (level-2 nested), add Children here:
-        // Children: []resource.ChildViewDef{{...}},
-    })
-
-    resource.RegisterFieldKeys("{child_shortname}", []string{"{key1}", "{key2}", ...})
-}
-
-// {ChildTypeName}Columns returns the column definitions for the child list view.
-func {ChildTypeName}Columns() []resource.Column {
-    return []resource.Column{
-        {Key: "{key1}", Title: "{Title1}", Width: 28, Sortable: true},
-        {Key: "{key2}", Title: "{Title2}", Width: 12, Sortable: true},
-        // ... from architect spec
-    }
-}
-
-// Fetch{ChildTypeName} calls the AWS API to fetch child resources.
-func Fetch{ChildTypeName}(ctx context.Context, api {InterfaceName}, {parentParam} string) ([]resource.Resource, error) {
-    output, err := api.{APICall}(ctx, &{service}.{APICall}Input{
-        {ParentField}: &{parentParam},
-    })
-    if err != nil {
-        return nil, err
-    }
-
-    var resources []resource.Resource
-    for _, item := range output.{ResultField} {
-        id := /* ... */
-        name := /* ... */
-        status := /* ... */
-
-        fields := map[string]string{
-            "{key1}": /* ... */,
-            "{key2}": /* ... */,
-        }
-
-        detail := map[string]string{ /* ... */ }
-
-        rawJSON := ""
-        if jsonBytes, err := json.MarshalIndent(item, "", "  "); err == nil {
-            rawJSON = string(jsonBytes)
-        }
-
-        resources = append(resources, resource.Resource{
-            ID:         id,
-            Name:       name,
-            Status:     status,
-            Fields:     fields,
-            DetailData: detail,
-            RawJSON:    rawJSON,
-            RawStruct:  item,
-        })
-    }
-    return resources, nil
-}
+FILES TO EDIT:
+  internal/aws/interfaces.go — append {InterfaceName}
+  internal/resource/types.go — add Children to {parent}, add {ChildType}Columns()
+  internal/config/defaults.go — add "{child_shortname}" entry
+  .a9s/views.yaml — add {child_shortname} section
+  cmd/refgen/main.go — add entry (if SDK struct)
+  tests/unit/mocks_test.go — append mock
+  tests/unit/qa_detail_child_views_test.go — append 2 tests
+  tests/unit/qa_yaml_child_views_test.go — append 3 tests
+  tests/unit/qa_list_rawstruct_child_views_test.go — append 1 test
+  internal/demo/fixtures_{category}.go — register child demo
 ```
 
-**Pattern D (Cross-Service) variation** — fetcher resolves log group first:
-```go
-func Fetch{ChildTypeName}(ctx context.Context, parentAPI {ParentInterfaceName}, logsAPI {LogsInterfaceName}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
-    // Step 1: Resolve log group from parent metadata
-    logGroup := resolveLogGroup(ctx, parentAPI, parentCtx)
-    // Step 2: Fetch log events from CloudWatch Logs
-    output, err := logsAPI.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
-        LogGroupName: &logGroup,
-        // ...
-    })
-    // ... process and return resources
-}
-```
+## Phase 2: Tests FIRST (a9s-qa agent)
 
-### 2. Interface: `internal/aws/interfaces.go` (APPEND)
+The QA agent receives the architect's manifest and writes ALL tests. Tests MUST fail to compile because the implementation doesn't exist yet.
 
+### Test files to create/modify:
+
+**1. Mock:** `tests/unit/mocks_test.go` (APPEND)
+- For paginated APIs, use `outputs []*{Output}` slice with `callIdx` counter
+- For single-response APIs, use `output *{Output}`
+
+**2. Fetcher tests:** `tests/unit/aws_{child_shortname}_test.go` (CREATE)
+- Happy path: correct ID, Name, Status, all Fields, RawStruct
+- Empty response: empty slice, no error
+- API error: error propagation
+- Pagination (if applicable): multiple pages collected, stops at cap
+- Timestamp formatting: known epoch ms → expected formatted string
+- Byte formatting: known bytes → expected human-readable string
+- Nil fields: no panic, empty strings
+- RawStruct: original SDK struct preserved
+- **Parent context test**: verify the correct context key is used (e.g., ARN not name)
+
+**3. Detail tests:** `tests/unit/qa_detail_child_views_test.go` (APPEND)
+- ViewContainsExpectedFields
+- NilFields (no panic)
+- **Long field names not truncated** (if any path > 22 chars)
+- **Formatted timestamps in detail** (not raw epoch ms)
+
+**4. YAML + List tests:** (APPEND to existing files)
+- YAML view contains fields, frame title, no ANSI in raw content
+- List rawstruct renders correctly
+
+**5. Run `go test`** — confirm compilation failure (expected).
+
+## Phase 3: Implementation (a9s-coder agent)
+
+The coder receives the architect's file manifest and makes all tests pass.
+
+### Checklist (order matters):
+
+**1. Interface:** `internal/aws/interfaces.go` (APPEND)
 ```go
-// {ChildTypeName}{APICall}API defines the interface for the {Service} {APICall} operation.
-type {ChildTypeName}{APICall}API interface {
+type {InterfaceName} interface {
     {APICall}(ctx context.Context, params *{service}.{APICall}Input, optFns ...func(*{service}.Options)) (*{service}.{APICall}Output, error)
 }
 ```
 
-### 3. Client field: `internal/aws/client.go` (IF NEW SERVICE)
+**2. Client field** (IF new service): `internal/aws/client.go`
 
-**Only needed if the child fetcher uses a service not already in `ServiceClients`.**
+**3. Child fetcher:** `internal/aws/{child_type}.go` (CREATE)
+- `init()` registers: `RegisterFieldKeys`, `RegisterChildFetcher`, `RegisterChildType`
+- Fetcher function with proper formatting:
+  - Timestamps: `formatEpochMillis(*field)` — NEVER `fmt.Sprintf("%d", *field)`
+  - Bytes: `formatBytes(*field)` — NEVER `fmt.Sprintf("%d", *field)`
+  - Messages: strip newlines if content may contain `\n`
+- For paginated APIs: cap at reasonable limit (e.g., `const maxResults = 500`)
+- Column function returns `[]resource.Column` with proper widths
 
-Add field to `ServiceClients` struct:
-```go
-{ServiceField} *{service}.Client
+**4. Parent wiring:** `internal/resource/types.go` (EDIT)
+- Add/append `Children` on parent type
+- Add column function
+- **ContextKeys must map to actual data** — if API needs ARN, use Fields key that has ARN
+
+**5. Config:** `internal/config/defaults.go` (ADD)
+- List columns: use `Key:` for computed fields, `Path:` only for string SDK fields
+- Detail paths: include all relevant fields
+
+**6. Views config:** `.a9s/views.yaml` (ADD)
+- Mirror defaults.go but in YAML format
+- Use `key:` for computed fields, `path:` for string SDK fields
+
+**7. Refgen:** `cmd/refgen/main.go` (APPEND if SDK struct)
+
+**8. Demo fixtures:** `internal/demo/fixtures_{category}.go`
+
+**9. Parent fetcher** (IF needed): add missing Fields (e.g., ARN)
+- Write a test for this FIRST in the parent's test file
+
+### Verification:
+```
+go test ./tests/unit/ -count=1 -timeout 120s
+golangci-lint run ./...
+go build -o a9s ./cmd/a9s/
+go run ./cmd/refgen/ > .a9s/views_reference.yaml  # if SDK struct added
 ```
 
-Add constructor line in `CreateServiceClients`:
-```go
-{ServiceField}: {service}.NewFromConfig(cfg),
-```
+## Pattern Variants
 
-**Skip this step** if the child reuses an existing client (e.g., ECS events reuse `ECS` client).
+### Pattern A: Single Child (most common)
+- Parent has 1 child. `Enter` drills in.
+- Examples: Target Group Health, ASG Activities, Alarm History, ECR Images
 
-### 4. Add `Children` to parent `ResourceTypeDef`: `internal/resource/types.go` (EDIT)
+### Pattern B: Multi-Child Parent
+- 2+ children with different trigger keys.
+- Examples: ECS (`Enter`→Tasks, `e`→Events, `L`→Logs), CFN (`Enter`→Events, `r`→Resources)
+- Implement all children of the same parent in ONE release.
 
-Find the parent type's entry in the `resourceTypes` slice and add or append to its `Children`:
+### Pattern C: Level-2 Nested
+- Child has its own children. `RegisterChildType` includes `Children` slice.
+- Uses `@parent.` prefix in ContextKeys.
+- Examples: Log Streams→Events, Lambda Invocations→Log Lines, ELB Listeners→Rules
 
-**Pattern A (single child):**
-```go
-Children: []ChildViewDef{{
-    ChildType:      "{child_shortname}",
-    Key:            "enter",
-    ContextKeys:    map[string]string{"{context_key}": "ID"},
-    DisplayNameKey: "{context_key}",
-}},
-```
-
-**Pattern B (multi-child) — append to existing Children:**
-```go
-Children: []ChildViewDef{
-    // existing child entry...
-    {
-        ChildType:      "{child_shortname}",
-        Key:            "e",  // or "L", "r", "s"
-        ContextKeys:    map[string]string{"{context_key}": "ID", "{other_key}": "field_name"},
-        DisplayNameKey: "{display_key}",
-    },
-},
-```
-
-**ContextKeys source values:**
-- `"ID"` → `Resource.ID`
-- `"Name"` → `Resource.Name`
-- `"Status"` → `Resource.Status`
-- `"@parent.x"` → inherit from parent view's context (for Pattern C nesting)
-- `"field_key"` → `Resource.Fields["field_key"]`
-
-### 5. Default view config: `internal/config/defaults.go` (ADD)
-
-```go
-"{child_shortname}": {
-    List: []ListColumn{
-        {Title: "{Title1}", Path: "{SDKFieldName}", Width: 28},
-        {Title: "{Title2}", Path: "{SDKFieldName}", Width: 12},
-        // ... matching step 1 columns
-    },
-    Detail: []string{
-        "{SDKField1}", "{SDKField2}", // from architect spec
-    },
-},
-```
-
-### 6. User view config: `.a9s/views.yaml` (ADD section)
-
-```yaml
-  {child_shortname}:
-    list:
-      {Title1}:
-        path: {SDKFieldName}
-        width: 28
-      {Title2}:
-        path: {SDKFieldName}
-        width: 12
-    detail:
-      - {SDKField1}
-      - {SDKField2}
-```
-
-For computed fields (no direct SDK path), use `key:` instead of `path:`:
-```yaml
-      Duration:
-        key: duration
-        width: 12
-```
-
-### 7. Refgen entry (IF child uses an SDK struct): `cmd/refgen/main.go` (APPEND)
-
-```go
-{"{child_shortname}", "{service}types.{SDKType}", reflect.TypeOf({service}types.{SDKType}{})},
-```
-
-Add import if new service types package. Skip if the child uses computed fields only (e.g., Lambda invocations parsed from log lines).
-
-### 8. Mock: `tests/unit/mocks_test.go` (APPEND)
-
-```go
-// mock{ChildTypeName}Client implements awsclient.{InterfaceName} for testing.
-type mock{ChildTypeName}Client struct {
-    output *{service}.{APICall}Output
-    err    error
-}
-
-func (m *mock{ChildTypeName}Client) {APICall}(
-    ctx context.Context,
-    params *{service}.{APICall}Input,
-    optFns ...func(*{service}.Options),
-) (*{service}.{APICall}Output, error) {
-    return m.output, m.err
-}
-```
-
-### 9. Fetcher tests: `tests/unit/aws_{child_shortname}_test.go` (NEW FILE)
-
-Write tests covering:
-- Happy path: fetcher returns correct resources with expected fields
-- Empty response: fetcher returns empty slice, no error
-- API error: fetcher returns the error
-- Field extraction: all column keys populated correctly from mock data
-- Parent context: fetcher correctly uses context keys (e.g., bucket name, zone ID)
-- RawJSON: valid JSON marshaled
-- RawStruct: original SDK struct preserved
-
-**Use exact mock value assertions:**
-```go
-// GOOD — exact value comparison:
-if r.Fields["target_id"] != "i-abc123" {
-    t.Errorf("Fields[target_id] = %q, want %q", r.Fields["target_id"], "i-abc123")
-}
-```
-
-### 10. Detail view tests: `tests/unit/qa_detail_new_types_test.go` (APPEND)
-
-Follow the pattern from `a9s-add-resource` step 10. Add 3 tests:
-- `TestQA_Detail_{ChildTypeName}_ViewContainsExpectedFields`
-- `TestQA_Detail_{ChildTypeName}_NilFields`
-- `TestQA_Detail_{ChildTypeName}_FrameTitle`
-
-### 11. YAML + List view tests
-
-Follow the pattern from `a9s-add-resource` steps 11-12.
-
-### 12. Demo fixtures (OPTIONAL): `internal/demo/fixtures.go`
-
-```go
-func init() {
-    RegisterChildDemo("{child_shortname}", func(parentCtx map[string]string) []resource.Resource {
-        return []resource.Resource{
-            {
-                ID: "example-id", Name: "example-name", Status: "active",
-                Fields: map[string]string{"{key1}": "value1", "{key2}": "value2"},
-            },
-            // ... more fixture data
-        }
-    })
-}
-```
+### Pattern D: Cross-Service
+- Fetcher calls different AWS service than parent.
+- Needs multiple interfaces and possibly multiple client fields.
+- Examples: Lambda→Invocations (CW Logs), ECS→Container Logs (CW Logs)
 
 ## What You Do NOT Need to Change
 
-- `app.go` — the generic `handleEnterChildView` and `fetchChildResources` handle all child views
+- `app.go` — generic `handleEnterChildView` and `fetchChildResources`
 - `messages.go` — `EnterChildViewMsg` handles all child navigation
-- `resourcelist.go` — `handleChildKey` and `buildChildContext` handle all child key dispatch
-- `keys.go` — child-view trigger keys (`e`, `L`, `r`, `s`, `t`) are already defined
+- `resourcelist.go` — `handleChildKey` and `buildChildContext`
+- `keys.go` — trigger keys already defined
 
-## Quick Reference: Files per Pattern
+## Hard-Won Lessons (v3.1.0)
 
-### Pattern A (Simple Single-Child)
+1. **ContextKeys: ARN vs Name** — `Resource.ID` is often a name, not an ARN. If the child API needs an ARN, verify the parent populates it in Fields. Test this explicitly.
 
-| Action | File |
-|--------|------|
-| CREATE | `internal/aws/{child_type}.go` |
-| CREATE | `tests/unit/aws_{child_type}_test.go` |
-| APPEND | `internal/aws/interfaces.go` |
-| EDIT   | `internal/resource/types.go` (add Children to parent) |
-| APPEND | `internal/config/defaults.go` |
-| APPEND | `.a9s/views.yaml` |
-| APPEND | `cmd/refgen/main.go` (if SDK struct) |
-| APPEND | `tests/unit/mocks_test.go` |
-| APPEND | `tests/unit/qa_detail_new_types_test.go` |
-| APPEND | `tests/unit/qa_yaml_new_types_test.go` |
-| APPEND | `tests/unit/qa_list_rawstruct_test.go` |
+2. **`key:` vs `path:` in config** — `path:` reads raw SDK struct (epoch ms, raw bytes). `key:` reads formatted Fields values. ALWAYS use `key:` for timestamps and byte counts.
 
-Skip `internal/aws/client.go` if the parent's service client already exists.
+3. **Detail view Fields-first** — `renderFromConfig` checks Fields before RawStruct. Fetchers must populate Fields with ALL formatted values needed for detail display.
 
-### Pattern B (Multi-Child)
-Same as Pattern A. The `Children` edit in `types.go` appends to an existing slice.
+4. **Newlines in messages** — `PadOrTrunc` strips `\n`/`\r`, but log-like messages should be cleaned in the fetcher too.
 
-### Pattern C (Level-2 Nested)
-Same as Pattern A, plus the `RegisterChildType` call includes its own `Children` slice for the grandchild.
+5. **Narrow screens** — `fitColumns` shrinks the last column to remaining space (min 10 chars). Don't assume fixed terminal width.
 
-### Pattern D (Cross-Service)
-Same as Pattern A, plus: add interfaces for ALL services, may need client fields for both, two mocks (resolve + fetch).
+6. **Detail key column** — `computeKeyWidth()` auto-sizes from longest field name. Long dotted paths like `Target.AvailabilityZone` are handled.
 
-## Post-Implementation Steps
+7. **Pagination caps** — large AWS resources (log groups with 8000+ streams) need pagination limits. Add `const maxResults = 500` and break when exceeded.
 
-1. Run refgen (if SDK struct): `go run ./cmd/refgen/ > .a9s/views_reference.yaml`
-2. Run tests: `go test ./tests/unit/ -count=1 -timeout 120s`
-3. Run linter: `golangci-lint run ./...`
-4. Run vulncheck: `govulncheck ./...`
-5. Bump version in `cmd/a9s/main.go`
-6. Build: `go build -o a9s ./cmd/a9s/`
+8. **Deprecated AWS fields** — `StoredBytes` on LogStream is deprecated (always 0). Check AWS docs before adding fields.
+
+9. **formatBytes/formatFloat are shared utilities** in `internal/aws/log_streams.go` — reuse them, never delete.
+
+10. **Sort by age** — `getAgeField` matches field keys containing: time, date, launch, creation, event, start, timestamp. Name new time fields accordingly.
