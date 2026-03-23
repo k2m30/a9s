@@ -29,6 +29,12 @@ coverage.html
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+.claude/plans/
+.claude/agent-memory/
+.claude/projects/
+
+# Playwright MCP
+.playwright-mcp/
 
 /refgen
 
