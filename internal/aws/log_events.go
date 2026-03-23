@@ -33,7 +33,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  &logGroupName,
 		LogStreamName: &logStreamName,
-		StartFromHead: boolPtr(true),
+		StartFromHead: boolPtr(false),
 	}
 
 	output, err := api.GetLogEvents(ctx, input)
