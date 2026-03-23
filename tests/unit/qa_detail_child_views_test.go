@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 )
 
 // ===========================================================================
@@ -91,5 +92,56 @@ func TestQA_Detail_LogEvent_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("LogEvent detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Target Health detail view tests (child of Target Groups)
+// ===========================================================================
+
+func TestQA_Detail_TargetHealth_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	port := int32(8080)
+	thd := elbtypes.TargetHealthDescription{
+		Target: &elbtypes.TargetDescription{
+			Id:               ptrString("i-0abc1234def56789a"),
+			Port:             &port,
+			AvailabilityZone: ptrString("us-east-1a"),
+		},
+		TargetHealth: &elbtypes.TargetHealth{
+			State:       elbtypes.TargetHealthStateEnumUnhealthy,
+			Reason:      elbtypes.TargetHealthReasonEnumFailedHealthChecks,
+			Description: ptrString("Health checks failed with 503"),
+		},
+		HealthCheckPort: ptrString("8080"),
+	}
+	res := buildResource(
+		"i-0abc1234def56789a",
+		"i-0abc1234def56789a",
+		thd,
+	)
+	cfg := detailConfigForType("tg_health")
+	m := newDetailModel(res, "tg_health", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"i-0abc1234def56789a",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("TargetHealth detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_TargetHealth_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	thd := elbtypes.TargetHealthDescription{}
+	res := buildResource("empty-target", "empty-target", thd)
+	cfg := detailConfigForType("tg_health")
+	m := newDetailModel(res, "tg_health", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("TargetHealth detail should not be empty even with nil fields")
 	}
 }

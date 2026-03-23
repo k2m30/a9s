@@ -966,6 +966,21 @@ var defaultViews = ViewsConfig{
 				"Timestamp", "Message", "IngestionTime",
 			},
 		},
+		"tg_health": {
+			List: []ListColumn{
+				{Title: "Target ID", Key: "target_id", Width: 24},
+				{Title: "Port", Key: "port", Width: 8},
+				{Title: "AZ", Key: "az", Width: 14},
+				{Title: "Health", Key: "health", Width: 14},
+				{Title: "Reason", Key: "reason", Width: 28},
+				{Title: "Description", Key: "description", Width: 36},
+			},
+			Detail: []string{
+				"Target.Id", "Target.Port", "Target.AvailabilityZone",
+				"TargetHealth.State", "TargetHealth.Reason", "TargetHealth.Description",
+				"HealthCheckPort", "AnomalyDetection",
+			},
+		},
 	},
 }
 

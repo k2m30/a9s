@@ -122,6 +122,7 @@ func main() {
 		{"backup", "backuptypes.BackupPlansListMember", reflect.TypeOf(backuptypes.BackupPlansListMember{})},
 		{"log_streams", "cwlogstypes.LogStream", reflect.TypeOf(cwlogstypes.LogStream{})},
 		{"log_events", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
+		{"tg_health", "elbv2types.TargetHealthDescription", reflect.TypeOf(elbv2types.TargetHealthDescription{})},
 	}
 
 	fmt.Println("# views_reference.yaml")
