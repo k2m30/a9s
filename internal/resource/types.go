@@ -945,7 +945,6 @@ func LogStreamColumns() []Column {
 		{Key: "stream_name", Title: "Stream Name", Width: 48, Sortable: true},
 		{Key: "last_event", Title: "Last Event", Width: 22, Sortable: true},
 		{Key: "first_event", Title: "First Event", Width: 22, Sortable: true},
-		{Key: "stored_bytes", Title: "Size", Width: 12, Sortable: true},
 	}
 }
 

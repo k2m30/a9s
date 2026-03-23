@@ -387,7 +387,7 @@ var defaultViews = ViewsConfig{
 				{Title: "Size (bytes)", Path: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
-				{Title: "Created", Path: "CreationTime", Width: 16},
+				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
 			},
 			Detail: []string{
 				"LogGroupName", "LogGroupArn", "LogGroupClass",
@@ -949,12 +949,11 @@ var defaultViews = ViewsConfig{
 				{Title: "Stream Name", Path: "LogStreamName", Width: 48},
 				{Title: "Last Event", Path: "", Key: "last_event", Width: 22},
 				{Title: "First Event", Path: "", Key: "first_event", Width: 22},
-				{Title: "Size", Path: "", Key: "stored_bytes", Width: 12},
 			},
 			Detail: []string{
 				"LogStreamName", "Arn", "CreationTime",
 				"FirstEventTimestamp", "LastEventTimestamp",
-				"LastIngestionTime", "StoredBytes", "UploadSequenceToken",
+				"LastIngestionTime", "UploadSequenceToken",
 			},
 		},
 		"log_events": {

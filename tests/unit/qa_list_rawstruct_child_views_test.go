@@ -34,7 +34,6 @@ func TestQA_ListRawStruct_LogStreams(t *testing.T) {
 		LogStreamName:       ptrString("2024/03/22/[$LATEST]abcdef1234567890"),
 		FirstEventTimestamp: ptrInt64(1711065600000),
 		LastEventTimestamp:  ptrInt64(1711152000000),
-		StoredBytes:         ptrInt64(14336),
 	}
 
 	resources := []resource.Resource{
@@ -43,10 +42,9 @@ func TestQA_ListRawStruct_LogStreams(t *testing.T) {
 			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
 			Status: "",
 			Fields: map[string]string{
-				"stream_name":  "2024/03/22/[$LATEST]abcdef1234567890",
-				"last_event":   "2024-03-23 00:00",
-				"first_event":  "2024-03-22 00:00",
-				"stored_bytes": "14 KB",
+				"stream_name": "2024/03/22/[$LATEST]abcdef1234567890",
+				"last_event":  "2024-03-23 00:00",
+				"first_event": "2024-03-22 00:00",
 			},
 			RawStruct: ls,
 		},

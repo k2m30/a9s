@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("log_streams", []string{"stream_name", "last_event", "first_event", "stored_bytes"})
+	resource.RegisterFieldKeys("log_streams", []string{"stream_name", "last_event", "first_event"})
 
 	resource.RegisterChildFetcher("log_streams", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
 		c, ok := clients.(*ServiceClients)
@@ -72,20 +72,14 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 				firstEvent = formatEpochMillis(*s.FirstEventTimestamp)
 			}
 
-			storedBytes := ""
-			if s.StoredBytes != nil {
-				storedBytes = formatBytes(*s.StoredBytes)
-			}
-
 			r := resource.Resource{
 				ID:     name,
 				Name:   name,
 				Status: "",
 				Fields: map[string]string{
-					"stream_name":  name,
-					"last_event":   lastEvent,
-					"first_event":  firstEvent,
-					"stored_bytes": storedBytes,
+					"stream_name": name,
+					"last_event":  lastEvent,
+					"first_event": firstEvent,
 				},
 				RawStruct: s,
 			}
