@@ -5,7 +5,7 @@
 #   ./run-claude.sh                              # interactive
 #   ./run-claude.sh -p "fix the failing tests"   # with prompt
 #
-# Requires: ANTHROPIC_API_KEY set in environment
+# Auth: uses OAuth via ~/.claude.json (from /login). Also supports ANTHROPIC_API_KEY.
 
 set -euo pipefail
 
@@ -23,20 +23,27 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
         "$SCRIPT_DIR"
 fi
 
-# Validate required env
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "Error: ANTHROPIC_API_KEY is not set" >&2
+# Validate auth — need either OAuth token file or API key
+if [ ! -f "$HOME/.claude.json" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "Error: No auth found. Run 'claude /login' first, or set ANTHROPIC_API_KEY" >&2
     exit 1
 fi
 
 # Collect env vars to forward
 ENV_ARGS=(
-    -e ANTHROPIC_API_KEY
     -e "TERM=${TERM:-xterm-256color}"
     -e "LANG=${LANG:-en_US.UTF-8}"
     -e "LC_ALL=${LC_ALL:-en_US.UTF-8}"
     -e "COLORTERM=${COLORTERM:-truecolor}"
 )
+# Extract OAuth credentials from macOS keychain (Claude Code stores them there via /login)
+# Passed as env var, entrypoint writes to ~/.claude/.credentials.json (plaintext fallback)
+KEYCHAIN_CREDS=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true)
+if [ -n "$KEYCHAIN_CREDS" ]; then
+    ENV_ARGS+=(-e "CLAUDE_CREDENTIALS=$KEYCHAIN_CREDS")
+fi
+
+[ -n "${ANTHROPIC_API_KEY:-}" ]      && ENV_ARGS+=(-e ANTHROPIC_API_KEY)
 [ -n "${GITHUB_TOKEN:-}" ]           && ENV_ARGS+=(-e GITHUB_TOKEN)
 [ -n "${AWS_ACCESS_KEY_ID:-}" ]      && ENV_ARGS+=(-e AWS_ACCESS_KEY_ID)
 [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]  && ENV_ARGS+=(-e AWS_SECRET_ACCESS_KEY)
@@ -48,6 +55,9 @@ ENV_ARGS=(
 VOL_ARGS=(
     -v "$SCRIPT_DIR":/workspace
 )
+
+# OAuth credentials — mounted to staging path, entrypoint copies+patches to ~/.claude.json
+[ -f "$HOME/.claude.json" ] && VOL_ARGS+=(-v "$HOME/.claude.json:/tmp/host-claude.json:ro")
 
 # Host config — read-only
 [ -f "$HOME/.gitconfig" ]   && VOL_ARGS+=(-v "$HOME/.gitconfig:/home/dev/.gitconfig:ro")
