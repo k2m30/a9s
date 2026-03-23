@@ -95,6 +95,37 @@ func TestQA_Detail_LogEvent_NilFields(t *testing.T) {
 	}
 }
 
+// TestQA_Detail_LogEvent_FormattedTimestamps verifies that timestamps in the
+// detail view show human-readable format, not raw epoch milliseconds.
+// The detail renderer should prefer Fields values (which are pre-formatted)
+// over raw SDK struct extraction for fields that match Fields keys.
+func TestQA_Detail_LogEvent_FormattedTimestamps(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.OutputLogEvent{
+		Timestamp:     ptrInt64(1711065600000),
+		Message:       ptrString("test message"),
+		IngestionTime: ptrInt64(1711065601000),
+	}
+	res := buildResource("evt-001", "test message", ev)
+	// Fetcher populates Fields with formatted values
+	res.Fields = map[string]string{
+		"timestamp":      "2024-03-22 00:00",
+		"message":        "test message",
+		"ingestion_time": "2024-03-22 00:00",
+	}
+	cfg := detailConfigForType("log_events")
+	m := newDetailModel(res, "log_events", cfg)
+
+	view := m.View()
+	// Should show formatted timestamp, NOT raw epoch ms
+	if strings.Contains(view, "1711065600000") {
+		t.Errorf("detail view should show formatted timestamp, not raw epoch ms:\n%s", view)
+	}
+	if !strings.Contains(view, "2024-03-22") {
+		t.Errorf("detail view should contain formatted date '2024-03-22':\n%s", view)
+	}
+}
+
 // ===========================================================================
 // Target Health detail view tests (child of Target Groups)
 // ===========================================================================

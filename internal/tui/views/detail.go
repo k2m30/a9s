@@ -214,26 +214,28 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 	}
 	var lines []string
 	for _, path := range vd.Detail {
-		// Try extracting from RawStruct via fieldpath
 		val := ""
-		if m.res.RawStruct != nil {
-			val = fieldpath.ExtractSubtree(m.res.RawStruct, path)
-		}
-		// Fallback: try Fields map (case-insensitive key match)
-		if val == "" && len(m.res.Fields) > 0 {
+		// Try Fields map first — fetchers populate Fields with pre-formatted
+		// values (e.g., formatted timestamps instead of raw epoch ms).
+		if len(m.res.Fields) > 0 {
+			// Try exact case-insensitive match
 			for k, v := range m.res.Fields {
 				if strings.EqualFold(k, path) {
 					val = v
 					break
 				}
 			}
-			// Also try underscore-separated version: "InstanceId" → "instance_id"
+			// Try underscore-separated version: "InstanceId" → "instance_id"
 			if val == "" {
 				snakeKey := toSnakeCase(path)
 				if v, ok := m.res.Fields[snakeKey]; ok {
 					val = v
 				}
 			}
+		}
+		// Fall back to RawStruct extraction for fields not in Fields map
+		if val == "" && m.res.RawStruct != nil {
+			val = fieldpath.ExtractSubtree(m.res.RawStruct, path)
 		}
 		if val == "" {
 			val = "-"
