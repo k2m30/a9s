@@ -17,6 +17,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
 Available platforms:
 - **macOS**: Intel (amd64) and Apple Silicon (arm64)
 - **Linux**: amd64 and arm64
+- **Windows**: amd64 and arm64
 
 ### Docker
 
