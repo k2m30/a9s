@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -95,83 +96,9 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 		}
 
 		for _, event := range output.Events {
-			message := ""
-			if event.Message != nil {
-				message = *event.Message
+			if r, ok := convertReportEvent(event); ok {
+				resources = append(resources, r)
 			}
-
-			// Only parse REPORT lines
-			matches := reportRegex.FindStringSubmatch(message)
-			if matches == nil {
-				continue
-			}
-
-			requestID := matches[1]
-			durationMs := matches[2]
-			billedDurationMs := matches[3]
-			memorySizeMB := matches[4]
-			memoryUsedMB := matches[5]
-
-			// Format duration: strip trailing .00
-			formattedDuration := formatDuration(durationMs)
-			formattedBilled := formatDuration(billedDurationMs)
-
-			// Timestamp
-			ts := ""
-			if event.Timestamp != nil {
-				ts = formatEpochMillis(*event.Timestamp)
-			}
-
-			// Init Duration (cold start detection)
-			coldStart := "no"
-			initDurationMs := ""
-			if initMatch := initDurationRegex.FindStringSubmatch(message); initMatch != nil {
-				coldStart = "yes"
-				initDurationMs = formatDuration(initMatch[1])
-			}
-
-			// XRAY trace
-			xrayTraceID := ""
-			if xrayMatch := xrayTraceRegex.FindStringSubmatch(message); xrayMatch != nil {
-				xrayTraceID = xrayMatch[1]
-			}
-
-			// Status detection
-			status := "OK"
-			if timeoutRegex.MatchString(message) {
-				status = "TIMEOUT"
-			}
-
-			// Name: truncated request ID (first 8 chars)
-			name := requestID
-			if len(name) > 8 {
-				name = name[:8]
-			}
-
-			// Memory used display: "used/total MB"
-			memoryUsed := memoryUsedMB + "/" + memorySizeMB + " MB"
-
-			r := resource.Resource{
-				ID:     requestID,
-				Name:   name,
-				Status: status,
-				Fields: map[string]string{
-					"request_id":       requestID,
-					"timestamp":        ts,
-					"status":           status,
-					"duration_ms":      formattedDuration,
-					"billed_duration_ms": formattedBilled,
-					"memory_size_mb":   memorySizeMB,
-					"memory_used_mb":   memoryUsedMB,
-					"memory_used":      memoryUsed,
-					"init_duration_ms": initDurationMs,
-					"cold_start":       coldStart,
-					"xray_trace_id":    xrayTraceID,
-				},
-				RawStruct: event,
-			}
-
-			resources = append(resources, r)
 		}
 
 		if output.NextToken == nil || len(resources) >= maxInvocations {
@@ -186,6 +113,86 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 	}
 
 	return resources, nil
+}
+
+// convertReportEvent parses a single FilteredLogEvent for a REPORT line and returns
+// a Resource plus true if the event matched, or a zero Resource plus false if not.
+func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, bool) {
+	message := ""
+	if event.Message != nil {
+		message = *event.Message
+	}
+
+	// Only parse REPORT lines
+	matches := reportRegex.FindStringSubmatch(message)
+	if matches == nil {
+		return resource.Resource{}, false
+	}
+
+	requestID := matches[1]
+	durationMs := matches[2]
+	billedDurationMs := matches[3]
+	memorySizeMB := matches[4]
+	memoryUsedMB := matches[5]
+
+	// Format duration: strip trailing .00
+	formattedDuration := formatDuration(durationMs)
+	formattedBilled := formatDuration(billedDurationMs)
+
+	// Timestamp
+	ts := ""
+	if event.Timestamp != nil {
+		ts = formatEpochMillis(*event.Timestamp)
+	}
+
+	// Init Duration (cold start detection)
+	coldStart := "no"
+	initDurationMs := ""
+	if initMatch := initDurationRegex.FindStringSubmatch(message); initMatch != nil {
+		coldStart = "yes"
+		initDurationMs = formatDuration(initMatch[1])
+	}
+
+	// XRAY trace
+	xrayTraceID := ""
+	if xrayMatch := xrayTraceRegex.FindStringSubmatch(message); xrayMatch != nil {
+		xrayTraceID = xrayMatch[1]
+	}
+
+	// Status detection
+	status := "OK"
+	if timeoutRegex.MatchString(message) {
+		status = "TIMEOUT"
+	}
+
+	// Name: truncated request ID (first 8 chars)
+	name := requestID
+	if len(name) > 8 {
+		name = name[:8]
+	}
+
+	// Memory used display: "used/total MB"
+	memoryUsed := memoryUsedMB + "/" + memorySizeMB + " MB"
+
+	return resource.Resource{
+		ID:     requestID,
+		Name:   name,
+		Status: status,
+		Fields: map[string]string{
+			"request_id":         requestID,
+			"timestamp":          ts,
+			"status":             status,
+			"duration_ms":        formattedDuration,
+			"billed_duration_ms": formattedBilled,
+			"memory_size_mb":     memorySizeMB,
+			"memory_used_mb":     memoryUsedMB,
+			"memory_used":        memoryUsed,
+			"init_duration_ms":   initDurationMs,
+			"cold_start":         coldStart,
+			"xray_trace_id":      xrayTraceID,
+		},
+		RawStruct: event,
+	}, true
 }
 
 // formatDuration formats a duration string, stripping trailing ".00".

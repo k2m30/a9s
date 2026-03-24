@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -53,49 +54,7 @@ func FetchCfnResources(
 		}
 
 		for _, summary := range output.StackResourceSummaries {
-			logicalResourceID := ""
-			if summary.LogicalResourceId != nil {
-				logicalResourceID = *summary.LogicalResourceId
-			}
-
-			physicalResourceID := ""
-			if summary.PhysicalResourceId != nil {
-				physicalResourceID = *summary.PhysicalResourceId
-			}
-
-			resourceType := ""
-			if summary.ResourceType != nil {
-				resourceType = *summary.ResourceType
-			}
-
-			resourceStatus := string(summary.ResourceStatus)
-
-			driftStatus := ""
-			if summary.DriftInformation != nil {
-				driftStatus = string(summary.DriftInformation.StackResourceDriftStatus)
-			}
-
-			lastUpdated := ""
-			if summary.LastUpdatedTimestamp != nil {
-				lastUpdated = summary.LastUpdatedTimestamp.UTC().Format("2006-01-02 15:04:05")
-			}
-
-			r := resource.Resource{
-				ID:     logicalResourceID,
-				Name:   logicalResourceID,
-				Status: resourceStatus,
-				Fields: map[string]string{
-					"logical_resource_id":  logicalResourceID,
-					"physical_resource_id": physicalResourceID,
-					"resource_type":        resourceType,
-					"resource_status":      resourceStatus,
-					"drift_status":         driftStatus,
-					"last_updated":         lastUpdated,
-				},
-				RawStruct: summary,
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, convertCfnResource(summary))
 		}
 
 		if output.NextToken == nil {
@@ -105,4 +64,49 @@ func FetchCfnResources(
 	}
 
 	return resources, nil
+}
+
+// convertCfnResource converts a single CloudFormation StackResourceSummary into a generic Resource.
+func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource {
+	logicalResourceID := ""
+	if summary.LogicalResourceId != nil {
+		logicalResourceID = *summary.LogicalResourceId
+	}
+
+	physicalResourceID := ""
+	if summary.PhysicalResourceId != nil {
+		physicalResourceID = *summary.PhysicalResourceId
+	}
+
+	resourceType := ""
+	if summary.ResourceType != nil {
+		resourceType = *summary.ResourceType
+	}
+
+	resourceStatus := string(summary.ResourceStatus)
+
+	driftStatus := ""
+	if summary.DriftInformation != nil {
+		driftStatus = string(summary.DriftInformation.StackResourceDriftStatus)
+	}
+
+	lastUpdated := ""
+	if summary.LastUpdatedTimestamp != nil {
+		lastUpdated = summary.LastUpdatedTimestamp.UTC().Format("2006-01-02 15:04:05")
+	}
+
+	return resource.Resource{
+		ID:     logicalResourceID,
+		Name:   logicalResourceID,
+		Status: resourceStatus,
+		Fields: map[string]string{
+			"logical_resource_id":  logicalResourceID,
+			"physical_resource_id": physicalResourceID,
+			"resource_type":        resourceType,
+			"resource_status":      resourceStatus,
+			"drift_status":         driftStatus,
+			"last_updated":         lastUpdated,
+		},
+		RawStruct: summary,
+	}
 }
