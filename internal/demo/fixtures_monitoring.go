@@ -2,7 +2,6 @@ package demo
 
 import (
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
@@ -12,7 +11,6 @@ import (
 func init() {
 	demoData["alarm"] = cloudwatchAlarmFixtures
 	demoData["logs"] = cloudwatchLogGroupFixtures
-	demoData["trail"] = cloudtrailFixtures
 
 	RegisterChildDemo("log_streams", func(parentCtx map[string]string) []resource.Resource {
 		return logStreamFixtures(parentCtx["log_group_name"])
@@ -409,95 +407,6 @@ func logEventFixtures(_, _ string) []resource.Resource {
 				Timestamp:     aws.Int64(1711065700000),
 				Message:       aws.String("REPORT RequestId: a1b2c3d4 Duration: 1523.45 ms Billed Duration: 1524 ms Memory Size: 256 MB Max Memory Used: 128 MB"),
 				IngestionTime: aws.Int64(1711065701000),
-			},
-		},
-	}
-}
-
-// cloudtrailFixtures returns demo CloudTrail trail fixtures.
-// Field keys: trail_name, s3_bucket, home_region, multi_region
-func cloudtrailFixtures() []resource.Resource {
-	return []resource.Resource{
-		{
-			ID:     "acme-management-trail",
-			Name:   "acme-management-trail",
-			Status: "",
-			Fields: map[string]string{
-				"trail_name":     "acme-management-trail",
-				"trail_arn":      "arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail",
-				"s3_bucket":      "cloudtrail-audit-logs",
-				"home_region":    "us-east-1",
-				"multi_region":   "true",
-				"org_trail":      "false",
-				"log_validation": "true",
-			},
-			RawStruct: cloudtrailtypes.Trail{
-				Name:                       aws.String("acme-management-trail"),
-				TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail"),
-				S3BucketName:               aws.String("cloudtrail-audit-logs"),
-				HomeRegion:                 aws.String("us-east-1"),
-				IsMultiRegionTrail:         aws.Bool(true),
-				IsOrganizationTrail:        aws.Bool(false),
-				LogFileValidationEnabled:   aws.Bool(true),
-				IncludeGlobalServiceEvents: aws.Bool(true),
-				HasCustomEventSelectors:    aws.Bool(true),
-				HasInsightSelectors:        aws.Bool(false),
-				CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
-			},
-		},
-		{
-			ID:     "data-events-trail",
-			Name:   "data-events-trail",
-			Status: "",
-			Fields: map[string]string{
-				"trail_name":     "data-events-trail",
-				"trail_arn":      "arn:aws:cloudtrail:us-east-1:123456789012:trail/data-events-trail",
-				"s3_bucket":      "cloudtrail-audit-logs",
-				"home_region":    "us-east-1",
-				"multi_region":   "false",
-				"org_trail":      "false",
-				"log_validation": "true",
-			},
-			RawStruct: cloudtrailtypes.Trail{
-				Name:                       aws.String("data-events-trail"),
-				TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/data-events-trail"),
-				S3BucketName:               aws.String("cloudtrail-audit-logs"),
-				S3KeyPrefix:                aws.String("data-events"),
-				HomeRegion:                 aws.String("us-east-1"),
-				IsMultiRegionTrail:         aws.Bool(false),
-				IsOrganizationTrail:        aws.Bool(false),
-				LogFileValidationEnabled:   aws.Bool(true),
-				IncludeGlobalServiceEvents: aws.Bool(false),
-				HasCustomEventSelectors:    aws.Bool(true),
-				HasInsightSelectors:        aws.Bool(false),
-			},
-		},
-		{
-			ID:     "security-audit-trail",
-			Name:   "security-audit-trail",
-			Status: "",
-			Fields: map[string]string{
-				"trail_name":     "security-audit-trail",
-				"trail_arn":      "arn:aws:cloudtrail:us-east-1:123456789012:trail/security-audit-trail",
-				"s3_bucket":      "cloudtrail-audit-logs",
-				"home_region":    "us-east-1",
-				"multi_region":   "true",
-				"org_trail":      "true",
-				"log_validation": "true",
-			},
-			RawStruct: cloudtrailtypes.Trail{
-				Name:                       aws.String("security-audit-trail"),
-				TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/security-audit-trail"),
-				S3BucketName:               aws.String("cloudtrail-audit-logs"),
-				S3KeyPrefix:                aws.String("security"),
-				HomeRegion:                 aws.String("us-east-1"),
-				IsMultiRegionTrail:         aws.Bool(true),
-				IsOrganizationTrail:        aws.Bool(true),
-				LogFileValidationEnabled:   aws.Bool(true),
-				IncludeGlobalServiceEvents: aws.Bool(true),
-				HasCustomEventSelectors:    aws.Bool(false),
-				HasInsightSelectors:        aws.Bool(true),
-				CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
 			},
 		},
 	}

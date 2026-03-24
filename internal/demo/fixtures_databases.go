@@ -3,25 +3,18 @@ package demo
 import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
-	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
-	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
+	demoData["s3"] = s3Buckets
+	demoData["dbi"] = rdsInstances
 	demoData["redis"] = redisFixtures
 	demoData["dbc"] = docdbClusterFixtures
-	demoData["ddb"] = dynamodbFixtures
-	demoData["opensearch"] = opensearchFixtures
-	demoData["redshift"] = redshiftFixtures
-	demoData["efs"] = efsFixtures
-	demoData["rds-snap"] = rdsSnapshotFixtures
-	demoData["docdb-snap"] = docdbSnapshotFixtures
 }
 
 // redisFixtures returns demo ElastiCache Redis cluster fixtures.
@@ -223,574 +216,360 @@ func docdbClusterFixtures() []resource.Resource {
 	}
 }
 
-// dynamodbFixtures returns demo DynamoDB table fixtures.
-// Field keys: table_name, status, item_count, size_bytes, billing_mode
-// Note: the production fetcher stores *ddbtypes.TableDescription (pointer) as RawStruct.
-func dynamodbFixtures() []resource.Resource {
+// s3Buckets returns demo S3 bucket fixtures.
+func s3Buckets() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "acme-orders",
-			Name:   "acme-orders",
-			Status: "ACTIVE",
-			Fields: map[string]string{
-				"table_name":   "acme-orders",
-				"status":       "ACTIVE",
-				"item_count":   "2458103",
-				"size_bytes":   "1073741824",
-				"billing_mode": "PAY_PER_REQUEST",
-			},
-			RawStruct: &ddbtypes.TableDescription{
-				TableName:      aws.String("acme-orders"),
-				TableStatus:    ddbtypes.TableStatusActive,
-				TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"),
-				ItemCount:      aws.Int64(2458103),
-				TableSizeBytes: aws.Int64(1073741824),
-				CreationDateTime: aws.Time(mustParseTime("2025-02-10T09:00:00+00:00")),
-				BillingModeSummary: &ddbtypes.BillingModeSummary{
-					BillingMode: ddbtypes.BillingModePayPerRequest,
-				},
-			},
-		},
-		{
-			ID:     "acme-sessions",
-			Name:   "acme-sessions",
-			Status: "ACTIVE",
-			Fields: map[string]string{
-				"table_name":   "acme-sessions",
-				"status":       "ACTIVE",
-				"item_count":   "89421",
-				"size_bytes":   "52428800",
-				"billing_mode": "PAY_PER_REQUEST",
-			},
-			RawStruct: &ddbtypes.TableDescription{
-				TableName:      aws.String("acme-sessions"),
-				TableStatus:    ddbtypes.TableStatusActive,
-				TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-sessions"),
-				ItemCount:      aws.Int64(89421),
-				TableSizeBytes: aws.Int64(52428800),
-				CreationDateTime: aws.Time(mustParseTime("2025-05-18T14:30:00+00:00")),
-				BillingModeSummary: &ddbtypes.BillingModeSummary{
-					BillingMode: ddbtypes.BillingModePayPerRequest,
-				},
-			},
-		},
-		{
-			ID:     "acme-inventory",
-			Name:   "acme-inventory",
-			Status: "ACTIVE",
-			Fields: map[string]string{
-				"table_name":   "acme-inventory",
-				"status":       "ACTIVE",
-				"item_count":   "345678",
-				"size_bytes":   "209715200",
-				"billing_mode": "PROVISIONED",
-			},
-			RawStruct: &ddbtypes.TableDescription{
-				TableName:      aws.String("acme-inventory"),
-				TableStatus:    ddbtypes.TableStatusActive,
-				TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-inventory"),
-				ItemCount:      aws.Int64(345678),
-				TableSizeBytes: aws.Int64(209715200),
-				CreationDateTime: aws.Time(mustParseTime("2025-01-08T11:15:00+00:00")),
-				BillingModeSummary: &ddbtypes.BillingModeSummary{
-					BillingMode: ddbtypes.BillingModeProvisioned,
-				},
-			},
-		},
-		{
-			ID:     "acme-audit-log",
-			Name:   "acme-audit-log",
-			Status: "ACTIVE",
-			Fields: map[string]string{
-				"table_name":   "acme-audit-log",
-				"status":       "ACTIVE",
-				"item_count":   "15234567",
-				"size_bytes":   "5368709120",
-				"billing_mode": "PAY_PER_REQUEST",
-			},
-			RawStruct: &ddbtypes.TableDescription{
-				TableName:      aws.String("acme-audit-log"),
-				TableStatus:    ddbtypes.TableStatusActive,
-				TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-audit-log"),
-				ItemCount:      aws.Int64(15234567),
-				TableSizeBytes: aws.Int64(5368709120),
-				CreationDateTime: aws.Time(mustParseTime("2024-11-20T07:00:00+00:00")),
-				BillingModeSummary: &ddbtypes.BillingModeSummary{
-					BillingMode: ddbtypes.BillingModePayPerRequest,
-				},
-			},
-		},
-	}
-}
-
-// opensearchFixtures returns demo OpenSearch domain fixtures.
-// Field keys: domain_name, engine_version, instance_type, instance_count, endpoint
-func opensearchFixtures() []resource.Resource {
-	return []resource.Resource{
-		{
-			ID:     "acme-logs",
-			Name:   "acme-logs",
+			ID:     "data-pipeline-logs",
+			Name:   "data-pipeline-logs",
 			Status: "",
 			Fields: map[string]string{
-				"domain_name":    "acme-logs",
-				"engine_version": "OpenSearch_2.11",
-				"instance_type":  "r6g.large.search",
-				"instance_count": "3",
-				"endpoint":       "search-acme-logs-abc123.us-east-1.es.amazonaws.com",
+				"name":          "data-pipeline-logs",
+				"bucket_name":   "data-pipeline-logs",
+				"creation_date": "2025-01-15T09:23:41+00:00",
 			},
-			RawStruct: ostypes.DomainStatus{
-				ARN:        aws.String("arn:aws:es:us-east-1:123456789012:domain/acme-logs"),
-				DomainId:   aws.String("123456789012/acme-logs"),
-				DomainName: aws.String("acme-logs"),
-				EngineVersion: aws.String("OpenSearch_2.11"),
-				Endpoint:      aws.String("search-acme-logs-abc123.us-east-1.es.amazonaws.com"),
-				Created:       aws.Bool(true),
-				Deleted:       aws.Bool(false),
-				ClusterConfig: &ostypes.ClusterConfig{
-					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeR6gLargeSearch,
-					InstanceCount: aws.Int32(3),
-				},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("data-pipeline-logs"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2025-01-15T09:23:41+00:00")),
 			},
 		},
 		{
-			ID:     "acme-product-search",
-			Name:   "acme-product-search",
+			ID:     "webapp-assets-prod",
+			Name:   "webapp-assets-prod",
 			Status: "",
 			Fields: map[string]string{
-				"domain_name":    "acme-product-search",
-				"engine_version": "OpenSearch_2.11",
-				"instance_type":  "r6g.xlarge.search",
-				"instance_count": "2",
-				"endpoint":       "search-acme-product-search-def456.us-east-1.es.amazonaws.com",
+				"name":          "webapp-assets-prod",
+				"bucket_name":   "webapp-assets-prod",
+				"creation_date": "2025-03-22T14:07:19+00:00",
 			},
-			RawStruct: ostypes.DomainStatus{
-				ARN:        aws.String("arn:aws:es:us-east-1:123456789012:domain/acme-product-search"),
-				DomainId:   aws.String("123456789012/acme-product-search"),
-				DomainName: aws.String("acme-product-search"),
-				EngineVersion: aws.String("OpenSearch_2.11"),
-				Endpoint:      aws.String("search-acme-product-search-def456.us-east-1.es.amazonaws.com"),
-				Created:       aws.Bool(true),
-				Deleted:       aws.Bool(false),
-				ClusterConfig: &ostypes.ClusterConfig{
-					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeR6gXlargeSearch,
-					InstanceCount: aws.Int32(2),
-				},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("webapp-assets-prod"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2025-03-22T14:07:19+00:00")),
 			},
 		},
 		{
-			ID:     "staging-analytics",
-			Name:   "staging-analytics",
+			ID:     "ml-training-data",
+			Name:   "ml-training-data",
 			Status: "",
 			Fields: map[string]string{
-				"domain_name":    "staging-analytics",
-				"engine_version": "OpenSearch_2.9",
-				"instance_type":  "m6g.large.search",
-				"instance_count": "1",
-				"endpoint":       "search-staging-analytics-ghi789.us-east-1.es.amazonaws.com",
+				"name":          "ml-training-data",
+				"bucket_name":   "ml-training-data",
+				"creation_date": "2025-06-10T08:45:33+00:00",
 			},
-			RawStruct: ostypes.DomainStatus{
-				ARN:        aws.String("arn:aws:es:us-east-1:123456789012:domain/staging-analytics"),
-				DomainId:   aws.String("123456789012/staging-analytics"),
-				DomainName: aws.String("staging-analytics"),
-				EngineVersion: aws.String("OpenSearch_2.9"),
-				Endpoint:      aws.String("search-staging-analytics-ghi789.us-east-1.es.amazonaws.com"),
-				Created:       aws.Bool(true),
-				Deleted:       aws.Bool(false),
-				ClusterConfig: &ostypes.ClusterConfig{
-					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeM6gLargeSearch,
-					InstanceCount: aws.Int32(1),
-				},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("ml-training-data"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2025-06-10T08:45:33+00:00")),
+			},
+		},
+		{
+			ID:     "terraform-state-prod",
+			Name:   "terraform-state-prod",
+			Status: "",
+			Fields: map[string]string{
+				"name":          "terraform-state-prod",
+				"bucket_name":   "terraform-state-prod",
+				"creation_date": "2024-11-02T16:30:12+00:00",
+			},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("terraform-state-prod"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2024-11-02T16:30:12+00:00")),
+			},
+		},
+		{
+			ID:     "cloudtrail-audit-logs",
+			Name:   "cloudtrail-audit-logs",
+			Status: "",
+			Fields: map[string]string{
+				"name":          "cloudtrail-audit-logs",
+				"bucket_name":   "cloudtrail-audit-logs",
+				"creation_date": "2024-08-19T11:12:05+00:00",
+			},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("cloudtrail-audit-logs"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2024-08-19T11:12:05+00:00")),
+			},
+		},
+		{
+			ID:     "backup-db-snapshots",
+			Name:   "backup-db-snapshots",
+			Status: "",
+			Fields: map[string]string{
+				"name":          "backup-db-snapshots",
+				"bucket_name":   "backup-db-snapshots",
+				"creation_date": "2025-09-01T07:55:28+00:00",
+			},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String("backup-db-snapshots"),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime("2025-09-01T07:55:28+00:00")),
 			},
 		},
 	}
 }
 
-// redshiftFixtures returns demo Redshift cluster fixtures.
-// Field keys: cluster_id, status, node_type, num_nodes, db_name, endpoint
-func redshiftFixtures() []resource.Resource {
+func s3ObjDataPipeline() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "acme-warehouse",
-			Name:   "acme-warehouse",
-			Status: "available",
+			ID:     "logs/2026/03/",
+			Name:   "logs/2026/03/",
+			Status: "folder",
 			Fields: map[string]string{
-				"cluster_id":  "acme-warehouse",
-				"status":      "available",
-				"node_type":   "ra3.xlplus",
-				"num_nodes":   "4",
-				"db_name":     "analytics",
-				"endpoint":    "acme-warehouse.c9xyz123.us-east-1.redshift.amazonaws.com",
-				"master_user": "admin",
-				"create_time": "2025-03-10 09:00:00",
+				"key":           "logs/2026/03/",
+				"size":          "-",
+				"last_modified": "2026-03-20T12:00:00+00:00",
+				"storage_class": "STANDARD",
 			},
-			RawStruct: redshifttypes.Cluster{
-				ClusterIdentifier: aws.String("acme-warehouse"),
-				ClusterStatus:     aws.String("available"),
-				NodeType:          aws.String("ra3.xlplus"),
-				NumberOfNodes:     aws.Int32(4),
-				DBName:            aws.String("analytics"),
-				MasterUsername:    aws.String("admin"),
-				ClusterCreateTime: aws.Time(mustParseTime("2025-03-10T09:00:00+00:00")),
-				Endpoint: &redshifttypes.Endpoint{
-					Address: aws.String("acme-warehouse.c9xyz123.us-east-1.redshift.amazonaws.com"),
-					Port:    aws.Int32(5439),
-				},
+			RawStruct: s3types.CommonPrefix{
+				Prefix: aws.String("logs/2026/03/"),
 			},
 		},
 		{
-			ID:     "acme-reporting",
-			Name:   "acme-reporting",
-			Status: "available",
+			ID:     "logs/2026/02/",
+			Name:   "logs/2026/02/",
+			Status: "folder",
 			Fields: map[string]string{
-				"cluster_id":  "acme-reporting",
-				"status":      "available",
-				"node_type":   "ra3.xlplus",
-				"num_nodes":   "2",
-				"db_name":     "reporting",
-				"endpoint":    "acme-reporting.c9xyz123.us-east-1.redshift.amazonaws.com",
-				"master_user": "admin",
-				"create_time": "2025-07-22 14:30:00",
+				"key":           "logs/2026/02/",
+				"size":          "-",
+				"last_modified": "2026-02-28T23:59:59+00:00",
+				"storage_class": "STANDARD",
 			},
-			RawStruct: redshifttypes.Cluster{
-				ClusterIdentifier: aws.String("acme-reporting"),
-				ClusterStatus:     aws.String("available"),
-				NodeType:          aws.String("ra3.xlplus"),
-				NumberOfNodes:     aws.Int32(2),
-				DBName:            aws.String("reporting"),
-				MasterUsername:    aws.String("admin"),
-				ClusterCreateTime: aws.Time(mustParseTime("2025-07-22T14:30:00+00:00")),
-				Endpoint: &redshifttypes.Endpoint{
-					Address: aws.String("acme-reporting.c9xyz123.us-east-1.redshift.amazonaws.com"),
-					Port:    aws.Int32(5439),
-				},
+			RawStruct: s3types.CommonPrefix{
+				Prefix: aws.String("logs/2026/02/"),
 			},
 		},
 		{
-			ID:     "staging-dwh",
-			Name:   "staging-dwh",
-			Status: "paused",
+			ID:     "config.json",
+			Name:   "config.json",
+			Status: "file",
 			Fields: map[string]string{
-				"cluster_id":  "staging-dwh",
-				"status":      "paused",
-				"node_type":   "dc2.large",
-				"num_nodes":   "2",
-				"db_name":     "staging",
-				"endpoint":    "staging-dwh.c9xyz123.us-east-1.redshift.amazonaws.com",
-				"master_user": "stgadmin",
-				"create_time": "2025-10-15 08:00:00",
+				"key":           "config.json",
+				"size":          "2.4 KB",
+				"last_modified": "2026-03-18T09:15:22+00:00",
+				"storage_class": "STANDARD",
 			},
-			RawStruct: redshifttypes.Cluster{
-				ClusterIdentifier: aws.String("staging-dwh"),
-				ClusterStatus:     aws.String("paused"),
-				NodeType:          aws.String("dc2.large"),
-				NumberOfNodes:     aws.Int32(2),
-				DBName:            aws.String("staging"),
-				MasterUsername:    aws.String("stgadmin"),
-				ClusterCreateTime: aws.Time(mustParseTime("2025-10-15T08:00:00+00:00")),
-				Endpoint: &redshifttypes.Endpoint{
-					Address: aws.String("staging-dwh.c9xyz123.us-east-1.redshift.amazonaws.com"),
-					Port:    aws.Int32(5439),
-				},
+			RawStruct: s3types.Object{
+				Key:          aws.String("config.json"),
+				Size:         aws.Int64(2458),
+				StorageClass: s3types.ObjectStorageClassStandard,
+				LastModified: aws.Time(mustParseTime("2026-03-18T09:15:22+00:00")),
+			},
+		},
+		{
+			ID:     "schema/pipeline-v2.avro",
+			Name:   "schema/pipeline-v2.avro",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "schema/pipeline-v2.avro",
+				"size":          "18.7 KB",
+				"last_modified": "2026-01-10T14:32:07+00:00",
+				"storage_class": "STANDARD",
+			},
+			RawStruct: s3types.Object{
+				Key:          aws.String("schema/pipeline-v2.avro"),
+				Size:         aws.Int64(19148),
+				StorageClass: s3types.ObjectStorageClassStandard,
+				LastModified: aws.Time(mustParseTime("2026-01-10T14:32:07+00:00")),
+			},
+		},
+		{
+			ID:     "archive/2025-q4-summary.parquet",
+			Name:   "archive/2025-q4-summary.parquet",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "archive/2025-q4-summary.parquet",
+				"size":          "142.3 MB",
+				"last_modified": "2026-01-05T03:00:00+00:00",
+				"storage_class": "GLACIER",
+			},
+			RawStruct: s3types.Object{
+				Key:          aws.String("archive/2025-q4-summary.parquet"),
+				Size:         aws.Int64(149199462),
+				StorageClass: s3types.ObjectStorageClassGlacier,
+				LastModified: aws.Time(mustParseTime("2026-01-05T03:00:00+00:00")),
 			},
 		},
 	}
 }
 
-// efsFixtures returns demo EFS file system fixtures.
-// Field keys: file_system_id, name, life_cycle_state, performance_mode, encrypted, mount_targets
-func efsFixtures() []resource.Resource {
+func s3ObjWebapp() []resource.Resource {
 	return []resource.Resource{
-		{
-			ID:     "fs-0abc111111111111a",
-			Name:   "acme-shared-data",
-			Status: "available",
-			Fields: map[string]string{
-				"file_system_id":   "fs-0abc111111111111a",
-				"name":             "acme-shared-data",
-				"life_cycle_state": "available",
-				"performance_mode": "generalPurpose",
-				"throughput_mode":  "elastic",
-				"encrypted":        "true",
-				"mount_targets":    "3",
-			},
-			RawStruct: efstypes.FileSystemDescription{
-				FileSystemId:       aws.String("fs-0abc111111111111a"),
-				FileSystemArn:      aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a"),
-				Name:               aws.String("acme-shared-data"),
-				LifeCycleState:     efstypes.LifeCycleStateAvailable,
-				PerformanceMode:    efstypes.PerformanceModeGeneralPurpose,
-				ThroughputMode:     efstypes.ThroughputModeElastic,
-				Encrypted:          aws.Bool(true),
-				NumberOfMountTargets: 3,
-				CreationTime:       aws.Time(mustParseTime("2025-04-01T10:00:00+00:00")),
-				CreationToken:      aws.String("acme-shared-data"),
-				OwnerId:            aws.String("123456789012"),
-				SizeInBytes: &efstypes.FileSystemSize{
-					Value: 10737418240,
-				},
-				Tags: []efstypes.Tag{
-					{Key: aws.String("Name"), Value: aws.String("acme-shared-data")},
-					{Key: aws.String("Environment"), Value: aws.String("prod")},
-				},
-			},
-		},
-		{
-			ID:     "fs-0def222222222222b",
-			Name:   "ml-training-storage",
-			Status: "available",
-			Fields: map[string]string{
-				"file_system_id":   "fs-0def222222222222b",
-				"name":             "ml-training-storage",
-				"life_cycle_state": "available",
-				"performance_mode": "maxIO",
-				"throughput_mode":  "bursting",
-				"encrypted":        "true",
-				"mount_targets":    "2",
-			},
-			RawStruct: efstypes.FileSystemDescription{
-				FileSystemId:       aws.String("fs-0def222222222222b"),
-				FileSystemArn:      aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0def222222222222b"),
-				Name:               aws.String("ml-training-storage"),
-				LifeCycleState:     efstypes.LifeCycleStateAvailable,
-				PerformanceMode:    efstypes.PerformanceModeMaxIo,
-				ThroughputMode:     efstypes.ThroughputModeBursting,
-				Encrypted:          aws.Bool(true),
-				NumberOfMountTargets: 2,
-				CreationTime:       aws.Time(mustParseTime("2025-08-15T14:30:00+00:00")),
-				CreationToken:      aws.String("ml-training-storage"),
-				OwnerId:            aws.String("123456789012"),
-				SizeInBytes: &efstypes.FileSystemSize{
-					Value: 53687091200,
-				},
-				Tags: []efstypes.Tag{
-					{Key: aws.String("Name"), Value: aws.String("ml-training-storage")},
-					{Key: aws.String("Environment"), Value: aws.String("prod")},
-				},
-			},
-		},
-		{
-			ID:     "fs-0ghi333333333333c",
-			Name:   "staging-efs",
-			Status: "creating",
-			Fields: map[string]string{
-				"file_system_id":   "fs-0ghi333333333333c",
-				"name":             "staging-efs",
-				"life_cycle_state": "creating",
-				"performance_mode": "generalPurpose",
-				"throughput_mode":  "bursting",
-				"encrypted":        "false",
-				"mount_targets":    "0",
-			},
-			RawStruct: efstypes.FileSystemDescription{
-				FileSystemId:       aws.String("fs-0ghi333333333333c"),
-				FileSystemArn:      aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0ghi333333333333c"),
-				Name:               aws.String("staging-efs"),
-				LifeCycleState:     efstypes.LifeCycleStateCreating,
-				PerformanceMode:    efstypes.PerformanceModeGeneralPurpose,
-				ThroughputMode:     efstypes.ThroughputModeBursting,
-				Encrypted:          aws.Bool(false),
-				NumberOfMountTargets: 0,
-				CreationTime:       aws.Time(mustParseTime("2026-03-21T09:00:00+00:00")),
-				CreationToken:      aws.String("staging-efs"),
-				OwnerId:            aws.String("123456789012"),
-				SizeInBytes: &efstypes.FileSystemSize{
-					Value: 0,
-				},
-				Tags: []efstypes.Tag{
-					{Key: aws.String("Name"), Value: aws.String("staging-efs")},
-					{Key: aws.String("Environment"), Value: aws.String("staging")},
-				},
-			},
-		},
+		{ID: "css/", Name: "css/", Status: "folder", Fields: map[string]string{"key": "css/", "size": "-", "last_modified": "2026-03-20T10:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("css/")}},
+		{ID: "js/", Name: "js/", Status: "folder", Fields: map[string]string{"key": "js/", "size": "-", "last_modified": "2026-03-20T10:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("js/")}},
+		{ID: "images/", Name: "images/", Status: "folder", Fields: map[string]string{"key": "images/", "size": "-", "last_modified": "2026-03-19T15:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("images/")}},
+		{ID: "index.html", Name: "index.html", Status: "file", Fields: map[string]string{"key": "index.html", "size": "12.4 KB", "last_modified": "2026-03-20T10:05:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("index.html"), Size: aws.Int64(12697), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T10:05:00+00:00"))}},
+		{ID: "favicon.ico", Name: "favicon.ico", Status: "file", Fields: map[string]string{"key": "favicon.ico", "size": "4.2 KB", "last_modified": "2026-01-10T08:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("favicon.ico"), Size: aws.Int64(4301), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-01-10T08:00:00+00:00"))}},
+		{ID: "robots.txt", Name: "robots.txt", Status: "file", Fields: map[string]string{"key": "robots.txt", "size": "68 B", "last_modified": "2025-12-01T12:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("robots.txt"), Size: aws.Int64(68), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2025-12-01T12:00:00+00:00"))}},
 	}
 }
 
-// rdsSnapshotFixtures returns demo RDS DB snapshot fixtures.
-// Field keys: snapshot_id, db_instance, status, engine, snapshot_type, created
-func rdsSnapshotFixtures() []resource.Resource {
+func s3ObjMLTraining() []resource.Resource {
+	return []resource.Resource{
+		{ID: "datasets/", Name: "datasets/", Status: "folder", Fields: map[string]string{"key": "datasets/", "size": "-", "last_modified": "2026-03-15T09:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("datasets/")}},
+		{ID: "models/", Name: "models/", Status: "folder", Fields: map[string]string{"key": "models/", "size": "-", "last_modified": "2026-03-18T14:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("models/")}},
+		{ID: "notebooks/", Name: "notebooks/", Status: "folder", Fields: map[string]string{"key": "notebooks/", "size": "-", "last_modified": "2026-03-10T11:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("notebooks/")}},
+		{ID: "config.yaml", Name: "config.yaml", Status: "file", Fields: map[string]string{"key": "config.yaml", "size": "1.8 KB", "last_modified": "2026-03-19T16:22:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("config.yaml"), Size: aws.Int64(1843), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-19T16:22:00+00:00"))}},
+		{ID: "training-results-v3.json", Name: "training-results-v3.json", Status: "file", Fields: map[string]string{"key": "training-results-v3.json", "size": "847 KB", "last_modified": "2026-03-18T14:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("training-results-v3.json"), Size: aws.Int64(867328), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-18T14:30:00+00:00"))}},
+	}
+}
+
+func s3ObjTerraform() []resource.Resource {
+	return []resource.Resource{
+		{ID: "env:/", Name: "env:/", Status: "folder", Fields: map[string]string{"key": "env:/", "size": "-", "last_modified": "2026-03-20T08:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("env:/")}},
+		{ID: "prod/vpc.tfstate", Name: "prod/vpc.tfstate", Status: "file", Fields: map[string]string{"key": "prod/vpc.tfstate", "size": "245 KB", "last_modified": "2026-03-20T08:15:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("prod/vpc.tfstate"), Size: aws.Int64(250880), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T08:15:00+00:00"))}},
+		{ID: "prod/eks.tfstate", Name: "prod/eks.tfstate", Status: "file", Fields: map[string]string{"key": "prod/eks.tfstate", "size": "189 KB", "last_modified": "2026-03-19T22:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("prod/eks.tfstate"), Size: aws.Int64(193536), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-19T22:30:00+00:00"))}},
+		{ID: "staging/main.tfstate", Name: "staging/main.tfstate", Status: "file", Fields: map[string]string{"key": "staging/main.tfstate", "size": "312 KB", "last_modified": "2026-03-18T11:45:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("staging/main.tfstate"), Size: aws.Int64(319488), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-18T11:45:00+00:00"))}},
+	}
+}
+
+func s3ObjCloudtrail() []resource.Resource {
+	return []resource.Resource{
+		{ID: "AWSLogs/", Name: "AWSLogs/", Status: "folder", Fields: map[string]string{"key": "AWSLogs/", "size": "-", "last_modified": "2026-03-21T00:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("AWSLogs/")}},
+		{ID: "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/21/event-001.json.gz", Name: "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/21/event-001.json.gz", Status: "file", Fields: map[string]string{"key": "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/21/event-001.json.gz", "size": "54.2 KB", "last_modified": "2026-03-21T00:05:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/21/event-001.json.gz"), Size: aws.Int64(55501), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-21T00:05:00+00:00"))}},
+		{ID: "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/20/digest.json.gz", Name: "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/20/digest.json.gz", Status: "file", Fields: map[string]string{"key": "AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/20/digest.json.gz", "size": "1.1 KB", "last_modified": "2026-03-20T23:59:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("AWSLogs/123456789012/CloudTrail/us-east-1/2026/03/20/digest.json.gz"), Size: aws.Int64(1127), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T23:59:00+00:00"))}},
+	}
+}
+
+func s3ObjBackups() []resource.Resource {
+	return []resource.Resource{
+		{ID: "rds/", Name: "rds/", Status: "folder", Fields: map[string]string{"key": "rds/", "size": "-", "last_modified": "2026-03-20T04:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("rds/")}},
+		{ID: "docdb/", Name: "docdb/", Status: "folder", Fields: map[string]string{"key": "docdb/", "size": "-", "last_modified": "2026-03-19T04:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("docdb/")}},
+		{ID: "rds/prod-api-primary-2026-03-20.snap", Name: "rds/prod-api-primary-2026-03-20.snap", Status: "file", Fields: map[string]string{"key": "rds/prod-api-primary-2026-03-20.snap", "size": "2.3 GB", "last_modified": "2026-03-20T04:15:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("rds/prod-api-primary-2026-03-20.snap"), Size: aws.Int64(2469606195), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-03-20T04:15:00+00:00"))}},
+		{ID: "rds/prod-api-primary-2026-03-19.snap", Name: "rds/prod-api-primary-2026-03-19.snap", Status: "file", Fields: map[string]string{"key": "rds/prod-api-primary-2026-03-19.snap", "size": "2.3 GB", "last_modified": "2026-03-19T04:15:00+00:00", "storage_class": "GLACIER"}, RawStruct: s3types.Object{Key: aws.String("rds/prod-api-primary-2026-03-19.snap"), Size: aws.Int64(2469606195), StorageClass: s3types.ObjectStorageClassGlacier, LastModified: aws.Time(mustParseTime("2026-03-19T04:15:00+00:00"))}},
+	}
+}
+// rdsInstances returns demo RDS (DB Instance) fixtures.
+func rdsInstances() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "rds:prod-api-primary-2026-03-20",
-			Name:   "rds:prod-api-primary-2026-03-20",
+			ID:     "prod-api-primary",
+			Name:   "prod-api-primary",
 			Status: "available",
 			Fields: map[string]string{
-				"snapshot_id":   "rds:prod-api-primary-2026-03-20",
-				"db_instance":   "prod-api-primary",
-				"status":        "available",
-				"engine":        "aurora-postgresql",
-				"snapshot_type": "automated",
-				"created":       "2026-03-20T03:00:00Z",
+				"db_identifier":  "prod-api-primary",
+				"engine":         "aurora-postgresql",
+				"engine_version": "16.4",
+				"status":         "available",
+				"class":          "db.r6g.xlarge",
+				"endpoint":       "prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com",
+				"multi_az":       "Yes",
 			},
-			RawStruct: rdstypes.DBSnapshot{
-				DBSnapshotIdentifier: aws.String("rds:prod-api-primary-2026-03-20"),
+			RawStruct: rdstypes.DBInstance{
 				DBInstanceIdentifier: aws.String("prod-api-primary"),
-				Status:               aws.String("available"),
 				Engine:               aws.String("aurora-postgresql"),
 				EngineVersion:        aws.String("16.4"),
-				SnapshotType:         aws.String("automated"),
-				SnapshotCreateTime:   aws.Time(mustParseTime("2026-03-20T03:00:00+00:00")),
-				AllocatedStorage:     aws.Int32(100),
-				DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-api-primary-2026-03-20"),
+				DBInstanceStatus:     aws.String("available"),
+				DBInstanceClass:      aws.String("db.r6g.xlarge"),
+				Endpoint: &rdstypes.Endpoint{
+					Address: aws.String("prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com"),
+					Port:    aws.Int32(5432),
+				},
+				MultiAZ: aws.Bool(true),
 			},
 		},
 		{
-			ID:     "rds:analytics-warehouse-2026-03-20",
-			Name:   "rds:analytics-warehouse-2026-03-20",
+			ID:     "prod-api-replica",
+			Name:   "prod-api-replica",
 			Status: "available",
 			Fields: map[string]string{
-				"snapshot_id":   "rds:analytics-warehouse-2026-03-20",
-				"db_instance":   "analytics-warehouse",
-				"status":        "available",
-				"engine":        "postgres",
-				"snapshot_type": "automated",
-				"created":       "2026-03-20T03:30:00Z",
+				"db_identifier":  "prod-api-replica",
+				"engine":         "aurora-postgresql",
+				"engine_version": "16.4",
+				"status":         "available",
+				"class":          "db.r6g.large",
+				"endpoint":       "prod-api-replica.c9xyz123.us-east-1.rds.amazonaws.com",
+				"multi_az":       "No",
 			},
-			RawStruct: rdstypes.DBSnapshot{
-				DBSnapshotIdentifier: aws.String("rds:analytics-warehouse-2026-03-20"),
+			RawStruct: rdstypes.DBInstance{
+				DBInstanceIdentifier: aws.String("prod-api-replica"),
+				Engine:               aws.String("aurora-postgresql"),
+				EngineVersion:        aws.String("16.4"),
+				DBInstanceStatus:     aws.String("available"),
+				DBInstanceClass:      aws.String("db.r6g.large"),
+				Endpoint: &rdstypes.Endpoint{
+					Address: aws.String("prod-api-replica.c9xyz123.us-east-1.rds.amazonaws.com"),
+					Port:    aws.Int32(5432),
+				},
+				MultiAZ: aws.Bool(false),
+			},
+		},
+		{
+			ID:     "analytics-warehouse",
+			Name:   "analytics-warehouse",
+			Status: "available",
+			Fields: map[string]string{
+				"db_identifier":  "analytics-warehouse",
+				"engine":         "postgres",
+				"engine_version": "16.2",
+				"status":         "available",
+				"class":          "db.m6g.2xlarge",
+				"endpoint":       "analytics-warehouse.c9xyz123.us-east-1.rds.amazonaws.com",
+				"multi_az":       "Yes",
+			},
+			RawStruct: rdstypes.DBInstance{
 				DBInstanceIdentifier: aws.String("analytics-warehouse"),
-				Status:               aws.String("available"),
 				Engine:               aws.String("postgres"),
 				EngineVersion:        aws.String("16.2"),
-				SnapshotType:         aws.String("automated"),
-				SnapshotCreateTime:   aws.Time(mustParseTime("2026-03-20T03:30:00+00:00")),
-				AllocatedStorage:     aws.Int32(500),
-				DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:analytics-warehouse-2026-03-20"),
+				DBInstanceStatus:     aws.String("available"),
+				DBInstanceClass:      aws.String("db.m6g.2xlarge"),
+				Endpoint: &rdstypes.Endpoint{
+					Address: aws.String("analytics-warehouse.c9xyz123.us-east-1.rds.amazonaws.com"),
+					Port:    aws.Int32(5432),
+				},
+				MultiAZ: aws.Bool(true),
 			},
 		},
 		{
-			ID:     "pre-migration-snapshot",
-			Name:   "pre-migration-snapshot",
-			Status: "available",
+			ID:     "staging-mysql",
+			Name:   "staging-mysql",
+			Status: "stopped",
 			Fields: map[string]string{
-				"snapshot_id":   "pre-migration-snapshot",
-				"db_instance":   "staging-mysql",
-				"status":        "available",
-				"engine":        "mysql",
-				"snapshot_type": "manual",
-				"created":       "2026-03-15T22:00:00Z",
+				"db_identifier":  "staging-mysql",
+				"engine":         "mysql",
+				"engine_version": "8.0.36",
+				"status":         "stopped",
+				"class":          "db.t3.medium",
+				"endpoint":       "staging-mysql.c9xyz123.us-east-1.rds.amazonaws.com",
+				"multi_az":       "No",
 			},
-			RawStruct: rdstypes.DBSnapshot{
-				DBSnapshotIdentifier: aws.String("pre-migration-snapshot"),
+			RawStruct: rdstypes.DBInstance{
 				DBInstanceIdentifier: aws.String("staging-mysql"),
-				Status:               aws.String("available"),
 				Engine:               aws.String("mysql"),
 				EngineVersion:        aws.String("8.0.36"),
-				SnapshotType:         aws.String("manual"),
-				SnapshotCreateTime:   aws.Time(mustParseTime("2026-03-15T22:00:00+00:00")),
-				AllocatedStorage:     aws.Int32(50),
-				DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:pre-migration-snapshot"),
+				DBInstanceStatus:     aws.String("stopped"),
+				DBInstanceClass:      aws.String("db.t3.medium"),
+				Endpoint: &rdstypes.Endpoint{
+					Address: aws.String("staging-mysql.c9xyz123.us-east-1.rds.amazonaws.com"),
+					Port:    aws.Int32(3306),
+				},
+				MultiAZ: aws.Bool(false),
 			},
 		},
 		{
-			ID:     "dev-feature-branch-snap",
-			Name:   "dev-feature-branch-snap",
+			ID:     "dev-feature-branch",
+			Name:   "dev-feature-branch",
 			Status: "creating",
 			Fields: map[string]string{
-				"snapshot_id":   "dev-feature-branch-snap",
-				"db_instance":   "dev-feature-branch",
-				"status":        "creating",
-				"engine":        "aurora-postgresql",
-				"snapshot_type": "manual",
-				"created":       "2026-03-21T10:30:00Z",
+				"db_identifier":  "dev-feature-branch",
+				"engine":         "aurora-postgresql",
+				"engine_version": "16.4",
+				"status":         "creating",
+				"class":          "db.t3.medium",
+				"endpoint":       "",
+				"multi_az":       "No",
 			},
-			RawStruct: rdstypes.DBSnapshot{
-				DBSnapshotIdentifier: aws.String("dev-feature-branch-snap"),
+			RawStruct: rdstypes.DBInstance{
 				DBInstanceIdentifier: aws.String("dev-feature-branch"),
-				Status:               aws.String("creating"),
 				Engine:               aws.String("aurora-postgresql"),
 				EngineVersion:        aws.String("16.4"),
-				SnapshotType:         aws.String("manual"),
-				SnapshotCreateTime:   aws.Time(mustParseTime("2026-03-21T10:30:00+00:00")),
-				AllocatedStorage:     aws.Int32(20),
-				DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"),
-			},
-		},
-	}
-}
-
-// docdbSnapshotFixtures returns demo DocumentDB cluster snapshot fixtures.
-// Field keys: snapshot_id, cluster_id, status, engine, snapshot_type, snapshot_create_time, storage_type
-func docdbSnapshotFixtures() []resource.Resource {
-	return []resource.Resource{
-		{
-			ID:     "rds:acme-docdb-prod-2026-03-20",
-			Name:   "rds:acme-docdb-prod-2026-03-20",
-			Status: "available",
-			Fields: map[string]string{
-				"snapshot_id":          "rds:acme-docdb-prod-2026-03-20",
-				"cluster_id":           "acme-docdb-prod",
-				"status":               "available",
-				"engine":               "docdb",
-				"snapshot_type":        "automated",
-				"snapshot_create_time": "2026-03-20T04:00:00Z",
-				"storage_type":         "standard",
-			},
-			RawStruct: docdbtypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds:acme-docdb-prod-2026-03-20"),
-				DBClusterIdentifier:         aws.String("acme-docdb-prod"),
-				DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"),
-				Status:                      aws.String("available"),
-				Engine:                      aws.String("docdb"),
-				EngineVersion:               aws.String("5.0.0"),
-				SnapshotType:                aws.String("automated"),
-				SnapshotCreateTime:          aws.Time(mustParseTime("2026-03-20T04:00:00+00:00")),
-				StorageType:                 aws.String("standard"),
-				StorageEncrypted:            aws.Bool(true),
-				VpcId:                       aws.String("vpc-0abc123def456789a"),
-			},
-		},
-		{
-			ID:     "pre-upgrade-docdb-snap",
-			Name:   "pre-upgrade-docdb-snap",
-			Status: "available",
-			Fields: map[string]string{
-				"snapshot_id":          "pre-upgrade-docdb-snap",
-				"cluster_id":           "staging-docdb",
-				"status":               "available",
-				"engine":               "docdb",
-				"snapshot_type":        "manual",
-				"snapshot_create_time": "2026-03-18T20:00:00Z",
-				"storage_type":         "standard",
-			},
-			RawStruct: docdbtypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("pre-upgrade-docdb-snap"),
-				DBClusterIdentifier:         aws.String("staging-docdb"),
-				DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:pre-upgrade-docdb-snap"),
-				Status:                      aws.String("available"),
-				Engine:                      aws.String("docdb"),
-				EngineVersion:               aws.String("4.0.0"),
-				SnapshotType:                aws.String("manual"),
-				SnapshotCreateTime:          aws.Time(mustParseTime("2026-03-18T20:00:00+00:00")),
-				StorageType:                 aws.String("standard"),
-				StorageEncrypted:            aws.Bool(true),
-				VpcId:                       aws.String("vpc-0abc123def456789a"),
-			},
-		},
-		{
-			ID:     "rds:analytics-docdb-2026-03-20",
-			Name:   "rds:analytics-docdb-2026-03-20",
-			Status: "available",
-			Fields: map[string]string{
-				"snapshot_id":          "rds:analytics-docdb-2026-03-20",
-				"cluster_id":           "analytics-docdb",
-				"status":               "available",
-				"engine":               "docdb",
-				"snapshot_type":        "automated",
-				"snapshot_create_time": "2026-03-20T04:30:00Z",
-				"storage_type":         "iopt1",
-			},
-			RawStruct: docdbtypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds:analytics-docdb-2026-03-20"),
-				DBClusterIdentifier:         aws.String("analytics-docdb"),
-				DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:analytics-docdb-2026-03-20"),
-				Status:                      aws.String("available"),
-				Engine:                      aws.String("docdb"),
-				EngineVersion:               aws.String("5.0.0"),
-				SnapshotType:                aws.String("automated"),
-				SnapshotCreateTime:          aws.Time(mustParseTime("2026-03-20T04:30:00+00:00")),
-				StorageType:                 aws.String("iopt1"),
-				StorageEncrypted:            aws.Bool(true),
-				VpcId:                       aws.String("vpc-0abc123def456789a"),
+				DBInstanceStatus:     aws.String("creating"),
+				DBInstanceClass:      aws.String("db.t3.medium"),
+				// Endpoint is nil for creating instances
+				MultiAZ: aws.Bool(false),
 			},
 		},
 	}

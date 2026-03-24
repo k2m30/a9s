@@ -101,62 +101,62 @@ func FetchEcsSvcTasks(
 	var resources []resource.Resource
 
 	for _, task := range allTasks {
-		taskIDShort := ""
-		taskArn := ""
-		if task.TaskArn != nil {
-			taskArn = *task.TaskArn
-			parts := strings.Split(taskArn, "/")
-			taskIDShort = parts[len(parts)-1]
-		}
-
-		status := ""
-		if task.LastStatus != nil {
-			status = *task.LastStatus
-		}
-
-		health := ""
-		if task.HealthStatus != "" {
-			health = strings.ToUpper(string(task.HealthStatus))
-		}
-
-		taskDefShort := ""
-		if task.TaskDefinitionArn != nil {
-			// Extract "family:revision" from ARN like
-			// "arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"
-			tdArn := *task.TaskDefinitionArn
-			parts := strings.Split(tdArn, "/")
-			if len(parts) > 0 {
-				taskDefShort = parts[len(parts)-1]
-			}
-		}
-
-		startedAt := ""
-		if task.StartedAt != nil {
-			startedAt = task.StartedAt.UTC().Format("2006-01-02 15:04:05")
-		}
-
-		stoppedReason := ""
-		if task.StoppedReason != nil {
-			stoppedReason = strings.ReplaceAll(*task.StoppedReason, "\n", " ")
-		}
-
-		r := resource.Resource{
-			ID:     taskIDShort,
-			Name:   taskIDShort,
-			Status: status,
-			Fields: map[string]string{
-				"task_id_short":  taskIDShort,
-				"status":         status,
-				"health":         health,
-				"task_def_short": taskDefShort,
-				"started_at":     startedAt,
-				"stopped_reason": stoppedReason,
-			},
-			RawStruct: task,
-		}
-
-		resources = append(resources, r)
+		resources = append(resources, convertEcsTask(task))
 	}
 
 	return resources, nil
+}
+
+// convertEcsTask converts a single ECS Task into a generic Resource.
+func convertEcsTask(task ecstypes.Task) resource.Resource {
+	taskIDShort := ""
+	if task.TaskArn != nil {
+		parts := strings.Split(*task.TaskArn, "/")
+		taskIDShort = parts[len(parts)-1]
+	}
+
+	status := ""
+	if task.LastStatus != nil {
+		status = *task.LastStatus
+	}
+
+	health := ""
+	if task.HealthStatus != "" {
+		health = strings.ToUpper(string(task.HealthStatus))
+	}
+
+	taskDefShort := ""
+	if task.TaskDefinitionArn != nil {
+		// Extract "family:revision" from ARN like
+		// "arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"
+		parts := strings.Split(*task.TaskDefinitionArn, "/")
+		if len(parts) > 0 {
+			taskDefShort = parts[len(parts)-1]
+		}
+	}
+
+	startedAt := ""
+	if task.StartedAt != nil {
+		startedAt = task.StartedAt.UTC().Format("2006-01-02 15:04:05")
+	}
+
+	stoppedReason := ""
+	if task.StoppedReason != nil {
+		stoppedReason = strings.ReplaceAll(*task.StoppedReason, "\n", " ")
+	}
+
+	return resource.Resource{
+		ID:     taskIDShort,
+		Name:   taskIDShort,
+		Status: status,
+		Fields: map[string]string{
+			"task_id_short":  taskIDShort,
+			"status":         status,
+			"health":         health,
+			"task_def_short": taskDefShort,
+			"started_at":     startedAt,
+			"stopped_reason": stoppedReason,
+		},
+		RawStruct: task,
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -56,51 +57,7 @@ func FetchCfnEvents(
 		}
 
 		for _, event := range output.StackEvents {
-			id := ""
-			if event.EventId != nil {
-				id = *event.EventId
-			}
-
-			timestamp := ""
-			name := ""
-			if event.Timestamp != nil {
-				timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04:05")
-				name = timestamp
-			}
-
-			logicalResourceID := ""
-			if event.LogicalResourceId != nil {
-				logicalResourceID = *event.LogicalResourceId
-			}
-
-			resourceType := ""
-			if event.ResourceType != nil {
-				resourceType = *event.ResourceType
-			}
-
-			resourceStatus := string(event.ResourceStatus)
-
-			resourceStatusReason := ""
-			if event.ResourceStatusReason != nil {
-				resourceStatusReason = strings.ReplaceAll(*event.ResourceStatusReason, "\n", " ")
-				resourceStatusReason = strings.ReplaceAll(resourceStatusReason, "\r", " ")
-			}
-
-			r := resource.Resource{
-				ID:     id,
-				Name:   name,
-				Status: resourceStatus,
-				Fields: map[string]string{
-					"timestamp":              timestamp,
-					"logical_resource_id":    logicalResourceID,
-					"resource_type":          resourceType,
-					"resource_status":        resourceStatus,
-					"resource_status_reason": resourceStatusReason,
-				},
-				RawStruct: event,
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, convertCfnEvent(event))
 
 			if len(resources) >= maxEvents {
 				return resources, nil
@@ -114,4 +71,51 @@ func FetchCfnEvents(
 	}
 
 	return resources, nil
+}
+
+// convertCfnEvent converts a single CloudFormation StackEvent into a generic Resource.
+func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
+	id := ""
+	if event.EventId != nil {
+		id = *event.EventId
+	}
+
+	timestamp := ""
+	name := ""
+	if event.Timestamp != nil {
+		timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04:05")
+		name = timestamp
+	}
+
+	logicalResourceID := ""
+	if event.LogicalResourceId != nil {
+		logicalResourceID = *event.LogicalResourceId
+	}
+
+	resourceType := ""
+	if event.ResourceType != nil {
+		resourceType = *event.ResourceType
+	}
+
+	resourceStatus := string(event.ResourceStatus)
+
+	resourceStatusReason := ""
+	if event.ResourceStatusReason != nil {
+		resourceStatusReason = strings.ReplaceAll(*event.ResourceStatusReason, "\n", " ")
+		resourceStatusReason = strings.ReplaceAll(resourceStatusReason, "\r", " ")
+	}
+
+	return resource.Resource{
+		ID:     id,
+		Name:   name,
+		Status: resourceStatus,
+		Fields: map[string]string{
+			"timestamp":              timestamp,
+			"logical_resource_id":    logicalResourceID,
+			"resource_type":          resourceType,
+			"resource_status":        resourceStatus,
+			"resource_status_reason": resourceStatusReason,
+		},
+		RawStruct: event,
+	}
 }
