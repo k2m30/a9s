@@ -76,6 +76,7 @@ func initStyles() {
 	rowColorCache = nil
 
 	if NoColorActive() {
+		RowSelected = lipgloss.NewStyle().Reverse(true)
 		return
 	}
 
