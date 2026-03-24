@@ -39,6 +39,10 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 
 {{< include "config.md" >}}
 
+## Environment Variables
+
+{{< include "env-vars.md" >}}
+
 ## AWS Permissions
 
 {{< include "permissions.md" >}}
