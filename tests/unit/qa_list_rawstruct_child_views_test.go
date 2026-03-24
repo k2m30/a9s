@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -507,8 +509,108 @@ func TestQA_ListRawStruct_CfnResources(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_AsgActivities: verify list rendering with Activity RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("asg_activities")
+	if typeDef == nil {
+		t.Fatal("asg_activities child resource type not registered")
+	}
+
+	cfg := configForType("asg_activities")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	activity := asgtypes.Activity{
+		ActivityId:           ptrString("act-list-001"),
+		AutoScalingGroupName: ptrString("my-asg"),
+		Cause:                ptrString("At 2024-03-22T10:00:00Z an instance was started"),
+		Description:          ptrString("Launching a new EC2 instance: i-0abc1234"),
+		StartTime:            &ts,
+		StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "act-list-001",
+			Name:   "2024-03-22 10:00:00",
+			Status: "Successful",
+			Fields: map[string]string{
+				"start_time":  "2024-03-22 10:00:00",
+				"status_code": "Successful",
+				"description": "Launching a new EC2 instance: i-0abc1234",
+				"cause":       "At 2024-03-22T10:00:00Z an instance was started",
+			},
+			RawStruct: activity,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "Successful") {
+		t.Errorf("asg_activities list should contain status code, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_AlarmHistory: verify list rendering with AlarmHistoryItem RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("alarm_history")
+	if typeDef == nil {
+		t.Fatal("alarm_history child resource type not registered")
+	}
+
+	cfg := configForType("alarm_history")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	item := cwtypes.AlarmHistoryItem{
+		AlarmName:       ptrString("HighCPUAlarm"),
+		AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+		HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+		HistorySummary:  ptrString("Alarm updated from OK to ALARM"),
+		Timestamp:       &ts,
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00:00",
+			Status: "StateUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:00:00",
+				"history_item_type": "StateUpdate",
+				"history_summary":   "Alarm updated from OK to ALARM",
+			},
+			RawStruct: item,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "StateUpdate") {
+		t.Errorf("alarm_history list should contain history item type, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
+	_ asgtypes.Activity                = asgtypes.Activity{}
+	_ cwtypes.AlarmHistoryItem         = cwtypes.AlarmHistoryItem{}
 	_ cwlogstypes.LogStream            = cwlogstypes.LogStream{}
 	_ cwlogstypes.OutputLogEvent       = cwlogstypes.OutputLogEvent{}
 	_ cwlogstypes.FilteredLogEvent     = cwlogstypes.FilteredLogEvent{}

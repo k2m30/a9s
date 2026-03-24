@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	cloudwatch "github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -806,6 +807,64 @@ type mockECSDescribeTaskDefinitionClient struct {
 
 func (m *mockECSDescribeTaskDefinitionClient) DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// ASG Scaling Activities mocks (child of Auto Scaling Groups)
+// ---------------------------------------------------------------------------
+
+// mockASGDescribeScalingActivitiesClient implements awsclient.ASGDescribeScalingActivitiesAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockASGDescribeScalingActivitiesClient struct {
+	output  *autoscaling.DescribeScalingActivitiesOutput
+	outputs []*autoscaling.DescribeScalingActivitiesOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockASGDescribeScalingActivitiesClient) DescribeScalingActivities(ctx context.Context, params *autoscaling.DescribeScalingActivitiesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeScalingActivitiesOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &autoscaling.DescribeScalingActivitiesOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
+// CloudWatch Alarm History mocks (child of CloudWatch Alarms)
+// ---------------------------------------------------------------------------
+
+// mockCloudWatchDescribeAlarmHistoryClient implements awsclient.CloudWatchDescribeAlarmHistoryAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockCloudWatchDescribeAlarmHistoryClient struct {
+	output  *cloudwatch.DescribeAlarmHistoryOutput
+	outputs []*cloudwatch.DescribeAlarmHistoryOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCloudWatchDescribeAlarmHistoryClient) DescribeAlarmHistory(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &cloudwatch.DescribeAlarmHistoryOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
 }
 
 // Ensure unused imports are used

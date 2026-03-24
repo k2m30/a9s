@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -585,5 +587,119 @@ func TestCfnResourcesDetailViewNilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("CfnResources detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ASG Scaling Activities detail view tests
+// ===========================================================================
+
+func TestAsgActivityDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
+	progress := int32(100)
+	activity := asgtypes.Activity{
+		ActivityId:            ptrString("act-detail-001"),
+		AutoScalingGroupName:  ptrString("my-asg"),
+		AutoScalingGroupARN:   ptrString("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/my-asg"),
+		AutoScalingGroupState: ptrString("InService"),
+		Cause:                 ptrString("At 2024-03-22T10:00:00Z an instance was started"),
+		Description:           ptrString("Launching a new EC2 instance: i-0abc1234"),
+		Details:               ptrString("{\"Subnet ID\":\"subnet-12345\"}"),
+		StartTime:             &ts,
+		EndTime:               &endTs,
+		StatusCode:            asgtypes.ScalingActivityStatusCodeSuccessful,
+		StatusMessage:         ptrString(""),
+		Progress:              &progress,
+	}
+	res := buildResource(
+		"act-detail-001",
+		"2024-03-22 10:00:00",
+		activity,
+	)
+	res.Fields = map[string]string{
+		"start_time":   "2024-03-22 10:00:00",
+		"status_code":  "Successful",
+		"description":  "Launching a new EC2 instance: i-0abc1234",
+		"cause":        "At 2024-03-22T10:00:00Z an instance was started",
+	}
+	cfg := detailConfigForType("asg_activities")
+	m := newDetailModel(res, "asg_activities", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"ActivityId",
+		"StatusCode",
+		"Description",
+		"Cause",
+		"Progress",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("AsgActivity detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestAsgActivityDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	activity := asgtypes.Activity{}
+	res := buildResource("empty-asg-activity", "empty-asg-activity", activity)
+	cfg := detailConfigForType("asg_activities")
+	m := newDetailModel(res, "asg_activities", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("AsgActivity detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Alarm History detail view tests
+// ===========================================================================
+
+func TestAlarmHistoryDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	item := cwtypes.AlarmHistoryItem{
+		AlarmName:       ptrString("HighCPUAlarm"),
+		AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+		HistoryData:     ptrString(`{"version":"1.0","oldState":{"stateValue":"OK"}}`),
+		HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+		HistorySummary:  ptrString("Alarm updated from OK to ALARM"),
+		Timestamp:       &ts,
+	}
+	res := buildResource("2024-03-22 10:00:00", "2024-03-22 10:00:00", item)
+	res.Status = "StateUpdate"
+	res.Fields = map[string]string{
+		"timestamp":         "2024-03-22 10:00:00",
+		"history_item_type": "StateUpdate",
+		"history_summary":   "Alarm updated from OK to ALARM",
+	}
+	cfg := detailConfigForType("alarm_history")
+	m := newDetailModel(res, "alarm_history", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"HistoryItemType",
+		"HistorySummary",
+		"AlarmName",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("AlarmHistory detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestAlarmHistoryDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	item := cwtypes.AlarmHistoryItem{}
+	res := buildResource("empty-alarm-history", "empty-alarm-history", item)
+	cfg := detailConfigForType("alarm_history")
+	m := newDetailModel(res, "alarm_history", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("AlarmHistory detail should not be empty even with nil fields")
 	}
 }

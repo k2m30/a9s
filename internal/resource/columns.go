@@ -127,3 +127,24 @@ func CfnResourceColumns() []Column {
 		{Key: "last_updated", Title: "Updated", Width: 22, Sortable: true},
 	}
 }
+
+// AsgActivityColumns returns the column definitions for Auto Scaling Group
+// scaling activities.
+func AsgActivityColumns() []Column {
+	return []Column{
+		{Key: "start_time", Title: "Start Time", Width: 22, Sortable: true},
+		{Key: "status_code", Title: "Status", Width: 14, Sortable: true},
+		{Key: "description", Title: "Description", Width: 50, Sortable: false},
+		{Key: "cause", Title: "Cause", Width: 40, Sortable: false},
+	}
+}
+
+// AlarmHistoryColumns returns the column definitions for CloudWatch Alarm
+// history items.
+func AlarmHistoryColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "history_item_type", Title: "Type", Width: 18, Sortable: true},
+		{Key: "history_summary", Title: "Summary", Width: 60, Sortable: false},
+	}
+}

@@ -128,6 +128,8 @@ func main() {
 		{"ecs_svc_logs", "cwlogstypes.FilteredLogEvent", reflect.TypeOf(cwlogstypes.FilteredLogEvent{})},
 		{"cfn_events", "cfntypes.StackEvent", reflect.TypeOf(cfntypes.StackEvent{})},
 		{"cfn_resources", "cfntypes.StackResourceSummary", reflect.TypeOf(cfntypes.StackResourceSummary{})},
+		{"asg_activities", "asgtypes.Activity", reflect.TypeOf(asgtypes.Activity{})},
+		{"alarm_history", "cwtypes.AlarmHistoryItem", reflect.TypeOf(cwtypes.AlarmHistoryItem{})},
 	}
 
 	fmt.Println("# views_reference.yaml")
