@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -79,7 +80,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 	for {
 		input := &cloudwatchlogs.FilterLogEventsInput{
 			LogGroupName:  &logGroup,
-			FilterPattern: strPtr("REPORT RequestId"),
+			FilterPattern: aws.String("REPORT RequestId"),
 			StartTime:     &startTime,
 			Limit:         &limit,
 			NextToken:     nextToken,
@@ -90,7 +91,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
 				return nil, nil
 			}
-			return nil, fmt.Errorf("fetching lambda invocations: %w", err)
+			return nil, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
 		}
 
 		for _, event := range output.Events {
@@ -190,9 +191,4 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 // formatDuration formats a duration string, stripping trailing ".00".
 func formatDuration(ms string) string {
 	return strings.TrimSuffix(ms, ".00") + " ms"
-}
-
-// strPtr returns a pointer to a string.
-func strPtr(s string) *string {
-	return &s
 }
