@@ -151,3 +151,132 @@ func TestFetchLambdaFunctions_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Lambda parent fetcher: new Fields required for child views
+// ---------------------------------------------------------------------------
+
+// TestLambdaFetcherPopulatesLogGroup verifies that the Lambda fetcher
+// populates the "log_group" field. When LoggingConfig.LogGroup is set, use
+// that value; otherwise default to "/aws/lambda/{FunctionName}".
+func TestLambdaFetcherPopulatesLogGroup(t *testing.T) {
+	mock := &mockLambdaListFunctionsClient{
+		output: &lambda.ListFunctionsOutput{
+			Functions: []lambdatypes.FunctionConfiguration{
+				{
+					FunctionName: aws.String("default-log-func"),
+					Runtime:      lambdatypes.RuntimePython312,
+					PackageType:  lambdatypes.PackageTypeZip,
+					MemorySize:   aws.Int32(128),
+					Timeout:      aws.Int32(30),
+					Handler:      aws.String("index.handler"),
+					LastModified: aws.String("2025-01-01T00:00:00.000+0000"),
+					CodeSize:     1024,
+					// No LoggingConfig → default log group
+				},
+				{
+					FunctionName: aws.String("custom-log-func"),
+					Runtime:      lambdatypes.RuntimePython312,
+					PackageType:  lambdatypes.PackageTypeZip,
+					MemorySize:   aws.Int32(256),
+					Timeout:      aws.Int32(60),
+					Handler:      aws.String("app.handler"),
+					LastModified: aws.String("2025-02-01T00:00:00.000+0000"),
+					CodeSize:     2048,
+					LoggingConfig: &lambdatypes.LoggingConfig{
+						LogGroup: aws.String("/custom/log/group"),
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchLambdaFunctions(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+
+	t.Run("default_log_group", func(t *testing.T) {
+		logGroup, ok := resources[0].Fields["log_group"]
+		if !ok {
+			t.Fatal("Fields missing key 'log_group'")
+		}
+		expected := "/aws/lambda/default-log-func"
+		if logGroup != expected {
+			t.Errorf("Fields[log_group]: expected %q, got %q", expected, logGroup)
+		}
+	})
+
+	t.Run("custom_log_group", func(t *testing.T) {
+		logGroup, ok := resources[1].Fields["log_group"]
+		if !ok {
+			t.Fatal("Fields missing key 'log_group'")
+		}
+		expected := "/custom/log/group"
+		if logGroup != expected {
+			t.Errorf("Fields[log_group]: expected %q, got %q", expected, logGroup)
+		}
+	})
+}
+
+// TestLambdaFetcherPopulatesPackageType verifies that the Lambda fetcher
+// populates the "package_type" field with "Zip" or "Image".
+func TestLambdaFetcherPopulatesPackageType(t *testing.T) {
+	mock := &mockLambdaListFunctionsClient{
+		output: &lambda.ListFunctionsOutput{
+			Functions: []lambdatypes.FunctionConfiguration{
+				{
+					FunctionName: aws.String("zip-func"),
+					Runtime:      lambdatypes.RuntimePython312,
+					PackageType:  lambdatypes.PackageTypeZip,
+					MemorySize:   aws.Int32(128),
+					Timeout:      aws.Int32(30),
+					Handler:      aws.String("index.handler"),
+					LastModified: aws.String("2025-01-01T00:00:00.000+0000"),
+					CodeSize:     1024,
+				},
+				{
+					FunctionName: aws.String("image-func"),
+					PackageType:  lambdatypes.PackageTypeImage,
+					MemorySize:   aws.Int32(256),
+					Timeout:      aws.Int32(60),
+					LastModified: aws.String("2025-02-01T00:00:00.000+0000"),
+					CodeSize:     0,
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchLambdaFunctions(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+
+	t.Run("zip_package_type", func(t *testing.T) {
+		pkgType, ok := resources[0].Fields["package_type"]
+		if !ok {
+			t.Fatal("Fields missing key 'package_type'")
+		}
+		if pkgType != "Zip" {
+			t.Errorf("Fields[package_type]: expected %q, got %q", "Zip", pkgType)
+		}
+	})
+
+	t.Run("image_package_type", func(t *testing.T) {
+		pkgType, ok := resources[1].Fields["package_type"]
+		if !ok {
+			t.Fatal("Fields missing key 'package_type'")
+		}
+		if pkgType != "Image" {
+			t.Errorf("Fields[package_type]: expected %q, got %q", "Image", pkgType)
+		}
+	})
+}

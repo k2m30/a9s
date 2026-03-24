@@ -211,3 +211,105 @@ func TestQA_Detail_LongFieldNames(t *testing.T) {
 		}
 	}
 }
+
+// ===========================================================================
+// Lambda Invocation detail view tests (child of Lambda)
+// ===========================================================================
+
+func TestLambdaInvocationDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711065600000),
+		Message:       ptrString("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
+		IngestionTime: ptrInt64(1711065601000),
+		LogStreamName: ptrString("2024/03/22/[$LATEST]abcdef"),
+		EventId:       ptrString("evt-001"),
+	}
+	res := buildResource(
+		"12345678-1234-1234-1234-123456789012",
+		"12345678-1234-1234-1234-123456789012",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"request_id":       "12345678-1234-1234-1234-123456789012",
+		"timestamp":        "2024-03-22 00:00",
+		"status":           "OK",
+		"duration_ms":      "2103 ms",
+		"billed_duration_ms": "2200 ms",
+		"memory_size_mb":   "256",
+		"memory_used_mb":   "128",
+		"cold_start":       "no",
+		"memory_used":      "128/256 MB",
+	}
+	cfg := detailConfigForType("lambda_invocations")
+	m := newDetailModel(res, "lambda_invocations", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"12345678-1234-1234-1234-123456789012",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("LambdaInvocation detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestLambdaInvocationDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{}
+	res := buildResource("empty-invocation", "empty-invocation", ev)
+	cfg := detailConfigForType("lambda_invocations")
+	m := newDetailModel(res, "lambda_invocations", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("LambdaInvocation detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Lambda Invocation Log detail view tests (level-2 child of Invocations)
+// ===========================================================================
+
+func TestLambdaInvocationLogDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711065600000),
+		Message:       ptrString("INFO Processing request for user abc-123"),
+		IngestionTime: ptrInt64(1711065600500),
+		EventId:       ptrString("log-002"),
+	}
+	res := buildResource(
+		"log-002",
+		"INFO Processing request for user abc-123",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"timestamp": "2024-03-22 00:00",
+		"message":   "INFO Processing request for user abc-123",
+	}
+	cfg := detailConfigForType("lambda_invocation_logs")
+	m := newDetailModel(res, "lambda_invocation_logs", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Processing request",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("LambdaInvocationLog detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestLambdaInvocationLogDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{}
+	res := buildResource("empty-log", "empty-log", ev)
+	cfg := detailConfigForType("lambda_invocation_logs")
+	m := newDetailModel(res, "lambda_invocation_logs", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("LambdaInvocationLog detail should not be empty even with nil fields")
+	}
+}

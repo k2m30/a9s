@@ -980,6 +980,31 @@ var defaultViews = ViewsConfig{
 				"HealthCheckPort", "AnomalyDetection",
 			},
 		},
+		"lambda_invocations": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Request ID", Key: "request_id", Width: 38},
+				{Title: "Status", Key: "status", Width: 10},
+				{Title: "Duration", Key: "duration_ms", Width: 14},
+				{Title: "Memory", Key: "memory_used", Width: 16},
+				{Title: "Cold Start", Key: "cold_start", Width: 12},
+			},
+			Detail: []string{
+				"request_id", "timestamp", "status",
+				"duration_ms", "billed_duration_ms",
+				"memory_size_mb", "memory_used_mb",
+				"init_duration_ms", "xray_trace_id",
+			},
+		},
+		"lambda_invocation_logs": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Message", Key: "message", Width: 120},
+			},
+			Detail: []string{
+				"timestamp", "message",
+			},
+		},
 	},
 }
 

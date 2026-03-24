@@ -126,6 +126,14 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "handler", Title: "Handler", Width: 30, Sortable: false},
 			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 		},
+		Children: []ChildViewDef{
+			{
+				ChildType:      "lambda_invocations",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"function_name": "function_name", "log_group": "log_group"},
+				DisplayNameKey: "function_name",
+			},
+		},
 	},
 	{
 		Name:      "Auto Scaling Groups",
@@ -967,6 +975,28 @@ func TargetHealthColumns() []Column {
 		{Key: "health", Title: "Health", Width: 14, Sortable: true},
 		{Key: "reason", Title: "Reason", Width: 28, Sortable: true},
 		{Key: "description", Title: "Description", Width: 36, Sortable: true},
+	}
+}
+
+// LambdaInvocationColumns returns the column definitions for Lambda invocations
+// within a Lambda function's log group.
+func LambdaInvocationColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "request_id", Title: "Request ID", Width: 38, Sortable: true},
+		{Key: "status", Title: "Status", Width: 10, Sortable: true},
+		{Key: "duration_ms", Title: "Duration", Width: 14, Sortable: true},
+		{Key: "memory_used", Title: "Memory", Width: 16, Sortable: true},
+		{Key: "cold_start", Title: "Cold Start", Width: 12, Sortable: true},
+	}
+}
+
+// LambdaInvocationLogColumns returns the column definitions for individual log
+// lines within a Lambda invocation.
+func LambdaInvocationLogColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "message", Title: "Message", Width: 120, Sortable: true},
 	}
 }
 
