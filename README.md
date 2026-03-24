@@ -46,7 +46,7 @@ Instead of clicking through the AWS Console or chaining CLI commands, answer the
 - Human-readable formatting (timestamps, byte sizes)
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 3,400+ unit tests
+- 2,000+ unit tests
 
 ## Installation
 
