@@ -335,6 +335,79 @@ func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Test: generated views.yaml round-trips through parser and matches defaults
+// ---------------------------------------------------------------------------
+
+func TestViewsYAML_RoundTrip_MatchesDefaults(t *testing.T) {
+	// Read the generated .a9s/views.yaml
+	data, err := os.ReadFile(filepath.Join("..", "..", ".a9s", "views.yaml"))
+	if err != nil {
+		t.Fatalf("failed to read .a9s/views.yaml: %v", err)
+	}
+
+	cfg, err := config.Parse(data)
+	if err != nil {
+		t.Fatalf("failed to parse .a9s/views.yaml: %v", err)
+	}
+
+	defaults := config.DefaultConfig()
+
+	// Every default view must be present in the parsed YAML
+	for name, defView := range defaults.Views {
+		yamlView, ok := cfg.Views[name]
+		if !ok {
+			t.Errorf("views.yaml missing resource %q (present in defaults.go)", name)
+			continue
+		}
+
+		// Check list column count matches
+		if len(yamlView.List) != len(defView.List) {
+			t.Errorf("%s: list column count mismatch: yaml=%d, default=%d",
+				name, len(yamlView.List), len(defView.List))
+			continue
+		}
+
+		// Check each list column
+		for i, defCol := range defView.List {
+			yamlCol := yamlView.List[i]
+			if yamlCol.Title != defCol.Title {
+				t.Errorf("%s.List[%d].Title: yaml=%q, default=%q", name, i, yamlCol.Title, defCol.Title)
+			}
+			if yamlCol.Key != defCol.Key {
+				t.Errorf("%s.List[%d].Key: yaml=%q, default=%q", name, i, yamlCol.Key, defCol.Key)
+			}
+			if yamlCol.Path != defCol.Path {
+				t.Errorf("%s.List[%d].Path: yaml=%q, default=%q", name, i, yamlCol.Path, defCol.Path)
+			}
+			if yamlCol.Width != defCol.Width {
+				t.Errorf("%s.List[%d].Width: yaml=%d, default=%d", name, i, yamlCol.Width, defCol.Width)
+			}
+		}
+
+		// Check detail path count matches
+		if len(yamlView.Detail) != len(defView.Detail) {
+			t.Errorf("%s: detail path count mismatch: yaml=%d, default=%d",
+				name, len(yamlView.Detail), len(defView.Detail))
+			continue
+		}
+
+		// Check each detail path
+		for i, defPath := range defView.Detail {
+			if yamlView.Detail[i] != defPath {
+				t.Errorf("%s.Detail[%d]: yaml=%q, default=%q", name, i, yamlView.Detail[i], defPath)
+			}
+		}
+	}
+
+	// Also check no extra views in YAML that aren't in defaults
+	for name := range cfg.Views {
+		if _, ok := defaults.Views[name]; !ok {
+			t.Errorf("views.yaml has extra resource %q not in defaults.go", name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // T019: Test invalid YAML — returns error, GetViewDef still returns defaults
 // ---------------------------------------------------------------------------
 
