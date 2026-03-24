@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-03-24
+
+### Changed
+- Split oversized source files to comply with go-codebase-checklist size constraints (#71):
+  - `types.go` (1093→108 lines): split into 12 category files + `columns.go`
+  - `defaults.go` (1105→54 lines): split into 12 category files
+  - `app.go` (953→345 lines): split into `app_handlers.go`, `app_input.go`, `app_fetchers.go`
+  - 7 AWS fetcher functions: extracted per-item `convertXxx()` helpers (all under 50 lines)
+  - Demo fixtures: split 6 oversized files into smaller category files
+  - Test files: split top 3 oversized files (`qa_redis_docdb`, `qa_mainmenu`, `mocks`)
+- Website UX/UI audit — 18 fixes (#52)
+
+### Added
+- "Why a9s?" section with real-life use cases in README and website
+- Documentation for `NO_COLOR`, `AWS_PROFILE`, `AWS_REGION` environment variables
+- CFN Stacks added to README feature summary drill-down list
+- v3.3.0 and v3.4.0 release notes to website
+
 ### Added
 - `--demo` mode with synthetic fixtures for all 62 resource types (no AWS credentials needed)
 - Demo GIF embedded in README and website
