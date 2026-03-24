@@ -196,6 +196,14 @@ All resource short names work as commands.
 
 a9s stores view configuration in `~/.a9s/views.yaml` (optional — sensible defaults are built-in). AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `NO_COLOR` | Set to any value (e.g., `NO_COLOR=1`) to disable all color output. Follows the [no-color.org](https://no-color.org) standard. Useful for accessibility, scripting, or piping output. |
+| `AWS_PROFILE` | Override the active AWS profile (same as `-p` flag). |
+| `AWS_REGION` | Override the active AWS region (same as `-r` flag). |
+
 ## AWS Permissions
 
 a9s uses **read-only** AWS API calls exclusively. The following managed policies provide sufficient access:
