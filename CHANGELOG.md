@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-03-24
+
+### Fixed
+- NO_COLOR cursor visibility: use ANSI reverse video for selected row (#74)
+
 ## [3.4.1] - 2026-03-24
 
 ### Changed
