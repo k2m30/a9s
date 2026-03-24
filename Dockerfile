@@ -9,5 +9,6 @@ COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=certs /etc/passwd /etc/passwd
 COPY --from=certs --chown=10001:10001 /home/a9s /home/a9s
 COPY build/${TARGETOS}-${TARGETARCH}/a9s /usr/local/bin/a9s
+ENV TERM=xterm-256color COLORTERM=truecolor
 USER a9s
 ENTRYPOINT ["a9s"]
