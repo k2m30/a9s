@@ -283,6 +283,66 @@ views:
       - Outputs
       - Tags
 
+  cfn_events:
+    list:
+      Timestamp:
+        key: timestamp
+        width: 22
+      Logical ID:
+        path: LogicalResourceId
+        width: 28
+      Type:
+        path: ResourceType
+        width: 28
+      Status:
+        key: resource_status
+        width: 24
+      Reason:
+        key: resource_status_reason
+        width: 40
+    detail:
+      - EventId
+      - StackId
+      - StackName
+      - Timestamp
+      - LogicalResourceId
+      - PhysicalResourceId
+      - ResourceType
+      - ResourceStatus
+      - ResourceStatusReason
+      - ResourceProperties
+      - ClientRequestToken
+
+  cfn_resources:
+    list:
+      Logical ID:
+        path: LogicalResourceId
+        width: 28
+      Physical ID:
+        path: PhysicalResourceId
+        width: 28
+      Type:
+        path: ResourceType
+        width: 28
+      Status:
+        key: resource_status
+        width: 24
+      Drift:
+        key: drift_status
+        width: 12
+      Updated:
+        key: last_updated
+        width: 22
+    detail:
+      - LogicalResourceId
+      - PhysicalResourceId
+      - ResourceType
+      - ResourceStatus
+      - ResourceStatusReason
+      - LastUpdatedTimestamp
+      - DriftInformation
+      - ModuleInfo
+
   codeartifact:
     list:
       Repository:

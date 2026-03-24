@@ -18,6 +18,13 @@ func init() {
 	demoData["cb"] = codebuildFixtures
 	demoData["ecr"] = ecrFixtures
 	demoData["codeartifact"] = codeartifactFixtures
+
+	RegisterChildDemo("cfn_events", func(parentCtx map[string]string) []resource.Resource {
+		return cfnEventFixtures(parentCtx["stack_name"])
+	})
+	RegisterChildDemo("cfn_resources", func(parentCtx map[string]string) []resource.Resource {
+		return cfnResourceFixtures(parentCtx["stack_name"])
+	})
 }
 
 // cfnFixtures returns demo CloudFormation Stack fixtures.
@@ -405,6 +412,281 @@ func codeartifactFixtures() []resource.Resource {
 				Description:          aws.String("Maven repository for Java microservices"),
 				AdministratorAccount: aws.String("123456789012"),
 				CreatedTime:          aws.Time(mustParseTime("2025-04-01T09:30:00+00:00")),
+			},
+		},
+	}
+}
+
+// cfnEventFixtures returns demo CloudFormation Stack Event fixtures for a typical
+// stack update cycle.
+func cfnEventFixtures(stackName string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-001",
+			Name:   "2026-03-20 10:00:00",
+			Status: "UPDATE_IN_PROGRESS",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:00:00",
+				"logical_resource_id":    stackName,
+				"resource_type":          "AWS::CloudFormation::Stack",
+				"resource_status":        "UPDATE_IN_PROGRESS",
+				"resource_status_reason": "User Initiated",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:              aws.String("evt-001"),
+				StackName:            aws.String(stackName),
+				Timestamp:            aws.Time(mustParseTime("2026-03-20T10:00:00+00:00")),
+				LogicalResourceId:    aws.String(stackName),
+				ResourceType:         aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:       cfntypes.ResourceStatusUpdateInProgress,
+				ResourceStatusReason: aws.String("User Initiated"),
+			},
+		},
+		{
+			ID:     "evt-002",
+			Name:   "2026-03-20 10:00:15",
+			Status: "UPDATE_IN_PROGRESS",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:00:15",
+				"logical_resource_id":    "WebServerASG",
+				"resource_type":          "AWS::AutoScaling::AutoScalingGroup",
+				"resource_status":        "UPDATE_IN_PROGRESS",
+				"resource_status_reason": "Resource update initiated",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:              aws.String("evt-002"),
+				StackName:            aws.String(stackName),
+				Timestamp:            aws.Time(mustParseTime("2026-03-20T10:00:15+00:00")),
+				LogicalResourceId:    aws.String("WebServerASG"),
+				ResourceType:         aws.String("AWS::AutoScaling::AutoScalingGroup"),
+				ResourceStatus:       cfntypes.ResourceStatusUpdateInProgress,
+				ResourceStatusReason: aws.String("Resource update initiated"),
+			},
+		},
+		{
+			ID:     "evt-003",
+			Name:   "2026-03-20 10:01:30",
+			Status: "UPDATE_COMPLETE",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:01:30",
+				"logical_resource_id":    "WebServerASG",
+				"resource_type":          "AWS::AutoScaling::AutoScalingGroup",
+				"resource_status":        "UPDATE_COMPLETE",
+				"resource_status_reason": "",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:           aws.String("evt-003"),
+				StackName:         aws.String(stackName),
+				Timestamp:         aws.Time(mustParseTime("2026-03-20T10:01:30+00:00")),
+				LogicalResourceId: aws.String("WebServerASG"),
+				ResourceType:      aws.String("AWS::AutoScaling::AutoScalingGroup"),
+				ResourceStatus:    cfntypes.ResourceStatusUpdateComplete,
+			},
+		},
+		{
+			ID:     "evt-004",
+			Name:   "2026-03-20 10:01:45",
+			Status: "UPDATE_IN_PROGRESS",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:01:45",
+				"logical_resource_id":    "AppSecurityGroup",
+				"resource_type":          "AWS::EC2::SecurityGroup",
+				"resource_status":        "UPDATE_IN_PROGRESS",
+				"resource_status_reason": "Resource update initiated",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:              aws.String("evt-004"),
+				StackName:            aws.String(stackName),
+				Timestamp:            aws.Time(mustParseTime("2026-03-20T10:01:45+00:00")),
+				LogicalResourceId:    aws.String("AppSecurityGroup"),
+				ResourceType:         aws.String("AWS::EC2::SecurityGroup"),
+				ResourceStatus:       cfntypes.ResourceStatusUpdateInProgress,
+				ResourceStatusReason: aws.String("Resource update initiated"),
+			},
+		},
+		{
+			ID:     "evt-005",
+			Name:   "2026-03-20 10:02:00",
+			Status: "UPDATE_COMPLETE",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:02:00",
+				"logical_resource_id":    "AppSecurityGroup",
+				"resource_type":          "AWS::EC2::SecurityGroup",
+				"resource_status":        "UPDATE_COMPLETE",
+				"resource_status_reason": "",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:           aws.String("evt-005"),
+				StackName:         aws.String(stackName),
+				Timestamp:         aws.Time(mustParseTime("2026-03-20T10:02:00+00:00")),
+				LogicalResourceId: aws.String("AppSecurityGroup"),
+				ResourceType:      aws.String("AWS::EC2::SecurityGroup"),
+				ResourceStatus:    cfntypes.ResourceStatusUpdateComplete,
+			},
+		},
+		{
+			ID:     "evt-006",
+			Name:   "2026-03-20 10:02:30",
+			Status: "UPDATE_COMPLETE",
+			Fields: map[string]string{
+				"timestamp":              "2026-03-20 10:02:30",
+				"logical_resource_id":    stackName,
+				"resource_type":          "AWS::CloudFormation::Stack",
+				"resource_status":        "UPDATE_COMPLETE",
+				"resource_status_reason": "",
+			},
+			RawStruct: cfntypes.StackEvent{
+				EventId:           aws.String("evt-006"),
+				StackName:         aws.String(stackName),
+				Timestamp:         aws.Time(mustParseTime("2026-03-20T10:02:30+00:00")),
+				LogicalResourceId: aws.String(stackName),
+				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:    cfntypes.ResourceStatusUpdateComplete,
+			},
+		},
+	}
+}
+
+// cfnResourceFixtures returns demo CloudFormation Stack Resource fixtures for a
+// typical infrastructure stack.
+func cfnResourceFixtures(stackName string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "VPC",
+			Name:   "VPC",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "VPC",
+				"physical_resource_id": "vpc-0abc123def456789a",
+				"resource_type":        "AWS::EC2::VPC",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2024-10-15 09:02:00",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("VPC"),
+				PhysicalResourceId:   aws.String("vpc-0abc123def456789a"),
+				ResourceType:         aws.String("AWS::EC2::VPC"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2024-10-15T09:02:00+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+				},
+			},
+		},
+		{
+			ID:     "PublicSubnet1",
+			Name:   "PublicSubnet1",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "PublicSubnet1",
+				"physical_resource_id": "subnet-0aaa111111111111a",
+				"resource_type":        "AWS::EC2::Subnet",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2024-10-15 09:03:00",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("PublicSubnet1"),
+				PhysicalResourceId:   aws.String("subnet-0aaa111111111111a"),
+				ResourceType:         aws.String("AWS::EC2::Subnet"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2024-10-15T09:03:00+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+				},
+			},
+		},
+		{
+			ID:     "PrivateSubnet1",
+			Name:   "PrivateSubnet1",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "PrivateSubnet1",
+				"physical_resource_id": "subnet-0bbb222222222222b",
+				"resource_type":        "AWS::EC2::Subnet",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "MODIFIED",
+				"last_updated":         "2024-10-15 09:03:30",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("PrivateSubnet1"),
+				PhysicalResourceId:   aws.String("subnet-0bbb222222222222b"),
+				ResourceType:         aws.String("AWS::EC2::Subnet"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2024-10-15T09:03:30+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusModified,
+				},
+			},
+		},
+		{
+			ID:     "InternetGateway",
+			Name:   "InternetGateway",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "InternetGateway",
+				"physical_resource_id": "igw-0ccc333333333333c",
+				"resource_type":        "AWS::EC2::InternetGateway",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "NOT_CHECKED",
+				"last_updated":         "2024-10-15 09:04:00",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("InternetGateway"),
+				PhysicalResourceId:   aws.String("igw-0ccc333333333333c"),
+				ResourceType:         aws.String("AWS::EC2::InternetGateway"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2024-10-15T09:04:00+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusNotChecked,
+				},
+			},
+		},
+		{
+			ID:     "NATGateway",
+			Name:   "NATGateway",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "NATGateway",
+				"physical_resource_id": "nat-0ddd444444444444d",
+				"resource_type":        "AWS::EC2::NatGateway",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2024-10-15 09:06:00",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("NATGateway"),
+				PhysicalResourceId:   aws.String("nat-0ddd444444444444d"),
+				ResourceType:         aws.String("AWS::EC2::NatGateway"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2024-10-15T09:06:00+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+				},
+			},
+		},
+		{
+			ID:     "AppSecurityGroup",
+			Name:   "AppSecurityGroup",
+			Status: "UPDATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "AppSecurityGroup",
+				"physical_resource_id": "sg-0eee555555555555e",
+				"resource_type":        "AWS::EC2::SecurityGroup",
+				"resource_status":      "UPDATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2026-03-20 10:02:00",
+			},
+			RawStruct: cfntypes.StackResourceSummary{
+				LogicalResourceId:    aws.String("AppSecurityGroup"),
+				PhysicalResourceId:   aws.String("sg-0eee555555555555e"),
+				ResourceType:         aws.String("AWS::EC2::SecurityGroup"),
+				ResourceStatus:       cfntypes.ResourceStatusUpdateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseTime("2026-03-20T10:02:00+00:00")),
+				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+				},
 			},
 		},
 	}

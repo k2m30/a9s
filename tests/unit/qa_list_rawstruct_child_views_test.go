@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -399,6 +400,113 @@ func TestQA_ListRawStruct_EcsSvcLogs(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_CfnEvents: verify list rendering with StackEvent RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_CfnEvents(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("cfn_events")
+	if typeDef == nil {
+		t.Fatal("cfn_events child resource type not registered")
+	}
+
+	cfg := configForType("cfn_events")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	ev := cfntypes.StackEvent{
+		EventId:              ptrString("evt-list-cfn-001"),
+		StackId:              ptrString("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
+		StackName:            ptrString("my-stack"),
+		Timestamp:            &ts,
+		LogicalResourceId:    ptrString("MyBucket"),
+		ResourceType:         ptrString("AWS::S3::Bucket"),
+		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+		ResourceStatusReason: ptrString("Resource creation complete"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "evt-list-cfn-001",
+			Name:   "2024-03-22 10:00:00",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"timestamp":              "2024-03-22 10:00:00",
+				"logical_resource_id":    "MyBucket",
+				"resource_type":          "AWS::S3::Bucket",
+				"resource_status":        "CREATE_COMPLETE",
+				"resource_status_reason": "Resource creation complete",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "MyBucket") {
+		t.Errorf("cfn_events list should contain logical resource id, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_CfnResources: verify list rendering with StackResourceSummary RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_CfnResources(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("cfn_resources")
+	if typeDef == nil {
+		t.Fatal("cfn_resources child resource type not registered")
+	}
+
+	cfg := configForType("cfn_resources")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	summary := cfntypes.StackResourceSummary{
+		LogicalResourceId:    ptrString("MyBucket"),
+		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
+		ResourceType:         ptrString("AWS::S3::Bucket"),
+		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+		LastUpdatedTimestamp: &ts,
+		DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+			StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+		},
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "MyBucket",
+			Name:   "MyBucket",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "MyBucket",
+				"physical_resource_id": "my-stack-mybucket-abc123",
+				"resource_type":        "AWS::S3::Bucket",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2024-03-22 10:00:00",
+			},
+			RawStruct: summary,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "MyBucket") {
+		t.Errorf("cfn_resources list should contain logical resource id, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ cwlogstypes.LogStream            = cwlogstypes.LogStream{}
@@ -407,4 +515,6 @@ var (
 	_ elbtypes.TargetHealthDescription = elbtypes.TargetHealthDescription{}
 	_ ecstypes.ServiceEvent            = ecstypes.ServiceEvent{}
 	_ ecstypes.Task                    = ecstypes.Task{}
+	_ cfntypes.StackEvent              = cfntypes.StackEvent{}
+	_ cfntypes.StackResourceSummary    = cfntypes.StackResourceSummary{}
 )

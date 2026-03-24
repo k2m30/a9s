@@ -25,6 +25,7 @@
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
+| `r` | Open Stack Resources (CFN Stacks) |
 | `w` | Toggle line wrap (in YAML view) |
 | `Tab` | Autocomplete (in command mode) |
 

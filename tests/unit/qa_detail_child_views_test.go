@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -468,5 +469,121 @@ func TestQA_Detail_EcsSvcLogs_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("EcsSvcLogs detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// CFN Stack Events detail view tests
+// ===========================================================================
+
+func TestCfnEventsDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	ev := cfntypes.StackEvent{
+		EventId:              ptrString("evt-detail-001"),
+		StackId:              ptrString("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
+		StackName:            ptrString("my-stack"),
+		Timestamp:            &ts,
+		LogicalResourceId:    ptrString("MyBucket"),
+		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
+		ResourceType:         ptrString("AWS::S3::Bucket"),
+		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+		ResourceStatusReason: ptrString("Resource creation complete"),
+		ClientRequestToken:   ptrString("console-token-12345"),
+	}
+	res := buildResource(
+		"evt-detail-001",
+		"2024-03-22 10:00:00",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"timestamp":              "2024-03-22 10:00:00",
+		"logical_resource_id":    "MyBucket",
+		"resource_type":          "AWS::S3::Bucket",
+		"resource_status":        "CREATE_COMPLETE",
+		"resource_status_reason": "Resource creation complete",
+	}
+	cfg := detailConfigForType("cfn_events")
+	m := newDetailModel(res, "cfn_events", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"MyBucket",
+		"evt-detail-001",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("CfnEvents detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestCfnEventsDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cfntypes.StackEvent{}
+	res := buildResource("empty-cfn-event", "empty-cfn-event", ev)
+	cfg := detailConfigForType("cfn_events")
+	m := newDetailModel(res, "cfn_events", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("CfnEvents detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// CFN Stack Resources detail view tests
+// ===========================================================================
+
+func TestCfnResourcesDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	res_summary := cfntypes.StackResourceSummary{
+		LogicalResourceId:    ptrString("MyBucket"),
+		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
+		ResourceType:         ptrString("AWS::S3::Bucket"),
+		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+		ResourceStatusReason: ptrString(""),
+		LastUpdatedTimestamp: &ts,
+		DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
+			StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+		},
+	}
+	res := buildResource(
+		"MyBucket",
+		"MyBucket",
+		res_summary,
+	)
+	res.Fields = map[string]string{
+		"logical_resource_id":  "MyBucket",
+		"physical_resource_id": "my-stack-mybucket-abc123",
+		"resource_type":        "AWS::S3::Bucket",
+		"resource_status":      "CREATE_COMPLETE",
+		"drift_status":         "IN_SYNC",
+		"last_updated":         "2024-03-22 10:00:00",
+	}
+	cfg := detailConfigForType("cfn_resources")
+	m := newDetailModel(res, "cfn_resources", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"MyBucket",
+		"my-stack-mybucket-abc123",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("CfnResources detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestCfnResourcesDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	res_summary := cfntypes.StackResourceSummary{}
+	res := buildResource("empty-cfn-resource", "empty-cfn-resource", res_summary)
+	cfg := detailConfigForType("cfn_resources")
+	m := newDetailModel(res, "cfn_resources", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("CfnResources detail should not be empty even with nil fields")
 	}
 }
