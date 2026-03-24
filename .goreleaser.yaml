@@ -46,6 +46,16 @@ brews:
     test: |
       system "#{bin}/a9s", "--version"
 
+scoops:
+  - repository:
+      owner: k2m30
+      name: scoop-a9s
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    directory: bucket
+    homepage: https://github.com/k2m30/a9s
+    description: Terminal UI AWS Resource Manager
+    license: GPL-3.0-or-later
+
 checksum:
   name_template: checksums.txt
 
