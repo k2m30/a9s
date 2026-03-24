@@ -18,6 +18,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 
 | Parent | Child View | Key | Description |
 |--------|-----------|-----|-------------|
+| Lambda Functions | Invocations | `Enter` | Recent invocations with status, duration, memory, cold start |
+| Lambda Invocations | Log Lines | `Enter` | Full log output for a specific invocation (START → app logs → END) |
 | S3 Buckets | Objects | `Enter` | Browse bucket contents, drill into folders |
 | Route 53 Zones | DNS Records | `Enter` | View A, CNAME, MX, and other record types |
 | Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
