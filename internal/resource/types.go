@@ -84,6 +84,26 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "running_count", Title: "Running", Width: 9, Sortable: true},
 			{Key: "launch_type", Title: "Launch Type", Width: 12, Sortable: true},
 		},
+		Children: []ChildViewDef{
+			{
+				ChildType:      "ecs_tasks",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"cluster": "cluster", "service_name": "service_name"},
+				DisplayNameKey: "service_name",
+			},
+			{
+				ChildType:      "ecs_svc_events",
+				Key:            "e",
+				ContextKeys:    map[string]string{"cluster": "cluster", "service_name": "service_name"},
+				DisplayNameKey: "service_name",
+			},
+			{
+				ChildType:      "ecs_svc_logs",
+				Key:            "L",
+				ContextKeys:    map[string]string{"cluster": "cluster", "service_name": "service_name", "task_definition": "task_definition"},
+				DisplayNameKey: "service_name",
+			},
+		},
 	},
 	{
 		Name:      "ECS Clusters",
@@ -996,6 +1016,35 @@ func LambdaInvocationColumns() []Column {
 func LambdaInvocationLogColumns() []Column {
 	return []Column{
 		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+	}
+}
+
+// EcsSvcEventColumns returns the column definitions for ECS service events.
+func EcsSvcEventColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+	}
+}
+
+// EcsSvcTaskColumns returns the column definitions for ECS service tasks.
+func EcsSvcTaskColumns() []Column {
+	return []Column{
+		{Key: "task_id_short", Title: "Task ID", Width: 14, Sortable: true},
+		{Key: "status", Title: "Status", Width: 12, Sortable: true},
+		{Key: "health", Title: "Health", Width: 10, Sortable: true},
+		{Key: "task_def_short", Title: "Task Definition", Width: 28, Sortable: true},
+		{Key: "started_at", Title: "Started At", Width: 22, Sortable: true},
+		{Key: "stopped_reason", Title: "Stopped Reason", Width: 40, Sortable: true},
+	}
+}
+
+// EcsSvcLogColumns returns the column definitions for ECS service container logs.
+func EcsSvcLogColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "stream_short", Title: "Stream", Width: 20, Sortable: true},
 		{Key: "message", Title: "Message", Width: 120, Sortable: true},
 	}
 }

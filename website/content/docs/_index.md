@@ -25,6 +25,9 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
 | Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
 | Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
+| ECS Services | Service Events | `e` | Event timeline (steady state, placement failures, deployments) |
+| ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
+| ECS Services | Container Logs | `L` | Application logs from CloudWatch (resolved from task definition) |
 
 ## Commands
 

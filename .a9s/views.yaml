@@ -1127,3 +1127,75 @@ views:
     detail:
       - timestamp
       - message
+
+  ecs_svc_events:
+    list:
+      Timestamp:
+        key: timestamp
+        width: 22
+      Message:
+        key: message
+        width: 120
+    detail:
+      - Id
+      - CreatedAt
+      - Message
+
+  ecs_tasks:
+    list:
+      Task ID:
+        key: task_id_short
+        width: 14
+      Status:
+        key: status
+        width: 12
+      Health:
+        key: health
+        width: 10
+      Task Definition:
+        key: task_def_short
+        width: 28
+      Started At:
+        key: started_at
+        width: 22
+      Stopped Reason:
+        key: stopped_reason
+        width: 40
+    detail:
+      - TaskArn
+      - ClusterArn
+      - LastStatus
+      - DesiredStatus
+      - HealthStatus
+      - TaskDefinitionArn
+      - StartedAt
+      - StoppedAt
+      - StoppedReason
+      - StopCode
+      - LaunchType
+      - PlatformVersion
+      - Cpu
+      - Memory
+      - Group
+      - StartedBy
+      - Containers
+      - Attachments
+      - Tags
+
+  ecs_svc_logs:
+    list:
+      Timestamp:
+        key: timestamp
+        width: 22
+      Stream:
+        key: stream_short
+        width: 20
+      Message:
+        key: message
+        width: 120
+    detail:
+      - Timestamp
+      - Message
+      - IngestionTime
+      - EventId
+      - LogStreamName
