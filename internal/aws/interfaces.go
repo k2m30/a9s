@@ -456,3 +456,13 @@ type CWLogsGetLogEventsAPI interface {
 type ELBv2DescribeTargetHealthAPI interface {
 	DescribeTargetHealth(ctx context.Context, params *elbv2.DescribeTargetHealthInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeTargetHealthOutput, error)
 }
+
+// CWLogsFilterLogEventsAPI defines the interface for the CloudWatchLogs FilterLogEvents operation.
+type CWLogsFilterLogEventsAPI interface {
+	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
+}
+
+// LambdaGetFunctionAPI defines the interface for the Lambda GetFunction operation.
+type LambdaGetFunctionAPI interface {
+	GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error)
+}

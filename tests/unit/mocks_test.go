@@ -1264,6 +1264,46 @@ func (m *mockCWLogsGetLogEventsClient) GetLogEvents(ctx context.Context, params 
 	return m.output, m.err
 }
 
+// ---------------------------------------------------------------------------
+// Lambda Invocations mocks (child of Lambda, cross-service via CW Logs)
+// ---------------------------------------------------------------------------
+
+// mockCWLogsFilterLogEventsClient implements awsclient.CWLogsFilterLogEventsAPI.
+// Supports multiple outputs for pagination via NextToken.
+type mockCWLogsFilterLogEventsClient struct {
+	outputs   []*cloudwatchlogs.FilterLogEventsOutput
+	err       error
+	callIdx   int
+	lastInput *cloudwatchlogs.FilterLogEventsInput
+}
+
+func (m *mockCWLogsFilterLogEventsClient) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	m.lastInput = params
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &cloudwatchlogs.FilterLogEventsOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// Lambda GetFunction mocks (for Lambda Code viewer)
+// ---------------------------------------------------------------------------
+
+// mockLambdaGetFunctionClient implements awsclient.LambdaGetFunctionAPI.
+type mockLambdaGetFunctionClient struct {
+	output *lambda.GetFunctionOutput
+	err    error
+}
+
+func (m *mockLambdaGetFunctionClient) GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	return m.output, m.err
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

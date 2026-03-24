@@ -354,6 +354,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "index.handler",
 				"last_modified": "2026-03-15T08:22:14+00:00",
 				"code_size":     "1048576",
+				"log_group":     "/aws/lambda/api-gateway-authorizer",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("api-gateway-authorizer"),
@@ -379,6 +381,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "transform.lambda_handler",
 				"last_modified": "2026-03-10T16:45:33+00:00",
 				"code_size":     "5242880",
+				"log_group":     "/aws/lambda/data-pipeline-transform",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("data-pipeline-transform"),
@@ -404,6 +408,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "main",
 				"last_modified": "2026-02-28T11:03:47+00:00",
 				"code_size":     "8388608",
+				"log_group":     "/aws/lambda/order-processor",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("order-processor"),
@@ -429,6 +435,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "thumbnail.handler",
 				"last_modified": "2026-03-01T09:18:55+00:00",
 				"code_size":     "15728640",
+				"log_group":     "/aws/lambda/image-thumbnail-gen",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("image-thumbnail-gen"),
@@ -454,6 +462,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "com.example.PaymentHandler::handleRequest",
 				"last_modified": "2026-03-12T20:11:09+00:00",
 				"code_size":     "31457280",
+				"log_group":     "/aws/lambda/payment-webhook",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("payment-webhook"),
@@ -479,6 +489,8 @@ func lambdaFunctions() []resource.Resource {
 				"handler":       "notify.handler",
 				"last_modified": "2026-01-20T13:42:00+00:00",
 				"code_size":     "524288",
+				"log_group":     "/aws/lambda/cloudwatch-slack-notifier",
+				"package_type":  "Zip",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("cloudwatch-slack-notifier"),
