@@ -50,6 +50,9 @@ views_reference.yaml
 dist/
 build/
 
+# Social media assets (generated locally)
+docs/demos/social/
+
 # Hugo build output
 website/public/
 website/.hugo_build.lock
