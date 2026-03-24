@@ -3,7 +3,7 @@
 ## Overview
 
 All MUST-HAVE, SHOULD-HAVE, and Structural child views from the [devops research](devops-research.md).
-Two child views already implemented: S3 Objects and R53 Records.
+Seven child views already implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, and Lambda Invocation Logs.
 
 ### Status Key
 
@@ -18,14 +18,14 @@ Two child views already implemented: S3 Objects and R53 Records.
 |---|--------|-----------|------|--------|-------------|---------|
 | — | S3 Buckets (s3) | Objects | MUST-HAVE | Implemented | [s3-objects.md](s3-objects.md) | No |
 | — | Route 53 Zones (r53) | Records | MUST-HAVE | Implemented | [r53-records.md](r53-records.md) | No |
-| 1 | Log Groups (logs) | Log Streams | MUST-HAVE | Planned | [logs-streams.md](logs-streams.md) | Yes: Log Events (level 2) |
-| 2 | Lambda (lambda) | Invocations | MUST-HAVE | Planned | [lambda-invocations.md](lambda-invocations.md) | Yes: Log Lines (level 2) |
+| 1 | Log Groups (logs) | Log Streams | MUST-HAVE | Implemented | [logs-streams.md](logs-streams.md) | Yes: Log Events (level 2) |
+| 2 | Lambda (lambda) | Invocations | MUST-HAVE | Implemented | [lambda-invocations.md](lambda-invocations.md) | Yes: Log Lines (level 2) |
 | 3 | ECS Services (ecs-svc) | Service Events | MUST-HAVE | Planned | [ecs-svc-events.md](ecs-svc-events.md) | No |
 | 4 | ECS Services (ecs-svc) | Tasks | MUST-HAVE | Planned | [ecs-svc-tasks.md](ecs-svc-tasks.md) | No |
 | 5 | ECS Services (ecs-svc) | Container Logs | MUST-HAVE | Planned | [ecs-svc-logs.md](ecs-svc-logs.md) | No |
 | 6 | CFN Stacks (cfn) | Stack Events | MUST-HAVE | Planned | [cfn-events.md](cfn-events.md) | No |
 | 7 | CFN Stacks (cfn) | Stack Resources | MUST-HAVE | Planned | [cfn-resources.md](cfn-resources.md) | No |
-| 8 | Target Groups (tg) | Target Health | MUST-HAVE | Planned | [tg-health.md](tg-health.md) | No |
+| 8 | Target Groups (tg) | Target Health | MUST-HAVE | Implemented | [tg-health.md](tg-health.md) | No |
 | 9 | ASG (asg) | Scaling Activities | MUST-HAVE | Planned | [asg-activities.md](asg-activities.md) | No |
 | 10 | Load Balancers (elb) | Listeners | MUST-HAVE | Planned | [elb-listeners.md](elb-listeners.md) | Yes: Rules (level 2) |
 | 11 | CW Alarms (alarm) | Alarm History | SHOULD-HAVE | Planned | [alarm-history.md](alarm-history.md) | No |
