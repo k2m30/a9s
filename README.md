@@ -21,6 +21,17 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 **Try without AWS.** Run `a9s --demo` to explore the full UI with synthetic data — no AWS account needed.
 
+## Why a9s?
+
+Instead of clicking through the AWS Console or chaining CLI commands, answer these in seconds:
+
+- **"Why is this target unhealthy?"** — drill from Load Balancer → Target Group → Target Health
+- **"Is my deployment stuck?"** — ECS service events, tasks, and container logs in one flow
+- **"What's running in this account?"** — browse all resources across 12 service categories
+- **"Which security groups are wide open?"** — scan rules, spot `0.0.0.0/0` instantly
+- **"What happened overnight?"** — CloudWatch alarms and log streams at a glance
+- **"What changed in this stack?"** — CFN stack events and resources without leaving the terminal
+
 ## Features
 
 - **62 AWS resource types** across 12 service categories
