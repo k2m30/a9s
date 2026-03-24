@@ -4,6 +4,13 @@
 brew install k2m30/a9s/a9s
 ```
 
+### Scoop (Windows)
+
+```powershell
+scoop bucket add a9s https://github.com/k2m30/scoop-a9s.git
+scoop install a9s
+```
+
 ### Go install
 
 ```sh
@@ -18,6 +25,8 @@ Available platforms:
 - **macOS**: Intel (amd64) and Apple Silicon (arm64)
 - **Linux**: amd64 and arm64
 - **Windows**: amd64 and arm64
+
+> **Windows note:** Downloaded binaries may trigger a Microsoft Defender SmartScreen warning because they are not code-signed. Click "More info" → "Run anyway" to proceed, or install via Scoop to avoid this.
 
 ### Docker
 
