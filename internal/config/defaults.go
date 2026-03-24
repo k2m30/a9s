@@ -1041,6 +1041,36 @@ var defaultViews = ViewsConfig{
 				"Timestamp", "Message", "IngestionTime", "EventId", "LogStreamName",
 			},
 		},
+		"cfn_events": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Logical ID", Path: "LogicalResourceId", Width: 28},
+				{Title: "Type", Path: "ResourceType", Width: 28},
+				{Title: "Status", Key: "resource_status", Width: 24},
+				{Title: "Reason", Key: "resource_status_reason", Width: 40},
+			},
+			Detail: []string{
+				"EventId", "StackId", "StackName", "Timestamp",
+				"LogicalResourceId", "PhysicalResourceId",
+				"ResourceType", "ResourceStatus", "ResourceStatusReason",
+				"ResourceProperties", "ClientRequestToken",
+			},
+		},
+		"cfn_resources": {
+			List: []ListColumn{
+				{Title: "Logical ID", Path: "LogicalResourceId", Width: 28},
+				{Title: "Physical ID", Path: "PhysicalResourceId", Width: 28},
+				{Title: "Type", Path: "ResourceType", Width: 28},
+				{Title: "Status", Key: "resource_status", Width: 24},
+				{Title: "Drift", Key: "drift_status", Width: 12},
+				{Title: "Updated", Key: "last_updated", Width: 22},
+			},
+			Detail: []string{
+				"LogicalResourceId", "PhysicalResourceId",
+				"ResourceType", "ResourceStatus", "ResourceStatusReason",
+				"LastUpdatedTimestamp", "DriftInformation", "ModuleInfo",
+			},
+		},
 	},
 }
 

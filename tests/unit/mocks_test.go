@@ -616,6 +616,56 @@ func (m *mockCFNDescribeStacksClient) DescribeStacks(ctx context.Context, params
 	return m.output, m.err
 }
 
+// mockCFNDescribeStackEventsClient implements awsclient.CFNDescribeStackEventsAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockCFNDescribeStackEventsClient struct {
+	output  *cloudformation.DescribeStackEventsOutput
+	outputs []*cloudformation.DescribeStackEventsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCFNDescribeStackEventsClient) DescribeStackEvents(ctx context.Context, params *cloudformation.DescribeStackEventsInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStackEventsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &cloudformation.DescribeStackEventsOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
+// mockCFNListStackResourcesClient implements awsclient.CFNListStackResourcesAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockCFNListStackResourcesClient struct {
+	output  *cloudformation.ListStackResourcesOutput
+	outputs []*cloudformation.ListStackResourcesOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCFNListStackResourcesClient) ListStackResources(ctx context.Context, params *cloudformation.ListStackResourcesInput, optFns ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &cloudformation.ListStackResourcesOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
 // ---------------------------------------------------------------------------
 // IAM mocks
 // ---------------------------------------------------------------------------

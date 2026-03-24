@@ -824,6 +824,10 @@ var resourceTypes = []ResourceTypeDef{
 			{Key: "last_updated", Title: "Updated", Width: 22, Sortable: true},
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
+		Children: []ChildViewDef{
+			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
+			{ChildType: "cfn_resources", Key: "r", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
+		},
 	},
 	{
 		Name:      "CodePipelines",
@@ -1046,6 +1050,29 @@ func EcsSvcLogColumns() []Column {
 		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
 		{Key: "stream_short", Title: "Stream", Width: 20, Sortable: true},
 		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+	}
+}
+
+// CfnEventColumns returns the column definitions for CloudFormation stack events.
+func CfnEventColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "logical_resource_id", Title: "Logical ID", Width: 28, Sortable: true},
+		{Key: "resource_type", Title: "Type", Width: 28, Sortable: true},
+		{Key: "resource_status", Title: "Status", Width: 24, Sortable: true},
+		{Key: "resource_status_reason", Title: "Reason", Width: 40, Sortable: false},
+	}
+}
+
+// CfnResourceColumns returns the column definitions for CloudFormation stack resources.
+func CfnResourceColumns() []Column {
+	return []Column{
+		{Key: "logical_resource_id", Title: "Logical ID", Width: 28, Sortable: true},
+		{Key: "physical_resource_id", Title: "Physical ID", Width: 28, Sortable: true},
+		{Key: "resource_type", Title: "Type", Width: 28, Sortable: true},
+		{Key: "resource_status", Title: "Status", Width: 24, Sortable: true},
+		{Key: "drift_status", Title: "Drift", Width: 12, Sortable: true},
+		{Key: "last_updated", Title: "Updated", Width: 22, Sortable: true},
 	}
 }
 

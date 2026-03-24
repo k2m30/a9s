@@ -204,6 +204,16 @@ type CFNDescribeStacksAPI interface {
 	DescribeStacks(ctx context.Context, params *cloudformation.DescribeStacksInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStacksOutput, error)
 }
 
+// CFNDescribeStackEventsAPI defines the interface for the CloudFormation DescribeStackEvents operation.
+type CFNDescribeStackEventsAPI interface {
+	DescribeStackEvents(ctx context.Context, params *cloudformation.DescribeStackEventsInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStackEventsOutput, error)
+}
+
+// CFNListStackResourcesAPI defines the interface for the CloudFormation ListStackResources operation.
+type CFNListStackResourcesAPI interface {
+	ListStackResources(ctx context.Context, params *cloudformation.ListStackResourcesInput, optFns ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error)
+}
+
 // IAMListRolesAPI defines the interface for the IAM ListRoles operation.
 type IAMListRolesAPI interface {
 	ListRoles(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error)

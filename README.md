@@ -140,6 +140,7 @@ a9s --version             # print version
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
+| `r` | Open Stack Resources (CFN Stacks) |
 | `w` | Toggle line wrap (in YAML view) |
 | `Tab` | Autocomplete (in command mode) |
 
@@ -174,6 +175,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | ECS Services | Service Events | `e` | Event timeline (steady state, placement failures, deployments) |
 | ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
 | ECS Services | Container Logs | `L` | Application logs from CloudWatch (resolved from task definition) |
+| CFN Stacks | Stack Events | `Enter` | Event timeline showing stack operation progress and status |
+| CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
 
 ## Commands
 

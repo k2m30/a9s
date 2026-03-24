@@ -429,3 +429,112 @@ func TestQA_YAML_EcsSvcLogs_RawContentUncolored(t *testing.T) {
 		t.Error("EcsSvcLogs RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// CFN Stack Events YAML view fixtures
+// ===========================================================================
+
+func fixtureCfnEvents() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-yaml-cfn-001",
+			Name:   "2024-03-22 10:00:00",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"timestamp":              "2024-03-22 10:00:00",
+				"logical_resource_id":    "MyBucket",
+				"resource_type":          "AWS::S3::Bucket",
+				"resource_status":        "CREATE_COMPLETE",
+				"resource_status_reason": "Resource creation complete",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// CFN Stack Events YAML tests
+// ===========================================================================
+
+func TestQA_YAML_CfnEvents_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureCfnEvents() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("CfnEvents YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("CfnEvents YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_CfnEvents_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureCfnEvents()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CfnEvents FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_CfnEvents_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureCfnEvents()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("CfnEvents RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// CFN Stack Resources YAML view fixtures
+// ===========================================================================
+
+func fixtureCfnResources() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "MyBucket",
+			Name:   "MyBucket",
+			Status: "CREATE_COMPLETE",
+			Fields: map[string]string{
+				"logical_resource_id":  "MyBucket",
+				"physical_resource_id": "my-stack-mybucket-abc123",
+				"resource_type":        "AWS::S3::Bucket",
+				"resource_status":      "CREATE_COMPLETE",
+				"drift_status":         "IN_SYNC",
+				"last_updated":         "2024-03-22 10:00:00",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// CFN Stack Resources YAML tests
+// ===========================================================================
+
+func TestQA_YAML_CfnResources_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureCfnResources() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("CfnResources YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("CfnResources YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_CfnResources_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureCfnResources()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CfnResources FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_CfnResources_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureCfnResources()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("CfnResources RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
