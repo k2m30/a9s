@@ -159,9 +159,104 @@ func TestQA_ListRawStruct_TargetHealth(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestLambdaInvocationsListRawStruct: verify list rendering with FilteredLogEvent RawStruct
+// ===========================================================================
+
+func TestLambdaInvocationsListRawStruct(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("lambda_invocations")
+	if typeDef == nil {
+		t.Fatal("lambda_invocations child resource type not registered")
+	}
+
+	cfg := configForType("lambda_invocations")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711065600000),
+		Message:       ptrString("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
+		IngestionTime: ptrInt64(1711065601000),
+		EventId:       ptrString("evt-001"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "12345678-1234-1234-1234-123456789012",
+			Name:   "12345678-1234-1234-1234-123456789012",
+			Status: "OK",
+			Fields: map[string]string{
+				"request_id":  "12345678-1234-1234-1234-123456789012",
+				"timestamp":   "2024-03-22 00:00",
+				"status":      "OK",
+				"duration_ms": "2103 ms",
+				"memory_used": "128/256 MB",
+				"cold_start":  "no",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "12345678") {
+		t.Errorf("lambda_invocations list should contain request ID, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestLambdaInvocationLogsListRawStruct: verify list rendering with FilteredLogEvent RawStruct
+// ===========================================================================
+
+func TestLambdaInvocationLogsListRawStruct(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("lambda_invocation_logs")
+	if typeDef == nil {
+		t.Fatal("lambda_invocation_logs child resource type not registered")
+	}
+
+	cfg := configForType("lambda_invocation_logs")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711065600000),
+		Message:       ptrString("INFO Processing request for user abc-123"),
+		IngestionTime: ptrInt64(1711065600500),
+		EventId:       ptrString("log-002"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "log-002",
+			Name:   "INFO Processing request for user abc-123",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 00:00",
+				"message":   "INFO Processing request for user abc-123",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "Processing request") {
+		t.Errorf("lambda_invocation_logs list should contain log message, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
-	_ cwlogstypes.LogStream      = cwlogstypes.LogStream{}
-	_ cwlogstypes.OutputLogEvent = cwlogstypes.OutputLogEvent{}
+	_ cwlogstypes.LogStream        = cwlogstypes.LogStream{}
+	_ cwlogstypes.OutputLogEvent   = cwlogstypes.OutputLogEvent{}
+	_ cwlogstypes.FilteredLogEvent = cwlogstypes.FilteredLogEvent{}
 	_ elbtypes.TargetHealthDescription = elbtypes.TargetHealthDescription{}
 )

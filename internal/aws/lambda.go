@@ -17,7 +17,7 @@ func init() {
 		}
 		return FetchLambdaFunctions(ctx, c.Lambda)
 	})
-	resource.RegisterFieldKeys("lambda", []string{"function_name", "runtime", "memory", "timeout", "handler", "last_modified", "code_size"})
+	resource.RegisterFieldKeys("lambda", []string{"function_name", "runtime", "memory", "timeout", "handler", "last_modified", "code_size", "log_group", "package_type"})
 }
 
 // FetchLambdaFunctions calls the Lambda ListFunctions API and converts the
@@ -63,6 +63,13 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 			codeSize = formatBytes(fn.CodeSize)
 		}
 
+		logGroup := "/aws/lambda/" + functionName
+		if fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {
+			logGroup = *fn.LoggingConfig.LogGroup
+		}
+
+		packageType := string(fn.PackageType)
+
 		r := resource.Resource{
 			ID:     functionName,
 			Name:   functionName,
@@ -75,8 +82,10 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 				"handler":       handler,
 				"last_modified": lastModified,
 				"code_size":     codeSize,
+				"log_group":     logGroup,
+				"package_type":  packageType,
 			},
-			RawStruct:  fn,
+			RawStruct: fn,
 		}
 
 		resources = append(resources, r)

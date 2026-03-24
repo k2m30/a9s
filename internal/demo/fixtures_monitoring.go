@@ -20,6 +20,12 @@ func init() {
 	RegisterChildDemo("log_events", func(parentCtx map[string]string) []resource.Resource {
 		return logEventFixtures(parentCtx["log_group_name"], parentCtx["log_stream_name"])
 	})
+	RegisterChildDemo("lambda_invocations", func(parentCtx map[string]string) []resource.Resource {
+		return lambdaInvocationFixtures(parentCtx["function_name"])
+	})
+	RegisterChildDemo("lambda_invocation_logs", func(parentCtx map[string]string) []resource.Resource {
+		return lambdaInvocationLogFixtures(parentCtx["log_group"], parentCtx["request_id"])
+	})
 }
 
 // cloudwatchAlarmFixtures returns demo CloudWatch alarm fixtures.
@@ -492,6 +498,106 @@ func cloudtrailFixtures() []resource.Resource {
 				HasCustomEventSelectors:    aws.Bool(false),
 				HasInsightSelectors:        aws.Bool(true),
 				CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			},
+		},
+	}
+}
+
+// lambdaInvocationFixtures returns demo Lambda invocation fixtures.
+func lambdaInvocationFixtures(_ string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Name:   "a1b2c3d4",
+			Status: "OK",
+			Fields: map[string]string{
+				"request_id":       "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+				"timestamp":        "2024-03-22 00:00",
+				"status":           "OK",
+				"duration_ms":      "523 ms",
+				"billed_duration_ms": "600 ms",
+				"memory_size_mb":   "256",
+				"memory_used_mb":   "128",
+				"memory_used":      "128/256 MB",
+				"init_duration_ms": "",
+				"cold_start":       "no",
+				"xray_trace_id":    "",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp: aws.Int64(1711065600000),
+				Message:   aws.String("REPORT RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890\tDuration: 523.00 ms\tBilled Duration: 600 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
+				EventId:   aws.String("evt-demo-001"),
+			},
+		},
+		{
+			ID:     "bbbbbbbb-1111-2222-3333-444444444444",
+			Name:   "bbbbbbbb",
+			Status: "OK",
+			Fields: map[string]string{
+				"request_id":       "bbbbbbbb-1111-2222-3333-444444444444",
+				"timestamp":        "2024-03-22 00:05",
+				"status":           "OK",
+				"duration_ms":      "1250 ms",
+				"billed_duration_ms": "1300 ms",
+				"memory_size_mb":   "256",
+				"memory_used_mb":   "200",
+				"memory_used":      "200/256 MB",
+				"init_duration_ms": "350 ms",
+				"cold_start":       "yes",
+				"xray_trace_id":    "",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp: aws.Int64(1711065900000),
+				Message:   aws.String("REPORT RequestId: bbbbbbbb-1111-2222-3333-444444444444\tDuration: 1250.00 ms\tBilled Duration: 1300 ms\tMemory Size: 256 MB\tMax Memory Used: 200 MB\tInit Duration: 350.00 ms\t"),
+				EventId:   aws.String("evt-demo-002"),
+			},
+		},
+	}
+}
+
+// lambdaInvocationLogFixtures returns demo Lambda invocation log fixtures.
+func lambdaInvocationLogFixtures(_, _ string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "log-demo-001",
+			Name:   "START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST",
+			Status: "META",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 00:00",
+				"message":   "START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp: aws.Int64(1711065600000),
+				Message:   aws.String("START RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890 Version: $LATEST"),
+				EventId:   aws.String("log-demo-001"),
+			},
+		},
+		{
+			ID:     "log-demo-002",
+			Name:   "INFO Processing request for user abc-123",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 00:00",
+				"message":   "INFO Processing request for user abc-123",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp: aws.Int64(1711065601000),
+				Message:   aws.String("INFO Processing request for user abc-123"),
+				EventId:   aws.String("log-demo-002"),
+			},
+		},
+		{
+			ID:     "log-demo-003",
+			Name:   "END RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Status: "META",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 00:00",
+				"message":   "END RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp: aws.Int64(1711065602000),
+				Message:   aws.String("END RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
+				EventId:   aws.String("log-demo-003"),
 			},
 		},
 	}

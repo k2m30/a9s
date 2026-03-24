@@ -165,3 +165,109 @@ func TestQA_YAML_TargetHealth_RawContentUncolored(t *testing.T) {
 		t.Error("TargetHealth RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// Lambda Invocations YAML view fixtures
+// ===========================================================================
+
+func fixtureLambdaInvocations() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "12345678-1234-1234-1234-123456789012",
+			Name:   "12345678-1234-1234-1234-123456789012",
+			Status: "OK",
+			Fields: map[string]string{
+				"request_id":  "12345678-1234-1234-1234-123456789012",
+				"timestamp":   "2024-03-22 00:00",
+				"status":      "OK",
+				"duration_ms": "2103 ms",
+				"memory_used": "128/256 MB",
+				"cold_start":  "no",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Lambda Invocations YAML tests
+// ===========================================================================
+
+func TestLambdaInvocationsYAMLViewContains(t *testing.T) {
+	for _, r := range fixtureLambdaInvocations() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("LambdaInvocations YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("LambdaInvocations YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestLambdaInvocationsYAMLFrameTitle(t *testing.T) {
+	m := yamlModel(fixtureLambdaInvocations()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LambdaInvocations FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestLambdaInvocationsYAMLNoANSI(t *testing.T) {
+	m := yamlModel(fixtureLambdaInvocations()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("LambdaInvocations RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// Lambda Invocation Logs YAML view fixtures
+// ===========================================================================
+
+func fixtureLambdaInvocationLogs() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "log-001",
+			Name:   "INFO Processing request for user abc-123",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 00:00",
+				"message":   "INFO Processing request for user abc-123",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Lambda Invocation Logs YAML tests
+// ===========================================================================
+
+func TestLambdaInvocationLogsYAMLViewContains(t *testing.T) {
+	for _, r := range fixtureLambdaInvocationLogs() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("LambdaInvocationLogs YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("LambdaInvocationLogs YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestLambdaInvocationLogsYAMLFrameTitle(t *testing.T) {
+	m := yamlModel(fixtureLambdaInvocationLogs()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("LambdaInvocationLogs FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestLambdaInvocationLogsYAMLNoANSI(t *testing.T) {
+	m := yamlModel(fixtureLambdaInvocationLogs()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("LambdaInvocationLogs RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
