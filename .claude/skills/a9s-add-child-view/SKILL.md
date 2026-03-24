@@ -136,9 +136,9 @@ type {InterfaceName} interface {
 - List columns: use `Key:` for computed fields, `Path:` only for string SDK fields
 - Detail paths: include all relevant fields
 
-**6. Views config:** `.a9s/views.yaml` (ADD)
-- Mirror defaults.go but in YAML format
-- Use `key:` for computed fields, `path:` for string SDK fields
+**6. Views config:** `.a9s/views.yaml` (REGENERATE)
+- Run: `go run ./cmd/viewsgen/ > .a9s/views.yaml`
+- This auto-generates from defaults.go — do NOT edit views.yaml manually
 
 **7. Refgen:** `cmd/refgen/main.go` (APPEND if SDK struct)
 
@@ -152,7 +152,8 @@ type {InterfaceName} interface {
 go test ./tests/unit/ -count=1 -timeout 120s
 golangci-lint run ./...
 go build -o a9s ./cmd/a9s/
-go run ./cmd/refgen/ > .a9s/views_reference.yaml  # if SDK struct added
+go run ./cmd/viewsgen/ > .a9s/views.yaml           # always — regenerate from defaults
+go run ./cmd/refgen/ > .a9s/views_reference.yaml    # if SDK struct added to refgen
 ```
 
 ## Pattern Variants

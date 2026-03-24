@@ -39,6 +39,7 @@ specs/           # feature specifications
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
 - `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
+- `go run ./cmd/viewsgen/ > .a9s/views.yaml` — regenerate views.yaml from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
 
@@ -97,6 +98,39 @@ Adding a new child view requires NO changes to `app.go`, `messages.go`, or `reso
 Key registries: `resource.RegisterChildType()`, `resource.RegisterChildFetcher()`, `demo.RegisterChildDemo()`.
 
 ContextKeys resolution: `"ID"` → Resource.ID, `"Name"` → Resource.Name, `"@parent.x"` → inherited from parent context, else → Resource.Fields[key].
+
+## Agent File Access Rules
+
+Agents MUST use targeted file access — never broad globs on large directories.
+
+### DO
+- `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
+- `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
+- `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
+- `Grep("RegisterChildDemo.*{child_type}", "internal/demo/")` — find a specific fixture
+- `Grep("func Test.*{Resource}", "tests/unit/qa_detail_child_views_test.go")` — find append point
+
+### DON'T
+- `Glob("tests/unit/*.go")` — returns 148 files, most irrelevant
+- `Glob("internal/aws/*.go")` — returns 77 files, most irrelevant
+- `Glob("internal/demo/*.go")` — read only the category file you need
+- Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
+
+### Demo fixture file map (`internal/demo/`)
+| File | Resource types |
+|------|---------------|
+| `fixtures_compute.go` | EC2, ECS, Lambda, ASG, EB + ECS child views |
+| `fixtures_databases.go` | RDS, Redis, DynamoDB, DocDB |
+| `fixtures_networking.go` | ELB, TG, VPC, SG, Subnets, NAT, IGW, EIP, ENI |
+| `fixtures_security.go` | IAM Roles, Policies, Users, Groups, WAF |
+| `fixtures_secrets.go` | Secrets Manager, SSM, KMS |
+| `fixtures_dns_cdn.go` | R53, CloudFront, ACM, API GW |
+| `fixtures_cicd.go` | CFN, CodeBuild, CodePipeline, ECR, CodeArtifact |
+| `fixtures_monitoring.go` | CW Alarms, Log Groups, CloudTrail + Log child views |
+| `fixtures_messaging.go` | SQS, SNS, EventBridge, Kinesis, SFN, MSK |
+| `fixtures_data.go` | Glue, Athena, OpenSearch, Redshift |
+| `fixtures_containers.go` | EKS, Node Groups |
+| `fixtures_backup.go` | Backup, SES, EFS |
 
 ## Rules
 
