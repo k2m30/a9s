@@ -127,6 +127,19 @@ func computeDefaultViews() map[string]ViewDef {
 				"EnvironmentArn",
 			},
 		},
+		"asg_activities": {
+			List: []ListColumn{
+				{Title: "Start Time", Key: "start_time", Width: 22},
+				{Title: "Status", Key: "status_code", Width: 14},
+				{Title: "Description", Key: "description", Width: 50},
+				{Title: "Cause", Key: "cause", Width: 40},
+			},
+			Detail: []string{
+				"ActivityId", "StartTime", "EndTime", "StatusCode", "StatusMessage",
+				"Description", "Cause", "Details", "Progress",
+				"AutoScalingGroupName", "AutoScalingGroupARN", "AutoScalingGroupState",
+			},
+		},
 		// Child views for compute resources
 		"ecs_tasks": {
 			List: []ListColumn{

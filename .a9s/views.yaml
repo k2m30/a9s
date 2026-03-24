@@ -77,6 +77,20 @@ views:
       - InsufficientDataActions
       - ActionsEnabled
 
+  alarm_history:
+    list:
+      Timestamp:
+        key: timestamp
+        width: 22
+      Type:
+        key: history_item_type
+        width: 18
+      Summary:
+        key: history_summary
+        width: 60
+    detail:
+      [Timestamp, HistoryItemType, HistorySummary, HistoryData, AlarmName, AlarmType]
+
   apigw:
     list:
       API ID:
@@ -143,6 +157,34 @@ views:
       - VPCZoneIdentifier
       - CreatedTime
       - Tags
+
+  asg_activities:
+    list:
+      Start Time:
+        key: start_time
+        width: 22
+      Status:
+        key: status_code
+        width: 14
+      Description:
+        key: description
+        width: 50
+      Cause:
+        key: cause
+        width: 40
+    detail:
+      - ActivityId
+      - StartTime
+      - EndTime
+      - StatusCode
+      - StatusMessage
+      - Description
+      - Cause
+      - Details
+      - Progress
+      - AutoScalingGroupName
+      - AutoScalingGroupARN
+      - AutoScalingGroupState
 
   athena:
     list:

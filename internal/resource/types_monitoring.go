@@ -14,6 +14,12 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "namespace", Title: "Namespace", Width: 24, Sortable: true},
 				{Key: "threshold", Title: "Threshold", Width: 12, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "alarm_history",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"alarm_name": "alarm_name"},
+				DisplayNameKey: "alarm_name",
+			}},
 		},
 		{
 			Name:      "CloudWatch Log Groups",

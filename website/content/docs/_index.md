@@ -30,6 +30,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | ECS Services | Container Logs | `L` | Application logs from CloudWatch (resolved from task definition) |
 | CFN Stacks | Stack Events | `Enter` | Event timeline showing stack operation progress and status |
 | CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
+| Auto Scaling Groups | Scaling Activities | `Enter` | Scaling activity history with status, description, cause |
+| CloudWatch Alarms | Alarm History | `Enter` | State transitions, configuration updates, and action events |
 
 ## Commands
 

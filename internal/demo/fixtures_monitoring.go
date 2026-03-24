@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -17,6 +19,9 @@ func init() {
 	})
 	RegisterChildDemo("log_events", func(parentCtx map[string]string) []resource.Resource {
 		return logEventFixtures(parentCtx["log_group_name"], parentCtx["log_stream_name"])
+	})
+	RegisterChildDemo("alarm_history", func(parentCtx map[string]string) []resource.Resource {
+		return alarmHistoryFixtures(parentCtx["alarm_name"])
 	})
 	RegisterChildDemo("lambda_invocations", func(parentCtx map[string]string) []resource.Resource {
 		return lambdaInvocationFixtures(parentCtx["function_name"])
@@ -263,6 +268,107 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 				Arn:          aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
 				StoredBytes:  aws.Int64(10737418240),
 				CreationTime: aws.Int64(1688169600000),
+			},
+		},
+	}
+}
+
+// alarmHistoryFixtures returns demo alarm history fixtures for any alarm.
+func alarmHistoryFixtures(_ string) []resource.Resource {
+	ts1 := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	ts2 := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
+	ts3 := time.Date(2024, 3, 22, 10, 5, 1, 0, time.UTC)
+	ts4 := time.Date(2024, 3, 21, 14, 30, 0, 0, time.UTC)
+	ts5 := time.Date(2024, 3, 20, 8, 0, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00:00",
+			Status: "StateUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:00:00",
+				"history_item_type": "StateUpdate",
+				"history_summary":   "Alarm updated from OK to ALARM",
+			},
+			RawStruct: cwtypes.AlarmHistoryItem{
+				AlarmName:       aws.String("api-high-error-rate"),
+				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+				HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+				HistorySummary:  aws.String("Alarm updated from OK to ALARM"),
+				HistoryData:     aws.String(`{"version":"1.0","oldState":{"stateValue":"OK"},"newState":{"stateValue":"ALARM"}}`),
+				Timestamp:       &ts1,
+			},
+		},
+		{
+			ID:     "2024-03-22 10:05:00",
+			Name:   "2024-03-22 10:05:00",
+			Status: "StateUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:05:00",
+				"history_item_type": "StateUpdate",
+				"history_summary":   "Alarm updated from ALARM to OK",
+			},
+			RawStruct: cwtypes.AlarmHistoryItem{
+				AlarmName:       aws.String("api-high-error-rate"),
+				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+				HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+				HistorySummary:  aws.String("Alarm updated from ALARM to OK"),
+				HistoryData:     aws.String(`{"version":"1.0","oldState":{"stateValue":"ALARM"},"newState":{"stateValue":"OK"}}`),
+				Timestamp:       &ts2,
+			},
+		},
+		{
+			ID:     "2024-03-22 10:05:01",
+			Name:   "2024-03-22 10:05:01",
+			Status: "Action",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:05:01",
+				"history_item_type": "Action",
+				"history_summary":   "Published notification to arn:aws:sns:us-east-1:123456789012:ops-alerts",
+			},
+			RawStruct: cwtypes.AlarmHistoryItem{
+				AlarmName:       aws.String("api-high-error-rate"),
+				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+				HistoryItemType: cwtypes.HistoryItemTypeAction,
+				HistorySummary:  aws.String("Published notification to arn:aws:sns:us-east-1:123456789012:ops-alerts"),
+				Timestamp:       &ts3,
+			},
+		},
+		{
+			ID:     "2024-03-21 14:30:00",
+			Name:   "2024-03-21 14:30:00",
+			Status: "ConfigurationUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-21 14:30:00",
+				"history_item_type": "ConfigurationUpdate",
+				"history_summary":   "Alarm threshold changed from 10.0 to 5.0",
+			},
+			RawStruct: cwtypes.AlarmHistoryItem{
+				AlarmName:       aws.String("api-high-error-rate"),
+				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+				HistoryItemType: cwtypes.HistoryItemTypeConfigurationUpdate,
+				HistorySummary:  aws.String("Alarm threshold changed from 10.0 to 5.0"),
+				HistoryData:     aws.String(`{"version":"1.0","type":"Update","updatedAlarm":{"threshold":5.0}}`),
+				Timestamp:       &ts4,
+			},
+		},
+		{
+			ID:     "2024-03-20 08:00:00",
+			Name:   "2024-03-20 08:00:00",
+			Status: "StateUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-20 08:00:00",
+				"history_item_type": "StateUpdate",
+				"history_summary":   "Alarm updated from INSUFFICIENT_DATA to OK",
+			},
+			RawStruct: cwtypes.AlarmHistoryItem{
+				AlarmName:       aws.String("api-high-error-rate"),
+				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
+				HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+				HistorySummary:  aws.String("Alarm updated from INSUFFICIENT_DATA to OK"),
+				HistoryData:     aws.String(`{"version":"1.0","oldState":{"stateValue":"INSUFFICIENT_DATA"},"newState":{"stateValue":"OK"}}`),
+				Timestamp:       &ts5,
 			},
 		},
 	}

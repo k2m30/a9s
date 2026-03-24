@@ -114,6 +114,9 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			},
+			Children: []ChildViewDef{
+				{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
+			},
 		},
 		{
 			Name:      "Elastic Beanstalk",

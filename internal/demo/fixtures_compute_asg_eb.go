@@ -16,6 +16,9 @@ func init() {
 	demoData["asg"] = asgFixtures
 	demoData["eb"] = ebFixtures
 
+	RegisterChildDemo("asg_activities", func(parentCtx map[string]string) []resource.Resource {
+		return asgActivityFixtures(parentCtx["asg_name"])
+	})
 	RegisterChildDemo("ecs_svc_events", func(parentCtx map[string]string) []resource.Resource {
 		return ecsSvcEventFixtures(parentCtx["service_name"])
 	})
@@ -179,6 +182,114 @@ func asgFixtures() []resource.Resource {
 					{Key: aws.String("Name"), Value: aws.String("eks-acme-prod-ng-general"), ResourceId: aws.String("eks-acme-prod-ng-general"), ResourceType: aws.String("auto-scaling-group"), PropagateAtLaunch: aws.Bool(true)},
 					{Key: aws.String("kubernetes.io/cluster/acme-prod"), Value: aws.String("owned"), ResourceId: aws.String("eks-acme-prod-ng-general"), ResourceType: aws.String("auto-scaling-group"), PropagateAtLaunch: aws.Bool(true)},
 				},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ASG Scaling Activities (child of Auto Scaling Groups)
+// ---------------------------------------------------------------------------
+
+// asgActivityFixtures returns demo ASG scaling activity fixtures.
+func asgActivityFixtures(asgName string) []resource.Resource {
+	ts1 := time.Date(2026, 3, 22, 10, 0, 0, 0, time.UTC)
+	end1 := time.Date(2026, 3, 22, 10, 2, 0, 0, time.UTC)
+	ts2 := time.Date(2026, 3, 22, 9, 30, 0, 0, time.UTC)
+	end2 := time.Date(2026, 3, 22, 9, 32, 0, 0, time.UTC)
+	ts3 := time.Date(2026, 3, 22, 8, 15, 0, 0, time.UTC)
+	end3 := time.Date(2026, 3, 22, 8, 16, 0, 0, time.UTC)
+	ts4 := time.Date(2026, 3, 22, 7, 45, 0, 0, time.UTC)
+	progress100 := int32(100)
+	progress50 := int32(50)
+
+	return []resource.Resource{
+		{
+			ID:     "act-demo-001",
+			Name:   "2026-03-22 10:00:00",
+			Status: "Successful",
+			Fields: map[string]string{
+				"start_time":  "2026-03-22 10:00:00",
+				"status_code": "Successful",
+				"description": "Launching a new EC2 instance: i-0abc1234def56789a",
+				"cause":       "At 2026-03-22T10:00:00Z a monitor alarm TargetTracking-" + asgName + "-AlarmHigh was in state ALARM",
+			},
+			RawStruct: asgtypes.Activity{
+				ActivityId:           aws.String("act-demo-001"),
+				AutoScalingGroupName: aws.String(asgName),
+				AutoScalingGroupARN:  aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/" + asgName),
+				Cause:                aws.String("At 2026-03-22T10:00:00Z a monitor alarm TargetTracking-" + asgName + "-AlarmHigh was in state ALARM"),
+				Description:          aws.String("Launching a new EC2 instance: i-0abc1234def56789a"),
+				StartTime:            &ts1,
+				EndTime:              &end1,
+				StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+				StatusMessage:        aws.String(""),
+				Progress:             &progress100,
+			},
+		},
+		{
+			ID:     "act-demo-002",
+			Name:   "2026-03-22 09:30:00",
+			Status: "Successful",
+			Fields: map[string]string{
+				"start_time":  "2026-03-22 09:30:00",
+				"status_code": "Successful",
+				"description": "Terminating EC2 instance: i-0fed9876cba54321b",
+				"cause":       "At 2026-03-22T09:30:00Z a monitor alarm TargetTracking-" + asgName + "-AlarmLow was in state ALARM",
+			},
+			RawStruct: asgtypes.Activity{
+				ActivityId:           aws.String("act-demo-002"),
+				AutoScalingGroupName: aws.String(asgName),
+				AutoScalingGroupARN:  aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/" + asgName),
+				Cause:                aws.String("At 2026-03-22T09:30:00Z a monitor alarm TargetTracking-" + asgName + "-AlarmLow was in state ALARM"),
+				Description:          aws.String("Terminating EC2 instance: i-0fed9876cba54321b"),
+				StartTime:            &ts2,
+				EndTime:              &end2,
+				StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+				StatusMessage:        aws.String(""),
+				Progress:             &progress100,
+			},
+		},
+		{
+			ID:     "act-demo-003",
+			Name:   "2026-03-22 08:15:00",
+			Status: "Failed",
+			Fields: map[string]string{
+				"start_time":  "2026-03-22 08:15:00",
+				"status_code": "Failed",
+				"description": "Launching a new EC2 instance. Status Reason: Your request for accessing resources in this region is being validated.",
+				"cause":       "At 2026-03-22T08:15:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 4.",
+			},
+			RawStruct: asgtypes.Activity{
+				ActivityId:           aws.String("act-demo-003"),
+				AutoScalingGroupName: aws.String(asgName),
+				Cause:                aws.String("At 2026-03-22T08:15:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 4."),
+				Description:          aws.String("Launching a new EC2 instance. Status Reason: Your request for accessing resources in this region is being validated."),
+				StartTime:            &ts3,
+				EndTime:              &end3,
+				StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
+				StatusMessage:        aws.String("Your request for accessing resources in this region is being validated."),
+				Progress:             &progress100,
+			},
+		},
+		{
+			ID:     "act-demo-004",
+			Name:   "2026-03-22 07:45:00",
+			Status: "InProgress",
+			Fields: map[string]string{
+				"start_time":  "2026-03-22 07:45:00",
+				"status_code": "InProgress",
+				"description": "Launching a new EC2 instance: i-0new1234launch567",
+				"cause":       "At 2026-03-22T07:45:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 4.",
+			},
+			RawStruct: asgtypes.Activity{
+				ActivityId:           aws.String("act-demo-004"),
+				AutoScalingGroupName: aws.String(asgName),
+				Cause:                aws.String("At 2026-03-22T07:45:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 4."),
+				Description:          aws.String("Launching a new EC2 instance: i-0new1234launch567"),
+				StartTime:            &ts4,
+				StatusCode:           asgtypes.ScalingActivityStatusCodeInProgress,
+				Progress:             &progress50,
 			},
 		},
 	}
