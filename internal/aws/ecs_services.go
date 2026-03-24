@@ -18,7 +18,7 @@ func init() {
 		}
 		return FetchECSServices(ctx, c.ECS, c.ECS, c.ECS)
 	})
-	resource.RegisterFieldKeys("ecs-svc", []string{"service_name", "cluster", "status", "desired_count", "running_count", "launch_type"})
+	resource.RegisterFieldKeys("ecs-svc", []string{"service_name", "cluster", "status", "desired_count", "running_count", "launch_type", "task_definition"})
 }
 
 // FetchECSServices performs a three-step fetch:
@@ -78,19 +78,25 @@ func FetchECSServices(
 			runningCount := fmt.Sprintf("%d", svc.RunningCount)
 			launchType := string(svc.LaunchType)
 
+			taskDefinition := ""
+			if svc.TaskDefinition != nil {
+				taskDefinition = *svc.TaskDefinition
+			}
+
 			r := resource.Resource{
 				ID:     serviceName,
 				Name:   serviceName,
 				Status: status,
 				Fields: map[string]string{
-					"service_name":  serviceName,
-					"cluster":       clusterName,
-					"status":        status,
-					"desired_count": desiredCount,
-					"running_count": runningCount,
-					"launch_type":   launchType,
+					"service_name":    serviceName,
+					"cluster":         clusterName,
+					"status":          status,
+					"desired_count":   desiredCount,
+					"running_count":   runningCount,
+					"launch_type":     launchType,
+					"task_definition": taskDefinition,
 				},
-				RawStruct:  svc,
+				RawStruct: svc,
 			}
 
 			resources = append(resources, r)

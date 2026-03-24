@@ -1005,6 +1005,42 @@ var defaultViews = ViewsConfig{
 				"timestamp", "message",
 			},
 		},
+		"ecs_svc_events": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Message", Key: "message", Width: 120},
+			},
+			Detail: []string{
+				"Id", "CreatedAt", "Message",
+			},
+		},
+		"ecs_tasks": {
+			List: []ListColumn{
+				{Title: "Task ID", Key: "task_id_short", Width: 14},
+				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Health", Key: "health", Width: 10},
+				{Title: "Task Definition", Key: "task_def_short", Width: 28},
+				{Title: "Started At", Key: "started_at", Width: 22},
+				{Title: "Stopped Reason", Key: "stopped_reason", Width: 40},
+			},
+			Detail: []string{
+				"TaskArn", "ClusterArn", "LastStatus", "DesiredStatus",
+				"HealthStatus", "TaskDefinitionArn", "StartedAt", "StoppedAt",
+				"StoppedReason", "StopCode", "LaunchType", "PlatformVersion",
+				"Cpu", "Memory", "Group", "StartedBy",
+				"Containers", "Attachments", "Tags",
+			},
+		},
+		"ecs_svc_logs": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Stream", Key: "stream_short", Width: 20},
+				{Title: "Message", Key: "message", Width: 120},
+			},
+			Detail: []string{
+				"Timestamp", "Message", "IngestionTime", "EventId", "LogStreamName",
+			},
+		},
 	},
 }
 

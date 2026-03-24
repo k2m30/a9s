@@ -3,8 +3,10 @@ package unit_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -253,10 +255,156 @@ func TestLambdaInvocationLogsListRawStruct(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_EcsSvcEvents: verify list rendering with ServiceEvent RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_EcsSvcEvents(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("ecs_svc_events")
+	if typeDef == nil {
+		t.Fatal("ecs_svc_events child resource type not registered")
+	}
+
+	cfg := configForType("ecs_svc_events")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	ev := ecstypes.ServiceEvent{
+		Id:        ptrString("evt-list-001"),
+		CreatedAt: &ts,
+		Message:   ptrString("(service web-service) has reached a steady state."),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "evt-list-001",
+			Name:   "(service web-service) has reached a steady state.",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 10:00",
+				"message":   "(service web-service) has reached a steady state.",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "steady state") {
+		t.Errorf("ecs_svc_events list should contain event message, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_EcsSvcTasks: verify list rendering with Task RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_EcsSvcTasks(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("ecs_tasks")
+	if typeDef == nil {
+		t.Fatal("ecs_tasks child resource type not registered")
+	}
+
+	cfg := configForType("ecs_tasks")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	task := ecstypes.Task{
+		TaskArn:           ptrString("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+		LastStatus:        ptrString("RUNNING"),
+		DesiredStatus:     ptrString("RUNNING"),
+		HealthStatus:      ecstypes.HealthStatusHealthy,
+		TaskDefinitionArn: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
+		StartedAt:         &startedAt,
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "abc123def456",
+			Name:   "abc123def456",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"task_id_short":  "abc123def456",
+				"status":         "RUNNING",
+				"health":         "HEALTHY",
+				"task_def_short": "web-app:5",
+				"started_at":     "2024-03-22 10:00",
+				"stopped_reason": "",
+			},
+			RawStruct: task,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "abc123def456") {
+		t.Errorf("ecs_tasks list should contain task ID, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_EcsSvcLogs: verify list rendering with FilteredLogEvent RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_EcsSvcLogs(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("ecs_svc_logs")
+	if typeDef == nil {
+		t.Fatal("ecs_svc_logs child resource type not registered")
+	}
+
+	cfg := configForType("ecs_svc_logs")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711036800000),
+		Message:       ptrString("INFO Starting application server on port 8080"),
+		IngestionTime: ptrInt64(1711036801000),
+		LogStreamName: ptrString("ecs/web/abc123def456"),
+		EventId:       ptrString("evt-svc-log-list"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "evt-svc-log-list",
+			Name:   "INFO Starting application server on port 8080",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":    "2024-03-21 16:00",
+				"stream_short": "web/abc123de",
+				"message":      "INFO Starting application server on port 8080",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "Starting application") {
+		t.Errorf("ecs_svc_logs list should contain log message, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
-	_ cwlogstypes.LogStream        = cwlogstypes.LogStream{}
-	_ cwlogstypes.OutputLogEvent   = cwlogstypes.OutputLogEvent{}
-	_ cwlogstypes.FilteredLogEvent = cwlogstypes.FilteredLogEvent{}
+	_ cwlogstypes.LogStream            = cwlogstypes.LogStream{}
+	_ cwlogstypes.OutputLogEvent       = cwlogstypes.OutputLogEvent{}
+	_ cwlogstypes.FilteredLogEvent     = cwlogstypes.FilteredLogEvent{}
 	_ elbtypes.TargetHealthDescription = elbtypes.TargetHealthDescription{}
+	_ ecstypes.ServiceEvent            = ecstypes.ServiceEvent{}
+	_ ecstypes.Task                    = ecstypes.Task{}
 )
