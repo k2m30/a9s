@@ -126,6 +126,8 @@ func main() {
 		{"ecs_svc_events", "ecstypes.ServiceEvent", reflect.TypeOf(ecstypes.ServiceEvent{})},
 		{"ecs_tasks", "ecstypes.Task", reflect.TypeOf(ecstypes.Task{})},
 		{"ecs_svc_logs", "cwlogstypes.FilteredLogEvent", reflect.TypeOf(cwlogstypes.FilteredLogEvent{})},
+		{"cfn_events", "cfntypes.StackEvent", reflect.TypeOf(cfntypes.StackEvent{})},
+		{"cfn_resources", "cfntypes.StackResourceSummary", reflect.TypeOf(cfntypes.StackResourceSummary{})},
 	}
 
 	fmt.Println("# views_reference.yaml")
