@@ -21,21 +21,9 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 **Try without AWS.** Run `a9s --demo` to explore the full UI with synthetic data — no AWS account needed.
 
-## Why a9s?
-
-Instead of clicking through the AWS Console or chaining CLI commands, answer these in seconds:
-
-- **"Why is this target unhealthy?"** — drill from Load Balancer → Target Group → Target Health
-- **"Is my deployment stuck?"** — ECS service events, tasks, and container logs in one flow
-- **"What's running in this account?"** — browse all resources across 12 service categories
-- **"Which security groups are wide open?"** — scan rules, spot `0.0.0.0/0` instantly
-- **"What happened overnight?"** — CloudWatch alarms and log streams at a glance
-- **"What changed in this stack?"** — CFN stack events and resources without leaving the terminal
-
 ## Features
 
 - **62 AWS resource types** across 12 service categories
-- **Child view drill-downs** — press Enter to explore nested resources (ECS → Tasks/Events/Logs, Lambda → Invocations → Log Lines, Log Streams → Log Events, Target Group → Target Health, CFN → Stack Events/Resources, S3 → Objects, R53 → Records)
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
 - Multi-profile and multi-region support
@@ -43,10 +31,9 @@ Instead of clicking through the AWS Console or chaining CLI commands, answer the
 - Column sorting by name, ID, or date
 - Filter/search within resource lists
 - Horizontal scrolling for wide tables
-- Human-readable formatting (timestamps, byte sizes)
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 2,000+ unit tests
+- 1,045+ unit tests
 
 ## Installation
 
@@ -54,6 +41,13 @@ Instead of clicking through the AWS Console or chaining CLI commands, answer the
 
 ```sh
 brew install k2m30/a9s/a9s
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add a9s https://github.com/k2m30/scoop-a9s.git
+scoop install a9s
 ```
 
 ### Go install
@@ -70,6 +64,8 @@ Available platforms:
 - **macOS**: Intel (amd64) and Apple Silicon (arm64)
 - **Linux**: amd64 and arm64
 - **Windows**: amd64 and arm64
+
+> **Windows note:** Downloaded binaries may trigger a Microsoft Defender SmartScreen warning because they are not code-signed. Click "More info" → "Run anyway" to proceed, or install via Scoop to avoid this.
 
 ### Docker
 
@@ -171,25 +167,6 @@ a9s --version             # print version
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
 
-## Child Views (Drill-Downs)
-
-Press `Enter` on a resource to explore its nested children. Press `Esc` to go back.
-
-| Parent | Child View | Key | Description |
-|--------|-----------|-----|-------------|
-| Lambda Functions | Invocations | `Enter` | Recent invocations with status, duration, memory, cold start |
-| Lambda Invocations | Log Lines | `Enter` | Full log output for a specific invocation (START → app logs → END) |
-| S3 Buckets | Objects | `Enter` | Browse bucket contents, drill into folders |
-| Route 53 Zones | DNS Records | `Enter` | View A, CNAME, MX, and other record types |
-| Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
-| Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
-| Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
-| ECS Services | Service Events | `e` | Event timeline (steady state, placement failures, deployments) |
-| ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
-| ECS Services | Container Logs | `L` | Application logs from CloudWatch (resolved from task definition) |
-| CFN Stacks | Stack Events | `Enter` | Event timeline showing stack operation progress and status |
-| CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
-
 ## Commands
 
 Press `:` to enter command mode, then type a command:
@@ -207,14 +184,6 @@ All resource short names work as commands.
 ## Configuration
 
 a9s stores view configuration in `~/.a9s/views.yaml` (optional — sensible defaults are built-in). AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `NO_COLOR` | Set to any value (e.g., `NO_COLOR=1`) to disable all color output. Follows the [no-color.org](https://no-color.org) standard. Useful for accessibility, scripting, or piping output. |
-| `AWS_PROFILE` | Override the active AWS profile (same as `-p` flag). |
-| `AWS_REGION` | Override the active AWS region (same as `-r` flag). |
 
 ## AWS Permissions
 
