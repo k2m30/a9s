@@ -1,11 +1,22 @@
 {{ define "main" }}
-<div class="container" style="padding: 40px 20px 80px;">
-  <h2 style="color: var(--fg-bright); margin-bottom: 24px;">{{ .Title }}</h2>
-  {{ .Content }}
-  {{ range .Pages }}
-  <div style="margin-bottom: 16px;">
-    <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+<div class="container docs-layout" style="padding: 40px 20px 80px;">
+  <aside class="toc">
+    <nav>
+      <strong>On this page</strong>
+      <ul>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#key-bindings">Key Bindings</a></li>
+        <li><a href="#child-views-drill-downs">Child Views</a></li>
+        <li><a href="#commands">Commands</a></li>
+        <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#environment-variables">Environment Variables</a></li>
+        <li><a href="#aws-permissions">AWS Permissions</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <div class="docs-content">
+    <h2 style="color: var(--fg-bright); margin-bottom: 24px;">{{ .Title }}</h2>
+    {{ .Content }}
   </div>
-  {{ end }}
 </div>
 {{ end }}

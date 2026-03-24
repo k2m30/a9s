@@ -1,5 +1,6 @@
 ---
 title: "Resource Types"
+type: resources
 ---
 
 a9s supports **62 AWS resource types** across **12 service categories**. All API calls are read-only.
