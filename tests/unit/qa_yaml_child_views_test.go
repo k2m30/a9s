@@ -538,3 +538,129 @@ func TestQA_YAML_CfnResources_RawContentUncolored(t *testing.T) {
 		t.Error("CfnResources RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// ASG Scaling Activities YAML view fixtures
+// ===========================================================================
+
+func fixtureAsgActivities() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "act-yaml-001",
+			Name:   "2024-03-22 10:00:00",
+			Status: "Successful",
+			Fields: map[string]string{
+				"start_time":  "2024-03-22 10:00:00",
+				"status_code": "Successful",
+				"description": "Launching a new EC2 instance: i-0abc1234",
+				"cause":       "At 2024-03-22T10:00:00Z an instance was started",
+			},
+		},
+		{
+			ID:     "act-yaml-002",
+			Name:   "2024-03-22 10:05:00",
+			Status: "Failed",
+			Fields: map[string]string{
+				"start_time":  "2024-03-22 10:05:00",
+				"status_code": "Failed",
+				"description": "Terminating EC2 instance: i-0def5678",
+				"cause":       "At 2024-03-22T10:05:00Z an instance was terminated due to health check failure",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ASG Scaling Activities YAML tests
+// ===========================================================================
+
+func TestQA_YAML_AsgActivities_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureAsgActivities() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("AsgActivities YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("AsgActivities YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_AsgActivities_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureAsgActivities()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("AsgActivities FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_AsgActivities_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureAsgActivities()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("AsgActivities RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// Alarm History YAML view fixtures
+// ===========================================================================
+
+func fixtureAlarmHistory() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00:00",
+			Status: "StateUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:00:00",
+				"history_item_type": "StateUpdate",
+				"history_summary":   "Alarm updated from OK to ALARM",
+			},
+		},
+		{
+			ID:     "2024-03-22 10:05:00",
+			Name:   "2024-03-22 10:05:00",
+			Status: "ConfigurationUpdate",
+			Fields: map[string]string{
+				"timestamp":         "2024-03-22 10:05:00",
+				"history_item_type": "ConfigurationUpdate",
+				"history_summary":   "Alarm threshold changed from 80 to 90",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Alarm History YAML tests
+// ===========================================================================
+
+func TestQA_YAML_AlarmHistory_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureAlarmHistory() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("AlarmHistory YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("AlarmHistory YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_AlarmHistory_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureAlarmHistory()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("AlarmHistory FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_AlarmHistory_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureAlarmHistory()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("AlarmHistory RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

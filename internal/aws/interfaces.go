@@ -481,3 +481,13 @@ type ECSDescribeTaskDefinitionAPI interface {
 type LambdaGetFunctionAPI interface {
 	GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error)
 }
+
+// ASGDescribeScalingActivitiesAPI defines the interface for the AutoScaling DescribeScalingActivities operation.
+type ASGDescribeScalingActivitiesAPI interface {
+	DescribeScalingActivities(ctx context.Context, params *autoscaling.DescribeScalingActivitiesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeScalingActivitiesOutput, error)
+}
+
+// CloudWatchDescribeAlarmHistoryAPI defines the interface for the CloudWatch DescribeAlarmHistory operation.
+type CloudWatchDescribeAlarmHistoryAPI interface {
+	DescribeAlarmHistory(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error)
+}

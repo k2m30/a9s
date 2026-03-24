@@ -50,6 +50,17 @@ func monitoringDefaultViews() map[string]ViewDef {
 			},
 		},
 		// Child views for monitoring resources
+		"alarm_history": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Type", Key: "history_item_type", Width: 18},
+				{Title: "Summary", Key: "history_summary", Width: 60},
+			},
+			Detail: []string{
+				"Timestamp", "HistoryItemType", "HistorySummary",
+				"HistoryData", "AlarmName", "AlarmType",
+			},
+		},
 		"log_streams": {
 			List: []ListColumn{
 				{Title: "Stream Name", Path: "LogStreamName", Width: 48},
