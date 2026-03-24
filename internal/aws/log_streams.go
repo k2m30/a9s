@@ -61,34 +61,7 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 		}
 
 		for _, s := range output.LogStreams {
-			name := ""
-			if s.LogStreamName != nil {
-				name = *s.LogStreamName
-			}
-
-			lastEvent := ""
-			if s.LastEventTimestamp != nil {
-				lastEvent = formatEpochMillis(*s.LastEventTimestamp)
-			}
-
-			firstEvent := ""
-			if s.FirstEventTimestamp != nil {
-				firstEvent = formatEpochMillis(*s.FirstEventTimestamp)
-			}
-
-			r := resource.Resource{
-				ID:     name,
-				Name:   name,
-				Status: "",
-				Fields: map[string]string{
-					"stream_name": name,
-					"last_event":  lastEvent,
-					"first_event": firstEvent,
-				},
-				RawStruct: s,
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, convertLogStream(s))
 		}
 
 		if output.NextToken == nil || len(resources) >= maxLogStreams {
@@ -98,6 +71,36 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 	}
 
 	return resources, nil
+}
+
+// convertLogStream converts a single CloudWatch LogStream into a generic Resource.
+func convertLogStream(s cwlogstypes.LogStream) resource.Resource {
+	name := ""
+	if s.LogStreamName != nil {
+		name = *s.LogStreamName
+	}
+
+	lastEvent := ""
+	if s.LastEventTimestamp != nil {
+		lastEvent = formatEpochMillis(*s.LastEventTimestamp)
+	}
+
+	firstEvent := ""
+	if s.FirstEventTimestamp != nil {
+		firstEvent = formatEpochMillis(*s.FirstEventTimestamp)
+	}
+
+	return resource.Resource{
+		ID:     name,
+		Name:   name,
+		Status: "",
+		Fields: map[string]string{
+			"stream_name": name,
+			"last_event":  lastEvent,
+			"first_event": firstEvent,
+		},
+		RawStruct: s,
+	}
 }
 
 // formatEpochMillis converts epoch milliseconds to a human-readable timestamp.

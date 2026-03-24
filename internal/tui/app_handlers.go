@@ -1,0 +1,373 @@
+package tui
+
+import (
+	"fmt"
+	"time"
+
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/atotto/clipboard"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
+)
+
+// handleKeyMsg processes all keyboard input: force-quit, input modes, global
+// keys, then falls through to the active view.
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Global keys handled before delegation
+	if key.Matches(msg, m.keys.ForceQuit) {
+		return m, tea.Quit
+	}
+
+	// Handle input modes
+	switch m.inputMode {
+	case modeFilter:
+		return m.updateFilterMode(msg)
+	case modeCommand:
+		return m.updateCommandMode(msg)
+	}
+
+	// Global keys in normal mode
+	if key.Matches(msg, m.keys.Help) {
+		// If already on help, let the help view handle it (closes help)
+		if _, ok := m.activeView().(*views.HelpModel); ok {
+			return m.updateActiveView(msg)
+		}
+		ctx := m.helpContext()
+		help := views.NewHelp(m.keys, ctx)
+		help.SetSize(m.innerSize())
+		m.pushView(&help)
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+	if key.Matches(msg, m.keys.Escape) {
+		// If active view has a confirmed filter, clear it first
+		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
+			f.SetFilter("")
+			return m, nil
+		}
+		// Otherwise pop view; no-op on main menu (never quit from Esc)
+		m.popView()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Colon) {
+		m.inputMode = modeCommand
+		m.cmdInput.Reset()
+		m.cmdInput.Focus()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Filter) {
+		// Only activate filter mode on filterable views
+		if _, ok := m.activeView().(views.Filterable); ok {
+			m.inputMode = modeFilter
+			m.cmdInput.Reset()
+			m.cmdInput.Focus()
+			return m, nil
+		}
+		// On static views (detail, yaml, help, reveal), ignore /
+		// (help handles it via its own Update which sends PopViewMsg)
+	}
+
+	// Copy (c) — context-dependent clipboard copy
+	if key.Matches(msg, m.keys.Copy) {
+		return m.handleCopy()
+	}
+
+	// Refresh (ctrl+r) — re-fetch resources in resource list
+	if key.Matches(msg, m.keys.Refresh) {
+		return m.handleRefresh()
+	}
+
+	// Reveal (x) — reveal secret value (only for secrets)
+	if key.Matches(msg, m.keys.Reveal) {
+		return m.handleReveal()
+	}
+
+	return m.updateActiveView(msg)
+}
+
+// handleFlash sets the flash message and schedules its auto-clear.
+func (m Model) handleFlash(msg messages.FlashMsg) (tea.Model, tea.Cmd) {
+	newGen := m.flash.gen + 1
+	m.flash = flashState{text: msg.Text, isError: msg.IsError, active: true, gen: newGen}
+	gen := m.flash.gen
+	return m, tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
+		return messages.ClearFlashMsg{Gen: gen}
+	})
+}
+
+// handleClearFlash clears the flash if the generation matches (not stale).
+func (m Model) handleClearFlash(msg messages.ClearFlashMsg) (tea.Model, tea.Cmd) {
+	if msg.Gen == m.flash.gen {
+		m.flash.active = false
+	}
+	return m, nil
+}
+
+// handleClientsReady stores the new AWS clients and optionally triggers a
+// pending refresh (after profile/region switch).
+func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true}
+		m.pendingRefresh = false
+		return m, nil
+	}
+	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
+		m.clients = clients
+	}
+	if m.profile == "" && !m.demoMode {
+		m.profile = "default"
+	}
+	if m.region == "" && !m.demoMode {
+		configPath := awsclient.DefaultConfigPath()
+		m.region = awsclient.GetDefaultRegion(configPath, m.profile)
+	}
+	if m.pendingRefresh {
+		m.pendingRefresh = false
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			rt := rl.ResourceType()
+			m.flash = flashState{text: "Connected. Refreshing...", active: true}
+			cmd := m.fetchResources(rt)
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
+// handleProfileSelected switches the AWS profile, pops the profile selector,
+// and reconnects.
+func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, nil
+	}
+	m.profile = msg.Profile
+	m.region = "" // clear so handleClientsReady resolves the new profile's default region
+	m.pendingRefresh = true
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
+		m.popView()
+	}
+	flashCmd := func() tea.Msg {
+		return messages.FlashMsg{Text: "Switching to " + msg.Profile + "..."}
+	}
+	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, ""))
+}
+
+// handleRegionSelected switches the AWS region, pops the region selector,
+// and reconnects.
+func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, nil
+	}
+	m.region = msg.Region
+	m.pendingRefresh = true
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
+		m.popView()
+	}
+	flashCmd := func() tea.Msg {
+		return messages.FlashMsg{Text: "Switching to " + msg.Region + "..."}
+	}
+	return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region))
+}
+
+// handleProfilesLoaded pushes the profile selector view onto the stack.
+func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) {
+	p := views.NewProfile(msg.profiles, m.profile, m.keys)
+	p.SetSize(m.innerSize())
+	m.pushView(&p)
+	return m, nil
+}
+
+// handleSecretRevealed pushes the secret reveal view or flashes an error.
+func (m Model) handleSecretRevealed(msg messages.SecretRevealedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.flash = flashState{text: "reveal failed: " + msg.Err.Error(), isError: true, active: true}
+		return m, nil
+	}
+	rv := views.NewReveal(msg.SecretName, msg.Value, m.keys)
+	rv.SetSize(m.innerSize())
+	m.pushView(&rv)
+	return m, nil
+}
+
+// handleEnterChildView creates a child resource list view and kicks off a fetch
+// using the child type registry. This is the generic handler for all child views.
+func (m Model) handleEnterChildView(msg messages.EnterChildViewMsg) (tea.Model, tea.Cmd) {
+	childTypeDef := resource.GetChildType(msg.ChildType)
+	if childTypeDef == nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: fmt.Sprintf("unknown child type: %s", msg.ChildType), IsError: true}
+		}
+	}
+	rl := views.NewChildResourceList(*childTypeDef, msg.ParentContext, msg.DisplayName, m.viewConfig, m.keys)
+	rl.SetSize(m.innerSize())
+	rl, initCmd := rl.Init()
+	m.pushView(&rl)
+	fetchCmd := m.fetchChildResources(msg.ChildType, msg.ParentContext)
+	return m, tea.Batch(initCmd, fetchCmd)
+}
+
+// handleAPIError shows a flash error and clears loading state on the resource list.
+func (m Model) handleAPIError(msg messages.APIErrorMsg) (tea.Model, tea.Cmd) {
+	code, message, _ := awsclient.ClassifyAWSError(msg.Err)
+	var flashText string
+	if code != "" && code != "Unknown" {
+		flashText = fmt.Sprintf("[%s] %s", code, message)
+	} else {
+		flashText = msg.Err.Error()
+	}
+	m.flash = flashState{text: flashText, isError: true, active: true}
+	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+		rl.ClearLoading()
+	}
+	return m, nil
+}
+
+// handleNavigate pushes the appropriate view onto the stack.
+func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
+	switch msg.Target {
+	case messages.TargetResourceList:
+		rt := resource.FindResourceType(msg.ResourceType)
+		if rt == nil {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: fmt.Sprintf("unknown resource type: %s", msg.ResourceType), IsError: true}
+			}
+		}
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetSize(m.innerSize())
+		rl, initCmd := rl.Init()
+		m.pushView(&rl)
+		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
+
+	case messages.TargetDetail:
+		if msg.Resource == nil {
+			return m, nil
+		}
+		resType := msg.ResourceType
+		if resType == "" {
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				resType = rl.ResourceType()
+			}
+		}
+		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
+		d.SetSize(m.innerSize())
+		m.pushView(&d)
+		return m, nil
+
+	case messages.TargetYAML:
+		if msg.Resource == nil {
+			return m, nil
+		}
+		y := views.NewYAML(*msg.Resource, m.keys)
+		y.SetSize(m.innerSize())
+		m.pushView(&y)
+		return m, nil
+
+	case messages.TargetHelp:
+		ctx := m.helpContext()
+		h := views.NewHelp(m.keys, ctx)
+		h.SetSize(m.innerSize())
+		m.pushView(&h)
+		return m, nil
+
+	case messages.TargetProfile:
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Profile switching disabled in demo mode", IsError: true}
+			}
+		}
+		cmd := m.fetchProfiles()
+		return m, cmd
+
+	case messages.TargetRegion:
+		if m.demoMode {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Region switching disabled in demo mode", IsError: true}
+			}
+		}
+		regions := awsclient.AllRegions()
+		regionCodes := make([]string, len(regions))
+		for i, r := range regions {
+			regionCodes[i] = r.Code
+		}
+		rg := views.NewRegion(regionCodes, m.region, m.keys)
+		rg.SetSize(m.innerSize())
+		m.pushView(&rg)
+		return m, nil
+
+	case messages.TargetReveal:
+		if msg.Resource == nil {
+			return m, nil
+		}
+		cmd := m.fetchSecretValue(msg.Resource.ID)
+		return m, cmd
+	}
+	return m, nil
+}
+
+// handleCopy performs context-dependent clipboard copy as a tea.Cmd.
+// Each view implements CopyContent() to provide its own content and label.
+func (m Model) handleCopy() (tea.Model, tea.Cmd) {
+	content, label := m.activeView().CopyContent()
+	if content == "" {
+		return m, nil
+	}
+	return m, copyToClipboard(content, label)
+}
+
+// handleRefresh re-fetches resources when on a resource list view.
+func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
+	rl, ok := m.activeView().(*views.ResourceListModel)
+	if !ok {
+		return m, nil
+	}
+	rt := rl.ResourceType()
+	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+
+	// If the view has a parent context, it's a child view — use child fetch path.
+	if pc := rl.ParentContext(); pc != nil {
+		cmd := m.fetchChildResources(rt, pc)
+		return m, cmd
+	}
+
+	// Top-level resource list — fetch via registry.
+	cmd := m.fetchResources(rt)
+	return m, cmd
+}
+
+// handleReveal fetches a secret value (only for secrets resource type).
+func (m Model) handleReveal() (tea.Model, tea.Cmd) {
+	if m.demoMode {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Secret reveal disabled in demo mode", IsError: true}
+		}
+	}
+	rl, ok := m.activeView().(*views.ResourceListModel)
+	if !ok {
+		return m, nil
+	}
+	if rl.ResourceType() != "secrets" {
+		return m, nil
+	}
+	r := rl.SelectedResource()
+	if r == nil {
+		return m, nil
+	}
+	cmd := m.fetchSecretValue(r.ID)
+	return m, cmd
+}
+
+func copyToClipboard(content, successLabel string) tea.Cmd {
+	return func() tea.Msg {
+		err := clipboard.WriteAll(content)
+		if err != nil {
+			return messages.FlashMsg{Text: fmt.Sprintf("Copy failed: %v", err), IsError: true}
+		}
+		return messages.FlashMsg{Text: successLabel, IsError: false}
+	}
+}

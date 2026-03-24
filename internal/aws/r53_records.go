@@ -58,52 +58,7 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 		}
 
 		for _, record := range output.ResourceRecordSets {
-			name := ""
-			if record.Name != nil {
-				name = *record.Name
-			}
-
-			recType := string(record.Type)
-
-			ttl := ""
-			if record.TTL != nil {
-				ttl = fmt.Sprintf("%d", *record.TTL)
-			}
-
-			// Compute values: join ResourceRecords or use AliasTarget
-			var values string
-			if record.AliasTarget != nil && record.AliasTarget.DNSName != nil {
-				values = "ALIAS: " + *record.AliasTarget.DNSName
-			} else {
-				var vals []string
-				for _, rr := range record.ResourceRecords {
-					if rr.Value != nil {
-						vals = append(vals, *rr.Value)
-					}
-				}
-				values = strings.Join(vals, ", ")
-			}
-
-			// ID = Name|Type, appending |SetIdentifier if non-empty
-			id := name + "|" + recType
-			if record.SetIdentifier != nil && *record.SetIdentifier != "" {
-				id += "|" + *record.SetIdentifier
-			}
-
-			r := resource.Resource{
-				ID:     id,
-				Name:   name,
-				Status: recType,
-				Fields: map[string]string{
-					"name":   name,
-					"type":   recType,
-					"ttl":    ttl,
-					"values": values,
-				},
-				RawStruct: record,
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, convertR53Record(record))
 		}
 
 		if !output.IsTruncated {
@@ -115,4 +70,52 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 	}
 
 	return resources, nil
+}
+
+// convertR53Record converts a single Route53 ResourceRecordSet into a generic Resource.
+func convertR53Record(record r53types.ResourceRecordSet) resource.Resource {
+	name := ""
+	if record.Name != nil {
+		name = *record.Name
+	}
+
+	recType := string(record.Type)
+
+	ttl := ""
+	if record.TTL != nil {
+		ttl = fmt.Sprintf("%d", *record.TTL)
+	}
+
+	// Compute values: join ResourceRecords or use AliasTarget
+	var values string
+	if record.AliasTarget != nil && record.AliasTarget.DNSName != nil {
+		values = "ALIAS: " + *record.AliasTarget.DNSName
+	} else {
+		var vals []string
+		for _, rr := range record.ResourceRecords {
+			if rr.Value != nil {
+				vals = append(vals, *rr.Value)
+			}
+		}
+		values = strings.Join(vals, ", ")
+	}
+
+	// ID = Name|Type, appending |SetIdentifier if non-empty
+	id := name + "|" + recType
+	if record.SetIdentifier != nil && *record.SetIdentifier != "" {
+		id += "|" + *record.SetIdentifier
+	}
+
+	return resource.Resource{
+		ID:     id,
+		Name:   name,
+		Status: recType,
+		Fields: map[string]string{
+			"name":   name,
+			"type":   recType,
+			"ttl":    ttl,
+			"values": values,
+		},
+		RawStruct: record,
+	}
 }
