@@ -3,6 +3,7 @@ package unit
 import (
 	"image/color"
 	"os"
+	"strings"
 	"testing"
 
 	lipgloss "charm.land/lipgloss/v2"
@@ -183,6 +184,24 @@ func TestNoColorActive_WithEnvUnset(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	if styles.NoColorActive() {
 		t.Error("NoColorActive() should return false when NO_COLOR is unset")
+	}
+}
+
+func TestNoColor_RowSelectedUsesReverse(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	styles.Reinit()
+	defer func() {
+		os.Unsetenv("NO_COLOR")
+		styles.Reinit()
+	}()
+
+	rendered := styles.RowSelected.Render("hello")
+	if rendered == "hello" {
+		t.Error("RowSelected in NO_COLOR mode should apply reverse video, got plain text")
+	}
+	// ANSI reverse video escape is \x1b[7m
+	if !strings.Contains(rendered, "\x1b[7m") {
+		t.Errorf("RowSelected in NO_COLOR mode should use ANSI reverse (\\x1b[7m), got %q", rendered)
 	}
 }
 
