@@ -3,8 +3,10 @@ package unit_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 )
 
@@ -311,5 +313,160 @@ func TestLambdaInvocationLogDetailViewNilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("LambdaInvocationLog detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ECS Service Events detail view tests (child of ECS Services)
+// ===========================================================================
+
+func TestQA_Detail_EcsSvcEvents_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	ev := ecstypes.ServiceEvent{
+		Id:        ptrString("evt-detail-001"),
+		CreatedAt: &ts,
+		Message:   ptrString("(service web-service) has reached a steady state."),
+	}
+	res := buildResource(
+		"evt-detail-001",
+		"(service web-service) has reached a steady state.",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"timestamp": "2024-03-22 10:00",
+		"message":   "(service web-service) has reached a steady state.",
+	}
+	cfg := detailConfigForType("ecs_svc_events")
+	m := newDetailModel(res, "ecs_svc_events", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"steady state",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EcsSvcEvents detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_EcsSvcEvents_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := ecstypes.ServiceEvent{}
+	res := buildResource("empty-event", "empty-event", ev)
+	cfg := detailConfigForType("ecs_svc_events")
+	m := newDetailModel(res, "ecs_svc_events", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EcsSvcEvents detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ECS Service Tasks detail view tests (child of ECS Services)
+// ===========================================================================
+
+func TestQA_Detail_EcsSvcTasks_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	task := ecstypes.Task{
+		TaskArn:           ptrString("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+		LastStatus:        ptrString("RUNNING"),
+		DesiredStatus:     ptrString("RUNNING"),
+		HealthStatus:      ecstypes.HealthStatusHealthy,
+		TaskDefinitionArn: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
+		StartedAt:         &startedAt,
+		Cpu:               ptrString("256"),
+		Memory:            ptrString("512"),
+		LaunchType:        ecstypes.LaunchTypeFargate,
+		PlatformVersion:   ptrString("1.4.0"),
+		Group:             ptrString("service:web-service"),
+	}
+	res := buildResource(
+		"abc123def456",
+		"abc123def456",
+		task,
+	)
+	res.Fields = map[string]string{
+		"task_id_short":  "abc123def456",
+		"status":         "RUNNING",
+		"health":         "HEALTHY",
+		"task_def_short": "web-app:5",
+		"started_at":     "2024-03-22 10:00",
+		"stopped_reason": "",
+	}
+	cfg := detailConfigForType("ecs_tasks")
+	m := newDetailModel(res, "ecs_tasks", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"abc123def456",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EcsSvcTasks detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_EcsSvcTasks_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	task := ecstypes.Task{}
+	res := buildResource("empty-task", "empty-task", task)
+	cfg := detailConfigForType("ecs_tasks")
+	m := newDetailModel(res, "ecs_tasks", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EcsSvcTasks detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ECS Service Logs detail view tests (child of ECS Services)
+// ===========================================================================
+
+func TestQA_Detail_EcsSvcLogs_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{
+		Timestamp:     ptrInt64(1711036800000),
+		Message:       ptrString("INFO Starting application server on port 8080"),
+		IngestionTime: ptrInt64(1711036801000),
+		LogStreamName: ptrString("ecs/web/abc123def456"),
+		EventId:       ptrString("evt-svc-log-001"),
+	}
+	res := buildResource(
+		"evt-svc-log-001",
+		"INFO Starting application server on port 8080",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"timestamp":    "2024-03-21 16:00",
+		"stream_short": "web/abc123de",
+		"message":      "INFO Starting application server on port 8080",
+	}
+	cfg := detailConfigForType("ecs_svc_logs")
+	m := newDetailModel(res, "ecs_svc_logs", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Starting application",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EcsSvcLogs detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_EcsSvcLogs_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.FilteredLogEvent{}
+	res := buildResource("empty-svc-log", "empty-svc-log", ev)
+	cfg := detailConfigForType("ecs_svc_logs")
+	m := newDetailModel(res, "ecs_svc_logs", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EcsSvcLogs detail should not be empty even with nil fields")
 	}
 }

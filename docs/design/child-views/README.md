@@ -20,9 +20,9 @@ Seven child views already implemented: S3 Objects, R53 Records, Log Streams, Log
 | — | Route 53 Zones (r53) | Records | MUST-HAVE | Implemented | [r53-records.md](r53-records.md) | No |
 | 1 | Log Groups (logs) | Log Streams | MUST-HAVE | Implemented | [logs-streams.md](logs-streams.md) | Yes: Log Events (level 2) |
 | 2 | Lambda (lambda) | Invocations | MUST-HAVE | Implemented | [lambda-invocations.md](lambda-invocations.md) | Yes: Log Lines (level 2) |
-| 3 | ECS Services (ecs-svc) | Service Events | MUST-HAVE | Planned | [ecs-svc-events.md](ecs-svc-events.md) | No |
-| 4 | ECS Services (ecs-svc) | Tasks | MUST-HAVE | Planned | [ecs-svc-tasks.md](ecs-svc-tasks.md) | No |
-| 5 | ECS Services (ecs-svc) | Container Logs | MUST-HAVE | Planned | [ecs-svc-logs.md](ecs-svc-logs.md) | No |
+| 3 | ECS Services (ecs-svc) | Service Events | MUST-HAVE | Implemented | [ecs-svc-events.md](ecs-svc-events.md) | No |
+| 4 | ECS Services (ecs-svc) | Tasks | MUST-HAVE | Implemented | [ecs-svc-tasks.md](ecs-svc-tasks.md) | No |
+| 5 | ECS Services (ecs-svc) | Container Logs | MUST-HAVE | Implemented | [ecs-svc-logs.md](ecs-svc-logs.md) | No |
 | 6 | CFN Stacks (cfn) | Stack Events | MUST-HAVE | Planned | [cfn-events.md](cfn-events.md) | No |
 | 7 | CFN Stacks (cfn) | Stack Resources | MUST-HAVE | Planned | [cfn-resources.md](cfn-resources.md) | No |
 | 8 | Target Groups (tg) | Target Health | MUST-HAVE | Implemented | [tg-health.md](tg-health.md) | No |

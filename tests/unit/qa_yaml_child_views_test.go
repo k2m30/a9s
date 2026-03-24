@@ -271,3 +271,161 @@ func TestLambdaInvocationLogsYAMLNoANSI(t *testing.T) {
 		t.Error("LambdaInvocationLogs RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// ECS Service Events YAML view fixtures
+// ===========================================================================
+
+func fixtureEcsSvcEvents() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-yaml-001",
+			Name:   "(service web-service) has reached a steady state.",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2024-03-22 10:00",
+				"message":   "(service web-service) has reached a steady state.",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ECS Service Events YAML tests
+// ===========================================================================
+
+func TestQA_YAML_EcsSvcEvents_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEcsSvcEvents() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EcsSvcEvents YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EcsSvcEvents YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EcsSvcEvents_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcEvents()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcEvents FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EcsSvcEvents_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcEvents()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EcsSvcEvents RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// ECS Service Tasks YAML view fixtures
+// ===========================================================================
+
+func fixtureEcsSvcTasks() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "abc123def456",
+			Name:   "abc123def456",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"task_id_short":  "abc123def456",
+				"status":         "RUNNING",
+				"health":         "HEALTHY",
+				"task_def_short": "web-app:5",
+				"started_at":     "2024-03-22 10:00",
+				"stopped_reason": "",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ECS Service Tasks YAML tests
+// ===========================================================================
+
+func TestQA_YAML_EcsSvcTasks_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEcsSvcTasks() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EcsSvcTasks YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EcsSvcTasks YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EcsSvcTasks_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcTasks()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcTasks FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EcsSvcTasks_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcTasks()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EcsSvcTasks RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// ECS Service Logs YAML view fixtures
+// ===========================================================================
+
+func fixtureEcsSvcLogs() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-svc-log-001",
+			Name:   "INFO Starting application server on port 8080",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":    "2024-03-21 16:00",
+				"stream_short": "web/abc123de",
+				"message":      "INFO Starting application server on port 8080",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ECS Service Logs YAML tests
+// ===========================================================================
+
+func TestQA_YAML_EcsSvcLogs_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEcsSvcLogs() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EcsSvcLogs YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EcsSvcLogs YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EcsSvcLogs_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcLogs()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EcsSvcLogs FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EcsSvcLogs_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEcsSvcLogs()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EcsSvcLogs RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

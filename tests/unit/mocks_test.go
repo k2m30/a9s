@@ -1304,6 +1304,20 @@ func (m *mockLambdaGetFunctionClient) GetFunction(ctx context.Context, params *l
 	return m.output, m.err
 }
 
+// ---------------------------------------------------------------------------
+// ECS DescribeTaskDefinition mocks (for ECS Service Logs child view)
+// ---------------------------------------------------------------------------
+
+// mockECSDescribeTaskDefinitionClient implements awsclient.ECSDescribeTaskDefinitionAPI.
+type mockECSDescribeTaskDefinitionClient struct {
+	output *ecs.DescribeTaskDefinitionOutput
+	err    error
+}
+
+func (m *mockECSDescribeTaskDefinitionClient) DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return m.output, m.err
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

@@ -24,7 +24,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 ## Features
 
 - **62 AWS resource types** across 12 service categories
-- **Child view drill-downs** — press Enter to explore nested resources (Lambda → Invocations → Log Lines, Log Streams → Log Events, Target Group → Target Health, S3 → Objects, R53 → Records)
+- **Child view drill-downs** — press Enter to explore nested resources (ECS → Tasks/Events/Logs, Lambda → Invocations → Log Lines, Log Streams → Log Events, Target Group → Target Health, S3 → Objects, R53 → Records)
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
 - Multi-profile and multi-region support
@@ -35,7 +35,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Human-readable formatting (timestamps, byte sizes)
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 3,300+ unit tests
+- 3,400+ unit tests
 
 ## Installation
 
@@ -171,6 +171,9 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
 | Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
 | Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
+| ECS Services | Service Events | `e` | Event timeline (steady state, placement failures, deployments) |
+| ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
+| ECS Services | Container Logs | `L` | Application logs from CloudWatch (resolved from task definition) |
 
 ## Commands
 

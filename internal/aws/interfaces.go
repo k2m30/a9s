@@ -462,6 +462,11 @@ type CWLogsFilterLogEventsAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
+// ECSDescribeTaskDefinitionAPI defines the interface for the ECS DescribeTaskDefinition operation.
+type ECSDescribeTaskDefinitionAPI interface {
+	DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error)
+}
+
 // LambdaGetFunctionAPI defines the interface for the Lambda GetFunction operation.
 type LambdaGetFunctionAPI interface {
 	GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error)

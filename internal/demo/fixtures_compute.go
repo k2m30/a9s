@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
@@ -19,6 +20,16 @@ func init() {
 	demoData["ecs-task"] = ecsTaskFixtures
 	demoData["asg"] = asgFixtures
 	demoData["eb"] = ebFixtures
+
+	RegisterChildDemo("ecs_svc_events", func(parentCtx map[string]string) []resource.Resource {
+		return ecsSvcEventFixtures(parentCtx["service_name"])
+	})
+	RegisterChildDemo("ecs_tasks", func(parentCtx map[string]string) []resource.Resource {
+		return ecsSvcTaskFixtures(parentCtx["service_name"])
+	})
+	RegisterChildDemo("ecs_svc_logs", func(parentCtx map[string]string) []resource.Resource {
+		return ecsSvcLogFixtures(parentCtx["service_name"])
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -899,3 +910,174 @@ func ebFixtures() []resource.Resource {
 	}
 }
 
+
+// ---------------------------------------------------------------------------
+// ECS Service Events (child of ECS Services)
+// ---------------------------------------------------------------------------
+
+func ecsSvcEventFixtures(serviceName string) []resource.Resource {
+	ts1 := time.Date(2026, 3, 22, 10, 0, 0, 0, time.UTC)
+	ts2 := time.Date(2026, 3, 22, 9, 55, 0, 0, time.UTC)
+	ts3 := time.Date(2026, 3, 22, 9, 50, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "evt-demo-001",
+			Name:   "2026-03-22 10:00:00",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 10:00:00",
+				"message":   "(service " + serviceName + ") has reached a steady state.",
+			},
+			RawStruct: ecstypes.ServiceEvent{
+				Id:        aws.String("evt-demo-001"),
+				CreatedAt: &ts1,
+				Message:   aws.String("(service " + serviceName + ") has reached a steady state."),
+			},
+		},
+		{
+			ID:     "evt-demo-002",
+			Name:   "2026-03-22 09:55:00",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 09:55:00",
+				"message":   "(service " + serviceName + ") has started 2 tasks: (task abc123).",
+			},
+			RawStruct: ecstypes.ServiceEvent{
+				Id:        aws.String("evt-demo-002"),
+				CreatedAt: &ts2,
+				Message:   aws.String("(service " + serviceName + ") has started 2 tasks: (task abc123)."),
+			},
+		},
+		{
+			ID:     "evt-demo-003",
+			Name:   "2026-03-22 09:50:00",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 09:50:00",
+				"message":   "(service " + serviceName + ") registered 1 targets in (target-group my-tg).",
+			},
+			RawStruct: ecstypes.ServiceEvent{
+				Id:        aws.String("evt-demo-003"),
+				CreatedAt: &ts3,
+				Message:   aws.String("(service " + serviceName + ") registered 1 targets in (target-group my-tg)."),
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ECS Service Tasks (child of ECS Services)
+// ---------------------------------------------------------------------------
+
+func ecsSvcTaskFixtures(serviceName string) []resource.Resource {
+	startedAt := time.Date(2026, 3, 22, 8, 0, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "a1b2c3d4e5f6",
+			Name:   "a1b2c3d4e5f6",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"task_id_short":  "a1b2c3d4e5f6",
+				"status":         "RUNNING",
+				"health":         "HEALTHY",
+				"task_def_short": serviceName + ":5",
+				"started_at":     "2026-03-22 08:00:00",
+				"stopped_reason": "",
+			},
+			RawStruct: ecstypes.Task{
+				TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/a1b2c3d4e5f6"),
+				LastStatus:        aws.String("RUNNING"),
+				DesiredStatus:     aws.String("RUNNING"),
+				HealthStatus:      ecstypes.HealthStatusHealthy,
+				TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/" + serviceName + ":5"),
+				StartedAt:         &startedAt,
+				LaunchType:        ecstypes.LaunchTypeFargate,
+				Cpu:               aws.String("256"),
+				Memory:            aws.String("512"),
+			},
+		},
+		{
+			ID:     "f6e5d4c3b2a1",
+			Name:   "f6e5d4c3b2a1",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"task_id_short":  "f6e5d4c3b2a1",
+				"status":         "RUNNING",
+				"health":         "HEALTHY",
+				"task_def_short": serviceName + ":5",
+				"started_at":     "2026-03-22 08:00:00",
+				"stopped_reason": "",
+			},
+			RawStruct: ecstypes.Task{
+				TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/f6e5d4c3b2a1"),
+				LastStatus:        aws.String("RUNNING"),
+				DesiredStatus:     aws.String("RUNNING"),
+				HealthStatus:      ecstypes.HealthStatusHealthy,
+				TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/" + serviceName + ":5"),
+				StartedAt:         &startedAt,
+				LaunchType:        ecstypes.LaunchTypeFargate,
+				Cpu:               aws.String("256"),
+				Memory:            aws.String("512"),
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ECS Service Logs (child of ECS Services)
+// ---------------------------------------------------------------------------
+
+func ecsSvcLogFixtures(serviceName string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-svc-log-demo-001",
+			Name:   "INFO Starting application server on port 8080",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":    "2026-03-22 10:00",
+				"stream_short": "web/a1b2c3d4",
+				"message":      "INFO Starting application server on port 8080",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp:     aws.Int64(1774278000000),
+				Message:       aws.String("INFO Starting application server on port 8080"),
+				LogStreamName: aws.String("ecs/web/a1b2c3d4e5f6"),
+				EventId:       aws.String("evt-svc-log-demo-001"),
+			},
+		},
+		{
+			ID:     "evt-svc-log-demo-002",
+			Name:   "INFO Health check passed",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":    "2026-03-22 10:01",
+				"stream_short": "web/a1b2c3d4",
+				"message":      "INFO Health check passed",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp:     aws.Int64(1774278060000),
+				Message:       aws.String("INFO Health check passed"),
+				LogStreamName: aws.String("ecs/web/a1b2c3d4e5f6"),
+				EventId:       aws.String("evt-svc-log-demo-002"),
+			},
+		},
+		{
+			ID:     "evt-svc-log-demo-003",
+			Name:   "ERROR Connection refused to database",
+			Status: "",
+			Fields: map[string]string{
+				"timestamp":    "2026-03-22 10:02",
+				"stream_short": "web/f6e5d4c3",
+				"message":      "ERROR Connection refused to database",
+			},
+			RawStruct: cwlogstypes.FilteredLogEvent{
+				Timestamp:     aws.Int64(1774278120000),
+				Message:       aws.String("ERROR Connection refused to database"),
+				LogStreamName: aws.String("ecs/web/f6e5d4c3b2a1"),
+				EventId:       aws.String("evt-svc-log-demo-003"),
+			},
+		},
+	}
+}
