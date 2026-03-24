@@ -3,12 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ .Title }} | a9s</title>
-  <meta name="description" content="Terminal UI AWS Resource Manager — browse, inspect, and manage 62 AWS resource types">
-  <meta property="og:title" content="a9s — Terminal UI for AWS">
+  {{ if .IsHome }}<title>{{ .Site.Title }}</title>{{ else }}<title>{{ .Title }} | a9s</title>{{ end }}
+  <meta name="description" content="{{ .Site.Params.description }}">
+  <link rel="canonical" href="{{ .Permalink }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%231a1b26'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='14' font-weight='bold' fill='%237aa2f7'>a9s</text></svg>">
+  <meta property="og:title" content="{{ .Site.Title }}">
   <meta property="og:description" content="Like k9s, but for your cloud. Browse 62 AWS resource types from your terminal.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://k2m30.github.io/a9s/">
+  <meta property="og:url" content="{{ .Permalink }}">
+  <meta property="og:image" content="{{ "demo.gif" | absURL }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ .Site.Title }}">
+  <meta name="twitter:description" content="{{ .Site.Params.description }}">
+  <meta name="twitter:image" content="{{ "demo.gif" | absURL }}">
   <style>
     :root {
       --bg: #1a1b26;
@@ -30,19 +37,78 @@
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .container { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+
+    /* Skip-to-content */
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: 16px;
+      background: var(--accent);
+      color: var(--bg-dark);
+      padding: 8px 16px;
+      border-radius: 0 0 4px 4px;
+      z-index: 200;
+      font-weight: 600;
+    }
+    .skip-link:focus { top: 0; text-decoration: none; }
+
+    /* Header */
     header {
       background: var(--bg-dark);
       border-bottom: 1px solid var(--border);
       padding: 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     header .container {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: relative;
     }
     header h1 { color: var(--accent); font-size: 1.4rem; }
-    header nav a { margin-left: 24px; color: var(--fg); font-size: 0.9rem; }
-    header nav a:hover { color: var(--accent); }
+    header h1 a { color: var(--accent); text-decoration: none; }
+    header h1 a:hover { text-decoration: none; opacity: 0.9; }
+    header nav { display: flex; align-items: center; gap: 0; }
+    header nav a {
+      margin-left: 24px;
+      color: var(--fg);
+      font-size: 0.9rem;
+      padding: 12px 0;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
+    header nav a:hover { color: var(--accent); text-decoration: none; }
+    header nav a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
+    /* Hamburger toggle (CSS-only) */
+    .nav-toggle { display: none; }
+    .nav-toggle-label { display: none; cursor: pointer; padding: 12px 0; }
+    .nav-toggle-label span,
+    .nav-toggle-label span::before,
+    .nav-toggle-label span::after {
+      display: block;
+      background: var(--fg);
+      height: 2px;
+      width: 24px;
+      border-radius: 2px;
+      position: relative;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .nav-toggle-label span::before,
+    .nav-toggle-label span::after {
+      content: '';
+      position: absolute;
+    }
+    .nav-toggle-label span::before { top: -7px; }
+    .nav-toggle-label span::after { top: 7px; }
+    .nav-toggle:checked + .nav-toggle-label span { background: transparent; }
+    .nav-toggle:checked + .nav-toggle-label span::before { top: 0; transform: rotate(45deg); background: var(--fg); }
+    .nav-toggle:checked + .nav-toggle-label span::after { top: 0; transform: rotate(-45deg); background: var(--fg); }
+
+    /* Hero */
     .hero {
       text-align: center;
       padding: 80px 20px 60px;
@@ -84,13 +150,31 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 16px 24px;
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 1rem;
       color: var(--green);
       margin-bottom: 32px;
     }
-    .install-box span { color: var(--fg); margin-right: 8px; }
+    .install-box .prompt { color: var(--fg); }
+    .copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--fg);
+      font-size: 0.85rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+      font-family: inherit;
+    }
+    .copy-btn:hover { opacity: 1; }
+    .copy-btn.copied { color: var(--green); opacity: 1; }
+
+    /* Features grid */
     .features {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -122,6 +206,8 @@
       border: 1px solid var(--border);
       color: var(--fg);
     }
+
+    /* Footer */
     footer {
       border-top: 1px solid var(--border);
       padding: 24px 0;
@@ -129,11 +215,18 @@
       font-size: 0.85rem;
       color: var(--fg);
     }
+    footer a { color: var(--fg); }
+    footer a:hover { color: var(--accent); }
+    footer .footer-links { margin-bottom: 8px; }
+    footer .footer-links a { margin: 0 12px; }
+
+    /* Stats */
     .stats { display: flex; justify-content: center; gap: 40px; margin: 32px 0; }
     .stat { text-align: center; }
     .stat .number { font-size: 2rem; font-weight: 700; color: var(--accent); }
     .stat .label { font-size: 0.85rem; }
-    /* Demo GIF placeholder */
+
+    /* Demo GIF */
     .demo {
       max-width: 800px;
       margin: 0 auto 40px;
@@ -146,8 +239,13 @@
       color: var(--fg);
       font-style: italic;
     }
+
+    /* Content pages */
     section { padding: 40px 0; }
     section h2 { color: var(--fg-bright); margin-bottom: 24px; text-align: center; }
+    .container h2 { color: var(--fg-bright); margin-top: 40px; margin-bottom: 16px; }
+    .container h3 { color: var(--fg-bright); margin-top: 28px; margin-bottom: 12px; }
+    .container h2:first-child, .container h3:first-child { margin-top: 0; }
     table { width: 100%; border-collapse: collapse; margin: 16px 0; }
     th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
     th { color: var(--accent); font-weight: 600; }
@@ -164,29 +262,220 @@
       border-radius: 8px;
       padding: 16px;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.9rem;
       color: var(--green);
     }
+    pre code {
+      background: none;
+      padding: 0;
+      border-radius: 0;
+      font-size: inherit;
+    }
+    pre {
+      position: relative;
+    }
+    pre .code-copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--border);
+      border: none;
+      cursor: pointer;
+      color: var(--fg);
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    pre:hover .code-copy { opacity: 0.7; }
+    pre .code-copy:hover { opacity: 1; }
+    pre .code-copy.copied { color: var(--green); opacity: 1; }
+
+    /* Docs TOC sidebar */
+    .docs-layout { display: flex; gap: 40px; }
+    .toc { width: 200px; flex-shrink: 0; position: sticky; top: 80px; align-self: flex-start; }
+    .toc strong { color: var(--fg-bright); font-size: 0.85rem; display: block; margin-bottom: 8px; }
+    .toc ul { list-style: none; padding: 0; }
+    .toc li { padding: 4px 0; }
+    .toc a { color: var(--fg); font-size: 0.85rem; }
+    .toc a:hover { color: var(--accent); text-decoration: none; }
+    .docs-content { flex: 1; min-width: 0; }
+
+    /* Resource filter */
+    .resource-filter {
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--fg);
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 24px;
+    }
+    .resource-filter:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      /* Mobile nav */
+      .nav-toggle-label { display: block; min-height: 44px; display: flex; align-items: center; }
+      header nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-dark);
+        border-bottom: 1px solid var(--border);
+        flex-direction: column;
+        padding: 0 20px;
+        z-index: 99;
+      }
+      .nav-toggle:checked ~ nav { display: flex; }
+      header nav a {
+        margin-left: 0;
+        padding: 12px 0;
+        min-height: 44px;
+        border-bottom: 1px solid var(--border);
+        width: 100%;
+      }
+      header nav a:last-child { border-bottom: none; }
+      header nav a.active { border-bottom-color: var(--accent); }
+
+      /* Hero responsive */
+      .hero { padding: 40px 16px 30px; }
+      .hero h2 { font-size: 1.8rem; }
+      .hero p { font-size: 1rem; }
+      .hero .tagline { font-size: 0.95rem; }
+      .use-cases li { font-size: 0.85rem; }
+      .install-box { font-size: 0.85rem; padding: 12px 16px; }
+      .stats { gap: 20px; }
+      .stat .number { font-size: 1.5rem; }
+
+      /* Demo GIF */
+      .demo { padding: 16px; }
+      .demo img { border-radius: 4px; }
+
+      /* Code blocks */
+      pre { max-width: calc(100vw - 40px); font-size: 0.8rem; }
+
+      /* Features grid */
+      .features { padding: 30px 0; gap: 16px; }
+
+      /* Docs TOC stacked on mobile */
+      .docs-layout { flex-direction: column; gap: 0; }
+      .toc { width: 100%; position: static; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
   </style>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
   <header>
     <div class="container">
-      <h1>a9s</h1>
+      <h1><a href="{{ site.Home.RelPermalink }}">a9s</a></h1>
+      <input type="checkbox" id="nav-toggle" class="nav-toggle">
+      <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation"><span></span></label>
       <nav>
-        <a href="{{ "install/" | relURL }}">Install</a>
-        <a href="{{ "docs/" | relURL }}">Docs</a>
-        <a href="{{ "resources/" | relURL }}">Resources</a>
+        <a href="{{ "install/" | relURL }}"{{ if hasPrefix .RelPermalink "/a9s/install" }} class="active"{{ end }}>Install</a>
+        <a href="{{ "docs/" | relURL }}"{{ if hasPrefix .RelPermalink "/a9s/docs" }} class="active"{{ end }}>Docs</a>
+        <a href="{{ "resources/" | relURL }}"{{ if hasPrefix .RelPermalink "/a9s/resources" }} class="active"{{ end }}>Resources</a>
         <a href="https://github.com/k2m30/a9s">GitHub</a>
       </nav>
     </div>
   </header>
-  <main>{{ block "main" . }}{{ end }}</main>
+  <main id="main-content">{{ block "main" . }}{{ end }}</main>
   <footer>
     <div class="container">
-      <p>a9s is open source (GPL-3.0-or-later) | <a href="https://github.com/k2m30/a9s">GitHub</a></p>
+      <p class="footer-links">
+        <a href="{{ "docs/" | relURL }}">Docs</a>
+        <a href="{{ "install/" | relURL }}">Install</a>
+        <a href="{{ "resources/" | relURL }}">Resources</a>
+        <a href="https://github.com/k2m30/a9s/releases">Releases</a>
+        <a href="https://github.com/k2m30/a9s">GitHub</a>
+      </p>
+      <p>a9s is open source (GPL-3.0-or-later)</p>
     </div>
   </footer>
+  <script>
+  (function() {
+    /* Copy button for install command */
+    var copyBtn = document.querySelector('.copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function() {
+        var cmd = document.getElementById('install-cmd');
+        if (!cmd) return;
+        navigator.clipboard.writeText(cmd.textContent).then(function() {
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(function() {
+            copyBtn.textContent = 'Copy';
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        });
+      });
+    }
+    /* Resource filter */
+    var filter = document.getElementById('resource-filter');
+    if (filter) {
+      filter.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        var rows = document.querySelectorAll('table tr');
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].parentElement.tagName === 'THEAD') continue;
+          rows[i].style.display = rows[i].textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+        }
+        /* Hide empty table headers when all rows hidden */
+        var tables = document.querySelectorAll('table');
+        for (var j = 0; j < tables.length; j++) {
+          var visible = tables[j].querySelectorAll('tbody tr:not([style*="display: none"])');
+          var section = tables[j].previousElementSibling;
+          if (section && section.tagName === 'H2') {
+            section.style.display = visible.length === 0 && q ? 'none' : '';
+          }
+          tables[j].style.display = visible.length === 0 && q ? 'none' : '';
+        }
+      });
+    }
+    /* Copy buttons on all code blocks */
+    var pres = document.querySelectorAll('pre');
+    for (var p = 0; p < pres.length; p++) {
+      (function(pre) {
+        var btn = document.createElement('button');
+        btn.className = 'code-copy';
+        btn.type = 'button';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', function() {
+          var code = pre.querySelector('code');
+          var text = code ? code.textContent : pre.textContent;
+          navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function() {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 2000);
+          });
+        });
+        pre.appendChild(btn);
+      })(pres[p]);
+    }
+    /* Close mobile nav on link click */
+    var toggle = document.getElementById('nav-toggle');
+    if (toggle) {
+      var navLinks = document.querySelectorAll('header nav a');
+      for (var k = 0; k < navLinks.length; k++) {
+        navLinks[k].addEventListener('click', function() { toggle.checked = false; });
+      }
+    }
+  })();
+  </script>
 </body>
 </html>
