@@ -68,6 +68,25 @@ func TestListProfiles_CredentialsFileNeverRead(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigPath_EnvOverride(t *testing.T) {
+	t.Setenv("AWS_CONFIG_FILE", "/custom/path/config")
+	got := awsclient.DefaultConfigPath()
+	if got != "/custom/path/config" {
+		t.Errorf("expected /custom/path/config, got %s", got)
+	}
+}
+
+func TestDefaultConfigPath_FallbackWithoutEnv(t *testing.T) {
+	t.Setenv("AWS_CONFIG_FILE", "")
+	got := awsclient.DefaultConfigPath()
+	if got == "" {
+		t.Error("expected non-empty default path")
+	}
+	if got == "/custom/path/config" {
+		t.Error("should not return custom path when env is empty")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // T035 - Test region helpers
 // ---------------------------------------------------------------------------
