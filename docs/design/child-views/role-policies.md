@@ -1,6 +1,6 @@
 # Child View: IAM Roles --> Attached Policies
 
-**Status:** Planned
+**Status:** Implemented
 **Tier:** SHOULD-HAVE
 
 ---

@@ -1,6 +1,6 @@
 # Child View: IAM Groups --> Group Members
 
-**Status:** Planned
+**Status:** Implemented
 **Tier:** SHOULD-HAVE (Structural)
 
 ---

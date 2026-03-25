@@ -32,6 +32,9 @@ func init() {
 	RegisterChildDemo("elb_listeners", func(parentCtx map[string]string) []resource.Resource {
 		return elbListenerFixtures(parentCtx["load_balancer_arn"])
 	})
+	RegisterChildDemo("elb_listener_rules", func(parentCtx map[string]string) []resource.Resource {
+		return elbListenerRuleFixtures()
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +422,7 @@ func elbListenerFixtures(_ string) []resource.Resource {
 				"default_action_target": "acme-web-tg",
 				"ssl_policy":            "ELBSecurityPolicy-TLS13-1-2-2021-06",
 				"certificate_short":     "abc-def-123",
+				"listener_display":      ":443 HTTPS",
 			},
 			RawStruct: elbv2types.Listener{
 				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/aaa111"),
@@ -445,6 +449,7 @@ func elbListenerFixtures(_ string) []resource.Resource {
 				"default_action_target": "HTTPS://#{host}:443#{path}?#{query}",
 				"ssl_policy":            "",
 				"certificate_short":     "",
+				"listener_display":      ":80 HTTP",
 			},
 			RawStruct: elbv2types.Listener{
 				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/bbb222"),
@@ -471,6 +476,7 @@ func elbListenerFixtures(_ string) []resource.Resource {
 				"default_action_target": "acme-api-tg",
 				"ssl_policy":            "ELBSecurityPolicy-2016-08",
 				"certificate_short":     "xyz-789-456",
+				"listener_display":      ":8443 HTTPS",
 			},
 			RawStruct: elbv2types.Listener{
 				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/ccc333"),
@@ -497,6 +503,7 @@ func elbListenerFixtures(_ string) []resource.Resource {
 				"default_action_target": "acme-nlb-tcp-tg",
 				"ssl_policy":            "",
 				"certificate_short":     "",
+				"listener_display":      ":5000 TCP",
 			},
 			RawStruct: elbv2types.Listener{
 				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/net/acme-prod-nlb/abcdef1234567890/ddd444"),
@@ -506,6 +513,96 @@ func elbListenerFixtures(_ string) []resource.Resource {
 					Type:           elbv2types.ActionTypeEnumForward,
 					TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-nlb-tcp-tg/112233aabbccddee"),
 				}},
+			},
+		},
+	}
+}
+
+func elbListenerRuleFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule1",
+			Name:   "100",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "100",
+				"conditions_summary": "path: /api/*",
+				"action_type":        "forward",
+				"action_target":      "acme-api-tg",
+				"is_default":         "false",
+			},
+			RawStruct: elbv2types.Rule{
+				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule1"),
+				Priority: aws.String("100"),
+				IsDefault: aws.Bool(false),
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule2",
+			Name:   "200",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "200",
+				"conditions_summary": "host: admin.example.com AND path: /dashboard/*",
+				"action_type":        "forward",
+				"action_target":      "acme-admin-tg",
+				"is_default":         "false",
+			},
+			RawStruct: elbv2types.Rule{
+				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule2"),
+				Priority: aws.String("200"),
+				IsDefault: aws.Bool(false),
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule3",
+			Name:   "300",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "300",
+				"conditions_summary": "path: /health",
+				"action_type":        "fixed-response",
+				"action_target":      "200 text/plain",
+				"is_default":         "false",
+			},
+			RawStruct: elbv2types.Rule{
+				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule3"),
+				Priority: aws.String("300"),
+				IsDefault: aws.Bool(false),
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule4",
+			Name:   "400",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "400",
+				"conditions_summary": "path: /old/*",
+				"action_type":        "redirect",
+				"action_target":      "HTTPS://#{host}:443/new/#{path}?#{query}",
+				"is_default":         "false",
+			},
+			RawStruct: elbv2types.Rule{
+				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule4"),
+				Priority: aws.String("400"),
+				IsDefault: aws.Bool(false),
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/default",
+			Name:   "default",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "default",
+				"conditions_summary": "",
+				"action_type":        "forward",
+				"action_target":      "acme-web-tg",
+				"is_default":         "true",
+			},
+			RawStruct: elbv2types.Rule{
+				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/default"),
+				Priority: aws.String("default"),
+				IsDefault: aws.Bool(true),
 			},
 		},
 	}

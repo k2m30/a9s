@@ -526,3 +526,23 @@ type CodeBuildListBuildsForProjectAPI interface {
 type CodeBuildBatchGetBuildsAPI interface {
 	BatchGetBuilds(ctx context.Context, params *codebuild.BatchGetBuildsInput, optFns ...func(*codebuild.Options)) (*codebuild.BatchGetBuildsOutput, error)
 }
+
+// IAMListAttachedRolePoliciesAPI defines the interface for the IAM ListAttachedRolePolicies operation.
+type IAMListAttachedRolePoliciesAPI interface {
+	ListAttachedRolePolicies(ctx context.Context, params *iam.ListAttachedRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error)
+}
+
+// IAMListRolePoliciesAPI defines the interface for the IAM ListRolePolicies operation.
+type IAMListRolePoliciesAPI interface {
+	ListRolePolicies(ctx context.Context, params *iam.ListRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error)
+}
+
+// IAMGetGroupAPI defines the interface for the IAM GetGroup operation.
+type IAMGetGroupAPI interface {
+	GetGroup(ctx context.Context, params *iam.GetGroupInput, optFns ...func(*iam.Options)) (*iam.GetGroupOutput, error)
+}
+
+// ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
+type ELBv2DescribeRulesAPI interface {
+	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)
+}

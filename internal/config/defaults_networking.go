@@ -197,6 +197,17 @@ func networkingDefaultViews() map[string]ViewDef {
 				"SslPolicy", "Certificates", "AlpnPolicy", "MutualAuthentication",
 			},
 		},
+		"elb_listener_rules": {
+			List: []ListColumn{
+				{Title: "Priority", Key: "priority", Width: 10},
+				{Title: "Conditions", Key: "conditions_summary", Width: 36},
+				{Title: "Action", Key: "action_type", Width: 16},
+				{Title: "Target", Key: "action_target", Width: 32},
+			},
+			Detail: []string{
+				"RuleArn", "Priority", "Conditions", "Actions", "IsDefault",
+			},
+		},
 		"tg_health": {
 			List: []ListColumn{
 				{Title: "Target ID", Key: "target_id", Width: 24},

@@ -230,3 +230,33 @@ func ECRImageColumns() []Column {
 		{Key: "finding_counts", Title: "Findings", Width: 20, Sortable: false},
 	}
 }
+
+// RolePolicyColumns returns the column definitions for IAM role policies
+// (both managed and inline).
+func RolePolicyColumns() []Column {
+	return []Column{
+		{Key: "policy_name", Title: "Policy Name", Width: 40, Sortable: true},
+		{Key: "policy_arn", Title: "Policy ARN", Width: 56, Sortable: true},
+		{Key: "policy_type", Title: "Type", Width: 10, Sortable: true},
+	}
+}
+
+// IAMGroupMemberColumns returns the column definitions for IAM group members.
+func IAMGroupMemberColumns() []Column {
+	return []Column{
+		{Key: "user_name", Title: "User Name", Width: 28, Sortable: true},
+		{Key: "user_id", Title: "User ID", Width: 24, Sortable: true},
+		{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
+		{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
+	}
+}
+
+// ELBListenerRuleColumns returns the column definitions for ELB listener rules.
+func ELBListenerRuleColumns() []Column {
+	return []Column{
+		{Key: "priority", Title: "Priority", Width: 10, Sortable: true},
+		{Key: "conditions_summary", Title: "Conditions", Width: 36, Sortable: true},
+		{Key: "action_type", Title: "Action", Width: 16, Sortable: true},
+		{Key: "action_target", Title: "Target", Width: 32, Sortable: false},
+	}
+}

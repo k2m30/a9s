@@ -13,6 +13,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -899,6 +900,102 @@ func TestQA_ListRawStruct_PipelineStages(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_RolePolicies: verify list rendering with RolePolicyRow RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_RolePolicies(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("role_policies")
+	if typeDef == nil {
+		t.Fatal("role_policies child resource type not registered")
+	}
+
+	cfg := configForType("role_policies")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	row := awsclient.RolePolicyRow{
+		PolicyName: "ReadOnlyAccess",
+		PolicyArn:  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+		PolicyType: "Managed",
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
+			Name:   "ReadOnlyAccess",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "ReadOnlyAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+				"policy_type": "Managed",
+			},
+			RawStruct: row,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "ReadOnlyAccess") {
+		t.Errorf("role_policies list should contain policy name, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Managed") {
+		t.Errorf("role_policies list should contain policy type, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_ELBListenerRules: verify list rendering with Rule RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_ELBListenerRules(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("elb_listener_rules")
+	if typeDef == nil {
+		t.Fatal("elb_listener_rules child resource type not registered")
+	}
+
+	cfg := configForType("elb_listener_rules")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	rule := elbtypes.Rule{
+		RuleArn:  ptrString("arn:rule/1"),
+		Priority: ptrString("100"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "arn:rule/1",
+			Name:   "100",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "100",
+				"conditions_summary": "path: /api/*",
+				"action_type":        "forward",
+				"action_target":      "api-tg",
+			},
+			RawStruct: rule,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "100") {
+		t.Errorf("elb_listener_rules list should contain priority, got:\n%s", view)
+	}
+	if !strings.Contains(view, "forward") {
+		t.Errorf("elb_listener_rules list should contain action type, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -915,4 +1012,7 @@ var (
 	_ cbtypes.Build                    = cbtypes.Build{}
 	_ ecrtypes.ImageDetail             = ecrtypes.ImageDetail{}
 	_ awsclient.PipelineStageRow       = awsclient.PipelineStageRow{}
+	_ awsclient.RolePolicyRow          = awsclient.RolePolicyRow{}
+	_ elbtypes.Rule                    = elbtypes.Rule{}
+	_ iamtypes.User                    = iamtypes.User{}
 )
