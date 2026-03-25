@@ -664,3 +664,71 @@ func TestQA_YAML_AlarmHistory_RawContentUncolored(t *testing.T) {
 		t.Error("AlarmHistory RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// ELB Listeners YAML view fixtures
+// ===========================================================================
+
+func fixtureELBListeners() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
+			Name:   "443",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "443",
+				"protocol":              "HTTPS",
+				"default_action_type":   "forward",
+				"default_action_target": "api-prod-tg",
+				"ssl_policy":            "ELBSecurityPolicy-TLS13-1-2-2021-06",
+				"certificate_short":     "abc-def-123",
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/ghi789",
+			Name:   "80",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "80",
+				"protocol":              "HTTP",
+				"default_action_type":   "redirect",
+				"default_action_target": "HTTPS:443",
+				"ssl_policy":            "",
+				"certificate_short":     "",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ELB Listeners YAML tests
+// ===========================================================================
+
+func TestQA_YAML_ELBListeners_ContainsFields(t *testing.T) {
+	for _, r := range fixtureELBListeners() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("ELBListeners YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("ELBListeners YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_ELBListeners_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureELBListeners()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ELBListeners FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_ELBListeners_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureELBListeners()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("ELBListeners RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

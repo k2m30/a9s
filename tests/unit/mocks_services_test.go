@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -859,6 +860,35 @@ func (m *mockCloudWatchDescribeAlarmHistoryClient) DescribeAlarmHistory(ctx cont
 	if m.outputs != nil {
 		if m.callIdx >= len(m.outputs) {
 			return &cloudwatch.DescribeAlarmHistoryOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
+// ELBv2 Describe Listeners mocks (child of Load Balancers)
+// ---------------------------------------------------------------------------
+
+// mockELBv2DescribeListenersClient implements awsclient.ELBv2DescribeListenersAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockELBv2DescribeListenersClient struct {
+	output  *elbv2.DescribeListenersOutput
+	outputs []*elbv2.DescribeListenersOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockELBv2DescribeListenersClient) DescribeListeners(ctx context.Context, params *elbv2.DescribeListenersInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &elbv2.DescribeListenersOutput{}, nil
 		}
 		out := m.outputs[m.callIdx]
 		m.callIdx++

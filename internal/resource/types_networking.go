@@ -15,6 +15,12 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "elb_listeners",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"load_balancer_arn": "load_balancer_arn", "lb_name": "Name"},
+				DisplayNameKey: "lb_name",
+			}},
 		},
 		{
 			Name:      "Target Groups",

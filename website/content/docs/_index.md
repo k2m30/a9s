@@ -32,6 +32,7 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
 | Auto Scaling Groups | Scaling Activities | `Enter` | Scaling activity history with status, description, cause |
 | CloudWatch Alarms | Alarm History | `Enter` | State transitions, configuration updates, and action events |
+| Load Balancers | Listeners | `Enter` | Port, protocol, action, target, SSL policy, certificate |
 
 ## Commands
 
