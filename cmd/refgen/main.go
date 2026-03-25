@@ -133,6 +133,8 @@ func main() {
 		{"elb_listeners", "elbv2types.Listener", reflect.TypeOf(elbv2types.Listener{})},
 		{"sfn_executions", "sfntypes.ExecutionListItem", reflect.TypeOf(sfntypes.ExecutionListItem{})},
 		{"sfn_execution_history", "sfntypes.HistoryEvent", reflect.TypeOf(sfntypes.HistoryEvent{})},
+		{"cb_builds", "cbtypes.Build", reflect.TypeOf(cbtypes.Build{})},
+		{"cb_build_logs", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

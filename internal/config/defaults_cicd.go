@@ -70,6 +70,31 @@ func cicdDefaultViews() map[string]ViewDef {
 				"Description", "AdministratorAccount", "CreatedTime",
 			},
 		},
+		"cb_builds": {
+			List: []ListColumn{
+				{Title: "Build #", Key: "build_number", Width: 10},
+				{Title: "Status", Key: "build_status", Width: 14},
+				{Title: "Start Time", Key: "start_time", Width: 22},
+				{Title: "Duration", Key: "duration", Width: 12},
+				{Title: "Source Version", Key: "source_version_short", Width: 14},
+				{Title: "Initiator", Key: "initiator", Width: 24},
+			},
+			Detail: []string{
+				"Id", "Arn", "BuildNumber", "BuildStatus", "StartTime", "EndTime",
+				"CurrentPhase", "SourceVersion", "ResolvedSourceVersion", "Initiator",
+				"Source", "Environment", "Phases", "Logs", "Cache", "VpcConfig",
+				"ServiceRole", "TimeoutInMinutes", "QueuedTimeoutInMinutes", "BuildBatchArn",
+			},
+		},
+		"cb_build_logs": {
+			List: []ListColumn{
+				{Title: "Timestamp", Key: "timestamp", Width: 22},
+				{Title: "Message", Key: "message", Width: 120},
+			},
+			Detail: []string{
+				"Timestamp", "IngestionTime", "Message", "EventId",
+			},
+		},
 		// Child views for CI/CD resources
 		"cfn_events": {
 			List: []ListColumn{

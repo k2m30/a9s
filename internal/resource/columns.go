@@ -182,3 +182,25 @@ func ELBListenerColumns() []Column {
 		{Key: "certificate_short", Title: "Certificate", Width: 32, Sortable: false},
 	}
 }
+
+// CBBuildColumns returns the column definitions for CodeBuild builds within
+// a CodeBuild project.
+func CBBuildColumns() []Column {
+	return []Column{
+		{Key: "build_number", Title: "Build #", Width: 10, Sortable: true},
+		{Key: "build_status", Title: "Status", Width: 14, Sortable: true},
+		{Key: "start_time", Title: "Start Time", Width: 22, Sortable: true},
+		{Key: "duration", Title: "Duration", Width: 12, Sortable: true},
+		{Key: "source_version_short", Title: "Source Version", Width: 14, Sortable: false},
+		{Key: "initiator", Title: "Initiator", Width: 24, Sortable: false},
+	}
+}
+
+// CBBuildLogColumns returns the column definitions for CodeBuild build log
+// events within a build.
+func CBBuildLogColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "message", Title: "Message", Width: 120, Sortable: false},
+	}
+}

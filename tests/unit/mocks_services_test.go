@@ -955,6 +955,54 @@ func (m *mockSFNGetExecutionHistoryClient) GetExecutionHistory(ctx context.Conte
 	return m.output, nil
 }
 
+// ---------------------------------------------------------------------------
+// CodeBuild ListBuildsForProject mocks (child of CodeBuild Projects)
+// ---------------------------------------------------------------------------
+
+// mockCodeBuildListBuildsForProjectClient implements awsclient.CodeBuildListBuildsForProjectAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+type mockCodeBuildListBuildsForProjectClient struct {
+	outputs []*codebuild.ListBuildsForProjectOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCodeBuildListBuildsForProjectClient) ListBuildsForProject(ctx context.Context, params *codebuild.ListBuildsForProjectInput, optFns ...func(*codebuild.Options)) (*codebuild.ListBuildsForProjectOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &codebuild.ListBuildsForProjectOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// CodeBuild BatchGetBuilds mocks (child of CodeBuild Projects)
+// ---------------------------------------------------------------------------
+
+// mockCodeBuildBatchGetBuildsClient implements awsclient.CodeBuildBatchGetBuildsAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+type mockCodeBuildBatchGetBuildsClient struct {
+	outputs []*codebuild.BatchGetBuildsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockCodeBuildBatchGetBuildsClient) BatchGetBuilds(ctx context.Context, params *codebuild.BatchGetBuildsInput, optFns ...func(*codebuild.Options)) (*codebuild.BatchGetBuildsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &codebuild.BatchGetBuildsOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String
