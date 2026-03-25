@@ -85,5 +85,47 @@ func messagingDefaultViews() map[string]ViewDef {
 				"Name", "StateMachineArn", "Type", "CreationDate",
 			},
 		},
+		"sfn_execution_history": {
+			List: []ListColumn{
+				{Title: "Timestamp", Path: "Timestamp", Width: 22},
+				{Title: "Event Type", Key: "event_type_short", Width: 24},
+				{Title: "State", Key: "state_name", Width: 24},
+				{Title: "Detail", Key: "event_detail", Width: 40},
+			},
+			Detail: []string{
+				"Timestamp", "Type", "Id", "PreviousEventId",
+				"ActivityFailedEventDetails", "ActivityScheduleFailedEventDetails",
+				"ActivityScheduledEventDetails", "ActivityStartedEventDetails",
+				"ActivitySucceededEventDetails", "ActivityTimedOutEventDetails",
+				"ExecutionAbortedEventDetails", "ExecutionFailedEventDetails",
+				"ExecutionStartedEventDetails", "ExecutionSucceededEventDetails",
+				"ExecutionTimedOutEventDetails",
+				"LambdaFunctionFailedEventDetails", "LambdaFunctionScheduledEventDetails",
+				"LambdaFunctionStartFailedEventDetails", "LambdaFunctionSucceededEventDetails",
+				"LambdaFunctionTimedOutEventDetails",
+				"TaskFailedEventDetails", "TaskScheduledEventDetails",
+				"TaskStartedEventDetails", "TaskStartFailedEventDetails",
+				"TaskSubmitFailedEventDetails", "TaskSubmittedEventDetails",
+				"TaskSucceededEventDetails", "TaskTimedOutEventDetails",
+				"MapRunFailedEventDetails", "MapRunStartedEventDetails",
+				"StateEnteredEventDetails", "StateExitedEventDetails",
+			},
+		},
+		"sfn_executions": {
+			List: []ListColumn{
+				{Title: "Name", Path: "Name", Width: 36},
+				{Title: "Status", Path: "Status", Width: 12},
+				{Title: "Start Date", Path: "StartDate", Width: 22},
+				{Title: "Stop Date", Path: "StopDate", Width: 22},
+				{Title: "Duration", Key: "duration", Width: 12},
+			},
+			Detail: []string{
+				"ExecutionArn", "Name", "Status",
+				"StartDate", "StopDate",
+				"StateMachineArn", "StateMachineAliasArn", "StateMachineVersionArn",
+				"MapRunArn", "ItemCount",
+				"RedriveCount", "RedriveDate",
+			},
+		},
 	}
 }

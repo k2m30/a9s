@@ -351,6 +351,16 @@ type SFNListStateMachinesAPI interface {
 	ListStateMachines(ctx context.Context, params *sfn.ListStateMachinesInput, optFns ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error)
 }
 
+// SFNListExecutionsAPI defines the interface for the SFN ListExecutions operation.
+type SFNListExecutionsAPI interface {
+	ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error)
+}
+
+// SFNGetExecutionHistoryAPI defines the interface for the SFN GetExecutionHistory operation.
+type SFNGetExecutionHistoryAPI interface {
+	GetExecutionHistory(ctx context.Context, params *sfn.GetExecutionHistoryInput, optFns ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error)
+}
+
 // CodePipelineListPipelinesAPI defines the interface for the CodePipeline ListPipelines operation.
 type CodePipelineListPipelinesAPI interface {
 	ListPipelines(ctx context.Context, params *codepipeline.ListPipelinesInput, optFns ...func(*codepipeline.Options)) (*codepipeline.ListPipelinesOutput, error)

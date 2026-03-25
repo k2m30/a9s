@@ -342,8 +342,14 @@ func (m *ResourceListModel) SetSize(w, h int) {
 }
 
 // CopyContent returns the selected resource's ID for clipboard copy.
+// When the resource type defines a CopyField, that field value is used instead.
 func (m ResourceListModel) CopyContent() (string, string) {
 	if r := m.SelectedResource(); r != nil {
+		if m.typeDef.CopyField != "" {
+			if val, ok := r.Fields[m.typeDef.CopyField]; ok && val != "" {
+				return val, "Copied: " + val
+			}
+		}
 		return r.ID, "Copied: " + r.ID
 	}
 	return "", ""
@@ -387,6 +393,12 @@ func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) 
 		}
 		// Check drill condition
 		if child.DrillCondition != nil && !child.DrillCondition(*r) {
+			if child.DrillBlockMessage != "" {
+				msg := child.DrillBlockMessage
+				return m, func() tea.Msg {
+					return messages.FlashMsg{Text: msg, IsError: true}
+				}
+			}
 			continue
 		}
 		// Build context and create message

@@ -189,6 +189,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | Auto Scaling Groups | Scaling Activities | `Enter` | Scaling activity history with status, description, cause |
 | CloudWatch Alarms | Alarm History | `Enter` | State transitions, configuration updates, and action events |
 | Load Balancers | Listeners | `Enter` | Port, protocol, action, target, SSL policy, certificate |
+| Step Functions | Executions | `Enter` | Execution list with status, duration, start/stop times |
+| SFN Executions | Execution History | `Enter` | Step-by-step state machine trace with errors and state names |
 
 ## Commands
 

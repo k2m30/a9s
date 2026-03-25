@@ -149,6 +149,28 @@ func AlarmHistoryColumns() []Column {
 	}
 }
 
+// SFNExecutionColumns returns the column definitions for SFN execution list items.
+func SFNExecutionColumns() []Column {
+	return []Column{
+		{Key: "name", Title: "Name", Width: 36, Sortable: true},
+		{Key: "status", Title: "Status", Width: 12, Sortable: true},
+		{Key: "start_date", Title: "Start Date", Width: 22, Sortable: true},
+		{Key: "stop_date", Title: "Stop Date", Width: 22, Sortable: true},
+		{Key: "duration", Title: "Duration", Width: 12, Sortable: true},
+	}
+}
+
+// SFNExecutionHistoryColumns returns the column definitions for SFN execution
+// history events.
+func SFNExecutionHistoryColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "event_type_short", Title: "Event Type", Width: 24, Sortable: true},
+		{Key: "state_name", Title: "State", Width: 24, Sortable: true},
+		{Key: "event_detail", Title: "Detail", Width: 40, Sortable: false},
+	}
+}
+
 // ELBListenerColumns returns the column definitions for ELB listeners.
 func ELBListenerColumns() []Column {
 	return []Column{

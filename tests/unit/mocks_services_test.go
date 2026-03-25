@@ -897,6 +897,64 @@ func (m *mockELBv2DescribeListenersClient) DescribeListeners(ctx context.Context
 	return m.output, nil
 }
 
+// ---------------------------------------------------------------------------
+// SFN ListExecutions mocks (child of Step Functions)
+// ---------------------------------------------------------------------------
+
+// mockSFNListExecutionsClient implements awsclient.SFNListExecutionsAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockSFNListExecutionsClient struct {
+	output  *sfn.ListExecutionsOutput
+	outputs []*sfn.ListExecutionsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockSFNListExecutionsClient) ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &sfn.ListExecutionsOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
+// SFN GetExecutionHistory mocks (child of SFN Executions — Level 2)
+// ---------------------------------------------------------------------------
+
+// mockSFNGetExecutionHistoryClient implements awsclient.SFNGetExecutionHistoryAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockSFNGetExecutionHistoryClient struct {
+	output  *sfn.GetExecutionHistoryOutput
+	outputs []*sfn.GetExecutionHistoryOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockSFNGetExecutionHistoryClient) GetExecutionHistory(ctx context.Context, params *sfn.GetExecutionHistoryInput, optFns ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &sfn.GetExecutionHistoryOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

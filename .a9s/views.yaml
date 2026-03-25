@@ -1860,6 +1860,85 @@ views:
     detail:
       [Name, StateMachineArn, Type, CreationDate]
 
+  sfn_execution_history:
+    list:
+      Timestamp:
+        path: Timestamp
+        width: 22
+      Event Type:
+        key: event_type_short
+        width: 24
+      State:
+        key: state_name
+        width: 24
+      Detail:
+        key: event_detail
+        width: 40
+    detail:
+      - Timestamp
+      - Type
+      - Id
+      - PreviousEventId
+      - ActivityFailedEventDetails
+      - ActivityScheduleFailedEventDetails
+      - ActivityScheduledEventDetails
+      - ActivityStartedEventDetails
+      - ActivitySucceededEventDetails
+      - ActivityTimedOutEventDetails
+      - ExecutionAbortedEventDetails
+      - ExecutionFailedEventDetails
+      - ExecutionStartedEventDetails
+      - ExecutionSucceededEventDetails
+      - ExecutionTimedOutEventDetails
+      - LambdaFunctionFailedEventDetails
+      - LambdaFunctionScheduledEventDetails
+      - LambdaFunctionStartFailedEventDetails
+      - LambdaFunctionSucceededEventDetails
+      - LambdaFunctionTimedOutEventDetails
+      - TaskFailedEventDetails
+      - TaskScheduledEventDetails
+      - TaskStartedEventDetails
+      - TaskStartFailedEventDetails
+      - TaskSubmitFailedEventDetails
+      - TaskSubmittedEventDetails
+      - TaskSucceededEventDetails
+      - TaskTimedOutEventDetails
+      - MapRunFailedEventDetails
+      - MapRunStartedEventDetails
+      - StateEnteredEventDetails
+      - StateExitedEventDetails
+
+  sfn_executions:
+    list:
+      Name:
+        path: Name
+        width: 36
+      Status:
+        path: Status
+        width: 12
+      Start Date:
+        path: StartDate
+        width: 22
+      Stop Date:
+        path: StopDate
+        width: 22
+      Duration:
+        key: duration
+        width: 12
+    detail:
+      - ExecutionArn
+      - Name
+      - Status
+      - StartDate
+      - StopDate
+      - StateMachineArn
+      - StateMachineAliasArn
+      - StateMachineVersionArn
+      - MapRunArn
+      - ItemCount
+      - RedriveCount
+      - RedriveDate
+
   sg:
     list:
       Group ID:
