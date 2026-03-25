@@ -5,6 +5,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -14,6 +15,13 @@ func init() {
 	demoData["iam-user"] = iamUserFixtures
 	demoData["iam-group"] = iamGroupFixtures
 	demoData["waf"] = wafFixtures
+
+	RegisterChildDemo("role_policies", func(parentCtx map[string]string) []resource.Resource {
+		return rolePolicyFixtures()
+	})
+	RegisterChildDemo("iam_group_members", func(parentCtx map[string]string) []resource.Resource {
+		return iamGroupMemberFixtures()
+	})
 }
 
 // iamRoleFixtures returns demo IAM Role fixtures.
@@ -313,6 +321,199 @@ func iamGroupFixtures() []resource.Resource {
 				Arn:        aws.String("arn:aws:iam::123456789012:group/readonly"),
 				Path:       aws.String("/"),
 				CreateDate: aws.Time(mustParseTime("2024-03-01T08:10:00+00:00")),
+			},
+		},
+	}
+}
+
+// rolePolicyFixtures returns demo role policy fixtures (5 managed + 2 inline).
+func rolePolicyFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
+			Name:   "ReadOnlyAccess",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "ReadOnlyAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+				"policy_type": "Managed",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "ReadOnlyAccess",
+				PolicyArn:  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+				PolicyType: "Managed",
+			},
+		},
+		{
+			ID:     "arn:aws:iam::aws:policy/CloudWatchFullAccess",
+			Name:   "CloudWatchFullAccess",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "CloudWatchFullAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/CloudWatchFullAccess",
+				"policy_type": "Managed",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "CloudWatchFullAccess",
+				PolicyArn:  "arn:aws:iam::aws:policy/CloudWatchFullAccess",
+				PolicyType: "Managed",
+			},
+		},
+		{
+			ID:     "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+			Name:   "AmazonS3ReadOnlyAccess",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "AmazonS3ReadOnlyAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+				"policy_type": "Managed",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "AmazonS3ReadOnlyAccess",
+				PolicyArn:  "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+				PolicyType: "Managed",
+			},
+		},
+		{
+			ID:     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+			Name:   "AmazonEKSWorkerNodePolicy",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "AmazonEKSWorkerNodePolicy",
+				"policy_arn":  "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+				"policy_type": "Managed",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "AmazonEKSWorkerNodePolicy",
+				PolicyArn:  "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+				PolicyType: "Managed",
+			},
+		},
+		{
+			ID:     "arn:aws:iam::aws:policy/AdministratorAccess",
+			Name:   "AdministratorAccess",
+			Status: "failed",
+			Fields: map[string]string{
+				"policy_name": "AdministratorAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/AdministratorAccess",
+				"policy_type": "Managed",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "AdministratorAccess",
+				PolicyArn:  "arn:aws:iam::aws:policy/AdministratorAccess",
+				PolicyType: "Managed",
+			},
+		},
+		{
+			ID:     "trust-policy",
+			Name:   "trust-policy",
+			Status: "terminated",
+			Fields: map[string]string{
+				"policy_name": "trust-policy",
+				"policy_arn":  "",
+				"policy_type": "Inline",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "trust-policy",
+				PolicyArn:  "",
+				PolicyType: "Inline",
+			},
+		},
+		{
+			ID:     "logging-policy",
+			Name:   "logging-policy",
+			Status: "terminated",
+			Fields: map[string]string{
+				"policy_name": "logging-policy",
+				"policy_arn":  "",
+				"policy_type": "Inline",
+			},
+			RawStruct: awsclient.RolePolicyRow{
+				PolicyName: "logging-policy",
+				PolicyArn:  "",
+				PolicyType: "Inline",
+			},
+		},
+	}
+}
+
+// iamGroupMemberFixtures returns demo IAM group member fixtures.
+func iamGroupMemberFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "alice.johnson",
+			Name:   "alice.johnson",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "alice.johnson",
+				"user_id":            "AIDAEXAMPLE111111111",
+				"arn":                "arn:aws:iam::123456789012:user/alice.johnson",
+				"path":               "/",
+				"create_date":        "2024-06-15 09:00",
+				"password_last_used": "N/A (not in API)",
+			},
+			RawStruct: iamtypes.User{
+				UserName: aws.String("alice.johnson"),
+				UserId:   aws.String("AIDAEXAMPLE111111111"),
+				Arn:      aws.String("arn:aws:iam::123456789012:user/alice.johnson"),
+				Path:     aws.String("/"),
+			},
+		},
+		{
+			ID:     "bob.smith",
+			Name:   "bob.smith",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "bob.smith",
+				"user_id":            "AIDAEXAMPLE222222222",
+				"arn":                "arn:aws:iam::123456789012:user/bob.smith",
+				"path":               "/",
+				"create_date":        "2024-09-01 10:30",
+				"password_last_used": "N/A (not in API)",
+			},
+			RawStruct: iamtypes.User{
+				UserName: aws.String("bob.smith"),
+				UserId:   aws.String("AIDAEXAMPLE222222222"),
+				Arn:      aws.String("arn:aws:iam::123456789012:user/bob.smith"),
+				Path:     aws.String("/"),
+			},
+		},
+		{
+			ID:     "ci-service-account",
+			Name:   "ci-service-account",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "ci-service-account",
+				"user_id":            "AIDAEXAMPLE333333333",
+				"arn":                "arn:aws:iam::123456789012:user/service-accounts/ci-service-account",
+				"path":               "/service-accounts/",
+				"create_date":        "2025-01-10 12:00",
+				"password_last_used": "N/A (not in API)",
+			},
+			RawStruct: iamtypes.User{
+				UserName: aws.String("ci-service-account"),
+				UserId:   aws.String("AIDAEXAMPLE333333333"),
+				Arn:      aws.String("arn:aws:iam::123456789012:user/service-accounts/ci-service-account"),
+				Path:     aws.String("/service-accounts/"),
+			},
+		},
+		{
+			ID:     "deploy-bot",
+			Name:   "deploy-bot",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "deploy-bot",
+				"user_id":            "AIDAEXAMPLE444444444",
+				"arn":                "arn:aws:iam::123456789012:user/deploy-bot",
+				"path":               "/",
+				"create_date":        "2025-02-20 16:45",
+				"password_last_used": "N/A (not in API)",
+			},
+			RawStruct: iamtypes.User{
+				UserName: aws.String("deploy-bot"),
+				UserId:   aws.String("AIDAEXAMPLE444444444"),
+				Arn:      aws.String("arn:aws:iam::123456789012:user/deploy-bot"),
+				Path:     aws.String("/"),
 			},
 		},
 	}

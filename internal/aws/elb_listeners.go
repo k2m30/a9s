@@ -14,7 +14,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("elb_listeners", []string{
 		"port", "protocol", "default_action_type", "default_action_target",
-		"ssl_policy", "certificate_short",
+		"ssl_policy", "certificate_short", "listener_display",
 	})
 
 	resource.RegisterChildFetcher("elb_listeners", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
@@ -29,6 +29,14 @@ func init() {
 		Name:      "ELB Listeners",
 		ShortName: "elb_listeners",
 		Columns:   resource.ELBListenerColumns(),
+		Children: []resource.ChildViewDef{
+			{
+				ChildType:      "elb_listener_rules",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"listener_arn": "ID"},
+				DisplayNameKey: "listener_display",
+			},
+		},
 	})
 }
 
@@ -134,6 +142,7 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 			"default_action_target": actionTarget,
 			"ssl_policy":            sslPolicy,
 			"certificate_short":     certShort,
+			"listener_display":      fmt.Sprintf(":%s %s", port, protocol),
 		},
 		RawStruct: listener,
 	}

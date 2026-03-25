@@ -6,6 +6,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
@@ -136,6 +138,9 @@ func main() {
 		{"cb_builds", "cbtypes.Build", reflect.TypeOf(cbtypes.Build{})},
 		{"cb_build_logs", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
 		{"ecr_images", "ecrtypes.ImageDetail", reflect.TypeOf(ecrtypes.ImageDetail{})},
+		{"role_policies", "awsclient.RolePolicyRow", reflect.TypeOf(awsclient.RolePolicyRow{})},
+		{"iam_group_members", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
+		{"elb_listener_rules", "elbv2types.Rule", reflect.TypeOf(elbv2types.Rule{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

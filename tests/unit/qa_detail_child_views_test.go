@@ -13,6 +13,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -1176,5 +1177,160 @@ func TestQA_Detail_PipelineStages_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("PipelineStages detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Role Policies detail view tests (child of IAM Roles)
+// ===========================================================================
+
+func TestQA_Detail_RolePolicies_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	row := awsclient.RolePolicyRow{
+		PolicyName: "ReadOnlyAccess",
+		PolicyArn:  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+		PolicyType: "Managed",
+	}
+	res := buildResource("arn:aws:iam::aws:policy/ReadOnlyAccess", "ReadOnlyAccess", row)
+	res.Status = ""
+	res.Fields = map[string]string{
+		"policy_name": "ReadOnlyAccess",
+		"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+		"policy_type": "Managed",
+	}
+	cfg := detailConfigForType("role_policies")
+	m := newDetailModel(res, "role_policies", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"PolicyName",
+		"PolicyArn",
+		"PolicyType",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("RolePolicies detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_RolePolicies_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	row := awsclient.RolePolicyRow{}
+	res := buildResource("empty-role-policy", "empty-role-policy", row)
+	cfg := detailConfigForType("role_policies")
+	m := newDetailModel(res, "role_policies", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("RolePolicies detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// IAM Group Members detail view tests (child of IAM Groups)
+// ===========================================================================
+
+func TestQA_Detail_IAMGroupMembers_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	createDate := time.Date(2024, 3, 15, 9, 30, 0, 0, time.UTC)
+	user := iamtypes.User{
+		UserName:   ptrString("alice"),
+		UserId:     ptrString("AIDAEXAMPLE1111111111"),
+		Arn:        ptrString("arn:aws:iam::123456789012:user/alice"),
+		Path:       ptrString("/"),
+		CreateDate: &createDate,
+	}
+	res := buildResource("alice", "alice", user)
+	res.Status = ""
+	res.Fields = map[string]string{
+		"user_name":          "alice",
+		"user_id":            "AIDAEXAMPLE1111111111",
+		"create_date":        "2024-03-15 09:30",
+		"password_last_used": "N/A (not in API)",
+	}
+	cfg := detailConfigForType("iam_group_members")
+	m := newDetailModel(res, "iam_group_members", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"UserName",
+		"UserId",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("IAMGroupMembers detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_IAMGroupMembers_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	user := iamtypes.User{}
+	res := buildResource("empty-member", "empty-member", user)
+	cfg := detailConfigForType("iam_group_members")
+	m := newDetailModel(res, "iam_group_members", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("IAMGroupMembers detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ELB Listener Rules detail view tests (child of ELB Listeners)
+// ===========================================================================
+
+func TestQA_Detail_ELBListenerRules_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	rule := elbtypes.Rule{
+		RuleArn:  ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/api/abc/def/rule1"),
+		Priority: ptrString("100"),
+		Conditions: []elbtypes.RuleCondition{
+			{
+				Field: ptrString("path-pattern"),
+				PathPatternConfig: &elbtypes.PathPatternConditionConfig{
+					Values: []string{"/api/*"},
+				},
+			},
+		},
+		Actions: []elbtypes.Action{
+			{
+				Type:           elbtypes.ActionTypeEnumForward,
+				TargetGroupArn: ptrString("arn:tg/api-tg"),
+			},
+		},
+		IsDefault: ptrBool(false),
+	}
+	res := buildResource("arn:rule/1", "100", rule)
+	res.Status = ""
+	res.Fields = map[string]string{
+		"priority":           "100",
+		"conditions_summary": "path: /api/*",
+		"action_type":        "forward",
+		"action_target":      "api-tg",
+	}
+	cfg := detailConfigForType("elb_listener_rules")
+	m := newDetailModel(res, "elb_listener_rules", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"RuleArn",
+		"Priority",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("ELBListenerRules detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_ELBListenerRules_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	rule := elbtypes.Rule{}
+	res := buildResource("empty-rule", "empty-rule", rule)
+	cfg := detailConfigForType("elb_listener_rules")
+	m := newDetailModel(res, "elb_listener_rules", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("ELBListenerRules detail should not be empty even with nil fields")
 	}
 }

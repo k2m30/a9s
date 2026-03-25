@@ -28,7 +28,7 @@ tests/
   unit/          # 2,000+ unit tests
   integration/   # integration tests
 docs/
-  design/        # visual design spec (incl. child-views/ with 21 specs)
+  design/        # visual design spec (incl. child-views/ with 24 view levels)
   qa/            # QA user stories
 specs/           # feature specifications
 ```

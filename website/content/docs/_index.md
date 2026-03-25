@@ -39,6 +39,9 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | CodeBuild Builds | Build Logs | `Enter` | Full build output from CloudWatch Logs with phase highlighting |
 | CodePipelines | Pipeline Stages | `Enter` | Flattened stage→action view with status coloring and external URLs |
 | ECR Repositories | Images | `Enter` | Tags, digest, size, push time, scan findings with severity counts |
+| IAM Roles | Attached Policies | `Enter` | Managed and inline policies with type, ARN, admin highlight |
+| IAM Groups | Group Members | `Enter` | Member users with ID, creation date, password last used |
+| ELB Listeners | Listener Rules | `Enter` | Priority, conditions, action type, target (nested level 2) |
 
 ## Commands
 

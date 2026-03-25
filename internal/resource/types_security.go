@@ -14,6 +14,14 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
+			Children: []ChildViewDef{
+				{
+					ChildType:      "role_policies",
+					Key:            "enter",
+					ContextKeys:    map[string]string{"role_name": "ID"},
+					DisplayNameKey: "role_name",
+				},
+			},
 		},
 		{
 			Name:      "IAM Policies",
@@ -52,6 +60,14 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: true},
+			},
+			Children: []ChildViewDef{
+				{
+					ChildType:      "iam_group_members",
+					Key:            "enter",
+					ContextKeys:    map[string]string{"group_name": "ID"},
+					DisplayNameKey: "group_name",
+				},
 			},
 		},
 		{

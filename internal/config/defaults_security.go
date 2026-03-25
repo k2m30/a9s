@@ -68,5 +68,29 @@ func securityDefaultViews() map[string]ViewDef {
 				"Name", "Id", "ARN", "Description", "LockToken",
 			},
 		},
+		// Child views for security resources
+		"role_policies": {
+			List: []ListColumn{
+				{Title: "Policy Name", Key: "policy_name", Width: 40},
+				{Title: "Policy ARN", Key: "policy_arn", Width: 56},
+				{Title: "Type", Key: "policy_type", Width: 10},
+			},
+			Detail: []string{
+				"PolicyName", "PolicyArn", "PolicyType",
+			},
+		},
+		"iam_group_members": {
+			List: []ListColumn{
+				{Title: "User Name", Key: "user_name", Width: 28},
+				{Title: "User ID", Key: "user_id", Width: 24},
+				{Title: "Created", Key: "create_date", Width: 22},
+				{Title: "Password Last Used", Key: "password_last_used", Width: 22},
+			},
+			Detail: []string{
+				"UserName", "UserId", "Arn", "Path",
+				"CreateDate", "PasswordLastUsed",
+				"PermissionsBoundary", "Tags",
+			},
+		},
 	}
 }
