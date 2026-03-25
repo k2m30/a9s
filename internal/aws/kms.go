@@ -68,7 +68,7 @@ func FetchKMSKeys(
 			KeyId: aws.String(*key.KeyId),
 		})
 		if err != nil {
-			return nil, err
+			continue // skip keys we can't describe (e.g. permission denied)
 		}
 
 		meta := descOutput.KeyMetadata

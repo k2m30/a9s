@@ -255,3 +255,101 @@ func TestKMS_Aliases(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// T-KMS03 - DescribeKey partial failure: skip undescribable keys (fixes #85)
+// ---------------------------------------------------------------------------
+
+func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
+	// ListKeys returns 3 keys, but DescribeKey only succeeds for 2 of them
+	listKeysMock := &mockKMSListKeysClient{
+		output: &kms.ListKeysOutput{
+			Keys: []kmstypes.KeyListEntry{
+				{KeyId: aws.String("key-ok-1"), KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/key-ok-1")},
+				{KeyId: aws.String("key-denied"), KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/key-denied")},
+				{KeyId: aws.String("key-ok-2"), KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/key-ok-2")},
+			},
+		},
+	}
+
+	// Only key-ok-1 and key-ok-2 have describe outputs; key-denied is missing -> mock returns error
+	describeKeyMock := &mockKMSDescribeKeyClient{
+		outputs: map[string]*kms.DescribeKeyOutput{
+			"key-ok-1": {
+				KeyMetadata: &kmstypes.KeyMetadata{
+					KeyId:       aws.String("key-ok-1"),
+					Arn:         aws.String("arn:aws:kms:us-east-1:123456789012:key/key-ok-1"),
+					Description: aws.String("First key"),
+					KeyState:    kmstypes.KeyStateEnabled,
+					KeyManager:  kmstypes.KeyManagerTypeCustomer,
+					Enabled:     true,
+				},
+			},
+			"key-ok-2": {
+				KeyMetadata: &kmstypes.KeyMetadata{
+					KeyId:       aws.String("key-ok-2"),
+					Arn:         aws.String("arn:aws:kms:us-east-1:123456789012:key/key-ok-2"),
+					Description: aws.String("Second key"),
+					KeyState:    kmstypes.KeyStateEnabled,
+					KeyManager:  kmstypes.KeyManagerTypeCustomer,
+					Enabled:     true,
+				},
+			},
+		},
+	}
+
+	listAliasesMock := &mockKMSListAliasesClient{
+		output: &kms.ListAliasesOutput{
+			Aliases: []kmstypes.AliasListEntry{
+				{AliasName: aws.String("alias/first"), TargetKeyId: aws.String("key-ok-1")},
+				{AliasName: aws.String("alias/second"), TargetKeyId: aws.String("key-ok-2")},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	if err != nil {
+		t.Fatalf("expected no error (skip undescribable keys), got %v", err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources (skipping denied key), got %d", len(resources))
+	}
+
+	if resources[0].ID != "key-ok-1" {
+		t.Errorf("resource[0].ID: expected %q, got %q", "key-ok-1", resources[0].ID)
+	}
+	if resources[1].ID != "key-ok-2" {
+		t.Errorf("resource[1].ID: expected %q, got %q", "key-ok-2", resources[1].ID)
+	}
+}
+
+func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
+	// ListKeys returns 2 keys, but DescribeKey fails for both
+	listKeysMock := &mockKMSListKeysClient{
+		output: &kms.ListKeysOutput{
+			Keys: []kmstypes.KeyListEntry{
+				{KeyId: aws.String("key-fail-1"), KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/key-fail-1")},
+				{KeyId: aws.String("key-fail-2"), KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/key-fail-2")},
+			},
+		},
+	}
+
+	// Empty outputs map -> all DescribeKey calls will error
+	describeKeyMock := &mockKMSDescribeKeyClient{
+		outputs: map[string]*kms.DescribeKeyOutput{},
+	}
+
+	listAliasesMock := &mockKMSListAliasesClient{
+		output: &kms.ListAliasesOutput{Aliases: []kmstypes.AliasListEntry{}},
+	}
+
+	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	if err != nil {
+		t.Fatalf("expected no error (all keys skipped gracefully), got %v", err)
+	}
+
+	if len(resources) != 0 {
+		t.Errorf("expected 0 resources when all describes fail, got %d", len(resources))
+	}
+}
