@@ -194,8 +194,10 @@ func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) 
 // handleSecretRevealed pushes the secret reveal view or flashes an error.
 func (m Model) handleSecretRevealed(msg messages.SecretRevealedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.flash = flashState{text: "reveal failed: " + msg.Err.Error(), isError: true, active: true}
-		return m, nil
+		errText := "reveal failed: " + msg.Err.Error()
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: errText, IsError: true}
+		}
 	}
 	rv := views.NewReveal(msg.SecretName, msg.Value, m.keys)
 	rv.SetSize(m.innerSize())

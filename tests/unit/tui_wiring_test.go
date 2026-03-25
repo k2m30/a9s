@@ -349,9 +349,13 @@ func TestWiring_SecretRevealedMsg_Error(t *testing.T) {
 	tui.Version = "1.0.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
+	m, cmd := rootApplyMsg(m, messages.SecretRevealedMsg{
 		Err: errForTest("access denied"),
 	})
+	// The handler now returns a FlashMsg command; dispatch it.
+	if cmd != nil {
+		m, _ = rootApplyMsg(m, cmd())
+	}
 
 	plain := stripANSI(rootViewContent(m))
 	if !containsSubstring(plain, "reveal failed") {

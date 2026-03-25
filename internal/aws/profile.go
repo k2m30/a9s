@@ -9,8 +9,12 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-// DefaultConfigPath returns the default AWS config file path (~/.aws/config).
+// DefaultConfigPath returns the AWS config file path.
+// Honors $AWS_CONFIG_FILE if set; falls back to ~/.aws/config.
 func DefaultConfigPath() string {
+	if p := os.Getenv("AWS_CONFIG_FILE"); p != "" {
+		return p
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return filepath.Join("~", ".aws", "config")

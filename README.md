@@ -34,7 +34,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
-- 2,100+ unit tests
+- 2,300+ unit tests
 
 ## Installation
 

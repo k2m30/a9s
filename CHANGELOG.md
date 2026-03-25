@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.2] - 2026-03-25
+
+### Added
+- Respect `AWS_CONFIG_FILE` environment variable for profile discovery, enabling per-project AWS config via direnv (#88)
+
+### Fixed
+- Test count in README and website updated to reflect actual count (2,300+)
+
 ## [3.11.1] - 2026-03-25
 
 ### Fixed
