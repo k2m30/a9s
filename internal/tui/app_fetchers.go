@@ -143,6 +143,13 @@ func (m *Model) fetchSecretValue(secretName string) tea.Cmd {
 }
 
 func (m *Model) connectAWS(profile, region string) tea.Cmd {
+	// Resolve region fallback BEFORE the async closure so that NewAWSSession
+	// always receives a non-empty region. Without this, the SDK fails with
+	// "Missing Region" when ~/.aws/config is absent (issue #82).
+	if region == "" {
+		configPath := awsclient.DefaultConfigPath()
+		region = awsclient.GetDefaultRegion(configPath, profile)
+	}
 	return func() tea.Msg {
 		cfg, err := awsclient.NewAWSSession(profile, region)
 		if err != nil {
