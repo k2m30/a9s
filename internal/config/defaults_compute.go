@@ -40,6 +40,7 @@ func computeDefaultViews() map[string]ViewDef {
 		"ecs-svc": {
 			List: []ListColumn{
 				{Title: "Service Name", Path: "ServiceName", Width: 32},
+				{Title: "Cluster", Key: "cluster", Width: 24},
 				{Title: "Status", Path: "Status", Width: 12},
 				{Title: "Desired", Path: "DesiredCount", Width: 9},
 				{Title: "Running", Path: "RunningCount", Width: 9},
