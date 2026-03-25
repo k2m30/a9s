@@ -1,6 +1,6 @@
 # Child View: ECR Repositories --> Images
 
-**Status:** Planned
+**Status:** Implemented
 **Tier:** SHOULD-HAVE
 
 ---
