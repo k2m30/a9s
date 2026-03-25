@@ -17,7 +17,7 @@ func init() {
 		}
 		return FetchLoadBalancers(ctx, c.ELBv2)
 	})
-	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id"})
+	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"})
 }
 
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the
@@ -54,17 +54,23 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 			vpcID = *lb.VpcId
 		}
 
+		lbArn := ""
+		if lb.LoadBalancerArn != nil {
+			lbArn = *lb.LoadBalancerArn
+		}
+
 		r := resource.Resource{
 			ID:     lbName,
 			Name:   lbName,
 			Status: state,
 			Fields: map[string]string{
-				"name":     lbName,
-				"dns_name": dnsName,
-				"type":     lbType,
-				"scheme":   scheme,
-				"state":    state,
-				"vpc_id":   vpcID,
+				"name":              lbName,
+				"dns_name":          dnsName,
+				"type":              lbType,
+				"scheme":            scheme,
+				"state":             state,
+				"vpc_id":            vpcID,
+				"load_balancer_arn": lbArn,
 			},
 			RawStruct:  lb,
 		}

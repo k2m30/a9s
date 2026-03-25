@@ -3,7 +3,7 @@
 ## Overview
 
 All MUST-HAVE, SHOULD-HAVE, and Structural child views from the [devops research](devops-research.md).
-Seven child views already implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, and Lambda Invocation Logs.
+Fifteen child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, and ELB Listeners.
 
 ### Status Key
 
@@ -23,12 +23,12 @@ Seven child views already implemented: S3 Objects, R53 Records, Log Streams, Log
 | 3 | ECS Services (ecs-svc) | Service Events | MUST-HAVE | Implemented | [ecs-svc-events.md](ecs-svc-events.md) | No |
 | 4 | ECS Services (ecs-svc) | Tasks | MUST-HAVE | Implemented | [ecs-svc-tasks.md](ecs-svc-tasks.md) | No |
 | 5 | ECS Services (ecs-svc) | Container Logs | MUST-HAVE | Implemented | [ecs-svc-logs.md](ecs-svc-logs.md) | No |
-| 6 | CFN Stacks (cfn) | Stack Events | MUST-HAVE | Planned | [cfn-events.md](cfn-events.md) | No |
-| 7 | CFN Stacks (cfn) | Stack Resources | MUST-HAVE | Planned | [cfn-resources.md](cfn-resources.md) | No |
+| 6 | CFN Stacks (cfn) | Stack Events | MUST-HAVE | Implemented | [cfn-events.md](cfn-events.md) | No |
+| 7 | CFN Stacks (cfn) | Stack Resources | MUST-HAVE | Implemented | [cfn-resources.md](cfn-resources.md) | No |
 | 8 | Target Groups (tg) | Target Health | MUST-HAVE | Implemented | [tg-health.md](tg-health.md) | No |
-| 9 | ASG (asg) | Scaling Activities | MUST-HAVE | Planned | [asg-activities.md](asg-activities.md) | No |
-| 10 | Load Balancers (elb) | Listeners | MUST-HAVE | Planned | [elb-listeners.md](elb-listeners.md) | Yes: Rules (level 2) |
-| 11 | CW Alarms (alarm) | Alarm History | SHOULD-HAVE | Planned | [alarm-history.md](alarm-history.md) | No |
+| 9 | ASG (asg) | Scaling Activities | MUST-HAVE | Implemented | [asg-activities.md](asg-activities.md) | No |
+| 10 | Load Balancers (elb) | Listeners | MUST-HAVE | Implemented | [elb-listeners.md](elb-listeners.md) | Yes: Rules (level 2) |
+| 11 | CW Alarms (alarm) | Alarm History | SHOULD-HAVE | Implemented | [alarm-history.md](alarm-history.md) | No |
 | 12 | Step Functions (sfn) | Executions | SHOULD-HAVE | Planned | [sfn-executions.md](sfn-executions.md) | Yes: History (level 2) |
 | 13 | CodeBuild (cb) | Builds | SHOULD-HAVE | Planned | [cb-builds.md](cb-builds.md) | Yes: Build Logs (level 2) |
 | 14 | CodePipeline (pipeline) | Pipeline Stages | SHOULD-HAVE | Planned | [pipeline-stages.md](pipeline-stages.md) | No |

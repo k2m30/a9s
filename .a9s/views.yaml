@@ -1017,6 +1017,36 @@ views:
       - CanonicalHostedZoneId
       - CreatedTime
 
+  elb_listeners:
+    list:
+      Port:
+        path: Port
+        width: 8
+      Protocol:
+        path: Protocol
+        width: 10
+      Action:
+        key: default_action_type
+        width: 16
+      Target:
+        key: default_action_target
+        width: 32
+      SSL Policy:
+        path: SslPolicy
+        width: 24
+      Certificate:
+        key: certificate_short
+        width: 32
+    detail:
+      - ListenerArn
+      - Port
+      - Protocol
+      - DefaultActions
+      - SslPolicy
+      - Certificates
+      - AlpnPolicy
+      - MutualAuthentication
+
   eni:
     list:
       ENI ID:

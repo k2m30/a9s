@@ -130,6 +130,7 @@ func main() {
 		{"cfn_resources", "cfntypes.StackResourceSummary", reflect.TypeOf(cfntypes.StackResourceSummary{})},
 		{"asg_activities", "asgtypes.Activity", reflect.TypeOf(asgtypes.Activity{})},
 		{"alarm_history", "cwtypes.AlarmHistoryItem", reflect.TypeOf(cwtypes.AlarmHistoryItem{})},
+		{"elb_listeners", "elbv2types.Listener", reflect.TypeOf(elbv2types.Listener{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

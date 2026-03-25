@@ -148,3 +148,15 @@ func AlarmHistoryColumns() []Column {
 		{Key: "history_summary", Title: "Summary", Width: 60, Sortable: false},
 	}
 }
+
+// ELBListenerColumns returns the column definitions for ELB listeners.
+func ELBListenerColumns() []Column {
+	return []Column{
+		{Key: "port", Title: "Port", Width: 8, Sortable: true},
+		{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
+		{Key: "default_action_type", Title: "Action", Width: 16, Sortable: true},
+		{Key: "default_action_target", Title: "Target", Width: 32, Sortable: false},
+		{Key: "ssl_policy", Title: "SSL Policy", Width: 24, Sortable: false},
+		{Key: "certificate_short", Title: "Certificate", Width: 32, Sortable: false},
+	}
+}
