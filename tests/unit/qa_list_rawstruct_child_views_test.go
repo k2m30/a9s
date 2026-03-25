@@ -9,6 +9,7 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -669,6 +670,115 @@ func TestQA_ListRawStruct_ELBListeners(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_CBBuilds: verify list rendering with Build RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("cb_builds")
+	if typeDef == nil {
+		t.Fatal("cb_builds child resource type not registered")
+	}
+
+	cfg := configForType("cb_builds")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	endTs := time.Date(2024, 6, 15, 10, 4, 12, 0, time.UTC)
+	build := cbtypes.Build{
+		Id:            ptrString("my-project:build-id-001"),
+		Arn:           ptrString("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
+		BuildNumber:   ptrInt64(142),
+		BuildStatus:   cbtypes.StatusTypeSucceeded,
+		StartTime:     &startTs,
+		EndTime:       &endTs,
+		CurrentPhase:  ptrString("COMPLETED"),
+		SourceVersion: ptrString("abc123de"),
+		Initiator:     ptrString("codepipeline/my-pipeline"),
+		Logs: &cbtypes.LogsLocation{
+			GroupName:  ptrString("/aws/codebuild/my-project"),
+			StreamName: ptrString("build-id-001"),
+		},
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "my-project:build-id-001",
+			Name:   "#142",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"build_number":         "142",
+				"build_status":         "SUCCEEDED",
+				"start_time":           "2024-06-15 10:00:00",
+				"duration":             "4m 12s",
+				"source_version_short": "abc123de",
+				"initiator":            "codepipeline/my-pipeline",
+			},
+			RawStruct: build,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "SUCCEEDED") {
+		t.Errorf("cb_builds list should contain build status, got:\n%s", view)
+	}
+	if !strings.Contains(view, "142") {
+		t.Errorf("cb_builds list should contain build number, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_CBBuildLogs: verify list rendering with OutputLogEvent RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("cb_build_logs")
+	if typeDef == nil {
+		t.Fatal("cb_build_logs child resource type not registered")
+	}
+
+	cfg := configForType("cb_build_logs")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ev := cwlogstypes.OutputLogEvent{
+		Timestamp:     ptrInt64(1718445600000),
+		Message:       ptrString("[Container] Running command echo hello"),
+		IngestionTime: ptrInt64(1718445601000),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "evt-1718445600000-0",
+			Name:   "[Container] Running command echo hello",
+			Status: "IN_PROGRESS",
+			Fields: map[string]string{
+				"timestamp":      "2024-06-15 10:00:00",
+				"message":        "[Container] Running command echo hello",
+				"ingestion_time": "2024-06-15 10:00:01",
+				"event_id":       "evt-1718445600000-0",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "Running command") {
+		t.Errorf("cb_build_logs list should contain message text, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -682,4 +792,5 @@ var (
 	_ cfntypes.StackEvent              = cfntypes.StackEvent{}
 	_ cfntypes.StackResourceSummary    = cfntypes.StackResourceSummary{}
 	_ elbtypes.Listener                = elbtypes.Listener{}
+	_ cbtypes.Build                    = cbtypes.Build{}
 )

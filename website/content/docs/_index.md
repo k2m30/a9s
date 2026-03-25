@@ -35,6 +35,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | Load Balancers | Listeners | `Enter` | Port, protocol, action, target, SSL policy, certificate |
 | Step Functions | Executions | `Enter` | Execution list with status, duration, start/stop times |
 | SFN Executions | Execution History | `Enter` | Step-by-step state machine trace with errors and state names |
+| CodeBuild Projects | Builds | `Enter` | Recent builds with status, duration, source version, initiator |
+| CodeBuild Builds | Build Logs | `Enter` | Full build output from CloudWatch Logs with phase highlighting |
 
 ## Commands
 

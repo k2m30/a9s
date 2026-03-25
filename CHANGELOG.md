@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-03-25
+
+### Added
+- Child view: CodeBuild Projects → Builds — drill into any project to see recent builds with status, duration, source version, and initiator (#41)
+- Child view: CodeBuild Builds → Build Logs — full build output from CloudWatch Logs with phase/error highlighting (#42)
+- Build log status classification: ERROR (red), SUCCEEDED (green), IN_PROGRESS (blue) for quick visual scanning
+- `DrillCondition` on build logs: shows "Build logs not available in CloudWatch" when logs are disabled
+
 ## [3.8.0] - 2026-03-25
 
 ### Added
