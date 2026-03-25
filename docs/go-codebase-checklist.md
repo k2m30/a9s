@@ -69,7 +69,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] `internal/` used to enforce API boundaries — all domain packages live under `internal/`
 - [ ] Package paths are flat over deep (`internal/tui/views` not `internal/tui/components/views/models`)
 - [ ] Dependency direction is strictly enforced:
-  - `views` -> `keys`, `messages`, `styles`, `fieldpath`, `config`, `resource`
+  - `views` -> `keys`, `messages`, `styles`, `text`, `fieldpath`, `config`, `resource`
   - `messages` -> `resource` only
   - `layout` -> `styles` only
   - `text` -> stdlib + lipgloss + `charmbracelet/x/ansi` only
