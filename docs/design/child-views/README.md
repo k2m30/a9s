@@ -3,7 +3,7 @@
 ## Overview
 
 All MUST-HAVE, SHOULD-HAVE, and Structural child views from the [devops research](devops-research.md).
-Fifteen child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, and ELB Listeners.
+Seventeen child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, ELB Listeners, SFN Executions, and SFN Execution History.
 
 ### Status Key
 
@@ -29,7 +29,7 @@ Fifteen child view levels implemented: S3 Objects, R53 Records, Log Streams, Log
 | 9 | ASG (asg) | Scaling Activities | MUST-HAVE | Implemented | [asg-activities.md](asg-activities.md) | No |
 | 10 | Load Balancers (elb) | Listeners | MUST-HAVE | Implemented | [elb-listeners.md](elb-listeners.md) | Yes: Rules (level 2) |
 | 11 | CW Alarms (alarm) | Alarm History | SHOULD-HAVE | Implemented | [alarm-history.md](alarm-history.md) | No |
-| 12 | Step Functions (sfn) | Executions | SHOULD-HAVE | Planned | [sfn-executions.md](sfn-executions.md) | Yes: History (level 2) |
+| 12 | Step Functions (sfn) | Executions | SHOULD-HAVE | Implemented | [sfn-executions.md](sfn-executions.md) | Yes: History (level 2) |
 | 13 | CodeBuild (cb) | Builds | SHOULD-HAVE | Planned | [cb-builds.md](cb-builds.md) | Yes: Build Logs (level 2) |
 | 14 | CodePipeline (pipeline) | Pipeline Stages | SHOULD-HAVE | Planned | [pipeline-stages.md](pipeline-stages.md) | No |
 | 15 | ECR (ecr) | Images | SHOULD-HAVE | Planned | [ecr-images.md](ecr-images.md) | No |

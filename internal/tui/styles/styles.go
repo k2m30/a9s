@@ -95,8 +95,12 @@ func initStyles() {
 		"creating":     lipgloss.NewStyle().Foreground(ColPending),
 		"modifying":    lipgloss.NewStyle().Foreground(ColPending),
 		"updating":     lipgloss.NewStyle().Foreground(ColPending),
-		"terminated":   lipgloss.NewStyle().Foreground(ColTerminated),
-		"shutting-down": lipgloss.NewStyle().Foreground(ColTerminated),
+		"terminated":      lipgloss.NewStyle().Foreground(ColTerminated),
+		"shutting-down":   lipgloss.NewStyle().Foreground(ColTerminated),
+		"succeeded":       lipgloss.NewStyle().Foreground(ColRunning),
+		"timed_out":       lipgloss.NewStyle().Foreground(ColStopped),
+		"aborted":         lipgloss.NewStyle().Foreground(ColTerminated),
+		"pending_redrive": lipgloss.NewStyle().Foreground(ColPending),
 	}
 
 	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)

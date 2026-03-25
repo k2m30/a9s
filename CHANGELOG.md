@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-03-25
+
+### Added
+- Child view: Step Functions → Executions — drill into any state machine to see executions with status, duration, start/stop times (#39)
+- Child view: SFN Executions → Execution History — step-by-step state machine trace with event classification, state tracking, and error details (#40)
+- `DrillBlockMessage` on `ChildViewDef` — shows flash message when drill is blocked (EXPRESS state machines show explanation)
+- `CopyField` on `ResourceTypeDef` — child views can specify which field `c` copies (execution ARN, event detail)
+- Status colors for SFN execution states: succeeded, timed_out, aborted, pending_redrive
+
 ## [3.4.2] - 2026-03-24
 
 ### Fixed

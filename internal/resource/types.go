@@ -35,6 +35,9 @@ type ChildViewDef struct {
 	// is only entered if the predicate returns true for the selected resource.
 	// A nil DrillCondition means always drill.
 	DrillCondition func(Resource) bool
+	// DrillBlockMessage is the flash text shown when DrillCondition returns false.
+	// Empty means silent skip (no flash).
+	DrillBlockMessage string
 }
 
 // ResourceTypeDef defines a category of AWS resources the app can browse.
@@ -52,6 +55,9 @@ type ResourceTypeDef struct {
 	// Children defines child views that can be drilled into from this resource
 	// type's list view. Each entry maps a key press to a child type navigation.
 	Children []ChildViewDef
+	// CopyField overrides which field CopyContent copies. When non-empty,
+	// the resource list copies Fields[CopyField] instead of the default ID.
+	CopyField string
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.
