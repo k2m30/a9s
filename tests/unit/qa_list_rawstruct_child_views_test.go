@@ -10,9 +10,11 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -779,6 +781,124 @@ func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_ECRImages: verify list rendering with ImageDetail RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_ECRImages(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("ecr_images")
+	if typeDef == nil {
+		t.Fatal("ecr_images child resource type not registered")
+	}
+
+	cfg := configForType("ecr_images")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	img := ecrtypes.ImageDetail{
+		ImageDigest:      ptrString("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+		ImageTags:        []string{"latest", "v1.0.0"},
+		ImagePushedAt:    &pushedAt,
+		ImageSizeInBytes: ptrInt64(52428800),
+		ImageScanStatus: &ecrtypes.ImageScanStatus{
+			Status: ecrtypes.ScanStatusComplete,
+		},
+		ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+			FindingSeverityCounts: map[string]int32{
+				"HIGH":   3,
+				"MEDIUM": 5,
+			},
+		},
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			Name:   "latest, v1.0.0",
+			Status: "",
+			Fields: map[string]string{
+				"image_tags":     "latest, v1.0.0",
+				"digest_short":   "abcdef123456",
+				"pushed_at":      "2024-06-15 10:00:00",
+				"image_size":     "50.0 MB",
+				"scan_status":    "COMPLETE",
+				"finding_counts": "3H 5M",
+			},
+			RawStruct: img,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "latest") {
+		t.Errorf("ecr_images list should contain image tag, got:\n%s", view)
+	}
+	if !strings.Contains(view, "abcdef123456") {
+		t.Errorf("ecr_images list should contain digest short, got:\n%s", view)
+	}
+}
+
+// ===========================================================================
+// TestQA_ListRawStruct_PipelineStages: verify list rendering with PipelineStageRow RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_PipelineStages(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("pipeline_stages")
+	if typeDef == nil {
+		t.Fatal("pipeline_stages child resource type not registered")
+	}
+
+	cfg := configForType("pipeline_stages")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	row := awsclient.PipelineStageRow{
+		StageName:    "Source",
+		StageStatus:  "Succeeded",
+		ActionName:   "GitHub",
+		ActionStatus: "Succeeded",
+		ExternalURL:  "https://github.com/org/repo/commit/abc123",
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "Source/GitHub",
+			Name:   "GitHub",
+			Status: "running",
+			Fields: map[string]string{
+				"stage_name":       "Source",
+				"stage_status":     "Succeeded",
+				"action_name":      "GitHub",
+				"action_status":    "Succeeded",
+				"last_change_time": "2024-06-15 10:00:00",
+				"external_url":     "https://github.com/org/repo/commit/abc123",
+			},
+			RawStruct: row,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "Source") {
+		t.Errorf("pipeline_stages list should contain stage name, got:\n%s", view)
+	}
+	if !strings.Contains(view, "GitHub") {
+		t.Errorf("pipeline_stages list should contain action name, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Succeeded") {
+		t.Errorf("pipeline_stages list should contain action status, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -793,4 +913,6 @@ var (
 	_ cfntypes.StackResourceSummary    = cfntypes.StackResourceSummary{}
 	_ elbtypes.Listener                = elbtypes.Listener{}
 	_ cbtypes.Build                    = cbtypes.Build{}
+	_ ecrtypes.ImageDetail             = ecrtypes.ImageDetail{}
+	_ awsclient.PipelineStageRow       = awsclient.PipelineStageRow{}
 )

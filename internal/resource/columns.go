@@ -204,3 +204,29 @@ func CBBuildLogColumns() []Column {
 		{Key: "message", Title: "Message", Width: 120, Sortable: false},
 	}
 }
+
+// PipelineStageColumns returns the column definitions for pipeline stage-action
+// pairs within a CodePipeline pipeline's current state.
+func PipelineStageColumns() []Column {
+	return []Column{
+		{Key: "stage_name", Title: "Stage", Width: 20, Sortable: true},
+		{Key: "stage_status", Title: "Stage Status", Width: 14, Sortable: true},
+		{Key: "action_name", Title: "Action", Width: 24, Sortable: true},
+		{Key: "action_status", Title: "Action Status", Width: 14, Sortable: true},
+		{Key: "last_change_time", Title: "Last Changed", Width: 22, Sortable: true},
+		{Key: "external_url", Title: "External URL", Width: 40, Sortable: false},
+	}
+}
+
+// ECRImageColumns returns the column definitions for ECR images within
+// a repository.
+func ECRImageColumns() []Column {
+	return []Column{
+		{Key: "image_tags", Title: "Tag(s)", Width: 24, Sortable: true},
+		{Key: "digest_short", Title: "Digest", Width: 16, Sortable: true},
+		{Key: "pushed_at", Title: "Pushed At", Width: 22, Sortable: true},
+		{Key: "image_size", Title: "Size", Width: 12, Sortable: true},
+		{Key: "scan_status", Title: "Scan Status", Width: 14, Sortable: true},
+		{Key: "finding_counts", Title: "Findings", Width: 20, Sortable: false},
+	}
+}

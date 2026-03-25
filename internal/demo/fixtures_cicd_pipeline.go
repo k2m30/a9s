@@ -8,6 +8,7 @@ import (
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -20,6 +21,9 @@ func init() {
 	})
 	RegisterChildDemo("cb_build_logs", func(parentCtx map[string]string) []resource.Resource {
 		return cbBuildLogFixtures()
+	})
+	RegisterChildDemo("pipeline_stages", func(parentCtx map[string]string) []resource.Resource {
+		return pipelineStageFixtures()
 	})
 }
 
@@ -417,6 +421,114 @@ func codebuildFixtures() []resource.Resource {
 				},
 				LastModified: aws.Time(mustParseTime("2026-03-10T08:00:00+00:00")),
 				Created:      aws.Time(mustParseTime("2025-04-20T14:30:00+00:00")),
+			},
+		},
+	}
+}
+
+// pipelineStageFixtures returns demo pipeline stage-action fixtures.
+// 4 stages, 6 total stage-action rows (Staging has 2 actions, Production has 2).
+func pipelineStageFixtures() []resource.Resource {
+	t1 := mustParseTime("2026-03-22T03:10:00+00:00")
+	t2 := mustParseTime("2026-03-22T03:14:00+00:00")
+	t3 := mustParseTime("2026-03-22T03:18:00+00:00")
+	t4 := mustParseTime("2026-03-22T03:22:00+00:00")
+	t5 := mustParseTime("2026-03-22T03:23:00+00:00")
+
+	return []resource.Resource{
+		{
+			ID: "Source/SourceAction", Name: "SourceAction", Status: "running",
+			Fields: map[string]string{
+				"stage_name": "Source", "stage_status": "Succeeded",
+				"action_name": "SourceAction", "action_status": "Succeeded",
+				"last_change_time": "2026-03-22 03:10:00",
+				"external_url":     "https://github.com/acme/api/commit/a1b2c3d",
+				"action_token": "", "action_error_details": "",
+				"revision_id": "a1b2c3d4e5f6", "revision_summary": "a1b2c3d4e5f6",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Source", StageStatus: "Succeeded",
+				ActionName: "SourceAction", ActionStatus: "Succeeded",
+				LastStatusChange: &t1,
+				ExternalURL:     "https://github.com/acme/api/commit/a1b2c3d",
+				RevisionId: "a1b2c3d4e5f6", RevisionSummary: "a1b2c3d4e5f6",
+			},
+		},
+		{
+			ID: "Build/BuildAction", Name: "BuildAction", Status: "running",
+			Fields: map[string]string{
+				"stage_name": "Build", "stage_status": "Succeeded",
+				"action_name": "BuildAction", "action_status": "Succeeded",
+				"last_change_time": "2026-03-22 03:14:00",
+				"external_url":     "https://us-east-1.console.aws.amazon.com/codesuite/codebuild",
+				"action_token": "", "action_error_details": "",
+				"revision_id": "", "revision_summary": "",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Build", StageStatus: "Succeeded",
+				ActionName: "BuildAction", ActionStatus: "Succeeded",
+				LastStatusChange: &t2,
+				ExternalURL:     "https://us-east-1.console.aws.amazon.com/codesuite/codebuild",
+			},
+		},
+		{
+			ID: "Staging/DeployToStaging", Name: "DeployToStaging", Status: "running",
+			Fields: map[string]string{
+				"stage_name": "Staging", "stage_status": "Succeeded",
+				"action_name": "DeployToStaging", "action_status": "Succeeded",
+				"last_change_time": "2026-03-22 03:18:00", "external_url": "",
+				"action_token": "", "action_error_details": "",
+				"revision_id": "", "revision_summary": "",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Staging", StageStatus: "Succeeded",
+				ActionName: "DeployToStaging", ActionStatus: "Succeeded",
+				LastStatusChange: &t3,
+			},
+		},
+		{
+			ID: "Staging/IntegrationTests", Name: "IntegrationTests", Status: "running",
+			Fields: map[string]string{
+				"stage_name": "", "stage_status": "",
+				"action_name": "IntegrationTests", "action_status": "Succeeded",
+				"last_change_time": "2026-03-22 03:22:00", "external_url": "",
+				"action_token": "", "action_error_details": "",
+				"revision_id": "", "revision_summary": "",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Staging", StageStatus: "Succeeded",
+				ActionName: "IntegrationTests", ActionStatus: "Succeeded",
+				LastStatusChange: &t4,
+			},
+		},
+		{
+			ID: "Production/ApprovalGate", Name: "ApprovalGate", Status: "pending",
+			Fields: map[string]string{
+				"stage_name": "Production", "stage_status": "InProgress",
+				"action_name": "ApprovalGate", "action_status": "InProgress",
+				"last_change_time": "2026-03-22 03:23:00", "external_url": "",
+				"action_token": "approval-token-abc123", "action_error_details": "",
+				"revision_id": "", "revision_summary": "",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Production", StageStatus: "InProgress",
+				ActionName: "ApprovalGate", ActionStatus: "InProgress",
+				LastStatusChange: &t5,
+				Token: "approval-token-abc123",
+			},
+		},
+		{
+			ID: "Production/DeployToProduction", Name: "DeployToProduction", Status: "terminated",
+			Fields: map[string]string{
+				"stage_name": "", "stage_status": "",
+				"action_name": "DeployToProduction", "action_status": "",
+				"last_change_time": "", "external_url": "",
+				"action_token": "", "action_error_details": "",
+				"revision_id": "", "revision_summary": "",
+			},
+			RawStruct: awsclient.PipelineStageRow{
+				StageName: "Production", StageStatus: "InProgress",
+				ActionName: "DeployToProduction",
 			},
 		},
 	}
