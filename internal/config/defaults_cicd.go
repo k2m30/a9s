@@ -95,6 +95,37 @@ func cicdDefaultViews() map[string]ViewDef {
 				"Timestamp", "IngestionTime", "Message", "EventId",
 			},
 		},
+		"pipeline_stages": {
+			List: []ListColumn{
+				{Title: "Stage", Key: "stage_name", Width: 20},
+				{Title: "Stage Status", Key: "stage_status", Width: 14},
+				{Title: "Action", Key: "action_name", Width: 24},
+				{Title: "Action Status", Key: "action_status", Width: 14},
+				{Title: "Last Changed", Key: "last_change_time", Width: 22},
+				{Title: "External URL", Key: "external_url", Width: 40},
+			},
+			Detail: []string{
+				"StageName", "StageStatus", "ActionName", "ActionStatus",
+				"LastStatusChange", "ExternalURL", "Token",
+				"ErrorCode", "ErrorMessage", "RevisionId", "RevisionSummary",
+			},
+		},
+		"ecr_images": {
+			List: []ListColumn{
+				{Title: "Tag(s)", Key: "image_tags", Width: 24},
+				{Title: "Digest", Key: "digest_short", Width: 16},
+				{Title: "Pushed At", Key: "pushed_at", Width: 22},
+				{Title: "Size", Key: "image_size", Width: 12},
+				{Title: "Scan Status", Key: "scan_status", Width: 14},
+				{Title: "Findings", Key: "finding_counts", Width: 20},
+			},
+			Detail: []string{
+				"ImageDigest", "ImageTags", "ImagePushedAt",
+				"ImageSizeInBytes", "ImageManifestMediaType",
+				"ArtifactMediaType", "ImageScanStatus",
+				"ImageScanFindingsSummary", "LastRecordedPullTime",
+			},
+		},
 		// Child views for CI/CD resources
 		"cfn_events": {
 			List: []ListColumn{

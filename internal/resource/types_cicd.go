@@ -31,6 +31,12 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 				{Key: "updated", Title: "Updated", Width: 22, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "pipeline_stages",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"pipeline_name": "ID"},
+				DisplayNameKey: "Name",
+			}},
 		},
 		{
 			Name:      "CodeBuild Projects",
@@ -62,6 +68,12 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "scan_on_push", Title: "Scan", Width: 6, Sortable: true},
 				{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "ecr_images",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"repository_name": "ID", "repository_uri": "uri"},
+				DisplayNameKey: "repository_name",
+			}},
 		},
 		{
 			Name:      "CodeArtifact Repos",

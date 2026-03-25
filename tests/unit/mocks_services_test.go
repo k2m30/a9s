@@ -1003,6 +1003,47 @@ func (m *mockCodeBuildBatchGetBuildsClient) BatchGetBuilds(ctx context.Context, 
 	return out, nil
 }
 
+// ---------------------------------------------------------------------------
+// ECR DescribeImages mocks (child of ECR Repositories)
+// ---------------------------------------------------------------------------
+
+// mockECRDescribeImagesClient implements awsclient.ECRDescribeImagesAPI.
+// It supports pagination via the pages slice with calls counter.
+type mockECRDescribeImagesClient struct {
+	pages []*ecr.DescribeImagesOutput
+	err   error
+	calls int
+}
+
+func (m *mockECRDescribeImagesClient) DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.calls >= len(m.pages) {
+		return &ecr.DescribeImagesOutput{}, nil
+	}
+	out := m.pages[m.calls]
+	m.calls++
+	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// CodePipeline GetPipelineState mocks (child of CodePipelines)
+// ---------------------------------------------------------------------------
+
+// mockCodePipelineGetPipelineStateClient implements awsclient.CodePipelineGetPipelineStateAPI.
+type mockCodePipelineGetPipelineStateClient struct {
+	output *codepipeline.GetPipelineStateOutput
+	err    error
+}
+
+func (m *mockCodePipelineGetPipelineStateClient) GetPipelineState(ctx context.Context, params *codepipeline.GetPipelineStateInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.output, nil
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

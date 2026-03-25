@@ -336,6 +336,11 @@ type ECRDescribeRepositoriesAPI interface {
 	DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
 }
 
+// ECRDescribeImagesAPI defines the interface for the ECR DescribeImages operation.
+type ECRDescribeImagesAPI interface {
+	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
+}
+
 // EFSDescribeFileSystemsAPI defines the interface for the EFS DescribeFileSystems operation.
 type EFSDescribeFileSystemsAPI interface {
 	DescribeFileSystems(ctx context.Context, params *efs.DescribeFileSystemsInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error)
@@ -364,6 +369,11 @@ type SFNGetExecutionHistoryAPI interface {
 // CodePipelineListPipelinesAPI defines the interface for the CodePipeline ListPipelines operation.
 type CodePipelineListPipelinesAPI interface {
 	ListPipelines(ctx context.Context, params *codepipeline.ListPipelinesInput, optFns ...func(*codepipeline.Options)) (*codepipeline.ListPipelinesOutput, error)
+}
+
+// CodePipelineGetPipelineStateAPI defines the interface for the CodePipeline GetPipelineState operation.
+type CodePipelineGetPipelineStateAPI interface {
+	GetPipelineState(ctx context.Context, params *codepipeline.GetPipelineStateInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error)
 }
 
 // --- Batch 2b interfaces ---
