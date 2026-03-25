@@ -1,6 +1,6 @@
 # Child View: CodePipeline --> Pipeline Stage State
 
-**Status:** Planned
+**Status:** Implemented
 **Tier:** SHOULD-HAVE
 
 ---

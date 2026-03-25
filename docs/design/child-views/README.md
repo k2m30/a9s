@@ -3,7 +3,7 @@
 ## Overview
 
 All MUST-HAVE, SHOULD-HAVE, and Structural child views from the [devops research](devops-research.md).
-Nineteen child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, ELB Listeners, SFN Executions, SFN Execution History, CodeBuild Builds, and CodeBuild Build Logs.
+Twenty-one child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, ELB Listeners, SFN Executions, SFN Execution History, CodeBuild Builds, CodeBuild Build Logs, Pipeline Stages, and ECR Images.
 
 ### Status Key
 
@@ -31,8 +31,8 @@ Nineteen child view levels implemented: S3 Objects, R53 Records, Log Streams, Lo
 | 11 | CW Alarms (alarm) | Alarm History | SHOULD-HAVE | Implemented | [alarm-history.md](alarm-history.md) | No |
 | 12 | Step Functions (sfn) | Executions | SHOULD-HAVE | Implemented | [sfn-executions.md](sfn-executions.md) | Yes: History (level 2) |
 | 13 | CodeBuild (cb) | Builds | SHOULD-HAVE | Implemented | [cb-builds.md](cb-builds.md) | Yes: Build Logs (level 2) |
-| 14 | CodePipeline (pipeline) | Pipeline Stages | SHOULD-HAVE | Planned | [pipeline-stages.md](pipeline-stages.md) | No |
-| 15 | ECR (ecr) | Images | SHOULD-HAVE | Planned | [ecr-images.md](ecr-images.md) | No |
+| 14 | CodePipeline (pipeline) | Pipeline Stages | SHOULD-HAVE | Implemented | [pipeline-stages.md](pipeline-stages.md) | No |
+| 15 | ECR (ecr) | Images | SHOULD-HAVE | Implemented | [ecr-images.md](ecr-images.md) | No |
 | 16 | RDS Instances (dbi) | RDS Events | SHOULD-HAVE | Planned | [dbi-events.md](dbi-events.md) | No |
 | 17 | IAM Roles (role) | Attached Policies | SHOULD-HAVE | Planned | [role-policies.md](role-policies.md) | No |
 | 18 | SNS Topics (sns) | Subscriptions | SHOULD-HAVE | Planned | [sns-subscriptions.md](sns-subscriptions.md) | No |
