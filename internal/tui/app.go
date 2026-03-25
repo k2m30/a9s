@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -340,8 +341,12 @@ func (m Model) headerRight() string {
 		if maxFlash < 20 {
 			maxFlash = 20
 		}
-		if len(text) > maxFlash {
-			text = text[:maxFlash-3] + "..."
+		if lipgloss.Width(text) > maxFlash {
+			// Truncate by runes to handle Unicode safely.
+			runes := []rune(text)
+			if len(runes) > maxFlash-3 {
+				text = string(runes[:maxFlash-3]) + "..."
+			}
 		}
 		if m.flash.isError {
 			return styles.FlashError.Render(text)
