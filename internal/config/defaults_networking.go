@@ -183,6 +183,20 @@ func networkingDefaultViews() map[string]ViewDef {
 			},
 		},
 		// Child views for networking resources
+		"elb_listeners": {
+			List: []ListColumn{
+				{Title: "Port", Path: "Port", Width: 8},
+				{Title: "Protocol", Path: "Protocol", Width: 10},
+				{Title: "Action", Key: "default_action_type", Width: 16},
+				{Title: "Target", Key: "default_action_target", Width: 32},
+				{Title: "SSL Policy", Path: "SslPolicy", Width: 24},
+				{Title: "Certificate", Key: "certificate_short", Width: 32},
+			},
+			Detail: []string{
+				"ListenerArn", "Port", "Protocol", "DefaultActions",
+				"SslPolicy", "Certificates", "AlpnPolicy", "MutualAuthentication",
+			},
+		},
 		"tg_health": {
 			List: []ListColumn{
 				{Title: "Target ID", Key: "target_id", Width: 24},

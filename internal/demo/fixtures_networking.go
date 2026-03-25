@@ -28,6 +28,10 @@ func init() {
 	demoData["elb"] = elbFixtures
 	demoData["tg"] = tgFixtures
 	demoData["vpc"] = vpcFixtures
+
+	RegisterChildDemo("elb_listeners", func(parentCtx map[string]string) []resource.Resource {
+		return elbListenerFixtures(parentCtx["load_balancer_arn"])
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -42,12 +46,13 @@ func elbFixtures() []resource.Resource {
 			Name:   "acme-prod-web",
 			Status: "active",
 			Fields: map[string]string{
-				"name":     "acme-prod-web",
-				"dns_name": "acme-prod-web-1234567890.us-east-1.elb.amazonaws.com",
-				"type":     "application",
-				"scheme":   "internet-facing",
-				"state":    "active",
-				"vpc_id":   prodVPCID,
+				"name":              "acme-prod-web",
+				"dns_name":          "acme-prod-web-1234567890.us-east-1.elb.amazonaws.com",
+				"type":              "application",
+				"scheme":            "internet-facing",
+				"state":             "active",
+				"vpc_id":            prodVPCID,
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef",
 			},
 			RawStruct: elbv2types.LoadBalancer{
 				LoadBalancerName: aws.String("acme-prod-web"),
@@ -74,12 +79,13 @@ func elbFixtures() []resource.Resource {
 			Name:   "acme-internal-api",
 			Status: "active",
 			Fields: map[string]string{
-				"name":     "acme-internal-api",
-				"dns_name": "internal-acme-api-0987654321.us-east-1.elb.amazonaws.com",
-				"type":     "application",
-				"scheme":   "internal",
-				"state":    "active",
-				"vpc_id":   prodVPCID,
+				"name":              "acme-internal-api",
+				"dns_name":          "internal-acme-api-0987654321.us-east-1.elb.amazonaws.com",
+				"type":              "application",
+				"scheme":            "internal",
+				"state":             "active",
+				"vpc_id":            prodVPCID,
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-internal-api/0987654321fedcba",
 			},
 			RawStruct: elbv2types.LoadBalancer{
 				LoadBalancerName: aws.String("acme-internal-api"),
@@ -106,12 +112,13 @@ func elbFixtures() []resource.Resource {
 			Name:   "acme-prod-nlb",
 			Status: "active",
 			Fields: map[string]string{
-				"name":     "acme-prod-nlb",
-				"dns_name": "acme-prod-nlb-abcdef1234.us-east-1.elb.amazonaws.com",
-				"type":     "network",
-				"scheme":   "internet-facing",
-				"state":    "active",
-				"vpc_id":   prodVPCID,
+				"name":              "acme-prod-nlb",
+				"dns_name":          "acme-prod-nlb-abcdef1234.us-east-1.elb.amazonaws.com",
+				"type":              "network",
+				"scheme":            "internet-facing",
+				"state":             "active",
+				"vpc_id":            prodVPCID,
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/acme-prod-nlb/abcdef1234567890",
 			},
 			RawStruct: elbv2types.LoadBalancer{
 				LoadBalancerName: aws.String("acme-prod-nlb"),
@@ -137,12 +144,13 @@ func elbFixtures() []resource.Resource {
 			Name:   "staging-web-alb",
 			Status: "provisioning",
 			Fields: map[string]string{
-				"name":     "staging-web-alb",
-				"dns_name": "staging-web-alb-5555555555.us-east-1.elb.amazonaws.com",
-				"type":     "application",
-				"scheme":   "internet-facing",
-				"state":    "provisioning",
-				"vpc_id":   stagingVPCID,
+				"name":              "staging-web-alb",
+				"dns_name":          "staging-web-alb-5555555555.us-east-1.elb.amazonaws.com",
+				"type":              "application",
+				"scheme":            "internet-facing",
+				"state":             "provisioning",
+				"vpc_id":            stagingVPCID,
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa",
 			},
 			RawStruct: elbv2types.LoadBalancer{
 				LoadBalancerName: aws.String("staging-web-alb"),
@@ -385,6 +393,119 @@ func vpcFixtures() []resource.Resource {
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("default")},
 				},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ELB Listeners (elbv2types.Listener) — child of Load Balancers
+// Fields: port, protocol, default_action_type, default_action_target,
+//
+//	ssl_policy, certificate_short
+//
+// ---------------------------------------------------------------------------
+
+func elbListenerFixtures(_ string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/aaa111",
+			Name:   "443",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "443",
+				"protocol":              "HTTPS",
+				"default_action_type":   "forward",
+				"default_action_target": "acme-web-tg",
+				"ssl_policy":            "ELBSecurityPolicy-TLS13-1-2-2021-06",
+				"certificate_short":     "abc-def-123",
+			},
+			RawStruct: elbv2types.Listener{
+				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/aaa111"),
+				Port:        aws.Int32(443),
+				Protocol:    elbv2types.ProtocolEnumHttps,
+				SslPolicy:   aws.String("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+				Certificates: []elbv2types.Certificate{{
+					CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
+				}},
+				DefaultActions: []elbv2types.Action{{
+					Type:           elbv2types.ActionTypeEnumForward,
+					TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"),
+				}},
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/bbb222",
+			Name:   "80",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "80",
+				"protocol":              "HTTP",
+				"default_action_type":   "redirect",
+				"default_action_target": "HTTPS://#{host}:443#{path}?#{query}",
+				"ssl_policy":            "",
+				"certificate_short":     "",
+			},
+			RawStruct: elbv2types.Listener{
+				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/bbb222"),
+				Port:        aws.Int32(80),
+				Protocol:    elbv2types.ProtocolEnumHttp,
+				DefaultActions: []elbv2types.Action{{
+					Type: elbv2types.ActionTypeEnumRedirect,
+					RedirectConfig: &elbv2types.RedirectActionConfig{
+						Protocol:   aws.String("HTTPS"),
+						Port:       aws.String("443"),
+						StatusCode: elbv2types.RedirectActionStatusCodeEnumHttp301,
+					},
+				}},
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/ccc333",
+			Name:   "8443",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "8443",
+				"protocol":              "HTTPS",
+				"default_action_type":   "forward",
+				"default_action_target": "acme-api-tg",
+				"ssl_policy":            "ELBSecurityPolicy-2016-08",
+				"certificate_short":     "xyz-789-456",
+			},
+			RawStruct: elbv2types.Listener{
+				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-prod-web/1234567890abcdef/ccc333"),
+				Port:        aws.Int32(8443),
+				Protocol:    elbv2types.ProtocolEnumHttps,
+				SslPolicy:   aws.String("ELBSecurityPolicy-2016-08"),
+				Certificates: []elbv2types.Certificate{{
+					CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/xyz-789-456"),
+				}},
+				DefaultActions: []elbv2types.Action{{
+					Type:           elbv2types.ActionTypeEnumForward,
+					TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0987654321fedcba"),
+				}},
+			},
+		},
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/net/acme-prod-nlb/abcdef1234567890/ddd444",
+			Name:   "5000",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "5000",
+				"protocol":              "TCP",
+				"default_action_type":   "forward",
+				"default_action_target": "acme-nlb-tcp-tg",
+				"ssl_policy":            "",
+				"certificate_short":     "",
+			},
+			RawStruct: elbv2types.Listener{
+				ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/net/acme-prod-nlb/abcdef1234567890/ddd444"),
+				Port:        aws.Int32(5000),
+				Protocol:    elbv2types.ProtocolEnumTcp,
+				DefaultActions: []elbv2types.Action{{
+					Type:           elbv2types.ActionTypeEnumForward,
+					TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-nlb-tcp-tg/112233aabbccddee"),
+				}},
 			},
 		},
 	}

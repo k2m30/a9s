@@ -607,6 +607,68 @@ func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_ELBListeners: verify list rendering with Listener RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_ELBListeners(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("elb_listeners")
+	if typeDef == nil {
+		t.Fatal("elb_listeners child resource type not registered")
+	}
+
+	cfg := configForType("elb_listeners")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	listener := elbtypes.Listener{
+		ListenerArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
+		Port:        ptrInt32(443),
+		Protocol:    elbtypes.ProtocolEnumHttps,
+		SslPolicy:   ptrString("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+		Certificates: []elbtypes.Certificate{{
+			CertificateArn: ptrString("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
+		}},
+		DefaultActions: []elbtypes.Action{{
+			Type:           elbtypes.ActionTypeEnumForward,
+			TargetGroupArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
+		}},
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
+			Name:   "443",
+			Status: "",
+			Fields: map[string]string{
+				"port":                  "443",
+				"protocol":              "HTTPS",
+				"default_action_type":   "forward",
+				"default_action_target": "api-prod-tg",
+				"ssl_policy":            "ELBSecurityPolicy-TLS13-1-2-2021-06",
+				"certificate_short":     "abc-def-123",
+			},
+			RawStruct: listener,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "443") {
+		t.Errorf("elb_listeners list should contain port 443, got:\n%s", view)
+	}
+	if !strings.Contains(view, "HTTPS") {
+		t.Errorf("elb_listeners list should contain protocol HTTPS, got:\n%s", view)
+	}
+	if !strings.Contains(view, "forward") {
+		t.Errorf("elb_listeners list should contain action type 'forward', got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -619,4 +681,5 @@ var (
 	_ ecstypes.Task                    = ecstypes.Task{}
 	_ cfntypes.StackEvent              = cfntypes.StackEvent{}
 	_ cfntypes.StackResourceSummary    = cfntypes.StackResourceSummary{}
+	_ elbtypes.Listener                = elbtypes.Listener{}
 )

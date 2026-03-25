@@ -703,3 +703,55 @@ func TestAlarmHistoryDetailViewNilFields(t *testing.T) {
 		t.Error("AlarmHistory detail should not be empty even with nil fields")
 	}
 }
+
+// ===========================================================================
+// ELB Listeners detail view tests (child of Load Balancers)
+// ===========================================================================
+
+func TestQA_Detail_ELBListeners_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	listener := elbtypes.Listener{
+		ListenerArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
+		Port:        ptrInt32(443),
+		Protocol:    elbtypes.ProtocolEnumHttps,
+		SslPolicy:   ptrString("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+		Certificates: []elbtypes.Certificate{{
+			CertificateArn: ptrString("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
+		}},
+		DefaultActions: []elbtypes.Action{{
+			Type:           elbtypes.ActionTypeEnumForward,
+			TargetGroupArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
+		}},
+	}
+	res := buildResource(
+		"arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
+		"443",
+		listener,
+	)
+	cfg := detailConfigForType("elb_listeners")
+	m := newDetailModel(res, "elb_listeners", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"ListenerArn",
+		"Port",
+		"Protocol",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("ELBListeners detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_ELBListeners_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	listener := elbtypes.Listener{}
+	res := buildResource("empty-listener", "empty-listener", listener)
+	cfg := detailConfigForType("elb_listeners")
+	m := newDetailModel(res, "elb_listeners", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("ELBListeners detail should not be empty even with nil fields")
+	}
+}

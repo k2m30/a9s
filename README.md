@@ -33,7 +33,8 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Horizontal scrolling for wide tables
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 1,045+ unit tests
+- Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
+- 2,100+ unit tests
 
 ## Installation
 
@@ -166,6 +167,28 @@ a9s --version             # print version
 |-----|--------|
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
+
+## Child Views (Drill-Downs)
+
+Press `Enter` on a resource to explore its nested children. Press `Esc` to go back.
+
+| Parent | Child View | Key | Description |
+|--------|-----------|-----|-------------|
+| Lambda Functions | Invocations | `Enter` | Recent invocations with status, duration, memory, cold start |
+| Lambda Invocations | Log Lines | `Enter` | Full log output for a specific invocation |
+| S3 Buckets | Objects | `Enter` | Browse bucket contents, drill into folders |
+| Route 53 Zones | DNS Records | `Enter` | View A, CNAME, MX, and other record types |
+| Log Groups | Log Streams | `Enter` | Streams sorted by most recent event |
+| Log Streams | Log Events | `Enter` | Color-coded log lines (ERROR=red, WARN=yellow) |
+| Target Groups | Target Health | `Enter` | Health status per target (healthy/unhealthy/draining) |
+| ECS Services | Service Events | `e` | Event timeline (steady state, placement failures, deployments) |
+| ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
+| ECS Services | Container Logs | `L` | Application logs from CloudWatch |
+| CFN Stacks | Stack Events | `Enter` | Event timeline showing stack operation progress and status |
+| CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
+| Auto Scaling Groups | Scaling Activities | `Enter` | Scaling activity history with status, description, cause |
+| CloudWatch Alarms | Alarm History | `Enter` | State transitions, configuration updates, and action events |
+| Load Balancers | Listeners | `Enter` | Port, protocol, action, target, SSL policy, certificate |
 
 ## Commands
 
