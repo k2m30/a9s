@@ -11,6 +11,7 @@ import (
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 )
 
 // ===========================================================================
@@ -236,15 +237,15 @@ func TestLambdaInvocationDetailViewContainsExpectedFields(t *testing.T) {
 		ev,
 	)
 	res.Fields = map[string]string{
-		"request_id":       "12345678-1234-1234-1234-123456789012",
-		"timestamp":        "2024-03-22 00:00",
-		"status":           "OK",
-		"duration_ms":      "2103 ms",
+		"request_id":         "12345678-1234-1234-1234-123456789012",
+		"timestamp":          "2024-03-22 00:00",
+		"status":             "OK",
+		"duration_ms":        "2103 ms",
 		"billed_duration_ms": "2200 ms",
-		"memory_size_mb":   "256",
-		"memory_used_mb":   "128",
-		"cold_start":       "no",
-		"memory_used":      "128/256 MB",
+		"memory_size_mb":     "256",
+		"memory_used_mb":     "128",
+		"cold_start":         "no",
+		"memory_used":        "128/256 MB",
 	}
 	cfg := detailConfigForType("lambda_invocations")
 	m := newDetailModel(res, "lambda_invocations", cfg)
@@ -619,10 +620,10 @@ func TestAsgActivityDetailViewContainsExpectedFields(t *testing.T) {
 		activity,
 	)
 	res.Fields = map[string]string{
-		"start_time":   "2024-03-22 10:00:00",
-		"status_code":  "Successful",
-		"description":  "Launching a new EC2 instance: i-0abc1234",
-		"cause":        "At 2024-03-22T10:00:00Z an instance was started",
+		"start_time":  "2024-03-22 10:00:00",
+		"status_code": "Successful",
+		"description": "Launching a new EC2 instance: i-0abc1234",
+		"cause":       "At 2024-03-22T10:00:00Z an instance was started",
 	}
 	cfg := detailConfigForType("asg_activities")
 	m := newDetailModel(res, "asg_activities", cfg)
@@ -753,5 +754,177 @@ func TestQA_Detail_ELBListeners_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("ELBListeners detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// SFN Executions detail view tests (child of Step Functions)
+// ===========================================================================
+
+func TestQA_Detail_SFNExecutions_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	stopTs := time.Date(2024, 6, 15, 10, 2, 47, 0, time.UTC)
+	itemCount := int32(42)
+	redriveCount := int32(1)
+	redriveTs := time.Date(2024, 6, 15, 11, 0, 0, 0, time.UTC)
+
+	item := sfntypes.ExecutionListItem{
+		ExecutionArn:           ptrString("arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001"),
+		Name:                   ptrString("exec-001"),
+		StartDate:              &startTs,
+		StopDate:               &stopTs,
+		StateMachineArn:        ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine"),
+		Status:                 sfntypes.ExecutionStatusSucceeded,
+		ItemCount:              &itemCount,
+		MapRunArn:              ptrString("arn:aws:states:us-east-1:123456789012:mapRun:my-state-machine/exec-001:map-run-id"),
+		RedriveCount:           &redriveCount,
+		RedriveDate:            &redriveTs,
+		StateMachineAliasArn:   ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:prod"),
+		StateMachineVersionArn: ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:1"),
+	}
+	res := buildResource("exec-001", "exec-001", item)
+	res.Status = "SUCCEEDED"
+	res.Fields = map[string]string{
+		"execution_arn":             "arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001",
+		"name":                      "exec-001",
+		"status":                    "SUCCEEDED",
+		"start_date":                "2024-06-15 10:00:00",
+		"stop_date":                 "2024-06-15 10:02:47",
+		"duration":                  "2m 47s",
+		"state_machine_arn":         "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine",
+		"state_machine_alias_arn":   "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:prod",
+		"state_machine_version_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:1",
+		"map_run_arn":               "arn:aws:states:us-east-1:123456789012:mapRun:my-state-machine/exec-001:map-run-id",
+		"item_count":                "42",
+		"redrive_count":             "1",
+		"redrive_date":              "2024-06-15 11:00:00",
+	}
+	cfg := detailConfigForType("sfn_executions")
+	m := newDetailModel(res, "sfn_executions", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"ExecutionArn",
+		"Name",
+		"Status",
+		"StartDate",
+		"StopDate",
+		"StateMachineArn",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("SFNExecutions detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_SFNExecutions_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	item := sfntypes.ExecutionListItem{}
+	res := buildResource("empty-sfn-execution", "empty-sfn-execution", item)
+	cfg := detailConfigForType("sfn_executions")
+	m := newDetailModel(res, "sfn_executions", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("SFNExecutions detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// SFN Execution History detail view tests (Level 2 child of SFN Executions)
+// ===========================================================================
+
+func TestQA_Detail_SFNExecutionHistory_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	event := sfntypes.HistoryEvent{
+		Id:        1,
+		Timestamp: &ts,
+		Type:      sfntypes.HistoryEventTypeTaskStateEntered,
+		StateEnteredEventDetails: &sfntypes.StateEnteredEventDetails{
+			Name:  ptrString("ProcessOrder"),
+			Input: ptrString(`{"orderId":"12345"}`),
+		},
+	}
+	res := buildResource("1", "Task State Entered", event)
+	res.Status = "pending"
+	res.Fields = map[string]string{
+		"timestamp":         "2024-06-15 10:00:00",
+		"event_type":        "TaskStateEntered",
+		"event_type_short":  "Task State Entered",
+		"state_name":        "ProcessOrder",
+		"event_detail":      `{"orderId":"12345"}`,
+		"event_id":          "1",
+		"previous_event_id": "0",
+	}
+	cfg := detailConfigForType("sfn_execution_history")
+	m := newDetailModel(res, "sfn_execution_history", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Timestamp",
+		"Type",
+		"Id",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("SFNExecutionHistory detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_SFNExecutionHistory_FailedEvent(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 5, 0, time.UTC)
+
+	event := sfntypes.HistoryEvent{
+		Id:              5,
+		PreviousEventId: 4,
+		Timestamp:       &ts,
+		Type:            sfntypes.HistoryEventTypeTaskFailed,
+		TaskFailedEventDetails: &sfntypes.TaskFailedEventDetails{
+			Resource:     ptrString("lambda:invoke"),
+			ResourceType: ptrString("lambda"),
+			Error:        ptrString("States.TaskFailed"),
+			Cause:        ptrString("Lambda function returned error"),
+		},
+	}
+	res := buildResource("5", "Task Failed", event)
+	res.Status = "failed"
+	res.Fields = map[string]string{
+		"timestamp":         "2024-06-15 10:00:05",
+		"event_type":        "TaskFailed",
+		"event_type_short":  "Task Failed",
+		"state_name":        "ProcessOrder",
+		"event_detail":      "States.TaskFailed: Lambda function returned error",
+		"event_id":          "5",
+		"previous_event_id": "4",
+	}
+	cfg := detailConfigForType("sfn_execution_history")
+	m := newDetailModel(res, "sfn_execution_history", cfg)
+
+	view := m.View()
+	// The detail view should render key fields from the TaskFailedEventDetails struct
+	for _, expected := range []string{
+		"TaskFailedEventDetails",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("SFNExecutionHistory failed event detail should contain %q, got:\n%s",
+				expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_SFNExecutionHistory_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	event := sfntypes.HistoryEvent{}
+	res := buildResource("empty-history", "empty-history", event)
+	cfg := detailConfigForType("sfn_execution_history")
+	m := newDetailModel(res, "sfn_execution_history", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("SFNExecutionHistory detail should not be empty even with nil fields")
 	}
 }

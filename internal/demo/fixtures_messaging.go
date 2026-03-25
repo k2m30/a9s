@@ -21,6 +21,14 @@ func init() {
 	demoData["kinesis"] = kinesisStreams
 	demoData["msk"] = mskClusters
 	demoData["sfn"] = stepFunctions
+
+	RegisterChildDemo("sfn_executions", func(parentCtx map[string]string) []resource.Resource {
+		return sfnExecutionFixtures(parentCtx["state_machine_arn"])
+	})
+
+	RegisterChildDemo("sfn_execution_history", func(_ map[string]string) []resource.Resource {
+		return sfnExecutionHistoryFixtures()
+	})
 }
 
 // sqsQueues returns demo SQS queue fixtures.
@@ -416,6 +424,399 @@ func mskClusters() []resource.Resource {
 				State:          kafkatypes.ClusterStateCreating,
 				CurrentVersion: aws.String("K1INITIAL"),
 				CreationTime:   aws.Time(mustParseTime("2026-03-20T16:00:00+00:00")),
+			},
+		},
+	}
+}
+
+// sfnExecutionFixtures returns demo SFN execution fixtures for a given state machine ARN.
+func sfnExecutionFixtures(_ string) []resource.Resource {
+	start1 := time.Date(2026, 3, 22, 3, 15, 0, 0, time.UTC)
+	stop1 := time.Date(2026, 3, 22, 3, 17, 47, 0, time.UTC)
+
+	start2 := time.Date(2026, 3, 22, 2, 0, 0, 0, time.UTC)
+	stop2 := time.Date(2026, 3, 22, 2, 0, 12, 0, time.UTC)
+
+	start3 := time.Date(2026, 3, 22, 1, 30, 0, 0, time.UTC)
+
+	start4 := time.Date(2026, 3, 21, 22, 0, 0, 0, time.UTC)
+	stop4 := time.Date(2026, 3, 22, 0, 30, 0, 0, time.UTC)
+
+	start5 := time.Date(2026, 3, 21, 18, 0, 0, 0, time.UTC)
+	stop5 := time.Date(2026, 3, 21, 18, 0, 3, 0, time.UTC)
+
+	start6 := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
+	stop6 := time.Date(2026, 3, 21, 12, 5, 30, 0, time.UTC)
+
+	start7 := time.Date(2026, 3, 20, 8, 0, 0, 0, time.UTC)
+	stop7 := time.Date(2026, 3, 20, 8, 45, 0, 0, time.UTC)
+
+	redriveCount := int32(1)
+	redriveDate := time.Date(2026, 3, 21, 19, 0, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "exec-2026-0322-0315-a1b2c3d4",
+			Name:   "exec-2026-0322-0315-a1b2c3d4",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0315-a1b2c3d4",
+				"name":                     "exec-2026-0322-0315-a1b2c3d4",
+				"status":                   "SUCCEEDED",
+				"start_date":               "2026-03-22 03:15:00",
+				"stop_date":                "2026-03-22 03:17:47",
+				"duration":                 "2m 47s",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0315-a1b2c3d4"),
+				Name:            aws.String("exec-2026-0322-0315-a1b2c3d4"),
+				StartDate:       &start1,
+				StopDate:        &stop1,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusSucceeded,
+			},
+		},
+		{
+			ID:     "exec-2026-0322-0200-b2c3d4e5",
+			Name:   "exec-2026-0322-0200-b2c3d4e5",
+			Status: "FAILED",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0200-b2c3d4e5",
+				"name":                     "exec-2026-0322-0200-b2c3d4e5",
+				"status":                   "FAILED",
+				"start_date":               "2026-03-22 02:00:00",
+				"stop_date":                "2026-03-22 02:00:12",
+				"duration":                 "12s",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0200-b2c3d4e5"),
+				Name:            aws.String("exec-2026-0322-0200-b2c3d4e5"),
+				StartDate:       &start2,
+				StopDate:        &stop2,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusFailed,
+			},
+		},
+		{
+			ID:     "exec-2026-0322-0130-c3d4e5f6",
+			Name:   "exec-2026-0322-0130-c3d4e5f6",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0130-c3d4e5f6",
+				"name":                     "exec-2026-0322-0130-c3d4e5f6",
+				"status":                   "RUNNING",
+				"start_date":               "2026-03-22 01:30:00",
+				"stop_date":                "",
+				"duration":                 "",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0130-c3d4e5f6"),
+				Name:            aws.String("exec-2026-0322-0130-c3d4e5f6"),
+				StartDate:       &start3,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusRunning,
+			},
+		},
+		{
+			ID:     "exec-2026-0321-2200-d4e5f6a7",
+			Name:   "exec-2026-0321-2200-d4e5f6a7",
+			Status: "TIMED_OUT",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-2200-d4e5f6a7",
+				"name":                     "exec-2026-0321-2200-d4e5f6a7",
+				"status":                   "TIMED_OUT",
+				"start_date":               "2026-03-21 22:00:00",
+				"stop_date":                "2026-03-22 00:30:00",
+				"duration":                 "2h 30m",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-2200-d4e5f6a7"),
+				Name:            aws.String("exec-2026-0321-2200-d4e5f6a7"),
+				StartDate:       &start4,
+				StopDate:        &stop4,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusTimedOut,
+			},
+		},
+		{
+			ID:     "exec-2026-0321-1800-e5f6a7b8",
+			Name:   "exec-2026-0321-1800-e5f6a7b8",
+			Status: "ABORTED",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-1800-e5f6a7b8",
+				"name":                     "exec-2026-0321-1800-e5f6a7b8",
+				"status":                   "ABORTED",
+				"start_date":               "2026-03-21 18:00:00",
+				"stop_date":                "2026-03-21 18:00:03",
+				"duration":                 "3s",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "1",
+				"redrive_date":             "2026-03-21 19:00:00",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-1800-e5f6a7b8"),
+				Name:            aws.String("exec-2026-0321-1800-e5f6a7b8"),
+				StartDate:       &start5,
+				StopDate:        &stop5,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusAborted,
+				RedriveCount:    &redriveCount,
+				RedriveDate:     &redriveDate,
+			},
+		},
+		{
+			ID:     "exec-2026-0321-1200-f6a7b8c9",
+			Name:   "exec-2026-0321-1200-f6a7b8c9",
+			Status: "PENDING_REDRIVE",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-1200-f6a7b8c9",
+				"name":                     "exec-2026-0321-1200-f6a7b8c9",
+				"status":                   "PENDING_REDRIVE",
+				"start_date":               "2026-03-21 12:00:00",
+				"stop_date":                "2026-03-21 12:05:30",
+				"duration":                 "5m 30s",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0321-1200-f6a7b8c9"),
+				Name:            aws.String("exec-2026-0321-1200-f6a7b8c9"),
+				StartDate:       &start6,
+				StopDate:        &stop6,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusPendingRedrive,
+			},
+		},
+		{
+			ID:     "exec-2026-0320-0800-a7b8c9d0",
+			Name:   "exec-2026-0320-0800-a7b8c9d0",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"execution_arn":            "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0320-0800-a7b8c9d0",
+				"name":                     "exec-2026-0320-0800-a7b8c9d0",
+				"status":                   "SUCCEEDED",
+				"start_date":               "2026-03-20 08:00:00",
+				"stop_date":                "2026-03-20 08:45:00",
+				"duration":                 "45m 0s",
+				"state_machine_arn":        "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+				"state_machine_alias_arn":  "",
+				"state_machine_version_arn": "",
+				"map_run_arn":              "",
+				"item_count":               "",
+				"redrive_count":            "",
+				"redrive_date":             "",
+			},
+			RawStruct: sfntypes.ExecutionListItem{
+				ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0320-0800-a7b8c9d0"),
+				Name:            aws.String("exec-2026-0320-0800-a7b8c9d0"),
+				StartDate:       &start7,
+				StopDate:        &stop7,
+				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+				Status:          sfntypes.ExecutionStatusSucceeded,
+			},
+		},
+	}
+}
+
+// sfnExecutionHistoryFixtures returns demo SFN execution history event fixtures
+// simulating a workflow that validates an order, then fails during payment processing.
+func sfnExecutionHistoryFixtures() []resource.Resource {
+	ts1 := time.Date(2026, 3, 22, 3, 15, 0, 0, time.UTC)
+	ts2 := time.Date(2026, 3, 22, 3, 15, 0, 100000000, time.UTC)
+	ts3 := time.Date(2026, 3, 22, 3, 15, 0, 200000000, time.UTC)
+	ts4 := time.Date(2026, 3, 22, 3, 15, 2, 0, time.UTC)
+	ts5 := time.Date(2026, 3, 22, 3, 15, 2, 100000000, time.UTC)
+	ts6 := time.Date(2026, 3, 22, 3, 15, 2, 200000000, time.UTC)
+	ts7 := time.Date(2026, 3, 22, 3, 15, 2, 300000000, time.UTC)
+	ts8 := time.Date(2026, 3, 22, 3, 15, 5, 0, time.UTC)
+	ts9 := time.Date(2026, 3, 22, 3, 15, 5, 100000000, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID: "1", Name: "Execution Started", Status: "active",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:00", "event_type": "ExecutionStarted",
+				"event_type_short": "Execution Started", "state_name": "\u2014",
+				"event_detail": `{"orderId":"ORD-98765","customerId":"C-1234"}`,
+				"event_id": "1", "previous_event_id": "0",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 1, Timestamp: &ts1, Type: sfntypes.HistoryEventTypeExecutionStarted,
+				ExecutionStartedEventDetails: &sfntypes.ExecutionStartedEventDetails{
+					Input: aws.String(`{"orderId":"ORD-98765","customerId":"C-1234"}`),
+				},
+			},
+		},
+		{
+			ID: "2", Name: "Task State Entered", Status: "pending",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:00", "event_type": "TaskStateEntered",
+				"event_type_short": "Task State Entered", "state_name": "ValidateOrder",
+				"event_detail": `{"orderId":"ORD-98765","customerId":"C-1234"}`,
+				"event_id": "2", "previous_event_id": "1",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 2, PreviousEventId: 1, Timestamp: &ts2, Type: sfntypes.HistoryEventTypeTaskStateEntered,
+				StateEnteredEventDetails: &sfntypes.StateEnteredEventDetails{
+					Name:  aws.String("ValidateOrder"),
+					Input: aws.String(`{"orderId":"ORD-98765","customerId":"C-1234"}`),
+				},
+			},
+		},
+		{
+			ID: "3", Name: "Task Scheduled", Status: "pending",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:00", "event_type": "TaskScheduled",
+				"event_type_short": "Task Scheduled", "state_name": "ValidateOrder",
+				"event_detail": "lambda:invoke",
+				"event_id": "3", "previous_event_id": "2",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 3, PreviousEventId: 2, Timestamp: &ts3, Type: sfntypes.HistoryEventTypeTaskScheduled,
+				TaskScheduledEventDetails: &sfntypes.TaskScheduledEventDetails{
+					Resource:     aws.String("lambda:invoke"),
+					ResourceType: aws.String("lambda"),
+					Region:       aws.String("us-east-1"),
+					Parameters:   aws.String(`{"FunctionName":"validate-order"}`),
+				},
+			},
+		},
+		{
+			ID: "4", Name: "Task Succeeded", Status: "succeeded",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:02", "event_type": "TaskSucceeded",
+				"event_type_short": "Task Succeeded", "state_name": "ValidateOrder",
+				"event_detail": `{"valid":true,"amount":129.99}`,
+				"event_id": "4", "previous_event_id": "3",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 4, PreviousEventId: 3, Timestamp: &ts4, Type: sfntypes.HistoryEventTypeTaskSucceeded,
+				TaskSucceededEventDetails: &sfntypes.TaskSucceededEventDetails{
+					Resource:     aws.String("lambda:invoke"),
+					ResourceType: aws.String("lambda"),
+					Output:       aws.String(`{"valid":true,"amount":129.99}`),
+				},
+			},
+		},
+		{
+			ID: "5", Name: "Task State Exited", Status: "succeeded",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:02", "event_type": "TaskStateExited",
+				"event_type_short": "Task State Exited", "state_name": "ValidateOrder",
+				"event_detail": `{"valid":true,"amount":129.99}`,
+				"event_id": "5", "previous_event_id": "4",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 5, PreviousEventId: 4, Timestamp: &ts5, Type: sfntypes.HistoryEventTypeTaskStateExited,
+				StateExitedEventDetails: &sfntypes.StateExitedEventDetails{
+					Name:   aws.String("ValidateOrder"),
+					Output: aws.String(`{"valid":true,"amount":129.99}`),
+				},
+			},
+		},
+		{
+			ID: "6", Name: "Task State Entered", Status: "pending",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:02", "event_type": "TaskStateEntered",
+				"event_type_short": "Task State Entered", "state_name": "ProcessPayment",
+				"event_detail": `{"valid":true,"amount":129.99}`,
+				"event_id": "6", "previous_event_id": "5",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 6, PreviousEventId: 5, Timestamp: &ts6, Type: sfntypes.HistoryEventTypeTaskStateEntered,
+				StateEnteredEventDetails: &sfntypes.StateEnteredEventDetails{
+					Name:  aws.String("ProcessPayment"),
+					Input: aws.String(`{"valid":true,"amount":129.99}`),
+				},
+			},
+		},
+		{
+			ID: "7", Name: "Task Scheduled", Status: "pending",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:02", "event_type": "TaskScheduled",
+				"event_type_short": "Task Scheduled", "state_name": "ProcessPayment",
+				"event_detail": "lambda:invoke",
+				"event_id": "7", "previous_event_id": "6",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 7, PreviousEventId: 6, Timestamp: &ts7, Type: sfntypes.HistoryEventTypeTaskScheduled,
+				TaskScheduledEventDetails: &sfntypes.TaskScheduledEventDetails{
+					Resource:     aws.String("lambda:invoke"),
+					ResourceType: aws.String("lambda"),
+					Region:       aws.String("us-east-1"),
+					Parameters:   aws.String(`{"FunctionName":"process-payment"}`),
+				},
+			},
+		},
+		{
+			ID: "8", Name: "Task Failed", Status: "failed",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:05", "event_type": "TaskFailed",
+				"event_type_short": "Task Failed", "state_name": "ProcessPayment",
+				"event_detail": "States.TaskFailed: Payment gateway timeout after 3 retries",
+				"event_id": "8", "previous_event_id": "7",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 8, PreviousEventId: 7, Timestamp: &ts8, Type: sfntypes.HistoryEventTypeTaskFailed,
+				TaskFailedEventDetails: &sfntypes.TaskFailedEventDetails{
+					Resource:     aws.String("lambda:invoke"),
+					ResourceType: aws.String("lambda"),
+					Error:        aws.String("States.TaskFailed"),
+					Cause:        aws.String("Payment gateway timeout after 3 retries"),
+				},
+			},
+		},
+		{
+			ID: "9", Name: "Execution Failed", Status: "failed",
+			Fields: map[string]string{
+				"timestamp": "2026-03-22 03:15:05", "event_type": "ExecutionFailed",
+				"event_type_short": "Execution Failed", "state_name": "\u2014",
+				"event_detail": "States.TaskFailed: Payment gateway timeout after 3 retries",
+				"event_id": "9", "previous_event_id": "8",
+			},
+			RawStruct: sfntypes.HistoryEvent{
+				Id: 9, PreviousEventId: 8, Timestamp: &ts9, Type: sfntypes.HistoryEventTypeExecutionFailed,
+				ExecutionFailedEventDetails: &sfntypes.ExecutionFailedEventDetails{
+					Error: aws.String("States.TaskFailed"),
+					Cause: aws.String("Payment gateway timeout after 3 retries"),
+				},
 			},
 		},
 	}

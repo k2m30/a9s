@@ -131,6 +131,8 @@ func main() {
 		{"asg_activities", "asgtypes.Activity", reflect.TypeOf(asgtypes.Activity{})},
 		{"alarm_history", "cwtypes.AlarmHistoryItem", reflect.TypeOf(cwtypes.AlarmHistoryItem{})},
 		{"elb_listeners", "elbv2types.Listener", reflect.TypeOf(elbv2types.Listener{})},
+		{"sfn_executions", "sfntypes.ExecutionListItem", reflect.TypeOf(sfntypes.ExecutionListItem{})},
+		{"sfn_execution_history", "sfntypes.HistoryEvent", reflect.TypeOf(sfntypes.HistoryEvent{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

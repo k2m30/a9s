@@ -1,6 +1,6 @@
 # Child View: Step Functions --> Executions --> Execution History
 
-**Status:** Planned
+**Status:** Implemented
 **Tier:** SHOULD-HAVE (Executions) + Structural (Execution History)
 
 ---

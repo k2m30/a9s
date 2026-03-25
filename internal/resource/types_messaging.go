@@ -85,6 +85,16 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: false},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "sfn_executions",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"state_machine_arn": "arn", "state_machine_name": "Name"},
+				DisplayNameKey: "state_machine_name",
+				DrillCondition: func(r Resource) bool {
+					return r.Fields["type"] != "EXPRESS"
+				},
+				DrillBlockMessage: "Execution history is not available for Express state machines",
+			}},
 		},
 	}
 }
