@@ -1131,3 +1131,57 @@ func TestQA_YAML_ELBListenerRules_NoANSI(t *testing.T) {
 		t.Error("ELBListenerRules RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// RDS Instance Events (dbi_events) YAML view fixtures
+// ===========================================================================
+
+func fixtureDbiEvents() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:   "2024-06-15 10:00:00/my-db-instance",
+			Name: "2024-06-15 10:00:00",
+			Fields: map[string]string{
+				"timestamp":         "2024-06-15 10:00:00",
+				"event_categories":  "maintenance",
+				"message":           "Applying offline patches to DB instance",
+				"source_identifier": "my-db-instance",
+				"source_type":       "db-instance",
+				"source_arn":        "arn:aws:rds:us-east-1:123456789012:db:my-db-instance",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// RDS Instance Events (dbi_events) YAML tests
+// ===========================================================================
+
+func TestQA_YAML_DbiEvents_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureDbiEvents() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("DbiEvents YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("DbiEvents YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_DbiEvents_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureDbiEvents()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("DbiEvents FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_DbiEvents_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureDbiEvents()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("DbiEvents RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

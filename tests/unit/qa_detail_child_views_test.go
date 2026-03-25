@@ -14,6 +14,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -1332,5 +1333,62 @@ func TestQA_Detail_ELBListenerRules_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("ELBListenerRules detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// RDS Instance Events (dbi_events) detail view tests
+// ===========================================================================
+
+func TestDbiEventsDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	ev := rdstypes.Event{
+		Date:             &ts,
+		EventCategories:  []string{"maintenance"},
+		Message:          ptrString("Applying offline patches to DB instance"),
+		SourceIdentifier: ptrString("my-db-instance"),
+		SourceType:       rdstypes.SourceTypeDbInstance,
+		SourceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
+	}
+	res := buildResource(
+		"2024-06-15 10:00:00/my-db-instance",
+		"2024-06-15 10:00:00",
+		ev,
+	)
+	res.Fields = map[string]string{
+		"timestamp":         "2024-06-15 10:00:00",
+		"event_categories":  "maintenance",
+		"message":           "Applying offline patches to DB instance",
+		"source_identifier": "my-db-instance",
+		"source_type":       "db-instance",
+		"source_arn":        "arn:aws:rds:us-east-1:123456789012:db:my-db-instance",
+	}
+	cfg := detailConfigForType("dbi_events")
+	m := newDetailModel(res, "dbi_events", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"my-db-instance",
+		"maintenance",
+		"Applying offline patches to DB instance",
+		"2024-06-15 10:00:00",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("DbiEvents detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestDbiEventsDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := rdstypes.Event{}
+	res := buildResource("empty-dbi-event", "empty-dbi-event", ev)
+	cfg := detailConfigForType("dbi_events")
+	m := newDetailModel(res, "dbi_events", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("DbiEvents detail should not be empty even with nil fields")
 	}
 }

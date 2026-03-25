@@ -168,6 +168,17 @@ func databasesDefaultViews() map[string]ViewDef {
 			},
 		},
 		// Child views for database/storage resources
+		"dbi_events": {
+			List: []ListColumn{
+				{Title: "Timestamp", Path: "Date", Width: 22},
+				{Title: "Category", Key: "event_categories", Width: 18},
+				{Title: "Message", Path: "Message", Width: 60},
+			},
+			Detail: []string{
+				"Date", "SourceIdentifier", "SourceType",
+				"EventCategories", "SourceArn", "Message",
+			},
+		},
 		"s3_objects": {
 			List: []ListColumn{
 				{Title: "Key", Path: "Key", Width: 36},

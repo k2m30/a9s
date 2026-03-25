@@ -269,6 +269,39 @@ func (m *mockRDSDescribeDBSnapshotsClient) DescribeDBSnapshots(ctx context.Conte
 }
 
 // ---------------------------------------------------------------------------
+// RDS Events mocks
+// ---------------------------------------------------------------------------
+
+// mockRDSDescribeEventsClient implements awsclient.RDSDescribeEventsAPI.
+// It supports pagination via the outputs slice with callIdx counter.
+// For backward compatibility, if outputs is nil it falls back to the single output field.
+type mockRDSDescribeEventsClient struct {
+	output  *rds.DescribeEventsOutput
+	outputs []*rds.DescribeEventsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockRDSDescribeEventsClient) DescribeEvents(
+	ctx context.Context,
+	params *rds.DescribeEventsInput,
+	optFns ...func(*rds.Options),
+) (*rds.DescribeEventsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &rds.DescribeEventsOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
 // Transit Gateways mocks
 // ---------------------------------------------------------------------------
 

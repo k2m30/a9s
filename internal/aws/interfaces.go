@@ -274,6 +274,11 @@ type RDSDescribeDBSnapshotsAPI interface {
 	DescribeDBSnapshots(ctx context.Context, params *rds.DescribeDBSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error)
 }
 
+// RDSDescribeEventsAPI defines the interface for the RDS DescribeEvents operation.
+type RDSDescribeEventsAPI interface {
+	DescribeEvents(ctx context.Context, params *rds.DescribeEventsInput, optFns ...func(*rds.Options)) (*rds.DescribeEventsOutput, error)
+}
+
 // EC2DescribeTransitGatewaysAPI defines the interface for the EC2 DescribeTransitGateways operation.
 type EC2DescribeTransitGatewaysAPI interface {
 	DescribeTransitGateways(ctx context.Context, params *ec2.DescribeTransitGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error)

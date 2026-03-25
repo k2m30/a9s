@@ -16,6 +16,12 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "dbi_events",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"db_identifier": "ID"},
+				DisplayNameKey: "db_identifier",
+			}},
 		},
 		{
 			Name:      "S3 Buckets",

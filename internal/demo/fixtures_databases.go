@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
@@ -15,6 +17,10 @@ func init() {
 	demoData["dbi"] = rdsInstances
 	demoData["redis"] = redisFixtures
 	demoData["dbc"] = docdbClusterFixtures
+
+	RegisterChildDemo("dbi_events", func(parentCtx map[string]string) []resource.Resource {
+		return dbiEventFixtures(parentCtx["db_identifier"])
+	})
 }
 
 // redisFixtures returns demo ElastiCache Redis cluster fixtures.
@@ -573,4 +579,67 @@ func rdsInstances() []resource.Resource {
 			},
 		},
 	}
+}
+
+// dbiEventFixtures returns demo RDS DB instance event fixtures.
+func dbiEventFixtures(dbIdentifier string) []resource.Resource {
+	now := time.Now().UTC()
+	ts := func(hoursAgo int) time.Time {
+		return now.Add(-time.Duration(hoursAgo) * time.Hour)
+	}
+	fmtTS := func(t time.Time) string {
+		return t.Format("2006-01-02 15:04:05")
+	}
+
+	events := []struct {
+		hoursAgo   int
+		categories []string
+		message    string
+		sourceType rdstypes.SourceType
+	}{
+		{2, []string{"maintenance"}, "Applying offline patches to DB instance", rdstypes.SourceTypeDbInstance},
+		{6, []string{"maintenance"}, "Finished applying offline patches to DB instance", rdstypes.SourceTypeDbInstance},
+		{12, []string{"failover"}, "Started cross AZ failover to DB instance: " + dbIdentifier, rdstypes.SourceTypeDbInstance},
+		{18, []string{"availability"}, "DB instance restarted", rdstypes.SourceTypeDbInstance},
+		{24, []string{"notification"}, "DB instance is being started", rdstypes.SourceTypeDbInstance},
+		{48, []string{"notification"}, "Recovery of the DB instance has started. Recovery time will vary with the amount of data to be recovered.", rdstypes.SourceTypeDbInstance},
+		{72, []string{"configuration change"}, "Updated to use DBParameterGroup default.postgres16", rdstypes.SourceTypeDbInstance},
+	}
+
+	sourceArn := "arn:aws:rds:us-east-1:123456789012:db:" + dbIdentifier
+
+	var resources []resource.Resource
+	for _, e := range events {
+		t := ts(e.hoursAgo)
+		timestamp := fmtTS(t)
+		categories := ""
+		for i, c := range e.categories {
+			if i > 0 {
+				categories += ", "
+			}
+			categories += c
+		}
+		resources = append(resources, resource.Resource{
+			ID:   timestamp + "/" + dbIdentifier,
+			Name: timestamp,
+			Fields: map[string]string{
+				"timestamp":         timestamp,
+				"event_categories":  categories,
+				"message":           e.message,
+				"source_identifier": dbIdentifier,
+				"source_type":       string(e.sourceType),
+				"source_arn":        sourceArn,
+			},
+			RawStruct: rdstypes.Event{
+				Date:             aws.Time(t),
+				EventCategories:  e.categories,
+				Message:          aws.String(e.message),
+				SourceIdentifier: aws.String(dbIdentifier),
+				SourceType:       e.sourceType,
+				SourceArn:        aws.String(sourceArn),
+			},
+		})
+	}
+
+	return resources
 }

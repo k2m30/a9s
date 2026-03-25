@@ -251,6 +251,15 @@ func IAMGroupMemberColumns() []Column {
 	}
 }
 
+// DbiEventColumns returns the column definitions for RDS DB instance events.
+func DbiEventColumns() []Column {
+	return []Column{
+		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "event_categories", Title: "Category", Width: 18, Sortable: true},
+		{Key: "message", Title: "Message", Width: 60, Sortable: true},
+	}
+}
+
 // ELBListenerRuleColumns returns the column definitions for ELB listener rules.
 func ELBListenerRuleColumns() []Column {
 	return []Column{
