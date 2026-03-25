@@ -43,6 +43,12 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "cb_builds",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"project_name": "ID"},
+				DisplayNameKey: "project_name",
+			}},
 		},
 		{
 			Name:      "ECR Repositories",

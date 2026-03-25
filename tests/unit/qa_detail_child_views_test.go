@@ -9,6 +9,7 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
@@ -926,5 +927,127 @@ func TestQA_Detail_SFNExecutionHistory_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("SFNExecutionHistory detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// CodeBuild Builds detail view tests (child of CodeBuild Projects)
+// ===========================================================================
+
+func TestQA_Detail_CBBuilds_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	endTs := time.Date(2024, 6, 15, 10, 4, 12, 0, time.UTC)
+
+	build := cbtypes.Build{
+		Id:                    ptrString("my-project:build-id-001"),
+		Arn:                   ptrString("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
+		BuildNumber:           ptrInt64(142),
+		BuildStatus:           cbtypes.StatusTypeSucceeded,
+		StartTime:             &startTs,
+		EndTime:               &endTs,
+		CurrentPhase:          ptrString("COMPLETED"),
+		SourceVersion:         ptrString("abc123def456789012345678901234567890abcd"),
+		ResolvedSourceVersion: ptrString("abc123def456789012345678901234567890abcd"),
+		Initiator:             ptrString("codepipeline/my-pipeline"),
+		ProjectName:           ptrString("my-project"),
+		Logs: &cbtypes.LogsLocation{
+			GroupName:  ptrString("/aws/codebuild/my-project"),
+			StreamName: ptrString("build-id-001"),
+		},
+	}
+	res := buildResource("my-project:build-id-001", "#142", build)
+	res.Status = "SUCCEEDED"
+	res.Fields = map[string]string{
+		"build_number":            "142",
+		"build_status":            "SUCCEEDED",
+		"start_time":              "2024-06-15 10:00:00",
+		"end_time":                "2024-06-15 10:04:12",
+		"duration":                "4m 12s",
+		"source_version_short":    "abc123de",
+		"initiator":               "codepipeline/my-pipeline",
+		"build_id":                "my-project:build-id-001",
+		"build_arn":               "arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001",
+		"current_phase":           "COMPLETED",
+		"source_version":          "abc123def456789012345678901234567890abcd",
+		"resolved_source_version": "abc123def456789012345678901234567890abcd",
+		"log_group_name":          "/aws/codebuild/my-project",
+		"log_stream_name":         "build-id-001",
+	}
+	cfg := detailConfigForType("cb_builds")
+	m := newDetailModel(res, "cb_builds", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"BuildStatus",
+		"StartTime",
+		"Arn",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("CBBuilds detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_CBBuilds_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	build := cbtypes.Build{}
+	res := buildResource("empty-cb-build", "empty-cb-build", build)
+	cfg := detailConfigForType("cb_builds")
+	m := newDetailModel(res, "cb_builds", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("CBBuilds detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// CodeBuild Build Logs detail view tests (Level 2 child of CodeBuild Builds)
+// ===========================================================================
+
+func TestQA_Detail_CBBuildLogs_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.OutputLogEvent{
+		Timestamp:     ptrInt64(1718445600000),
+		Message:       ptrString("[Container] Running command echo hello"),
+		IngestionTime: ptrInt64(1718445601000),
+	}
+	res := buildResource(
+		"evt-1718445600000-0",
+		"[Container] Running command echo hello",
+		ev,
+	)
+	res.Status = "IN_PROGRESS"
+	res.Fields = map[string]string{
+		"timestamp":      "2024-06-15 10:00:00",
+		"message":        "[Container] Running command echo hello",
+		"ingestion_time": "2024-06-15 10:00:01",
+		"event_id":       "evt-1718445600000-0",
+	}
+	cfg := detailConfigForType("cb_build_logs")
+	m := newDetailModel(res, "cb_build_logs", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Timestamp",
+		"Message",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("CBBuildLogs detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_CBBuildLogs_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	ev := cwlogstypes.OutputLogEvent{}
+	res := buildResource("empty-cb-log", "empty-cb-log", ev)
+	cfg := detailConfigForType("cb_build_logs")
+	m := newDetailModel(res, "cb_build_logs", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("CBBuildLogs detail should not be empty even with nil fields")
 	}
 }

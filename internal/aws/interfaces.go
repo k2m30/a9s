@@ -506,3 +506,13 @@ type ASGDescribeScalingActivitiesAPI interface {
 type CloudWatchDescribeAlarmHistoryAPI interface {
 	DescribeAlarmHistory(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error)
 }
+
+// CodeBuildListBuildsForProjectAPI defines the interface for the CodeBuild ListBuildsForProject operation.
+type CodeBuildListBuildsForProjectAPI interface {
+	ListBuildsForProject(ctx context.Context, params *codebuild.ListBuildsForProjectInput, optFns ...func(*codebuild.Options)) (*codebuild.ListBuildsForProjectOutput, error)
+}
+
+// CodeBuildBatchGetBuildsAPI defines the interface for the CodeBuild BatchGetBuilds operation.
+type CodeBuildBatchGetBuildsAPI interface {
+	BatchGetBuilds(ctx context.Context, params *codebuild.BatchGetBuildsInput, optFns ...func(*codebuild.Options)) (*codebuild.BatchGetBuildsOutput, error)
+}

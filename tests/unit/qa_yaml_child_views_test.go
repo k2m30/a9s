@@ -732,3 +732,119 @@ func TestQA_YAML_ELBListeners_NoANSI(t *testing.T) {
 		t.Error("ELBListeners RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// CodeBuild Builds YAML view fixtures
+// ===========================================================================
+
+func fixtureCBBuilds() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "my-project:build-id-001",
+			Name:   "#142",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"build_number":            "142",
+				"build_status":            "SUCCEEDED",
+				"start_time":              "2024-06-15 10:00:00",
+				"end_time":                "2024-06-15 10:04:12",
+				"duration":                "4m 12s",
+				"source_version_short":    "abc123de",
+				"initiator":               "codepipeline/my-pipeline",
+				"build_id":                "my-project:build-id-001",
+				"build_arn":               "arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001",
+				"current_phase":           "COMPLETED",
+				"source_version":          "abc123def456789012345678901234567890abcd",
+				"resolved_source_version": "abc123def456789012345678901234567890abcd",
+				"log_group_name":          "/aws/codebuild/my-project",
+				"log_stream_name":         "build-id-001",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// CodeBuild Builds YAML tests
+// ===========================================================================
+
+func TestQA_YAML_CBBuilds_ContainsFields(t *testing.T) {
+	for _, r := range fixtureCBBuilds() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("CBBuilds YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("CBBuilds YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_CBBuilds_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureCBBuilds()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CBBuilds FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_CBBuilds_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureCBBuilds()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("CBBuilds RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// CodeBuild Build Logs YAML view fixtures
+// ===========================================================================
+
+func fixtureCBBuildLogs() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-1718445600000-0",
+			Name:   "[Container] Running command echo hello",
+			Status: "IN_PROGRESS",
+			Fields: map[string]string{
+				"timestamp":      "2024-06-15 10:00:00",
+				"message":        "[Container] Running command echo hello",
+				"ingestion_time": "2024-06-15 10:00:01",
+				"event_id":       "evt-1718445600000-0",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// CodeBuild Build Logs YAML tests
+// ===========================================================================
+
+func TestQA_YAML_CBBuildLogs_ContainsFields(t *testing.T) {
+	for _, r := range fixtureCBBuildLogs() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("CBBuildLogs YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("CBBuildLogs YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_CBBuildLogs_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureCBBuildLogs()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CBBuildLogs FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_CBBuildLogs_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureCBBuildLogs()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("CBBuildLogs RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

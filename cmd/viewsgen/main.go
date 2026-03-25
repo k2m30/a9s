@@ -39,7 +39,7 @@ func main() {
 		if len(v.List) > 0 {
 			fmt.Println("    list:")
 			for _, col := range v.List {
-				fmt.Printf("      %s:\n", col.Title)
+				fmt.Printf("      %s:\n", yamlKey(col.Title))
 				if col.Key != "" {
 					fmt.Printf("        key: %s\n", col.Key)
 				} else if col.Path != "" {
@@ -64,4 +64,13 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+// yamlKey returns a YAML-safe key string. Keys containing characters that are
+// special in YAML (#, :, etc.) are double-quoted.
+func yamlKey(s string) string {
+	if strings.ContainsAny(s, "#:{}[]&*?|>!%@`") {
+		return fmt.Sprintf("%q", s)
+	}
+	return s
 }
