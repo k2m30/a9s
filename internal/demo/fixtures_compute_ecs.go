@@ -32,7 +32,7 @@ func ecsServiceFixtures() []resource.Resource {
 			Status: "ACTIVE",
 			Fields: map[string]string{
 				"service_name":  "api-gateway",
-				"cluster":       ecsClusterArnServices,
+				"cluster":       "acme-services",
 				"status":        "ACTIVE",
 				"desired_count": "4",
 				"running_count": "4",
@@ -62,7 +62,7 @@ func ecsServiceFixtures() []resource.Resource {
 			Status: "ACTIVE",
 			Fields: map[string]string{
 				"service_name":  "web-frontend",
-				"cluster":       ecsClusterArnServices,
+				"cluster":       "acme-services",
 				"status":        "ACTIVE",
 				"desired_count": "3",
 				"running_count": "3",
@@ -91,7 +91,7 @@ func ecsServiceFixtures() []resource.Resource {
 			Status: "ACTIVE",
 			Fields: map[string]string{
 				"service_name":  "order-worker",
-				"cluster":       ecsClusterArnServices,
+				"cluster":       "acme-services",
 				"status":        "ACTIVE",
 				"desired_count": "2",
 				"running_count": "1",
@@ -120,7 +120,7 @@ func ecsServiceFixtures() []resource.Resource {
 			Status: "ACTIVE",
 			Fields: map[string]string{
 				"service_name":  "batch-etl-runner",
-				"cluster":       ecsClusterArnBatch,
+				"cluster":       "acme-batch",
 				"status":        "ACTIVE",
 				"desired_count": "1",
 				"running_count": "1",
@@ -150,7 +150,7 @@ func ecsServiceFixtures() []resource.Resource {
 			Status: "DRAINING",
 			Fields: map[string]string{
 				"service_name":  "log-aggregator",
-				"cluster":       ecsClusterArnBatch,
+				"cluster":       "acme-batch",
 				"status":        "DRAINING",
 				"desired_count": "0",
 				"running_count": "1",
