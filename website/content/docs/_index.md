@@ -37,6 +37,8 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | SFN Executions | Execution History | `Enter` | Step-by-step state machine trace with errors and state names |
 | CodeBuild Projects | Builds | `Enter` | Recent builds with status, duration, source version, initiator |
 | CodeBuild Builds | Build Logs | `Enter` | Full build output from CloudWatch Logs with phase highlighting |
+| CodePipelines | Pipeline Stages | `Enter` | Flattened stage→action view with status coloring and external URLs |
+| ECR Repositories | Images | `Enter` | Tags, digest, size, push time, scan findings with severity counts |
 
 ## Commands
 
