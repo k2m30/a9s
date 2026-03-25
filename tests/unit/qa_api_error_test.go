@@ -200,6 +200,82 @@ func TestQA_APIError_OnMainMenu(t *testing.T) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// TASK-086: API error auto-dismiss (fixes #86)
+// ══════════════════════════════════════════════════════════════════════════════
+
+func TestQA_APIError_ReturnsClearCmd(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Navigate to resource list so APIErrorMsg has a target view
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+
+	// Send APIErrorMsg — handleAPIError should return a cmd that schedules auto-clear
+	_, cmd := rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2",
+		Err:          fmt.Errorf("access denied"),
+	})
+
+	if cmd == nil {
+		t.Fatal("handleAPIError must return a non-nil cmd to schedule flash auto-clear")
+	}
+}
+
+func TestQA_APIError_AutoDismiss(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+
+	// Send APIErrorMsg
+	m, cmd := rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2",
+		Err:          fmt.Errorf("access denied"),
+	})
+
+	// Verify flash is visible
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "access denied") {
+		t.Fatalf("flash error should be visible, got: %s", plain[:min(300, len(plain))])
+	}
+
+	// Execute the returned cmd to get ClearFlashMsg
+	if cmd == nil {
+		t.Fatal("cmd must not be nil — cannot proceed to auto-dismiss")
+	}
+	msg := cmd()
+	clearMsg, ok := msg.(messages.ClearFlashMsg)
+	if !ok {
+		t.Fatalf("expected ClearFlashMsg, got %T", msg)
+	}
+
+	// Apply ClearFlashMsg — flash should disappear
+	m, _ = rootApplyMsg(m, clearMsg)
+	plain = stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "access denied") {
+		t.Error("flash error should be cleared after ClearFlashMsg")
+	}
+}
+
+func TestQA_FlashMsg_ReturnsClearCmd(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// FlashMsg (non-API error) already works — control test
+	_, cmd := rootApplyMsg(m, messages.FlashMsg{Text: "test error", IsError: true})
+
+	if cmd == nil {
+		t.Fatal("handleFlash must return a non-nil cmd to schedule flash auto-clear")
+	}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // TASK-003: Fix S3 object refresh bug
 // ══════════════════════════════════════════════════════════════════════════════
 

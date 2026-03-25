@@ -36,7 +36,7 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 			TableName: aws.String(tableName),
 		})
 		if err != nil {
-			return nil, err
+			continue // skip tables we can't describe (e.g. permission denied)
 		}
 
 		table := descOutput.Table

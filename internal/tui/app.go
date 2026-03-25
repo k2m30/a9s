@@ -333,10 +333,20 @@ func (m Model) headerRight() string {
 		return styles.FilterActive.Render(":" + m.cmdInput.Value())
 	}
 	if m.flash.active {
-		if m.flash.isError {
-			return styles.FlashError.Render(m.flash.text)
+		text := m.flash.text
+		// Truncate to prevent header wrapping (fixes #84).
+		// Reserve ~40 chars for the left side (a9s + version + profile:region + padding).
+		maxFlash := m.width - 40
+		if maxFlash < 20 {
+			maxFlash = 20
 		}
-		return styles.FlashSuccess.Render(m.flash.text)
+		if len(text) > maxFlash {
+			text = text[:maxFlash-3] + "..."
+		}
+		if m.flash.isError {
+			return styles.FlashError.Render(text)
+		}
+		return styles.FlashSuccess.Render(text)
 	}
 	if rv, ok := m.activeView().(*views.RevealModel); ok {
 		return rv.HeaderWarning()
