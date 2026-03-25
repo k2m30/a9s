@@ -102,8 +102,8 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 	if r0.Fields["service_name"] != "web-service" {
 		t.Errorf("resource[0].Fields[\"service_name\"]: expected %q, got %q", "web-service", r0.Fields["service_name"])
 	}
-	if r0.Fields["cluster"] != clusterArn {
-		t.Errorf("resource[0].Fields[\"cluster\"]: expected %q, got %q", clusterArn, r0.Fields["cluster"])
+	if r0.Fields["cluster"] != "prod-cluster" {
+		t.Errorf("resource[0].Fields[\"cluster\"]: expected %q, got %q", "prod-cluster", r0.Fields["cluster"])
 	}
 	if r0.Fields["status"] != "ACTIVE" {
 		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "ACTIVE", r0.Fields["status"])
@@ -148,6 +148,43 @@ func TestFetchECSServices_ListClustersError(t *testing.T) {
 	}
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d resources", len(resources))
+	}
+}
+
+func TestFetchECSServices_ClusterNameExtractedFromARN(t *testing.T) {
+	cases := []struct {
+		arn      string
+		expected string
+	}{
+		{"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster", "prod-cluster"},
+		{"arn:aws:ecs:eu-west-1:123456789012:cluster/staging", "staging"},
+		{"no-slash-arn", "no-slash-arn"},
+	}
+
+	for _, tc := range cases {
+		listClustersMock := &mockECSListClustersClient{
+			output: &ecs.ListClustersOutput{ClusterArns: []string{tc.arn}},
+		}
+		listServicesMock := &mockECSListServicesClient{
+			outputs: map[string]*ecs.ListServicesOutput{
+				tc.arn: {ServiceArns: []string{"arn:aws:ecs:us-east-1:123:service/x/svc"}},
+			},
+		}
+		describeServicesMock := &mockECSDescribeServicesClient{
+			output: &ecs.DescribeServicesOutput{
+				Services: []ecstypes.Service{
+					{ServiceName: aws.String("svc"), ClusterArn: aws.String(tc.arn)},
+				},
+			},
+		}
+
+		resources, err := awsclient.FetchECSServices(context.Background(), listClustersMock, listServicesMock, describeServicesMock)
+		if err != nil {
+			t.Fatalf("arn=%q: unexpected error: %v", tc.arn, err)
+		}
+		if got := resources[0].Fields["cluster"]; got != tc.expected {
+			t.Errorf("arn=%q: Fields[\"cluster\"]: expected %q, got %q", tc.arn, tc.expected, got)
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -66,7 +67,12 @@ func FetchECSServices(
 
 			clusterName := ""
 			if svc.ClusterArn != nil {
-				clusterName = *svc.ClusterArn
+				arn := *svc.ClusterArn
+				if idx := strings.LastIndex(arn, "/"); idx >= 0 {
+					clusterName = arn[idx+1:]
+				} else {
+					clusterName = arn
+				}
 			}
 
 			status := ""

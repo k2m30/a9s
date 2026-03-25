@@ -822,6 +822,9 @@ views:
       Service Name:
         path: ServiceName
         width: 32
+      Cluster:
+        key: cluster
+        width: 24
       Status:
         path: Status
         width: 12
