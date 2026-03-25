@@ -963,3 +963,171 @@ func TestQA_YAML_PipelineStages_NoANSI(t *testing.T) {
 		t.Error("PipelineStages RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// Role Policies YAML view fixtures
+// ===========================================================================
+
+func fixtureRolePolicies() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
+			Name:   "ReadOnlyAccess",
+			Status: "",
+			Fields: map[string]string{
+				"policy_name": "ReadOnlyAccess",
+				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
+				"policy_type": "Managed",
+			},
+		},
+		{
+			ID:     "my-inline-policy",
+			Name:   "my-inline-policy",
+			Status: "terminated",
+			Fields: map[string]string{
+				"policy_name": "my-inline-policy",
+				"policy_arn":  "",
+				"policy_type": "Inline",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Role Policies YAML tests
+// ===========================================================================
+
+func TestQA_YAML_RolePolicies_ContainsFields(t *testing.T) {
+	for _, r := range fixtureRolePolicies() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("RolePolicies YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("RolePolicies YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_RolePolicies_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureRolePolicies()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("RolePolicies FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_RolePolicies_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureRolePolicies()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("RolePolicies RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// IAM Group Members YAML view fixtures
+// ===========================================================================
+
+func fixtureIAMGroupMembers() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "alice",
+			Name:   "alice",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "alice",
+				"user_id":            "AIDAEXAMPLE1111111111",
+				"create_date":        "2024-03-15 09:30",
+				"password_last_used": "N/A (not in API)",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// IAM Group Members YAML tests
+// ===========================================================================
+
+func TestQA_YAML_IAMGroupMembers_ContainsFields(t *testing.T) {
+	for _, r := range fixtureIAMGroupMembers() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("IAMGroupMembers YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("IAMGroupMembers YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_IAMGroupMembers_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureIAMGroupMembers()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("IAMGroupMembers FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_IAMGroupMembers_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureIAMGroupMembers()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("IAMGroupMembers RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// ELB Listener Rules YAML view fixtures
+// ===========================================================================
+
+func fixtureELBListenerRules() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "arn:rule/1",
+			Name:   "100",
+			Status: "",
+			Fields: map[string]string{
+				"priority":           "100",
+				"conditions_summary": "path: /api/*",
+				"action_type":        "forward",
+				"action_target":      "api-tg",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ELB Listener Rules YAML tests
+// ===========================================================================
+
+func TestQA_YAML_ELBListenerRules_ContainsFields(t *testing.T) {
+	for _, r := range fixtureELBListenerRules() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("ELBListenerRules YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("ELBListenerRules YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_ELBListenerRules_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureELBListenerRules()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ELBListenerRules FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_ELBListenerRules_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureELBListenerRules()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("ELBListenerRules RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

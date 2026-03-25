@@ -1,6 +1,6 @@
 # Child View: Load Balancers --> Listeners --> Listener Rules
 
-**Status:** Implemented (Listeners) / Planned (Rules)
+**Status:** Implemented (Listeners + Rules)
 **Tier:** MUST-HAVE (Listeners) + Structural (Rules)
 
 ---

@@ -3,7 +3,7 @@
 ## Overview
 
 All MUST-HAVE, SHOULD-HAVE, and Structural child views from the [devops research](devops-research.md).
-Twenty-one child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, ELB Listeners, SFN Executions, SFN Execution History, CodeBuild Builds, CodeBuild Build Logs, Pipeline Stages, and ECR Images.
+Twenty-four child view levels implemented: S3 Objects, R53 Records, Log Streams, Log Events, Target Health, Lambda Invocations, Lambda Invocation Logs, ECS Service Events, ECS Tasks, ECS Container Logs, CFN Stack Events, CFN Stack Resources, ASG Scaling Activities, CW Alarm History, ELB Listeners, ELB Listener Rules, SFN Executions, SFN Execution History, CodeBuild Builds, CodeBuild Build Logs, Pipeline Stages, ECR Images, Role Policies, and Group Members.
 
 ### Status Key
 
@@ -34,13 +34,13 @@ Twenty-one child view levels implemented: S3 Objects, R53 Records, Log Streams, 
 | 14 | CodePipeline (pipeline) | Pipeline Stages | SHOULD-HAVE | Implemented | [pipeline-stages.md](pipeline-stages.md) | No |
 | 15 | ECR (ecr) | Images | SHOULD-HAVE | Implemented | [ecr-images.md](ecr-images.md) | No |
 | 16 | RDS Instances (dbi) | RDS Events | SHOULD-HAVE | Planned | [dbi-events.md](dbi-events.md) | No |
-| 17 | IAM Roles (role) | Attached Policies | SHOULD-HAVE | Planned | [role-policies.md](role-policies.md) | No |
+| 17 | IAM Roles (role) | Attached Policies | SHOULD-HAVE | Implemented | [role-policies.md](role-policies.md) | No |
 | 18 | SNS Topics (sns) | Subscriptions | SHOULD-HAVE | Planned | [sns-subscriptions.md](sns-subscriptions.md) | No |
 | 19 | EB Rules (eb-rule) | Targets | SHOULD-HAVE | Planned | [eb-rule-targets.md](eb-rule-targets.md) | No |
 | 20 | Glue Jobs (glue) | Job Runs | SHOULD-HAVE | Planned | [glue-runs.md](glue-runs.md) | No |
-| 21 | IAM Groups (iam-group) | Group Members | SHOULD-HAVE | Planned | [iam-group-members.md](iam-group-members.md) | No |
+| 21 | IAM Groups (iam-group) | Group Members | SHOULD-HAVE | Implemented | [iam-group-members.md](iam-group-members.md) | No |
 
-**Total: 21 parent-child relationships, 25 view levels (4 have nested level 2)**
+**Total: 21 parent-child relationships, 28 view levels (5 have nested level 2)**
 
 ---
 
