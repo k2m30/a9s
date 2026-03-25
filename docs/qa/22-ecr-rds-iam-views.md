@@ -693,7 +693,7 @@ aws iam list-attached-role-policies --role-name my-role \
 
 | ID | Story | Expected |
 |----|-------|----------|
-| C.19.1 | Main Menu -> IAM Roles -> Role Policies -> Policy Detail -> YAML; then Escape four times. | Each Escape pops one level: YAML -> Detail -> Policies -> IAM Roles -> Main Menu. No state is lost at any intermediate level. |
+| C.19.1 | Main Menu -> IAM Roles -> Role Policies -> Enter (opens Policy Document grandchild view) -> Esc -> Esc -> Esc -> Esc. | Each Escape pops one level: Policy Document -> Policies -> IAM Roles -> Main Menu. No state is lost at any intermediate level. **Updated:** Enter now opens the Policy Document view, not the detail view. Full grandchild stories are in `25-policy-document-view.md`. |
 | C.19.2 | IAM Roles -> Role Policies -> Detail (d); then Escape twice. | Detail -> Policies -> IAM Roles. The cursor is still on the same IAM role. |
 
 ### C.20 Alternating Row Colors
@@ -737,7 +737,7 @@ aws iam list-attached-role-policies --role-name my-role \
 |----|-------|----------|
 | D.4.1 | I press Enter on a row in ECR Images. | The detail view opens for that image (same behavior as pressing d). There is no further child view to drill into from an image. |
 | D.4.2 | I press Enter on a row in RDS Events. | The detail view opens for that event (same behavior as pressing d). There is no further child view to drill into from an event. |
-| D.4.3 | I press Enter on a row in Role Policies. | The detail view opens for that policy (same behavior as pressing d). There is no further child view to drill into from a policy. |
+| D.4.3 | I press Enter on a row in Role Policies. | **Superseded by `25-policy-document-view.md`**: Enter now opens the Policy Document grandchild view (JSON viewer), not the detail view. See stories A.1 and A.2 in that file. |
 
 ### D.5 Full Navigation Flow
 
