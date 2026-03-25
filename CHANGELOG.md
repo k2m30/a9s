@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.1] - 2026-03-25
+
+### Fixed
+- Error flash messages now auto-dismiss after 5 seconds instead of persisting forever (#86)
+- Long error messages truncated in header to prevent multi-line wrapping that pushed content off-screen (#84)
+- KMS fetcher gracefully skips keys that can't be described (e.g. permission denied) instead of failing entirely (#85)
+- DynamoDB fetcher gracefully skips tables that can't be described instead of failing entirely
+
 ## [3.9.0] - 2026-03-25
 
 ### Added
