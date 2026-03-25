@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -728,5 +729,82 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	// Execute returned cmd if any (should not panic)
 	if cmd != nil {
 		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic on execution
+	}
+}
+
+// ── Bug #84: Multi-line error messages in header push content off-screen ─────
+
+// longAWSError is a realistic AWS AccessDeniedException message (~250 chars)
+// that reproduces the header overflow bug described in issue #84.
+const longAWSError = "User: arn:aws:iam::805291200126:user/mikhail.chuprynski@3keys.com is not authorized to perform: kms:DescribeKey on resource: arn:aws:kms:eu-central-1:805291200126:key/c9feb7c5-56b6-430f-a2fd-d414426b2283 because no resource-based policy allows the kms:DescribeKey action"
+
+func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Send a long API error that exceeds terminal width
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "kms",
+		Err:          fmt.Errorf("%s", longAWSError),
+	})
+
+	// Get the view WITHOUT a long error for baseline comparison
+	baselineModel := newRootSizedModel()
+	baselineContent := rootViewContent(baselineModel)
+	baselineLines := len(strings.Split(baselineContent, "\n"))
+
+	content := rootViewContent(m)
+	errorLines := len(strings.Split(content, "\n"))
+
+	// The long error must not cause additional lines compared to the baseline.
+	// When the header wraps, it adds extra lines to the total output.
+	if errorLines != baselineLines {
+		t.Errorf("long error should not add extra lines: baseline=%d, with error=%d — header is wrapping", baselineLines, errorLines)
+	}
+}
+
+func TestRoot_View_LongErrorStillOneLine(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Send a long API error
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "kms",
+		Err:          fmt.Errorf("%s", longAWSError),
+	})
+
+	content := rootViewContent(m)
+	lines := strings.Split(content, "\n")
+	// Terminal height is 40, so View() must produce exactly 40 lines.
+	// If the header wraps due to a long error, extra lines push content off-screen.
+	if len(lines) != 40 {
+		t.Errorf("expected exactly 40 lines (terminal height), got %d — long error likely caused header to wrap", len(lines))
+	}
+}
+
+func TestRoot_View_ErrorTruncatedInHeader(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Send a long API error
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "kms",
+		Err:          fmt.Errorf("%s", longAWSError),
+	})
+
+	content := rootViewContent(m)
+	// The header must occupy exactly 1 line. Count how many lines before the
+	// first frame border character (top-left corner "┌") to detect wrapping.
+	lines := strings.Split(content, "\n")
+	headerLineCount := 0
+	for _, line := range lines {
+		plain := stripANSI(line)
+		if strings.Contains(plain, "\u250c") { // ┌ = top-left frame corner
+			break
+		}
+		headerLineCount++
+	}
+	if headerLineCount != 1 {
+		t.Errorf("header should occupy exactly 1 line, but occupies %d lines — long error text is causing the header to wrap", headerLineCount)
 	}
 }

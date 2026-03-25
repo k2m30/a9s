@@ -15,6 +15,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
+// apiErrorFlashDuration controls how long API error messages stay visible.
+// Longer than regular flash (2s) because error messages are more important.
+const apiErrorFlashDuration = 5 * time.Second
+
 // handleKeyMsg processes all keyboard input: force-quit, input modes, global
 // keys, then falls through to the active view.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -114,9 +118,13 @@ func (m Model) handleClearFlash(msg messages.ClearFlashMsg) (tea.Model, tea.Cmd)
 // pending refresh (after profile/region switch).
 func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true}
+		newGen := m.flash.gen + 1
+		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true, gen: newGen}
 		m.pendingRefresh = false
-		return m, nil
+		gen := m.flash.gen
+		return m, tea.Tick(apiErrorFlashDuration, func(_ time.Time) tea.Msg {
+			return messages.ClearFlashMsg{Gen: gen}
+		})
 	}
 	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
@@ -221,11 +229,15 @@ func (m Model) handleAPIError(msg messages.APIErrorMsg) (tea.Model, tea.Cmd) {
 	} else {
 		flashText = msg.Err.Error()
 	}
-	m.flash = flashState{text: flashText, isError: true, active: true}
+	newGen := m.flash.gen + 1
+	m.flash = flashState{text: flashText, isError: true, active: true, gen: newGen}
 	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 		rl.ClearLoading()
 	}
-	return m, nil
+	gen := m.flash.gen
+	return m, tea.Tick(apiErrorFlashDuration, func(_ time.Time) tea.Msg {
+		return messages.ClearFlashMsg{Gen: gen}
+	})
 }
 
 // handleNavigate pushes the appropriate view onto the stack.
