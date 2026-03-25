@@ -1,6 +1,9 @@
 package demo
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
@@ -19,6 +22,9 @@ func init() {
 	})
 	RegisterChildDemo("cfn_resources", func(parentCtx map[string]string) []resource.Resource {
 		return cfnResourceFixtures(parentCtx["stack_name"])
+	})
+	RegisterChildDemo("ecr_images", func(parentCtx map[string]string) []resource.Resource {
+		return ecrImageFixtures(parentCtx["repository_name"], parentCtx["repository_uri"])
 	})
 }
 
@@ -549,6 +555,207 @@ func cfnResourceFixtures(stackName string) []resource.Resource {
 				LastUpdatedTimestamp: aws.Time(mustParseTime("2026-03-20T10:02:00+00:00")),
 				DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
 					StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
+				},
+			},
+		},
+	}
+}
+
+// ecrImageFixtures returns demo ECR Image fixtures for a given repository.
+func ecrImageFixtures(repoName, repoURI string) []resource.Resource {
+	pushedAt1 := mustParseTime("2026-03-22T10:00:00+00:00")
+	pushedAt2 := mustParseTime("2026-03-21T14:30:00+00:00")
+	pushedAt3 := mustParseTime("2026-03-20T08:15:00+00:00")
+	pushedAt4 := mustParseTime("2026-03-18T16:00:00+00:00")
+	pushedAt5 := mustParseTime("2026-03-15T11:45:00+00:00")
+	pushedAt6 := mustParseTime("2026-03-10T09:00:00+00:00")
+
+	makeURI := func(tag string) string {
+		if tag != "" {
+			return repoURI + ":" + tag
+		}
+		return ""
+	}
+
+	makeDigestShort := func(digest string) string {
+		s := strings.TrimPrefix(digest, "sha256:")
+		if len(s) > 12 {
+			return s[:12]
+		}
+		return s
+	}
+
+	digest1 := "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+	digest2 := "sha256:b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
+	digest3 := "sha256:c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+	digest4 := "sha256:d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
+	digest5 := "sha256:e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+	digest6 := "sha256:f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1"
+
+	return []resource.Resource{
+		{
+			ID:     digest1,
+			Name:   "latest, v2.3.1",
+			Status: "",
+			Fields: map[string]string{
+				"image_tags":      "latest, v2.3.1",
+				"digest_short":    makeDigestShort(digest1),
+				"pushed_at":       "2026-03-22 10:00:00",
+				"image_size":      "85 MB",
+				"scan_status":     "COMPLETE",
+				"finding_counts":  "",
+				"image_uri":       makeURI("latest"),
+				"image_digest":    digest1,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest1),
+				ImageTags:        []string{"latest", "v2.3.1"},
+				ImagePushedAt:    &pushedAt1,
+				ImageSizeInBytes: aws.Int64(89128960),
+				ImageScanStatus: &ecrtypes.ImageScanStatus{
+					Status: ecrtypes.ScanStatusComplete,
+				},
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{},
+				},
+			},
+		},
+		{
+			ID:     digest2,
+			Name:   "v2.3.0",
+			Status: "pending",
+			Fields: map[string]string{
+				"image_tags":      "v2.3.0",
+				"digest_short":    makeDigestShort(digest2),
+				"pushed_at":       "2026-03-21 14:30:00",
+				"image_size":      "84 MB",
+				"scan_status":     "COMPLETE",
+				"finding_counts":  "2H 5M",
+				"image_uri":       makeURI("v2.3.0"),
+				"image_digest":    digest2,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest2),
+				ImageTags:        []string{"v2.3.0"},
+				ImagePushedAt:    &pushedAt2,
+				ImageSizeInBytes: aws.Int64(88080384),
+				ImageScanStatus: &ecrtypes.ImageScanStatus{
+					Status: ecrtypes.ScanStatusComplete,
+				},
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{
+						"HIGH":   2,
+						"MEDIUM": 5,
+					},
+				},
+			},
+		},
+		{
+			ID:     digest3,
+			Name:   "v2.2.0",
+			Status: "failed",
+			Fields: map[string]string{
+				"image_tags":      "v2.2.0",
+				"digest_short":    makeDigestShort(digest3),
+				"pushed_at":       "2026-03-20 08:15:00",
+				"image_size":      "82 MB",
+				"scan_status":     "COMPLETE",
+				"finding_counts":  "1C 3H 8M",
+				"image_uri":       makeURI("v2.2.0"),
+				"image_digest":    digest3,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest3),
+				ImageTags:        []string{"v2.2.0"},
+				ImagePushedAt:    &pushedAt3,
+				ImageSizeInBytes: aws.Int64(85983232),
+				ImageScanStatus: &ecrtypes.ImageScanStatus{
+					Status: ecrtypes.ScanStatusComplete,
+				},
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{
+						"CRITICAL": 1,
+						"HIGH":     3,
+						"MEDIUM":   8,
+					},
+				},
+			},
+		},
+		{
+			ID:     digest4,
+			Name:   "staging",
+			Status: "",
+			Fields: map[string]string{
+				"image_tags":      "staging",
+				"digest_short":    makeDigestShort(digest4),
+				"pushed_at":       "2026-03-18 16:00:00",
+				"image_size":      "86 MB",
+				"scan_status":     "COMPLETE",
+				"finding_counts":  "",
+				"image_uri":       makeURI("staging"),
+				"image_digest":    digest4,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest4),
+				ImageTags:        []string{"staging"},
+				ImagePushedAt:    &pushedAt4,
+				ImageSizeInBytes: aws.Int64(90177536),
+				ImageScanStatus: &ecrtypes.ImageScanStatus{
+					Status: ecrtypes.ScanStatusComplete,
+				},
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{},
+				},
+			},
+		},
+		{
+			ID:     digest5,
+			Name:   makeDigestShort(digest5),
+			Status: "terminated",
+			Fields: map[string]string{
+				"image_tags":      "<untagged>",
+				"digest_short":    makeDigestShort(digest5),
+				"pushed_at":       "2026-03-15 11:45:00",
+				"image_size":      "80 MB",
+				"scan_status":     "",
+				"finding_counts":  "",
+				"image_uri":       fmt.Sprintf("%s@%s", repoURI, digest5),
+				"image_digest":    digest5,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest5),
+				ImageTags:        []string{},
+				ImagePushedAt:    &pushedAt5,
+				ImageSizeInBytes: aws.Int64(83886080),
+			},
+		},
+		{
+			ID:     digest6,
+			Name:   "v2.1.0",
+			Status: "failed",
+			Fields: map[string]string{
+				"image_tags":      "v2.1.0",
+				"digest_short":    makeDigestShort(digest6),
+				"pushed_at":       "2026-03-10 09:00:00",
+				"image_size":      "79 MB",
+				"scan_status":     "FAILED",
+				"finding_counts":  "",
+				"image_uri":       makeURI("v2.1.0"),
+				"image_digest":    digest6,
+				"repository_name": repoName,
+			},
+			RawStruct: ecrtypes.ImageDetail{
+				ImageDigest:      aws.String(digest6),
+				ImageTags:        []string{"v2.1.0"},
+				ImagePushedAt:    &pushedAt6,
+				ImageSizeInBytes: aws.Int64(82837504),
+				ImageScanStatus: &ecrtypes.ImageScanStatus{
+					Status: ecrtypes.ScanStatusFailed,
 				},
 			},
 		},

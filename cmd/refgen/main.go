@@ -135,6 +135,7 @@ func main() {
 		{"sfn_execution_history", "sfntypes.HistoryEvent", reflect.TypeOf(sfntypes.HistoryEvent{})},
 		{"cb_builds", "cbtypes.Build", reflect.TypeOf(cbtypes.Build{})},
 		{"cb_build_logs", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
+		{"ecr_images", "ecrtypes.ImageDetail", reflect.TypeOf(ecrtypes.ImageDetail{})},
 	}
 
 	fmt.Println("# views_reference.yaml")

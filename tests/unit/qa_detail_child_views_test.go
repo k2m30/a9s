@@ -10,9 +10,12 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // ===========================================================================
@@ -1049,5 +1052,129 @@ func TestQA_Detail_CBBuildLogs_NilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("CBBuildLogs detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// ECR Images detail view tests
+// ===========================================================================
+
+func TestQA_Detail_ECRImages_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	img := ecrtypes.ImageDetail{
+		ImageDigest:      ptrString("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+		ImageTags:        []string{"latest", "v1.0.0"},
+		ImagePushedAt:    &pushedAt,
+		ImageSizeInBytes: ptrInt64(52428800),
+		ImageScanStatus: &ecrtypes.ImageScanStatus{
+			Status: ecrtypes.ScanStatusComplete,
+		},
+		ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+			FindingSeverityCounts: map[string]int32{
+				"HIGH":   3,
+				"MEDIUM": 5,
+			},
+		},
+	}
+	res := buildResource("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", "latest, v1.0.0", img)
+	res.Status = ""
+	res.Fields = map[string]string{
+		"image_tags":     "latest, v1.0.0",
+		"digest_short":   "abcdef123456",
+		"pushed_at":      "2024-06-15 10:00:00",
+		"image_size":     "50.0 MB",
+		"scan_status":    "COMPLETE",
+		"finding_counts": "3H 5M",
+		"image_uri":      "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest",
+	}
+	cfg := detailConfigForType("ecr_images")
+	m := newDetailModel(res, "ecr_images", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"ImageDigest",
+		"ImageTags",
+		"ImagePushedAt",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("ECRImages detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_ECRImages_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	img := ecrtypes.ImageDetail{}
+	res := buildResource("empty-ecr-image", "empty-ecr-image", img)
+	cfg := detailConfigForType("ecr_images")
+	m := newDetailModel(res, "ecr_images", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("ECRImages detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Pipeline Stages detail view tests (child of CodePipelines)
+// ===========================================================================
+
+func TestQA_Detail_PipelineStages_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+
+	row := awsclient.PipelineStageRow{
+		StageName:       "Source",
+		StageStatus:     "Succeeded",
+		ActionName:      "GitHub",
+		ActionStatus:    "Succeeded",
+		LastStatusChange: ptrTime(time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)),
+		ExternalURL:     "https://github.com/org/repo/commit/abc123",
+		Token:           "approval-token-xyz",
+		ErrorCode:       "",
+		ErrorMessage:    "",
+		RevisionId:      "abc123def456",
+		RevisionSummary: "commit-sha-abc",
+	}
+	res := buildResource("Source/GitHub", "GitHub", row)
+	res.Status = "running"
+	res.Fields = map[string]string{
+		"stage_name":           "Source",
+		"stage_status":         "Succeeded",
+		"action_name":          "GitHub",
+		"action_status":        "Succeeded",
+		"last_change_time":     "2024-06-15 10:00:00",
+		"external_url":         "https://github.com/org/repo/commit/abc123",
+		"action_token":         "approval-token-xyz",
+		"action_error_details": "",
+		"revision_id":          "abc123def456",
+		"revision_summary":     "commit-sha-abc",
+	}
+	cfg := detailConfigForType("pipeline_stages")
+	m := newDetailModel(res, "pipeline_stages", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"StageName",
+		"ActionName",
+		"ActionStatus",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("PipelineStages detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_PipelineStages_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	row := awsclient.PipelineStageRow{}
+	res := buildResource("empty-pipeline-stage", "empty-pipeline-stage", row)
+	cfg := detailConfigForType("pipeline_stages")
+	m := newDetailModel(res, "pipeline_stages", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("PipelineStages detail should not be empty even with nil fields")
 	}
 }

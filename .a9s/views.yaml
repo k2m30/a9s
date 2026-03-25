@@ -756,6 +756,37 @@ views:
       - EncryptionConfiguration
       - CreatedAt
 
+  ecr_images:
+    list:
+      Tag(s):
+        key: image_tags
+        width: 24
+      Digest:
+        key: digest_short
+        width: 16
+      Pushed At:
+        key: pushed_at
+        width: 22
+      Size:
+        key: image_size
+        width: 12
+      Scan Status:
+        key: scan_status
+        width: 14
+      Findings:
+        key: finding_counts
+        width: 20
+    detail:
+      - ImageDigest
+      - ImageTags
+      - ImagePushedAt
+      - ImageSizeInBytes
+      - ImageManifestMediaType
+      - ArtifactMediaType
+      - ImageScanStatus
+      - ImageScanFindingsSummary
+      - LastRecordedPullTime
+
   ecs:
     list:
       Cluster Name:
@@ -1567,6 +1598,39 @@ views:
         width: 22
     detail:
       [Name, PipelineType, Version, Created, Updated, ExecutionMode]
+
+  pipeline_stages:
+    list:
+      Stage:
+        key: stage_name
+        width: 20
+      Stage Status:
+        key: stage_status
+        width: 14
+      Action:
+        key: action_name
+        width: 24
+      Action Status:
+        key: action_status
+        width: 14
+      Last Changed:
+        key: last_change_time
+        width: 22
+      External URL:
+        key: external_url
+        width: 40
+    detail:
+      - StageName
+      - StageStatus
+      - ActionName
+      - ActionStatus
+      - LastStatusChange
+      - ExternalURL
+      - Token
+      - ErrorCode
+      - ErrorMessage
+      - RevisionId
+      - RevisionSummary
 
   policy:
     list:

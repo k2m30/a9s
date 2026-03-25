@@ -848,3 +848,118 @@ func TestQA_YAML_CBBuildLogs_NoANSI(t *testing.T) {
 		t.Error("CBBuildLogs RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// ECR Images YAML view fixtures
+// ===========================================================================
+
+func fixtureECRImages() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			Name:   "latest, v1.0.0",
+			Status: "",
+			Fields: map[string]string{
+				"image_tags":     "latest, v1.0.0",
+				"digest_short":   "abcdef123456",
+				"pushed_at":      "2024-06-15 10:00:00",
+				"image_size":     "50.0 MB",
+				"scan_status":    "COMPLETE",
+				"finding_counts": "3H 5M",
+				"image_uri":      "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// ECR Images YAML tests
+// ===========================================================================
+
+func TestQA_YAML_ECRImages_ContainsFields(t *testing.T) {
+	for _, r := range fixtureECRImages() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("ECRImages YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("ECRImages YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_ECRImages_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureECRImages()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("ECRImages FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_ECRImages_NoANSI(t *testing.T) {
+	m := yamlModel(fixtureECRImages()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("ECRImages RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// Pipeline Stages YAML view fixtures
+// ===========================================================================
+
+func fixturePipelineStages() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "Source/GitHub",
+			Name:   "GitHub",
+			Status: "running",
+			Fields: map[string]string{
+				"stage_name":           "Source",
+				"stage_status":         "Succeeded",
+				"action_name":          "GitHub",
+				"action_status":        "Succeeded",
+				"last_change_time":     "2024-06-15 10:00:00",
+				"external_url":         "https://github.com/org/repo/commit/abc123",
+				"action_token":         "approval-token-xyz",
+				"action_error_details": "",
+				"revision_id":          "abc123def456",
+				"revision_summary":     "commit-sha-abc",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Pipeline Stages YAML tests
+// ===========================================================================
+
+func TestQA_YAML_PipelineStages_ContainsFields(t *testing.T) {
+	for _, r := range fixturePipelineStages() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("PipelineStages YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("PipelineStages YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_PipelineStages_FrameTitle(t *testing.T) {
+	m := yamlModel(fixturePipelineStages()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("PipelineStages FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_PipelineStages_NoANSI(t *testing.T) {
+	m := yamlModel(fixturePipelineStages()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("PipelineStages RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
