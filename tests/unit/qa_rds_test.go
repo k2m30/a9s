@@ -788,25 +788,32 @@ func TestQA_RDS_Navigation_JumpToTop(t *testing.T) {
 	}
 }
 
-func TestQA_RDS_Navigation_EnterOpensDetail(t *testing.T) {
+func TestQA_RDS_Navigation_EnterOpensChildView(t *testing.T) {
 	m := rdsLoadedModel(t)
 
-	// Press Enter — should return a cmd that produces NavigateMsg.
+	// Press Enter — dbi now has a child view (dbi_events), so Enter should
+	// produce EnterChildViewMsg instead of NavigateMsg.
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on RDS list should return a command")
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	child, ok := msg.(messages.EnterChildViewMsg)
 	if !ok {
-		t.Fatalf("Enter should produce NavigateMsg, got %T", msg)
+		t.Fatalf("Enter should produce EnterChildViewMsg, got %T", msg)
 	}
-	if nav.Target != messages.TargetDetail {
-		t.Errorf("Enter should navigate to Detail, got target %d", nav.Target)
+	if child.ChildType != "dbi_events" {
+		t.Errorf("ChildType: expected %q, got %q", "dbi_events", child.ChildType)
 	}
-	if nav.Resource == nil {
-		t.Error("NavigateMsg.Resource should not be nil")
+	if child.DisplayName == "" {
+		t.Error("DisplayName should not be empty")
+	}
+	if child.ParentContext == nil {
+		t.Error("ParentContext should not be nil")
+	}
+	if child.ParentContext["db_identifier"] == "" {
+		t.Error("ParentContext should include db_identifier")
 	}
 }
 

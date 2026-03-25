@@ -14,6 +14,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -996,6 +997,60 @@ func TestQA_ListRawStruct_ELBListenerRules(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_DbiEvents: verify list rendering with rdstypes.Event RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_DbiEvents(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("dbi_events")
+	if typeDef == nil {
+		t.Fatal("dbi_events child resource type not registered")
+	}
+
+	cfg := configForType("dbi_events")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	ev := rdstypes.Event{
+		Date:             &ts,
+		EventCategories:  []string{"maintenance"},
+		Message:          ptrString("Applying offline patches to DB instance"),
+		SourceIdentifier: ptrString("my-db-instance"),
+		SourceType:       rdstypes.SourceTypeDbInstance,
+		SourceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:   "2024-06-15 10:00:00/my-db-instance",
+			Name: "2024-06-15 10:00:00",
+			Fields: map[string]string{
+				"timestamp":         "2024-06-15 10:00:00",
+				"event_categories":  "maintenance",
+				"message":           "Applying offline patches to DB instance",
+				"source_identifier": "my-db-instance",
+				"source_type":       "db-instance",
+				"source_arn":        "arn:aws:rds:us-east-1:123456789012:db:my-db-instance",
+			},
+			RawStruct: ev,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "maintenance") {
+		t.Errorf("dbi_events list should contain event category, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Applying offline patches") {
+		t.Errorf("dbi_events list should contain message, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -1015,4 +1070,5 @@ var (
 	_ awsclient.RolePolicyRow          = awsclient.RolePolicyRow{}
 	_ elbtypes.Rule                    = elbtypes.Rule{}
 	_ iamtypes.User                    = iamtypes.User{}
+	_ rdstypes.Event                   = rdstypes.Event{}
 )

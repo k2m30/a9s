@@ -63,6 +63,7 @@ func main() {
 		{"s3_objects", "s3types.Object", reflect.TypeOf(s3types.Object{})},
 		{"ec2", "ec2types.Instance", reflect.TypeOf(ec2types.Instance{})},
 		{"dbi", "rdstypes.DBInstance", reflect.TypeOf(rdstypes.DBInstance{})},
+		{"dbi_events", "rdstypes.Event", reflect.TypeOf(rdstypes.Event{})},
 		{"redis", "elasticachetypes.CacheCluster", reflect.TypeOf(elasticachetypes.CacheCluster{})},
 		{"dbc", "docdbtypes.DBCluster", reflect.TypeOf(docdbtypes.DBCluster{})},
 		{"eks", "ekstypes.Cluster", reflect.TypeOf(ekstypes.Cluster{})},
