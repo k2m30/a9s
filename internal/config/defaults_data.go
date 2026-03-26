@@ -16,6 +16,23 @@ func dataDefaultViews() map[string]ViewDef {
 				"CreatedOn", "LastModifiedOn",
 			},
 		},
+		"glue_runs": {
+			List: []ListColumn{
+				{Title: "Run ID", Key: "run_id_short", Width: 12},
+				{Title: "State", Path: "JobRunState", Width: 12},
+				{Title: "Started", Path: "StartedOn", Width: 22},
+				{Title: "Execution Time", Key: "execution_time_human", Width: 14},
+				{Title: "Error Message", Path: "ErrorMessage", Width: 44},
+				{Title: "DPU Hours", Key: "dpu_hours", Width: 10},
+			},
+			Detail: []string{
+				"Id", "JobRunState", "StartedOn", "CompletedOn",
+				"ExecutionTime", "ErrorMessage", "Attempt", "PreviousRunId",
+				"TriggerName", "JobName", "AllocatedCapacity", "MaxCapacity",
+				"WorkerType", "NumberOfWorkers", "Timeout", "GlueVersion",
+				"DPUSeconds", "ExecutionClass", "LogGroupName",
+			},
+		},
 		"athena": {
 			List: []ListColumn{
 				{Title: "Workgroup", Path: "Name", Width: 28},

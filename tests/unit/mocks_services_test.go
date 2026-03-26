@@ -585,6 +585,33 @@ func (m *mockGlueClient) GetJobs(ctx context.Context, params *glue.GetJobsInput,
 	return m.output, m.err
 }
 
+// mockGlueGetJobRunsClient implements awsclient.GlueGetJobRunsAPI.
+type mockGlueGetJobRunsClient struct {
+	output  *glue.GetJobRunsOutput
+	outputs []*glue.GetJobRunsOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockGlueGetJobRunsClient) GetJobRuns(
+	ctx context.Context,
+	params *glue.GetJobRunsInput,
+	optFns ...func(*glue.Options),
+) (*glue.GetJobRunsOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.outputs != nil {
+		if m.callIdx >= len(m.outputs) {
+			return &glue.GetJobRunsOutput{}, nil
+		}
+		out := m.outputs[m.callIdx]
+		m.callIdx++
+		return out, nil
+	}
+	return m.output, nil
+}
+
 // ---------------------------------------------------------------------------
 // Elastic Beanstalk mocks
 // ---------------------------------------------------------------------------

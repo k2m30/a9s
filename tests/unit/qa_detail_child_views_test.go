@@ -14,6 +14,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
@@ -1497,5 +1498,67 @@ func TestEbRuleTargetsDetailViewNilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("EbRuleTargets detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// Glue Job Runs detail view tests (child of Glue Jobs)
+// ===========================================================================
+
+func TestGlueRunsDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
+	dpuSec := 45000.0
+
+	run := gluetypes.JobRun{
+		Id:            ptrString("jr_abc12345-6789-0abc-def0-123456789012"),
+		JobName:       ptrString("etl-daily-load"),
+		JobRunState:   gluetypes.JobRunStateSucceeded,
+		StartedOn:     &startTs,
+		ExecutionTime: 2843,
+		ErrorMessage:  ptrString(""),
+		DPUSeconds:    &dpuSec,
+	}
+	res := buildResource("jr_abc12345-6789-0abc-def0-123456789012", "2024-08-10 14:30:00", run)
+	res.Status = "SUCCEEDED"
+	res.Fields = map[string]string{
+		"run_id_short":        "jr_abc12",
+		"job_run_state":       "SUCCEEDED",
+		"started_on":          "2024-08-10 14:30:00",
+		"execution_time_human": "47m 23s",
+		"error_message":       "",
+		"dpu_hours":           "12.5",
+		"run_id":              "jr_abc12345-6789-0abc-def0-123456789012",
+		"job_name":            "etl-daily-load",
+	}
+	cfg := detailConfigForType("glue_runs")
+	m := newDetailModel(res, "glue_runs", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Id",
+		"JobName",
+		"JobRunState",
+		"StartedOn",
+		"ExecutionTime",
+		"DPUSeconds",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("GlueRuns detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+
+func TestGlueRunsDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	run := gluetypes.JobRun{}
+	res := buildResource("empty-glue-run", "empty-glue-run", run)
+	cfg := detailConfigForType("glue_runs")
+	m := newDetailModel(res, "glue_runs", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("GlueRuns detail should not be empty even with nil fields")
 	}
 }

@@ -114,6 +114,7 @@ func main() {
 		{"kinesis", "kinesistypes.StreamSummary", reflect.TypeOf(kinesistypes.StreamSummary{})},
 		{"waf", "wafv2types.WebACLSummary", reflect.TypeOf(wafv2types.WebACLSummary{})},
 		{"glue", "gluetypes.Job", reflect.TypeOf(gluetypes.Job{})},
+		{"glue_runs", "gluetypes.JobRun", reflect.TypeOf(gluetypes.JobRun{})},
 		{"eb", "ebtypes.EnvironmentDescription", reflect.TypeOf(ebtypes.EnvironmentDescription{})},
 		{"ses", "sesv2types.IdentityInfo", reflect.TypeOf(sesv2types.IdentityInfo{})},
 		{"redshift", "redshifttypes.Cluster", reflect.TypeOf(redshifttypes.Cluster{})},
