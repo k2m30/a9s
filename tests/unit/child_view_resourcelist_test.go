@@ -149,8 +149,8 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 		Name:      "Route 53 Hosted Zones",
 		ShortName: "r53",
 		Columns: []resource.Column{
-			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 			{Key: "name", Title: "Name", Width: 36, Sortable: true},
+			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 		},
 		Children: []resource.ChildViewDef{{
 			ChildType:      "r53_records",

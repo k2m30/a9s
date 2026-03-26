@@ -93,12 +93,12 @@ views:
 
   apigw:
     list:
-      API ID:
-        path: ApiId
-        width: 14
       Name:
         path: Name
         width: 28
+      API ID:
+        path: ApiId
+        width: 14
       Protocol:
         path: ProtocolType
         width: 12
@@ -311,12 +311,12 @@ views:
 
   cf:
     list:
-      Distribution ID:
-        path: Id
-        width: 16
       Domain Name:
         path: DomainName
         width: 40
+      Distribution ID:
+        path: Id
+        width: 16
       Status:
         path: Status
         width: 12
@@ -1025,12 +1025,12 @@ views:
 
   efs:
     list:
-      File System ID:
-        path: FileSystemId
-        width: 22
       Name:
         path: Name
         width: 28
+      File System ID:
+        path: FileSystemId
+        width: 22
       State:
         path: LifeCycleState
         width: 12
@@ -1059,11 +1059,11 @@ views:
 
   eip:
     list:
+      Name:
+        width: 24
       Allocation ID:
         path: AllocationId
         width: 26
-      Name:
-        width: 24
       Public IP:
         path: PublicIp
         width: 16
@@ -1203,11 +1203,11 @@ views:
 
   eni:
     list:
+      Name:
+        width: 24
       ENI ID:
         path: NetworkInterfaceId
         width: 26
-      Name:
-        width: 24
       Status:
         path: Status
         width: 12
@@ -1382,11 +1382,11 @@ views:
 
   igw:
     list:
+      Name:
+        width: 28
       IGW ID:
         path: InternetGatewayId
         width: 26
-      Name:
-        width: 28
       VPC ID:
         key: vpc_id
         width: 24
@@ -1615,11 +1615,11 @@ views:
 
   nat:
     list:
+      Name:
+        width: 24
       NAT Gateway ID:
         path: NatGatewayId
         width: 26
-      Name:
-        width: 24
       VPC ID:
         path: VpcId
         width: 24
@@ -1800,12 +1800,12 @@ views:
 
   r53:
     list:
-      Zone ID:
-        path: Id
-        width: 30
       Name:
         path: Name
         width: 36
+      Zone ID:
+        path: Id
+        width: 30
       Records:
         path: ResourceRecordSetCount
         width: 9
@@ -2004,11 +2004,11 @@ views:
 
   rtb:
     list:
+      Name:
+        width: 28
       Route Table ID:
         path: RouteTableId
         width: 26
-      Name:
-        width: 28
       VPC ID:
         path: VpcId
         width: 24
@@ -2207,12 +2207,12 @@ views:
 
   sg:
     list:
-      Group ID:
-        path: GroupId
-        width: 24
       Group Name:
         path: GroupName
         width: 28
+      Group ID:
+        path: GroupId
+        width: 24
       VPC ID:
         path: VpcId
         width: 24
@@ -2326,11 +2326,11 @@ views:
 
   subnet:
     list:
+      Name:
+        width: 28
       Subnet ID:
         path: SubnetId
         width: 26
-      Name:
-        width: 28
       VPC ID:
         path: VpcId
         width: 24
@@ -2431,11 +2431,11 @@ views:
 
   tgw:
     list:
+      Name:
+        width: 28
       TGW ID:
         path: TransitGatewayId
         width: 26
-      Name:
-        width: 28
       State:
         path: State
         width: 12
@@ -2483,10 +2483,10 @@ views:
 
   vpc:
     list:
+      Name:
+        width: 24
       VPC ID:
         path: VpcId
-        width: 24
-      Name:
         width: 24
       CIDR Block:
         path: CidrBlock
@@ -2511,12 +2511,12 @@ views:
 
   vpce:
     list:
-      Endpoint ID:
-        path: VpcEndpointId
-        width: 26
       Service Name:
         path: ServiceName
         width: 40
+      Endpoint ID:
+        path: VpcEndpointId
+        width: 26
       Type:
         path: VpcEndpointType
         width: 12

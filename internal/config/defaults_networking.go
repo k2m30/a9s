@@ -38,8 +38,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"sg": {
 			List: []ListColumn{
-				{Title: "Group ID", Path: "GroupId", Width: 24},
 				{Title: "Group Name", Path: "GroupName", Width: 28},
+				{Title: "Group ID", Path: "GroupId", Width: 24},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
@@ -51,8 +51,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"vpc": {
 			List: []ListColumn{
-				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Name", Path: "", Width: 24},
+				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "Default", Path: "IsDefault", Width: 9},
@@ -65,8 +65,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"subnet": {
 			List: []ListColumn{
-				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "Name", Path: "", Width: 28},
+				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 				{Title: "AZ", Path: "AvailabilityZone", Width: 14},
@@ -81,8 +81,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"rtb": {
 			List: []ListColumn{
-				{Title: "Route Table ID", Path: "RouteTableId", Width: 26},
 				{Title: "Name", Path: "", Width: 28},
+				{Title: "Route Table ID", Path: "RouteTableId", Width: 26},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Routes", Path: "", Key: "routes_count", Width: 8},
 				{Title: "Assoc.", Path: "", Key: "associations_count", Width: 8},
@@ -94,8 +94,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"nat": {
 			List: []ListColumn{
-				{Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
 				{Title: "Name", Path: "", Width: 24},
+				{Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "State", Path: "State", Width: 12},
@@ -109,8 +109,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"igw": {
 			List: []ListColumn{
-				{Title: "IGW ID", Path: "InternetGatewayId", Width: 26},
 				{Title: "Name", Path: "", Width: 28},
+				{Title: "IGW ID", Path: "InternetGatewayId", Width: 26},
 				{Title: "VPC ID", Path: "", Key: "vpc_id", Width: 24},
 				{Title: "State", Path: "", Key: "state", Width: 12},
 			},
@@ -120,8 +120,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"eip": {
 			List: []ListColumn{
-				{Title: "Allocation ID", Path: "AllocationId", Width: 26},
 				{Title: "Name", Path: "", Width: 24},
+				{Title: "Allocation ID", Path: "AllocationId", Width: 26},
 				{Title: "Public IP", Path: "PublicIp", Width: 16},
 				{Title: "Association", Path: "AssociationId", Width: 26},
 				{Title: "Instance", Path: "InstanceId", Width: 20},
@@ -135,8 +135,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"vpce": {
 			List: []ListColumn{
-				{Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
 				{Title: "Service Name", Path: "ServiceName", Width: 40},
+				{Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
 				{Title: "Type", Path: "VpcEndpointType", Width: 12},
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
@@ -151,8 +151,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"tgw": {
 			List: []ListColumn{
-				{Title: "TGW ID", Path: "TransitGatewayId", Width: 26},
 				{Title: "Name", Path: "", Width: 28},
+				{Title: "TGW ID", Path: "TransitGatewayId", Width: 26},
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "Owner", Path: "OwnerId", Width: 14},
 				{Title: "Description", Path: "Description", Width: 30},
@@ -165,8 +165,8 @@ func networkingDefaultViews() map[string]ViewDef {
 		},
 		"eni": {
 			List: []ListColumn{
-				{Title: "ENI ID", Path: "NetworkInterfaceId", Width: 26},
 				{Title: "Name", Path: "", Width: 24},
+				{Title: "ENI ID", Path: "NetworkInterfaceId", Width: 26},
 				{Title: "Status", Path: "Status", Width: 12},
 				{Title: "Type", Path: "InterfaceType", Width: 14},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},

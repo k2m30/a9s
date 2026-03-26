@@ -104,8 +104,8 @@ func TestQA_VPCEndpoints_TypeDef(t *testing.T) {
 		key   string
 		title string
 	}{
-		{"vpce_id", "Endpoint ID"},
 		{"service_name", "Service Name"},
+		{"vpce_id", "Endpoint ID"},
 		{"type", "Type"},
 		{"state", "State"},
 		{"vpc_id", "VPC ID"},

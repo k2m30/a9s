@@ -34,8 +34,8 @@ func r53ZoneTypeDef() resource.ResourceTypeDef {
 		ShortName: "r53",
 		Aliases:   []string{"r53", "route53", "dns", "hosted-zones"},
 		Columns: []resource.Column{
-			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 			{Key: "name", Title: "Name", Width: 36, Sortable: true},
+			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 			{Key: "record_count", Title: "Records", Width: 9, Sortable: true},
 			{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 			{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
@@ -298,7 +298,7 @@ func TestQA_R53_A3_1_ZoneList_ColumnHeaders(t *testing.T) {
 	})
 	out := m.View()
 
-	for _, col := range []string{"Zone ID", "Name", "Records", "Private", "Comment"} {
+	for _, col := range []string{"Name", "Zone ID", "Records", "Private", "Comment"} {
 		if !strings.Contains(out, col) {
 			t.Errorf("zone list should have %q column header", col)
 		}
