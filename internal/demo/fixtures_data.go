@@ -11,6 +11,10 @@ import (
 func init() {
 	demoData["glue"] = glueFixtures
 	demoData["athena"] = athenaFixtures
+
+	RegisterChildDemo("glue_runs", func(parentCtx map[string]string) []resource.Resource {
+		return glueRunFixtures(parentCtx["job_name"])
+	})
 }
 
 // glueFixtures returns demo Glue Job fixtures.
@@ -101,6 +105,111 @@ func glueFixtures() []resource.Resource {
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("pythonshell"),
 				},
+			},
+		},
+	}
+}
+
+// glueRunFixtures returns demo Glue Job Run fixtures for the given job name.
+func glueRunFixtures(jobName string) []resource.Resource {
+	dpuSucceeded := 45000.0
+	dpuFailed := 12000.0
+	dpuTimeout := 72000.0
+
+	return []resource.Resource{
+		{
+			ID:     "jr_aaa11111-1111-1111-1111-111111111111",
+			Name:   "2026-03-20 08:00:00",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"run_id_short":         "jr_aaa11",
+				"job_run_state":        "SUCCEEDED",
+				"started_on":           "2026-03-20 08:00:00",
+				"execution_time_human": "47m 23s",
+				"error_message":        "",
+				"dpu_hours":            "12.5",
+				"run_id":               "jr_aaa11111-1111-1111-1111-111111111111",
+				"job_name":             jobName,
+			},
+			RawStruct: gluetypes.JobRun{
+				Id:            aws.String("jr_aaa11111-1111-1111-1111-111111111111"),
+				JobName:       aws.String(jobName),
+				JobRunState:   gluetypes.JobRunStateSucceeded,
+				StartedOn:     aws.Time(mustParseTime("2026-03-20T08:00:00+00:00")),
+				CompletedOn:   aws.Time(mustParseTime("2026-03-20T08:47:23+00:00")),
+				ExecutionTime: 2843,
+				DPUSeconds:    &dpuSucceeded,
+			},
+		},
+		{
+			ID:     "jr_bbb22222-2222-2222-2222-222222222222",
+			Name:   "2026-03-19 14:30:00",
+			Status: "FAILED",
+			Fields: map[string]string{
+				"run_id_short":         "jr_bbb22",
+				"job_run_state":        "FAILED",
+				"started_on":           "2026-03-19 14:30:00",
+				"execution_time_human": "5m 12s",
+				"error_message":        "An error occurred while calling o42.pyWriteDynamicFrame: Connection refused",
+				"dpu_hours":            "3.3",
+				"run_id":               "jr_bbb22222-2222-2222-2222-222222222222",
+				"job_name":             jobName,
+			},
+			RawStruct: gluetypes.JobRun{
+				Id:            aws.String("jr_bbb22222-2222-2222-2222-222222222222"),
+				JobName:       aws.String(jobName),
+				JobRunState:   gluetypes.JobRunStateFailed,
+				StartedOn:     aws.Time(mustParseTime("2026-03-19T14:30:00+00:00")),
+				CompletedOn:   aws.Time(mustParseTime("2026-03-19T14:35:12+00:00")),
+				ExecutionTime: 312,
+				ErrorMessage:  aws.String("An error occurred while calling o42.pyWriteDynamicFrame: Connection refused"),
+				DPUSeconds:    &dpuFailed,
+			},
+		},
+		{
+			ID:     "jr_ccc33333-3333-3333-3333-333333333333",
+			Name:   "2026-03-21 02:00:00",
+			Status: "RUNNING",
+			Fields: map[string]string{
+				"run_id_short":         "jr_ccc33",
+				"job_run_state":        "RUNNING",
+				"started_on":           "2026-03-21 02:00:00",
+				"execution_time_human": "",
+				"error_message":        "",
+				"dpu_hours":            "",
+				"run_id":               "jr_ccc33333-3333-3333-3333-333333333333",
+				"job_name":             jobName,
+			},
+			RawStruct: gluetypes.JobRun{
+				Id:          aws.String("jr_ccc33333-3333-3333-3333-333333333333"),
+				JobName:     aws.String(jobName),
+				JobRunState: gluetypes.JobRunStateRunning,
+				StartedOn:   aws.Time(mustParseTime("2026-03-21T02:00:00+00:00")),
+			},
+		},
+		{
+			ID:     "jr_ddd44444-4444-4444-4444-444444444444",
+			Name:   "2026-03-18 22:00:00",
+			Status: "TIMEOUT",
+			Fields: map[string]string{
+				"run_id_short":         "jr_ddd44",
+				"job_run_state":        "TIMEOUT",
+				"started_on":           "2026-03-18 22:00:00",
+				"execution_time_human": "2h 0m",
+				"error_message":        "Job execution exceeded timeout of 7200 seconds",
+				"dpu_hours":            "20.0",
+				"run_id":               "jr_ddd44444-4444-4444-4444-444444444444",
+				"job_name":             jobName,
+			},
+			RawStruct: gluetypes.JobRun{
+				Id:            aws.String("jr_ddd44444-4444-4444-4444-444444444444"),
+				JobName:       aws.String(jobName),
+				JobRunState:   gluetypes.JobRunStateTimeout,
+				StartedOn:     aws.Time(mustParseTime("2026-03-18T22:00:00+00:00")),
+				CompletedOn:   aws.Time(mustParseTime("2026-03-19T00:00:00+00:00")),
+				ExecutionTime: 7200,
+				ErrorMessage:  aws.String("Job execution exceeded timeout of 7200 seconds"),
+				DPUSeconds:    &dpuTimeout,
 			},
 		},
 	}

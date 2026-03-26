@@ -14,6 +14,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -1101,6 +1102,65 @@ func TestQA_ListRawStruct_EbRuleTargets(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_GlueRuns: verify list rendering with JobRun RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("glue_runs")
+	if typeDef == nil {
+		t.Fatal("glue_runs child resource type not registered")
+	}
+
+	cfg := configForType("glue_runs")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
+	dpuSec := 45000.0
+
+	run := gluetypes.JobRun{
+		Id:            ptrString("jr_abc12345-6789-0abc-def0-123456789012"),
+		JobName:       ptrString("etl-daily-load"),
+		JobRunState:   gluetypes.JobRunStateSucceeded,
+		StartedOn:     &startTs,
+		ExecutionTime: 2843,
+		DPUSeconds:    &dpuSec,
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
+			Name:   "2024-08-10 14:30:00",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"run_id_short":         "jr_abc12",
+				"job_run_state":        "SUCCEEDED",
+				"started_on":           "2024-08-10 14:30:00",
+				"execution_time_human": "47m 23s",
+				"error_message":        "",
+				"dpu_hours":            "12.5",
+				"run_id":               "jr_abc12345-6789-0abc-def0-123456789012",
+				"job_name":             "etl-daily-load",
+			},
+			RawStruct: run,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "jr_abc12") {
+		t.Errorf("glue_runs list should contain run_id_short, got:\n%s", view)
+	}
+	if !strings.Contains(view, "SUCCEEDED") {
+		t.Errorf("glue_runs list should contain state, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -1122,4 +1182,5 @@ var (
 	_ iamtypes.User                    = iamtypes.User{}
 	_ rdstypes.Event                   = rdstypes.Event{}
 	_ ebtypes.Target                   = ebtypes.Target{}
+	_ gluetypes.JobRun                 = gluetypes.JobRun{}
 )

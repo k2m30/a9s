@@ -14,6 +14,12 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "num_workers", Title: "Workers", Width: 9, Sortable: true},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "glue_runs",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"job_name": "ID"},
+				DisplayNameKey: "job_name",
+			}},
 		},
 		{
 			Name:      "Athena Workgroups",

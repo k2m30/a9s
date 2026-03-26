@@ -1305,3 +1305,60 @@ func TestQA_YAML_EbRuleTargets_RawContentUncolored(t *testing.T) {
 		t.Error("EbRuleTargets RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// Glue Job Runs YAML view fixtures
+// ===========================================================================
+
+func fixtureGlueRuns() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
+			Name:   "2024-08-10 14:30:00",
+			Status: "SUCCEEDED",
+			Fields: map[string]string{
+				"run_id_short":         "jr_abc12",
+				"job_run_state":        "SUCCEEDED",
+				"started_on":           "2024-08-10 14:30:00",
+				"execution_time_human": "47m 23s",
+				"error_message":        "",
+				"dpu_hours":            "12.5",
+				"run_id":               "jr_abc12345-6789-0abc-def0-123456789012",
+				"job_name":             "etl-daily-load",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// Glue Job Runs YAML tests
+// ===========================================================================
+
+func TestQA_YAML_GlueRuns_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureGlueRuns() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("GlueRuns YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("GlueRuns YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_GlueRuns_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureGlueRuns()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("GlueRuns FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_GlueRuns_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureGlueRuns()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("GlueRuns RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

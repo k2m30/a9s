@@ -408,6 +408,11 @@ type GlueGetJobsAPI interface {
 	GetJobs(ctx context.Context, params *glue.GetJobsInput, optFns ...func(*glue.Options)) (*glue.GetJobsOutput, error)
 }
 
+// GlueGetJobRunsAPI defines the interface for the Glue GetJobRuns operation.
+type GlueGetJobRunsAPI interface {
+	GetJobRuns(ctx context.Context, params *glue.GetJobRunsInput, optFns ...func(*glue.Options)) (*glue.GetJobRunsOutput, error)
+}
+
 // EBDescribeEnvironmentsAPI defines the interface for the Elastic Beanstalk DescribeEnvironments operation.
 type EBDescribeEnvironmentsAPI interface {
 	DescribeEnvironments(ctx context.Context, params *elasticbeanstalk.DescribeEnvironmentsInput, optFns ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error)

@@ -281,6 +281,18 @@ func EbRuleTargetColumns() []Column {
 	}
 }
 
+// GlueRunColumns returns the column definitions for Glue Job Runs.
+func GlueRunColumns() []Column {
+	return []Column{
+		{Key: "run_id_short", Title: "Run ID", Width: 12, Sortable: true},
+		{Key: "job_run_state", Title: "State", Width: 12, Sortable: true},
+		{Key: "started_on", Title: "Started", Width: 22, Sortable: true},
+		{Key: "execution_time_human", Title: "Execution Time", Width: 14, Sortable: true},
+		{Key: "error_message", Title: "Error Message", Width: 44, Sortable: false},
+		{Key: "dpu_hours", Title: "DPU Hours", Width: 10, Sortable: true},
+	}
+}
+
 // ELBListenerRuleColumns returns the column definitions for ELB listener rules.
 func ELBListenerRuleColumns() []Column {
 	return []Column{
