@@ -42,6 +42,10 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | IAM Roles | Attached Policies | `Enter` | Managed and inline policies with type, ARN, admin highlight |
 | IAM Groups | Group Members | `Enter` | Member users with ID, creation date, password last used |
 | ELB Listeners | Listener Rules | `Enter` | Priority, conditions, action type, target (nested level 2) |
+| RDS Instances | RDS Events | `Enter` | Failovers, maintenance, reboots, configuration changes |
+| SNS Topics | Subscriptions | `Enter` | Subscribers with protocol, endpoint, confirmation status |
+| EventBridge Rules | Targets | `Enter` | Target ARN, input configuration, IAM role |
+| Glue Jobs | Job Runs | `Enter` | Execution history with status, duration, DPU usage, errors |
 
 ## Commands
 
