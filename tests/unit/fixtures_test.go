@@ -99,6 +99,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "10.0.48.186",
 				"public_ip":   "203.0.113.20",
 				"launch_time": "2026-02-25T17:03:15+00:00",
+				"lifecycle":   "spot",
 			},
 		},
 		{
@@ -113,6 +114,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "10.0.48.175",
 				"public_ip":   "203.0.113.10",
 				"launch_time": "2025-07-25T12:26:50+00:00",
+				"lifecycle":   "on-demand",
 			},
 		},
 		{
@@ -127,6 +129,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "10.0.12.47",
 				"public_ip":   "",
 				"launch_time": "2025-09-05T11:53:44+00:00",
+				"lifecycle":   "on-demand",
 			},
 		},
 		{
@@ -141,6 +144,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "10.0.0.32",
 				"public_ip":   "",
 				"launch_time": "2026-03-06T14:06:22+00:00",
+				"lifecycle":   "on-demand",
 			},
 		},
 		{
@@ -155,6 +159,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "10.0.3.140",
 				"public_ip":   "",
 				"launch_time": "2026-03-17T14:17:19+00:00",
+				"lifecycle":   "on-demand",
 			},
 		},
 		{
@@ -169,6 +174,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"private_ip":  "",
 				"public_ip":   "",
 				"launch_time": "2026-03-18T01:00:03+00:00",
+				"lifecycle":   "on-demand",
 			},
 		},
 	}
