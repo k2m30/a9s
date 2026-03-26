@@ -361,6 +361,11 @@ type EventBridgeListRulesAPI interface {
 	ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error)
 }
 
+// EventBridgeListTargetsByRuleAPI defines the interface for the EventBridge ListTargetsByRule operation.
+type EventBridgeListTargetsByRuleAPI interface {
+	ListTargetsByRule(ctx context.Context, params *eventbridge.ListTargetsByRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error)
+}
+
 // SFNListStateMachinesAPI defines the interface for the SFN ListStateMachines operation.
 type SFNListStateMachinesAPI interface {
 	ListStateMachines(ctx context.Context, params *sfn.ListStateMachinesInput, optFns ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error)

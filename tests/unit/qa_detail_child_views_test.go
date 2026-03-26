@@ -13,6 +13,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
@@ -1447,5 +1448,54 @@ func TestSnsSubscriptionsDetailViewNilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("SnsSubscriptions detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// EventBridge Rule Targets detail view tests (child of EventBridge Rules)
+// ===========================================================================
+
+func TestEbRuleTargetsDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	target := ebtypes.Target{
+		Id:      ptrString("lambda-target-1"),
+		Arn:     ptrString("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
+		RoleArn: ptrString("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
+		Input:   ptrString(`{"source":"eventbridge"}`),
+	}
+	res := buildResource("lambda-target-1", "lambda-target-1", target)
+	res.Status = ""
+	res.Fields = map[string]string{
+		"target_id":          "lambda-target-1",
+		"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
+		"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeLambdaRole",
+		"resource_type_name": "Lambda: data-pipeline-daily",
+		"input_summary":      `{"source":"eventbridge"}`,
+	}
+	cfg := detailConfigForType("eb_rule_targets")
+	m := newDetailModel(res, "eb_rule_targets", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"Id",
+		"Arn",
+		"RoleArn",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EbRuleTargets detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestEbRuleTargetsDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	target := ebtypes.Target{}
+	res := buildResource("empty-target", "empty-target", target)
+	cfg := detailConfigForType("eb_rule_targets")
+	m := newDetailModel(res, "eb_rule_targets", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EbRuleTargets detail should not be empty even with nil fields")
 	}
 }

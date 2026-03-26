@@ -108,6 +108,7 @@ func main() {
 		{"ecr", "ecrtypes.Repository", reflect.TypeOf(ecrtypes.Repository{})},
 		{"efs", "efstypes.FileSystemDescription", reflect.TypeOf(efstypes.FileSystemDescription{})},
 		{"eb-rule", "eventbridgetypes.Rule", reflect.TypeOf(eventbridgetypes.Rule{})},
+		{"eb_rule_targets", "eventbridgetypes.Target", reflect.TypeOf(eventbridgetypes.Target{})},
 		{"sfn", "sfntypes.StateMachineListItem", reflect.TypeOf(sfntypes.StateMachineListItem{})},
 		{"pipeline", "cptypes.PipelineSummary", reflect.TypeOf(cptypes.PipelineSummary{})},
 		{"kinesis", "kinesistypes.StreamSummary", reflect.TypeOf(kinesistypes.StreamSummary{})},

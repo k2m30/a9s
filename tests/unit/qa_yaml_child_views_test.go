@@ -1239,3 +1239,69 @@ func TestQA_YAML_SnsSubscriptions_RawContentUncolored(t *testing.T) {
 		t.Error("SnsSubscriptions RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// EventBridge Rule Targets YAML view fixtures
+// ===========================================================================
+
+func fixtureEbRuleTargets() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "lambda-target-1",
+			Name:   "lambda-target-1",
+			Status: "",
+			Fields: map[string]string{
+				"target_id":          "lambda-target-1",
+				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
+				"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeLambdaRole",
+				"resource_type_name": "Lambda: data-pipeline-daily",
+				"input_summary":      "\u2014",
+			},
+		},
+		{
+			ID:     "sqs-target-2",
+			Name:   "sqs-target-2",
+			Status: "",
+			Fields: map[string]string{
+				"target_id":          "sqs-target-2",
+				"target_arn":         "arn:aws:sqs:us-east-1:123456789012:processing-queue",
+				"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeSQSRole",
+				"resource_type_name": "SQS: processing-queue",
+				"input_summary":      `{"source":"eventbridge"}`,
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// EventBridge Rule Targets YAML tests
+// ===========================================================================
+
+func TestQA_YAML_EbRuleTargets_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEbRuleTargets() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EbRuleTargets YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EbRuleTargets YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EbRuleTargets_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEbRuleTargets()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EbRuleTargets FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EbRuleTargets_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEbRuleTargets()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EbRuleTargets RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
