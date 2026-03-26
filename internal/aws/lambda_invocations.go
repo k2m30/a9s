@@ -21,12 +21,12 @@ func init() {
 		"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
 	})
 
-	resource.RegisterChildFetcher("lambda_invocations", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("lambda_invocations", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"])
+		return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -70,10 +70,16 @@ var timeoutRegex = regexp.MustCompile(`Status:\s*timeout`)
 
 // FetchLambdaInvocations calls the CloudWatchLogs FilterLogEvents API with a
 // "REPORT RequestId" filter pattern, parses each REPORT line, and returns a
-// slice of Resource structs representing individual Lambda invocations.
-func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, functionName, logGroup string) ([]resource.Resource, error) {
+// FetchResult with pagination support. Each call returns up to maxInvocations
+// (50) items. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
+// continuation.
+func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, functionName, logGroup string, continuationToken string) (resource.FetchResult, error) {
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	startTime := time.Now().Add(-invocationLookbackHours * time.Hour).UnixMilli()
 	limit := int32(maxInvocations)
@@ -90,9 +96,9 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 		output, err := api.FilterLogEvents(ctx, input)
 		if err != nil {
 			if strings.Contains(err.Error(), "ResourceNotFoundException") {
-				return nil, nil
+				return resource.FetchResult{}, nil
 			}
-			return nil, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
+			return resource.FetchResult{}, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
 		}
 
 		for _, event := range output.Events {
@@ -101,7 +107,26 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			}
 		}
 
-		if output.NextToken == nil || len(resources) >= maxInvocations {
+		if len(resources) >= maxInvocations {
+			apiNextToken := ""
+			if output.NextToken != nil {
+				apiNextToken = *output.NextToken
+			}
+			// Reverse so newest invocations are first
+			for i, j := 0, len(resources)-1; i < j; i, j = i+1, j-1 {
+				resources[i], resources[j] = resources[j], resources[i]
+			}
+			return resource.FetchResult{
+				Resources: resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: apiNextToken != "",
+					NextToken:   apiNextToken,
+					PageSize:    len(resources),
+				},
+			}, nil
+		}
+
+		if output.NextToken == nil {
 			break
 		}
 		nextToken = output.NextToken
@@ -112,7 +137,14 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 		resources[i], resources[j] = resources[j], resources[i]
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertReportEvent parses a single FilteredLogEvent for a REPORT line and returns

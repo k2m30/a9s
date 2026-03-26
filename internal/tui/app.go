@@ -185,6 +185,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = m.fetchResources(msg.ResourceType)
 		}
 		return m, cmd
+	case messages.LoadMoreMsg:
+		cmd := m.fetchMoreResources(msg)
+		return m, cmd
 	case messages.APIErrorMsg:
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoadedMsg:

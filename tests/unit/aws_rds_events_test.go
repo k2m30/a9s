@@ -57,38 +57,39 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"my-db-instance",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("event_0_ID", func(t *testing.T) {
 		// ID format: "timestamp/source_identifier"
 		expected := "2024-06-15 10:00:00/my-db-instance"
-		if resources[0].ID != expected {
-			t.Errorf("ID: expected %q, got %q", expected, resources[0].ID)
+		if result.Resources[0].ID != expected {
+			t.Errorf("ID: expected %q, got %q", expected, result.Resources[0].ID)
 		}
 	})
 
 	t.Run("event_0_Name_is_formatted_timestamp", func(t *testing.T) {
-		if resources[0].Name == "" {
+		if result.Resources[0].Name == "" {
 			t.Error("Name should not be empty")
 		}
-		if !strings.Contains(resources[0].Name, "2024-06-15") {
-			t.Errorf("Name should contain formatted date, got %q", resources[0].Name)
+		if !strings.Contains(result.Resources[0].Name, "2024-06-15") {
+			t.Errorf("Name should contain formatted date, got %q", result.Resources[0].Name)
 		}
 	})
 
 	t.Run("event_0_Fields_timestamp", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
@@ -98,35 +99,35 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	})
 
 	t.Run("event_0_Fields_event_categories", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["event_categories"] != "maintenance" {
 			t.Errorf("Fields[event_categories]: expected %q, got %q", "maintenance", r.Fields["event_categories"])
 		}
 	})
 
 	t.Run("event_0_Fields_message", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["message"] != "Applying offline patches to DB instance" {
 			t.Errorf("Fields[message]: expected %q, got %q", "Applying offline patches to DB instance", r.Fields["message"])
 		}
 	})
 
 	t.Run("event_0_Fields_source_identifier", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["source_identifier"] != "my-db-instance" {
 			t.Errorf("Fields[source_identifier]: expected %q, got %q", "my-db-instance", r.Fields["source_identifier"])
 		}
 	})
 
 	t.Run("event_0_Fields_source_type", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["source_type"] != "db-instance" {
 			t.Errorf("Fields[source_type]: expected %q, got %q", "db-instance", r.Fields["source_type"])
 		}
 	})
 
 	t.Run("event_0_Fields_source_arn", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["source_arn"] != "arn:aws:rds:us-east-1:123456789012:db:my-db-instance" {
 			t.Errorf("Fields[source_arn]: expected %q, got %q",
 				"arn:aws:rds:us-east-1:123456789012:db:my-db-instance", r.Fields["source_arn"])
@@ -134,7 +135,7 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	})
 
 	t.Run("event_0_RawStruct", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.RawStruct == nil {
 			t.Fatal("RawStruct must not be nil")
 		}
@@ -148,7 +149,7 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	})
 
 	t.Run("event_2_multiple_categories", func(t *testing.T) {
-		r := resources[2]
+		r := result.Resources[2]
 		if r.Fields["event_categories"] != "availability, notification" {
 			t.Errorf("Fields[event_categories]: expected %q, got %q",
 				"availability, notification", r.Fields["event_categories"])
@@ -158,7 +159,7 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "event_categories", "message", "source_identifier", "source_type", "source_arn"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -177,16 +178,17 @@ func TestFetchRDSEvents_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"empty-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -196,16 +198,17 @@ func TestFetchRDSEvents_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"err-db",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -231,42 +234,43 @@ func TestFetchRDSEvents_NilOptionalFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"nil-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(resources))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_Message", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["message"] != "" {
 			t.Errorf("Fields[message] should be empty for nil, got %q", r.Fields["message"])
 		}
 	})
 
 	t.Run("nil_Date", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["timestamp"] != "" {
 			t.Logf("Fields[timestamp] is %q (expected empty for nil Date)", r.Fields["timestamp"])
 		}
 	})
 
 	t.Run("nil_SourceArn", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["source_arn"] != "" {
 			t.Errorf("Fields[source_arn] should be empty for nil, got %q", r.Fields["source_arn"])
 		}
 	})
 
 	t.Run("nil_SourceIdentifier", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["source_identifier"] != "" {
 			t.Errorf("Fields[source_identifier] should be empty for nil, got %q", r.Fields["source_identifier"])
 		}
@@ -293,20 +297,21 @@ func TestFetchRDSEvents_NewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"nl-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	msg := resources[0].Fields["message"]
+	msg := result.Resources[0].Fields["message"]
 	if strings.Contains(msg, "\n") {
 		t.Errorf("Fields[message] should not contain \\n, got %q", msg)
 	}
@@ -334,20 +339,21 @@ func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"ts-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	tsField := resources[0].Fields["timestamp"]
+	tsField := result.Resources[0].Fields["timestamp"]
 	if tsField != "2024-12-25 14:30:45" {
 		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30:45", tsField)
 	}
@@ -373,20 +379,21 @@ func TestFetchRDSEvents_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"raw-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
@@ -446,20 +453,21 @@ func TestFetchRDSEvents_EventCategoriesJoined(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"cat-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	cats := resources[0].Fields["event_categories"]
+	cats := result.Resources[0].Fields["event_categories"]
 	if cats != "availability, failover, notification" {
 		t.Errorf("Fields[event_categories]: expected %q, got %q",
 			"availability, failover, notification", cats)
@@ -528,26 +536,27 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"pag-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 6 {
-			t.Fatalf("expected 6 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 6 {
+			t.Fatalf("expected 6 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
 	t.Run("page1_messages", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			expected := fmt.Sprintf("Event page 1 item %d", i+1)
-			if resources[i].Fields["message"] != expected {
-				t.Errorf("resources[%d].Fields[message]: expected %q, got %q", i, expected, resources[i].Fields["message"])
+			if result.Resources[i].Fields["message"] != expected {
+				t.Errorf("resources[%d].Fields[message]: expected %q, got %q", i, expected, result.Resources[i].Fields["message"])
 			}
 		}
 	})
@@ -555,8 +564,8 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 	t.Run("page2_messages", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			expected := fmt.Sprintf("Event page 2 item %d", i+1)
-			if resources[i+3].Fields["message"] != expected {
-				t.Errorf("resources[%d].Fields[message]: expected %q, got %q", i+3, expected, resources[i+3].Fields["message"])
+			if result.Resources[i+3].Fields["message"] != expected {
+				t.Errorf("resources[%d].Fields[message]: expected %q, got %q", i+3, expected, result.Resources[i+3].Fields["message"])
 			}
 		}
 	})
@@ -569,7 +578,7 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "event_categories", "message", "source_identifier", "source_type"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -608,18 +617,19 @@ func TestFetchRDSEvents_MaxEventsCap(t *testing.T) {
 
 	mock := &mockRDSDescribeEventsClient{outputs: outputs}
 
-	resources, err := awsclient.FetchRDSEvents(
+	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
 		"big-db",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxEvents cap), got %d", len(resources))
+		if len(result.Resources) != 200 {
+			t.Errorf("expected exactly 200 resources (maxEvents cap), got %d", len(result.Resources))
 		}
 	})
 
@@ -632,17 +642,17 @@ func TestFetchRDSEvents_MaxEventsCap(t *testing.T) {
 	})
 
 	t.Run("first_event_correct", func(t *testing.T) {
-		if resources[0].Fields["message"] != "Event p0-0" {
+		if result.Resources[0].Fields["message"] != "Event p0-0" {
 			t.Errorf("first resource message: expected %q, got %q",
-				"Event p0-0", resources[0].Fields["message"])
+				"Event p0-0", result.Resources[0].Fields["message"])
 		}
 	})
 
 	t.Run("last_event_correct", func(t *testing.T) {
 		// Last event should be the 50th event of page 3 (index 199 = page3, event49)
-		if resources[199].Fields["message"] != "Event p3-49" {
+		if result.Resources[199].Fields["message"] != "Event p3-49" {
 			t.Errorf("last resource message: expected %q, got %q",
-				"Event p3-49", resources[199].Fields["message"])
+				"Event p3-49", result.Resources[199].Fields["message"])
 		}
 	})
 }
@@ -717,12 +727,13 @@ func TestDbiEvents_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestDbiEvents_ChildFetcherRegistered verifies that the child fetcher is
+// TestDbiEvents_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestDbiEvents_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("dbi_events")
+func TestDbiEvents_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("dbi_events")
 	if f == nil {
-		t.Fatal("dbi_events child fetcher not registered")
+		t.Fatal("dbi_events paginated child fetcher not registered")
 	}
 }
 
@@ -769,4 +780,53 @@ func TestDbiEvents_CopyField(t *testing.T) {
 	if td.CopyField != "message" {
 		t.Errorf("CopyField: expected %q, got %q", "message", td.CopyField)
 	}
+}
+
+// TestFetchRDSEvents_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as Marker.
+func TestFetchRDSEvents_ContinuationToken(t *testing.T) {
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingRDSEventsMock{
+		inner: &mockRDSDescribeEventsClient{
+			output: &rds.DescribeEventsOutput{
+				Events: []rdstypes.Event{
+					{
+						SourceIdentifier: aws.String("my-db"),
+						Date:             &ts,
+						Message:          aws.String("Page 2 event"),
+						EventCategories:  []string{"availability"},
+						SourceType:       rdstypes.SourceTypeDbInstance,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchRDSEvents(context.Background(), wrapper, "my-db", "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedMarker == nil {
+		t.Fatal("expected Marker to be set in API call")
+	}
+	if *wrapper.capturedMarker != "my-continuation-token" {
+		t.Errorf("expected Marker %q, got %q", "my-continuation-token", *wrapper.capturedMarker)
+	}
+}
+
+// tokenCapturingRDSEventsMock wraps the RDS events mock to capture Marker.
+type tokenCapturingRDSEventsMock struct {
+	inner          *mockRDSDescribeEventsClient
+	capturedMarker *string
+}
+
+func (m *tokenCapturingRDSEventsMock) DescribeEvents(ctx context.Context, params *rds.DescribeEventsInput, optFns ...func(*rds.Options)) (*rds.DescribeEventsOutput, error) {
+	m.capturedMarker = params.Marker
+	return m.inner.DescribeEvents(ctx, params, optFns...)
 }

@@ -23,54 +23,64 @@ func init() {
 // FetchIAMUsers calls the IAM ListUsers API and converts the
 // response into a slice of generic Resource structs.
 func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resource, error) {
-	output, err := api.ListUsers(ctx, &iam.ListUsersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching IAM users: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, user := range output.Users {
-		userName := ""
-		if user.UserName != nil {
-			userName = *user.UserName
+	for {
+		output, err := api.ListUsers(ctx, &iam.ListUsersInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching IAM users: %w", err)
 		}
 
-		userID := ""
-		if user.UserId != nil {
-			userID = *user.UserId
+		for _, user := range output.Users {
+			userName := ""
+			if user.UserName != nil {
+				userName = *user.UserName
+			}
+
+			userID := ""
+			if user.UserId != nil {
+				userID = *user.UserId
+			}
+
+			path := ""
+			if user.Path != nil {
+				path = *user.Path
+			}
+
+			createDate := ""
+			if user.CreateDate != nil {
+				createDate = user.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			passwordLastUsed := "Never"
+			if user.PasswordLastUsed != nil {
+				passwordLastUsed = user.PasswordLastUsed.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			r := resource.Resource{
+				ID:     userName,
+				Name:   userName,
+				Status: "",
+				Fields: map[string]string{
+					"user_name":          userName,
+					"user_id":            userID,
+					"path":               path,
+					"create_date":        createDate,
+					"password_last_used": passwordLastUsed,
+				},
+				RawStruct: user,
+			}
+
+			resources = append(resources, r)
 		}
 
-		path := ""
-		if user.Path != nil {
-			path = *user.Path
+		if !output.IsTruncated {
+			break
 		}
-
-		createDate := ""
-		if user.CreateDate != nil {
-			createDate = user.CreateDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		passwordLastUsed := "Never"
-		if user.PasswordLastUsed != nil {
-			passwordLastUsed = user.PasswordLastUsed.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		r := resource.Resource{
-			ID:     userName,
-			Name:   userName,
-			Status: "",
-			Fields: map[string]string{
-				"user_name":          userName,
-				"user_id":            userID,
-				"path":               path,
-				"create_date":        createDate,
-				"password_last_used": passwordLastUsed,
-			},
-			RawStruct:  user,
-		}
-
-		resources = append(resources, r)
+		marker = output.Marker
 	}
 
 	return resources, nil

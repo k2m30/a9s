@@ -24,14 +24,18 @@ func init() {
 // FetchSNSTopics calls the SNS ListTopics API and converts the
 // response into a slice of generic Resource structs.
 func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {
-	output, err := api.ListTopics(ctx, &sns.ListTopicsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching SNS topics: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, topic := range output.Topics {
+	for {
+		output, err := api.ListTopics(ctx, &sns.ListTopicsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching SNS topics: %w", err)
+		}
+
+		for _, topic := range output.Topics {
 		topicArn := ""
 		if topic.TopicArn != nil {
 			topicArn = *topic.TopicArn
@@ -55,6 +59,12 @@ func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resou
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

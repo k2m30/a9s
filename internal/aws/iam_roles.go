@@ -23,14 +23,18 @@ func init() {
 // FetchIAMRoles calls the IAM ListRoles API and converts the
 // response into a slice of generic Resource structs.
 func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resource, error) {
-	output, err := api.ListRoles(ctx, &iam.ListRolesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching IAM roles: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, role := range output.Roles {
+	for {
+		output, err := api.ListRoles(ctx, &iam.ListRolesInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching IAM roles: %w", err)
+		}
+
+		for _, role := range output.Roles {
 		roleName := ""
 		if role.RoleName != nil {
 			roleName = *role.RoleName
@@ -71,6 +75,12 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 		}
 
 		resources = append(resources, r)
+		}
+
+		if !output.IsTruncated {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

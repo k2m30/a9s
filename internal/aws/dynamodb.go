@@ -24,14 +24,18 @@ func init() {
 // FetchDynamoDBTables performs a two-step fetch: ListTables to get names,
 // then DescribeTable per table for full details.
 func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListTables(ctx, &dynamodb.ListTablesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing DynamoDB tables: %w", err)
-	}
-
 	var resources []resource.Resource
+	var exclusiveStartTableName *string
 
-	for _, tableName := range listOutput.TableNames {
+	for {
+		listOutput, err := listAPI.ListTables(ctx, &dynamodb.ListTablesInput{
+			ExclusiveStartTableName: exclusiveStartTableName,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing DynamoDB tables: %w", err)
+		}
+
+		for _, tableName := range listOutput.TableNames {
 		descOutput, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(tableName),
 		})
@@ -78,6 +82,12 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 		}
 
 		resources = append(resources, r)
+		}
+
+		if listOutput.LastEvaluatedTableName == nil {
+			break
+		}
+		exclusiveStartTableName = listOutput.LastEvaluatedTableName
 	}
 
 	return resources, nil

@@ -44,10 +44,13 @@ func TestFetchLambdaInvocations_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "my-func", "/aws/lambda/my-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "my-func", "/aws/lambda/my-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -152,10 +155,13 @@ func TestFetchLambdaInvocations_ColdStartDetection(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "cold-func", "/aws/lambda/cold-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "cold-func", "/aws/lambda/cold-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -193,10 +199,13 @@ func TestFetchLambdaInvocations_ErrorStatus(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "err-func", "/aws/lambda/err-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "err-func", "/aws/lambda/err-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -226,10 +235,13 @@ func TestFetchLambdaInvocations_TimeoutStatus(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "timeout-func", "/aws/lambda/timeout-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "timeout-func", "/aws/lambda/timeout-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) < 1 {
 		t.Fatalf("expected at least 1 resource, got %d", len(resources))
@@ -253,10 +265,13 @@ func TestFetchLambdaInvocations_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "empty-func", "/aws/lambda/empty-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "empty-func", "/aws/lambda/empty-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
@@ -268,10 +283,13 @@ func TestFetchLambdaInvocations_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "err-func", "/aws/lambda/err-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "err-func", "/aws/lambda/err-func", "",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
+
+		resources := result.Resources
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d", len(resources))
 	}
@@ -295,10 +313,13 @@ func TestFetchLambdaInvocations_MultipleInvocations(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "multi-func", "/aws/lambda/multi-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "multi-func", "/aws/lambda/multi-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 10 {
 		t.Fatalf("expected 10 resources, got %d", len(resources))
@@ -343,13 +364,14 @@ func TestFetchLambdaInvocations_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "nil-func", "/aws/lambda/nil-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "nil-func", "/aws/lambda/nil-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
 	// Nil/empty REPORT lines may be skipped or produce empty resources
-	_ = resources
+	_ = result
 }
 
 // TestFetchLambdaInvocations_RawStruct verifies that RawStruct is the
@@ -371,10 +393,13 @@ func TestFetchLambdaInvocations_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "raw-func", "/aws/lambda/raw-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "raw-func", "/aws/lambda/raw-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) < 1 {
 		t.Fatalf("expected at least 1 resource, got %d", len(resources))
@@ -422,7 +447,8 @@ func TestFetchLambdaInvocations_ParentContext(t *testing.T) {
 
 	// The fetcher should use the custom log group, not construct a default
 	customLogGroup := "/custom/log/group/my-func"
-	_, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "my-func", customLogGroup)
+	_, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "my-func", customLogGroup, "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -463,10 +489,13 @@ func TestFetchLambdaInvocations_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "paginated-func", "/aws/lambda/paginated-func")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "paginated-func", "/aws/lambda/paginated-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) < 2 {
 		t.Fatalf("expected at least 2 resources across pages, got %d", len(resources))
@@ -487,10 +516,13 @@ func TestFetchLambdaInvocations_LogGroupNotFound(t *testing.T) {
 		err: fmt.Errorf("operation error CloudWatch Logs: FilterLogEvents, https response error StatusCode: 400, ResourceNotFoundException: The specified log group does not exist."),
 	}
 
-	resources, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "never-invoked", "/aws/lambda/never-invoked")
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "never-invoked", "/aws/lambda/never-invoked", "",
+)
 	if err != nil {
 		t.Fatalf("ResourceNotFoundException should return nil error, got: %v", err)
 	}
+
+		resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources for non-existent log group, got %d", len(resources))
 	}
@@ -532,4 +564,50 @@ func TestLambdaInvocationColumns(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestFetchLambdaInvocations_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchLambdaInvocations_ContinuationToken(t *testing.T) {
+	wrapper := &tokenCapturingLambdaInvocationsMock{
+		inner: &mockCWLogsFilterLogEventsClient{
+			outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+				{
+					Events: []cwlogstypes.FilteredLogEvent{
+						{
+							Timestamp: aws.Int64(1711036800000),
+							Message:   aws.String("REPORT RequestId: abcd1234-5678-9012-abcd-ef0123456789\tDuration: 100.00 ms\tBilled Duration: 100.00 ms\tMemory Size: 128 MB\tMax Memory Used: 64 MB\n"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLambdaInvocations(context.Background(), wrapper, "my-func", "/aws/lambda/my-func", "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingLambdaInvocationsMock wraps the CWLogs mock to capture NextToken.
+type tokenCapturingLambdaInvocationsMock struct {
+	inner             *mockCWLogsFilterLogEventsClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingLambdaInvocationsMock) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.FilterLogEvents(ctx, params, optFns...)
 }

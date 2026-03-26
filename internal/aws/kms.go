@@ -33,33 +33,58 @@ func FetchKMSKeys(
 	describeKeyAPI KMSDescribeKeyAPI,
 	listAliasesAPI KMSListAliasesAPI,
 ) ([]resource.Resource, error) {
-	// Step 1: List all keys
-	listOutput, err := listKeysAPI.ListKeys(ctx, &kms.ListKeysInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing KMS keys: %w", err)
+	// Step 1: List all keys with pagination
+	var allKeys []kmstypes.KeyListEntry
+	var keysMarker *string
+
+	for {
+		listOutput, err := listKeysAPI.ListKeys(ctx, &kms.ListKeysInput{
+			Marker: keysMarker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing KMS keys: %w", err)
+		}
+
+		allKeys = append(allKeys, listOutput.Keys...)
+
+		if !listOutput.Truncated {
+			break
+		}
+		keysMarker = listOutput.NextMarker
 	}
 
-	if len(listOutput.Keys) == 0 {
+	if len(allKeys) == 0 {
 		return []resource.Resource{}, nil
 	}
 
-	// Step 2: List all aliases to build a map of keyID -> alias
-	aliasOutput, err := listAliasesAPI.ListAliases(ctx, &kms.ListAliasesInput{})
-	if err != nil {
-		return nil, err
-	}
-
+	// Step 2: List all aliases with pagination to build a map of keyID -> alias
 	aliasMap := make(map[string]string)
-	for _, alias := range aliasOutput.Aliases {
-		if alias.TargetKeyId != nil && alias.AliasName != nil {
-			aliasMap[*alias.TargetKeyId] = *alias.AliasName
+	var aliasMarker *string
+
+	for {
+		aliasOutput, err := listAliasesAPI.ListAliases(ctx, &kms.ListAliasesInput{
+			Marker: aliasMarker,
+		})
+		if err != nil {
+			return nil, err
 		}
+
+		for _, alias := range aliasOutput.Aliases {
+			if alias.TargetKeyId != nil && alias.AliasName != nil {
+				aliasMap[*alias.TargetKeyId] = *alias.AliasName
+			}
+		}
+
+		if !aliasOutput.Truncated {
+			break
+		}
+		aliasMarker = aliasOutput.NextMarker
 	}
 
 	// Step 3: Describe each key and filter to CUSTOMER-managed
 	var resources []resource.Resource
 
-	for _, key := range listOutput.Keys {
+	for _, key := range allKeys {
 		if key.KeyId == nil {
 			continue
 		}

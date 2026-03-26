@@ -74,30 +74,31 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:5",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("event_0_ID_not_empty", func(t *testing.T) {
-		if resources[0].ID == "" {
+		if result.Resources[0].ID == "" {
 			t.Error("ID should not be empty")
 		}
 	})
 
 	t.Run("event_0_Fields_timestamp", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
@@ -109,14 +110,14 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 
 	t.Run("event_0_Fields_timestamp_formatted", func(t *testing.T) {
 		// 1711036800000 = 2024-03-21 16:00 UTC
-		r := resources[0]
+		r := result.Resources[0]
 		if !strings.Contains(r.Fields["timestamp"], "2024-03-21") {
 			t.Errorf("timestamp should contain date '2024-03-21', got %q", r.Fields["timestamp"])
 		}
 	})
 
 	t.Run("event_0_Fields_stream_short", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["stream_short"] == "" {
 			t.Error("Fields[stream_short] should not be empty")
 		}
@@ -125,7 +126,7 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 	})
 
 	t.Run("event_0_Fields_message", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["message"] == "" {
 			t.Error("Fields[message] should not be empty")
 		}
@@ -135,7 +136,7 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 	})
 
 	t.Run("event_0_RawStruct", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.RawStruct == nil {
 			t.Fatal("RawStruct must not be nil")
 		}
@@ -151,7 +152,7 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "stream_short", "message"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -189,7 +190,8 @@ func TestFetchEcsSvcLogs_NonAwslogsDriver(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"fluentd-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/fluentd-task:1",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error for non-awslogs driver, got nil")
 	}
@@ -218,7 +220,8 @@ func TestFetchEcsSvcLogs_NoContainers(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"no-containers-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/empty-task:1",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error for empty containers, got nil")
 	}
@@ -233,19 +236,20 @@ func TestFetchEcsSvcLogs_DescribeTaskDefinitionError(t *testing.T) {
 
 	cwLogsMock := &mockCWLogsFilterLogEventsClient{}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/missing-task:1",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -275,19 +279,20 @@ func TestFetchEcsSvcLogs_FilterLogEventsError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"throttled-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:5",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -328,23 +333,24 @@ func TestFetchEcsSvcLogs_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/ts-cluster",
 		"ts-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/ts-task:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	ts := resources[0].Fields["timestamp"]
+	ts := result.Resources[0].Fields["timestamp"]
 	if ts == "" {
 		t.Fatal("Fields[timestamp] should not be empty")
 	}
@@ -394,23 +400,24 @@ func TestFetchEcsSvcLogs_NewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nl-cluster",
 		"nl-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/nl-task:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	msg := resources[0].Fields["message"]
+	msg := result.Resources[0].Fields["message"]
 	if strings.Contains(msg, "\n") {
 		t.Errorf("Fields[message] should not contain newlines, got %q", msg)
 	}
@@ -451,23 +458,24 @@ func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nil-cluster",
 		"nil-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/nil-task:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
 		// If we got here, no panic occurred
@@ -530,23 +538,24 @@ func TestFetchEcsSvcLogs_StreamShortComputation(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/ss-cluster",
 		"ss-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/ss-task:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	ss := resources[0].Fields["stream_short"]
+	ss := result.Resources[0].Fields["stream_short"]
 	if ss == "" {
 		t.Fatal("Fields[stream_short] should not be empty")
 	}
@@ -594,23 +603,24 @@ func TestFetchEcsSvcLogs_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcLogs(
+	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
 		cwLogsMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/raw-cluster",
 		"raw-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/raw-task:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
@@ -757,7 +767,8 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod",
 		"web-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web:1",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -767,8 +778,8 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 	// the loop breaks because NextToken is nil OR len >= maxLogEvents.
 	// Since page 2 has no NextToken, we get all 240.
 	// But if the cap is enforced mid-page, we get exactly 240 (both pages consumed).
-	if len(results) < 200 {
-		t.Errorf("expected at least 200 results (pagination should fetch 2 pages), got %d", len(results))
+	if len(results.Resources) < 200 {
+		t.Errorf("expected at least 200 results (pagination should fetch 2 pages), got %d", len(results.Resources))
 	}
 
 	// Verify the mock was called twice (2 pages)
@@ -777,12 +788,13 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 	}
 }
 
-// TestEcsSvcLogs_ChildFetcherRegistered verifies that the child fetcher is
+// TestEcsSvcLogs_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestEcsSvcLogs_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("ecs_svc_logs")
+func TestEcsSvcLogs_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("ecs_svc_logs")
 	if f == nil {
-		t.Fatal("ecs_svc_logs child fetcher not registered")
+		t.Fatal("ecs_svc_logs paginated child fetcher not registered")
 	}
 }
 
@@ -836,4 +848,78 @@ func TestEcsSvcLogs_TaskDefinitionFieldOnParent(t *testing.T) {
 	if !found {
 		t.Error("ecs-svc field keys should include 'task_definition' for ecs_svc_logs context")
 	}
+}
+
+// TestFetchEcsSvcLogs_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the FilterLogEvents API as NextToken.
+func TestFetchEcsSvcLogs_ContinuationToken(t *testing.T) {
+	taskDefMock := &mockECSDescribeTaskDefinitionClient{
+		output: &ecs.DescribeTaskDefinitionOutput{
+			TaskDefinition: &ecstypes.TaskDefinition{
+				ContainerDefinitions: []ecstypes.ContainerDefinition{
+					{
+						Name: aws.String("web"),
+						LogConfiguration: &ecstypes.LogConfiguration{
+							LogDriver: ecstypes.LogDriverAwslogs,
+							Options: map[string]string{
+								"awslogs-group": "/ecs/web-service",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	wrapper := &tokenCapturingEcsSvcLogsMock{
+		inner: &mockCWLogsFilterLogEventsClient{
+			outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+				{
+					Events: []cwlogstypes.FilteredLogEvent{
+						{
+							Timestamp:     aws.Int64(1711036800000),
+							Message:       aws.String("Log from token page"),
+							LogStreamName: aws.String("ecs/web/abc123def456"),
+							EventId:       aws.String("evt-token-001"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchEcsSvcLogs(
+		context.Background(),
+		taskDefMock,
+		wrapper,
+		"arn:aws:ecs:us-east-1:123456789012:cluster/prod",
+		"web-service",
+		"arn:aws:ecs:us-east-1:123456789012:task-definition/web:1",
+		"my-continuation-token",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in FilterLogEvents call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingEcsSvcLogsMock wraps the CWLogs FilterLogEvents mock to capture NextToken.
+type tokenCapturingEcsSvcLogsMock struct {
+	inner             *mockCWLogsFilterLogEventsClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingEcsSvcLogsMock) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.FilterLogEvents(ctx, params, optFns...)
 }

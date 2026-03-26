@@ -21,12 +21,12 @@ func init() {
 		"resolved_source_version", "log_group_name", "log_stream_name",
 	})
 
-	resource.RegisterChildFetcher("cb_builds", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("cb_builds", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCBBuilds(ctx, c.CodeBuild, c.CodeBuild, parentCtx)
+		return FetchCBBuilds(ctx, c.CodeBuild, c.CodeBuild, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -50,17 +50,28 @@ func init() {
 // FetchCBBuilds performs a two-step fetch:
 // 1. ListBuildsForProject (paginated) to collect build IDs up to maxCBBuilds
 // 2. BatchGetBuilds in chunks of 100 (API limit) to get full build details
+//
+// When continuationToken is provided, it resumes ListBuildsForProject from
+// that token. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
+// continuation.
 func FetchCBBuilds(
 	ctx context.Context,
 	listAPI CodeBuildListBuildsForProjectAPI,
 	batchAPI CodeBuildBatchGetBuildsAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	projectName := parentCtx["project_name"]
 
 	// Step 1: Collect all build IDs via pagination
 	var allIDs []string
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
+
+	var lastAPINextToken string
 
 	for {
 		input := &codebuild.ListBuildsForProjectInput{
@@ -70,10 +81,16 @@ func FetchCBBuilds(
 
 		output, err := listAPI.ListBuildsForProject(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("listing builds for %s: %w", projectName, err)
+			return resource.FetchResult{}, fmt.Errorf("listing builds for %s: %w", projectName, err)
 		}
 
 		allIDs = append(allIDs, output.Ids...)
+
+		if output.NextToken != nil {
+			lastAPINextToken = *output.NextToken
+		} else {
+			lastAPINextToken = ""
+		}
 
 		if len(allIDs) >= maxCBBuilds {
 			allIDs = allIDs[:maxCBBuilds]
@@ -87,7 +104,14 @@ func FetchCBBuilds(
 	}
 
 	if len(allIDs) == 0 {
-		return []resource.Resource{}, nil
+		return resource.FetchResult{
+			Resources: []resource.Resource{},
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				TotalHint:   0,
+				PageSize:    0,
+			},
+		}, nil
 	}
 
 	// Step 2: BatchGetBuilds in chunks of 100
@@ -104,7 +128,7 @@ func FetchCBBuilds(
 			Ids: chunk,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("batch get builds for %s: %w", projectName, err)
+			return resource.FetchResult{}, fmt.Errorf("batch get builds for %s: %w", projectName, err)
 		}
 
 		for _, build := range batchOutput.Builds {
@@ -112,7 +136,15 @@ func FetchCBBuilds(
 		}
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: lastAPINextToken != "",
+			NextToken:   lastAPINextToken,
+			PageSize:    len(resources),
+			TotalHint:   len(resources),
+		},
+	}, nil
 }
 
 // convertCBBuild converts a single cbtypes.Build into a generic Resource.

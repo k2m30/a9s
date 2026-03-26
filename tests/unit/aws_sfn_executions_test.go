@@ -54,20 +54,21 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_execution_name", func(t *testing.T) {
 		if r.ID != "exec-001" {
@@ -216,16 +217,17 @@ func TestFetchSFNExecutions_Empty(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:empty-sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -239,16 +241,17 @@ func TestFetchSFNExecutions_APIError(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:err-sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -280,70 +283,71 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_StopDate", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["stop_date"] != "" {
 			t.Logf("Fields[stop_date] is %q (expected empty for nil)", r.Fields["stop_date"])
 		}
 	})
 
 	t.Run("nil_MapRunArn", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["map_run_arn"] != "" {
 			t.Logf("Fields[map_run_arn] is %q (expected empty for nil)", r.Fields["map_run_arn"])
 		}
 	})
 
 	t.Run("nil_StateMachineAliasArn", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["state_machine_alias_arn"] != "" {
 			t.Logf("Fields[state_machine_alias_arn] is %q (expected empty for nil)", r.Fields["state_machine_alias_arn"])
 		}
 	})
 
 	t.Run("nil_StateMachineVersionArn", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["state_machine_version_arn"] != "" {
 			t.Logf("Fields[state_machine_version_arn] is %q (expected empty for nil)", r.Fields["state_machine_version_arn"])
 		}
 	})
 
 	t.Run("nil_ItemCount", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["item_count"] != "" {
 			t.Logf("Fields[item_count] is %q (expected empty for nil)", r.Fields["item_count"])
 		}
 	})
 
 	t.Run("nil_RedriveCount", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["redrive_count"] != "" {
 			t.Logf("Fields[redrive_count] is %q (expected empty for nil)", r.Fields["redrive_count"])
 		}
 	})
 
 	t.Run("nil_RedriveDate", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["redrive_date"] != "" {
 			t.Logf("Fields[redrive_date] is %q (expected empty for nil)", r.Fields["redrive_date"])
 		}
 	})
 
 	t.Run("status_populated", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Status != "RUNNING" {
 			t.Errorf("Status: expected %q, got %q", "RUNNING", r.Status)
 		}
@@ -414,26 +418,27 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 5 {
+			t.Fatalf("expected 5 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
 	t.Run("page1_executions", func(t *testing.T) {
 		expectedIDs := []string{"exec-p1-1", "exec-p1-2", "exec-p1-3"}
 		for i, expectedID := range expectedIDs {
-			if resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, resources[i].ID)
+			if result.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
 			}
 		}
 	})
@@ -441,8 +446,8 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 	t.Run("page2_executions", func(t *testing.T) {
 		expectedIDs := []string{"exec-p2-1", "exec-p2-2"}
 		for i, expectedID := range expectedIDs {
-			if resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, resources[i+3].ID)
+			if result.Resources[i+3].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, result.Resources[i+3].ID)
 			}
 		}
 	})
@@ -454,7 +459,7 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 	})
 
 	t.Run("all_have_status", func(t *testing.T) {
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			if r.Status == "" {
 				t.Errorf("resources[%d].Status should not be empty", i)
 			}
@@ -463,7 +468,7 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"execution_arn", "name", "status", "start_date"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -508,18 +513,19 @@ func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxExecutions cap), got %d", len(resources))
+		if len(result.Resources) != 200 {
+			t.Errorf("expected exactly 200 resources (maxExecutions cap), got %d", len(result.Resources))
 		}
 	})
 
@@ -532,15 +538,15 @@ func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 	})
 
 	t.Run("first_execution_correct", func(t *testing.T) {
-		if resources[0].ID != "exec-p0-0" {
-			t.Errorf("first resource ID: expected %q, got %q", "exec-p0-0", resources[0].ID)
+		if result.Resources[0].ID != "exec-p0-0" {
+			t.Errorf("first resource ID: expected %q, got %q", "exec-p0-0", result.Resources[0].ID)
 		}
 	})
 
 	t.Run("last_execution_correct", func(t *testing.T) {
 		// Last execution should be the 50th of page 3 (index 199 = page3, item49)
-		if resources[199].ID != "exec-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "exec-p3-49", resources[199].ID)
+		if result.Resources[199].ID != "exec-p3-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "exec-p3-49", result.Resources[199].ID)
 		}
 	})
 }
@@ -570,19 +576,20 @@ func TestFetchSFNExecutions_DurationComputed(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	duration := resources[0].Fields["duration"]
+	duration := result.Resources[0].Fields["duration"]
 
 	t.Run("contains_minutes_and_seconds", func(t *testing.T) {
 		if !strings.Contains(duration, "2m") {
@@ -624,19 +631,20 @@ func TestFetchSFNExecutions_DurationRunning(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	resources, err := awsclient.FetchSFNExecutions(
+	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	duration := resources[0].Fields["duration"]
+	duration := result.Resources[0].Fields["duration"]
 
 	t.Run("starts_with_tilde", func(t *testing.T) {
 		if !strings.HasPrefix(duration, "~") {
@@ -684,23 +692,24 @@ func TestFetchSFNExecutions_StatusPreserved(t *testing.T) {
 				"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 			}
 
-			resources, err := awsclient.FetchSFNExecutions(
+			result, err := awsclient.FetchSFNExecutions(
 				context.Background(),
 				mock,
 				parentCtx,
-			)
+							"",
+)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
-			if len(resources) != 1 {
-				t.Fatalf("expected 1 resource, got %d", len(resources))
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 
-			if resources[0].Status != tc.expected {
-				t.Errorf("Status: expected %q, got %q", tc.expected, resources[0].Status)
+			if result.Resources[0].Status != tc.expected {
+				t.Errorf("Status: expected %q, got %q", tc.expected, result.Resources[0].Status)
 			}
-			if resources[0].Fields["status"] != tc.expected {
-				t.Errorf("Fields[status]: expected %q, got %q", tc.expected, resources[0].Fields["status"])
+			if result.Resources[0].Fields["status"] != tc.expected {
+				t.Errorf("Fields[status]: expected %q, got %q", tc.expected, result.Resources[0].Fields["status"])
 			}
 		})
 	}
@@ -780,12 +789,13 @@ func TestSFNExecutions_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutions_ChildFetcherRegistered verifies that the child fetcher is
+// TestSFNExecutions_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestSFNExecutions_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("sfn_executions")
+func TestSFNExecutions_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("sfn_executions")
 	if f == nil {
-		t.Fatal("sfn_executions child fetcher not registered")
+		t.Fatal("sfn_executions paginated child fetcher not registered")
 	}
 }
 
@@ -968,4 +978,57 @@ func TestConfigDefaultViewDef_SFNExecutions(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestFetchSFNExecutions_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchSFNExecutions_ContinuationToken(t *testing.T) {
+	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingSFNExecutionsMock{
+		inner: &mockSFNListExecutionsClient{
+			output: &sfn.ListExecutionsOutput{
+				Executions: []sfntypes.ExecutionListItem{
+					{
+						ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:my-sm:exec-from-token"),
+						Name:            aws.String("exec-from-token"),
+						StartDate:       &startTs,
+						StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:my-sm"),
+						Status:          sfntypes.ExecutionStatusSucceeded,
+					},
+				},
+			},
+		},
+	}
+
+	parentCtx := map[string]string{
+		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-sm",
+	}
+
+	result, err := awsclient.FetchSFNExecutions(context.Background(), wrapper, parentCtx, "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingSFNExecutionsMock wraps the SFN ListExecutions mock to capture NextToken.
+type tokenCapturingSFNExecutionsMock struct {
+	inner             *mockSFNListExecutionsClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingSFNExecutionsMock) ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.ListExecutions(ctx, params, optFns...)
 }

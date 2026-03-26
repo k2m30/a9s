@@ -64,21 +64,22 @@ func TestFetchCBBuilds_Basic(t *testing.T) {
 		"project_name": "my-project",
 	}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_full_build_id", func(t *testing.T) {
 		if r.ID != "my-project:build-id-001" {
@@ -214,17 +215,18 @@ func TestFetchCBBuilds_EmptyProject(t *testing.T) {
 		"project_name": "empty-project",
 	}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -241,20 +243,21 @@ func TestFetchCBBuilds_ListError(t *testing.T) {
 		"project_name": "error-project",
 	}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 	if !strings.Contains(err.Error(), "access denied") {
 		t.Errorf("error should contain 'access denied', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -277,20 +280,21 @@ func TestFetchCBBuilds_BatchError(t *testing.T) {
 		"project_name": "batch-error-project",
 	}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 	if !strings.Contains(err.Error(), "throttling") {
 		t.Errorf("error should contain 'throttling', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -324,21 +328,22 @@ func TestFetchCBBuilds_Duration(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	duration := resources[0].Fields["duration"]
+	duration := result.Resources[0].Fields["duration"]
 	if !strings.Contains(duration, "4m") {
 		t.Errorf("Fields[duration] should contain '4m', got %q", duration)
 	}
@@ -376,21 +381,22 @@ func TestFetchCBBuilds_InProgressDuration(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	duration := resources[0].Fields["duration"]
+	duration := result.Resources[0].Fields["duration"]
 	if !strings.Contains(duration, "~") {
 		t.Errorf("in-progress Fields[duration] should contain '~', got %q", duration)
 	}
@@ -426,21 +432,22 @@ func TestFetchCBBuilds_SourceVersionShort(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	short := resources[0].Fields["source_version_short"]
+	short := result.Resources[0].Fields["source_version_short"]
 	if short != "abc123de" {
 		t.Errorf("Fields[source_version_short]: expected %q, got %q", "abc123de", short)
 	}
@@ -471,66 +478,67 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 	parentCtx := map[string]string{"project_name": "proj"}
 
 	// Should not panic
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_Id", func(t *testing.T) {
 		// ID may be empty or derived; just ensure no panic occurred
-		_ = resources[0].ID
+		_ = result.Resources[0].ID
 	})
 
 	t.Run("nil_BuildNumber", func(t *testing.T) {
 		// Name should handle nil BuildNumber gracefully
-		_ = resources[0].Name
+		_ = result.Resources[0].Name
 	})
 
 	t.Run("nil_StartTime", func(t *testing.T) {
-		if resources[0].Fields["start_time"] != "" {
-			t.Logf("Fields[start_time] is %q (expected empty for nil)", resources[0].Fields["start_time"])
+		if result.Resources[0].Fields["start_time"] != "" {
+			t.Logf("Fields[start_time] is %q (expected empty for nil)", result.Resources[0].Fields["start_time"])
 		}
 	})
 
 	t.Run("nil_EndTime", func(t *testing.T) {
-		if resources[0].Fields["end_time"] != "" {
-			t.Logf("Fields[end_time] is %q (expected empty for nil)", resources[0].Fields["end_time"])
+		if result.Resources[0].Fields["end_time"] != "" {
+			t.Logf("Fields[end_time] is %q (expected empty for nil)", result.Resources[0].Fields["end_time"])
 		}
 	})
 
 	t.Run("nil_SourceVersion", func(t *testing.T) {
-		if resources[0].Fields["source_version"] != "" {
-			t.Logf("Fields[source_version] is %q (expected empty for nil)", resources[0].Fields["source_version"])
+		if result.Resources[0].Fields["source_version"] != "" {
+			t.Logf("Fields[source_version] is %q (expected empty for nil)", result.Resources[0].Fields["source_version"])
 		}
 	})
 
 	t.Run("nil_Initiator", func(t *testing.T) {
-		if resources[0].Fields["initiator"] != "" {
-			t.Logf("Fields[initiator] is %q (expected empty for nil)", resources[0].Fields["initiator"])
+		if result.Resources[0].Fields["initiator"] != "" {
+			t.Logf("Fields[initiator] is %q (expected empty for nil)", result.Resources[0].Fields["initiator"])
 		}
 	})
 
 	t.Run("nil_CurrentPhase", func(t *testing.T) {
-		if resources[0].Fields["current_phase"] != "" {
-			t.Logf("Fields[current_phase] is %q (expected empty for nil)", resources[0].Fields["current_phase"])
+		if result.Resources[0].Fields["current_phase"] != "" {
+			t.Logf("Fields[current_phase] is %q (expected empty for nil)", result.Resources[0].Fields["current_phase"])
 		}
 	})
 
 	t.Run("nil_Logs", func(t *testing.T) {
-		if resources[0].Fields["log_group_name"] != "" {
-			t.Logf("Fields[log_group_name] is %q (expected empty for nil)", resources[0].Fields["log_group_name"])
+		if result.Resources[0].Fields["log_group_name"] != "" {
+			t.Logf("Fields[log_group_name] is %q (expected empty for nil)", result.Resources[0].Fields["log_group_name"])
 		}
-		if resources[0].Fields["log_stream_name"] != "" {
-			t.Logf("Fields[log_stream_name] is %q (expected empty for nil)", resources[0].Fields["log_stream_name"])
+		if result.Resources[0].Fields["log_stream_name"] != "" {
+			t.Logf("Fields[log_stream_name] is %q (expected empty for nil)", result.Resources[0].Fields["log_stream_name"])
 		}
 	})
 }
@@ -567,27 +575,28 @@ func TestFetchCBBuilds_LogFields(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	if resources[0].Fields["log_group_name"] != "/aws/codebuild/my-project" {
+	if result.Resources[0].Fields["log_group_name"] != "/aws/codebuild/my-project" {
 		t.Errorf("Fields[log_group_name]: expected %q, got %q",
-			"/aws/codebuild/my-project", resources[0].Fields["log_group_name"])
+			"/aws/codebuild/my-project", result.Resources[0].Fields["log_group_name"])
 	}
-	if resources[0].Fields["log_stream_name"] != "12345678-abcd-efgh-1234-567890abcdef" {
+	if result.Resources[0].Fields["log_stream_name"] != "12345678-abcd-efgh-1234-567890abcdef" {
 		t.Errorf("Fields[log_stream_name]: expected %q, got %q",
-			"12345678-abcd-efgh-1234-567890abcdef", resources[0].Fields["log_stream_name"])
+			"12345678-abcd-efgh-1234-567890abcdef", result.Resources[0].Fields["log_stream_name"])
 	}
 }
 
@@ -620,27 +629,28 @@ func TestFetchCBBuilds_LogFieldsNil(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	if resources[0].Fields["log_group_name"] != "" {
+	if result.Resources[0].Fields["log_group_name"] != "" {
 		t.Errorf("Fields[log_group_name] should be empty when Logs is nil, got %q",
-			resources[0].Fields["log_group_name"])
+			result.Resources[0].Fields["log_group_name"])
 	}
-	if resources[0].Fields["log_stream_name"] != "" {
+	if result.Resources[0].Fields["log_stream_name"] != "" {
 		t.Errorf("Fields[log_stream_name] should be empty when Logs is nil, got %q",
-			resources[0].Fields["log_stream_name"])
+			result.Resources[0].Fields["log_stream_name"])
 	}
 }
 
@@ -676,18 +686,19 @@ func TestFetchCBBuilds_Pagination(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
 	}
 }
 
@@ -711,7 +722,8 @@ func TestFetchCBBuilds_ParentContext(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -747,23 +759,24 @@ func TestFetchCBBuilds_RawStruct(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	resources, err := awsclient.FetchCBBuilds(
+	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
 		batchMock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	raw, ok := resources[0].RawStruct.(cbtypes.Build)
+	raw, ok := result.Resources[0].RawStruct.(cbtypes.Build)
 	if !ok {
-		t.Fatalf("RawStruct should be cbtypes.Build, got %T", resources[0].RawStruct)
+		t.Fatalf("RawStruct should be cbtypes.Build, got %T", result.Resources[0].RawStruct)
 	}
 	if raw.Id == nil || *raw.Id != "proj:b-raw" {
 		t.Error("RawStruct.Id not preserved correctly")
@@ -817,12 +830,13 @@ func TestCBBuildColumns(t *testing.T) {
 	}
 }
 
-// TestCBBuilds_ChildFetcherRegistered verifies that the child fetcher is
+// TestCBBuilds_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestCBBuilds_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("cb_builds")
+func TestCBBuilds_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("cb_builds")
 	if f == nil {
-		t.Fatal("cb_builds child fetcher not registered")
+		t.Fatal("cb_builds paginated child fetcher not registered")
 	}
 }
 
@@ -846,6 +860,69 @@ func TestConfigDefaultViewDef_CBBuilds(t *testing.T) {
 			t.Error("expected non-empty Detail paths for cb_builds")
 		}
 	})
+}
+
+// TestFetchCBBuilds_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the ListBuildsForProject API as NextToken.
+func TestFetchCBBuilds_ContinuationToken(t *testing.T) {
+	startTime := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+	buildNum := int64(42)
+
+	wrapper := &tokenCapturingCBBuildsMock{
+		inner: &mockCodeBuildListBuildsForProjectClient{
+			outputs: []*codebuild.ListBuildsForProjectOutput{
+				{
+					Ids: []string{"my-project:build-from-token"},
+				},
+			},
+		},
+	}
+
+	batchMock := &mockCodeBuildBatchGetBuildsClient{
+		outputs: []*codebuild.BatchGetBuildsOutput{
+			{
+			Builds: []cbtypes.Build{
+				{
+					Id:          aws.String("my-project:build-from-token"),
+					BuildNumber: &buildNum,
+					BuildStatus: cbtypes.StatusTypeSucceeded,
+					StartTime:   &startTime,
+				},
+			},
+			},
+		},
+	}
+
+	parentCtx := map[string]string{
+		"project_name": "my-project",
+	}
+
+	result, err := awsclient.FetchCBBuilds(context.Background(), wrapper, batchMock, parentCtx, "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in ListBuildsForProject call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingCBBuildsMock wraps the CodeBuild ListBuildsForProject mock to capture NextToken.
+type tokenCapturingCBBuildsMock struct {
+	inner             *mockCodeBuildListBuildsForProjectClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingCBBuildsMock) ListBuildsForProject(ctx context.Context, params *codebuild.ListBuildsForProjectInput, optFns ...func(*codebuild.Options)) (*codebuild.ListBuildsForProjectOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.ListBuildsForProject(ctx, params, optFns...)
 }
 
 // Ensure all imports are used.

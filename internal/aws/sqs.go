@@ -25,51 +25,61 @@ func init() {
 // FetchSQSQueues performs a two-step fetch: ListQueues to get URLs,
 // then GetQueueAttributes per queue for details.
 func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListQueues(ctx, &sqs.ListQueuesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing SQS queues: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, queueURL := range listOutput.QueueUrls {
-		attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-			QueueUrl: &queueURL,
-			AttributeNames: []sqstypes.QueueAttributeName{
-				sqstypes.QueueAttributeNameAll,
-			},
+	for {
+		listOutput, err := listAPI.ListQueues(ctx, &sqs.ListQueuesInput{
+			NextToken: nextToken,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
+			return nil, fmt.Errorf("listing SQS queues: %w", err)
 		}
 
-		attrs := attrOutput.Attributes
+		for _, queueURL := range listOutput.QueueUrls {
+			attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+				QueueUrl: &queueURL,
+				AttributeNames: []sqstypes.QueueAttributeName{
+					sqstypes.QueueAttributeNameAll,
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
+			}
 
-		// Extract queue name from URL (last segment after /)
-		queueName := queueURL
-		if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
-			queueName = parts[len(parts)-1]
+			attrs := attrOutput.Attributes
+
+			// Extract queue name from URL (last segment after /)
+			queueName := queueURL
+			if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
+				queueName = parts[len(parts)-1]
+			}
+
+			approxMessages := attrs["ApproximateNumberOfMessages"]
+			approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
+			delaySeconds := attrs["DelaySeconds"]
+
+			r := resource.Resource{
+				ID:     queueName,
+				Name:   queueName,
+				Status: "",
+				Fields: map[string]string{
+					"queue_name":         queueName,
+					"queue_url":          queueURL,
+					"approx_messages":    approxMessages,
+					"approx_not_visible": approxNotVisible,
+					"delay_seconds":      delaySeconds,
+				},
+				RawStruct: fmt.Sprintf("%v", attrs),
+			}
+
+			resources = append(resources, r)
 		}
 
-		approxMessages := attrs["ApproximateNumberOfMessages"]
-		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
-		delaySeconds := attrs["DelaySeconds"]
-
-		r := resource.Resource{
-			ID:     queueName,
-			Name:   queueName,
-			Status: "",
-			Fields: map[string]string{
-				"queue_name":         queueName,
-				"queue_url":          queueURL,
-				"approx_messages":    approxMessages,
-				"approx_not_visible": approxNotVisible,
-				"delay_seconds":      delaySeconds,
-			},
-			RawStruct:  fmt.Sprintf("%v", attrs),
+		if listOutput.NextToken == nil {
+			break
 		}
-
-		resources = append(resources, r)
+		nextToken = listOutput.NextToken
 	}
 
 	return resources, nil

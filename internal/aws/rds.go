@@ -23,14 +23,18 @@ func init() {
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the
 // response into a slice of generic Resource structs.
 func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching RDS instances: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, db := range output.DBInstances {
+	for {
+		output, err := api.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching RDS instances: %w", err)
+		}
+
+		for _, db := range output.DBInstances {
 		dbIdentifier := ""
 		if db.DBInstanceIdentifier != nil {
 			dbIdentifier = *db.DBInstanceIdentifier
@@ -83,6 +87,12 @@ func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]re
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

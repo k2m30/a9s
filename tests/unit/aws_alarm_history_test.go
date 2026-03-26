@@ -43,20 +43,21 @@ func TestFetchAlarmHistory_Basic(t *testing.T) {
 		"alarm_name": "HighCPUAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_formatted_timestamp", func(t *testing.T) {
 		if r.ID == "" {
@@ -140,16 +141,17 @@ func TestFetchAlarmHistory_Empty(t *testing.T) {
 		"alarm_name": "EmptyAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -163,16 +165,17 @@ func TestFetchAlarmHistory_APIError(t *testing.T) {
 		"alarm_name": "ErrAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -201,28 +204,29 @@ func TestFetchAlarmHistory_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_HistorySummary", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["history_summary"] != "" {
 			t.Logf("Fields[history_summary] is %q (expected empty for nil)", r.Fields["history_summary"])
 		}
 	})
 
 	t.Run("history_item_type_populated", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["history_item_type"] != "ConfigurationUpdate" {
 			t.Errorf("Fields[history_item_type]: expected %q, got %q", "ConfigurationUpdate", r.Fields["history_item_type"])
 		}
@@ -252,21 +256,22 @@ func TestFetchAlarmHistory_NewlineStripping(t *testing.T) {
 		"alarm_name": "NewlineAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("history_summary_no_newlines", func(t *testing.T) {
-		summary := resources[0].Fields["history_summary"]
+		summary := result.Resources[0].Fields["history_summary"]
 		if strings.Contains(summary, "\n") || strings.Contains(summary, "\r") {
 			t.Errorf("Fields[history_summary] should not contain newlines, got %q", summary)
 		}
@@ -296,20 +301,21 @@ func TestFetchAlarmHistory_TimestampFormatting(t *testing.T) {
 		"alarm_name": "TsAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	tsField := resources[0].Fields["timestamp"]
+	tsField := result.Resources[0].Fields["timestamp"]
 	if tsField != "2024-12-25 14:30:45" {
 		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30:45", tsField)
 	}
@@ -339,20 +345,21 @@ func TestFetchAlarmHistory_RawStruct(t *testing.T) {
 		"alarm_name": "RawAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
@@ -458,23 +465,24 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 		"alarm_name": "PaginatedAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 5 {
+			t.Fatalf("expected 5 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
 	t.Run("all_have_status", func(t *testing.T) {
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			if r.Status == "" {
 				t.Errorf("resources[%d].Status should not be empty", i)
 			}
@@ -489,7 +497,7 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "history_item_type", "history_summary"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -533,18 +541,19 @@ func TestFetchAlarmHistory_MaxCap(t *testing.T) {
 		"alarm_name": "BigAlarm",
 	}
 
-	resources, err := awsclient.FetchAlarmHistory(
+	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (max cap), got %d", len(resources))
+		if len(result.Resources) != 200 {
+			t.Errorf("expected exactly 200 resources (max cap), got %d", len(result.Resources))
 		}
 	})
 
@@ -557,15 +566,15 @@ func TestFetchAlarmHistory_MaxCap(t *testing.T) {
 	})
 
 	t.Run("first_item_correct", func(t *testing.T) {
-		if resources[0].Fields["history_summary"] != "Event p0-0" {
-			t.Errorf("first resource history_summary: expected %q, got %q", "Event p0-0", resources[0].Fields["history_summary"])
+		if result.Resources[0].Fields["history_summary"] != "Event p0-0" {
+			t.Errorf("first resource history_summary: expected %q, got %q", "Event p0-0", result.Resources[0].Fields["history_summary"])
 		}
 	})
 
 	t.Run("last_item_correct", func(t *testing.T) {
 		// Last item should be the 50th item of page 3 (index 199 = page3, item49)
-		if resources[199].Fields["history_summary"] != "Event p3-49" {
-			t.Errorf("last resource history_summary: expected %q, got %q", "Event p3-49", resources[199].Fields["history_summary"])
+		if result.Resources[199].Fields["history_summary"] != "Event p3-49" {
+			t.Errorf("last resource history_summary: expected %q, got %q", "Event p3-49", result.Resources[199].Fields["history_summary"])
 		}
 	})
 }
@@ -632,13 +641,72 @@ func TestAlarmHistory_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestAlarmHistory_ChildFetcherRegistered verifies that the child fetcher is
+// TestAlarmHistory_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestAlarmHistory_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("alarm_history")
+func TestAlarmHistory_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("alarm_history")
 	if f == nil {
-		t.Fatal("alarm_history child fetcher not registered")
+		t.Fatal("alarm_history paginated child fetcher not registered")
 	}
+}
+
+// TestFetchAlarmHistory_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchAlarmHistory_ContinuationToken(t *testing.T) {
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingAlarmHistoryMock{
+		inner: &mockCloudWatchDescribeAlarmHistoryClient{
+			output: &cloudwatch.DescribeAlarmHistoryOutput{
+				AlarmHistoryItems: []cwtypes.AlarmHistoryItem{
+					{
+						AlarmName:       aws.String("TokenAlarm"),
+						HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+						HistorySummary:  aws.String("Page 2 data"),
+						Timestamp:       &ts,
+					},
+				},
+			},
+		},
+	}
+
+	parentCtx := map[string]string{
+		"alarm_name": "TokenAlarm",
+	}
+
+	result, err := awsclient.FetchAlarmHistory(
+		context.Background(),
+		wrapper,
+		parentCtx,
+		"my-continuation-token",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	// Verify the continuation token was forwarded
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingAlarmHistoryMock wraps the alarm history mock to capture NextToken.
+type tokenCapturingAlarmHistoryMock struct {
+	inner             *mockCloudWatchDescribeAlarmHistoryClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingAlarmHistoryMock) DescribeAlarmHistory(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.DescribeAlarmHistory(ctx, params, optFns...)
 }
 
 // TestAlarmHistory_ParentHasChildDef verifies that the parent alarm resource

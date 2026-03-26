@@ -93,3 +93,49 @@ func GetChildFetcher(shortName string) ChildFetcher {
 func UnregisterChildFetcher(shortName string) {
 	delete(childFetcherRegistry, shortName)
 }
+
+// PaginatedFetcher returns a single page of resources.
+type PaginatedFetcher func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)
+
+// PaginatedChildFetcher returns a single page of child resources.
+type PaginatedChildFetcher func(ctx context.Context, clients interface{}, parentCtx ParentContext, continuationToken string) (FetchResult, error)
+
+// paginatedRegistry maps resource short names to their paginated fetcher functions.
+var paginatedRegistry = map[string]PaginatedFetcher{}
+
+// paginatedChildRegistry maps child type short names to their paginated child fetcher functions.
+var paginatedChildRegistry = map[string]PaginatedChildFetcher{}
+
+// RegisterPaginated adds a paginated fetcher for the given resource short name.
+// Called from init() in each aws/*.go file for resources that support pagination.
+func RegisterPaginated(shortName string, f PaginatedFetcher) {
+	paginatedRegistry[shortName] = f
+}
+
+// GetPaginatedFetcher returns the paginated fetcher for the given resource short name,
+// or nil if no paginated fetcher is registered.
+func GetPaginatedFetcher(shortName string) PaginatedFetcher {
+	return paginatedRegistry[shortName]
+}
+
+// UnregisterPaginated removes a paginated fetcher. Used only in tests for cleanup.
+func UnregisterPaginated(shortName string) {
+	delete(paginatedRegistry, shortName)
+}
+
+// RegisterPaginatedChild adds a paginated child fetcher for the given short name.
+// Called from init() in each aws/*.go file for child resources that support pagination.
+func RegisterPaginatedChild(shortName string, f PaginatedChildFetcher) {
+	paginatedChildRegistry[shortName] = f
+}
+
+// GetPaginatedChildFetcher returns the paginated child fetcher for the given short name,
+// or nil if no paginated child fetcher is registered.
+func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
+	return paginatedChildRegistry[shortName]
+}
+
+// UnregisterPaginatedChild removes a paginated child fetcher. Used only in tests for cleanup.
+func UnregisterPaginatedChild(shortName string) {
+	delete(paginatedChildRegistry, shortName)
+}
