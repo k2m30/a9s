@@ -24,6 +24,12 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "sns_subscriptions",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"topic_arn": "ID"},
+				DisplayNameKey: "display_name",
+			}},
 		},
 		{
 			Name:      "SNS Subscriptions",

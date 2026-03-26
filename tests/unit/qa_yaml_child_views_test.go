@@ -1185,3 +1185,57 @@ func TestQA_YAML_DbiEvents_RawContentUncolored(t *testing.T) {
 		t.Error("DbiEvents RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// SNS Topic Subscriptions (sns_subscriptions) YAML view fixtures
+// ===========================================================================
+
+func fixtureSnsSubscriptions() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:   "arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4",
+			Name: "user@example.com",
+			Fields: map[string]string{
+				"protocol":            "email",
+				"endpoint":            "user@example.com",
+				"confirmation_status": "Confirmed",
+				"owner":               "123456789012",
+				"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4",
+				"topic_arn":           "arn:aws:sns:us-east-1:123456789012:my-topic",
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// SNS Topic Subscriptions (sns_subscriptions) YAML tests
+// ===========================================================================
+
+func TestQA_YAML_SnsSubscriptions_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureSnsSubscriptions() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("SnsSubscriptions YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("SnsSubscriptions YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_SnsSubscriptions_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureSnsSubscriptions()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("SnsSubscriptions FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_SnsSubscriptions_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureSnsSubscriptions()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("SnsSubscriptions RawContent() contains ANSI codes, expected plain YAML")
+	}
+}

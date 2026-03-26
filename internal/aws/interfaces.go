@@ -299,6 +299,11 @@ type SNSListSubscriptionsAPI interface {
 	ListSubscriptions(ctx context.Context, params *sns.ListSubscriptionsInput, optFns ...func(*sns.Options)) (*sns.ListSubscriptionsOutput, error)
 }
 
+// SNSListSubscriptionsByTopicAPI defines the interface for the SNS ListSubscriptionsByTopic operation.
+type SNSListSubscriptionsByTopicAPI interface {
+	ListSubscriptionsByTopic(ctx context.Context, params *sns.ListSubscriptionsByTopicInput, optFns ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error)
+}
+
 // IAMListUsersAPI defines the interface for the IAM ListUsers operation.
 type IAMListUsersAPI interface {
 	ListUsers(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error)

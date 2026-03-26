@@ -260,6 +260,17 @@ func DbiEventColumns() []Column {
 	}
 }
 
+// SnsSubscriptionColumns returns the column definitions for SNS topic
+// subscriptions (child of SNS Topics).
+func SnsSubscriptionColumns() []Column {
+	return []Column{
+		{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
+		{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: true},
+		{Key: "confirmation_status", Title: "Status", Width: 18, Sortable: true},
+		{Key: "owner", Title: "Owner", Width: 14, Sortable: true},
+	}
+}
+
 // ELBListenerRuleColumns returns the column definitions for ELB listener rules.
 func ELBListenerRuleColumns() []Column {
 	return []Column{

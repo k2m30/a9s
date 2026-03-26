@@ -1,0 +1,518 @@
+package unit
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ---------------------------------------------------------------------------
+// SNS Topic Subscriptions fetcher tests (child of SNS Topics)
+// ---------------------------------------------------------------------------
+
+// TestFetchSNSTopicSubscriptions_Basic verifies parsing of 3 subscriptions
+// (email confirmed, https confirmed, sqs pending), checking ID, Name, Fields,
+// and RawStruct.
+func TestFetchSNSTopicSubscriptions_Basic(t *testing.T) {
+	topicArn := "arn:aws:sns:us-east-1:123456789012:my-topic"
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("user@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:my-topic:e5f6g7h8"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("https"),
+						Endpoint:        aws.String("https://api.example.com/webhook"),
+						Owner:           aws.String("123456789012"),
+					},
+					{
+						SubscriptionArn: aws.String("PendingConfirmation"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("sqs"),
+						Endpoint:        aws.String("arn:aws:sqs:us-east-1:123456789012:my-queue"),
+						Owner:           aws.String("123456789012"),
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(resources))
+	}
+
+	t.Run("email_confirmed_ID", func(t *testing.T) {
+		if resources[0].ID != "arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4" {
+			t.Errorf("ID: expected confirmed ARN, got %q", resources[0].ID)
+		}
+	})
+
+	t.Run("email_confirmed_Name", func(t *testing.T) {
+		if resources[0].Name != "user@example.com" {
+			t.Errorf("Name: expected %q, got %q", "user@example.com", resources[0].Name)
+		}
+	})
+
+	t.Run("email_confirmed_Fields", func(t *testing.T) {
+		r := resources[0]
+		if r.Fields["protocol"] != "email" {
+			t.Errorf("Fields[protocol]: expected %q, got %q", "email", r.Fields["protocol"])
+		}
+		if r.Fields["endpoint"] != "user@example.com" {
+			t.Errorf("Fields[endpoint]: expected %q, got %q", "user@example.com", r.Fields["endpoint"])
+		}
+		if r.Fields["owner"] != "123456789012" {
+			t.Errorf("Fields[owner]: expected %q, got %q", "123456789012", r.Fields["owner"])
+		}
+		if r.Fields["topic_arn"] != topicArn {
+			t.Errorf("Fields[topic_arn]: expected %q, got %q", topicArn, r.Fields["topic_arn"])
+		}
+		if r.Fields["subscription_arn"] != "arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4" {
+			t.Errorf("Fields[subscription_arn]: expected confirmed ARN, got %q", r.Fields["subscription_arn"])
+		}
+		if r.Fields["confirmation_status"] != "Confirmed" {
+			t.Errorf("Fields[confirmation_status]: expected %q, got %q", "Confirmed", r.Fields["confirmation_status"])
+		}
+	})
+
+	t.Run("email_confirmed_RawStruct", func(t *testing.T) {
+		r := resources[0]
+		if r.RawStruct == nil {
+			t.Fatal("RawStruct must not be nil")
+		}
+		raw, ok := r.RawStruct.(snstypes.Subscription)
+		if !ok {
+			t.Fatalf("RawStruct should be snstypes.Subscription, got %T", r.RawStruct)
+		}
+		if raw.Protocol == nil || *raw.Protocol != "email" {
+			t.Errorf("RawStruct.Protocol: expected %q", "email")
+		}
+	})
+
+	t.Run("https_confirmed_ID", func(t *testing.T) {
+		if resources[1].ID != "arn:aws:sns:us-east-1:123456789012:my-topic:e5f6g7h8" {
+			t.Errorf("ID: expected confirmed ARN, got %q", resources[1].ID)
+		}
+	})
+
+	t.Run("https_confirmed_Fields", func(t *testing.T) {
+		r := resources[1]
+		if r.Fields["protocol"] != "https" {
+			t.Errorf("Fields[protocol]: expected %q, got %q", "https", r.Fields["protocol"])
+		}
+		if r.Fields["endpoint"] != "https://api.example.com/webhook" {
+			t.Errorf("Fields[endpoint]: expected %q, got %q", "https://api.example.com/webhook", r.Fields["endpoint"])
+		}
+	})
+
+	t.Run("sqs_pending_confirmation_status", func(t *testing.T) {
+		r := resources[2]
+		if r.Fields["confirmation_status"] != "PendingConfirmation" {
+			t.Errorf("Fields[confirmation_status]: expected %q, got %q", "PendingConfirmation", r.Fields["confirmation_status"])
+		}
+	})
+}
+
+// TestFetchSNSTopicSubscriptions_Empty verifies that an empty response returns
+// an empty slice with no error.
+func TestFetchSNSTopicSubscriptions_Empty(t *testing.T) {
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				Subscriptions: []snstypes.Subscription{},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:empty-topic")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(resources))
+	}
+}
+
+// TestFetchSNSTopicSubscriptions_APIError verifies that API errors are
+// propagated correctly.
+func TestFetchSNSTopicSubscriptions_APIError(t *testing.T) {
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		err: fmt.Errorf("AWS API error: throttling exception"),
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:err-topic")
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(resources))
+	}
+}
+
+// TestFetchSNSTopicSubscriptions_NilOptionalFields verifies that a subscription
+// with nil Protocol, Endpoint, and Owner does not panic and produces empty
+// strings for those fields.
+func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:topic:sub-nil"),
+						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
+						// Protocol, Endpoint, Owner are all nil
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	r := resources[0]
+
+	t.Run("protocol_empty", func(t *testing.T) {
+		if r.Fields["protocol"] != "" {
+			t.Errorf("Fields[protocol]: expected empty, got %q", r.Fields["protocol"])
+		}
+	})
+
+	t.Run("endpoint_empty", func(t *testing.T) {
+		if r.Fields["endpoint"] != "" {
+			t.Errorf("Fields[endpoint]: expected empty, got %q", r.Fields["endpoint"])
+		}
+	})
+
+	t.Run("owner_empty", func(t *testing.T) {
+		if r.Fields["owner"] != "" {
+			t.Errorf("Fields[owner]: expected empty, got %q", r.Fields["owner"])
+		}
+	})
+}
+
+// TestFetchSNSTopicSubscriptions_ConfirmationStatus verifies the "Confirmed"
+// vs "PendingConfirmation" logic based on SubscriptionArn value.
+func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:topic:confirmed-sub"),
+						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("confirmed@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+					{
+						SubscriptionArn: aws.String("PendingConfirmation"),
+						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("pending@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+
+	t.Run("confirmed_sub_status", func(t *testing.T) {
+		if resources[0].Fields["confirmation_status"] != "Confirmed" {
+			t.Errorf("expected %q, got %q", "Confirmed", resources[0].Fields["confirmation_status"])
+		}
+	})
+
+	t.Run("pending_sub_status", func(t *testing.T) {
+		if resources[1].Fields["confirmation_status"] != "PendingConfirmation" {
+			t.Errorf("expected %q, got %q", "PendingConfirmation", resources[1].Fields["confirmation_status"])
+		}
+	})
+
+	t.Run("confirmed_sub_ID_is_ARN", func(t *testing.T) {
+		if resources[0].ID != "arn:aws:sns:us-east-1:123456789012:topic:confirmed-sub" {
+			t.Errorf("confirmed sub ID should be full ARN, got %q", resources[0].ID)
+		}
+	})
+}
+
+// TestFetchSNSTopicSubscriptions_Pagination verifies that paginated responses
+// via NextToken are followed and all subscriptions collected across pages.
+func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
+	topicArn := "arn:aws:sns:us-east-1:123456789012:paginated-topic"
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				NextToken: aws.String("page2-token"),
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:paginated-topic:sub-1"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("page1-user1@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:paginated-topic:sub-2"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("page1-user2@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+				},
+			},
+			{
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:paginated-topic:sub-3"),
+						TopicArn:        aws.String(topicArn),
+						Protocol:        aws.String("https"),
+						Endpoint:        aws.String("https://page2.example.com/webhook"),
+						Owner:           aws.String("123456789012"),
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	t.Run("total_count", func(t *testing.T) {
+		if len(resources) != 3 {
+			t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+		}
+	})
+
+	t.Run("page1_first_sub", func(t *testing.T) {
+		if resources[0].Name != "page1-user1@example.com" {
+			t.Errorf("resources[0].Name: expected %q, got %q", "page1-user1@example.com", resources[0].Name)
+		}
+	})
+
+	t.Run("page1_second_sub", func(t *testing.T) {
+		if resources[1].Name != "page1-user2@example.com" {
+			t.Errorf("resources[1].Name: expected %q, got %q", "page1-user2@example.com", resources[1].Name)
+		}
+	})
+
+	t.Run("page2_sub", func(t *testing.T) {
+		if resources[2].Name != "https://page2.example.com/webhook" {
+			t.Errorf("resources[2].Name: expected %q, got %q", "https://page2.example.com/webhook", resources[2].Name)
+		}
+	})
+
+	t.Run("api_called_twice", func(t *testing.T) {
+		if mock.callIdx != 2 {
+			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
+		}
+	})
+}
+
+// TestFetchSNSTopicSubscriptions_PendingIDFormat verifies that pending
+// subscriptions get an ID like "pending/Protocol/Endpoint" instead of the
+// literal "PendingConfirmation" string.
+func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
+	mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
+			{
+				Subscriptions: []snstypes.Subscription{
+					{
+						SubscriptionArn: aws.String("PendingConfirmation"),
+						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
+						Protocol:        aws.String("email"),
+						Endpoint:        aws.String("user@example.com"),
+						Owner:           aws.String("123456789012"),
+					},
+					{
+						SubscriptionArn: aws.String("PendingConfirmation"),
+						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
+						Protocol:        aws.String("sqs"),
+						Endpoint:        aws.String("arn:aws:sqs:us-east-1:123456789012:my-queue"),
+						Owner:           aws.String("123456789012"),
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+
+	t.Run("pending_email_ID", func(t *testing.T) {
+		expected := "pending/email/user@example.com"
+		if resources[0].ID != expected {
+			t.Errorf("pending email ID: expected %q, got %q", expected, resources[0].ID)
+		}
+	})
+
+	t.Run("pending_sqs_ID", func(t *testing.T) {
+		expected := "pending/sqs/arn:aws:sqs:us-east-1:123456789012:my-queue"
+		if resources[1].ID != expected {
+			t.Errorf("pending sqs ID: expected %q, got %q", expected, resources[1].ID)
+		}
+	})
+}
+
+// TestSnsSubscriptionColumns verifies that SnsSubscriptionColumns returns
+// the expected 4 columns with correct keys and widths.
+func TestSnsSubscriptionColumns(t *testing.T) {
+	cols := resource.SnsSubscriptionColumns()
+
+	expectedKeys := []string{"protocol", "endpoint", "confirmation_status", "owner"}
+	expectedWidths := []int{10, 48, 18, 14}
+
+	t.Run("column_count", func(t *testing.T) {
+		if len(cols) != 4 {
+			t.Fatalf("expected 4 columns, got %d", len(cols))
+		}
+	})
+
+	t.Run("column_keys", func(t *testing.T) {
+		for i, expected := range expectedKeys {
+			if cols[i].Key != expected {
+				t.Errorf("column[%d].Key: expected %q, got %q", i, expected, cols[i].Key)
+			}
+		}
+	})
+
+	t.Run("column_widths", func(t *testing.T) {
+		for i, expected := range expectedWidths {
+			if cols[i].Width != expected {
+				t.Errorf("column[%d].Width: expected %d, got %d", i, expected, cols[i].Width)
+			}
+		}
+	})
+
+	t.Run("columns_have_titles", func(t *testing.T) {
+		for i, col := range cols {
+			if col.Title == "" {
+				t.Errorf("column[%d] (%s) has empty Title", i, col.Key)
+			}
+		}
+	})
+
+	t.Run("columns_have_positive_width", func(t *testing.T) {
+		for i, col := range cols {
+			if col.Width <= 0 {
+				t.Errorf("column[%d] (%s) has non-positive Width: %d", i, col.Key, col.Width)
+			}
+		}
+	})
+
+	t.Run("columns_sortable", func(t *testing.T) {
+		for i, col := range cols {
+			if !col.Sortable {
+				t.Errorf("column[%d] (%s) should be sortable", i, col.Key)
+			}
+		}
+	})
+}
+
+// TestSnsSubscriptions_ChildTypeRegistered verifies that
+// resource.GetChildType("sns_subscriptions") returns a valid child type.
+func TestSnsSubscriptions_ChildTypeRegistered(t *testing.T) {
+	td := resource.GetChildType("sns_subscriptions")
+	if td == nil {
+		t.Fatal("sns_subscriptions child resource type not registered")
+	}
+	if td.Name == "" {
+		t.Error("child type Name should not be empty")
+	}
+	if td.ShortName != "sns_subscriptions" {
+		t.Errorf("child type ShortName: expected %q, got %q", "sns_subscriptions", td.ShortName)
+	}
+}
+
+// TestSnsSubscriptions_ChildFetcherRegistered verifies that
+// resource.GetChildFetcher("sns_subscriptions") is non-nil.
+func TestSnsSubscriptions_ChildFetcherRegistered(t *testing.T) {
+	f := resource.GetChildFetcher("sns_subscriptions")
+	if f == nil {
+		t.Fatal("sns_subscriptions child fetcher not registered")
+	}
+}
+
+// TestSnsSubscriptions_ParentHasChildDef verifies that the sns parent resource
+// type has a child view definition for sns_subscriptions with key "enter" and
+// ContextKeys containing {"topic_arn": "ID"}.
+func TestSnsSubscriptions_ParentHasChildDef(t *testing.T) {
+	rt := resource.FindResourceType("sns")
+	if rt == nil {
+		t.Fatal("sns resource type not found")
+	}
+
+	found := false
+	for _, child := range rt.Children {
+		if child.ChildType == "sns_subscriptions" {
+			found = true
+			if child.Key != "enter" {
+				t.Errorf("expected key %q, got %q", "enter", child.Key)
+			}
+			if child.ContextKeys["topic_arn"] != "ID" {
+				t.Errorf("ContextKeys[topic_arn]: expected %q, got %q", "ID", child.ContextKeys["topic_arn"])
+			}
+			if child.DisplayNameKey != "display_name" {
+				t.Errorf("DisplayNameKey: expected %q, got %q", "display_name", child.DisplayNameKey)
+			}
+		}
+	}
+	if !found {
+		t.Error("sns Children should contain sns_subscriptions child view def")
+	}
+}
+
+// TestSnsSubscriptions_CopyField verifies that the sns_subscriptions child
+// type has CopyField set to "endpoint".
+func TestSnsSubscriptions_CopyField(t *testing.T) {
+	td := resource.GetChildType("sns_subscriptions")
+	if td == nil {
+		t.Fatal("sns_subscriptions child type not found")
+	}
+	if td.CopyField != "endpoint" {
+		t.Errorf("CopyField: expected %q, got %q", "endpoint", td.CopyField)
+	}
+}
