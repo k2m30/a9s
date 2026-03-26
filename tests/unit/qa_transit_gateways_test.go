@@ -113,8 +113,8 @@ func TestQA_TransitGateways_TypeDef(t *testing.T) {
 		key   string
 		title string
 	}{
-		{"tgw_id", "TGW ID"},
 		{"name", "Name"},
+		{"tgw_id", "TGW ID"},
 		{"state", "State"},
 		{"owner_id", "Owner"},
 		{"description", "Description"},

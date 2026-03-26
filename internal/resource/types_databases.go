@@ -112,8 +112,8 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"efs", "file-systems"},
 			Category:  "DATABASES & STORAGE",
 			Columns: []Column{
-				{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
 				{Key: "life_cycle_state", Title: "State", Width: 12, Sortable: true},
 				{Key: "performance_mode", Title: "Perf Mode", Width: 16, Sortable: true},
 				{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},

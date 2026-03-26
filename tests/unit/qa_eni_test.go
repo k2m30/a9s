@@ -120,8 +120,8 @@ func TestQA_ENI_TypeDef(t *testing.T) {
 		key   string
 		title string
 	}{
-		{"eni_id", "ENI ID"},
 		{"name", "Name"},
+		{"eni_id", "ENI ID"},
 		{"status", "Status"},
 		{"type", "Type"},
 		{"vpc_id", "VPC ID"},

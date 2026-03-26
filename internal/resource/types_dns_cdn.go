@@ -8,8 +8,8 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"r53", "route53", "dns", "hosted-zones"},
 			Category:  "DNS & CDN",
 			Columns: []Column{
-				{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 				{Key: "name", Title: "Name", Width: 36, Sortable: true},
+				{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
 				{Key: "record_count", Title: "Records", Width: 9, Sortable: true},
 				{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 				{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
@@ -27,8 +27,8 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"cf", "cloudfront", "cdn"},
 			Category:  "DNS & CDN",
 			Columns: []Column{
-				{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
 				{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
+				{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 				{Key: "enabled", Title: "Enabled", Width: 9, Sortable: true},
 				{Key: "aliases", Title: "Aliases", Width: 30, Sortable: false},
@@ -54,8 +54,8 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"apigw", "apigateway", "api-gateway"},
 			Category:  "DNS & CDN",
 			Columns: []Column{
-				{Key: "api_id", Title: "API ID", Width: 14, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "api_id", Title: "API ID", Width: 14, Sortable: true},
 				{Key: "protocol", Title: "Protocol", Width: 12, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 50, Sortable: false},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},

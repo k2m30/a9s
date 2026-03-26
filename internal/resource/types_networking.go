@@ -48,8 +48,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"sg", "securitygroups", "security-groups"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
 				{Key: "group_name", Title: "Group Name", Width: 28, Sortable: true},
+				{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
@@ -60,8 +60,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"vpc", "vpcs"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
+				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "cidr_block", Title: "CIDR Block", Width: 18, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
@@ -73,8 +73,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"subnet", "subnets"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "subnet_id", Title: "Subnet ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "subnet_id", Title: "Subnet ID", Width: 26, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "cidr_block", Title: "CIDR Block", Width: 18, Sortable: true},
 				{Key: "availability_zone", Title: "AZ", Width: 14, Sortable: true},
@@ -88,8 +88,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"rtb", "routetables", "route-tables"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "route_table_id", Title: "Route Table ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "route_table_id", Title: "Route Table ID", Width: 26, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "routes_count", Title: "Routes", Width: 8, Sortable: true},
 				{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
@@ -101,8 +101,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"nat", "natgateways", "nat-gateways"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "nat_gateway_id", Title: "NAT Gateway ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
+				{Key: "nat_gateway_id", Title: "NAT Gateway ID", Width: 26, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "subnet_id", Title: "Subnet ID", Width: 26, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
@@ -115,8 +115,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"igw", "internetgateways", "internet-gateways"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "igw_id", Title: "IGW ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "igw_id", Title: "IGW ID", Width: 26, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
@@ -127,8 +127,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"eip", "elastic-ips", "elasticips"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "allocation_id", Title: "Allocation ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
+				{Key: "allocation_id", Title: "Allocation ID", Width: 26, Sortable: true},
 				{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: true},
 				{Key: "association_id", Title: "Association", Width: 26, Sortable: true},
 				{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},
@@ -141,8 +141,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"vpce", "vpc-endpoints", "vpcendpoints"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "vpce_id", Title: "Endpoint ID", Width: 26, Sortable: true},
 				{Key: "service_name", Title: "Service Name", Width: 40, Sortable: true},
+				{Key: "vpce_id", Title: "Endpoint ID", Width: 26, Sortable: true},
 				{Key: "type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
@@ -154,8 +154,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"tgw", "transit-gateways", "transitgateways"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "tgw_id", Title: "TGW ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
+				{Key: "tgw_id", Title: "TGW ID", Width: 26, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "owner_id", Title: "Owner", Width: 14, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
@@ -167,8 +167,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 			Aliases:   []string{"eni", "network-interfaces", "nis"},
 			Category:  "NETWORKING",
 			Columns: []Column{
-				{Key: "eni_id", Title: "ENI ID", Width: 26, Sortable: true},
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
+				{Key: "eni_id", Title: "ENI ID", Width: 26, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 				{Key: "type", Title: "Type", Width: 14, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},

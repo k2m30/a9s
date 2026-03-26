@@ -4,8 +4,8 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 	return map[string]ViewDef{
 		"r53": {
 			List: []ListColumn{
-				{Title: "Zone ID", Path: "Id", Width: 30},
 				{Title: "Name", Path: "Name", Width: 36},
+				{Title: "Zone ID", Path: "Id", Width: 30},
 				{Title: "Records", Path: "ResourceRecordSetCount", Width: 9},
 				{Title: "Private", Path: "Config.PrivateZone", Width: 9},
 				{Title: "Comment", Path: "Config.Comment", Width: 30},
@@ -17,8 +17,8 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		},
 		"cf": {
 			List: []ListColumn{
-				{Title: "Distribution ID", Path: "Id", Width: 16},
 				{Title: "Domain Name", Path: "DomainName", Width: 40},
+				{Title: "Distribution ID", Path: "Id", Width: 16},
 				{Title: "Status", Path: "Status", Width: 12},
 				{Title: "Enabled", Path: "Enabled", Width: 9},
 				{Title: "Aliases", Path: "Aliases.Items", Width: 30},
@@ -47,8 +47,8 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		},
 		"apigw": {
 			List: []ListColumn{
-				{Title: "API ID", Path: "ApiId", Width: 14},
 				{Title: "Name", Path: "Name", Width: 28},
+				{Title: "API ID", Path: "ApiId", Width: 14},
 				{Title: "Protocol", Path: "ProtocolType", Width: 12},
 				{Title: "Endpoint", Path: "ApiEndpoint", Width: 50},
 				{Title: "Description", Path: "Description", Width: 30},

@@ -116,8 +116,8 @@ func databasesDefaultViews() map[string]ViewDef {
 		},
 		"efs": {
 			List: []ListColumn{
-				{Title: "File System ID", Path: "FileSystemId", Width: 22},
 				{Title: "Name", Path: "Name", Width: 28},
+				{Title: "File System ID", Path: "FileSystemId", Width: 22},
 				{Title: "State", Path: "LifeCycleState", Width: 12},
 				{Title: "Perf Mode", Path: "PerformanceMode", Width: 16},
 				{Title: "Encrypted", Path: "Encrypted", Width: 10},
