@@ -468,6 +468,25 @@ func (m *mockSNSListTopicsClient) ListTopics(ctx context.Context, params *sns.Li
 	return m.output, m.err
 }
 
+// mockSNSListSubscriptionsByTopicClient supports paginated responses.
+type mockSNSListSubscriptionsByTopicClient struct {
+	outputs []*sns.ListSubscriptionsByTopicOutput
+	err     error
+	callIdx int
+}
+
+func (m *mockSNSListSubscriptionsByTopicClient) ListSubscriptionsByTopic(ctx context.Context, params *sns.ListSubscriptionsByTopicInput, optFns ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.callIdx >= len(m.outputs) {
+		return &sns.ListSubscriptionsByTopicOutput{}, nil
+	}
+	out := m.outputs[m.callIdx]
+	m.callIdx++
+	return out, nil
+}
+
 // ---------------------------------------------------------------------------
 // SQS mocks
 // ---------------------------------------------------------------------------

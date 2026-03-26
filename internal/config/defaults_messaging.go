@@ -85,6 +85,18 @@ func messagingDefaultViews() map[string]ViewDef {
 				"Name", "StateMachineArn", "Type", "CreationDate",
 			},
 		},
+		"sns_subscriptions": {
+			List: []ListColumn{
+				{Title: "Protocol", Key: "protocol", Width: 10},
+				{Title: "Endpoint", Key: "endpoint", Width: 48},
+				{Title: "Status", Key: "confirmation_status", Width: 18},
+				{Title: "Owner", Key: "owner", Width: 14},
+			},
+			Detail: []string{
+				"SubscriptionArn", "TopicArn", "Protocol",
+				"Endpoint", "Owner",
+			},
+		},
 		"sfn_execution_history": {
 			List: []ListColumn{
 				{Title: "Timestamp", Path: "Timestamp", Width: 22},

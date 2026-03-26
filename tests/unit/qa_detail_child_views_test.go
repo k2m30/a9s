@@ -16,6 +16,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
@@ -1390,5 +1391,61 @@ func TestDbiEventsDetailViewNilFields(t *testing.T) {
 	view := m.View()
 	if view == "" {
 		t.Error("DbiEvents detail should not be empty even with nil fields")
+	}
+}
+
+// ===========================================================================
+// SNS Topic Subscriptions (sns_subscriptions) detail view tests
+// ===========================================================================
+
+func TestSnsSubscriptionsDetailViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	sub := snstypes.Subscription{
+		SubscriptionArn: ptrString("arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4"),
+		TopicArn:        ptrString("arn:aws:sns:us-east-1:123456789012:my-topic"),
+		Protocol:        ptrString("email"),
+		Endpoint:        ptrString("user@example.com"),
+		Owner:           ptrString("123456789012"),
+	}
+	res := buildResource(
+		"arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4",
+		"user@example.com",
+		sub,
+	)
+	res.Fields = map[string]string{
+		"protocol":            "email",
+		"endpoint":            "user@example.com",
+		"confirmation_status": "Confirmed",
+		"owner":               "123456789012",
+		"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4",
+		"topic_arn":           "arn:aws:sns:us-east-1:123456789012:my-topic",
+	}
+	cfg := detailConfigForType("sns_subscriptions")
+	m := newDetailModel(res, "sns_subscriptions", cfg)
+
+	view := m.View()
+	// Detail view renders from RawStruct via fieldpath, so check fields that
+	// exist in the SDK struct (confirmation_status is computed, not in struct).
+	for _, expected := range []string{
+		"email",
+		"user@example.com",
+		"123456789012",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("SnsSubscriptions detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestSnsSubscriptionsDetailViewNilFields(t *testing.T) {
+	ensureNoColor(t)
+	sub := snstypes.Subscription{}
+	res := buildResource("empty-sns-sub", "empty-sns-sub", sub)
+	cfg := detailConfigForType("sns_subscriptions")
+	m := newDetailModel(res, "sns_subscriptions", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("SnsSubscriptions detail should not be empty even with nil fields")
 	}
 }

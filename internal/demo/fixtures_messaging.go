@@ -22,6 +22,10 @@ func init() {
 	demoData["msk"] = mskClusters
 	demoData["sfn"] = stepFunctions
 
+	RegisterChildDemo("sns_subscriptions", func(parentCtx map[string]string) []resource.Resource {
+		return snsTopicSubscriptionFixtures(parentCtx["topic_arn"])
+	})
+
 	RegisterChildDemo("sfn_executions", func(parentCtx map[string]string) []resource.Resource {
 		return sfnExecutionFixtures(parentCtx["state_machine_arn"])
 	})
@@ -891,6 +895,88 @@ func stepFunctions() []resource.Resource {
 				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:user-onboarding-flow"),
 				Type:            sfntypes.StateMachineTypeStandard,
 				CreationDate:    aws.Time(time.Date(2026, 1, 8, 16, 30, 0, 0, time.UTC)),
+			},
+		},
+	}
+}
+
+// snsTopicSubscriptionFixtures returns demo SNS subscriptions for a given topic ARN.
+func snsTopicSubscriptionFixtures(topicArn string) []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:   "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-email-001",
+			Name: "ops-team@acme.com",
+			Fields: map[string]string{
+				"protocol":            "email",
+				"endpoint":            "ops-team@acme.com",
+				"confirmation_status": "Confirmed",
+				"owner":               "123456789012",
+				"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-email-001",
+				"topic_arn":           topicArn,
+			},
+			RawStruct: snstypes.Subscription{
+				SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-email-001"),
+				TopicArn:        aws.String(topicArn),
+				Protocol:        aws.String("email"),
+				Endpoint:        aws.String("ops-team@acme.com"),
+				Owner:           aws.String("123456789012"),
+			},
+		},
+		{
+			ID:   "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002",
+			Name: "https://hooks.slack.com/services/T00/B00/xxx",
+			Fields: map[string]string{
+				"protocol":            "https",
+				"endpoint":            "https://hooks.slack.com/services/T00/B00/xxx",
+				"confirmation_status": "Confirmed",
+				"owner":               "123456789012",
+				"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002",
+				"topic_arn":           topicArn,
+			},
+			RawStruct: snstypes.Subscription{
+				SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002"),
+				TopicArn:        aws.String(topicArn),
+				Protocol:        aws.String("https"),
+				Endpoint:        aws.String("https://hooks.slack.com/services/T00/B00/xxx"),
+				Owner:           aws.String("123456789012"),
+			},
+		},
+		{
+			ID:   "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-sqs-003",
+			Name: "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
+			Fields: map[string]string{
+				"protocol":            "sqs",
+				"endpoint":            "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
+				"confirmation_status": "Confirmed",
+				"owner":               "123456789012",
+				"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-sqs-003",
+				"topic_arn":           topicArn,
+			},
+			RawStruct: snstypes.Subscription{
+				SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-sqs-003"),
+				TopicArn:        aws.String(topicArn),
+				Protocol:        aws.String("sqs"),
+				Endpoint:        aws.String("arn:aws:sqs:us-east-1:123456789012:order-processing-queue"),
+				Owner:           aws.String("123456789012"),
+			},
+		},
+		{
+			ID:   "pending/lambda/arn:aws:lambda:us-east-1:123456789012:function:process-notifications",
+			Name: "arn:aws:lambda:us-east-1:123456789012:function:process-notifications",
+			Fields: map[string]string{
+				"protocol":            "lambda",
+				"endpoint":            "arn:aws:lambda:us-east-1:123456789012:function:process-notifications",
+				"confirmation_status": "PendingConfirmation",
+				"owner":               "123456789012",
+				"subscription_arn":    "PendingConfirmation",
+				"topic_arn":           topicArn,
+			},
+			RawStruct: snstypes.Subscription{
+				SubscriptionArn: aws.String("PendingConfirmation"),
+				TopicArn:        aws.String(topicArn),
+				Protocol:        aws.String("lambda"),
+				Endpoint:        aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-notifications"),
+				Owner:           aws.String("123456789012"),
 			},
 		},
 	}

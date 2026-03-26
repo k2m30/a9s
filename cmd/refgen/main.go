@@ -97,6 +97,7 @@ func main() {
 		{"vpce", "ec2types.VpcEndpoint", reflect.TypeOf(ec2types.VpcEndpoint{})},
 		{"eni", "ec2types.NetworkInterface", reflect.TypeOf(ec2types.NetworkInterface{})},
 		{"sns-sub", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
+		{"sns_subscriptions", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
 		{"iam-user", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
 		{"iam-group", "iamtypes.Group", reflect.TypeOf(iamtypes.Group{})},
 		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeOf(docdbtypes.DBClusterSnapshot{})},
