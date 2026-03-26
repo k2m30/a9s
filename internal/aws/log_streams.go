@@ -15,12 +15,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("log_streams", []string{"stream_name", "last_event", "first_event"})
 
-	resource.RegisterChildFetcher("log_streams", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("log_streams", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLogStreams(ctx, c.CloudWatchLogs, parentCtx["log_group_name"])
+		return FetchLogStreams(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], continuationToken)
 	})
 	resource.RegisterChildType(resource.ResourceTypeDef{
 		Name:      "Log Streams",
@@ -41,11 +41,16 @@ func init() {
 const maxLogStreams = 500
 
 // FetchLogStreams calls the CloudWatchLogs DescribeLogStreams API for a given
-// log group and converts the response into a slice of generic Resource structs.
-// It paginates via NextToken, capped at maxLogStreams results.
-func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string) ([]resource.Resource, error) {
+// log group and converts the response into a FetchResult with pagination
+// support. Each call returns up to maxLogStreams (500) items. When the cap is
+// reached and more pages exist, FetchResult.Pagination.IsTruncated is set to
+// true with a NextToken for continuation.
+func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string, continuationToken string) (resource.FetchResult, error) {
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &cloudwatchlogs.DescribeLogStreamsInput{
@@ -57,20 +62,42 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 
 		output, err := api.DescribeLogStreams(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("fetching log streams: %w", err)
+			return resource.FetchResult{}, fmt.Errorf("fetching log streams: %w", err)
 		}
 
 		for _, s := range output.LogStreams {
 			resources = append(resources, convertLogStream(s))
 		}
 
-		if output.NextToken == nil || len(resources) >= maxLogStreams {
+		if len(resources) >= maxLogStreams {
+			apiNextToken := ""
+			if output.NextToken != nil {
+				apiNextToken = *output.NextToken
+			}
+			return resource.FetchResult{
+				Resources: resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: apiNextToken != "",
+					NextToken:   apiNextToken,
+					PageSize:    len(resources),
+				},
+			}, nil
+		}
+
+		if output.NextToken == nil {
 			break
 		}
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertLogStream converts a single CloudWatch LogStream into a generic Resource.

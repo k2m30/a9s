@@ -16,12 +16,12 @@ func init() {
 		"timestamp", "history_item_type", "history_summary",
 	})
 
-	resource.RegisterChildFetcher("alarm_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("alarm_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx)
+		return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -32,19 +32,25 @@ func init() {
 }
 
 // FetchAlarmHistory calls the CloudWatch DescribeAlarmHistory API and
-// converts the response into a slice of generic Resource structs. Pagination is
-// followed via NextToken, capped at 200 items.
+// converts the response into a FetchResult with pagination support. Each call
+// returns up to maxAlarmHistoryItems (200) items. When the cap is reached and
+// more pages exist, FetchResult.Pagination.IsTruncated is set to true with a
+// NextToken for continuation.
 func FetchAlarmHistory(
 	ctx context.Context,
 	api CloudWatchDescribeAlarmHistoryAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	const maxItems = 200
 
 	alarmName := parentCtx["alarm_name"]
 
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &cloudwatch.DescribeAlarmHistoryInput{
@@ -54,14 +60,25 @@ func FetchAlarmHistory(
 
 		output, err := api.DescribeAlarmHistory(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("describing alarm history for %s: %w", alarmName, err)
+			return resource.FetchResult{}, fmt.Errorf("describing alarm history for %s: %w", alarmName, err)
 		}
 
 		for _, item := range output.AlarmHistoryItems {
 			resources = append(resources, convertAlarmHistoryItem(item))
 
 			if len(resources) >= maxItems {
-				return resources, nil
+				apiNextToken := ""
+				if output.NextToken != nil {
+					apiNextToken = *output.NextToken
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextToken != "",
+						NextToken:   apiNextToken,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -71,7 +88,14 @@ func FetchAlarmHistory(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertAlarmHistoryItem converts a single CloudWatch AlarmHistoryItem into a generic Resource.

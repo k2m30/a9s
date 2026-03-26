@@ -45,7 +45,8 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 }
 
 // fetchChildResources returns a tea.Cmd that calls the appropriate child fetcher.
-// Uses the child fetcher registry to look up the fetcher by child type name.
+// It checks the paginated child registry first (passing empty continuation token
+// for the initial page), then falls back to the legacy child fetcher registry.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	if m.demoMode {
 		return m.fetchDemoChildResources(childType, parentCtx)
@@ -59,6 +60,24 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 			}
 		}
 
+		ctx := context.Background()
+		pc := resource.ParentContext(parentCtx)
+
+		// Try paginated child fetcher first (initial page with empty token).
+		pf := resource.GetPaginatedChildFetcher(childType)
+		if pf != nil {
+			result, err := pf(ctx, clients, pc, "")
+			if err != nil {
+				return messages.APIErrorMsg{ResourceType: childType, Err: err}
+			}
+			return messages.ResourcesLoadedMsg{
+				ResourceType: childType,
+				Resources:    result.Resources,
+				Pagination:   result.Pagination,
+			}
+		}
+
+		// Fall back to legacy (non-paginated) child fetcher.
 		fetcher := resource.GetChildFetcher(childType)
 		if fetcher == nil {
 			return messages.APIErrorMsg{
@@ -67,13 +86,80 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 			}
 		}
 
-		ctx := context.Background()
-		pc := resource.ParentContext(parentCtx)
 		resources, err := fetcher(ctx, clients, pc)
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: childType, Err: err}
 		}
 		return messages.ResourcesLoadedMsg{ResourceType: childType, Resources: resources}
+	}
+}
+
+// fetchMoreResources returns a tea.Cmd that fetches the next page of a paginated
+// resource list using the continuation token from LoadMoreMsg.
+func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
+	if m.demoMode {
+		// Demo mode doesn't support pagination — return empty append.
+		rt := msg.ResourceType
+		return func() tea.Msg {
+			return messages.ResourcesLoadedMsg{
+				ResourceType: rt,
+				Resources:    nil,
+				Pagination:   &resource.PaginationMeta{IsTruncated: false},
+				Append:       true,
+			}
+		}
+	}
+	clients := m.clients
+	rt := msg.ResourceType
+	token := msg.ContinuationToken
+	parentCtx := msg.ParentContext
+
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.APIErrorMsg{
+				ResourceType: rt,
+				Err:          fmt.Errorf("AWS clients not initialized"),
+			}
+		}
+		ctx := context.Background()
+
+		// Try paginated child fetcher first (for child views).
+		if len(parentCtx) > 0 {
+			pf := resource.GetPaginatedChildFetcher(rt)
+			if pf != nil {
+				pc := resource.ParentContext(parentCtx)
+				result, err := pf(ctx, clients, pc, token)
+				if err != nil {
+					return messages.APIErrorMsg{ResourceType: rt, Err: err}
+				}
+				return messages.ResourcesLoadedMsg{
+					ResourceType: rt,
+					Resources:    result.Resources,
+					Pagination:   result.Pagination,
+					Append:       true,
+				}
+			}
+		}
+
+		// Try paginated top-level fetcher.
+		pf := resource.GetPaginatedFetcher(rt)
+		if pf != nil {
+			result, err := pf(ctx, clients, token)
+			if err != nil {
+				return messages.APIErrorMsg{ResourceType: rt, Err: err}
+			}
+			return messages.ResourcesLoadedMsg{
+				ResourceType: rt,
+				Resources:    result.Resources,
+				Pagination:   result.Pagination,
+				Append:       true,
+			}
+		}
+
+		return messages.APIErrorMsg{
+			ResourceType: rt,
+			Err:          fmt.Errorf("no paginated fetcher for: %s", rt),
+		}
 	}
 }
 

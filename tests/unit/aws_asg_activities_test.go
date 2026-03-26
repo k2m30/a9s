@@ -51,20 +51,21 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 		"asg_name": "my-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_ActivityId", func(t *testing.T) {
 		if r.ID != "act-001" {
@@ -151,16 +152,17 @@ func TestFetchAsgActivities_Empty(t *testing.T) {
 		"asg_name": "empty-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -174,16 +176,17 @@ func TestFetchAsgActivities_APIError(t *testing.T) {
 		"asg_name": "err-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -213,28 +216,29 @@ func TestFetchAsgActivities_NilOptionalFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_Description", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["description"] != "" {
 			t.Logf("Fields[description] is %q (expected empty for nil)", r.Fields["description"])
 		}
 	})
 
 	t.Run("status_code_populated", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["status_code"] != "Successful" {
 			t.Errorf("Fields[status_code]: expected %q, got %q", "Successful", r.Fields["status_code"])
 		}
@@ -265,28 +269,29 @@ func TestFetchAsgActivities_NewlineStripping(t *testing.T) {
 		"asg_name": "nl-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("description_no_newlines", func(t *testing.T) {
-		desc := resources[0].Fields["description"]
+		desc := result.Resources[0].Fields["description"]
 		if strings.Contains(desc, "\n") || strings.Contains(desc, "\r") {
 			t.Errorf("Fields[description] should not contain newlines, got %q", desc)
 		}
 	})
 
 	t.Run("cause_no_newlines", func(t *testing.T) {
-		cause := resources[0].Fields["cause"]
+		cause := result.Resources[0].Fields["cause"]
 		if strings.Contains(cause, "\n") || strings.Contains(cause, "\r") {
 			t.Errorf("Fields[cause] should not contain newlines, got %q", cause)
 		}
@@ -316,20 +321,21 @@ func TestFetchAsgActivities_TimestampFormatting(t *testing.T) {
 		"asg_name": "ts-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	tsField := resources[0].Fields["start_time"]
+	tsField := result.Resources[0].Fields["start_time"]
 	if tsField != "2024-12-25 14:30:45" {
 		t.Errorf("Fields[start_time]: expected %q, got %q", "2024-12-25 14:30:45", tsField)
 	}
@@ -367,20 +373,21 @@ func TestFetchAsgActivities_RawStruct(t *testing.T) {
 		"asg_name": "raw-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
@@ -486,26 +493,27 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 		"asg_name": "paginated-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 5 {
+			t.Fatalf("expected 5 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
 	t.Run("page1_activities", func(t *testing.T) {
 		expectedIDs := []string{"act-p1-1", "act-p1-2", "act-p1-3"}
 		for i, expectedID := range expectedIDs {
-			if resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, resources[i].ID)
+			if result.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
 			}
 		}
 	})
@@ -513,8 +521,8 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 	t.Run("page2_activities", func(t *testing.T) {
 		expectedIDs := []string{"act-p2-1", "act-p2-2"}
 		for i, expectedID := range expectedIDs {
-			if resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, resources[i+3].ID)
+			if result.Resources[i+3].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, result.Resources[i+3].ID)
 			}
 		}
 	})
@@ -527,7 +535,7 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"start_time", "status_code", "description", "cause"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -570,18 +578,19 @@ func TestFetchAsgActivities_MaxActivitiesCap(t *testing.T) {
 		"asg_name": "big-asg",
 	}
 
-	resources, err := awsclient.FetchAsgActivities(
+	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxActivities cap), got %d", len(resources))
+		if len(result.Resources) != 200 {
+			t.Errorf("expected exactly 200 resources (maxActivities cap), got %d", len(result.Resources))
 		}
 	})
 
@@ -594,15 +603,15 @@ func TestFetchAsgActivities_MaxActivitiesCap(t *testing.T) {
 	})
 
 	t.Run("first_activity_correct", func(t *testing.T) {
-		if resources[0].ID != "act-p0-0" {
-			t.Errorf("first resource ID: expected %q, got %q", "act-p0-0", resources[0].ID)
+		if result.Resources[0].ID != "act-p0-0" {
+			t.Errorf("first resource ID: expected %q, got %q", "act-p0-0", result.Resources[0].ID)
 		}
 	})
 
 	t.Run("last_activity_correct", func(t *testing.T) {
 		// Last activity should be the 50th activity of page 3 (index 199 = page3, activity49)
-		if resources[199].ID != "act-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "act-p3-49", resources[199].ID)
+		if result.Resources[199].ID != "act-p3-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "act-p3-49", result.Resources[199].ID)
 		}
 	})
 }
@@ -660,13 +669,72 @@ func TestAsgActivities_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestAsgActivities_ChildFetcherRegistered verifies that the child fetcher is
+// TestAsgActivities_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestAsgActivities_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("asg_activities")
+func TestAsgActivities_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("asg_activities")
 	if f == nil {
-		t.Fatal("asg_activities child fetcher not registered")
+		t.Fatal("asg_activities paginated child fetcher not registered")
 	}
+}
+
+// TestFetchAsgActivities_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchAsgActivities_ContinuationToken(t *testing.T) {
+	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingAsgActivitiesMock{
+		inner: &mockASGDescribeScalingActivitiesClient{
+			output: &autoscaling.DescribeScalingActivitiesOutput{
+				Activities: []asgtypes.Activity{
+					{
+						ActivityId:           aws.String("act-token-001"),
+						AutoScalingGroupName: aws.String("my-asg"),
+						Cause:                aws.String("Manual scaling"),
+						StartTime:            &ts,
+						StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+					},
+				},
+			},
+		},
+	}
+
+	parentCtx := map[string]string{
+		"asg_name": "my-asg",
+	}
+
+	result, err := awsclient.FetchAsgActivities(
+		context.Background(),
+		wrapper,
+		parentCtx,
+		"my-continuation-token",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingAsgActivitiesMock wraps the ASG activities mock to capture NextToken.
+type tokenCapturingAsgActivitiesMock struct {
+	inner             *mockASGDescribeScalingActivitiesClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingAsgActivitiesMock) DescribeScalingActivities(ctx context.Context, params *autoscaling.DescribeScalingActivitiesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeScalingActivitiesOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.DescribeScalingActivities(ctx, params, optFns...)
 }
 
 // TestAsgActivities_ParentHasChildDef verifies that the parent asg resource

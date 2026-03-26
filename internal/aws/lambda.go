@@ -23,72 +23,82 @@ func init() {
 // FetchLambdaFunctions calls the Lambda ListFunctions API and converts the
 // response into a slice of generic Resource structs.
 func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]resource.Resource, error) {
-	output, err := api.ListFunctions(ctx, &lambda.ListFunctionsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Lambda functions: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, fn := range output.Functions {
-		functionName := ""
-		if fn.FunctionName != nil {
-			functionName = *fn.FunctionName
+	for {
+		output, err := api.ListFunctions(ctx, &lambda.ListFunctionsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Lambda functions: %w", err)
 		}
 
-		runtime := string(fn.Runtime)
+		for _, fn := range output.Functions {
+			functionName := ""
+			if fn.FunctionName != nil {
+				functionName = *fn.FunctionName
+			}
 
-		memory := ""
-		if fn.MemorySize != nil {
-			memory = fmt.Sprintf("%d", *fn.MemorySize)
+			runtime := string(fn.Runtime)
+
+			memory := ""
+			if fn.MemorySize != nil {
+				memory = fmt.Sprintf("%d", *fn.MemorySize)
+			}
+
+			timeout := ""
+			if fn.Timeout != nil {
+				timeout = fmt.Sprintf("%d", *fn.Timeout)
+			}
+
+			handler := ""
+			if fn.Handler != nil {
+				handler = *fn.Handler
+			}
+
+			lastModified := ""
+			if fn.LastModified != nil {
+				lastModified = *fn.LastModified
+			}
+
+			codeSize := ""
+			if fn.CodeSize != 0 {
+				codeSize = formatBytes(fn.CodeSize)
+			}
+
+			logGroup := "/aws/lambda/" + functionName
+			if fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {
+				logGroup = *fn.LoggingConfig.LogGroup
+			}
+
+			packageType := string(fn.PackageType)
+
+			r := resource.Resource{
+				ID:     functionName,
+				Name:   functionName,
+				Status: runtime,
+				Fields: map[string]string{
+					"function_name": functionName,
+					"runtime":       runtime,
+					"memory":        memory,
+					"timeout":       timeout,
+					"handler":       handler,
+					"last_modified": lastModified,
+					"code_size":     codeSize,
+					"log_group":     logGroup,
+					"package_type":  packageType,
+				},
+				RawStruct: fn,
+			}
+
+			resources = append(resources, r)
 		}
 
-		timeout := ""
-		if fn.Timeout != nil {
-			timeout = fmt.Sprintf("%d", *fn.Timeout)
+		if output.NextMarker == nil {
+			break
 		}
-
-		handler := ""
-		if fn.Handler != nil {
-			handler = *fn.Handler
-		}
-
-		lastModified := ""
-		if fn.LastModified != nil {
-			lastModified = *fn.LastModified
-		}
-
-		codeSize := ""
-		if fn.CodeSize != 0 {
-			codeSize = formatBytes(fn.CodeSize)
-		}
-
-		logGroup := "/aws/lambda/" + functionName
-		if fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {
-			logGroup = *fn.LoggingConfig.LogGroup
-		}
-
-		packageType := string(fn.PackageType)
-
-		r := resource.Resource{
-			ID:     functionName,
-			Name:   functionName,
-			Status: runtime,
-			Fields: map[string]string{
-				"function_name": functionName,
-				"runtime":       runtime,
-				"memory":        memory,
-				"timeout":       timeout,
-				"handler":       handler,
-				"last_modified": lastModified,
-				"code_size":     codeSize,
-				"log_group":     logGroup,
-				"package_type":  packageType,
-			},
-			RawStruct: fn,
-		}
-
-		resources = append(resources, r)
+		marker = output.NextMarker
 	}
 
 	return resources, nil

@@ -47,10 +47,13 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -131,10 +134,13 @@ func TestFetchLogStreams_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/empty")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/empty", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
@@ -146,10 +152,13 @@ func TestFetchLogStreams_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/err")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/err", "",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
+
+		resources := result.Resources
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d", len(resources))
 	}
@@ -190,10 +199,13 @@ func TestFetchLogStreams_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/paginated")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/paginated", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 3 {
@@ -245,10 +257,13 @@ func TestFetchLogStreams_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/ts")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/ts", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -288,10 +303,13 @@ func TestFetchLogStreams_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/nil")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/nil", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -339,10 +357,13 @@ func TestFetchLogStreams_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/test")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/test", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -435,10 +456,13 @@ func TestFetchLogStreams_MaxResults(t *testing.T) {
 	}
 
 	mock := &mockCWLogsDescribeLogStreamsClient{outputs: outputs}
-	resources, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/huge-group")
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/huge-group", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	// Should cap at a reasonable limit (e.g., 500) instead of loading all 1000
 	if len(resources) > 500 {
@@ -449,4 +473,51 @@ func TestFetchLogStreams_MaxResults(t *testing.T) {
 	if len(resources) < 50 {
 		t.Errorf("expected at least 50 resources, got %d", len(resources))
 	}
+}
+
+// TestFetchLogStreams_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchLogStreams_ContinuationToken(t *testing.T) {
+	wrapper := &tokenCapturingLogStreamsMock{
+		inner: &mockCWLogsDescribeLogStreamsClient{
+			outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
+				{
+					LogStreams: []cwlogstypes.LogStream{
+						{
+							LogStreamName:      aws.String("stream-from-token"),
+							LastEventTimestamp: aws.Int64(1711152000000),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLogStreams(context.Background(), wrapper, "/aws/lambda/my-func", "my-continuation-token",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingLogStreamsMock wraps the log streams mock to capture NextToken.
+type tokenCapturingLogStreamsMock struct {
+	inner             *mockCWLogsDescribeLogStreamsClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingLogStreamsMock) DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.DescribeLogStreams(ctx, params, optFns...)
 }

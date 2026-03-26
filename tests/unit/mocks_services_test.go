@@ -986,13 +986,15 @@ func (m *mockELBv2DescribeListenersClient) DescribeListeners(ctx context.Context
 // It supports pagination via the outputs slice with callIdx counter.
 // For backward compatibility, if outputs is nil it falls back to the single output field.
 type mockSFNListExecutionsClient struct {
-	output  *sfn.ListExecutionsOutput
-	outputs []*sfn.ListExecutionsOutput
-	err     error
-	callIdx int
+	output    *sfn.ListExecutionsOutput
+	outputs   []*sfn.ListExecutionsOutput
+	err       error
+	callIdx   int
+	lastInput *sfn.ListExecutionsInput
 }
 
 func (m *mockSFNListExecutionsClient) ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error) {
+	m.lastInput = params
 	if m.err != nil {
 		return nil, m.err
 	}

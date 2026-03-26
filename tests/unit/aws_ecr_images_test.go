@@ -71,20 +71,21 @@ func TestFetchECRImages_Basic(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_digest", func(t *testing.T) {
 		if r.ID != "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" {
@@ -194,16 +195,17 @@ func TestFetchECRImages_Empty(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/empty-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -218,19 +220,20 @@ func TestFetchECRImages_Error(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/error-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 	if !strings.Contains(err.Error(), "access denied") {
 		t.Errorf("error should contain 'access denied', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -258,44 +261,45 @@ func TestFetchECRImages_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_ImageDigest", func(t *testing.T) {
-		_ = resources[0].ID
+		_ = result.Resources[0].ID
 	})
 
 	t.Run("nil_ImageSizeInBytes", func(t *testing.T) {
-		if resources[0].Fields["image_size"] != "" {
-			t.Logf("Fields[image_size] is %q (expected empty for nil)", resources[0].Fields["image_size"])
+		if result.Resources[0].Fields["image_size"] != "" {
+			t.Logf("Fields[image_size] is %q (expected empty for nil)", result.Resources[0].Fields["image_size"])
 		}
 	})
 
 	t.Run("nil_ImageScanStatus", func(t *testing.T) {
-		if resources[0].Fields["scan_status"] != "" {
-			t.Logf("Fields[scan_status] is %q (expected empty for nil)", resources[0].Fields["scan_status"])
+		if result.Resources[0].Fields["scan_status"] != "" {
+			t.Logf("Fields[scan_status] is %q (expected empty for nil)", result.Resources[0].Fields["scan_status"])
 		}
 	})
 
 	t.Run("nil_ImagePushedAt", func(t *testing.T) {
-		if resources[0].Fields["pushed_at"] != "" {
-			t.Logf("Fields[pushed_at] is %q (expected empty for nil)", resources[0].Fields["pushed_at"])
+		if result.Resources[0].Fields["pushed_at"] != "" {
+			t.Logf("Fields[pushed_at] is %q (expected empty for nil)", result.Resources[0].Fields["pushed_at"])
 		}
 	})
 
 	t.Run("nil_FindingsSummary", func(t *testing.T) {
-		if resources[0].Fields["finding_counts"] != "" {
-			t.Logf("Fields[finding_counts] is %q (expected empty for nil)", resources[0].Fields["finding_counts"])
+		if result.Resources[0].Fields["finding_counts"] != "" {
+			t.Logf("Fields[finding_counts] is %q (expected empty for nil)", result.Resources[0].Fields["finding_counts"])
 		}
 	})
 }
@@ -325,20 +329,21 @@ func TestFetchECRImages_UntaggedImage(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("image_tags_untagged", func(t *testing.T) {
 		if r.Fields["image_tags"] != "<untagged>" {
@@ -378,20 +383,21 @@ func TestFetchECRImages_DigestShort(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	short := resources[0].Fields["digest_short"]
+	short := result.Resources[0].Fields["digest_short"]
 	if short != "abcdef123456" {
 		t.Errorf("Fields[digest_short]: expected %q, got %q", "abcdef123456", short)
 	}
@@ -431,20 +437,21 @@ func TestFetchECRImages_FindingCounts(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	fc := resources[0].Fields["finding_counts"]
+	fc := result.Resources[0].Fields["finding_counts"]
 	if !strings.Contains(fc, "1C") {
 		t.Errorf("Fields[finding_counts]: expected to contain '1C', got %q", fc)
 	}
@@ -479,22 +486,23 @@ func TestFetchECRImages_FindingCountsNil(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	if resources[0].Fields["finding_counts"] != "" {
+	if result.Resources[0].Fields["finding_counts"] != "" {
 		t.Errorf("Fields[finding_counts] should be empty with no scan summary, got %q",
-			resources[0].Fields["finding_counts"])
+			result.Resources[0].Fields["finding_counts"])
 	}
 }
 
@@ -535,20 +543,21 @@ func TestFetchECRImages_SizeFormatting(t *testing.T) {
 				"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 			}
 
-			resources, err := awsclient.FetchECRImages(
+			result, err := awsclient.FetchECRImages(
 				context.Background(),
 				mock,
 				parentCtx,
-			)
+							"",
+)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
 
-			if len(resources) != 1 {
-				t.Fatalf("expected 1 resource, got %d", len(resources))
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 
-			size := resources[0].Fields["image_size"]
+			size := result.Resources[0].Fields["image_size"]
 			// Accept both "KB"/"MB"/"GB" and "KiB"/"MiB"/"GiB" formats
 			if !strings.Contains(size, tc.contains) && !strings.Contains(size, strings.Replace(tc.contains, "B", "iB", 1)) {
 				t.Errorf("Fields[image_size]: expected to contain %q or %q, got %q",
@@ -602,18 +611,19 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 3 {
+			t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
@@ -655,21 +665,22 @@ func TestFetchECRImages_ImageURI(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(resources))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("tagged_uri", func(t *testing.T) {
-		uri := resources[0].Fields["image_uri"]
+		uri := result.Resources[0].Fields["image_uri"]
 		expected := "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest"
 		if uri != expected {
 			t.Errorf("Fields[image_uri] for tagged: expected %q, got %q", expected, uri)
@@ -677,7 +688,7 @@ func TestFetchECRImages_ImageURI(t *testing.T) {
 	})
 
 	t.Run("untagged_uri", func(t *testing.T) {
-		uri := resources[1].Fields["image_uri"]
+		uri := result.Resources[1].Fields["image_uri"]
 		expected := "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo@sha256:bbbbbb1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 		if uri != expected {
 			t.Errorf("Fields[image_uri] for untagged: expected %q, got %q", expected, uri)
@@ -770,21 +781,22 @@ func TestFetchECRImages_StatusMapping(t *testing.T) {
 				"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 			}
 
-			resources, err := awsclient.FetchECRImages(
+			result, err := awsclient.FetchECRImages(
 				context.Background(),
 				mock,
 				parentCtx,
-			)
+							"",
+)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
 
-			if len(resources) != 1 {
-				t.Fatalf("expected 1 resource, got %d", len(resources))
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 
-			if resources[0].Status != tc.expectedStatus {
-				t.Errorf("Status: expected %q, got %q", tc.expectedStatus, resources[0].Status)
+			if result.Resources[0].Status != tc.expectedStatus {
+				t.Errorf("Status: expected %q, got %q", tc.expectedStatus, result.Resources[0].Status)
 			}
 		})
 	}
@@ -808,7 +820,8 @@ func TestFetchECRImages_ParentContext(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -840,22 +853,23 @@ func TestFetchECRImages_RawStruct(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	resources, err := awsclient.FetchECRImages(
+	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
 		parentCtx,
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	raw, ok := resources[0].RawStruct.(ecrtypes.ImageDetail)
+	raw, ok := result.Resources[0].RawStruct.(ecrtypes.ImageDetail)
 	if !ok {
-		t.Fatalf("RawStruct should be ecrtypes.ImageDetail, got %T", resources[0].RawStruct)
+		t.Fatalf("RawStruct should be ecrtypes.ImageDetail, got %T", result.Resources[0].RawStruct)
 	}
 	if raw.ImageDigest == nil || *raw.ImageDigest != "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" {
 		t.Error("RawStruct.ImageDigest not preserved correctly")
@@ -940,12 +954,13 @@ func TestECRImageColumns(t *testing.T) {
 	})
 }
 
-// TestECRImages_ChildFetcherRegistered verifies that the child fetcher is
+// TestECRImages_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestECRImages_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("ecr_images")
+func TestECRImages_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("ecr_images")
 	if f == nil {
-		t.Fatal("ecr_images child fetcher not registered")
+		t.Fatal("ecr_images paginated child fetcher not registered")
 	}
 }
 
@@ -1007,6 +1022,60 @@ func TestConfigDefaultViewDef_ECRImages(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestFetchECRImages_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchECRImages_ContinuationToken(t *testing.T) {
+	pushedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingECRImagesMock{
+		inner: &mockECRDescribeImagesClient{
+			pages: []*ecr.DescribeImagesOutput{
+				{
+					ImageDetails: []ecrtypes.ImageDetail{
+						{
+							ImageDigest:   aws.String("sha256:abc123def456"),
+							ImageTags:     []string{"latest"},
+							ImagePushedAt: &pushedAt,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	parentCtx := map[string]string{
+		"repository_name": "my-repo",
+		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
+	}
+
+	result, err := awsclient.FetchECRImages(context.Background(), wrapper, parentCtx, "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingECRImagesMock wraps the ECR images mock to capture NextToken.
+type tokenCapturingECRImagesMock struct {
+	inner             *mockECRDescribeImagesClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingECRImagesMock) DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.DescribeImages(ctx, params, optFns...)
 }
 
 // Ensure all imports are used.

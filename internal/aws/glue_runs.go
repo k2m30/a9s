@@ -21,12 +21,12 @@ func init() {
 		"run_id", "job_name",
 	})
 
-	resource.RegisterChildFetcher("glue_runs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("glue_runs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"])
+		return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -38,15 +38,21 @@ func init() {
 }
 
 // FetchGlueJobRuns calls the Glue GetJobRuns API and converts the response
-// into a slice of generic Resource structs. Pagination is followed via
-// NextToken, capped at maxGlueJobRuns (200) items.
+// into a FetchResult with pagination support. Each call returns up to
+// maxGlueJobRuns (200) items. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
+// continuation.
 func FetchGlueJobRuns(
 	ctx context.Context,
 	api GlueGetJobRunsAPI,
 	jobName string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &glue.GetJobRunsInput{
@@ -56,14 +62,25 @@ func FetchGlueJobRuns(
 
 		output, err := api.GetJobRuns(ctx, input)
 		if err != nil {
-			return nil, err
+			return resource.FetchResult{}, err
 		}
 
 		for _, run := range output.JobRuns {
 			resources = append(resources, convertGlueJobRun(run))
 
 			if len(resources) >= maxGlueJobRuns {
-				return resources, nil
+				apiNextToken := ""
+				if output.NextToken != nil {
+					apiNextToken = *output.NextToken
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextToken != "",
+						NextToken:   apiNextToken,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -73,7 +90,14 @@ func FetchGlueJobRuns(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertGlueJobRun converts a single Glue JobRun into a generic Resource.

@@ -47,6 +47,9 @@ type Map struct {
 	PageUp   key.Binding
 	PageDown key.Binding
 
+	// Paginated fetch
+	LoadMore key.Binding
+
 	// Detail / YAML
 	ToggleWrap key.Binding
 }
@@ -89,6 +92,8 @@ func Default() Map {
 
 		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up")),
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down")),
+
+		LoadMore: key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "load more")),
 
 		ToggleWrap: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap")),
 	}

@@ -18,12 +18,12 @@ func init() {
 		"source_identifier", "source_type", "source_arn",
 	})
 
-	resource.RegisterChildFetcher("dbi_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("dbi_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"])
+		return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -35,13 +35,18 @@ func init() {
 }
 
 // FetchRDSEvents calls the RDS DescribeEvents API for a specific DB instance
-// and converts the response into a slice of generic Resource structs.
-// It paginates via Marker and caps collection at 200 events.
-func FetchRDSEvents(ctx context.Context, api RDSDescribeEventsAPI, dbIdentifier string) ([]resource.Resource, error) {
+// and converts the response into a FetchResult with pagination support. Each
+// call returns up to 200 events. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken (Marker)
+// for continuation.
+func FetchRDSEvents(ctx context.Context, api RDSDescribeEventsAPI, dbIdentifier string, continuationToken string) (resource.FetchResult, error) {
 	const maxEvents = 200
 
 	var resources []resource.Resource
 	var marker *string
+	if continuationToken != "" {
+		marker = &continuationToken
+	}
 
 	for {
 		input := &rds.DescribeEventsInput{
@@ -53,26 +58,42 @@ func FetchRDSEvents(ctx context.Context, api RDSDescribeEventsAPI, dbIdentifier 
 
 		output, err := api.DescribeEvents(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("fetching RDS events for %s: %w", dbIdentifier, err)
+			return resource.FetchResult{}, fmt.Errorf("fetching RDS events for %s: %w", dbIdentifier, err)
 		}
 
 		for _, event := range output.Events {
-			if len(resources) >= maxEvents {
-				return resources, nil
-			}
 			resources = append(resources, convertRDSEvent(event))
+
+			if len(resources) >= maxEvents {
+				apiMarker := ""
+				if output.Marker != nil && *output.Marker != "" {
+					apiMarker = *output.Marker
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiMarker != "",
+						NextToken:   apiMarker,
+						PageSize:    len(resources),
+					},
+				}, nil
+			}
 		}
 
 		if output.Marker == nil || *output.Marker == "" {
 			break
 		}
-		if len(resources) >= maxEvents {
-			break
-		}
 		marker = output.Marker
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertRDSEvent converts a single RDS Event into a generic Resource.

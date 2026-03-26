@@ -32,6 +32,15 @@ type PopViewMsg struct{}
 type ResourcesLoadedMsg struct {
 	ResourceType string
 	Resources    []resource.Resource
+	Pagination   *resource.PaginationMeta // nil for legacy fetchers
+	Append       bool                     // true = append to existing list
+}
+
+// LoadMoreMsg triggers loading the next page of a paginated resource list.
+type LoadMoreMsg struct {
+	ResourceType      string
+	ContinuationToken string
+	ParentContext     map[string]string // non-nil for child views
 }
 
 // APIErrorMsg is sent when an AWS API call fails.

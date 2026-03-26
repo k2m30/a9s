@@ -43,20 +43,21 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"etl-daily-load",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("ID_is_full_run_id", func(t *testing.T) {
 		if r.ID != "jr_abc12345-6789-0abc-def0-123456789012" {
@@ -160,16 +161,17 @@ func TestFetchGlueJobRuns_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"empty-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -179,19 +181,20 @@ func TestFetchGlueJobRuns_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"error-job",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 	if !strings.Contains(err.Error(), "access denied") {
 		t.Errorf("error should contain 'access denied', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -210,51 +213,52 @@ func TestFetchGlueJobRuns_NilOptionalFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"nil-fields-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
 	t.Run("nil_Id", func(t *testing.T) {
 		// ID may be empty; just ensure no panic occurred
-		_ = resources[0].ID
+		_ = result.Resources[0].ID
 	})
 
 	t.Run("nil_StartedOn", func(t *testing.T) {
-		if resources[0].Fields["started_on"] != "" {
-			t.Logf("Fields[started_on] is %q (expected empty for nil)", resources[0].Fields["started_on"])
+		if result.Resources[0].Fields["started_on"] != "" {
+			t.Logf("Fields[started_on] is %q (expected empty for nil)", result.Resources[0].Fields["started_on"])
 		}
 	})
 
 	t.Run("nil_ErrorMessage", func(t *testing.T) {
-		if resources[0].Fields["error_message"] != "" {
-			t.Logf("Fields[error_message] is %q (expected empty for nil)", resources[0].Fields["error_message"])
+		if result.Resources[0].Fields["error_message"] != "" {
+			t.Logf("Fields[error_message] is %q (expected empty for nil)", result.Resources[0].Fields["error_message"])
 		}
 	})
 
 	t.Run("nil_DPUSeconds", func(t *testing.T) {
-		if resources[0].Fields["dpu_hours"] != "" {
-			t.Logf("Fields[dpu_hours] is %q (expected empty for nil)", resources[0].Fields["dpu_hours"])
+		if result.Resources[0].Fields["dpu_hours"] != "" {
+			t.Logf("Fields[dpu_hours] is %q (expected empty for nil)", result.Resources[0].Fields["dpu_hours"])
 		}
 	})
 
 	t.Run("nil_JobName", func(t *testing.T) {
-		if resources[0].Fields["job_name"] != "" {
-			t.Logf("Fields[job_name] is %q (expected empty for nil)", resources[0].Fields["job_name"])
+		if result.Resources[0].Fields["job_name"] != "" {
+			t.Logf("Fields[job_name] is %q (expected empty for nil)", result.Resources[0].Fields["job_name"])
 		}
 	})
 
 	t.Run("status_populated", func(t *testing.T) {
-		if resources[0].Status != "RUNNING" {
-			t.Errorf("Status: expected %q, got %q", "RUNNING", resources[0].Status)
+		if result.Resources[0].Status != "RUNNING" {
+			t.Errorf("Status: expected %q, got %q", "RUNNING", result.Resources[0].Status)
 		}
 	})
 }
@@ -282,28 +286,29 @@ func TestFetchGlueJobRuns_ComputedRunIDShort(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"truncation-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(resources))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("long_id_truncated_to_8", func(t *testing.T) {
-		if resources[0].Fields["run_id_short"] != "jr_abc12" {
-			t.Errorf("Fields[run_id_short]: expected %q, got %q", "jr_abc12", resources[0].Fields["run_id_short"])
+		if result.Resources[0].Fields["run_id_short"] != "jr_abc12" {
+			t.Errorf("Fields[run_id_short]: expected %q, got %q", "jr_abc12", result.Resources[0].Fields["run_id_short"])
 		}
 	})
 
 	t.Run("short_id_unchanged", func(t *testing.T) {
-		if resources[1].Fields["run_id_short"] != "short" {
-			t.Errorf("Fields[run_id_short]: expected %q, got %q", "short", resources[1].Fields["run_id_short"])
+		if result.Resources[1].Fields["run_id_short"] != "short" {
+			t.Errorf("Fields[run_id_short]: expected %q, got %q", "short", result.Resources[1].Fields["run_id_short"])
 		}
 	})
 }
@@ -340,35 +345,36 @@ func TestFetchGlueJobRuns_ExecutionTimeHuman(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"duration-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("2843s_is_47m_23s", func(t *testing.T) {
-		dur := resources[0].Fields["execution_time_human"]
+		dur := result.Resources[0].Fields["execution_time_human"]
 		if dur != "47m 23s" {
 			t.Errorf("Fields[execution_time_human]: expected %q, got %q", "47m 23s", dur)
 		}
 	})
 
 	t.Run("7200s_is_2h_0m", func(t *testing.T) {
-		dur := resources[1].Fields["execution_time_human"]
+		dur := result.Resources[1].Fields["execution_time_human"]
 		if dur != "2h 0m" {
 			t.Errorf("Fields[execution_time_human]: expected %q, got %q", "2h 0m", dur)
 		}
 	})
 
 	t.Run("0s_is_empty", func(t *testing.T) {
-		dur := resources[2].Fields["execution_time_human"]
+		dur := result.Resources[2].Fields["execution_time_human"]
 		if dur != "" {
 			t.Errorf("Fields[execution_time_human]: expected empty for 0s, got %q", dur)
 		}
@@ -409,34 +415,35 @@ func TestFetchGlueJobRuns_DPUHours(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"dpu-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("45000_dpu_seconds_is_12.5_hours", func(t *testing.T) {
-		if resources[0].Fields["dpu_hours"] != "12.5" {
-			t.Errorf("Fields[dpu_hours]: expected %q, got %q", "12.5", resources[0].Fields["dpu_hours"])
+		if result.Resources[0].Fields["dpu_hours"] != "12.5" {
+			t.Errorf("Fields[dpu_hours]: expected %q, got %q", "12.5", result.Resources[0].Fields["dpu_hours"])
 		}
 	})
 
 	t.Run("zero_dpu_seconds_is_empty", func(t *testing.T) {
-		if resources[1].Fields["dpu_hours"] != "" {
-			t.Errorf("Fields[dpu_hours]: expected empty for 0.0, got %q", resources[1].Fields["dpu_hours"])
+		if result.Resources[1].Fields["dpu_hours"] != "" {
+			t.Errorf("Fields[dpu_hours]: expected empty for 0.0, got %q", result.Resources[1].Fields["dpu_hours"])
 		}
 	})
 
 	t.Run("nil_dpu_seconds_is_empty", func(t *testing.T) {
-		if resources[2].Fields["dpu_hours"] != "" {
-			t.Errorf("Fields[dpu_hours]: expected empty for nil, got %q", resources[2].Fields["dpu_hours"])
+		if result.Resources[2].Fields["dpu_hours"] != "" {
+			t.Errorf("Fields[dpu_hours]: expected empty for nil, got %q", result.Resources[2].Fields["dpu_hours"])
 		}
 	})
 }
@@ -459,20 +466,21 @@ func TestFetchGlueJobRuns_ErrorMessageNewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"error-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	errMsg := resources[0].Fields["error_message"]
+	errMsg := result.Resources[0].Fields["error_message"]
 	if strings.Contains(errMsg, "\n") {
 		t.Errorf("error_message should not contain newlines, got %q", errMsg)
 	}
@@ -519,33 +527,34 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"paginated-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+		if len(result.Resources) != 3 {
+			t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
 		}
 	})
 
 	t.Run("page1_runs", func(t *testing.T) {
 		expectedIDs := []string{"run-p1-1", "run-p1-2"}
 		for i, expectedID := range expectedIDs {
-			if resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, resources[i].ID)
+			if result.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
 			}
 		}
 	})
 
 	t.Run("page2_runs", func(t *testing.T) {
-		if resources[2].ID != "run-p2-1" {
-			t.Errorf("resources[2].ID: expected %q, got %q", "run-p2-1", resources[2].ID)
+		if result.Resources[2].ID != "run-p2-1" {
+			t.Errorf("resources[2].ID: expected %q, got %q", "run-p2-1", result.Resources[2].ID)
 		}
 	})
 
@@ -556,7 +565,7 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 	})
 
 	t.Run("all_have_status", func(t *testing.T) {
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			if r.Status == "" {
 				t.Errorf("resources[%d].Status should not be empty", i)
 			}
@@ -591,18 +600,19 @@ func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 
 	mock := &mockGlueGetJobRunsClient{outputs: outputs}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"capped-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxRuns cap), got %d", len(resources))
+		if len(result.Resources) != 200 {
+			t.Errorf("expected exactly 200 resources (maxRuns cap), got %d", len(result.Resources))
 		}
 	})
 
@@ -615,15 +625,15 @@ func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 	})
 
 	t.Run("first_run_correct", func(t *testing.T) {
-		if resources[0].ID != "run-p0-0" {
-			t.Errorf("first resource ID: expected %q, got %q", "run-p0-0", resources[0].ID)
+		if result.Resources[0].ID != "run-p0-0" {
+			t.Errorf("first resource ID: expected %q, got %q", "run-p0-0", result.Resources[0].ID)
 		}
 	})
 
 	t.Run("last_run_correct", func(t *testing.T) {
 		// Last run should be the 50th of page 3 (index 199 = page3, item49)
-		if resources[199].ID != "run-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "run-p3-49", resources[199].ID)
+		if result.Resources[199].ID != "run-p3-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "run-p3-49", result.Resources[199].ID)
 		}
 	})
 }
@@ -646,22 +656,23 @@ func TestFetchGlueJobRuns_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobRuns(
+	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"raw-job",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	raw, ok := resources[0].RawStruct.(gluetypes.JobRun)
+	raw, ok := result.Resources[0].RawStruct.(gluetypes.JobRun)
 	if !ok {
-		t.Fatalf("RawStruct should be gluetypes.JobRun, got %T", resources[0].RawStruct)
+		t.Fatalf("RawStruct should be gluetypes.JobRun, got %T", result.Resources[0].RawStruct)
 	}
 	if raw.Id == nil || *raw.Id != "raw-run-123" {
 		t.Error("RawStruct.Id not preserved correctly")
@@ -773,12 +784,13 @@ func TestGlueRuns_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestGlueRuns_ChildFetcherRegistered verifies that the child fetcher is
+// TestGlueRuns_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestGlueRuns_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("glue_runs")
+func TestGlueRuns_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("glue_runs")
 	if f == nil {
-		t.Fatal("glue_runs child fetcher not registered")
+		t.Fatal("glue_runs paginated child fetcher not registered")
 	}
 }
 
@@ -843,6 +855,54 @@ func TestConfigDefaultViewDef_GlueRuns(t *testing.T) {
 			t.Error("expected non-empty Detail paths for glue_runs")
 		}
 	})
+}
+
+// TestFetchGlueJobRuns_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchGlueJobRuns_ContinuationToken(t *testing.T) {
+	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingGlueRunsMock{
+		inner: &mockGlueGetJobRunsClient{
+			output: &glue.GetJobRunsOutput{
+				JobRuns: []gluetypes.JobRun{
+					{
+						Id:          aws.String("jr_from_token"),
+						JobName:     aws.String("my-job"),
+						JobRunState: gluetypes.JobRunStateSucceeded,
+						StartedOn:   &startTs,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchGlueJobRuns(context.Background(), wrapper, "my-job", "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingGlueRunsMock wraps the glue runs mock to capture NextToken.
+type tokenCapturingGlueRunsMock struct {
+	inner             *mockGlueGetJobRunsClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingGlueRunsMock) GetJobRuns(ctx context.Context, params *glue.GetJobRunsInput, optFns ...func(*glue.Options)) (*glue.GetJobRunsOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.GetJobRuns(ctx, params, optFns...)
 }
 
 // Ensure all imports are used.

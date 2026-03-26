@@ -23,14 +23,18 @@ func init() {
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching CloudWatch log groups: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, lg := range output.LogGroups {
+	for {
+		output, err := api.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching CloudWatch log groups: %w", err)
+		}
+
+		for _, lg := range output.LogGroups {
 		logGroupName := ""
 		if lg.LogGroupName != nil {
 			logGroupName = *lg.LogGroupName
@@ -65,6 +69,12 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -24,16 +24,19 @@ func init() {
 // FetchIAMPolicies calls the IAM ListPolicies API with Scope=Local
 // to return only customer-managed policies.
 func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.Resource, error) {
-	output, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
-		Scope: iamtypes.PolicyScopeTypeLocal,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fetching IAM policies: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, policy := range output.Policies {
+	for {
+		output, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
+			Scope:  iamtypes.PolicyScopeTypeLocal,
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching IAM policies: %w", err)
+		}
+
+		for _, policy := range output.Policies {
 		policyName := ""
 		if policy.PolicyName != nil {
 			policyName = *policy.PolicyName
@@ -74,6 +77,12 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 		}
 
 		resources = append(resources, r)
+		}
+
+		if !output.IsTruncated {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

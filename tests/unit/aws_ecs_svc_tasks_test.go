@@ -66,23 +66,24 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(resources))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("task_0_task_id_short", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		// task_id_short should be the last segment of the task ARN
 		if r.Fields["task_id_short"] != "abc123def456" {
 			t.Errorf("Fields[task_id_short]: expected %q, got %q", "abc123def456", r.Fields["task_id_short"])
@@ -90,21 +91,21 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	})
 
 	t.Run("task_0_status", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["status"] != "RUNNING" {
 			t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
 		}
 	})
 
 	t.Run("task_0_health", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["health"] != "HEALTHY" {
 			t.Errorf("Fields[health]: expected %q, got %q", "HEALTHY", r.Fields["health"])
 		}
 	})
 
 	t.Run("task_0_task_def_short", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		// task_def_short should be "family:revision" extracted from TaskDefinitionArn
 		if r.Fields["task_def_short"] != "web-app:5" {
 			t.Errorf("Fields[task_def_short]: expected %q, got %q", "web-app:5", r.Fields["task_def_short"])
@@ -112,14 +113,14 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	})
 
 	t.Run("task_0_started_at", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.Fields["started_at"] == "" {
 			t.Error("Fields[started_at] should not be empty")
 		}
 	})
 
 	t.Run("task_0_stopped_reason", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		// Running task should have empty stopped_reason
 		if r.Fields["stopped_reason"] != "" {
 			t.Errorf("Fields[stopped_reason]: expected empty for running task, got %q", r.Fields["stopped_reason"])
@@ -127,13 +128,13 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	})
 
 	t.Run("task_0_ID", func(t *testing.T) {
-		if resources[0].ID == "" {
+		if result.Resources[0].ID == "" {
 			t.Error("ID should not be empty")
 		}
 	})
 
 	t.Run("task_0_RawStruct", func(t *testing.T) {
-		r := resources[0]
+		r := result.Resources[0]
 		if r.RawStruct == nil {
 			t.Fatal("RawStruct must not be nil")
 		}
@@ -149,7 +150,7 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	// Verify required fields on all tasks
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"task_id_short", "status", "health", "task_def_short", "started_at", "stopped_reason"}
-		for i, r := range resources {
+		for i, r := range result.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -204,37 +205,38 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(resources))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
 	t.Run("running_task_status", func(t *testing.T) {
-		if resources[0].Status != "RUNNING" {
-			t.Errorf("Status: expected %q, got %q", "RUNNING", resources[0].Status)
+		if result.Resources[0].Status != "RUNNING" {
+			t.Errorf("Status: expected %q, got %q", "RUNNING", result.Resources[0].Status)
 		}
 	})
 
 	t.Run("stopped_task_status", func(t *testing.T) {
-		if resources[1].Status != "STOPPED" {
-			t.Errorf("Status: expected %q, got %q", "STOPPED", resources[1].Status)
+		if result.Resources[1].Status != "STOPPED" {
+			t.Errorf("Status: expected %q, got %q", "STOPPED", result.Resources[1].Status)
 		}
 	})
 
 	t.Run("stopped_task_reason", func(t *testing.T) {
-		if resources[1].Fields["stopped_reason"] != "Essential container in task exited" {
+		if result.Resources[1].Fields["stopped_reason"] != "Essential container in task exited" {
 			t.Errorf("Fields[stopped_reason]: expected %q, got %q",
-				"Essential container in task exited", resources[1].Fields["stopped_reason"])
+				"Essential container in task exited", result.Resources[1].Fields["stopped_reason"])
 		}
 	})
 }
@@ -251,18 +253,19 @@ func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 
 	describeTasksMock := &mockECSDescribeTasksClient{}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"empty-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -274,18 +277,19 @@ func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 
 	describeTasksMock := &mockECSDescribeTasksClient{}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -305,18 +309,19 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: internal server error"),
 	}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
-	)
+			"",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if result.Resources != nil {
+		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -348,22 +353,23 @@ func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster",
 		"my-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("task_id_short_extracts_last_segment", func(t *testing.T) {
 		if r.Fields["task_id_short"] != "a1b2c3d4e5f6" {
@@ -402,22 +408,23 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nil-cluster",
 		"nil-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
 		// If we got here, no panic occurred
@@ -478,22 +485,23 @@ func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcTasks(
+	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/raw-cluster",
 		"web-service",
-	)
+			"",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	r := resources[0]
+	r := result.Resources[0]
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
@@ -651,13 +659,14 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 
 	describeMock := &mockBatchingDescribeTasksClient{allTasks: allTasks}
 
-	results, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service")
+	results, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service", "",
+)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(results) != 150 {
-		t.Errorf("expected 150 tasks, got %d", len(results))
+	if len(results.Resources) != 150 {
+		t.Errorf("expected 150 tasks, got %d", len(results.Resources))
 	}
 
 	// Should have called DescribeTasks twice: 100 + 50
@@ -672,12 +681,13 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 	}
 }
 
-// TestEcsSvcTasks_ChildFetcherRegistered verifies that the child fetcher is
+// TestEcsSvcTasks_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is
 // registered under the correct short name.
-func TestEcsSvcTasks_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("ecs_tasks")
+func TestEcsSvcTasks_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("ecs_tasks")
 	if f == nil {
-		t.Fatal("ecs_tasks child fetcher not registered")
+		t.Fatal("ecs_tasks paginated child fetcher not registered")
 	}
 }
 
@@ -707,4 +717,75 @@ func TestEcsSvcTasks_ParentHasChildDef(t *testing.T) {
 	if !found {
 		t.Error("ecs-svc Children should contain ecs_tasks child view def")
 	}
+}
+
+// TestFetchEcsSvcTasks_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the ListTasks API as NextToken.
+func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
+	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
+
+	wrapper := &tokenCapturingECSListTasksMock{
+		inner: &mockECSListTasksClient{
+			outputs: map[string]*ecs.ListTasksOutput{
+				"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster": {
+					TaskArns: []string{
+						"arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456",
+					},
+				},
+			},
+		},
+	}
+
+	describeMock := &mockECSDescribeTasksClient{
+		output: &ecs.DescribeTasksOutput{
+			Tasks: []ecstypes.Task{
+				{
+					TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+					LastStatus:        aws.String("RUNNING"),
+					HealthStatus:      ecstypes.HealthStatusHealthy,
+					TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web:5"),
+					StartedAt:         &startedAt,
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchEcsSvcTasks(
+		context.Background(),
+		wrapper,
+		describeMock,
+		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
+		"my-service",
+		"my-continuation-token",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in ListTasks call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingECSListTasksMock wraps the ECS ListTasks mock to capture NextToken
+// from the first call only.
+type tokenCapturingECSListTasksMock struct {
+	inner             *mockECSListTasksClient
+	capturedNextToken *string
+	callCount         int
+}
+
+func (m *tokenCapturingECSListTasksMock) ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+	if m.callCount == 0 {
+		m.capturedNextToken = params.NextToken
+	}
+	m.callCount++
+	return m.inner.ListTasks(ctx, params, optFns...)
 }

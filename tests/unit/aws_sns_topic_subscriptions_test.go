@@ -52,10 +52,13 @@ func TestFetchSNSTopicSubscriptions_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -144,10 +147,13 @@ func TestFetchSNSTopicSubscriptions_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:empty-topic")
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:empty-topic", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
@@ -160,10 +166,13 @@ func TestFetchSNSTopicSubscriptions_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:err-topic")
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:err-topic", "",
+)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
+
+		resources := result.Resources
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d", len(resources))
 	}
@@ -187,10 +196,13 @@ func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -243,10 +255,13 @@ func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -310,10 +325,13 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 3 {
@@ -373,10 +391,13 @@ func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic")
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
+)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+		resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -468,11 +489,11 @@ func TestSnsSubscriptions_ChildTypeRegistered(t *testing.T) {
 }
 
 // TestSnsSubscriptions_ChildFetcherRegistered verifies that
-// resource.GetChildFetcher("sns_subscriptions") is non-nil.
-func TestSnsSubscriptions_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("sns_subscriptions")
+// resource.GetPaginatedChildFetcher("sns_subscriptions") is non-nil.
+func TestSnsSubscriptions_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("sns_subscriptions")
 	if f == nil {
-		t.Fatal("sns_subscriptions child fetcher not registered")
+		t.Fatal("sns_subscriptions paginated child fetcher not registered")
 	}
 }
 
@@ -515,4 +536,52 @@ func TestSnsSubscriptions_CopyField(t *testing.T) {
 	if td.CopyField != "endpoint" {
 		t.Errorf("CopyField: expected %q, got %q", "endpoint", td.CopyField)
 	}
+}
+
+// TestFetchSNSTopicSubscriptions_ContinuationToken verifies that a non-empty
+// continuation token is forwarded to the API as NextToken.
+func TestFetchSNSTopicSubscriptions_ContinuationToken(t *testing.T) {
+	wrapper := &tokenCapturingSNSSubsMock{
+		inner: &mockSNSListSubscriptionsByTopicClient{
+			outputs: []*sns.ListSubscriptionsByTopicOutput{
+				{
+					Subscriptions: []snstypes.Subscription{
+						{
+							Protocol:        aws.String("email"),
+							Endpoint:        aws.String("user@example.com"),
+							SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:topic:sub-id"),
+							TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:my-topic"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), wrapper, "arn:aws:sns:us-east-1:123456789012:my-topic", "my-continuation-token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	if wrapper.capturedNextToken == nil {
+		t.Fatal("expected NextToken to be set in API call")
+	}
+	if *wrapper.capturedNextToken != "my-continuation-token" {
+		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	}
+}
+
+// tokenCapturingSNSSubsMock wraps the SNS subscriptions mock to capture NextToken.
+type tokenCapturingSNSSubsMock struct {
+	inner             *mockSNSListSubscriptionsByTopicClient
+	capturedNextToken *string
+}
+
+func (m *tokenCapturingSNSSubsMock) ListSubscriptionsByTopic(ctx context.Context, params *sns.ListSubscriptionsByTopicInput, optFns ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
+	m.capturedNextToken = params.NextToken
+	return m.inner.ListSubscriptionsByTopic(ctx, params, optFns...)
 }

@@ -23,81 +23,91 @@ func init() {
 // FetchEC2Instances calls the EC2 DescribeInstances API and converts the
 // response into a slice of generic Resource structs.
 func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeInstances(ctx, &ec2.DescribeInstancesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching EC2 instances: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, reservation := range output.Reservations {
-		for _, inst := range reservation.Instances {
-			// Extract instance ID
-			instanceID := ""
-			if inst.InstanceId != nil {
-				instanceID = *inst.InstanceId
-			}
-
-			// Extract Name tag
-			name := ""
-			for _, tag := range inst.Tags {
-				if tag.Key != nil && *tag.Key == "Name" {
-					if tag.Value != nil {
-						name = *tag.Value
-					}
-					break
-				}
-			}
-
-			// Extract state
-			state := string(inst.State.Name)
-
-			// Extract instance type
-			instanceType := string(inst.InstanceType)
-
-			// Extract private IP
-			privateIP := ""
-			if inst.PrivateIpAddress != nil {
-				privateIP = *inst.PrivateIpAddress
-			}
-
-			// Extract public IP (may be nil)
-			publicIP := ""
-			if inst.PublicIpAddress != nil {
-				publicIP = *inst.PublicIpAddress
-			}
-
-			// Format launch time
-			launchTime := ""
-			if inst.LaunchTime != nil {
-				launchTime = inst.LaunchTime.Format("2006-01-02T15:04:05Z07:00")
-			}
-
-			// Extract lifecycle (on-demand if empty)
-			lifecycle := "on-demand"
-			if inst.InstanceLifecycle != "" {
-				lifecycle = string(inst.InstanceLifecycle)
-			}
-
-			r := resource.Resource{
-				ID:     instanceID,
-				Name:   name,
-				Status: state,
-				Fields: map[string]string{
-					"instance_id": instanceID,
-					"name":        name,
-					"state":       state,
-					"type":        instanceType,
-					"private_ip":  privateIP,
-					"public_ip":   publicIP,
-					"launch_time": launchTime,
-					"lifecycle":   lifecycle,
-				},
-				RawStruct: inst,
-			}
-
-			resources = append(resources, r)
+	for {
+		output, err := api.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching EC2 instances: %w", err)
 		}
+
+		for _, reservation := range output.Reservations {
+			for _, inst := range reservation.Instances {
+				// Extract instance ID
+				instanceID := ""
+				if inst.InstanceId != nil {
+					instanceID = *inst.InstanceId
+				}
+
+				// Extract Name tag
+				name := ""
+				for _, tag := range inst.Tags {
+					if tag.Key != nil && *tag.Key == "Name" {
+						if tag.Value != nil {
+							name = *tag.Value
+						}
+						break
+					}
+				}
+
+				// Extract state
+				state := string(inst.State.Name)
+
+				// Extract instance type
+				instanceType := string(inst.InstanceType)
+
+				// Extract private IP
+				privateIP := ""
+				if inst.PrivateIpAddress != nil {
+					privateIP = *inst.PrivateIpAddress
+				}
+
+				// Extract public IP (may be nil)
+				publicIP := ""
+				if inst.PublicIpAddress != nil {
+					publicIP = *inst.PublicIpAddress
+				}
+
+				// Format launch time
+				launchTime := ""
+				if inst.LaunchTime != nil {
+					launchTime = inst.LaunchTime.Format("2006-01-02T15:04:05Z07:00")
+				}
+
+				// Extract lifecycle (on-demand if empty)
+				lifecycle := "on-demand"
+				if inst.InstanceLifecycle != "" {
+					lifecycle = string(inst.InstanceLifecycle)
+				}
+
+				r := resource.Resource{
+					ID:     instanceID,
+					Name:   name,
+					Status: state,
+					Fields: map[string]string{
+						"instance_id": instanceID,
+						"name":        name,
+						"state":       state,
+						"type":        instanceType,
+						"private_ip":  privateIP,
+						"public_ip":   publicIP,
+						"launch_time": launchTime,
+						"lifecycle":   lifecycle,
+					},
+					RawStruct: inst,
+				}
+
+				resources = append(resources, r)
+			}
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

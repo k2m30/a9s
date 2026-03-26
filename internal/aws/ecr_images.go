@@ -21,12 +21,12 @@ func init() {
 		"repository_name",
 	})
 
-	resource.RegisterChildFetcher("ecr_images", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("ecr_images", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchECRImages(ctx, c.ECR, parentCtx)
+		return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -38,14 +38,19 @@ func init() {
 }
 
 // FetchECRImages calls the ECR DescribeImages API with pagination and converts
-// the response into a slice of generic Resource structs sorted by push time
-// (newest first).
-func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map[string]string) ([]resource.Resource, error) {
+// the response into a FetchResult with pagination support. Each call returns
+// up to maxECRImages (500) items sorted by push time (newest first). When the
+// cap is reached and more pages exist, FetchResult.Pagination.IsTruncated is
+// set to true with a NextToken for continuation.
+func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map[string]string, continuationToken string) (resource.FetchResult, error) {
 	repositoryName := parentCtx["repository_name"]
 	repositoryURI := parentCtx["repository_uri"]
 
 	var allImages []ecrtypes.ImageDetail
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &ecr.DescribeImagesInput{
@@ -55,14 +60,39 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 
 		output, err := api.DescribeImages(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("describing images for %s: %w", repositoryName, err)
+			return resource.FetchResult{}, fmt.Errorf("describing images for %s: %w", repositoryName, err)
 		}
 
 		allImages = append(allImages, output.ImageDetails...)
 
 		if len(allImages) >= maxECRImages {
 			allImages = allImages[:maxECRImages]
-			break
+			apiNextToken := ""
+			if output.NextToken != nil {
+				apiNextToken = *output.NextToken
+			}
+			// Sort by ImagePushedAt descending (newest first)
+			sort.Slice(allImages, func(i, j int) bool {
+				if allImages[i].ImagePushedAt == nil {
+					return false
+				}
+				if allImages[j].ImagePushedAt == nil {
+					return true
+				}
+				return allImages[i].ImagePushedAt.After(*allImages[j].ImagePushedAt)
+			})
+			resources := make([]resource.Resource, 0, len(allImages))
+			for _, img := range allImages {
+				resources = append(resources, convertECRImage(img, repositoryURI, repositoryName))
+			}
+			return resource.FetchResult{
+				Resources: resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: apiNextToken != "",
+					NextToken:   apiNextToken,
+					PageSize:    len(resources),
+				},
+			}, nil
 		}
 
 		if output.NextToken == nil {
@@ -72,7 +102,14 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 	}
 
 	if len(allImages) == 0 {
-		return []resource.Resource{}, nil
+		return resource.FetchResult{
+			Resources: []resource.Resource{},
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				TotalHint:   0,
+				PageSize:    0,
+			},
+		}, nil
 	}
 
 	// Sort by ImagePushedAt descending (newest first)
@@ -91,7 +128,14 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 		resources = append(resources, convertECRImage(img, repositoryURI, repositoryName))
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertECRImage converts a single ecrtypes.ImageDetail into a generic Resource.

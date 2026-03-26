@@ -15,12 +15,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ecs_svc_logs", []string{"timestamp", "stream_short", "message"})
 
-	resource.RegisterChildFetcher("ecs_svc_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("ecs_svc_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"])
+		return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -36,23 +36,25 @@ const maxLogEvents = 200
 // FetchEcsSvcLogs is a cross-service child fetcher. It first calls
 // DescribeTaskDefinition to extract the awslogs-group and awslogs-stream-prefix
 // from the task definition's first container, then calls FilterLogEvents to
-// retrieve recent log lines.
+// retrieve recent log lines. Returns a FetchResult with pagination support.
+// Each call returns up to maxLogEvents (200) items.
 func FetchEcsSvcLogs(
 	ctx context.Context,
 	taskDefAPI ECSDescribeTaskDefinitionAPI,
 	cwLogsAPI CWLogsFilterLogEventsAPI,
 	cluster, serviceName, taskDefinition string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	// Step 1: DescribeTaskDefinition to get log configuration
 	tdOutput, err := taskDefAPI.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &taskDefinition,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("describing task definition for %s: %w", serviceName, err)
+		return resource.FetchResult{}, fmt.Errorf("describing task definition for %s: %w", serviceName, err)
 	}
 
 	if tdOutput.TaskDefinition == nil || len(tdOutput.TaskDefinition.ContainerDefinitions) == 0 {
-		return nil, fmt.Errorf("no containers in task definition for %s", serviceName)
+		return resource.FetchResult{}, fmt.Errorf("no containers in task definition for %s", serviceName)
 	}
 
 	// Find the first container with awslogs driver
@@ -72,12 +74,15 @@ func FetchEcsSvcLogs(
 	}
 
 	if !found {
-		return nil, fmt.Errorf("no container with awslogs log driver in task definition for %s", serviceName)
+		return resource.FetchResult{}, fmt.Errorf("no container with awslogs log driver in task definition for %s", serviceName)
 	}
 
 	// Step 2: FilterLogEvents on the extracted log group
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &cloudwatchlogs.FilterLogEventsInput{
@@ -87,7 +92,7 @@ func FetchEcsSvcLogs(
 
 		output, err := cwLogsAPI.FilterLogEvents(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
+			return resource.FetchResult{}, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
 		}
 
 		for _, event := range output.Events {
@@ -130,13 +135,35 @@ func FetchEcsSvcLogs(
 			resources = append(resources, r)
 		}
 
-		if output.NextToken == nil || len(resources) >= maxLogEvents {
+		if len(resources) >= maxLogEvents {
+			apiNextToken := ""
+			if output.NextToken != nil {
+				apiNextToken = *output.NextToken
+			}
+			return resource.FetchResult{
+				Resources: resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: apiNextToken != "",
+					NextToken:   apiNextToken,
+					PageSize:    len(resources),
+				},
+			}, nil
+		}
+
+		if output.NextToken == nil {
 			break
 		}
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // computeStreamShort extracts "container/short-task-id" from a log stream name

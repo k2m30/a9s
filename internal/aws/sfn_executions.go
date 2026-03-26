@@ -21,12 +21,12 @@ func init() {
 		"redrive_count", "redrive_date",
 	})
 
-	resource.RegisterChildFetcher("sfn_executions", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("sfn_executions", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSFNExecutions(ctx, c.SFN, parentCtx)
+		return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -44,17 +44,23 @@ func init() {
 }
 
 // FetchSFNExecutions calls the SFN ListExecutions API and converts the
-// response into a slice of generic Resource structs. Pagination is followed
-// via NextToken, capped at maxSFNExecutions (200) items.
+// response into a FetchResult with pagination support. Each call returns
+// up to maxSFNExecutions (200) items. When the cap is reached and more
+// pages exist, FetchResult.Pagination.IsTruncated is set to true with
+// a NextToken for continuation.
 func FetchSFNExecutions(
 	ctx context.Context,
 	api SFNListExecutionsAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	smArn := parentCtx["state_machine_arn"]
 
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &sfn.ListExecutionsInput{
@@ -64,14 +70,26 @@ func FetchSFNExecutions(
 
 		output, err := api.ListExecutions(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("listing executions for %s: %w", smArn, err)
+			return resource.FetchResult{}, fmt.Errorf("listing executions for %s: %w", smArn, err)
 		}
 
 		for _, item := range output.Executions {
 			resources = append(resources, convertSFNExecution(item))
 
 			if len(resources) >= maxSFNExecutions {
-				return resources, nil
+				// Cap reached — check if more pages exist
+				apiNextToken := ""
+				if output.NextToken != nil {
+					apiNextToken = *output.NextToken
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextToken != "",
+						NextToken:   apiNextToken,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -81,7 +99,14 @@ func FetchSFNExecutions(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertSFNExecution converts a single SFN ExecutionListItem into a generic Resource.

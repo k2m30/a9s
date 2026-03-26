@@ -32,6 +32,9 @@ type ResourceListModel struct {
 	parentContext map[string]string // context from parent view for child fetchers
 	displayName   string           // custom display name for frame title
 
+	pagination  *resource.PaginationMeta // nil = unpaginated
+	loadingMore bool                      // true while fetching next page
+
 	loading bool
 	spinner spinner.Model
 
@@ -90,7 +93,13 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.ResourcesLoadedMsg:
 		m.loading = false
-		m.allResources = msg.Resources
+		m.loadingMore = false
+		if msg.Append {
+			m.allResources = append(m.allResources, msg.Resources...)
+		} else {
+			m.allResources = msg.Resources
+		}
+		m.pagination = msg.Pagination
 		m.applyFilter()
 		m.rowTextCache = nil
 		m.styledRowCache = nil
@@ -223,6 +232,20 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			if r := m.SelectedResource(); r != nil {
 				if updated, cmd := m.handleChildKey("s", r); cmd != nil {
 					return updated, cmd
+				}
+			}
+		case key.Matches(msg, m.keys.LoadMore):
+			if m.pagination != nil && m.pagination.IsTruncated && !m.loadingMore {
+				m.loadingMore = true
+				rt := m.typeDef.ShortName
+				token := m.pagination.NextToken
+				pc := m.parentContext
+				return m, func() tea.Msg {
+					return messages.LoadMoreMsg{
+						ResourceType:      rt,
+						ContinuationToken: token,
+						ParentContext:     pc,
+					}
 				}
 			}
 		}
@@ -448,9 +471,13 @@ func (m *ResourceListModel) ClearLoading() {
 	m.loading = false
 }
 
-// FrameTitle returns e.g. "ec2-instances(42)" or "ec2-instances(3/42)" when filtered.
+// FrameTitle returns e.g. "ec2(42)" or "ec2(3/42)" when filtered.
 // For child views with a display name, shows that name instead of the short name.
 // During loading, returns just the name without count.
+// When pagination indicates truncation:
+//   - "ec2(200+)"             — truncated, no filter
+//   - "ec2(200+ loading...)"  — truncated, loadingMore in progress
+//   - "ec2(15/200+)"          — truncated, filter active
 func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
 	if m.displayName != "" {
@@ -459,12 +486,24 @@ func (m ResourceListModel) FrameTitle() string {
 	if m.loading {
 		return name
 	}
+
 	total := len(m.allResources)
 	filtered := len(m.filteredResources)
-	if m.filterText != "" && filtered != total {
-		return name + "(" + itoa(filtered) + "/" + itoa(total) + ")"
+	truncated := m.pagination != nil && m.pagination.IsTruncated
+
+	totalStr := itoa(total)
+	if truncated {
+		totalStr = itoa(total) + "+"
 	}
-	return name + "(" + itoa(total) + ")"
+
+	if m.loadingMore {
+		return name + "(" + totalStr + " loading...)"
+	}
+
+	if m.filterText != "" && filtered != total {
+		return name + "(" + itoa(filtered) + "/" + totalStr + ")"
+	}
+	return name + "(" + totalStr + ")"
 }
 
 // applyFilter filters allResources into filteredResources.
