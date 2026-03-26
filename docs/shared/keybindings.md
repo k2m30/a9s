@@ -21,10 +21,13 @@
 | `y` | YAML view |
 | `x` | Reveal (expand) |
 | `c` | Copy resource ID to clipboard |
+| `i` | IAM identity view |
 | `/` | Filter |
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
+| `e` | Open Service Events (ECS Services) |
+| `L` | Open Container Logs (ECS Services) |
 | `r` | Open Stack Resources (CFN Stacks) |
 | `w` | Toggle line wrap (in YAML view) |
 | `Tab` | Autocomplete (in command mode) |
