@@ -304,7 +304,7 @@ func TestLayoutRenderFrame_WidthConsistency(t *testing.T) {
 // ── RenderHeader tests ───────────────────────────────────────────────────────
 
 func TestLayoutRenderHeader_ContainsAppName(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help", "", "")
 	plain := stripANSI(got)
 	if !strings.Contains(plain, "a9s") {
 		t.Error("header should contain 'a9s'")
@@ -312,7 +312,7 @@ func TestLayoutRenderHeader_ContainsAppName(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_ContainsVersion(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help", "", "")
 	plain := stripANSI(got)
 	if !strings.Contains(plain, "v0.5.0") {
 		t.Errorf("header should contain 'v0.5.0', got %q", plain)
@@ -320,7 +320,7 @@ func TestLayoutRenderHeader_ContainsVersion(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_ContainsProfileRegion(t *testing.T) {
-	got := layout.RenderHeader("prod", "us-west-2", "0.5.0", 80, "? for help")
+	got := layout.RenderHeader("prod", "us-west-2", "0.5.0", 80, "? for help", "", "")
 	plain := stripANSI(got)
 	if !strings.Contains(plain, "prod:us-west-2") {
 		t.Errorf("header should contain 'prod:us-west-2', got %q", plain)
@@ -328,7 +328,7 @@ func TestLayoutRenderHeader_ContainsProfileRegion(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_ContainsRightContent(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help", "", "")
 	plain := stripANSI(got)
 	if !strings.Contains(plain, "? for help") {
 		t.Errorf("header should contain '? for help', got %q", plain)
@@ -336,7 +336,7 @@ func TestLayoutRenderHeader_ContainsRightContent(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_RightContentAligned(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 80, "? for help", "", "")
 	vis := lipgloss.Width(got)
 	if vis != 80 {
 		t.Errorf("header should be exactly 80 columns wide, got %d", vis)
@@ -344,7 +344,7 @@ func TestLayoutRenderHeader_RightContentAligned(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_CustomRightContent(t *testing.T) {
-	got := layout.RenderHeader("prod", "us-east-1", "0.5.0", 80, "Copied!")
+	got := layout.RenderHeader("prod", "us-east-1", "0.5.0", 80, "Copied!", "", "")
 	plain := stripANSI(got)
 	if !strings.Contains(plain, "Copied!") {
 		t.Errorf("header should contain custom right content 'Copied!', got %q", plain)
@@ -352,7 +352,7 @@ func TestLayoutRenderHeader_CustomRightContent(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_NarrowWidth(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 40, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 40, "? for help", "", "")
 	vis := lipgloss.Width(got)
 	if vis != 40 {
 		t.Errorf("narrow header should be exactly 40 columns wide, got %d", vis)
@@ -360,7 +360,7 @@ func TestLayoutRenderHeader_NarrowWidth(t *testing.T) {
 }
 
 func TestLayoutRenderHeader_LeftRightSeparation(t *testing.T) {
-	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 120, "? for help")
+	got := layout.RenderHeader("default", "us-east-1", "0.5.0", 120, "? for help", "", "")
 	plain := stripANSI(got)
 
 	leftIdx := strings.Index(plain, "default:us-east-1")

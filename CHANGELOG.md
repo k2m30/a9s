@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.0] - 2026-03-26
+
+### Added
+- IAM identity in header and detail view — press `i` to see account, caller, and session info; header shows account badge and role/user name (#77)
+- EC2 Spot vs On-Demand instance lifecycle column — shows "spot" or "on-demand" with filter support (#72)
+- Design spec and preview renders for the identity view
+
+### Fixed
+- Name column is now first in all default list views — 14 resource types reordered (sg, vpc, subnet, rtb, nat, igw, eip, vpce, tgw, eni, r53, cf, apigw, efs) (#23)
+- Header identity badge gracefully drops on narrow terminals instead of wrapping to a second line
+
+## [3.15.0] - 2026-03-26
+
+### Added
+- Child view: Glue Jobs → Job Runs — drill into job execution history with status, duration, DPU usage, and error messages (#49)
+- Child view: EventBridge Rules → Targets — drill into rule targets showing ARN, input config, and role (#48)
+- Child view: SNS Topics → Subscriptions — drill into topic subscribers showing protocol, endpoint, and confirmation status (#47)
+- Child view: RDS Instances → RDS Events — drill into DB instance events showing failovers, maintenance, and reboots (#45)
+- ECS Services list view now shows cluster name column (#90)
+- 68 QA stories for cross-view search component (#89)
+- 138 QA stories for Policy Document grandchild view (#87)
+
+### Fixed
+- Demo mode uses short cluster names in ECS service fixtures
+- Architecture review issues and coverage gaps
+
 ## [3.11.2] - 2026-03-25
 
 ### Added

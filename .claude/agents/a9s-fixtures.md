@@ -65,7 +65,7 @@ List:     aws secretsmanager list-secrets --profile dev-account
 
 ## Output
 
-Save raw JSON responses to `/Users/k2m30/projects/a9s/tests/testdata/fixtures/`.
+Save raw JSON responses to `tests/testdata/fixtures/`.
 
 ## No Sanitization
 

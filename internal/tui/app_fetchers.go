@@ -109,6 +109,35 @@ func (m *Model) fetchDemoResources(resourceType string) tea.Cmd {
 	}
 }
 
+func (m *Model) fetchIdentity() tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg {
+			return messages.IdentityLoadedMsg{
+				Identity: &awsclient.CallerIdentity{
+					AccountID:     "123456789012",
+					AccountAlias:  "demo-account",
+					Arn:           "arn:aws:sts::123456789012:assumed-role/demo-admin/session",
+					RoleName:      "demo-admin",
+					SessionName:   "session",
+					IdentityName:  "demo-admin",
+					IsAssumedRole: true,
+				},
+			}
+		}
+	}
+	clients := m.clients
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.IdentityErrorMsg{Err: "AWS clients not initialized"}
+		}
+		identity, err := awsclient.FetchCallerIdentity(context.Background(), clients.STS, clients.IAM)
+		if err != nil {
+			return messages.IdentityErrorMsg{Err: err.Error()}
+		}
+		return messages.IdentityLoadedMsg{Identity: identity}
+	}
+}
+
 func (m *Model) fetchProfiles() tea.Cmd {
 	return func() tea.Msg {
 		configPath := awsclient.DefaultConfigPath()

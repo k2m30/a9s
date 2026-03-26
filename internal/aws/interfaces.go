@@ -46,6 +46,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 )
 
@@ -565,4 +566,16 @@ type IAMGetGroupAPI interface {
 // ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
 type ELBv2DescribeRulesAPI interface {
 	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)
+}
+
+// --- Identity interfaces ---
+
+// STSGetCallerIdentityAPI defines the interface for the STS GetCallerIdentity operation.
+type STSGetCallerIdentityAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+// IAMListAccountAliasesAPI defines the interface for the IAM ListAccountAliases operation.
+type IAMListAccountAliasesAPI interface {
+	ListAccountAliases(ctx context.Context, params *iam.ListAccountAliasesInput, optFns ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error)
 }
