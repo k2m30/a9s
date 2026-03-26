@@ -736,11 +736,11 @@ views:
     list:
       Name:
         width: 24
-      Instance ID:
-        path: InstanceId
-        width: 20
       State:
         path: State.Name
+        width: 12
+      Lifecycle:
+        path: InstanceLifecycle
         width: 12
       Type:
         path: InstanceType
@@ -751,6 +751,9 @@ views:
       Public IP:
         path: PublicIpAddress
         width: 16
+      Instance ID:
+        path: InstanceId
+        width: 20
       Launch Time:
         path: LaunchTime
         width: 22
@@ -758,6 +761,7 @@ views:
       - InstanceId
       - State
       - InstanceType
+      - InstanceLifecycle
       - ImageId
       - KeyName
       - Placement

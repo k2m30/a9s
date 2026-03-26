@@ -96,8 +96,9 @@ func realisticEC2Instance() ec2types.Instance {
 		SecurityGroups: []ec2types.GroupIdentifier{
 			{GroupId: ptrString("sg-0abc1234"), GroupName: ptrString("web-sg")},
 		},
-		PlatformDetails: ptrString("Linux/UNIX"),
-		Platform:        ec2types.PlatformValuesWindows,
+		PlatformDetails:   ptrString("Linux/UNIX"),
+		Platform:          ec2types.PlatformValuesWindows,
+		InstanceLifecycle: ec2types.InstanceLifecycleTypeSpot,
 	}
 }
 

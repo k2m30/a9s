@@ -5,15 +5,16 @@ func computeDefaultViews() map[string]ViewDef {
 		"ec2": {
 			List: []ListColumn{
 				{Title: "Name", Path: "", Width: 24},
-				{Title: "Instance ID", Path: "InstanceId", Width: 20},
 				{Title: "State", Path: "State.Name", Width: 12},
+				{Title: "Lifecycle", Path: "InstanceLifecycle", Width: 12},
 				{Title: "Type", Path: "InstanceType", Width: 14},
 				{Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 				{Title: "Public IP", Path: "PublicIpAddress", Width: 16},
+				{Title: "Instance ID", Path: "InstanceId", Width: 20},
 				{Title: "Launch Time", Path: "LaunchTime", Width: 22},
 			},
 			Detail: []string{
-				"InstanceId", "State", "InstanceType", "ImageId",
+				"InstanceId", "State", "InstanceType", "InstanceLifecycle", "ImageId",
 				"KeyName", "Placement",
 				"VpcId", "SubnetId", "PrivateIpAddress", "PrivateDnsName",
 				"PublicIpAddress", "IamInstanceProfile",

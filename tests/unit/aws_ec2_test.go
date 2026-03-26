@@ -120,7 +120,7 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	}
 
 	// Verify Fields contain the expected keys
-	requiredFields := []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time"}
+	requiredFields := []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
 			if _, ok := r.Fields[key]; !ok {
@@ -177,5 +177,141 @@ func TestFetchEC2Instances_EmptyResponse(t *testing.T) {
 	}
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T021b - Test EC2 InstanceLifecycle field parsing
+// ---------------------------------------------------------------------------
+
+func TestFetchEC2Instances_LifecycleSpot(t *testing.T) {
+	launchTime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockEC2Client{
+		output: &ec2.DescribeInstancesOutput{
+			Reservations: []ec2types.Reservation{
+				{
+					Instances: []ec2types.Instance{
+						{
+							InstanceId:   aws.String("i-spot001"),
+							InstanceType: ec2types.InstanceTypeT3Micro,
+							State: &ec2types.InstanceState{
+								Name: ec2types.InstanceStateNameRunning,
+							},
+							PrivateIpAddress:  aws.String("10.0.0.1"),
+							LaunchTime:        &launchTime,
+							InstanceLifecycle: ec2types.InstanceLifecycleTypeSpot,
+							Tags: []ec2types.Tag{
+								{Key: aws.String("Name"), Value: aws.String("spot-worker")},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	lifecycle, ok := resources[0].Fields["lifecycle"]
+	if !ok {
+		t.Fatal("Fields map missing 'lifecycle' key")
+	}
+	if lifecycle != "spot" {
+		t.Errorf("expected lifecycle %q, got %q", "spot", lifecycle)
+	}
+}
+
+func TestFetchEC2Instances_LifecycleOnDemand(t *testing.T) {
+	launchTime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockEC2Client{
+		output: &ec2.DescribeInstancesOutput{
+			Reservations: []ec2types.Reservation{
+				{
+					Instances: []ec2types.Instance{
+						{
+							InstanceId:   aws.String("i-od001"),
+							InstanceType: ec2types.InstanceTypeT3Micro,
+							State: &ec2types.InstanceState{
+								Name: ec2types.InstanceStateNameRunning,
+							},
+							PrivateIpAddress: aws.String("10.0.0.2"),
+							LaunchTime:       &launchTime,
+							// InstanceLifecycle is zero value (empty string) for on-demand
+							Tags: []ec2types.Tag{
+								{Key: aws.String("Name"), Value: aws.String("on-demand-server")},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	lifecycle, ok := resources[0].Fields["lifecycle"]
+	if !ok {
+		t.Fatal("Fields map missing 'lifecycle' key")
+	}
+	if lifecycle != "on-demand" {
+		t.Errorf("expected lifecycle %q, got %q", "on-demand", lifecycle)
+	}
+}
+
+func TestFetchEC2Instances_LifecycleScheduled(t *testing.T) {
+	launchTime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockEC2Client{
+		output: &ec2.DescribeInstancesOutput{
+			Reservations: []ec2types.Reservation{
+				{
+					Instances: []ec2types.Instance{
+						{
+							InstanceId:   aws.String("i-sched001"),
+							InstanceType: ec2types.InstanceTypeT3Micro,
+							State: &ec2types.InstanceState{
+								Name: ec2types.InstanceStateNameRunning,
+							},
+							PrivateIpAddress:  aws.String("10.0.0.3"),
+							LaunchTime:        &launchTime,
+							InstanceLifecycle: ec2types.InstanceLifecycleTypeScheduled,
+							Tags: []ec2types.Tag{
+								{Key: aws.String("Name"), Value: aws.String("scheduled-worker")},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	lifecycle, ok := resources[0].Fields["lifecycle"]
+	if !ok {
+		t.Fatal("Fields map missing 'lifecycle' key")
+	}
+	if lifecycle != "scheduled" {
+		t.Errorf("expected lifecycle %q, got %q", "scheduled", lifecycle)
 	}
 }

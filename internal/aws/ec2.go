@@ -17,7 +17,7 @@ func init() {
 		}
 		return FetchEC2Instances(ctx, c.EC2)
 	})
-	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time"})
+	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle"})
 }
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and converts the
@@ -73,6 +73,12 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 				launchTime = inst.LaunchTime.Format("2006-01-02T15:04:05Z07:00")
 			}
 
+			// Extract lifecycle (on-demand if empty)
+			lifecycle := "on-demand"
+			if inst.InstanceLifecycle != "" {
+				lifecycle = string(inst.InstanceLifecycle)
+			}
+
 			r := resource.Resource{
 				ID:     instanceID,
 				Name:   name,
@@ -85,8 +91,9 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 					"private_ip":  privateIP,
 					"public_ip":   publicIP,
 					"launch_time": launchTime,
+					"lifecycle":   lifecycle,
 				},
-				RawStruct:  inst,
+				RawStruct: inst,
 			}
 
 			resources = append(resources, r)

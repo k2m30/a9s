@@ -29,60 +29,70 @@ func ec2Instances() []resource.Resource {
 			ec2types.InstanceTypeT3Large, "10.0.1.10", "54.210.33.112",
 			"vpc-0abc123def456789a", "subnet-0aaa111111111111a",
 			time.Date(2025, 11, 15, 8, 30, 0, 0, time.UTC),
+			"",
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60002", "web-prod-02", "running",
 			ec2types.InstanceTypeT3Large, "10.0.1.11", "54.210.33.113",
 			"vpc-0abc123def456789a", "subnet-0aaa111111111111a",
 			time.Date(2025, 11, 15, 8, 32, 0, 0, time.UTC),
+			"",
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60003", "api-staging-01", "running",
 			ec2types.InstanceTypeM5Xlarge, "10.0.2.50", "",
 			"vpc-0abc123def456789a", "subnet-0bbb222222222222b",
 			time.Date(2026, 1, 20, 14, 15, 0, 0, time.UTC),
+			ec2types.InstanceLifecycleTypeSpot,
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60004", "worker-batch-03", "stopped",
 			ec2types.InstanceTypeC5Xlarge, "10.0.3.100", "",
 			"vpc-0abc123def456789a", "subnet-0ccc333333333333c",
 			time.Date(2025, 9, 5, 11, 0, 0, 0, time.UTC),
+			ec2types.InstanceLifecycleTypeSpot,
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60005", "bastion-prod", "running",
 			ec2types.InstanceTypeT3Micro, "10.0.0.5", "52.87.221.44",
 			"vpc-0abc123def456789a", "subnet-0aaa111111111111a",
 			time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC),
+			"",
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60006", "db-proxy-01", "running",
 			ec2types.InstanceTypeR5Large, "10.0.4.200", "",
 			"vpc-0abc123def456789a", "subnet-0ddd444444444444d",
 			time.Date(2025, 12, 10, 18, 45, 0, 0, time.UTC),
+			"",
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60007", "web-staging-01", "pending",
 			ec2types.InstanceTypeT3Medium, "10.0.2.70", "",
 			"vpc-0abc123def456789a", "subnet-0bbb222222222222b",
 			time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC),
+			ec2types.InstanceLifecycleTypeSpot,
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60008", "ml-trainer-gpu", "stopping",
 			ec2types.InstanceTypeG4dnXlarge, "10.0.5.30", "",
 			"vpc-0abc123def456789a", "subnet-0eee555555555555e",
 			time.Date(2026, 2, 14, 22, 0, 0, 0, time.UTC),
+			ec2types.InstanceLifecycleTypeSpot,
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60009", "temp-load-test", "shutting-down",
 			ec2types.InstanceTypeC5Large, "10.0.3.55", "",
 			"vpc-0abc123def456789a", "subnet-0ccc333333333333c",
 			time.Date(2026, 3, 20, 16, 30, 0, 0, time.UTC),
+			"",
 		),
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60010", "old-migration-worker", "terminated",
 			ec2types.InstanceTypeT3Small, "", "",
 			"vpc-0abc123def456789a", "subnet-0bbb222222222222b",
 			time.Date(2025, 8, 1, 12, 0, 0, 0, time.UTC),
+			"",
 		),
 	}
 }
@@ -96,6 +106,7 @@ func makeEC2Instance(
 	privateIP, publicIP string,
 	vpcID, subnetID string,
 	launchTime time.Time,
+	lifecycle ec2types.InstanceLifecycleType,
 ) resource.Resource {
 	stateName := ec2types.InstanceStateName(state)
 	stateCode := stateNameToCode(stateName)
@@ -114,7 +125,8 @@ func makeEC2Instance(
 			{Key: aws.String("Name"), Value: aws.String(name)},
 			{Key: aws.String("Environment"), Value: aws.String(envFromName(name))},
 		},
-		LaunchTime: aws.Time(launchTime),
+		LaunchTime:        aws.Time(launchTime),
+		InstanceLifecycle: lifecycle,
 	}
 
 	if publicIP != "" {
@@ -122,6 +134,11 @@ func makeEC2Instance(
 	}
 
 	launchTimeStr := launchTime.Format("2006-01-02T15:04:05Z07:00")
+
+	lifecycleStr := "on-demand"
+	if lifecycle != "" {
+		lifecycleStr = string(lifecycle)
+	}
 
 	return resource.Resource{
 		ID:     instanceID,
@@ -135,6 +152,7 @@ func makeEC2Instance(
 			"private_ip":  privateIP,
 			"public_ip":   publicIP,
 			"launch_time": launchTimeStr,
+			"lifecycle":   lifecycleStr,
 		},
 		RawStruct: inst,
 	}

@@ -1341,3 +1341,68 @@ func TestQA_EC2_FlashMsgAfterCopy(t *testing.T) {
 		t.Error("flash message 'Copied!' should appear in header after copy")
 	}
 }
+
+// ===========================================================================
+// Lifecycle field tests (Spot vs On-Demand)
+// ===========================================================================
+
+func TestQA_EC2_LifecycleColumnHeader(t *testing.T) {
+	m := newEC2ListModel(t)
+	plain := stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "Lifecycle") {
+		t.Error("EC2 list view should contain 'Lifecycle' column header")
+	}
+}
+
+func TestQA_EC2_LifecycleColumnData(t *testing.T) {
+	m := newEC2ListModel(t)
+	plain := stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "spot") {
+		t.Error("EC2 list view should show 'spot' lifecycle for the GPU instance")
+	}
+	if !strings.Contains(plain, "on-demand") {
+		t.Error("EC2 list view should show 'on-demand' lifecycle for non-spot instances")
+	}
+}
+
+func TestQA_EC2_FilterByLifecycle(t *testing.T) {
+	instances := fixtureEC2Instances()
+	result := views.FilterResources("spot", instances)
+
+	// Only the first instance (i-0aaa, GPU) has lifecycle "spot"
+	if len(result) != 1 {
+		t.Errorf("filter by 'spot' should return 1 instance, got %d", len(result))
+	}
+	if len(result) == 1 && result[0].ID != "i-0aaa111111111111a" {
+		t.Errorf("filtered instance should be i-0aaa111111111111a, got %s", result[0].ID)
+	}
+}
+
+func TestQA_EC2_DetailShowsLifecycle(t *testing.T) {
+	instances := fixtureEC2Instances()
+	m := newEC2DetailModel(t, instances[0]) // spot instance
+
+	plain := stripANSI(rootViewContent(m))
+
+	// Detail view renders Fields map keys/values; should show lifecycle field
+	if !strings.Contains(plain, "lifecycle") && !strings.Contains(plain, "InstanceLifecycle") {
+		t.Error("detail view for spot instance should display lifecycle field")
+	}
+	if !strings.Contains(plain, "spot") {
+		t.Error("detail view for spot instance should display 'spot' lifecycle value")
+	}
+}
+
+func TestQA_EC2_YAMLShowsLifecycle(t *testing.T) {
+	instances := fixtureEC2Instances()
+	m := newEC2YAMLModel(t, instances[0]) // spot instance
+
+	plain := stripANSI(rootViewContent(m))
+
+	// YAML view renders from Fields map or RawStruct; should contain lifecycle
+	if !strings.Contains(plain, "lifecycle") && !strings.Contains(plain, "InstanceLifecycle") {
+		t.Error("YAML view for spot instance should contain lifecycle or InstanceLifecycle key")
+	}
+}
