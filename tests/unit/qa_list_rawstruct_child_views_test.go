@@ -13,6 +13,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -1051,6 +1052,55 @@ func TestQA_ListRawStruct_DbiEvents(t *testing.T) {
 	}
 }
 
+// ===========================================================================
+// TestQA_ListRawStruct_EbRuleTargets: verify list rendering with Target RawStruct
+// ===========================================================================
+
+func TestQA_ListRawStruct_EbRuleTargets(t *testing.T) {
+	ensureNoColor(t)
+
+	typeDef := resource.GetChildType("eb_rule_targets")
+	if typeDef == nil {
+		t.Fatal("eb_rule_targets child resource type not registered")
+	}
+
+	cfg := configForType("eb_rule_targets")
+	k := keys.Default()
+	m := views.NewResourceList(*typeDef, cfg, k)
+	m.SetSize(400, 50)
+
+	target := ebtypes.Target{
+		Id:      ptrString("lambda-target-1"),
+		Arn:     ptrString("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
+		RoleArn: ptrString("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
+	}
+
+	resources := []resource.Resource{
+		{
+			ID:     "lambda-target-1",
+			Name:   "lambda-target-1",
+			Status: "",
+			Fields: map[string]string{
+				"target_id":          "lambda-target-1",
+				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
+				"resource_type_name": "Lambda: data-pipeline-daily",
+				"input_summary":      "\u2014",
+			},
+			RawStruct: target,
+		},
+	}
+
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	view := stripAnsi(m.View())
+
+	if !strings.Contains(view, "lambda-target-1") {
+		t.Errorf("eb_rule_targets list should contain target ID, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Lambda") {
+		t.Errorf("eb_rule_targets list should contain resource type name, got:\n%s", view)
+	}
+}
+
 // Compile-time type assertion for the new child view types
 var (
 	_ asgtypes.Activity                = asgtypes.Activity{}
@@ -1071,4 +1121,5 @@ var (
 	_ elbtypes.Rule                    = elbtypes.Rule{}
 	_ iamtypes.User                    = iamtypes.User{}
 	_ rdstypes.Event                   = rdstypes.Event{}
+	_ ebtypes.Target                   = ebtypes.Target{}
 )

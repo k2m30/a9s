@@ -33,6 +33,10 @@ func init() {
 	RegisterChildDemo("sfn_execution_history", func(_ map[string]string) []resource.Resource {
 		return sfnExecutionHistoryFixtures()
 	})
+
+	RegisterChildDemo("eb_rule_targets", func(_ map[string]string) []resource.Resource {
+		return ebRuleTargetFixtures()
+	})
 }
 
 // sqsQueues returns demo SQS queue fixtures.
@@ -977,6 +981,81 @@ func snsTopicSubscriptionFixtures(topicArn string) []resource.Resource {
 				Protocol:        aws.String("lambda"),
 				Endpoint:        aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-notifications"),
 				Owner:           aws.String("123456789012"),
+			},
+		},
+	}
+}
+
+// ebRuleTargetFixtures returns demo EventBridge rule target fixtures
+// covering Lambda, SQS, SNS, and SFN target types with different input configs.
+func ebRuleTargetFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:   "lambda-processor",
+			Name: "lambda-processor",
+			Fields: map[string]string{
+				"target_id":          "lambda-processor",
+				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:event-processor",
+				"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeLambdaRole",
+				"resource_type_name": "Lambda: event-processor",
+				"input_summary":      `{"source":"scheduled"}`,
+			},
+			RawStruct: eventbridgetypes.Target{
+				Id:      aws.String("lambda-processor"),
+				Arn:     aws.String("arn:aws:lambda:us-east-1:123456789012:function:event-processor"),
+				RoleArn: aws.String("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
+				Input:   aws.String(`{"source":"scheduled"}`),
+			},
+		},
+		{
+			ID:   "sqs-dlq",
+			Name: "sqs-dlq",
+			Fields: map[string]string{
+				"target_id":          "sqs-dlq",
+				"target_arn":         "arn:aws:sqs:us-east-1:123456789012:dead-letter-queue",
+				"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeSQSRole",
+				"resource_type_name": "SQS: dead-letter-queue",
+				"input_summary":      "\u2014",
+			},
+			RawStruct: eventbridgetypes.Target{
+				Id:      aws.String("sqs-dlq"),
+				Arn:     aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+				RoleArn: aws.String("arn:aws:iam::123456789012:role/EventBridgeSQSRole"),
+			},
+		},
+		{
+			ID:   "sns-notify",
+			Name: "sns-notify",
+			Fields: map[string]string{
+				"target_id":          "sns-notify",
+				"target_arn":         "arn:aws:sns:us-east-1:123456789012:alerts-topic",
+				"role_arn":           "",
+				"resource_type_name": "SNS: alerts-topic",
+				"input_summary":      "$.detail",
+			},
+			RawStruct: eventbridgetypes.Target{
+				Id:        aws.String("sns-notify"),
+				Arn:       aws.String("arn:aws:sns:us-east-1:123456789012:alerts-topic"),
+				InputPath: aws.String("$.detail"),
+			},
+		},
+		{
+			ID:   "sfn-workflow",
+			Name: "sfn-workflow",
+			Fields: map[string]string{
+				"target_id":          "sfn-workflow",
+				"target_arn":         "arn:aws:states:us-east-1:123456789012:stateMachine:order-workflow",
+				"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeSFNRole",
+				"resource_type_name": "SFN: order-workflow",
+				"input_summary":      "InputTransformer",
+			},
+			RawStruct: eventbridgetypes.Target{
+				Id:      aws.String("sfn-workflow"),
+				Arn:     aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-workflow"),
+				RoleArn: aws.String("arn:aws:iam::123456789012:role/EventBridgeSFNRole"),
+				InputTransformer: &eventbridgetypes.InputTransformer{
+					InputTemplate: aws.String(`"<instance> is in state <state>"`),
+				},
 			},
 		},
 	}

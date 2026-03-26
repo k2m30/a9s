@@ -271,6 +271,16 @@ func SnsSubscriptionColumns() []Column {
 	}
 }
 
+// EbRuleTargetColumns returns the column definitions for EventBridge rule targets.
+func EbRuleTargetColumns() []Column {
+	return []Column{
+		{Key: "target_id", Title: "Target ID", Width: 20, Sortable: true},
+		{Key: "target_arn", Title: "Target ARN", Width: 48, Sortable: true},
+		{Key: "resource_type_name", Title: "Resource", Width: 28, Sortable: true},
+		{Key: "input_summary", Title: "Input", Width: 36, Sortable: false},
+	}
+}
+
 // ELBListenerRuleColumns returns the column definitions for ELB listener rules.
 func ELBListenerRuleColumns() []Column {
 	return []Column{

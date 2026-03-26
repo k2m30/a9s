@@ -491,6 +491,26 @@ func (m *mockEventBridgeClient) ListRules(ctx context.Context, params *eventbrid
 }
 
 // ---------------------------------------------------------------------------
+// EventBridge ListTargetsByRule mock
+// ---------------------------------------------------------------------------
+
+type mockEventBridgeListTargetsClient struct {
+	output *eventbridge.ListTargetsByRuleOutput
+	err    error
+}
+
+func (m *mockEventBridgeListTargetsClient) ListTargetsByRule(
+	ctx context.Context,
+	params *eventbridge.ListTargetsByRuleInput,
+	optFns ...func(*eventbridge.Options),
+) (*eventbridge.ListTargetsByRuleOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
 // Step Functions (SFN) mocks
 // ---------------------------------------------------------------------------
 

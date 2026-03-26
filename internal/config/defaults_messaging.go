@@ -49,6 +49,20 @@ func messagingDefaultViews() map[string]ViewDef {
 				"ManagedBy", "RoleArn",
 			},
 		},
+		"eb_rule_targets": {
+			List: []ListColumn{
+				{Title: "Target ID", Path: "Id", Width: 20},
+				{Title: "Target ARN", Path: "Arn", Width: 48},
+				{Title: "Resource", Key: "resource_type_name", Width: 28},
+				{Title: "Input", Key: "input_summary", Width: 36},
+			},
+			Detail: []string{
+				"Id", "Arn", "RoleArn", "Input", "InputPath", "InputTransformer",
+				"DeadLetterConfig", "RetryPolicy", "SqsParameters", "EcsParameters",
+				"KinesisParameters", "BatchParameters", "HttpParameters",
+				"SageMakerPipelineParameters", "RedshiftDataParameters", "AppSyncParameters",
+			},
+		},
 		"kinesis": {
 			List: []ListColumn{
 				{Title: "Stream Name", Path: "StreamName", Width: 36},

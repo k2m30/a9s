@@ -55,6 +55,12 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "schedule", Title: "Schedule", Width: 24, Sortable: false},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
+			Children: []ChildViewDef{{
+				ChildType:      "eb_rule_targets",
+				Key:            "enter",
+				ContextKeys:    map[string]string{"rule_name": "ID", "event_bus": "event_bus"},
+				DisplayNameKey: "rule_name",
+			}},
 		},
 		{
 			Name:      "Kinesis Streams",
