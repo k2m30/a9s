@@ -17,6 +17,7 @@ type Map struct {
 	ForceQuit key.Binding
 	Help      key.Binding
 	Refresh   key.Binding
+	Identity  key.Binding
 
 	// Input modes
 	Colon  key.Binding
@@ -64,6 +65,7 @@ func Default() Map {
 		ForceQuit: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "force quit")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Refresh:   key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "refresh")),
+		Identity:  key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "identity")),
 
 		Colon:  key.NewBinding(key.WithKeys(":"), key.WithHelp(":", "command")),
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),

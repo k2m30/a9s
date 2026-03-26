@@ -46,6 +46,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 )
 
@@ -93,6 +94,7 @@ type ServiceClients struct {
 	KMS              *kms.Client
 	MSK              *kafka.Client
 	Backup           *backup.Client
+	STS              *sts.Client
 }
 
 // NewAWSSession creates a new AWS config using the given profile and region.
@@ -156,5 +158,6 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		KMS:              kms.NewFromConfig(cfg),
 		MSK:              kafka.NewFromConfig(cfg),
 		Backup:           backup.NewFromConfig(cfg),
+		STS:              sts.NewFromConfig(cfg),
 	}
 }

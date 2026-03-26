@@ -111,3 +111,15 @@ type RevealSecretMsg struct {
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
 
+// IdentityLoadedMsg is sent when the caller identity has been fetched.
+// Identity is typed as interface{} to avoid importing aws/ from the messages package.
+// The root model type-asserts it to *awsclient.CallerIdentity.
+type IdentityLoadedMsg struct {
+	Identity interface{}
+}
+
+// IdentityErrorMsg is sent when the caller identity fetch fails.
+type IdentityErrorMsg struct {
+	Err string
+}
+

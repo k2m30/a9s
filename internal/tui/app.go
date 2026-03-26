@@ -58,6 +58,9 @@ type Model struct {
 	pendingRefresh bool  // set after profile/region switch to refresh on ClientsReadyMsg
 	configErr      error // non-nil if views.yaml was found but corrupt
 
+	identity         *awsclient.CallerIdentity
+	identityFetching bool
+
 	// headerCache avoids re-computing the header string every render when
 	// profile, region, version, and right-side content haven't changed.
 	headerCache    string
@@ -187,6 +190,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ResourcesLoadedMsg:
 		m.flash.active = false
 		return m.updateActiveView(msg)
+	case messages.IdentityLoadedMsg:
+		return m.handleIdentityLoaded(msg)
+	case messages.IdentityErrorMsg:
+		return m.handleIdentityError(msg)
 	}
 	return m.updateActiveView(msg)
 }
@@ -220,10 +227,12 @@ func (m Model) View() tea.View {
 		}
 	}
 	rightContent := m.headerRight()
-	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + fmt.Sprintf("%d", m.width)
+	badge := m.accountBadge()
+	role := m.identityRoleName()
+	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
 	header := m.headerCache
 	if cacheKey != m.headerCacheKey {
-		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent)
+		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent, badge, role)
 		m.headerCache = header
 		m.headerCacheKey = cacheKey
 	}
@@ -316,6 +325,10 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd
+	case *views.IdentityModel:
+		updated, cmd := v.Update(msg)
+		m.stack[len(m.stack)-1] = &updated
+		return m, cmd
 	}
 	return m, nil
 }
@@ -357,4 +370,39 @@ func (m Model) headerRight() string {
 		return rv.HeaderWarning()
 	}
 	return styles.DimText.Render("? for help")
+}
+
+// accountBadge returns the account alias (preferred) or account ID for the header.
+func (m Model) accountBadge() string {
+	if m.identity == nil {
+		return ""
+	}
+	if m.identity.AccountAlias != "" {
+		return m.identity.AccountAlias
+	}
+	return m.identity.AccountID
+}
+
+// identityRoleName returns the identity name (role or user) for the header.
+func (m Model) identityRoleName() string {
+	if m.identity == nil {
+		return ""
+	}
+	return m.identity.IdentityName
+}
+
+// identityToViewData converts the cached CallerIdentity to a view-layer IdentityData.
+func (m Model) identityToViewData() views.IdentityData {
+	if m.identity == nil {
+		return views.IdentityData{}
+	}
+	return views.IdentityData{
+		AccountID:     m.identity.AccountID,
+		AccountAlias:  m.identity.AccountAlias,
+		ARN:           m.identity.Arn,
+		RoleName:      m.identity.RoleName,
+		UserName:      m.identity.UserName,
+		SessionName:   m.identity.SessionName,
+		IsAssumedRole: m.identity.IsAssumedRole,
+	}
 }

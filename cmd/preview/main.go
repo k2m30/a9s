@@ -831,6 +831,331 @@ func renderLambdaCodeHelp() string {
 	return sb.String()
 }
 
+// ── Header with account badge ──────────────────────────────────────────────
+
+// renderHeaderWithBadge returns the header with account alias/ID badge after profile:region.
+func renderHeaderWithBadge(profile, region, version, badge string, w int, rightContent string) string {
+	accent := lipgloss.NewStyle().
+		Foreground(colAccent).Bold(true).Render("a9s")
+	ver := lipgloss.NewStyle().
+		Foreground(colDim).Render(" v" + version)
+	ctx := lipgloss.NewStyle().
+		Foreground(colHeaderFg).Bold(true).
+		Render("  " + profile + ":" + region)
+
+	var badgeRendered string
+	if badge != "" {
+		badgeRendered = lipgloss.NewStyle().
+			Foreground(colDim).Render(" (" + badge + ")")
+	}
+
+	left := accent + ver + ctx + badgeRendered
+	leftW := lipgloss.Width(left)
+	rightW := lipgloss.Width(rightContent)
+
+	innerW := w - 2
+	gap := innerW - leftW - rightW
+	if gap < 1 {
+		gap = 1
+	}
+
+	content := left + strings.Repeat(" ", gap) + rightContent
+	return lipgloss.NewStyle().
+		Foreground(colHeaderFg).
+		Width(w).Padding(0, 1).Render(content)
+}
+
+// renderHeaderBadgeNormal returns the header with account badge and "? for help" on right.
+func renderHeaderBadgeNormal(profile, region, version, badge string, w int) string {
+	right := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
+	return renderHeaderWithBadge(profile, region, version, badge, w, right)
+}
+
+// renderHeaderBadgeExpiry returns the header with account badge and session expiry warning.
+func renderHeaderBadgeExpiry(profile, region, version, badge, expiryText string, expiryLevel string, w int) string {
+	var expiryRendered string
+	switch expiryLevel {
+	case "warning":
+		expiryRendered = lipgloss.NewStyle().Foreground(colPending).Render(expiryText+" ")
+	case "critical":
+		expiryRendered = lipgloss.NewStyle().Foreground(colError).Bold(true).Render(expiryText+" ")
+	}
+	helpHint := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
+	right := expiryRendered + helpHint
+	return renderHeaderWithBadge(profile, region, version, badge, w, right)
+}
+
+// ── VIEW 8: Header with account badge (various states) ──────────────────────
+
+func renderHeaderVariants() string {
+	const w = 110
+
+	var sb strings.Builder
+
+	// Variant 1: Normal with alias
+	sb.WriteString("  Header with account alias:\n")
+	sb.WriteString(renderHeaderBadgeNormal("prod-admin", "us-east-1", "3.11.0", "acme-prod", w))
+	sb.WriteString("\n\n")
+
+	// Variant 2: Normal with account ID (no alias)
+	sb.WriteString("  Header with account ID (no alias):\n")
+	sb.WriteString(renderHeaderBadgeNormal("prod-admin", "us-east-1", "3.11.0", "123456789012", w))
+	sb.WriteString("\n\n")
+
+	// Variant 3: Session expiry warning (yellow, 12min)
+	sb.WriteString("  Session expiry warning (12m remaining):\n")
+	sb.WriteString(renderHeaderBadgeExpiry("prod-admin", "us-east-1", "3.11.0", "acme-prod", "12m left", "warning", w))
+	sb.WriteString("\n\n")
+
+	// Variant 4: Session expiry critical (red, 3min)
+	sb.WriteString("  Session expiry critical (3m remaining):\n")
+	sb.WriteString(renderHeaderBadgeExpiry("prod-admin", "us-east-1", "3.11.0", "acme-prod", "3m left", "critical", w))
+	sb.WriteString("\n\n")
+
+	// Variant 5: Session expired
+	sb.WriteString("  Session expired:\n")
+	sb.WriteString(renderHeaderBadgeExpiry("prod-admin", "us-east-1", "3.11.0", "acme-prod", "EXPIRED", "critical", w))
+	sb.WriteString("\n\n")
+
+	// Variant 6: Narrow terminal (80 cols, badge still fits)
+	sb.WriteString("  Narrow terminal (80 cols):\n")
+	sb.WriteString(renderHeaderBadgeNormal("prod", "us-east-1", "3.11.0", "acme-prod", 80))
+	sb.WriteString("\n\n")
+
+	// Variant 7: Very narrow terminal (70 cols, badge omitted)
+	sb.WriteString("  Very narrow terminal (70 cols, badge omitted):\n")
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "3.11.0", 70))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 9: Identity Detail View — Assumed Role ──────────────────────────────
+
+func renderIdentityAssumedRole() string {
+	const w = 100
+
+	secStyle := lipgloss.NewStyle().Foreground(colDetailSec).Bold(true)
+	kStyle := lipgloss.NewStyle().Foreground(colDetailKey)
+	vStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+	hkStyle := lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colDim)
+
+	kw := 22
+
+	kv := func(key, val string) string {
+		return "     " + kStyle.Render(padOrTrunc(key, kw)) + vStyle.Render(val)
+	}
+	sec := func(s string) string {
+		return "  " + secStyle.Render(s)
+	}
+
+	expiryVal := vStyle.Render("2024-01-15 14:30:00 UTC ") +
+		lipgloss.NewStyle().Foreground(colPending).Render("(12m remaining)")
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, sec("Account:"))
+	lines = append(lines, kv("Alias:", "acme-prod"))
+	lines = append(lines, kv("Account ID:", "123456789012"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Caller:"))
+	lines = append(lines, kv("ARN:", "arn:aws:sts::123456789012:assumed-role/admin-role/session"))
+	lines = append(lines, kv("Role:", "admin-role"))
+	lines = append(lines, kv("Session:", "session"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Session:"))
+	lines = append(lines, "     "+kStyle.Render(padOrTrunc("Expiry:", kw))+expiryVal)
+	lines = append(lines, kv("Profile:", "prod-admin"))
+	lines = append(lines, kv("Region:", "us-east-1"))
+	lines = append(lines, kv("Credential Source:", "SSO"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+	hintLine := hkStyle.Render("c") + dimStyle.Render(" copy ARN  ") +
+		hkStyle.Render("esc/any") + dimStyle.Render(" close")
+	lines = append(lines, lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top, hintLine))
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderBadgeNormal("prod-admin", "us-east-1", "3.11.0", "acme-prod", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Identity", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 9b: Identity Detail View — IAM User ────────────────────────────────
+
+func renderIdentityIAMUser() string {
+	const w = 100
+
+	secStyle := lipgloss.NewStyle().Foreground(colDetailSec).Bold(true)
+	kStyle := lipgloss.NewStyle().Foreground(colDetailKey)
+	vStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+	hkStyle := lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colDim)
+
+	kw := 22
+
+	kv := func(key, val string) string {
+		return "     " + kStyle.Render(padOrTrunc(key, kw)) + vStyle.Render(val)
+	}
+	sec := func(s string) string {
+		return "  " + secStyle.Render(s)
+	}
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, sec("Account:"))
+	lines = append(lines, kv("Alias:", dimStyle.Render("--")))
+	lines = append(lines, kv("Account ID:", "123456789012"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Caller:"))
+	lines = append(lines, kv("ARN:", "arn:aws:iam::123456789012:user/deploy-bot"))
+	lines = append(lines, kv("User:", "deploy-bot"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Session:"))
+	lines = append(lines, kv("Expiry:", dimStyle.Render("-- (no session token)")))
+	lines = append(lines, kv("Profile:", "dev"))
+	lines = append(lines, kv("Region:", "us-west-2"))
+	lines = append(lines, kv("Credential Source:", "profile"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+	hintLine := hkStyle.Render("c") + dimStyle.Render(" copy ARN  ") +
+		hkStyle.Render("esc/any") + dimStyle.Render(" close")
+	lines = append(lines, lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top, hintLine))
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderBadgeNormal("dev", "us-west-2", "3.11.0", "123456789012", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Identity", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 9c: Identity Detail View — Session Expiring (Critical) ─────────────
+
+func renderIdentityExpiring() string {
+	const w = 100
+
+	secStyle := lipgloss.NewStyle().Foreground(colDetailSec).Bold(true)
+	kStyle := lipgloss.NewStyle().Foreground(colDetailKey)
+	vStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+	hkStyle := lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colDim)
+	critStyle := lipgloss.NewStyle().Foreground(colError).Bold(true)
+
+	kw := 22
+
+	kv := func(key, val string) string {
+		return "     " + kStyle.Render(padOrTrunc(key, kw)) + vStyle.Render(val)
+	}
+	sec := func(s string) string {
+		return "  " + secStyle.Render(s)
+	}
+
+	expiryVal := critStyle.Render("2024-01-15 14:30:00 UTC (3m remaining)")
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, sec("Account:"))
+	lines = append(lines, kv("Alias:", "acme-prod"))
+	lines = append(lines, kv("Account ID:", "123456789012"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Caller:"))
+	lines = append(lines, kv("ARN:", "arn:aws:sts::123456789012:assumed-role/admin-role/session"))
+	lines = append(lines, kv("Role:", "admin-role"))
+	lines = append(lines, kv("Session:", "session"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Session:"))
+	lines = append(lines, "     "+kStyle.Render(padOrTrunc("Expiry:", kw))+expiryVal)
+	lines = append(lines, kv("Profile:", "prod-admin"))
+	lines = append(lines, kv("Region:", "us-east-1"))
+	lines = append(lines, kv("Credential Source:", "SSO"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+	hintLine := hkStyle.Render("c") + dimStyle.Render(" copy ARN  ") +
+		hkStyle.Render("esc/any") + dimStyle.Render(" close")
+	lines = append(lines, lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top, hintLine))
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderBadgeExpiry("prod-admin", "us-east-1", "3.11.0", "acme-prod", "3m left", "critical", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Identity", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 9d: Identity Detail View — Error State ─────────────────────────────
+
+func renderIdentityError() string {
+	const w = 100
+
+	kStyle := lipgloss.NewStyle().Foreground(colDetailKey)
+	vStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+	errStyle := lipgloss.NewStyle().Foreground(colError).Bold(true)
+	hkStyle := lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colDim)
+
+	kw := 22
+
+	kv := func(key, val string) string {
+		return "  " + kStyle.Render(padOrTrunc(key, kw)) + vStyle.Render(val)
+	}
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, "  "+errStyle.Render("Error: Unable to locate credentials (NoCredentialProviders)"))
+	lines = append(lines, "")
+	lines = append(lines, kv("Profile:", "prod-admin"))
+	lines = append(lines, kv("Region:", "us-east-1"))
+	lines = append(lines, "")
+	lines = append(lines, "")
+	hintLine := hkStyle.Render("esc/any") + dimStyle.Render(" close")
+	lines = append(lines, lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top, hintLine))
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod-admin", "us-east-1", "3.11.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Identity", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 9e: Identity Detail View — Loading State ───────────────────────────
+
+func renderIdentityLoading() string {
+	const w = 100
+
+	spinStyle := lipgloss.NewStyle().Foreground(colAccent)
+	msgStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "")
+	lines = append(lines, "")
+	loadingText := spinStyle.Render("\u28bf") + msgStyle.Render(" Fetching identity...")
+	lines = append(lines, "        "+loadingText)
+	lines = append(lines, "")
+	lines = append(lines, "")
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderBadgeNormal("prod-admin", "us-east-1", "3.11.0", "", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "Identity", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -866,4 +1191,22 @@ func main() {
 
 	fmt.Println(divider("VIEW 7d: Lambda Code — Help Screen"))
 	fmt.Println(renderLambdaCodeHelp())
+
+	fmt.Println(divider("VIEW 8: Header Variants (Account Badge + Session Expiry)"))
+	fmt.Println(renderHeaderVariants())
+
+	fmt.Println(divider("VIEW 9: Identity — Assumed Role"))
+	fmt.Println(renderIdentityAssumedRole())
+
+	fmt.Println(divider("VIEW 9b: Identity — IAM User"))
+	fmt.Println(renderIdentityIAMUser())
+
+	fmt.Println(divider("VIEW 9c: Identity — Session Expiring (Critical)"))
+	fmt.Println(renderIdentityExpiring())
+
+	fmt.Println(divider("VIEW 9d: Identity — Error State"))
+	fmt.Println(renderIdentityError())
+
+	fmt.Println(divider("VIEW 9e: Identity — Loading"))
+	fmt.Println(renderIdentityLoading())
 }

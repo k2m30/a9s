@@ -191,6 +191,7 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 		{
 			title: "OTHER",
 			bindings: []helpBinding{
+				{"i", "identity"},
 				{"?", "help"},
 				{"esc", "back"},
 			},
@@ -239,6 +240,7 @@ func (m HelpModel) resourceListGroups(secrets bool) []helpGroup {
 			{"ctrl+r", "refresh"},
 			{"esc", "back"},
 			{"q", "quit"},
+			{"i", "identity"},
 			{"?", "help"},
 		},
 	}
@@ -268,6 +270,7 @@ func (m HelpModel) detailGroups() []helpGroup {
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"esc", "back"},
+				{"i", "identity"},
 				{"?", "help"},
 			},
 		},
@@ -295,6 +298,7 @@ func (m HelpModel) yamlGroups() []helpGroup {
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"esc", "back"},
+				{"i", "identity"},
 				{"?", "help"},
 			},
 		},
@@ -322,6 +326,7 @@ func (m HelpModel) selectorGroups() []helpGroup {
 		{
 			title: "OTHER",
 			bindings: []helpBinding{
+				{"i", "identity"},
 				{"?", "help"},
 			},
 		},
@@ -340,6 +345,7 @@ func (m HelpModel) revealGroups() []helpGroup {
 		{
 			title: "OTHER",
 			bindings: []helpBinding{
+				{"i", "identity"},
 				{"?", "help"},
 			},
 		},

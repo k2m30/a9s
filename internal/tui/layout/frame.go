@@ -136,13 +136,14 @@ func RenderFramePrepadded(lines []string, title string, w, h int) string {
 	return sb.String()
 }
 
-// RenderHeader produces the 1-line unframed header:
+// RenderHeader produces the 1-line unframed header with optional identity info:
 //
-//	a9s v0.5.0  profile:region                       ? for help
+//	a9s v0.5.0  profile:region (alias) role          ? for help
 //
 // "a9s" is in ColAccent bold, version in ColDim, profile:region in ColHeaderFg bold.
+// accountBadge and roleName are appended in dim style when non-empty and width >= 80.
 // rightContent is right-aligned. Gap filled with spaces to terminal width w.
-func RenderHeader(profile, region, version string, w int, rightContent string) string {
+func RenderHeader(profile, region, version string, w int, rightContent, accountBadge, roleName string) string {
 	accent := lipgloss.NewStyle().
 		Foreground(styles.ColAccent).Bold(true).Render("a9s")
 	ver := lipgloss.NewStyle().
@@ -152,11 +153,26 @@ func RenderHeader(profile, region, version string, w int, rightContent string) s
 		Render("  " + profile + ":" + region)
 
 	left := accent + ver + ctx
-	leftW := lipgloss.Width(left)
-	rightW := lipgloss.Width(rightContent)
 
-	// padding: 1 char on each side (via Padding(0,1))
+	dimStyle := lipgloss.NewStyle().Foreground(styles.ColDim)
+	rightW := lipgloss.Width(rightContent)
 	innerW := w - 2
+
+	// Add identity parts only if they fit on one line with >=2 char gap
+	if accountBadge != "" || roleName != "" {
+		candidate := left
+		if accountBadge != "" {
+			candidate += dimStyle.Render(" (" + accountBadge + ")")
+		}
+		if roleName != "" {
+			candidate += dimStyle.Render(" " + roleName)
+		}
+		if lipgloss.Width(candidate)+rightW+2 <= innerW {
+			left = candidate
+		}
+	}
+
+	leftW := lipgloss.Width(left)
 	gap := innerW - leftW - rightW
 	if gap < 1 {
 		gap = 1
@@ -166,4 +182,10 @@ func RenderHeader(profile, region, version string, w int, rightContent string) s
 	return lipgloss.NewStyle().
 		Foreground(styles.ColHeaderFg).
 		Width(w).Padding(0, 1).Render(content)
+}
+
+// RenderHeaderWithIdentity is an alias for RenderHeader for callers that
+// want an explicit name indicating identity parameters are being passed.
+func RenderHeaderWithIdentity(profile, region, version string, w int, rightContent, accountBadge, roleName string) string {
+	return RenderHeader(profile, region, version, w, rightContent, accountBadge, roleName)
 }

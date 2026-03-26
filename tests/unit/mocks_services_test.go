@@ -42,6 +42,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 )
 
@@ -1122,6 +1123,34 @@ func (m *mockCodePipelineGetPipelineStateClient) GetPipelineState(ctx context.Co
 		return nil, m.err
 	}
 	return m.output, nil
+}
+
+// ---------------------------------------------------------------------------
+// STS mocks
+// ---------------------------------------------------------------------------
+
+// mockSTSGetCallerIdentityClient implements awsclient.STSGetCallerIdentityAPI.
+type mockSTSGetCallerIdentityClient struct {
+	output *sts.GetCallerIdentityOutput
+	err    error
+}
+
+func (m *mockSTSGetCallerIdentityClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// IAM account alias mocks
+// ---------------------------------------------------------------------------
+
+// mockIAMListAccountAliasesClient implements awsclient.IAMListAccountAliasesAPI.
+type mockIAMListAccountAliasesClient struct {
+	output *iam.ListAccountAliasesOutput
+	err    error
+}
+
+func (m *mockIAMListAccountAliasesClient) ListAccountAliases(ctx context.Context, params *iam.ListAccountAliasesInput, optFns ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error) {
+	return m.output, m.err
 }
 
 // Ensure unused imports are used

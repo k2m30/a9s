@@ -736,7 +736,7 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 
 // longAWSError is a realistic AWS AccessDeniedException message (~250 chars)
 // that reproduces the header overflow bug described in issue #84.
-const longAWSError = "User: arn:aws:iam::333444555666:user/test-user@example.com is not authorized to perform: kms:DescribeKey on resource: arn:aws:kms:eu-central-1:333444555666:key/c9feb7c5-56b6-430f-a2fd-d414426b2283 because no resource-based policy allows the kms:DescribeKey action"
+const longAWSError = "User: arn:aws:iam::123456789012:user/test-user@example.com is not authorized to perform: kms:DescribeKey on resource: arn:aws:kms:eu-central-1:123456789012:key/abcdef01-2345-6789-abcd-ef0123456789 because no resource-based policy allows the kms:DescribeKey action"
 
 func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 	tui.Version = "test"

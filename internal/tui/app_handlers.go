@@ -47,6 +47,23 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&help)
 		return m, nil
 	}
+	if key.Matches(msg, m.keys.Identity) {
+		// If already on identity view, let it handle the key (dismisses)
+		if _, ok := m.activeView().(*views.IdentityModel); ok {
+			return m.updateActiveView(msg)
+		}
+		id := views.NewIdentity(m.profile, m.region, m.keys)
+		if m.identity != nil {
+			data := m.identityToViewData()
+			id.SetIdentity(data)
+		}
+		id.SetSize(m.innerSize())
+		m.pushView(&id)
+		// Always re-fetch on i press
+		m.identityFetching = true
+		cmd := m.fetchIdentity()
+		return m, cmd
+	}
 	if key.Matches(msg, m.keys.Quit) {
 		return m, tea.Quit
 	}
@@ -136,16 +153,20 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		configPath := awsclient.DefaultConfigPath()
 		m.region = awsclient.GetDefaultRegion(configPath, m.profile)
 	}
+	// Fetch identity on every clients-ready event
+	m.identityFetching = true
+	identityCmd := m.fetchIdentity()
+
 	if m.pendingRefresh {
 		m.pendingRefresh = false
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
 			cmd := m.fetchResources(rt)
-			return m, cmd
+			return m, tea.Batch(cmd, identityCmd)
 		}
 	}
-	return m, nil
+	return m, identityCmd
 }
 
 // handleProfileSelected switches the AWS profile, pops the profile selector,
@@ -156,6 +177,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	}
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
+	m.identity = nil
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
@@ -173,6 +195,7 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 		return m, nil
 	}
 	m.region = msg.Region
+	m.identity = nil
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
@@ -374,6 +397,29 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	}
 	cmd := m.fetchSecretValue(r.ID)
 	return m, cmd
+}
+
+// handleIdentityLoaded caches the identity and updates the identity view if active.
+func (m Model) handleIdentityLoaded(msg messages.IdentityLoadedMsg) (tea.Model, tea.Cmd) {
+	m.identityFetching = false
+	if id, ok := msg.Identity.(*awsclient.CallerIdentity); ok {
+		m.identity = id
+	}
+	// Update identity view if it's on top of the stack
+	if idView, ok := m.activeView().(*views.IdentityModel); ok {
+		data := m.identityToViewData()
+		idView.SetIdentity(data)
+	}
+	return m, nil
+}
+
+// handleIdentityError clears the fetching flag and updates the identity view if active.
+func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, tea.Cmd) {
+	m.identityFetching = false
+	if idView, ok := m.activeView().(*views.IdentityModel); ok {
+		idView.SetError(msg.Err)
+	}
+	return m, nil
 }
 
 func copyToClipboard(content, successLabel string) tea.Cmd {
