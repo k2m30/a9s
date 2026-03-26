@@ -233,6 +233,25 @@ a9s uses **read-only** AWS API calls exclusively. The following managed policies
 
 a9s will gracefully handle permission errors -- resources you don't have access to will show an error message instead of crashing.
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `NO_COLOR` | Set to any value (e.g., `NO_COLOR=1`) to disable all color output. Follows the [no-color.org](https://no-color.org) standard. Useful for accessibility, scripting, or piping output. |
+| `AWS_PROFILE` | Override the active AWS profile (same as `-p` flag). |
+| `AWS_REGION` | Override the active AWS region (same as `-r` flag). |
+
+## Why a9s?
+
+### Real-life use cases
+
+- **"Is my deployment healthy?"** — Jump to ECS Services, drill into tasks and events. See which tasks are running, which crashed, and why — without touching the AWS console.
+- **"Why are we getting 502s?"** — Check Target Groups → Target Health. Instantly see which targets are unhealthy and the exact reason (health check failed, connection refused, etc.).
+- **"What's in this S3 bucket?"** — Browse objects, drill into folders, check sizes and dates. Like a file manager for S3.
+- **"Which Lambda is failing?"** — Lambda → Invocations → Log Lines. Three key presses from function list to the actual error stack trace.
+- **"What happened during the deployment?"** — CFN Stacks → Stack Events shows every resource operation in real-time: what's being created, what failed, and the exact error message.
+- **"Which security groups allow 0.0.0.0/0?"** — Filter security groups, check inbound rules in the YAML detail view. No need to click through dozens of console pages.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for planned features and direction.

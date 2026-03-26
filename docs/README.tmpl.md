@@ -33,7 +33,8 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Horizontal scrolling for wide tables
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
-- 1,045+ unit tests
+- Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
+- 2,300+ unit tests
 
 ## Installation
 
@@ -64,6 +65,10 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 <!-- INCLUDE: keybindings.md -->
 
+## Child Views (Drill-Downs)
+
+<!-- INCLUDE: childviews.md -->
+
 ## Commands
 
 <!-- INCLUDE: commands.md -->
@@ -75,6 +80,21 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 ## AWS Permissions
 
 <!-- INCLUDE: permissions.md -->
+
+## Environment Variables
+
+<!-- INCLUDE: env-vars.md -->
+
+## Why a9s?
+
+### Real-life use cases
+
+- **"Is my deployment healthy?"** — Jump to ECS Services, drill into tasks and events. See which tasks are running, which crashed, and why — without touching the AWS console.
+- **"Why are we getting 502s?"** — Check Target Groups → Target Health. Instantly see which targets are unhealthy and the exact reason (health check failed, connection refused, etc.).
+- **"What's in this S3 bucket?"** — Browse objects, drill into folders, check sizes and dates. Like a file manager for S3.
+- **"Which Lambda is failing?"** — Lambda → Invocations → Log Lines. Three key presses from function list to the actual error stack trace.
+- **"What happened during the deployment?"** — CFN Stacks → Stack Events shows every resource operation in real-time: what's being created, what failed, and the exact error message.
+- **"Which security groups allow 0.0.0.0/0?"** — Filter security groups, check inbound rules in the YAML detail view. No need to click through dozens of console pages.
 
 ## Roadmap
 

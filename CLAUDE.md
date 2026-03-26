@@ -10,6 +10,7 @@ Auto-generated from all feature plans. Last updated: 2026-03-23
 ```text
 cmd/
   a9s/           # main binary
+  readmegen/     # README.md generator from docs/README.tmpl.md + docs/shared/
   refgen/        # views_reference.yaml generator
 internal/
   aws/           # AWS service clients & resource fetchers (top-level + child)
@@ -39,6 +40,7 @@ specs/           # feature specifications
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
 - `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
+- `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
 - `go run ./cmd/viewsgen/ > .a9s/views.yaml` — regenerate views.yaml from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
@@ -147,10 +149,16 @@ Agents MUST use targeted file access — never broad globs on large directories.
 
 ## Docs Sync Rule
 
-When code changes affect any of the following, update README.md AND `website/content/` in the same PR:
-- Resource types added/removed/renamed → README services table + `website/content/resources.md`
-- Key bindings added/removed/changed → README key bindings tables + `website/content/docs/_index.md`
-- Commands added/removed/changed → README commands table + `website/content/docs/_index.md`
-- CLI flags changed → README Quick Start + `website/content/install.md`
-- Install methods changed → README Installation + `website/content/install.md`
-- Go version bumped → README, CONTRIBUTING.md, `website/content/install.md`
+`docs/shared/` is the single source of truth for content shared between README and website.
+- README is generated: edit `docs/README.tmpl.md` or `docs/shared/*.md`, then run `go run ./cmd/readmegen/ > README.md`
+- Website uses Hugo `{{< include >}}` shortcodes that resolve to `docs/shared/` via module mount
+- **Never edit README.md directly** — it will be overwritten by readmegen
+
+When code changes affect any of the following, update the shared source and regenerate:
+- Key bindings added/removed/changed → `docs/shared/keybindings.md`
+- Child views added/removed → `docs/shared/childviews.md`
+- Commands added/removed/changed → `docs/shared/commands.md`
+- CLI flags changed → `docs/shared/quickstart.md`
+- Install methods changed → `docs/shared/install.md`
+- Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
+- Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
