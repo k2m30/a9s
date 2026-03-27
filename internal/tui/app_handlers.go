@@ -157,10 +157,15 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	m.identityFetching = true
 	identityCmd := m.fetchIdentity()
 
-	// Start availability cache loading (unless disabled or demo mode)
+	// Start availability probes (unless disabled)
 	var availCmd tea.Cmd
-	if !m.noCache && !m.demoMode {
-		availCmd = m.loadAvailabilityCache()
+	if !m.noCache {
+		if m.demoMode {
+			// Demo mode: skip cache file I/O, start probes directly
+			availCmd = m.startAvailabilityProbes()
+		} else {
+			availCmd = m.loadAvailabilityCache()
+		}
 	}
 
 	if m.pendingRefresh {
@@ -376,12 +381,16 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Main menu: restart availability checks
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
-		if m.noCache || m.demoMode {
+		if m.noCache {
 			return m, nil
 		}
 		// Increment gen to cancel any in-flight probes
 		m.availabilityGen++
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
+		if m.demoMode {
+			cmd := m.startAvailabilityProbes()
+			return m, cmd
+		}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
 	}
