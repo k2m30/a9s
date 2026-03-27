@@ -1,0 +1,37 @@
+list:
+  Node Group:
+    path: NodegroupName
+    width: 28
+  Cluster:
+    path: ClusterName
+    width: 24
+  Status:
+    path: Status
+    width: 14
+  Instance Types:
+    path: InstanceTypes
+    width: 20
+  Desired:
+    path: ScalingConfig.DesiredSize
+    width: 9
+
+detail:
+  - NodegroupName
+  - ClusterName
+  - Status
+  - InstanceTypes
+  - AmiType
+  - CapacityType
+  - DiskSize
+  - ScalingConfig
+  - NodeRole
+  - NodegroupArn
+  - ReleaseVersion
+  - Version
+  - Subnets
+  - LaunchTemplate
+  - Labels
+  - Taints
+  - Tags
+  - Health
+  - CreatedAt

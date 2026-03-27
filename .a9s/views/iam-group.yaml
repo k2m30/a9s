@@ -1,0 +1,19 @@
+list:
+  Group Name:
+    path: GroupName
+    width: 32
+  Group ID:
+    path: GroupId
+    width: 22
+  Path:
+    path: Path
+    width: 20
+  Created:
+    path: CreateDate
+    width: 22
+  ARN:
+    path: Arn
+    width: 60
+
+detail:
+  [GroupName, GroupId, Arn, Path, CreateDate]

@@ -1,0 +1,40 @@
+list:
+  Run ID:
+    key: run_id_short
+    width: 12
+  State:
+    path: JobRunState
+    width: 12
+  Started:
+    path: StartedOn
+    width: 22
+  Execution Time:
+    key: execution_time_human
+    width: 14
+  Error Message:
+    path: ErrorMessage
+    width: 44
+  DPU Hours:
+    key: dpu_hours
+    width: 10
+
+detail:
+  - Id
+  - JobRunState
+  - StartedOn
+  - CompletedOn
+  - ExecutionTime
+  - ErrorMessage
+  - Attempt
+  - PreviousRunId
+  - TriggerName
+  - JobName
+  - AllocatedCapacity
+  - MaxCapacity
+  - WorkerType
+  - NumberOfWorkers
+  - Timeout
+  - GlueVersion
+  - DPUSeconds
+  - ExecutionClass
+  - LogGroupName

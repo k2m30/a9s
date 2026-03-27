@@ -1,0 +1,26 @@
+list:
+  Repository:
+    path: RepositoryName
+    width: 36
+  URI:
+    path: RepositoryUri
+    width: 60
+  Tag Mutability:
+    path: ImageTagMutability
+    width: 16
+  Scan:
+    path: ImageScanningConfiguration.ScanOnPush
+    width: 6
+  Created:
+    path: CreatedAt
+    width: 22
+
+detail:
+  - RepositoryName
+  - RepositoryUri
+  - RepositoryArn
+  - RegistryId
+  - ImageTagMutability
+  - ImageScanningConfiguration
+  - EncryptionConfiguration
+  - CreatedAt

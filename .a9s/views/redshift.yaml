@@ -1,0 +1,31 @@
+list:
+  Cluster ID:
+    path: ClusterIdentifier
+    width: 28
+  Status:
+    path: ClusterStatus
+    width: 14
+  Node Type:
+    path: NodeType
+    width: 16
+  Nodes:
+    path: NumberOfNodes
+    width: 7
+  Database:
+    path: DBName
+    width: 16
+  Endpoint:
+    path: Endpoint.Address
+    width: 44
+
+detail:
+  - ClusterIdentifier
+  - ClusterStatus
+  - NodeType
+  - NumberOfNodes
+  - DBName
+  - MasterUsername
+  - Endpoint
+  - ClusterCreateTime
+  - ClusterNamespaceArn
+  - AvailabilityZone

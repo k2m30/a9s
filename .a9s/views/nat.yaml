@@ -1,0 +1,30 @@
+list:
+  Name:
+    width: 24
+  NAT Gateway ID:
+    path: NatGatewayId
+    width: 26
+  VPC ID:
+    path: VpcId
+    width: 24
+  Subnet ID:
+    path: SubnetId
+    width: 26
+  State:
+    path: State
+    width: 12
+  Public IP:
+    key: public_ip
+    width: 16
+
+detail:
+  - NatGatewayId
+  - VpcId
+  - SubnetId
+  - State
+  - ConnectivityType
+  - NatGatewayAddresses
+  - CreateTime
+  - FailureCode
+  - FailureMessage
+  - Tags

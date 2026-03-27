@@ -1,0 +1,24 @@
+list:
+  Cluster Name:
+    path: ClusterName
+    width: 28
+  Type:
+    path: ClusterType
+    width: 14
+  State:
+    path: State
+    width: 14
+  Version:
+    path: CurrentVersion
+    width: 14
+
+detail:
+  - ClusterName
+  - ClusterArn
+  - ClusterType
+  - State
+  - CurrentVersion
+  - CreationTime
+  - Provisioned
+  - Serverless
+  - Tags

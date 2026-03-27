@@ -1,0 +1,27 @@
+list:
+  Project Name:
+    path: Name
+    width: 32
+  Source Type:
+    path: Source.Type
+    width: 14
+  Description:
+    path: Description
+    width: 36
+  Last Modified:
+    path: LastModified
+    width: 22
+
+detail:
+  - Name
+  - Description
+  - Arn
+  - Source
+  - Environment
+  - ServiceRole
+  - Created
+  - LastModified
+  - Cache
+  - LogsConfig
+  - ConcurrentBuildLimit
+  - Tags

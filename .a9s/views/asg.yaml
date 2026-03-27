@@ -1,0 +1,37 @@
+list:
+  ASG Name:
+    path: AutoScalingGroupName
+    width: 36
+  Min:
+    path: MinSize
+    width: 6
+  Max:
+    path: MaxSize
+    width: 6
+  Desired:
+    path: DesiredCapacity
+    width: 8
+  Instances:
+    path: Instances
+    width: 10
+  Status:
+    path: Status
+    width: 12
+
+detail:
+  - AutoScalingGroupName
+  - AutoScalingGroupARN
+  - MinSize
+  - MaxSize
+  - DesiredCapacity
+  - AvailabilityZones
+  - LaunchConfigurationName
+  - HealthCheckType
+  - HealthCheckGracePeriod
+  - TargetGroupARNs
+  - LoadBalancerNames
+  - SuspendedProcesses
+  - TerminationPolicies
+  - VPCZoneIdentifier
+  - CreatedTime
+  - Tags

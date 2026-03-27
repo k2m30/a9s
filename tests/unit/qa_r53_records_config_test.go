@@ -58,10 +58,10 @@ func TestConfigDefaultViewDef_R53Records_DetailPaths(t *testing.T) {
 }
 
 func TestConfigYAMLParsing_R53Records(t *testing.T) {
-	paths := []string{testdataPath("views_r53_records.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_r53_records")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
-		t.Fatalf("LoadFrom failed: %v", err)
+		t.Fatalf("LoadFromDirs failed: %v", err)
 	}
 	if cfg == nil {
 		t.Fatal("expected non-nil config")
@@ -107,10 +107,10 @@ func TestGetViewDef_R53Records_NilConfig(t *testing.T) {
 }
 
 func TestGetViewDef_R53Records_FromConfig(t *testing.T) {
-	paths := []string{testdataPath("views_r53_records.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_r53_records")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
-		t.Fatalf("LoadFrom failed: %v", err)
+		t.Fatalf("LoadFromDirs failed: %v", err)
 	}
 
 	vd := config.GetViewDef(cfg, "r53_records")
@@ -125,10 +125,10 @@ func TestGetViewDef_R53Records_FromConfig(t *testing.T) {
 
 func TestGetViewDef_R53Records_PartialConfig_FallsBackToDefaults(t *testing.T) {
 	// Config has s3 but not r53_records -- should fall back to defaults
-	paths := []string{testdataPath("views_partial.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_partial")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
-		t.Fatalf("LoadFrom failed: %v", err)
+		t.Fatalf("LoadFromDirs failed: %v", err)
 	}
 
 	vd := config.GetViewDef(cfg, "r53_records")

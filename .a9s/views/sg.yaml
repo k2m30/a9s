@@ -1,0 +1,24 @@
+list:
+  Group Name:
+    path: GroupName
+    width: 28
+  Group ID:
+    path: GroupId
+    width: 24
+  VPC ID:
+    path: VpcId
+    width: 24
+  Description:
+    path: Description
+    width: 36
+
+detail:
+  - GroupId
+  - GroupName
+  - VpcId
+  - Description
+  - OwnerId
+  - SecurityGroupArn
+  - IpPermissions
+  - IpPermissionsEgress
+  - Tags

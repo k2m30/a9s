@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -52,9 +53,9 @@ func TestDetailLayout_KeysHaveColon(t *testing.T) {
 func TestDetailLayout_ScalarFieldsInline(t *testing.T) {
 	ensureNoColor(t)
 
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
-		t.Skipf("views.yaml not found: %v", err)
+		t.Skipf("views dir not loadable: %v", err)
 	}
 
 	// Use a simple struct where State is a scalar string, not a nested object
@@ -101,9 +102,12 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 			Code: ptrInt32(16),
 		},
 	}
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
-		t.Fatalf("views.yaml not found: %v", err)
+		t.Fatalf("views dir not loadable: %v", err)
+	}
+	if cfg == nil {
+		t.Skip(".a9s/views/ directory does not exist yet")
 	}
 	res := resource.Resource{
 		ID:        "i-test123",
@@ -204,9 +208,9 @@ func TestDetailLayout_EmptySliceShowsDashNotNull(t *testing.T) {
 		SecurityGroups: []ec2types.GroupIdentifier{}, // empty slice — triggers the bug
 		Tags:           []ec2types.Tag{},             // another empty slice
 	}
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
-		t.Fatalf("views.yaml not found: %v", err)
+		t.Fatalf("views dir not loadable: %v", err)
 	}
 	res := resource.Resource{
 		ID:        "i-0abc123def456789a",
@@ -253,9 +257,9 @@ func TestDetailLayout_NilSliceShowsDashNotNull(t *testing.T) {
 		},
 		// SecurityGroups and Tags are nil (zero value for slices)
 	}
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
-		t.Fatalf("views.yaml not found: %v", err)
+		t.Fatalf("views dir not loadable: %v", err)
 	}
 	res := resource.Resource{
 		ID:        "i-0abc123def456789a",

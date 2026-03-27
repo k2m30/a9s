@@ -1,0 +1,28 @@
+list:
+  Alias:
+    path: AliasName
+    width: 32
+  Key ID:
+    path: KeyId
+    width: 38
+  Status:
+    path: KeyState
+    width: 12
+  Description:
+    path: Description
+    width: 36
+
+detail:
+  - KeyId
+  - Arn
+  - Description
+  - KeyState
+  - KeyUsage
+  - KeySpec
+  - KeyManager
+  - Enabled
+  - CreationDate
+  - Origin
+  - MultiRegion
+  - EncryptionAlgorithms
+  - SigningAlgorithms

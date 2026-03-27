@@ -1,0 +1,24 @@
+list:
+  Plan Name:
+    path: BackupPlanName
+    width: 32
+  Plan ID:
+    path: BackupPlanId
+    width: 38
+  Created:
+    path: CreationDate
+    width: 22
+  Last Execution:
+    path: LastExecutionDate
+    width: 22
+
+detail:
+  - BackupPlanName
+  - BackupPlanId
+  - BackupPlanArn
+  - CreationDate
+  - LastExecutionDate
+  - DeletionDate
+  - VersionId
+  - CreatorRequestId
+  - AdvancedBackupSettings

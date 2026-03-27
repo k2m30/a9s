@@ -1,0 +1,43 @@
+list:
+  Function Name:
+    path: FunctionName
+    width: 36
+  Runtime:
+    path: Runtime
+    width: 16
+  Memory:
+    path: MemorySize
+    width: 8
+  Timeout:
+    path: Timeout
+    width: 8
+  State:
+    path: State
+    width: 10
+  Last Modified:
+    path: LastModified
+    width: 22
+
+detail:
+  - FunctionName
+  - FunctionArn
+  - Runtime
+  - Handler
+  - MemorySize
+  - Timeout
+  - EphemeralStorage
+  - CodeSize
+  - Description
+  - Role
+  - PackageType
+  - Architectures
+  - State
+  - LastUpdateStatus
+  - LastUpdateStatusReason
+  - Environment
+  - VpcConfig
+  - DeadLetterConfig
+  - TracingConfig
+  - Layers
+  - LoggingConfig
+  - LastModified

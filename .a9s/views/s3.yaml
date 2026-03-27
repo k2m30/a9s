@@ -1,0 +1,13 @@
+list:
+  Bucket Name:
+    path: Name
+    width: 36
+  Region:
+    path: BucketRegion
+    width: 14
+  Creation Date:
+    path: CreationDate
+    width: 22
+
+detail:
+  [Name, BucketArn, BucketRegion, CreationDate]

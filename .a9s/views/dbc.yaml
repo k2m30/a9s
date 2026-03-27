@@ -1,0 +1,35 @@
+list:
+  Cluster ID:
+    path: DBClusterIdentifier
+    width: 28
+  Version:
+    path: EngineVersion
+    width: 10
+  Status:
+    path: Status
+    width: 14
+  Instances:
+    path: DBClusterMembers
+    width: 10
+  Endpoint:
+    path: Endpoint
+    width: 48
+
+detail:
+  - DBClusterIdentifier
+  - DBClusterArn
+  - Engine
+  - EngineVersion
+  - Status
+  - Endpoint
+  - ReaderEndpoint
+  - Port
+  - StorageEncrypted
+  - KmsKeyId
+  - DeletionProtection
+  - DBClusterMembers
+  - DBSubnetGroup
+  - VpcSecurityGroups
+  - BackupRetentionPeriod
+  - PreferredMaintenanceWindow
+  - MasterUsername

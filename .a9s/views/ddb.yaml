@@ -1,0 +1,35 @@
+list:
+  Table Name:
+    path: TableName
+    width: 36
+  Status:
+    path: TableStatus
+    width: 12
+  Items:
+    path: ItemCount
+    width: 12
+  Size:
+    key: size_bytes
+    width: 14
+  Billing:
+    path: BillingModeSummary.BillingMode
+    width: 16
+
+detail:
+  - TableName
+  - TableArn
+  - TableId
+  - TableStatus
+  - ItemCount
+  - TableSizeBytes
+  - BillingModeSummary
+  - GlobalSecondaryIndexes
+  - LocalSecondaryIndexes
+  - ProvisionedThroughput
+  - DeletionProtectionEnabled
+  - StreamSpecification
+  - SSEDescription
+  - CreationDateTime
+  - KeySchema
+  - AttributeDefinitions
+  - Tags

@@ -179,8 +179,8 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Config / YAML
-- [ ] `views.yaml` uses ordered YAML maps for column definitions (parsed via `yaml.Node`)
-- [ ] Config lookup chain: `./views.yaml` -> `$A9S_CONFIG_FOLDER/views.yaml` -> `~/.a9s/views.yaml`
+- [ ] Per-resource YAML files use ordered YAML maps for column definitions (parsed via `yaml.Node`)
+- [ ] Config lookup chain: `$A9S_CONFIG_FOLDER/views/*.yaml` (or `~/.a9s/views/*.yaml`) -> `.a9s/views/*.yaml` (per-resource overlays)
 - [ ] `GetViewDef()` merges user config with defaults — partial overrides supported
 - [ ] Missing config file is not an error — defaults are always sufficient
 

@@ -1,0 +1,41 @@
+list:
+  "Build #":
+    key: build_number
+    width: 10
+  Status:
+    key: build_status
+    width: 14
+  Start Time:
+    key: start_time
+    width: 22
+  Duration:
+    key: duration
+    width: 12
+  Source Version:
+    key: source_version_short
+    width: 14
+  Initiator:
+    key: initiator
+    width: 24
+
+detail:
+  - Id
+  - Arn
+  - BuildNumber
+  - BuildStatus
+  - StartTime
+  - EndTime
+  - CurrentPhase
+  - SourceVersion
+  - ResolvedSourceVersion
+  - Initiator
+  - Source
+  - Environment
+  - Phases
+  - Logs
+  - Cache
+  - VpcConfig
+  - ServiceRole
+  - TimeoutInMinutes
+  - QueuedTimeoutInMinutes
+  - BuildBatchArn

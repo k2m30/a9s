@@ -1,0 +1,13 @@
+list:
+  Timestamp:
+    path: Date
+    width: 22
+  Category:
+    key: event_categories
+    width: 18
+  Message:
+    path: Message
+    width: 60
+
+detail:
+  [Date, SourceIdentifier, SourceType, EventCategories, SourceArn, Message]

@@ -1,0 +1,22 @@
+list:
+  Repository:
+    path: Name
+    width: 28
+  Domain:
+    path: DomainName
+    width: 24
+  Description:
+    path: Description
+    width: 30
+  Owner:
+    path: DomainOwner
+    width: 14
+
+detail:
+  - Name
+  - DomainName
+  - DomainOwner
+  - Arn
+  - Description
+  - AdministratorAccount
+  - CreatedTime

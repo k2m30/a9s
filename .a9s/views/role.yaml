@@ -1,0 +1,29 @@
+list:
+  Role Name:
+    path: RoleName
+    width: 36
+  Last Used:
+    path: RoleLastUsed.LastUsedDate
+    width: 22
+  Path:
+    path: Path
+    width: 20
+  Created:
+    path: CreateDate
+    width: 22
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - RoleName
+  - RoleId
+  - Arn
+  - Path
+  - CreateDate
+  - Description
+  - MaxSessionDuration
+  - RoleLastUsed
+  - PermissionsBoundary
+  - AssumeRolePolicyDocument
+  - Tags

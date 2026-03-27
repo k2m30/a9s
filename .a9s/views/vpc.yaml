@@ -1,0 +1,27 @@
+list:
+  Name:
+    width: 24
+  VPC ID:
+    path: VpcId
+    width: 24
+  CIDR Block:
+    path: CidrBlock
+    width: 18
+  State:
+    path: State
+    width: 12
+  Default:
+    path: IsDefault
+    width: 9
+
+detail:
+  - VpcId
+  - CidrBlock
+  - State
+  - IsDefault
+  - InstanceTenancy
+  - DhcpOptionsId
+  - OwnerId
+  - CidrBlockAssociationSet
+  - Ipv6CidrBlockAssociationSet
+  - Tags

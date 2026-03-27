@@ -1,0 +1,30 @@
+list:
+  Name:
+    width: 24
+  Allocation ID:
+    path: AllocationId
+    width: 26
+  Public IP:
+    path: PublicIp
+    width: 16
+  Association:
+    path: AssociationId
+    width: 26
+  Instance:
+    path: InstanceId
+    width: 20
+  Domain:
+    path: Domain
+    width: 8
+
+detail:
+  - AllocationId
+  - PublicIp
+  - AssociationId
+  - InstanceId
+  - Domain
+  - NetworkBorderGroup
+  - SubnetId
+  - PrivateIpAddress
+  - NetworkInterfaceId
+  - Tags

@@ -1,0 +1,33 @@
+list:
+  Name:
+    path: LoadBalancerName
+    width: 32
+  Type:
+    path: Type
+    width: 12
+  Scheme:
+    path: Scheme
+    width: 14
+  State:
+    path: State.Code
+    width: 12
+  DNS Name:
+    path: DNSName
+    width: 48
+  VPC ID:
+    path: VpcId
+    width: 24
+
+detail:
+  - LoadBalancerName
+  - LoadBalancerArn
+  - DNSName
+  - Type
+  - Scheme
+  - State
+  - VpcId
+  - AvailabilityZones
+  - SecurityGroups
+  - IpAddressType
+  - CanonicalHostedZoneId
+  - CreatedTime

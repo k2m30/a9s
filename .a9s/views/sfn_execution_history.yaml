@@ -1,0 +1,47 @@
+list:
+  Timestamp:
+    path: Timestamp
+    width: 22
+  Event Type:
+    key: event_type_short
+    width: 24
+  State:
+    key: state_name
+    width: 24
+  Detail:
+    key: event_detail
+    width: 40
+
+detail:
+  - Timestamp
+  - Type
+  - Id
+  - PreviousEventId
+  - ActivityFailedEventDetails
+  - ActivityScheduleFailedEventDetails
+  - ActivityScheduledEventDetails
+  - ActivityStartedEventDetails
+  - ActivitySucceededEventDetails
+  - ActivityTimedOutEventDetails
+  - ExecutionAbortedEventDetails
+  - ExecutionFailedEventDetails
+  - ExecutionStartedEventDetails
+  - ExecutionSucceededEventDetails
+  - ExecutionTimedOutEventDetails
+  - LambdaFunctionFailedEventDetails
+  - LambdaFunctionScheduledEventDetails
+  - LambdaFunctionStartFailedEventDetails
+  - LambdaFunctionSucceededEventDetails
+  - LambdaFunctionTimedOutEventDetails
+  - TaskFailedEventDetails
+  - TaskScheduledEventDetails
+  - TaskStartedEventDetails
+  - TaskStartFailedEventDetails
+  - TaskSubmitFailedEventDetails
+  - TaskSubmittedEventDetails
+  - TaskSucceededEventDetails
+  - TaskTimedOutEventDetails
+  - MapRunFailedEventDetails
+  - MapRunStartedEventDetails
+  - StateEnteredEventDetails
+  - StateExitedEventDetails

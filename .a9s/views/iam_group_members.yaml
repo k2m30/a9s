@@ -1,0 +1,23 @@
+list:
+  User Name:
+    key: user_name
+    width: 28
+  User ID:
+    key: user_id
+    width: 24
+  Created:
+    key: create_date
+    width: 22
+  Password Last Used:
+    key: password_last_used
+    width: 22
+
+detail:
+  - UserName
+  - UserId
+  - Arn
+  - Path
+  - CreateDate
+  - PasswordLastUsed
+  - PermissionsBoundary
+  - Tags

@@ -1,0 +1,31 @@
+list:
+  Target ID:
+    path: Id
+    width: 20
+  Target ARN:
+    path: Arn
+    width: 48
+  Resource:
+    key: resource_type_name
+    width: 28
+  Input:
+    key: input_summary
+    width: 36
+
+detail:
+  - Id
+  - Arn
+  - RoleArn
+  - Input
+  - InputPath
+  - InputTransformer
+  - DeadLetterConfig
+  - RetryPolicy
+  - SqsParameters
+  - EcsParameters
+  - KinesisParameters
+  - BatchParameters
+  - HttpParameters
+  - SageMakerPipelineParameters
+  - RedshiftDataParameters
+  - AppSyncParameters

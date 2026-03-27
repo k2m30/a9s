@@ -1,0 +1,32 @@
+list:
+  Environment:
+    path: EnvironmentName
+    width: 28
+  Application:
+    path: ApplicationName
+    width: 24
+  Status:
+    path: Status
+    width: 12
+  Health:
+    path: Health
+    width: 10
+  Version:
+    path: VersionLabel
+    width: 16
+
+detail:
+  - EnvironmentName
+  - EnvironmentId
+  - ApplicationName
+  - Status
+  - Health
+  - HealthStatus
+  - VersionLabel
+  - SolutionStackName
+  - PlatformArn
+  - EndpointURL
+  - CNAME
+  - DateCreated
+  - DateUpdated
+  - EnvironmentArn

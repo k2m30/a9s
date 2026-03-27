@@ -1,0 +1,33 @@
+list:
+  Name:
+    path: Name
+    width: 28
+  File System ID:
+    path: FileSystemId
+    width: 22
+  State:
+    path: LifeCycleState
+    width: 12
+  Perf Mode:
+    path: PerformanceMode
+    width: 16
+  Encrypted:
+    path: Encrypted
+    width: 10
+  Mounts:
+    path: NumberOfMountTargets
+    width: 8
+
+detail:
+  - FileSystemId
+  - Name
+  - LifeCycleState
+  - PerformanceMode
+  - ThroughputMode
+  - Encrypted
+  - NumberOfMountTargets
+  - FileSystemArn
+  - OwnerId
+  - SizeInBytes
+  - CreationTime
+  - Tags

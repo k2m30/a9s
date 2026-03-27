@@ -149,7 +149,7 @@ func main() {
 
 	fmt.Println("# views_reference.yaml")
 	fmt.Println("# Generated from AWS SDK Go v2 struct reflection")
-	fmt.Println("# Use these paths in your views.yaml configuration")
+	fmt.Println("# Use these paths in your ~/.a9s/views/ configuration files")
 	fmt.Println()
 
 	for _, r := range resources {

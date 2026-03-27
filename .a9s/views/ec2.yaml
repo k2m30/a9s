@@ -1,0 +1,46 @@
+list:
+  Name:
+    width: 24
+  State:
+    path: State.Name
+    width: 12
+  Lifecycle:
+    path: InstanceLifecycle
+    width: 12
+  Type:
+    path: InstanceType
+    width: 14
+  Private IP:
+    path: PrivateIpAddress
+    width: 16
+  Public IP:
+    path: PublicIpAddress
+    width: 16
+  Instance ID:
+    path: InstanceId
+    width: 20
+  Launch Time:
+    path: LaunchTime
+    width: 22
+
+detail:
+  - InstanceId
+  - State
+  - InstanceType
+  - InstanceLifecycle
+  - ImageId
+  - KeyName
+  - Placement
+  - VpcId
+  - SubnetId
+  - PrivateIpAddress
+  - PrivateDnsName
+  - PublicIpAddress
+  - IamInstanceProfile
+  - SecurityGroups
+  - EbsOptimized
+  - MetadataOptions
+  - LaunchTime
+  - Architecture
+  - Platform
+  - Tags

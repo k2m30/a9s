@@ -1,0 +1,39 @@
+list:
+  Cluster ID:
+    path: CacheClusterId
+    width: 28
+  Version:
+    path: EngineVersion
+    width: 10
+  Node Type:
+    path: CacheNodeType
+    width: 18
+  Status:
+    path: CacheClusterStatus
+    width: 14
+  Nodes:
+    path: NumCacheNodes
+    width: 8
+  Endpoint:
+    path: ConfigurationEndpoint.Address
+    width: 40
+
+detail:
+  - CacheClusterId
+  - ARN
+  - Engine
+  - EngineVersion
+  - CacheClusterStatus
+  - CacheNodeType
+  - NumCacheNodes
+  - CacheNodes
+  - ConfigurationEndpoint
+  - PreferredAvailabilityZone
+  - ReplicationGroupId
+  - CacheSubnetGroupName
+  - SecurityGroups
+  - AtRestEncryptionEnabled
+  - TransitEncryptionEnabled
+  - AuthTokenEnabled
+  - SnapshotRetentionLimit
+  - PreferredMaintenanceWindow

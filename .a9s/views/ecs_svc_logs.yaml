@@ -1,0 +1,13 @@
+list:
+  Timestamp:
+    key: timestamp
+    width: 22
+  Stream:
+    key: stream_short
+    width: 20
+  Message:
+    key: message
+    width: 120
+
+detail:
+  [Timestamp, Message, IngestionTime, EventId, LogStreamName]

@@ -1,0 +1,31 @@
+list:
+  Domain Name:
+    path: DomainName
+    width: 28
+  Engine Version:
+    path: EngineVersion
+    width: 16
+  Instance Type:
+    path: ClusterConfig.InstanceType
+    width: 22
+  Instances:
+    path: ClusterConfig.InstanceCount
+    width: 10
+  Endpoint:
+    path: Endpoint
+    width: 48
+
+detail:
+  - DomainName
+  - DomainId
+  - ARN
+  - EngineVersion
+  - ClusterConfig
+  - EBSOptions
+  - Endpoint
+  - Endpoints
+  - EncryptionAtRestOptions
+  - DomainEndpointOptions
+  - AdvancedSecurityOptions
+  - Created
+  - Deleted

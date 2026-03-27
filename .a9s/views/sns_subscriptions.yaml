@@ -1,0 +1,16 @@
+list:
+  Protocol:
+    key: protocol
+    width: 10
+  Endpoint:
+    key: endpoint
+    width: 48
+  Status:
+    key: confirmation_status
+    width: 18
+  Owner:
+    key: owner
+    width: 14
+
+detail:
+  [SubscriptionArn, TopicArn, Protocol, Endpoint, Owner]

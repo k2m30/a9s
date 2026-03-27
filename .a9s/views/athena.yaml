@@ -1,0 +1,16 @@
+list:
+  Workgroup:
+    path: Name
+    width: 28
+  State:
+    path: State
+    width: 12
+  Description:
+    path: Description
+    width: 30
+  Engine:
+    path: EngineVersion.EffectiveEngineVersion
+    width: 28
+
+detail:
+  [Name, State, Description, EngineVersion, CreationTime]

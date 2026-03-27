@@ -1,0 +1,10 @@
+list:
+  Timestamp:
+    key: timestamp
+    width: 22
+  Message:
+    key: message
+    width: 120
+
+detail:
+  [Timestamp, Message, IngestionTime, EventId]

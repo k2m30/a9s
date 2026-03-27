@@ -1,0 +1,42 @@
+list:
+  Snapshot ID:
+    path: DBClusterSnapshotIdentifier
+    width: 36
+  Cluster ID:
+    path: DBClusterIdentifier
+    width: 28
+  Status:
+    path: Status
+    width: 12
+  Engine:
+    path: Engine
+    width: 12
+  Type:
+    path: SnapshotType
+    width: 12
+  Created:
+    path: SnapshotCreateTime
+    width: 22
+  Storage:
+    path: StorageType
+    width: 10
+
+detail:
+  - DBClusterSnapshotIdentifier
+  - DBClusterSnapshotArn
+  - DBClusterIdentifier
+  - Status
+  - Engine
+  - EngineVersion
+  - SnapshotType
+  - SnapshotCreateTime
+  - ClusterCreateTime
+  - MasterUsername
+  - Port
+  - VpcId
+  - StorageEncrypted
+  - KmsKeyId
+  - StorageType
+  - PercentProgress
+  - SourceDBClusterSnapshotArn
+  - AvailabilityZones

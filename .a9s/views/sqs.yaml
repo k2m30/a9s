@@ -1,0 +1,19 @@
+list:
+  Queue Name:
+    key: queue_name
+    width: 36
+  Messages:
+    key: approx_messages
+    width: 10
+  In Flight:
+    key: approx_not_visible
+    width: 10
+  Delay:
+    key: delay_seconds
+    width: 8
+  Queue URL:
+    key: queue_url
+    width: 50
+
+detail:
+  [QueueUrl, Attributes]

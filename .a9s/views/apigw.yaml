@@ -1,0 +1,28 @@
+list:
+  Name:
+    path: Name
+    width: 28
+  API ID:
+    path: ApiId
+    width: 14
+  Protocol:
+    path: ProtocolType
+    width: 12
+  Endpoint:
+    path: ApiEndpoint
+    width: 50
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - ApiId
+  - Name
+  - ProtocolType
+  - ApiEndpoint
+  - Description
+  - CreatedDate
+  - ApiKeySelectionExpression
+  - RouteSelectionExpression
+  - CorsConfiguration
+  - Tags

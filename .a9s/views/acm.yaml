@@ -1,0 +1,31 @@
+list:
+  Domain Name:
+    path: DomainName
+    width: 40
+  Status:
+    path: Status
+    width: 14
+  Type:
+    path: Type
+    width: 14
+  Expires:
+    path: NotAfter
+    width: 22
+  In Use:
+    path: InUse
+    width: 8
+
+detail:
+  - DomainName
+  - CertificateArn
+  - SubjectAlternativeNameSummaries
+  - Status
+  - Type
+  - NotBefore
+  - NotAfter
+  - IssuedAt
+  - ImportedAt
+  - InUse
+  - CreatedAt
+  - RenewalEligibility
+  - KeyAlgorithm

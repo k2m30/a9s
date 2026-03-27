@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,9 +21,12 @@ import (
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 	styles.Reinit() // ensure styles are initialized
 
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
-		t.Fatalf("failed to load views.yaml: %v", err)
+		t.Fatalf("failed to load views dir: %v", err)
+	}
+	if cfg == nil {
+		t.Skip(".a9s/views/ directory does not exist yet")
 	}
 
 	k := keys.Default()

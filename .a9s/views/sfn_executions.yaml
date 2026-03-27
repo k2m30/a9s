@@ -1,0 +1,30 @@
+list:
+  Name:
+    path: Name
+    width: 36
+  Status:
+    path: Status
+    width: 12
+  Start Date:
+    path: StartDate
+    width: 22
+  Stop Date:
+    path: StopDate
+    width: 22
+  Duration:
+    key: duration
+    width: 12
+
+detail:
+  - ExecutionArn
+  - Name
+  - Status
+  - StartDate
+  - StopDate
+  - StateMachineArn
+  - StateMachineAliasArn
+  - StateMachineVersionArn
+  - MapRunArn
+  - ItemCount
+  - RedriveCount
+  - RedriveDate
