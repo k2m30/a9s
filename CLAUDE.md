@@ -61,25 +61,26 @@ Go 1.26+: Follow standard conventions
 |-------|-------|-------|
 | `a9s-common` | All agents | Shell rules, package access rules, build/test commands |
 | `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
-| `a9s-add-resource` | Coder + QA (on-demand) | 12-step blueprint for adding new AWS resource types (fetcher + view-layer tests) |
-| `a9s-add-child-view` | Coder + QA (on-demand) | Step-by-step blueprint for adding child views (child fetcher + type registration + parent wiring + tests) |
+| `a9s-add-resource` | Coder (steps 1-7), QA (steps 8-12) | Split blueprint: coder=implementation, QA=tests |
+| `a9s-add-child-view` | Coder (phase 3), QA (phase 2) | Split blueprint: architect scopes, QA tests, coder implements |
+| `a9s-implement-issue` | Architect (orchestrator) | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
 
 ## Agents
 
-| Agent | Role | Tools |
-|-------|------|-------|
-| `a9s-architect` | Architecture + resource type specs | Read-only |
-| `a9s-coder` | Implementation — views, fetchers, resource types (TDD) | All |
-| `a9s-tui-reviewer` | Code review — BT v2 correctness, design compliance | Read-only |
-| `a9s-qa` | Writes test code for all resource types | All |
-| `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Read/Glob/Grep |
-| `a9s-pm` | Progress tracking, dependency management, releases | Read-only |
-| `a9s-integrator` | Cross-package wiring, message flow, app.go | All |
-| `a9s-fixtures` | Test fixtures from dev-account via AWS MCP | Read/Write/Bash |
-| `test-coverage-analyzer` | Test suite analysis, coverage gaps | Read-only |
-| `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Read + Web |
-| `a9s-devops` | AWS practitioner — resource priorities, feature advice, real workflows | All |
-| `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Read-only |
+| Agent | Role | Writes to | Rejects without |
+|-------|------|-----------|-----------------|
+| `a9s-architect` | Scopes tasks, design decisions, interfaces | Nothing (design output only) | N/A (owns scoping) |
+| `a9s-coder` | Implementation only — no tests | `internal/`, `cmd/`, `.a9s/` | Exact file scope from architect |
+| `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope from architect |
+| `a9s-tui-reviewer` | Code review — BT v2 correctness, design compliance | Nothing (read-only) | N/A |
+| `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
+| `a9s-pm` | Progress tracking, dependency management, releases | Nothing (read-only) | N/A |
+| `a9s-integrator` | Cross-package wiring, message flow, app.go | `internal/tui/app.go`, `messages/` | N/A |
+| `a9s-fixtures` | Test fixtures from dev-account via AWS MCP | `internal/demo/` | N/A |
+| `test-coverage-analyzer` | Test suite analysis, coverage gaps | Nothing (read-only) | N/A |
+| `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Nothing (read-only) | N/A |
+| `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
+| `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 
 ## Child-View Architecture
 
@@ -137,7 +138,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 ## Rules
 
 - ALWAYS rebuild binary (`go build -o a9s ./cmd/a9s/`) after ANY code change — version is resolved at build time via `internal/buildinfo`
-- ALWAYS write failing tests BEFORE writing implementation code (TDD is non-negotiable)
+- TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.

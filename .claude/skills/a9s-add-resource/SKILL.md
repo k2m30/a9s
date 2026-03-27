@@ -1,24 +1,33 @@
 ---
 name: a9s-add-resource
-description: Blueprint for adding a new AWS resource type to a9s — 12-step checklist with templates (fetcher, types, config, tests, view-layer tests)
+description: Blueprint for adding a new AWS resource type to a9s — split into CODER steps (1-7) and QA steps (8-12) with templates
 disable-model-invocation: true
 ---
 
 # Adding a New AWS Resource Type
 
-Follow this exact 12-step checklist for each new resource type. Use EC2 as the canonical example.
-
-Steps 1-8: Implementation. Step 9: Fetcher tests. Steps 10-12: View-layer tests (detail, YAML, list).
-**Skipping steps 10-12 is the #1 cause of test coverage gaps.**
+Two agents, two tracks. The architect scopes both tasks. Coder and QA can run in parallel for resource types (pattern is rigid).
 
 ## Prerequisites
 
-You MUST have a resource spec from the architect with:
+You MUST have a scoped task from the architect with:
 - ShortName, Aliases, Display Name
 - AWS SDK import, SDK Type, API call
 - Pattern: A, B, or C (see below)
 - List columns (field keys, titles, widths)
 - Detail paths
+- **Exact files to create and modify** (with append points)
+
+**If you don't have this, STOP.** Reply with REJECTED and ask for architect scope.
+
+## Agent Ownership
+
+| Steps | Owner | Writes to |
+|-------|-------|-----------|
+| 1-7 (implementation) | **a9s-coder** | `internal/`, `cmd/`, `.a9s/` |
+| 8-12 (tests) | **a9s-qa** | `tests/unit/` |
+
+**Coder MUST NOT write test files. QA MUST NOT write production code.**
 
 ## Pattern Variants
 
@@ -27,10 +36,10 @@ Pick the right pattern based on the architect spec:
 ### Decision Tree
 
 1. **Does this resource need a NEW AWS service client?**
-   - YES → **Pattern A** (Simple). Example: Lambda, CloudWatch, IAM
-   - NO (reuses existing client) → **Pattern B** (Client Reuse). Example: VPC, SG reuse EC2; Subnets reuse EC2
-2. **Does fetching require multiple API calls?** (list parent → list children → describe each)
-   - YES → **Pattern C** (Multi-Step Fetch). Example: Node Groups (ListClusters → ListNodegroups → DescribeNodegroup)
+   - YES -> **Pattern A** (Simple). Example: Lambda, CloudWatch, IAM
+   - NO (reuses existing client) -> **Pattern B** (Client Reuse). Example: VPC, SG reuse EC2; Subnets reuse EC2
+2. **Does fetching require multiple API calls?** (list parent -> list children -> describe each)
+   - YES -> **Pattern C** (Multi-Step Fetch). Example: Node Groups (ListClusters -> ListNodegroups -> DescribeNodegroup)
 
 ### Pattern A: Simple (EC2, RDS, S3)
 - 1 API call, 1 new interface, new client field in `ServiceClients`
@@ -59,7 +68,7 @@ func init() {
 ### Pattern C: Multi-Step Fetch (Node Groups)
 - Multiple API calls, multiple interfaces, fetcher takes multiple API params
 - `init()` passes same client multiple times
-- Nested loops: list parent → list children → describe each
+- Nested loops: list parent -> list children -> describe each
 - Architect spec includes `API Sequence:` with ordered steps
 
 ```go
@@ -161,7 +170,9 @@ for k, v := range ng.Tags {
 }
 ```
 
-## Checklist
+---
+
+# CODER STEPS (1-7) — a9s-coder agent only
 
 ### 1. Fetcher: `internal/aws/{type}.go` (NEW FILE)
 
@@ -254,7 +265,7 @@ Add constructor line in `CreateServiceClients`:
 
 Add import if new service.
 
-**If the service already exists** (e.g., VPC and SG reuse `EC2` client, Node Groups reuse `EKS` client), skip this step. The fetcher's `init()` references the existing client field (e.g., `c.EC2` for VPC/SG).
+**If the service already exists** (Pattern B), skip this step.
 
 ### 4. Resource type def: `internal/resource/types.go` (APPEND to resourceTypes slice)
 
@@ -284,19 +295,9 @@ Add import if new service.
 },
 ```
 
-### 6. User view config: `views.yaml` (ADD section)
+### 6. User view config: `.a9s/views/{shortname}.yaml` (REGENERATE via viewsgen)
 
-```yaml
-  {shortname}:
-    list:
-      Title1:
-        path: SDKFieldName
-        width: 28
-      # ... matching defaults.go
-    detail:
-      - SDKField1
-      - SDKField2
-```
+Run: `go run ./cmd/viewsgen/`
 
 ### 7. Refgen entry: `cmd/refgen/main.go` (APPEND to resources slice)
 
@@ -305,6 +306,10 @@ Add import if new service.
 ```
 
 Add import if new service types package.
+
+---
+
+# QA STEPS (8-12) — a9s-qa agent only
 
 ### 8. Mock: `tests/unit/mocks_test.go` (APPEND)
 
@@ -509,9 +514,9 @@ Coverage analysis found these gaps when steps 10-12 were missing:
 - **Config-driven paths not exercised** — list columns from `defaults.go` might reference non-existent struct fields
 - **Cross-cutting tests only covered types with explicit test functions** — adding RawStruct tests ensures the new type is exercised end-to-end
 
-## Post-Implementation Steps
+## Post-Implementation Steps (run by whichever agent finishes last)
 
-1. Run refgen: `go run ./cmd/refgen/ > views_reference.yaml`
+1. Run refgen: `go run ./cmd/refgen/ > .a9s/views_reference.yaml`
 2. Run tests: `go test ./tests/unit/ -count=1 -timeout 120s`
 3. Build: `go build -o a9s ./cmd/a9s/`
 4. Bump version in `cmd/a9s/main.go`
