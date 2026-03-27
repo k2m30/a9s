@@ -19,6 +19,7 @@ const DefaultTTL = 1 * time.Hour
 // Entry holds availability info for a single resource type.
 type Entry struct {
 	HasResources bool   `yaml:"has_resources"`
+	Count        int    `yaml:"count"`
 	Error        string `yaml:"error,omitempty"`
 }
 

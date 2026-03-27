@@ -28,10 +28,11 @@ type MainMenuModel struct {
 	// Invalidated when filteredItems changes (in applyFilter, SetFilter).
 	renderLinesCache []renderLine
 
-	// availability tracks which resource types have resources.
-	// true = has resources, false = empty (will be dimmed).
+	// availability tracks resource counts per type.
 	// Absent key = unknown (not yet checked, render normally).
-	availability map[string]bool
+	// Value 0 = empty (dimmed, skip-navigable).
+	// Value > 0 = has resources (normal style, count shown).
+	availability map[string]int
 
 	// availChecked / availTotal track background check progress.
 	// Both zero means "not checking" or "done".
@@ -92,7 +93,7 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 				selected := m.filteredItems[c]
 				// Block navigation to known-empty types (defensive — cursor should never land here)
 				if m.availability != nil {
-					if hasRes, known := m.availability[selected.ShortName]; known && !hasRes {
+					if count, known := m.availability[selected.ShortName]; known && count == 0 {
 						return m, nil
 					}
 				}
@@ -153,7 +154,7 @@ func (m *MainMenuModel) skipUnavailable(direction int) {
 	cur := start
 	for cur >= 0 && cur < total {
 		item := m.filteredItems[cur]
-		if hasRes, known := m.availability[item.ShortName]; !known || hasRes {
+		if count, known := m.availability[item.ShortName]; !known || count > 0 {
 			// This item is navigable (unknown or has resources)
 			m.scroll.SetCursor(cur)
 			return
@@ -165,7 +166,7 @@ func (m *MainMenuModel) skipUnavailable(direction int) {
 	cur = start - direction
 	for cur >= 0 && cur < total {
 		item := m.filteredItems[cur]
-		if hasRes, known := m.availability[item.ShortName]; !known || hasRes {
+		if count, known := m.availability[item.ShortName]; !known || count > 0 {
 			m.scroll.SetCursor(cur)
 			return
 		}
@@ -244,24 +245,37 @@ func (m MainMenuModel) View() string {
 		if nameFieldW < 10 {
 			nameFieldW = 10
 		}
-		namePadded := text.PadOrTrunc(item.Name, nameFieldW)
-
 		if rl.itemIndex == m.scroll.Cursor() {
+			// Build name with count suffix if known
+			nameStr := item.Name
+			if m.availability != nil {
+				if count, known := m.availability[item.ShortName]; known {
+					nameStr += " (" + itoa(count) + ")"
+				}
+			}
+			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
+
 			// Selected row: full highlight, alias stays dimmed.
 			dimAlias := styles.DimText.Render(aliasPadded)
 			selectedName := "    " + namePadded + " "
 			line := styles.RowSelected.Width(m.width).Render(selectedName + dimAlias)
 			sb.WriteString(line)
 		} else {
-			// Check if this resource type is known-empty (grey it out)
-			isEmpty := false
+			// Check availability count
+			count, known := -1, false
 			if m.availability != nil {
-				if hasResources, known := m.availability[item.ShortName]; known && !hasResources {
-					isEmpty = true
-				}
+				count, known = m.availability[item.ShortName]
 			}
-			if isEmpty {
-				// Both name and alias dimmed for empty resource types
+
+			// Build name with count suffix if known
+			nameStr := item.Name
+			if known {
+				nameStr += " (" + itoa(count) + ")"
+			}
+			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
+
+			if known && count == 0 {
+				// Empty resource type — fully dimmed
 				dimAlias := styles.DimText.Render(aliasPadded)
 				dimName := styles.DimText.Render("    " + namePadded + " ")
 				sb.WriteString(dimName + dimAlias)
@@ -324,12 +338,12 @@ func (m *MainMenuModel) GetFilter() string {
 	return m.filterText
 }
 
-// SetAvailability marks a resource type as having or not having resources.
-func (m *MainMenuModel) SetAvailability(shortName string, hasResources bool) {
+// SetAvailability sets the resource count for a resource type.
+func (m *MainMenuModel) SetAvailability(shortName string, count int) {
 	if m.availability == nil {
-		m.availability = make(map[string]bool)
+		m.availability = make(map[string]int)
 	}
-	m.availability[shortName] = hasResources
+	m.availability[shortName] = count
 }
 
 // ClearAvailability resets all availability state (e.g., on profile/region switch).
@@ -341,11 +355,11 @@ func (m *MainMenuModel) ClearAvailability() {
 
 // GetAvailability returns a copy of the availability map for cache persistence.
 // Returns nil if no availability data has been set.
-func (m *MainMenuModel) GetAvailability() map[string]bool {
+func (m *MainMenuModel) GetAvailability() map[string]int {
 	if m.availability == nil {
 		return nil
 	}
-	cp := make(map[string]bool, len(m.availability))
+	cp := make(map[string]int, len(m.availability))
 	for k, v := range m.availability {
 		cp[k] = v
 	}

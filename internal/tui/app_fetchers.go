@@ -313,14 +313,14 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 		if err != nil || cf == nil {
 			// No cache or error — return empty entries, will trigger full re-check
 			return messages.AvailabilityCacheLoadedMsg{
-				Entries: make(map[string]bool),
+				Entries: make(map[string]int),
 				Expired: true,
 			}
 		}
-		entries := make(map[string]bool, len(cf.Resources))
+		entries := make(map[string]int, len(cf.Resources))
 		for name, entry := range cf.Resources {
 			if entry.Error == "" {
-				entries[name] = entry.HasResources
+				entries[name] = entry.Count
 			}
 		}
 		return messages.AvailabilityCacheLoadedMsg{
@@ -335,10 +335,15 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 	if m.demoMode {
 		return func() tea.Msg {
-			_, ok := demo.GetResources(shortName)
+			resources, ok := demo.GetResources(shortName)
+			count := 0
+			if ok {
+				count = len(resources)
+			}
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
 				HasResources: ok,
+				Count:        count,
 				Gen:          gen,
 			}
 		}
@@ -373,6 +378,7 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 		return messages.AvailabilityCheckedMsg{
 			ResourceType: shortName,
 			HasResources: len(resources) > 0,
+			Count:        len(resources),
 			Gen:          gen,
 		}
 	}
@@ -384,7 +390,7 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 	region := m.region
 
 	// Collect availability from main menu
-	var entries map[string]bool
+	var entries map[string]int
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		entries = menu.GetAvailability()
 	}
@@ -399,8 +405,8 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 			CheckedAt: time.Now(),
 			Resources: make(map[string]cache.Entry, len(entries)),
 		}
-		for name, hasResources := range entries {
-			cf.Resources[name] = cache.Entry{HasResources: hasResources}
+		for name, count := range entries {
+			cf.Resources[name] = cache.Entry{HasResources: count > 0, Count: count}
 		}
 		// Best-effort save — don't flash errors for cache write failures
 		_ = cache.Save(cf)

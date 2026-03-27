@@ -131,8 +131,10 @@ checked_at: 2026-03-27T10:00:00Z
 resources:
   ec2:
     has_resources: true
+    count: 7
   s3:
     has_resources: false
+    count: 0
     error: "access denied"
 `
 	filePath := filepath.Join(cacheDir, "test-profile--us-east-1.yaml")
@@ -168,6 +170,9 @@ resources:
 	if !ec2Entry.HasResources {
 		t.Error("ec2 HasResources should be true")
 	}
+	if ec2Entry.Count != 7 {
+		t.Errorf("ec2 Count = %d, want 7", ec2Entry.Count)
+	}
 	if ec2Entry.Error != "" {
 		t.Errorf("ec2 Error = %q, want empty", ec2Entry.Error)
 	}
@@ -178,6 +183,9 @@ resources:
 	}
 	if s3Entry.HasResources {
 		t.Error("s3 HasResources should be false")
+	}
+	if s3Entry.Count != 0 {
+		t.Errorf("s3 Count = %d, want 0", s3Entry.Count)
 	}
 	if s3Entry.Error != "access denied" {
 		t.Errorf("s3 Error = %q, want %q", s3Entry.Error, "access denied")
@@ -221,7 +229,7 @@ func TestCache_Save_CreatesDir(t *testing.T) {
 		Region:    "eu-west-1",
 		CheckedAt: time.Now(),
 		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true},
+			"ec2": {HasResources: true, Count: 5},
 		},
 	}
 
@@ -255,8 +263,8 @@ func TestCache_Save_WritesValidYAML(t *testing.T) {
 		Region:    "us-west-2",
 		CheckedAt: time.Date(2026, 3, 27, 12, 0, 0, 0, time.UTC),
 		Resources: map[string]cache.Entry{
-			"rds":    {HasResources: true},
-			"lambda": {HasResources: false, Error: "timeout"},
+			"rds":    {HasResources: true, Count: 3},
+			"lambda": {HasResources: false, Count: 0, Error: "timeout"},
 		},
 	}
 
@@ -374,16 +382,16 @@ func TestCache_SaveLoad_RoundTrip(t *testing.T) {
 		Region:    "ap-southeast-1",
 		CheckedAt: checkedAt,
 		Resources: map[string]cache.Entry{
-			"ec2":     {HasResources: true},
-			"s3":      {HasResources: true},
-			"rds":     {HasResources: false},
-			"lambda":  {HasResources: true},
-			"vpc":     {HasResources: false, Error: "access denied"},
-			"eks":     {HasResources: false},
-			"redis":   {HasResources: true},
-			"docdb":   {HasResources: false},
-			"secrets": {HasResources: true},
-			"sg":      {HasResources: true},
+			"ec2":     {HasResources: true, Count: 12},
+			"s3":      {HasResources: true, Count: 45},
+			"rds":     {HasResources: false, Count: 0},
+			"lambda":  {HasResources: true, Count: 8},
+			"vpc":     {HasResources: false, Count: 0, Error: "access denied"},
+			"eks":     {HasResources: false, Count: 0},
+			"redis":   {HasResources: true, Count: 2},
+			"docdb":   {HasResources: false, Count: 0},
+			"secrets": {HasResources: true, Count: 15},
+			"sg":      {HasResources: true, Count: 30},
 		},
 	}
 
@@ -421,6 +429,9 @@ func TestCache_SaveLoad_RoundTrip(t *testing.T) {
 		}
 		if loadedEntry.HasResources != origEntry.HasResources {
 			t.Errorf("Resources[%q].HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
+		}
+		if loadedEntry.Count != origEntry.Count {
+			t.Errorf("Resources[%q].Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
 		}
 		if loadedEntry.Error != origEntry.Error {
 			t.Errorf("Resources[%q].Error = %q, want %q", name, loadedEntry.Error, origEntry.Error)
@@ -479,7 +490,7 @@ func TestCache_Save_OverwritesExisting(t *testing.T) {
 		Region:    "us-east-1",
 		CheckedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true},
+			"ec2": {HasResources: true, Count: 10},
 		},
 	}
 	if err := cache.Save(f1); err != nil {
@@ -492,8 +503,8 @@ func TestCache_Save_OverwritesExisting(t *testing.T) {
 		Region:    "us-east-1",
 		CheckedAt: time.Date(2026, 3, 27, 0, 0, 0, 0, time.UTC),
 		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: false},
-			"s3":  {HasResources: true},
+			"ec2": {HasResources: false, Count: 0},
+			"s3":  {HasResources: true, Count: 20},
 		},
 	}
 	if err := cache.Save(f2); err != nil {
@@ -543,60 +554,60 @@ func TestCache_Load_AllResourceTypes(t *testing.T) {
 
 	// Build a cache file with many resource types to verify all survive round-trip.
 	entries := map[string]cache.Entry{
-		"ec2":           {HasResources: true},
-		"s3":            {HasResources: true},
-		"rds":           {HasResources: false},
-		"redis":         {HasResources: true},
-		"docdb":         {HasResources: false},
-		"eks":           {HasResources: true},
-		"secrets":       {HasResources: false, Error: "no access"},
-		"vpc":           {HasResources: true},
-		"sg":            {HasResources: true},
-		"nodegroups":    {HasResources: false},
-		"lambda":        {HasResources: true},
-		"elb":           {HasResources: false},
-		"tg":            {HasResources: true},
-		"subnets":       {HasResources: true},
-		"nat":           {HasResources: false},
-		"igw":           {HasResources: true},
-		"eip":           {HasResources: false},
-		"eni":           {HasResources: true},
-		"iam_roles":     {HasResources: true},
-		"iam_policies":  {HasResources: true},
-		"iam_users":     {HasResources: false},
-		"iam_groups":    {HasResources: false},
-		"waf":           {HasResources: true},
-		"ssm":           {HasResources: true},
-		"kms":           {HasResources: false},
-		"r53":           {HasResources: true},
-		"cloudfront":    {HasResources: false},
-		"acm":           {HasResources: true},
-		"apigw":         {HasResources: true},
-		"cfn":           {HasResources: false},
-		"codebuild":     {HasResources: true},
-		"codepipeline":  {HasResources: false},
-		"ecr":           {HasResources: true},
-		"codeartifact":  {HasResources: false},
-		"cw_alarms":     {HasResources: true},
-		"log_groups":    {HasResources: true},
-		"cloudtrail":    {HasResources: false},
-		"sqs":           {HasResources: true},
-		"sns":           {HasResources: false},
-		"eventbridge":   {HasResources: true},
-		"kinesis":       {HasResources: false},
-		"sfn":           {HasResources: true},
-		"msk":           {HasResources: false},
-		"glue":          {HasResources: true},
-		"athena":        {HasResources: false},
-		"opensearch":    {HasResources: true},
-		"redshift":      {HasResources: false},
-		"dynamodb":      {HasResources: true},
-		"asg":           {HasResources: true},
-		"eb":            {HasResources: false},
-		"ecs":           {HasResources: true},
-		"backup":        {HasResources: false},
-		"ses":           {HasResources: true},
-		"efs":           {HasResources: false},
+		"ec2":           {HasResources: true, Count: 10},
+		"s3":            {HasResources: true, Count: 25},
+		"rds":           {HasResources: false, Count: 0},
+		"redis":         {HasResources: true, Count: 3},
+		"docdb":         {HasResources: false, Count: 0},
+		"eks":           {HasResources: true, Count: 2},
+		"secrets":       {HasResources: false, Count: 0, Error: "no access"},
+		"vpc":           {HasResources: true, Count: 4},
+		"sg":            {HasResources: true, Count: 50},
+		"nodegroups":    {HasResources: false, Count: 0},
+		"lambda":        {HasResources: true, Count: 100},
+		"elb":           {HasResources: false, Count: 0},
+		"tg":            {HasResources: true, Count: 8},
+		"subnets":       {HasResources: true, Count: 12},
+		"nat":           {HasResources: false, Count: 0},
+		"igw":           {HasResources: true, Count: 1},
+		"eip":           {HasResources: false, Count: 0},
+		"eni":           {HasResources: true, Count: 20},
+		"iam_roles":     {HasResources: true, Count: 75},
+		"iam_policies":  {HasResources: true, Count: 200},
+		"iam_users":     {HasResources: false, Count: 0},
+		"iam_groups":    {HasResources: false, Count: 0},
+		"waf":           {HasResources: true, Count: 5},
+		"ssm":           {HasResources: true, Count: 30},
+		"kms":           {HasResources: false, Count: 0},
+		"r53":           {HasResources: true, Count: 15},
+		"cloudfront":    {HasResources: false, Count: 0},
+		"acm":           {HasResources: true, Count: 10},
+		"apigw":         {HasResources: true, Count: 3},
+		"cfn":           {HasResources: false, Count: 0},
+		"codebuild":     {HasResources: true, Count: 7},
+		"codepipeline":  {HasResources: false, Count: 0},
+		"ecr":           {HasResources: true, Count: 14},
+		"codeartifact":  {HasResources: false, Count: 0},
+		"cw_alarms":     {HasResources: true, Count: 40},
+		"log_groups":    {HasResources: true, Count: 60},
+		"cloudtrail":    {HasResources: false, Count: 0},
+		"sqs":           {HasResources: true, Count: 9},
+		"sns":           {HasResources: false, Count: 0},
+		"eventbridge":   {HasResources: true, Count: 6},
+		"kinesis":       {HasResources: false, Count: 0},
+		"sfn":           {HasResources: true, Count: 4},
+		"msk":           {HasResources: false, Count: 0},
+		"glue":          {HasResources: true, Count: 11},
+		"athena":        {HasResources: false, Count: 0},
+		"opensearch":    {HasResources: true, Count: 2},
+		"redshift":      {HasResources: false, Count: 0},
+		"dynamodb":      {HasResources: true, Count: 18},
+		"asg":           {HasResources: true, Count: 5},
+		"eb":            {HasResources: false, Count: 0},
+		"ecs":           {HasResources: true, Count: 8},
+		"backup":        {HasResources: false, Count: 0},
+		"ses":           {HasResources: true, Count: 3},
+		"efs":           {HasResources: false, Count: 0},
 	}
 
 	original := &cache.File{
@@ -627,8 +638,63 @@ func TestCache_Load_AllResourceTypes(t *testing.T) {
 		if loadedEntry.HasResources != origEntry.HasResources {
 			t.Errorf("%q: HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
 		}
+		if loadedEntry.Count != origEntry.Count {
+			t.Errorf("%q: Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
+		}
 		if loadedEntry.Error != origEntry.Error {
 			t.Errorf("%q: Error = %q, want %q", name, loadedEntry.Error, origEntry.Error)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Round-trip: Count field survives Save + Load
+// ---------------------------------------------------------------------------
+
+func TestCache_SaveLoad_RoundTrip_Count(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	checkedAt := time.Date(2026, 3, 27, 16, 0, 0, 0, time.UTC)
+	original := &cache.File{
+		Profile:   "count-test-profile",
+		Region:    "eu-west-1",
+		CheckedAt: checkedAt,
+		Resources: map[string]cache.Entry{
+			"ec2":    {HasResources: false, Count: 0},
+			"s3":     {HasResources: true, Count: 1},
+			"rds":    {HasResources: true, Count: 100},
+			"lambda": {HasResources: true, Count: 1000},
+		},
+	}
+
+	if err := cache.Save(original); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	loaded, err := cache.Load("count-test-profile", "eu-west-1")
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("Load() returned nil after Save()")
+	}
+
+	if len(loaded.Resources) != len(original.Resources) {
+		t.Fatalf("Resources count = %d, want %d", len(loaded.Resources), len(original.Resources))
+	}
+
+	for name, origEntry := range original.Resources {
+		loadedEntry, ok := loaded.Resources[name]
+		if !ok {
+			t.Errorf("Resources missing %q after round-trip", name)
+			continue
+		}
+		if loadedEntry.Count != origEntry.Count {
+			t.Errorf("Resources[%q].Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
+		}
+		if loadedEntry.HasResources != origEntry.HasResources {
+			t.Errorf("Resources[%q].HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
 		}
 	}
 }

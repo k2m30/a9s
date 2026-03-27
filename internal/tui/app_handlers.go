@@ -454,8 +454,8 @@ func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, te
 func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoadedMsg) (tea.Model, tea.Cmd) {
 	// Apply cached entries to the main menu
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		for shortName, hasResources := range msg.Entries {
-			menu.SetAvailability(shortName, hasResources)
+		for shortName, count := range msg.Entries {
+			menu.SetAvailability(shortName, count)
 		}
 	}
 
@@ -493,7 +493,7 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 	// Update menu availability (only if no error — errors mean "unknown")
 	if msg.Err == nil {
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			menu.SetAvailability(msg.ResourceType, msg.HasResources)
+			menu.SetAvailability(msg.ResourceType, msg.Count)
 		}
 	}
 
