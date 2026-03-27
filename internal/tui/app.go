@@ -67,6 +67,12 @@ type Model struct {
 	headerCacheKey string
 
 	demoMode bool
+
+	noCache         bool
+	availabilityGen int      // incremented on profile/region switch to cancel stale probes
+	availQueue      []string // resource short names remaining to probe
+	availChecked    int      // number probed so far in current gen
+	availTotal      int      // total types to probe in current gen
 }
 
 // Option configures the root Model.
@@ -76,6 +82,13 @@ type Option func(*Model)
 func WithDemo(enabled bool) Option {
 	return func(m *Model) {
 		m.demoMode = enabled
+	}
+}
+
+// WithNoCache disables resource availability caching and background checks.
+func WithNoCache(disabled bool) Option {
+	return func(m *Model) {
+		m.noCache = disabled
 	}
 }
 
@@ -197,6 +210,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleIdentityLoaded(msg)
 	case messages.IdentityErrorMsg:
 		return m.handleIdentityError(msg)
+	case messages.AvailabilityCacheLoadedMsg:
+		return m.handleAvailabilityCacheLoaded(msg)
+	case messages.AvailabilityCheckedMsg:
+		return m.handleAvailabilityChecked(msg)
 	}
 	return m.updateActiveView(msg)
 }

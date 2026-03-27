@@ -179,15 +179,28 @@ func TestWiring_RefreshInResourceList_ReturnsFetchCmd(t *testing.T) {
 	}
 }
 
-func TestWiring_RefreshNotOnMainMenu(t *testing.T) {
+func TestWiring_RefreshOnMainMenu_TriggersAvailabilityCheck(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Press ctrl+r on the main menu — should not trigger refresh
+	// Press ctrl+r on the main menu — should trigger availability cache reload
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
-	// On main menu, ctrl+r should produce nil cmd (no refresh)
+	// With caching enabled (default), ctrl+r on main menu fires the availability reload command
+	if cmd == nil {
+		t.Error("pressing ctrl+r on main menu should trigger availability cache reload command")
+	}
+}
+
+func TestWiring_RefreshOnMainMenu_NoCacheMode_NoOp(t *testing.T) {
+	m := tui.New("testprofile", "us-east-1", tui.WithNoCache(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// Press ctrl+r on the main menu in no-cache mode — should be a no-op
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+
+	// With caching disabled, ctrl+r on main menu should produce nil cmd
 	if cmd != nil {
-		t.Error("pressing ctrl+r on main menu should not trigger any command")
+		t.Error("pressing ctrl+r on main menu in no-cache mode should not trigger any command")
 	}
 }
 

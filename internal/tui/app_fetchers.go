@@ -3,13 +3,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // fetchResources returns a tea.Cmd that calls the appropriate AWS fetcher
@@ -298,5 +301,109 @@ func (m *Model) connectAWS(profile, region string) tea.Cmd {
 		}
 		clients := awsclient.CreateServiceClients(cfg)
 		return messages.ClientsReadyMsg{Clients: clients}
+	}
+}
+
+// loadAvailabilityCache returns a tea.Cmd that reads the availability cache from disk.
+func (m *Model) loadAvailabilityCache() tea.Cmd {
+	profile := m.profile
+	region := m.region
+	return func() tea.Msg {
+		cf, err := cache.Load(profile, region)
+		if err != nil || cf == nil {
+			// No cache or error — return empty entries, will trigger full re-check
+			return messages.AvailabilityCacheLoadedMsg{
+				Entries: make(map[string]bool),
+				Expired: true,
+			}
+		}
+		entries := make(map[string]bool, len(cf.Resources))
+		for name, entry := range cf.Resources {
+			if entry.Error == "" {
+				entries[name] = entry.HasResources
+			}
+		}
+		return messages.AvailabilityCacheLoadedMsg{
+			Entries: entries,
+			Expired: cf.IsExpired(cache.DefaultTTL),
+		}
+	}
+}
+
+// probeResourceAvailability returns a tea.Cmd that checks if a resource type
+// has any resources by calling its registered fetcher with a timeout.
+func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg {
+			_, ok := demo.GetResources(shortName)
+			return messages.AvailabilityCheckedMsg{
+				ResourceType: shortName,
+				HasResources: ok,
+				Gen:          gen,
+			}
+		}
+	}
+	clients := m.clients
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.AvailabilityCheckedMsg{
+				ResourceType: shortName,
+				Err:          fmt.Errorf("AWS clients not initialized"),
+				Gen:          gen,
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		fetcher := resource.GetFetcher(shortName)
+		if fetcher == nil {
+			return messages.AvailabilityCheckedMsg{
+				ResourceType: shortName,
+				Err:          fmt.Errorf("no fetcher for %s", shortName),
+				Gen:          gen,
+			}
+		}
+		resources, err := fetcher(ctx, clients)
+		if err != nil {
+			return messages.AvailabilityCheckedMsg{
+				ResourceType: shortName,
+				Err:          err,
+				Gen:          gen,
+			}
+		}
+		return messages.AvailabilityCheckedMsg{
+			ResourceType: shortName,
+			HasResources: len(resources) > 0,
+			Gen:          gen,
+		}
+	}
+}
+
+// saveAvailabilityCache returns a tea.Cmd that persists the current availability state to disk.
+func (m *Model) saveAvailabilityCache() tea.Cmd {
+	profile := m.profile
+	region := m.region
+
+	// Collect availability from main menu
+	var entries map[string]bool
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		entries = menu.GetAvailability()
+	}
+	if entries == nil {
+		return nil
+	}
+
+	return func() tea.Msg {
+		cf := &cache.File{
+			Profile:   profile,
+			Region:    region,
+			CheckedAt: time.Now(),
+			Resources: make(map[string]cache.Entry, len(entries)),
+		}
+		for name, hasResources := range entries {
+			cf.Resources[name] = cache.Entry{HasResources: hasResources}
+		}
+		// Best-effort save — don't flash errors for cache write failures
+		_ = cache.Save(cf)
+		return nil
 	}
 }
