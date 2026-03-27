@@ -62,28 +62,40 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.Up):
 			m.scroll.Up()
+			m.skipUnavailable(-1)
 		case key.Matches(msg, m.keys.Down):
 			m.scroll.Down()
+			m.skipUnavailable(+1)
 		case key.Matches(msg, m.keys.Top):
 			m.scroll.Top()
+			m.skipUnavailable(+1)
 		case key.Matches(msg, m.keys.Bottom):
 			m.scroll.Bottom()
+			m.skipUnavailable(-1)
 		case key.Matches(msg, m.keys.PageUp):
 			pageSize := m.height - 1
 			if pageSize < 1 {
 				pageSize = 1
 			}
 			m.scroll.PageUp(pageSize)
+			m.skipUnavailable(-1)
 		case key.Matches(msg, m.keys.PageDown):
 			pageSize := m.height - 1
 			if pageSize < 1 {
 				pageSize = 1
 			}
 			m.scroll.PageDown(pageSize)
+			m.skipUnavailable(+1)
 		case key.Matches(msg, m.keys.Enter):
 			c := m.scroll.Cursor()
 			if len(m.filteredItems) > 0 && c < len(m.filteredItems) {
 				selected := m.filteredItems[c]
+				// Block navigation to known-empty types (defensive — cursor should never land here)
+				if m.availability != nil {
+					if hasRes, known := m.availability[selected.ShortName]; known && !hasRes {
+						return m, nil
+					}
+				}
 				return m, func() tea.Msg {
 					return messages.NavigateMsg{
 						Target:       messages.TargetResourceList,
@@ -123,6 +135,44 @@ func (m *MainMenuModel) adjustScroll() {
 	if cursorLine >= m.scrollOffset+m.height {
 		m.scrollOffset = cursorLine - m.height + 1
 	}
+}
+
+// skipUnavailable advances the cursor past empty resource types.
+// direction is +1 (forward) or -1 (backward).
+// If no navigable item is found in the given direction, tries the opposite.
+// If ALL items are empty, gives up (avoids infinite loop).
+func (m *MainMenuModel) skipUnavailable(direction int) {
+	if m.availability == nil || len(m.filteredItems) == 0 {
+		return
+	}
+
+	total := len(m.filteredItems)
+	start := m.scroll.Cursor()
+
+	// Try to find a navigable item in the given direction
+	cur := start
+	for cur >= 0 && cur < total {
+		item := m.filteredItems[cur]
+		if hasRes, known := m.availability[item.ShortName]; !known || hasRes {
+			// This item is navigable (unknown or has resources)
+			m.scroll.SetCursor(cur)
+			return
+		}
+		cur += direction
+	}
+
+	// No navigable item found in that direction — try the opposite
+	cur = start - direction
+	for cur >= 0 && cur < total {
+		item := m.filteredItems[cur]
+		if hasRes, known := m.availability[item.ShortName]; !known || hasRes {
+			m.scroll.SetCursor(cur)
+			return
+		}
+		cur -= direction
+	}
+
+	// ALL items are empty — leave cursor where it is
 }
 
 // renderLine represents a single line in the menu: either a category header or a selectable item.
