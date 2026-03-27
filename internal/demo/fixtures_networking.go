@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -43,7 +45,7 @@ func init() {
 // ---------------------------------------------------------------------------
 
 func elbFixtures() []resource.Resource {
-	return []resource.Resource{
+	elbs := []resource.Resource{
 		{
 			ID:     "acme-prod-web",
 			Name:   "acme-prod-web",
@@ -175,6 +177,68 @@ func elbFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more ELBs to reach 22 total
+	elbTypes := []elbv2types.LoadBalancerTypeEnum{
+		elbv2types.LoadBalancerTypeEnumApplication, elbv2types.LoadBalancerTypeEnumNetwork,
+		elbv2types.LoadBalancerTypeEnumApplication, elbv2types.LoadBalancerTypeEnumApplication,
+	}
+	elbSchemes := []elbv2types.LoadBalancerSchemeEnum{
+		elbv2types.LoadBalancerSchemeEnumInternetFacing, elbv2types.LoadBalancerSchemeEnumInternal,
+	}
+	for i := 0; i < 18; i++ {
+		name := elbNamePool[i]
+		lbType := elbTypes[i%len(elbTypes)]
+		scheme := elbSchemes[i%len(elbSchemes)]
+		typeStr := "application"
+		if lbType == elbv2types.LoadBalancerTypeEnumNetwork {
+			typeStr = "network"
+		}
+		schemeStr := "internet-facing"
+		if scheme == elbv2types.LoadBalancerSchemeEnumInternal {
+			schemeStr = "internal"
+		}
+		arnSuffix := fmt.Sprintf("%s/%016x", name, i+100)
+		arn := fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/%s", arnSuffix)
+		if lbType == elbv2types.LoadBalancerTypeEnumNetwork {
+			arn = fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/%s", arnSuffix)
+		}
+		dns := fmt.Sprintf("%s-%010d.us-east-1.elb.amazonaws.com", name, i+1000)
+		vpcID := prodVPCID
+		if i >= 14 {
+			vpcID = stagingVPCID
+		}
+		createTime := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 8+(i%12))
+		elbs = append(elbs, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "active",
+			Fields: map[string]string{
+				"name":              name,
+				"dns_name":          dns,
+				"type":              typeStr,
+				"scheme":            schemeStr,
+				"state":             "active",
+				"vpc_id":            vpcID,
+				"load_balancer_arn": arn,
+			},
+			RawStruct: elbv2types.LoadBalancer{
+				LoadBalancerName: aws.String(name),
+				LoadBalancerArn:  aws.String(arn),
+				DNSName:          aws.String(dns),
+				Type:             lbType,
+				Scheme:           scheme,
+				State: &elbv2types.LoadBalancerState{
+					Code: elbv2types.LoadBalancerStateEnumActive,
+				},
+				VpcId:         aws.String(vpcID),
+				IpAddressType: elbv2types.IpAddressTypeIpv4,
+				CreatedTime:   aws.Time(mustParseTime(createTime)),
+			},
+		})
+	}
+
+	return elbs
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +247,7 @@ func elbFixtures() []resource.Resource {
 // ---------------------------------------------------------------------------
 
 func tgFixtures() []resource.Resource {
-	return []resource.Resource{
+	tgs := []resource.Resource{
 		{
 			ID:     "acme-web-tg",
 			Name:   "acme-web-tg",
@@ -315,6 +379,56 @@ func tgFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more target groups to reach 22 total
+	tgProtocols := []elbv2types.ProtocolEnum{
+		elbv2types.ProtocolEnumHttp, elbv2types.ProtocolEnumHttps,
+		elbv2types.ProtocolEnumHttp, elbv2types.ProtocolEnumTcp,
+	}
+	tgTargetTypes := []elbv2types.TargetTypeEnum{
+		elbv2types.TargetTypeEnumIp, elbv2types.TargetTypeEnumInstance,
+	}
+	tgPorts := []int32{8080, 443, 3000, 8443, 9090, 5000, 8080, 443, 3000, 8443, 9090, 5000, 8080, 443, 3000, 8443, 9090, 5000}
+	healthPaths := []string{"/health", "/healthz", "/api/health", "/ready", "/ping", "/status"}
+	for i := 0; i < 18; i++ {
+		name := tgNamePool[i]
+		port := tgPorts[i]
+		proto := tgProtocols[i%len(tgProtocols)]
+		targetType := tgTargetTypes[i%len(tgTargetTypes)]
+		healthPath := healthPaths[i%len(healthPaths)]
+		arn := fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/%s/%016x", name, i+200)
+		tgs = append(tgs, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"target_group_name": name,
+				"port":              fmt.Sprintf("%d", port),
+				"protocol":          string(proto),
+				"vpc_id":            prodVPCID,
+				"target_type":       string(targetType),
+				"health_check_path": healthPath,
+			},
+			RawStruct: elbv2types.TargetGroup{
+				TargetGroupName:            aws.String(name),
+				TargetGroupArn:             aws.String(arn),
+				Port:                       aws.Int32(port),
+				Protocol:                   proto,
+				VpcId:                      aws.String(prodVPCID),
+				TargetType:                 targetType,
+				HealthCheckPath:            aws.String(healthPath),
+				HealthCheckPort:            aws.String(fmt.Sprintf("%d", port)),
+				HealthCheckEnabled:         aws.Bool(true),
+				HealthCheckIntervalSeconds: aws.Int32(30),
+				HealthCheckTimeoutSeconds:  aws.Int32(5),
+				HealthyThresholdCount:      aws.Int32(3),
+				UnhealthyThresholdCount:    aws.Int32(3),
+				Matcher:                    &elbv2types.Matcher{HttpCode: aws.String("200")},
+			},
+		})
+	}
+
+	return tgs
 }
 
 // ---------------------------------------------------------------------------

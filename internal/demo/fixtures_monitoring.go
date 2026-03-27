@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +35,7 @@ func init() {
 // cloudwatchAlarmFixtures returns demo CloudWatch alarm fixtures.
 // Field keys: alarm_name, state, metric_name, namespace, threshold
 func cloudwatchAlarmFixtures() []resource.Resource {
-	return []resource.Resource{
+	alarms := []resource.Resource{
 		{
 			ID:     "api-high-error-rate",
 			Name:   "api-high-error-rate",
@@ -175,12 +176,51 @@ func cloudwatchAlarmFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 17 more alarms to reach 22 total
+	stateMap := map[string]cwtypes.StateValue{
+		"OK":                cwtypes.StateValueOk,
+		"ALARM":             cwtypes.StateValueAlarm,
+		"INSUFFICIENT_DATA": cwtypes.StateValueInsufficientData,
+	}
+	for i := 0; i < 17; i++ {
+		m := alarmMetricPool[i]
+		name := alarmNamePool[i]
+		alarms = append(alarms, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: m.State,
+			Fields: map[string]string{
+				"alarm_name":  name,
+				"state":       m.State,
+				"metric_name": m.MetricName,
+				"namespace":   m.Namespace,
+				"threshold":   fmt.Sprintf("%.2f", m.Threshold),
+			},
+			RawStruct: cwtypes.MetricAlarm{
+				AlarmName:          aws.String(name),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + name),
+				AlarmDescription:   aws.String(fmt.Sprintf("Auto-generated alarm for %s", name)),
+				StateValue:         stateMap[m.State],
+				MetricName:         aws.String(m.MetricName),
+				Namespace:          aws.String(m.Namespace),
+				Threshold:          aws.Float64(m.Threshold),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:  aws.Int32(3),
+				Period:             aws.Int32(300),
+				Statistic:          cwtypes.StatisticAverage,
+				ActionsEnabled:     aws.Bool(true),
+			},
+		})
+	}
+
+	return alarms
 }
 
 // cloudwatchLogGroupFixtures returns demo CloudWatch log group fixtures.
 // Field keys: log_group_name, stored_bytes, retention_days, creation_time
 func cloudwatchLogGroupFixtures() []resource.Resource {
-	return []resource.Resource{
+	logGroups := []resource.Resource{
 		{
 			ID:     "/aws/lambda/api-gateway-authorizer",
 			Name:   "/aws/lambda/api-gateway-authorizer",
@@ -271,6 +311,48 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 17 more log groups to reach 22 total
+	storedBytesPool := []int64{
+		26214400, 104857600, 536870912, 1073741824, 52428800,
+		209715200, 2147483648, 10485760, 419430400, 67108864,
+		838860800, 26214400, 157286400, 52428800, 1073741824,
+		209715200, 67108864,
+	}
+	retentionPool := []int32{7, 14, 30, 60, 90, 365, 0, 30, 14, 30, 90, 7, 30, 14, 365, 30, 90}
+	for i := 0; i < 17; i++ {
+		name := logGroupNamePool[i]
+		storedBytes := storedBytesPool[i]
+		retention := retentionPool[i]
+		creationTime := int64(1700000000000 + int64(i)*86400000)
+		retentionStr := fmt.Sprintf("%d", retention)
+		if retention == 0 {
+			retentionStr = ""
+		}
+		lg := cwlogstypes.LogGroup{
+			LogGroupName: aws.String(name),
+			Arn:          aws.String(fmt.Sprintf("arn:aws:logs:us-east-1:123456789012:log-group:%s:*", name)),
+			StoredBytes:  aws.Int64(storedBytes),
+			CreationTime: aws.Int64(creationTime),
+		}
+		if retention > 0 {
+			lg.RetentionInDays = aws.Int32(retention)
+		}
+		logGroups = append(logGroups, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"log_group_name": name,
+				"stored_bytes":   fmt.Sprintf("%d", storedBytes),
+				"retention_days": retentionStr,
+				"creation_time":  fmt.Sprintf("%d", creationTime),
+			},
+			RawStruct: lg,
+		})
+	}
+
+	return logGroups
 }
 
 // alarmHistoryFixtures returns demo alarm history fixtures for any alarm.

@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
@@ -26,7 +28,7 @@ func init() {
 
 // iamRoleFixtures returns demo IAM Role fixtures.
 func iamRoleFixtures() []resource.Resource {
-	return []resource.Resource{
+	roles := []resource.Resource{
 		{
 			ID:     "acme-eks-node-role",
 			Name:   "acme-eks-node-role",
@@ -109,11 +111,43 @@ func iamRoleFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 21 more roles to reach 25 total
+	paths := []string{"/", "/service-role/", "/", "/aws-service-role/"}
+	for i := 0; i < 21; i++ {
+		name := roleNamePool[i%len(roleNamePool)]
+		desc := roleDescPool[i%len(roleDescPool)]
+		roleID := fmt.Sprintf("AROAEXAMPLE%09d", 500+i)
+		path := paths[i%len(paths)]
+		createDate := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 8+(i%12))
+		roles = append(roles, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"role_name":   name,
+				"role_id":     roleID,
+				"path":        path,
+				"create_date": createDate,
+				"description": desc,
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:    aws.String(name),
+				RoleId:      aws.String(roleID),
+				Arn:         aws.String(fmt.Sprintf("arn:aws:iam::123456789012:role%s%s", path, name)),
+				Path:        aws.String(path),
+				CreateDate:  aws.Time(mustParseTime(createDate)),
+				Description: aws.String(desc),
+			},
+		})
+	}
+
+	return roles
 }
 
 // iamPolicyFixtures returns demo IAM Policy fixtures.
 func iamPolicyFixtures() []resource.Resource {
-	return []resource.Resource{
+	policies := []resource.Resource{
 		{
 			ID:     "acme-s3-read-only",
 			Name:   "acme-s3-read-only",
@@ -195,6 +229,36 @@ func iamPolicyFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more policies to reach 22 total
+	for i := 0; i < 18; i++ {
+		name := policyNamePool[i]
+		policyID := fmt.Sprintf("ANPAEXAMPLE%09d", 500+i)
+		attachCount := int32(1 + (i % 6))
+		createDate := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 9+(i%10))
+		policies = append(policies, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"policy_name":      name,
+				"policy_id":        policyID,
+				"attachment_count": fmt.Sprintf("%d", attachCount),
+				"path":             "/",
+				"create_date":      createDate,
+			},
+			RawStruct: iamtypes.Policy{
+				PolicyName:      aws.String(name),
+				PolicyId:        aws.String(policyID),
+				Arn:             aws.String("arn:aws:iam::123456789012:policy/" + name),
+				AttachmentCount: aws.Int32(attachCount),
+				Path:            aws.String("/"),
+				CreateDate:      aws.Time(mustParseTime(createDate)),
+			},
+		})
+	}
+
+	return policies
 }
 
 // iamUserFixtures returns demo IAM User fixtures.

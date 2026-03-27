@@ -3,6 +3,7 @@ package demo
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -30,7 +31,7 @@ func init() {
 
 // cfnFixtures returns demo CloudFormation Stack fixtures.
 func cfnFixtures() []resource.Resource {
-	return []resource.Resource{
+	stacks := []resource.Resource{
 		{
 			ID:     "acme-vpc-stack",
 			Name:   "acme-vpc-stack",
@@ -111,6 +112,54 @@ func cfnFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more stacks to reach 22 total
+	cfnStatusMap := map[string]cfntypes.StackStatus{
+		"CREATE_COMPLETE": cfntypes.StackStatusCreateComplete,
+		"UPDATE_COMPLETE": cfntypes.StackStatusUpdateComplete,
+	}
+	for i := 0; i < 18; i++ {
+		name := cfnNamePool[i]
+		status := cfnStatusPool[i]
+		creationTime := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 9+(i%10))
+		lastUpdated := ""
+		var lastUpdatedTime *time.Time
+		if status == "UPDATE_COMPLETE" {
+			lu := fmt.Sprintf("2026-%02d-%02dT%02d:00:00+00:00", 1+(i%3), 1+i%28, 10+i%12)
+			lastUpdated = lu
+			t := mustParseTime(lu)
+			lastUpdatedTime = &t
+		}
+		stackID := fmt.Sprintf("arn:aws:cloudformation:us-east-1:123456789012:stack/%s/%08d-%04d-%04d-%04d-%012d", name, i+10, i, i, i, i+100)
+		desc := fmt.Sprintf("Infrastructure stack for %s", strings.TrimPrefix(name, "acme-"))
+
+		s := cfntypes.Stack{
+			StackName:    aws.String(name),
+			StackStatus:  cfnStatusMap[status],
+			CreationTime: aws.Time(mustParseTime(creationTime)),
+			Description:  aws.String(desc),
+			StackId:      aws.String(stackID),
+		}
+		if lastUpdatedTime != nil {
+			s.LastUpdatedTime = lastUpdatedTime
+		}
+
+		stacks = append(stacks, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: status,
+			Fields: map[string]string{
+				"stack_name":    name,
+				"status":        status,
+				"creation_time": creationTime,
+				"last_updated":  lastUpdated,
+				"description":   desc,
+			},
+			RawStruct: s,
+		})
+	}
+
+	return stacks
 }
 
 // ecrFixtures returns demo ECR Repository fixtures.

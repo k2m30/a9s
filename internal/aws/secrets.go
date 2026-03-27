@@ -23,54 +23,64 @@ func init() {
 // FetchSecrets calls the SecretsManager ListSecrets API and converts the
 // response into a slice of generic Resource structs.
 func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {
-	output, err := api.ListSecrets(ctx, &secretsmanager.ListSecretsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching secrets: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, secret := range output.SecretList {
-		secretName := ""
-		if secret.Name != nil {
-			secretName = *secret.Name
+	for {
+		output, err := api.ListSecrets(ctx, &secretsmanager.ListSecretsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching secrets: %w", err)
 		}
 
-		description := ""
-		if secret.Description != nil {
-			description = *secret.Description
+		for _, secret := range output.SecretList {
+			secretName := ""
+			if secret.Name != nil {
+				secretName = *secret.Name
+			}
+
+			description := ""
+			if secret.Description != nil {
+				description = *secret.Description
+			}
+
+			lastAccessed := ""
+			if secret.LastAccessedDate != nil {
+				lastAccessed = secret.LastAccessedDate.Format("2006-01-02")
+			}
+
+			lastChanged := ""
+			if secret.LastChangedDate != nil {
+				lastChanged = secret.LastChangedDate.Format("2006-01-02")
+			}
+
+			rotationEnabled := "No"
+			if secret.RotationEnabled != nil && *secret.RotationEnabled {
+				rotationEnabled = "Yes"
+			}
+
+			r := resource.Resource{
+				ID:     secretName,
+				Name:   secretName,
+				Status: "",
+				Fields: map[string]string{
+					"secret_name":      secretName,
+					"description":      description,
+					"last_accessed":    lastAccessed,
+					"last_changed":     lastChanged,
+					"rotation_enabled": rotationEnabled,
+				},
+				RawStruct: secret,
+			}
+
+			resources = append(resources, r)
 		}
 
-		lastAccessed := ""
-		if secret.LastAccessedDate != nil {
-			lastAccessed = secret.LastAccessedDate.Format("2006-01-02")
+		if output.NextToken == nil {
+			break
 		}
-
-		lastChanged := ""
-		if secret.LastChangedDate != nil {
-			lastChanged = secret.LastChangedDate.Format("2006-01-02")
-		}
-
-		rotationEnabled := "No"
-		if secret.RotationEnabled != nil && *secret.RotationEnabled {
-			rotationEnabled = "Yes"
-		}
-
-		r := resource.Resource{
-			ID:     secretName,
-			Name:   secretName,
-			Status: "",
-			Fields: map[string]string{
-				"secret_name":      secretName,
-				"description":      description,
-				"last_accessed":    lastAccessed,
-				"last_changed":     lastChanged,
-				"rotation_enabled": rotationEnabled,
-			},
-			RawStruct:  secret,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -24,62 +24,72 @@ func init() {
 // FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts
 // the response into a slice of generic Resource structs.
 func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistributionsAPI) ([]resource.Resource, error) {
-	output, err := api.ListDistributions(ctx, &cloudfront.ListDistributionsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching CloudFront distributions: %w", err)
-	}
-
-	if output.DistributionList == nil {
-		return nil, nil
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, dist := range output.DistributionList.Items {
-		distID := ""
-		if dist.Id != nil {
-			distID = *dist.Id
+	for {
+		output, err := api.ListDistributions(ctx, &cloudfront.ListDistributionsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching CloudFront distributions: %w", err)
 		}
 
-		domainName := ""
-		if dist.DomainName != nil {
-			domainName = *dist.DomainName
+		if output.DistributionList == nil {
+			break
 		}
 
-		status := ""
-		if dist.Status != nil {
-			status = *dist.Status
+		for _, dist := range output.DistributionList.Items {
+			distID := ""
+			if dist.Id != nil {
+				distID = *dist.Id
+			}
+
+			domainName := ""
+			if dist.DomainName != nil {
+				domainName = *dist.DomainName
+			}
+
+			status := ""
+			if dist.Status != nil {
+				status = *dist.Status
+			}
+
+			enabled := "false"
+			if dist.Enabled != nil && *dist.Enabled {
+				enabled = "true"
+			}
+
+			// Extract aliases
+			aliases := ""
+			if dist.Aliases != nil && len(dist.Aliases.Items) > 0 {
+				aliases = strings.Join(dist.Aliases.Items, ", ")
+			}
+
+			priceClass := string(dist.PriceClass)
+
+			r := resource.Resource{
+				ID:     distID,
+				Name:   distID,
+				Status: status,
+				Fields: map[string]string{
+					"distribution_id": distID,
+					"domain_name":     domainName,
+					"status":          status,
+					"enabled":         enabled,
+					"aliases":         aliases,
+					"price_class":     priceClass,
+				},
+				RawStruct: dist,
+			}
+
+			resources = append(resources, r)
 		}
 
-		enabled := "false"
-		if dist.Enabled != nil && *dist.Enabled {
-			enabled = "true"
+		if output.DistributionList.IsTruncated == nil || !*output.DistributionList.IsTruncated {
+			break
 		}
-
-		// Extract aliases
-		aliases := ""
-		if dist.Aliases != nil && len(dist.Aliases.Items) > 0 {
-			aliases = strings.Join(dist.Aliases.Items, ", ")
-		}
-
-		priceClass := string(dist.PriceClass)
-
-		r := resource.Resource{
-			ID:     distID,
-			Name:   distID,
-			Status: status,
-			Fields: map[string]string{
-				"distribution_id": distID,
-				"domain_name":     domainName,
-				"status":          status,
-				"enabled":         enabled,
-				"aliases":         aliases,
-				"price_class":     priceClass,
-			},
-			RawStruct:  dist,
-		}
-
-		resources = append(resources, r)
+		marker = output.DistributionList.NextMarker
 	}
 
 	return resources, nil

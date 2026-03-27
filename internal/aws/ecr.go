@@ -23,51 +23,61 @@ func init() {
 // FetchECRRepositories calls the ECR DescribeRepositories API and converts
 // the response into a slice of generic Resource structs.
 func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching ECR repositories: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, repo := range output.Repositories {
-		repoName := ""
-		if repo.RepositoryName != nil {
-			repoName = *repo.RepositoryName
+	for {
+		output, err := api.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching ECR repositories: %w", err)
 		}
 
-		uri := ""
-		if repo.RepositoryUri != nil {
-			uri = *repo.RepositoryUri
+		for _, repo := range output.Repositories {
+			repoName := ""
+			if repo.RepositoryName != nil {
+				repoName = *repo.RepositoryName
+			}
+
+			uri := ""
+			if repo.RepositoryUri != nil {
+				uri = *repo.RepositoryUri
+			}
+
+			tagMutability := string(repo.ImageTagMutability)
+
+			scanOnPush := "false"
+			if repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush {
+				scanOnPush = "true"
+			}
+
+			createdAt := ""
+			if repo.CreatedAt != nil {
+				createdAt = repo.CreatedAt.Format("2006-01-02 15:04:05")
+			}
+
+			r := resource.Resource{
+				ID:     repoName,
+				Name:   repoName,
+				Status: "",
+				Fields: map[string]string{
+					"repository_name": repoName,
+					"uri":             uri,
+					"tag_mutability":  tagMutability,
+					"scan_on_push":    scanOnPush,
+					"created_at":      createdAt,
+				},
+				RawStruct: repo,
+			}
+
+			resources = append(resources, r)
 		}
 
-		tagMutability := string(repo.ImageTagMutability)
-
-		scanOnPush := "false"
-		if repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush {
-			scanOnPush = "true"
+		if output.NextToken == nil {
+			break
 		}
-
-		createdAt := ""
-		if repo.CreatedAt != nil {
-			createdAt = repo.CreatedAt.Format("2006-01-02 15:04:05")
-		}
-
-		r := resource.Resource{
-			ID:     repoName,
-			Name:   repoName,
-			Status: "",
-			Fields: map[string]string{
-				"repository_name": repoName,
-				"uri":             uri,
-				"tag_mutability":  tagMutability,
-				"scan_on_push":    scanOnPush,
-				"created_at":      createdAt,
-			},
-			RawStruct:  repo,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

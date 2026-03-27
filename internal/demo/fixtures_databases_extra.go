@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
@@ -21,7 +23,7 @@ func init() {
 // Field keys: table_name, status, item_count, size_bytes, billing_mode
 // Note: the production fetcher stores *ddbtypes.TableDescription (pointer) as RawStruct.
 func dynamodbFixtures() []resource.Resource {
-	return []resource.Resource{
+	tables := []resource.Resource{
 		{
 			ID:     "acme-orders",
 			Name:   "acme-orders",
@@ -115,6 +117,45 @@ func dynamodbFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more tables to reach 22 total
+	itemCounts := []int64{12345, 567890, 234567, 89012, 1234567, 45678, 890123, 23456, 678901, 12345678, 34567, 901234, 56789, 2345678, 78901, 123456, 9012345, 456789}
+	sizesBytes := []int64{10485760, 104857600, 52428800, 20971520, 536870912, 10485760, 209715200, 5242880, 104857600, 1073741824, 10485760, 209715200, 10485760, 536870912, 20971520, 52428800, 1073741824, 104857600}
+	for i := 0; i < 18; i++ {
+		name := ddbNamePool[i]
+		billing := "PAY_PER_REQUEST"
+		billingMode := ddbtypes.BillingModePayPerRequest
+		if i%4 == 0 {
+			billing = "PROVISIONED"
+			billingMode = ddbtypes.BillingModeProvisioned
+		}
+		createDate := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 8+(i%10))
+		tables = append(tables, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "ACTIVE",
+			Fields: map[string]string{
+				"table_name":   name,
+				"status":       "ACTIVE",
+				"item_count":   fmt.Sprintf("%d", itemCounts[i]),
+				"size_bytes":   fmt.Sprintf("%d", sizesBytes[i]),
+				"billing_mode": billing,
+			},
+			RawStruct: &ddbtypes.TableDescription{
+				TableName:        aws.String(name),
+				TableStatus:      ddbtypes.TableStatusActive,
+				TableArn:         aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/" + name),
+				ItemCount:        aws.Int64(itemCounts[i]),
+				TableSizeBytes:   aws.Int64(sizesBytes[i]),
+				CreationDateTime: aws.Time(mustParseTime(createDate)),
+				BillingModeSummary: &ddbtypes.BillingModeSummary{
+					BillingMode: billingMode,
+				},
+			},
+		})
+	}
+
+	return tables
 }
 
 // opensearchFixtures returns demo OpenSearch domain fixtures.

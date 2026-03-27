@@ -23,51 +23,61 @@ func init() {
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and converts the
 // response into a slice of generic Resource structs.
 func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeAlarms(ctx, &cloudwatch.DescribeAlarmsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching CloudWatch alarms: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, alarm := range output.MetricAlarms {
-		alarmName := ""
-		if alarm.AlarmName != nil {
-			alarmName = *alarm.AlarmName
+	for {
+		output, err := api.DescribeAlarms(ctx, &cloudwatch.DescribeAlarmsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching CloudWatch alarms: %w", err)
 		}
 
-		stateValue := string(alarm.StateValue)
+		for _, alarm := range output.MetricAlarms {
+			alarmName := ""
+			if alarm.AlarmName != nil {
+				alarmName = *alarm.AlarmName
+			}
 
-		metricName := ""
-		if alarm.MetricName != nil {
-			metricName = *alarm.MetricName
+			stateValue := string(alarm.StateValue)
+
+			metricName := ""
+			if alarm.MetricName != nil {
+				metricName = *alarm.MetricName
+			}
+
+			namespace := ""
+			if alarm.Namespace != nil {
+				namespace = *alarm.Namespace
+			}
+
+			threshold := ""
+			if alarm.Threshold != nil {
+				threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
+			}
+
+			r := resource.Resource{
+				ID:     alarmName,
+				Name:   alarmName,
+				Status: stateValue,
+				Fields: map[string]string{
+					"alarm_name":  alarmName,
+					"state":       stateValue,
+					"metric_name": metricName,
+					"namespace":   namespace,
+					"threshold":   threshold,
+				},
+				RawStruct: alarm,
+			}
+
+			resources = append(resources, r)
 		}
 
-		namespace := ""
-		if alarm.Namespace != nil {
-			namespace = *alarm.Namespace
+		if output.NextToken == nil {
+			break
 		}
-
-		threshold := ""
-		if alarm.Threshold != nil {
-			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
-		}
-
-		r := resource.Resource{
-			ID:     alarmName,
-			Name:   alarmName,
-			Status: stateValue,
-			Fields: map[string]string{
-				"alarm_name":  alarmName,
-				"state":       stateValue,
-				"metric_name": metricName,
-				"namespace":   namespace,
-				"threshold":   threshold,
-			},
-			RawStruct:  alarm,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

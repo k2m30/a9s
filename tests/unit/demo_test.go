@@ -105,9 +105,9 @@ func TestGetResources_S3(t *testing.T) {
 		}
 	}
 
-	// Should return 5-8 buckets for a realistic demo.
-	if len(resources) < 5 || len(resources) > 8 {
-		t.Errorf("expected 5-8 S3 buckets; got %d", len(resources))
+	// Should return at least 5 buckets for a realistic demo.
+	if len(resources) < 5 {
+		t.Errorf("expected at least 5 S3 buckets; got %d", len(resources))
 	}
 }
 
@@ -134,9 +134,9 @@ func TestGetResources_Lambda(t *testing.T) {
 		}
 	}
 
-	// Should return 5-8 functions for a realistic demo.
-	if len(resources) < 5 || len(resources) > 8 {
-		t.Errorf("expected 5-8 Lambda functions; got %d", len(resources))
+	// Should return at least 5 functions for a realistic demo.
+	if len(resources) < 5 {
+		t.Errorf("expected at least 5 Lambda functions; got %d", len(resources))
 	}
 }
 
@@ -180,9 +180,9 @@ func TestGetResources_RDS(t *testing.T) {
 		t.Error("all RDS resources have Status \"available\"; expected at least one different status (e.g., \"creating\" or \"stopped\")")
 	}
 
-	// Should return 4-8 instances for a realistic demo.
-	if len(resources) < 4 || len(resources) > 8 {
-		t.Errorf("expected 4-8 RDS instances; got %d", len(resources))
+	// Should return at least 4 instances for a realistic demo.
+	if len(resources) < 4 {
+		t.Errorf("expected at least 4 RDS instances; got %d", len(resources))
 	}
 }
 

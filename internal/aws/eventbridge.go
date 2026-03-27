@@ -23,51 +23,61 @@ func init() {
 // FetchEventBridgeRules calls the EventBridge ListRules API and converts
 // the response into a slice of generic Resource structs.
 func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]resource.Resource, error) {
-	output, err := api.ListRules(ctx, &eventbridge.ListRulesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching EventBridge rules: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, rule := range output.Rules {
-		name := ""
-		if rule.Name != nil {
-			name = *rule.Name
+	for {
+		output, err := api.ListRules(ctx, &eventbridge.ListRulesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching EventBridge rules: %w", err)
 		}
 
-		state := string(rule.State)
+		for _, rule := range output.Rules {
+			name := ""
+			if rule.Name != nil {
+				name = *rule.Name
+			}
 
-		description := ""
-		if rule.Description != nil {
-			description = *rule.Description
+			state := string(rule.State)
+
+			description := ""
+			if rule.Description != nil {
+				description = *rule.Description
+			}
+
+			eventBus := ""
+			if rule.EventBusName != nil {
+				eventBus = *rule.EventBusName
+			}
+
+			schedule := ""
+			if rule.ScheduleExpression != nil {
+				schedule = *rule.ScheduleExpression
+			}
+
+			r := resource.Resource{
+				ID:     name,
+				Name:   name,
+				Status: state,
+				Fields: map[string]string{
+					"name":        name,
+					"state":       state,
+					"description": description,
+					"event_bus":   eventBus,
+					"schedule":    schedule,
+				},
+				RawStruct: rule,
+			}
+
+			resources = append(resources, r)
 		}
 
-		eventBus := ""
-		if rule.EventBusName != nil {
-			eventBus = *rule.EventBusName
+		if output.NextToken == nil {
+			break
 		}
-
-		schedule := ""
-		if rule.ScheduleExpression != nil {
-			schedule = *rule.ScheduleExpression
-		}
-
-		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: state,
-			Fields: map[string]string{
-				"name":        name,
-				"state":       state,
-				"description": description,
-				"event_bus":   eventBus,
-				"schedule":    schedule,
-			},
-			RawStruct:  rule,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil
