@@ -173,7 +173,7 @@ func makeEC2Instance(
 		inst.PublicIpAddress = aws.String(publicIP)
 	}
 
-	launchTimeStr := launchTime.Format("2006-01-02T15:04:05Z07:00")
+	launchTimeStr := launchTime.Format("2006-01-02 15:04")
 
 	lifecycleStr := "on-demand"
 	if lifecycle != "" {
