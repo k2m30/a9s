@@ -24,51 +24,61 @@ func init() {
 // response into a slice of generic Resource structs.
 // Uses the StreamSummaries field (not the legacy StreamNames).
 func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]resource.Resource, error) {
-	output, err := api.ListStreams(ctx, &kinesis.ListStreamsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Kinesis streams: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, stream := range output.StreamSummaries {
-		streamName := ""
-		if stream.StreamName != nil {
-			streamName = *stream.StreamName
+	for {
+		output, err := api.ListStreams(ctx, &kinesis.ListStreamsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Kinesis streams: %w", err)
 		}
 
-		streamARN := ""
-		if stream.StreamARN != nil {
-			streamARN = *stream.StreamARN
+		for _, stream := range output.StreamSummaries {
+			streamName := ""
+			if stream.StreamName != nil {
+				streamName = *stream.StreamName
+			}
+
+			streamARN := ""
+			if stream.StreamARN != nil {
+				streamARN = *stream.StreamARN
+			}
+
+			status := string(stream.StreamStatus)
+
+			creationTime := ""
+			if stream.StreamCreationTimestamp != nil {
+				creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04:05")
+			}
+
+			streamMode := ""
+			if stream.StreamModeDetails != nil {
+				streamMode = string(stream.StreamModeDetails.StreamMode)
+			}
+
+			r := resource.Resource{
+				ID:     streamName,
+				Name:   streamName,
+				Status: status,
+				Fields: map[string]string{
+					"stream_name":   streamName,
+					"status":        status,
+					"stream_arn":    streamARN,
+					"creation_time": creationTime,
+					"stream_mode":   streamMode,
+				},
+				RawStruct: stream,
+			}
+
+			resources = append(resources, r)
 		}
 
-		status := string(stream.StreamStatus)
-
-		creationTime := ""
-		if stream.StreamCreationTimestamp != nil {
-			creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04:05")
+		if output.HasMoreStreams == nil || !*output.HasMoreStreams {
+			break
 		}
-
-		streamMode := ""
-		if stream.StreamModeDetails != nil {
-			streamMode = string(stream.StreamModeDetails.StreamMode)
-		}
-
-		r := resource.Resource{
-			ID:     streamName,
-			Name:   streamName,
-			Status: status,
-			Fields: map[string]string{
-				"stream_name":   streamName,
-				"status":        status,
-				"stream_arn":    streamARN,
-				"creation_time": creationTime,
-				"stream_mode":   streamMode,
-			},
-			RawStruct: stream,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

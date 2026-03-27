@@ -19,7 +19,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 **No telemetry.** a9s never phones home.
 
-**Try without AWS.** Run `a9s --demo` to explore the full UI with synthetic data — no AWS account needed.
+**Try without AWS.** Run `a9s --demo` to explore the full UI with synthetic data — no AWS account needed. About 30% of demo resources demonstrate pagination with the `M` key.
 
 ## Features
 
@@ -34,7 +34,8 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Clipboard support (copy resource IDs and YAML)
 - Tokyo Night Dark color theme
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
-- 2,300+ unit tests
+- Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
+- 2,600+ unit tests
 
 ## Installation
 

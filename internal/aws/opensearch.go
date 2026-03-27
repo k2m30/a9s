@@ -49,7 +49,7 @@ func FetchOpenSearchDomains(
 		DomainNames: domainNames,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("describing OpenSearch domains: %w", err)
 	}
 
 	var resources []resource.Resource

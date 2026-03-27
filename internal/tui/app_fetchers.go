@@ -98,14 +98,33 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 // resource list using the continuation token from LoadMoreMsg.
 func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 	if m.demoMode {
-		// Demo mode doesn't support pagination — return empty append.
 		rt := msg.ResourceType
+		parentCtx := msg.ParentContext
 		return func() tea.Msg {
+			var result resource.FetchResult
+			var ok bool
+			if len(parentCtx) > 0 {
+				result, ok = demo.GetMoreChildResources(rt, parentCtx)
+			} else {
+				canonicalType := rt
+				rtDef := resource.FindResourceType(rt)
+				if rtDef != nil {
+					canonicalType = rtDef.ShortName
+				}
+				result, ok = demo.GetMoreResources(canonicalType)
+			}
+			if !ok {
+				return messages.ResourcesLoadedMsg{
+					ResourceType: rt,
+					Append:       true,
+					Pagination:   &resource.PaginationMeta{IsTruncated: false},
+				}
+			}
 			return messages.ResourcesLoadedMsg{
 				ResourceType: rt,
-				Resources:    nil,
-				Pagination:   &resource.PaginationMeta{IsTruncated: false},
+				Resources:    result.Resources,
 				Append:       true,
+				Pagination:   result.Pagination,
 			}
 		}
 	}
@@ -164,21 +183,27 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 }
 
 // fetchDemoChildResources returns synthetic fixture data for child views in demo mode.
+// Uses paginated demo fetcher so child views show truncation + load-more UX.
 func (m *Model) fetchDemoChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	return func() tea.Msg {
-		resources, ok := demo.GetChildResources(childType, parentCtx)
+		result, ok := demo.GetChildResourcesPaginated(childType, parentCtx)
 		if !ok {
-			resources = nil
+			return messages.ResourcesLoadedMsg{
+				ResourceType: childType,
+				Resources:    nil,
+			}
 		}
 		return messages.ResourcesLoadedMsg{
 			ResourceType: childType,
-			Resources:    resources,
+			Resources:    result.Resources,
+			Pagination:   result.Pagination,
 		}
 	}
 }
 
 // fetchDemoResources returns a tea.Cmd that provides synthetic fixture data
-// instead of calling AWS APIs. Maintains the async message contract.
+// instead of calling AWS APIs. Uses paginated demo fetcher so types with >5
+// items show truncation + load-more UX. Maintains the async message contract.
 func (m *Model) fetchDemoResources(resourceType string) tea.Cmd {
 	return func() tea.Msg {
 		// Resolve alias to canonical short name
@@ -187,10 +212,11 @@ func (m *Model) fetchDemoResources(resourceType string) tea.Cmd {
 		if rt != nil {
 			canonicalType = rt.ShortName
 		}
-		resources, _ := demo.GetResources(canonicalType)
+		result, _ := demo.GetResourcesPaginated(canonicalType)
 		return messages.ResourcesLoadedMsg{
 			ResourceType: resourceType,
-			Resources:    resources,
+			Resources:    result.Resources,
+			Pagination:   result.Pagination,
 		}
 	}
 }

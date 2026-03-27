@@ -66,7 +66,7 @@ func FetchKMSKeys(
 			Marker: aliasMarker,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("listing KMS aliases: %w", err)
 		}
 
 		for _, alias := range aliasOutput.Aliases {

@@ -57,7 +57,7 @@ func FetchCodeBuildProjects(
 		Names: allNames,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("batch getting CodeBuild projects: %w", err)
 	}
 
 	var resources []resource.Resource

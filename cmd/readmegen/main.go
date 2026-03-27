@@ -30,7 +30,7 @@ func main() {
 		}
 
 		path := filepath.Join("docs", "shared", m[1])
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading %s: %v\n", path, err)
 			os.Exit(1)
