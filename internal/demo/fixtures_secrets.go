@@ -253,7 +253,7 @@ func ssmParameters() []resource.Resource {
 				"name":          name,
 				"type":          paramType,
 				"version":       fmt.Sprintf("%d", version),
-				"last_modified": mustParseTime(lastMod).Format("2006-01-02T15:04:05Z"),
+				"last_modified": mustParseTime(lastMod).Format("2006-01-02 15:04"),
 				"description":   desc,
 			},
 			RawStruct: ssmtypes.ParameterMetadata{
