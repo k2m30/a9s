@@ -1,0 +1,48 @@
+list:
+  DB Identifier:
+    path: DBInstanceIdentifier
+    width: 28
+  Engine:
+    path: Engine
+    width: 12
+  Version:
+    path: EngineVersion
+    width: 10
+  Status:
+    path: DBInstanceStatus
+    width: 14
+  Class:
+    path: DBInstanceClass
+    width: 16
+  Endpoint:
+    path: Endpoint.Address
+    width: 40
+  Multi-AZ:
+    path: MultiAZ
+    width: 10
+
+detail:
+  - DBInstanceIdentifier
+  - DBInstanceArn
+  - Engine
+  - EngineVersion
+  - DBInstanceStatus
+  - DBInstanceClass
+  - Endpoint
+  - MultiAZ
+  - AllocatedStorage
+  - StorageType
+  - Iops
+  - StorageEncrypted
+  - KmsKeyId
+  - AvailabilityZone
+  - PubliclyAccessible
+  - DBSubnetGroup
+  - VpcSecurityGroups
+  - BackupRetentionPeriod
+  - PreferredMaintenanceWindow
+  - PreferredBackupWindow
+  - DeletionProtection
+  - MasterUsername
+  - PerformanceInsightsEnabled
+  - Tags

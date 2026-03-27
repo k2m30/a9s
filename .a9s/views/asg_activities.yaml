@@ -1,0 +1,27 @@
+list:
+  Start Time:
+    key: start_time
+    width: 22
+  Status:
+    key: status_code
+    width: 14
+  Description:
+    key: description
+    width: 50
+  Cause:
+    key: cause
+    width: 40
+
+detail:
+  - ActivityId
+  - StartTime
+  - EndTime
+  - StatusCode
+  - StatusMessage
+  - Description
+  - Cause
+  - Details
+  - Progress
+  - AutoScalingGroupName
+  - AutoScalingGroupARN
+  - AutoScalingGroupState

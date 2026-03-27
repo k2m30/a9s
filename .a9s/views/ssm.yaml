@@ -1,0 +1,28 @@
+list:
+  Name:
+    path: Name
+    width: 40
+  Type:
+    path: Type
+    width: 14
+  Version:
+    path: Version
+    width: 8
+  Last Modified:
+    path: LastModifiedDate
+    width: 22
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - Name
+  - Type
+  - Version
+  - LastModifiedDate
+  - LastModifiedUser
+  - Description
+  - KeyId
+  - Tier
+  - DataType
+  - AllowedPattern

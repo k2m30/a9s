@@ -1,0 +1,13 @@
+list:
+  Timestamp:
+    key: timestamp
+    width: 22
+  Type:
+    key: history_item_type
+    width: 18
+  Summary:
+    key: history_summary
+    width: 60
+
+detail:
+  [Timestamp, HistoryItemType, HistorySummary, HistoryData, AlarmName, AlarmType]

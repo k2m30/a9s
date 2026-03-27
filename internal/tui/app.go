@@ -56,7 +56,7 @@ type Model struct {
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
 	pendingRefresh bool  // set after profile/region switch to refresh on ClientsReadyMsg
-	configErr      error // non-nil if views.yaml was found but corrupt
+	configErr      error // non-nil if views config was found but corrupt
 
 	identity         *awsclient.CallerIdentity
 	identityFetching bool

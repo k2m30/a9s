@@ -1,0 +1,26 @@
+list:
+  User Name:
+    path: UserName
+    width: 32
+  User ID:
+    path: UserId
+    width: 22
+  Path:
+    path: Path
+    width: 20
+  Created:
+    path: CreateDate
+    width: 22
+  Password Last Used:
+    path: PasswordLastUsed
+    width: 22
+
+detail:
+  - UserName
+  - UserId
+  - Arn
+  - Path
+  - CreateDate
+  - PasswordLastUsed
+  - PermissionsBoundary
+  - Tags

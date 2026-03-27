@@ -1,0 +1,30 @@
+list:
+  Timestamp:
+    key: timestamp
+    width: 22
+  Request ID:
+    key: request_id
+    width: 38
+  Status:
+    key: status
+    width: 10
+  Duration:
+    key: duration_ms
+    width: 14
+  Memory:
+    key: memory_used
+    width: 16
+  Cold Start:
+    key: cold_start
+    width: 12
+
+detail:
+  - request_id
+  - timestamp
+  - status
+  - duration_ms
+  - billed_duration_ms
+  - memory_size_mb
+  - memory_used_mb
+  - init_duration_ms
+  - xray_trace_id

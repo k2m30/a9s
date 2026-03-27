@@ -2,6 +2,7 @@ package unit
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -824,7 +825,7 @@ func TestQA_R53_E3_DemoMode_UnknownZone_EmptyRecords(t *testing.T) {
 }
 
 // GAP 2 config tests are in qa_r53_records_config_test.go (package unit_test)
-// because they use testdataPath which is defined in the unit_test package.
+// because they use testdataDir which is defined in the unit_test package.
 
 // ===========================================================================
 // GAP 3: Demo R53 Record Fixture Quality
@@ -1139,7 +1140,7 @@ func TestNewR53RecordsList_MultipleTerminalSizes(t *testing.T) {
 // ===========================================================================
 
 func TestDemoRender_R53RecordListShowsData(t *testing.T) {
-	cfg, _ := config.LoadFrom([]string{".a9s/views.yaml"})
+	cfg, _ := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 
 	zones, ok := demo.GetResources("r53")
 	if !ok {
@@ -1173,7 +1174,7 @@ func TestDemoRender_R53RecordListShowsData(t *testing.T) {
 }
 
 func TestDemoRender_R53RecordsListShowsData(t *testing.T) {
-	cfg, _ := config.LoadFrom([]string{".a9s/views.yaml"})
+	cfg, _ := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 
 	records, ok := demo.GetR53Records("/hostedzone/Z0123456789ABCDEFGHIJ")
 	if !ok {

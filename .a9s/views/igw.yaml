@@ -1,0 +1,15 @@
+list:
+  Name:
+    width: 28
+  IGW ID:
+    path: InternetGatewayId
+    width: 26
+  VPC ID:
+    key: vpc_id
+    width: 24
+  State:
+    key: state
+    width: 12
+
+detail:
+  [InternetGatewayId, Attachments, OwnerId, Tags]

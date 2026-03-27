@@ -12,6 +12,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
+// viewsDirs returns the standard views directory path for tests in tests/unit/.
+var viewsDirs = []string{"../../.a9s/views"}
+
 // --- Bug 1: S3 folders should be navigable, not show detail ---
 
 func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
@@ -86,10 +89,10 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 // --- Bug 3+4: Detail view must use correct ViewDef for the resource type ---
 
 func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
-	// Load the FULL config (all 8 resource types) — same as production
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	// Load the FULL config (all resource types) — same as production
+	cfg, err := config.LoadFromDirs(viewsDirs)
 	if err != nil {
-		t.Skipf("views.yaml not found: %v", err)
+		t.Skipf("views dir not found: %v", err)
 	}
 
 	// Create an EC2-like resource with RawStruct that has Tags
@@ -161,9 +164,9 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 }
 
 func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
-	cfg, err := config.LoadFrom([]string{"../../.a9s/views.yaml"})
+	cfg, err := config.LoadFromDirs(viewsDirs)
 	if err != nil {
-		t.Skipf("views.yaml not found: %v", err)
+		t.Skipf("views dir not found: %v", err)
 	}
 
 	// views.yaml s3_objects detail has: Key, Size, LastModified, StorageClass, ETag

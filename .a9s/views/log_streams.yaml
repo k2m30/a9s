@@ -1,0 +1,19 @@
+list:
+  Stream Name:
+    path: LogStreamName
+    width: 48
+  Last Event:
+    key: last_event
+    width: 22
+  First Event:
+    key: first_event
+    width: 22
+
+detail:
+  - LogStreamName
+  - Arn
+  - CreationTime
+  - FirstEventTimestamp
+  - LastEventTimestamp
+  - LastIngestionTime
+  - UploadSequenceToken

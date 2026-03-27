@@ -1,0 +1,29 @@
+list:
+  Target ID:
+    key: target_id
+    width: 24
+  Port:
+    key: port
+    width: 8
+  AZ:
+    key: az
+    width: 14
+  Health:
+    key: health
+    width: 14
+  Reason:
+    key: reason
+    width: 28
+  Description:
+    key: description
+    width: 36
+
+detail:
+  - Target.Id
+  - Target.Port
+  - Target.AvailabilityZone
+  - TargetHealth.State
+  - TargetHealth.Reason
+  - TargetHealth.Description
+  - HealthCheckPort
+  - AnomalyDetection

@@ -1,0 +1,16 @@
+list:
+  Identity:
+    path: IdentityName
+    width: 36
+  Type:
+    path: IdentityType
+    width: 16
+  Verification:
+    path: VerificationStatus
+    width: 16
+  Sending:
+    path: SendingEnabled
+    width: 10
+
+detail:
+  [IdentityName, IdentityType, SendingEnabled, VerificationStatus]

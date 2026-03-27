@@ -1,0 +1,32 @@
+list:
+  Service Name:
+    path: ServiceName
+    width: 40
+  Endpoint ID:
+    path: VpcEndpointId
+    width: 26
+  Type:
+    path: VpcEndpointType
+    width: 12
+  State:
+    path: State
+    width: 12
+  VPC ID:
+    path: VpcId
+    width: 24
+
+detail:
+  - VpcEndpointId
+  - ServiceName
+  - VpcEndpointType
+  - State
+  - VpcId
+  - SubnetIds
+  - NetworkInterfaceIds
+  - RouteTableIds
+  - Groups
+  - PrivateDnsEnabled
+  - PolicyDocument
+  - CreationTimestamp
+  - OwnerId
+  - Tags

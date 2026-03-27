@@ -1,0 +1,38 @@
+list:
+  Target Group:
+    path: TargetGroupName
+    width: 32
+  Port:
+    path: Port
+    width: 8
+  Protocol:
+    path: Protocol
+    width: 10
+  VPC ID:
+    path: VpcId
+    width: 24
+  Target Type:
+    path: TargetType
+    width: 12
+  Health Check:
+    path: HealthCheckPath
+    width: 24
+
+detail:
+  - TargetGroupName
+  - TargetGroupArn
+  - Port
+  - Protocol
+  - ProtocolVersion
+  - VpcId
+  - TargetType
+  - HealthCheckPath
+  - HealthCheckPort
+  - HealthCheckProtocol
+  - HealthCheckEnabled
+  - HealthCheckIntervalSeconds
+  - HealthCheckTimeoutSeconds
+  - HealthyThresholdCount
+  - UnhealthyThresholdCount
+  - Matcher
+  - LoadBalancerArns

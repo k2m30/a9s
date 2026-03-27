@@ -1,0 +1,10 @@
+list:
+  Bucket Name:
+    path: name
+    width: 40
+  Creation Date:
+    path: creationDate
+    width: 22
+detail:
+  - name
+  - creationDate

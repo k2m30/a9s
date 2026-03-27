@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ import (
 // visible data through the real view pipeline with production views.yaml.
 // This is the TDD test that should have existed from the start.
 func TestDemoRender_ListViewShowsData(t *testing.T) {
-	cfg, _ := config.LoadFrom([]string{".a9s/views.yaml"})
+	cfg, _ := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 
 	tests := []struct {
 		shortName string

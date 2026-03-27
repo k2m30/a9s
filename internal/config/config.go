@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -82,46 +83,81 @@ func parseListColumns(node *yaml.Node) ([]ListColumn, error) {
 	return cols, nil
 }
 
-// Load discovers and loads the first views.yaml found in the standard
-// lookup chain:
-//  1. .a9s/views.yaml (per-project override in CWD)
-//  2. ConfigDir()/views.yaml (env var or ~/.a9s/)
-//
-// Returns (nil, nil) when no config file is found.
-func Load() (*ViewsConfig, error) {
-	paths := lookupPaths()
-	return LoadFrom(paths)
-}
-
-// LoadFrom tries each path in order and loads the first file that exists.
-// Returns (nil, nil) when none of the paths exist.
-// Returns an error if a file is found but cannot be parsed.
-func LoadFrom(paths []string) (*ViewsConfig, error) {
-	for _, p := range paths {
-		info, err := os.Stat(p)
-		if err != nil || info.IsDir() {
-			continue
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", p, err)
-		}
-		cfg, err := Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", p, err)
-		}
-		return cfg, nil
+// ParseSingle decodes raw YAML bytes for a single resource view definition.
+// The YAML has no "views:" wrapper — it starts directly with "list:" and/or "detail:".
+// Returns a non-nil ViewDef even for empty data.
+func ParseSingle(data []byte) (*ViewDef, error) {
+	var vd ViewDef
+	if len(data) == 0 {
+		return &vd, nil
 	}
-	return nil, nil
-}
-
-// Parse decodes raw YAML bytes into a ViewsConfig.
-func Parse(data []byte) (*ViewsConfig, error) {
-	var cfg ViewsConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal(data, &vd); err != nil {
 		return nil, err
 	}
-	return &cfg, nil
+	return &vd, nil
+}
+
+// LoadFromDirs scans directories for per-resource YAML files ({ShortName}.yaml).
+// Directories are processed in order; later directories overlay earlier ones
+// on a per-resource basis (project dir overlays global dir).
+// Returns (nil, nil) when no directories exist or contain no .yaml files.
+func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
+	merged := make(map[string]ViewDef)
+
+	for _, dir := range dirs {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil, fmt.Errorf("reading directory %s: %w", dir, err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			if !strings.HasSuffix(name, ".yaml") {
+				continue
+			}
+
+			resourceName := strings.TrimSuffix(name, ".yaml")
+			filePath := filepath.Join(dir, name)
+
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				return nil, fmt.Errorf("reading %s: %w", filePath, err)
+			}
+
+			vd, err := ParseSingle(data)
+			if err != nil {
+				return nil, fmt.Errorf("parsing %s: %w", filePath, err)
+			}
+
+			merged[resourceName] = *vd
+		}
+	}
+
+	if len(merged) == 0 {
+		return nil, nil
+	}
+
+	return &ViewsConfig{Views: merged}, nil
+}
+
+// Load discovers and loads per-resource YAML files from the standard
+// lookup chain:
+//  1. ConfigDir()/views/ (global defaults — env var or ~/.a9s/)
+//  2. .a9s/views/ (per-project overrides in CWD)
+//
+// Later directories overlay earlier ones on a per-resource basis.
+// Returns (nil, nil) when no config files are found.
+func Load() (*ViewsConfig, error) {
+	dirs := lookupDirs()
+	return LoadFromDirs(dirs)
 }
 
 // GetViewDef returns the view definition for the given resource short name.
@@ -188,17 +224,18 @@ func ConfigFilePath(filename string) string {
 	return ""
 }
 
-// lookupPaths returns the ordered list of candidate config file paths.
-func lookupPaths() []string {
-	var paths []string
+// lookupDirs returns the ordered list of view config directories.
+// Global dir is listed first, project dir second (so project overlays global).
+func lookupDirs() []string {
+	var dirs []string
 
-	// 1. CWD .a9s/ directory (per-project overrides, mirrors ~/.a9s/ pattern)
-	paths = append(paths, filepath.Join(".a9s", "views.yaml"))
-
-	// 2. Resolved config directory (env var or ~/.a9s/)
+	// 1. Global config directory (env var or ~/.a9s/)
 	if dir := ConfigDir(); dir != "" {
-		paths = append(paths, filepath.Join(dir, "views.yaml"))
+		dirs = append(dirs, filepath.Join(dir, "views"))
 	}
 
-	return paths
+	// 2. CWD .a9s/views/ directory (per-project overrides)
+	dirs = append(dirs, filepath.Join(".a9s", "views"))
+
+	return dirs
 }

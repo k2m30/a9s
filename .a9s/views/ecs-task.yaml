@@ -1,0 +1,47 @@
+list:
+  Task ID:
+    path: TaskArn
+    width: 38
+  Cluster:
+    path: ClusterArn
+    width: 24
+  Status:
+    path: LastStatus
+    width: 12
+  Task Definition:
+    path: TaskDefinitionArn
+    width: 30
+  Launch:
+    path: LaunchType
+    width: 10
+  CPU:
+    path: Cpu
+    width: 6
+  Memory:
+    path: Memory
+    width: 8
+
+detail:
+  - TaskArn
+  - ClusterArn
+  - LastStatus
+  - DesiredStatus
+  - TaskDefinitionArn
+  - LaunchType
+  - Cpu
+  - Memory
+  - Group
+  - StartedBy
+  - StartedAt
+  - StoppedAt
+  - StoppedReason
+  - StopCode
+  - HealthStatus
+  - Connectivity
+  - PlatformVersion
+  - PlatformFamily
+  - AvailabilityZone
+  - Containers
+  - Attachments
+  - EnableExecuteCommand
+  - Tags

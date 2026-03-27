@@ -1,0 +1,10 @@
+list:
+  Topic Name:
+    path: TopicArn
+    width: 40
+  Topic ARN:
+    path: TopicArn
+    width: 60
+
+detail:
+  [TopicArn]

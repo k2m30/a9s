@@ -1,0 +1,27 @@
+list:
+  Job Name:
+    path: Name
+    width: 32
+  Version:
+    path: GlueVersion
+    width: 10
+  Worker Type:
+    path: WorkerType
+    width: 14
+  Workers:
+    path: NumberOfWorkers
+    width: 9
+  Last Modified:
+    path: LastModifiedOn
+    width: 22
+
+detail:
+  - Name
+  - Role
+  - GlueVersion
+  - WorkerType
+  - NumberOfWorkers
+  - MaxRetries
+  - Command
+  - CreatedOn
+  - LastModifiedOn

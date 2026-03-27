@@ -1,10 +1,11 @@
-// Command viewsgen generates a complete .a9s/views.yaml from built-in defaults.
-// Usage: go run ./cmd/viewsgen/ > .a9s/views.yaml
+// Command viewsgen generates per-resource YAML files under .a9s/views/.
+// Usage: go run ./cmd/viewsgen/
 package main
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -14,60 +15,61 @@ import (
 func main() {
 	cfg := config.DefaultConfig()
 
-	// Sort keys for stable output
+	outDir := filepath.Join(".a9s", "views")
+	if err := os.MkdirAll(outDir, 0750); err != nil {
+		fmt.Fprintf(os.Stderr, "error creating %s: %v\n", outDir, err)
+		os.Exit(1)
+	}
+
 	keys := make([]string, 0, len(cfg.Views))
 	for k := range cfg.Views {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	fmt.Println("# a9s development views.yaml")
-	fmt.Println("# Auto-generated from built-in defaults — DO NOT EDIT MANUALLY.")
-	fmt.Println("# Regenerate: go run ./cmd/viewsgen/ > .a9s/views.yaml")
-	fmt.Println("# To customize: create ~/.a9s/views.yaml with ONLY the resources you want to override.")
-	fmt.Println("# Generate field reference: go run ./cmd/refgen/ > .a9s/views_reference.yaml")
-	fmt.Println()
-	fmt.Println("views:")
-
-	for i, name := range keys {
+	for _, name := range keys {
 		v := cfg.Views[name]
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Printf("  %s:\n", name)
+		filePath := filepath.Join(outDir, name+".yaml")
+
+		var b strings.Builder
 
 		if len(v.List) > 0 {
-			fmt.Println("    list:")
+			b.WriteString("list:\n")
 			for _, col := range v.List {
-				fmt.Printf("      %s:\n", yamlKey(col.Title))
+				fmt.Fprintf(&b, "  %s:\n", yamlKey(col.Title))
 				if col.Key != "" {
-					fmt.Printf("        key: %s\n", col.Key)
+					fmt.Fprintf(&b, "    key: %s\n", col.Key)
 				} else if col.Path != "" {
-					fmt.Printf("        path: %s\n", col.Path)
+					fmt.Fprintf(&b, "    path: %s\n", col.Path)
 				}
-				fmt.Printf("        width: %d\n", col.Width)
+				fmt.Fprintf(&b, "    width: %d\n", col.Width)
 			}
 		}
 
 		if len(v.Detail) > 0 {
-			fmt.Println("    detail:")
-			// Print as flow style if it fits, otherwise block
+			if len(v.List) > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString("detail:\n")
 			joined := strings.Join(v.Detail, ", ")
 			if len(joined) < 80 {
-				fmt.Printf("      [%s]\n", joined)
+				fmt.Fprintf(&b, "  [%s]\n", joined)
 			} else {
 				for _, d := range v.Detail {
-					fmt.Printf("      - %s\n", d)
+					fmt.Fprintf(&b, "  - %s\n", d)
 				}
 			}
 		}
+
+		if err := os.WriteFile(filePath, []byte(b.String()), 0600); err != nil {
+			fmt.Fprintf(os.Stderr, "error writing %s: %v\n", filePath, err)
+			os.Exit(1)
+		}
 	}
 
-	os.Exit(0)
+	fmt.Printf("Generated %d files in %s/\n", len(keys), outDir)
 }
 
-// yamlKey returns a YAML-safe key string. Keys containing characters that are
-// special in YAML (#, :, etc.) are double-quoted.
 func yamlKey(s string) string {
 	if strings.ContainsAny(s, "#:{}[]&*?|>!%@`") {
 		return fmt.Sprintf("%q", s)

@@ -1,0 +1,15 @@
+list:
+  Instance ID:
+    path: instanceId
+    width: 20
+  State:
+    path: state.name
+    width: 12
+  Type:
+    path: instanceType
+    width: 14
+detail:
+  - instanceId
+  - state
+  - instanceType
+  - placement

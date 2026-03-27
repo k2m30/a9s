@@ -1,0 +1,32 @@
+list:
+  Stage:
+    key: stage_name
+    width: 20
+  Stage Status:
+    key: stage_status
+    width: 14
+  Action:
+    key: action_name
+    width: 24
+  Action Status:
+    key: action_status
+    width: 14
+  Last Changed:
+    key: last_change_time
+    width: 22
+  External URL:
+    key: external_url
+    width: 40
+
+detail:
+  - StageName
+  - StageStatus
+  - ActionName
+  - ActionStatus
+  - LastStatusChange
+  - ExternalURL
+  - Token
+  - ErrorCode
+  - ErrorMessage
+  - RevisionId
+  - RevisionSummary

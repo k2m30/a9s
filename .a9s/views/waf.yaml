@@ -1,0 +1,13 @@
+list:
+  Name:
+    path: Name
+    width: 28
+  ID:
+    path: Id
+    width: 38
+  Description:
+    path: Description
+    width: 36
+
+detail:
+  [Name, Id, ARN, Description, LockToken]

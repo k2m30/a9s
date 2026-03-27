@@ -1,0 +1,16 @@
+list:
+  Priority:
+    key: priority
+    width: 10
+  Conditions:
+    key: conditions_summary
+    width: 36
+  Action:
+    key: action_type
+    width: 16
+  Target:
+    key: action_target
+    width: 32
+
+detail:
+  [RuleArn, Priority, Conditions, Actions, IsDefault]

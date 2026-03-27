@@ -1,0 +1,16 @@
+list:
+  Name:
+    path: Name
+    width: 36
+  Type:
+    path: Type
+    width: 10
+  ARN:
+    path: StateMachineArn
+    width: 60
+  Created:
+    path: CreationDate
+    width: 22
+
+detail:
+  [Name, StateMachineArn, Type, CreationDate]

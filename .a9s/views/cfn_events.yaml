@@ -1,0 +1,29 @@
+list:
+  Timestamp:
+    key: timestamp
+    width: 22
+  Logical ID:
+    path: LogicalResourceId
+    width: 28
+  Type:
+    path: ResourceType
+    width: 28
+  Status:
+    key: resource_status
+    width: 24
+  Reason:
+    key: resource_status_reason
+    width: 40
+
+detail:
+  - EventId
+  - StackId
+  - StackName
+  - Timestamp
+  - LogicalResourceId
+  - PhysicalResourceId
+  - ResourceType
+  - ResourceStatus
+  - ResourceStatusReason
+  - ResourceProperties
+  - ClientRequestToken

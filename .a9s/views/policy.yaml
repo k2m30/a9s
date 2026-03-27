@@ -1,0 +1,30 @@
+list:
+  Policy Name:
+    path: PolicyName
+    width: 36
+  Policy ID:
+    path: PolicyId
+    width: 22
+  Attached:
+    path: AttachmentCount
+    width: 10
+  Path:
+    path: Path
+    width: 20
+  Created:
+    path: CreateDate
+    width: 22
+
+detail:
+  - PolicyName
+  - PolicyId
+  - Arn
+  - Path
+  - AttachmentCount
+  - PermissionsBoundaryUsageCount
+  - IsAttachable
+  - DefaultVersionId
+  - CreateDate
+  - UpdateDate
+  - Description
+  - Tags

@@ -1,0 +1,34 @@
+list:
+  Stack Name:
+    path: StackName
+    width: 36
+  Status:
+    path: StackStatus
+    width: 24
+  Created:
+    path: CreationTime
+    width: 22
+  Updated:
+    path: LastUpdatedTime
+    width: 22
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - StackName
+  - StackId
+  - StackStatus
+  - DetailedStatus
+  - StackStatusReason
+  - CreationTime
+  - LastUpdatedTime
+  - DeletionTime
+  - Description
+  - RoleARN
+  - Capabilities
+  - EnableTerminationProtection
+  - DriftInformation
+  - Parameters
+  - Outputs
+  - Tags

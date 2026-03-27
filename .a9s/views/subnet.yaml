@@ -1,0 +1,35 @@
+list:
+  Name:
+    width: 28
+  Subnet ID:
+    path: SubnetId
+    width: 26
+  VPC ID:
+    path: VpcId
+    width: 24
+  CIDR Block:
+    path: CidrBlock
+    width: 18
+  AZ:
+    path: AvailabilityZone
+    width: 14
+  State:
+    path: State
+    width: 12
+  Available IPs:
+    path: AvailableIpAddressCount
+    width: 14
+
+detail:
+  - SubnetId
+  - VpcId
+  - CidrBlock
+  - AvailabilityZone
+  - AvailabilityZoneId
+  - State
+  - AvailableIpAddressCount
+  - MapPublicIpOnLaunch
+  - DefaultForAz
+  - SubnetArn
+  - OwnerId
+  - Tags

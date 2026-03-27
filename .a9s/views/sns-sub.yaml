@@ -1,0 +1,16 @@
+list:
+  Topic ARN:
+    path: TopicArn
+    width: 48
+  Protocol:
+    path: Protocol
+    width: 10
+  Endpoint:
+    path: Endpoint
+    width: 48
+  Subscription ARN:
+    path: SubscriptionArn
+    width: 60
+
+detail:
+  [SubscriptionArn, TopicArn, Protocol, Endpoint, Owner]

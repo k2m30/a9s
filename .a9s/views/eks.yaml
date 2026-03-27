@@ -1,0 +1,31 @@
+list:
+  Cluster Name:
+    path: Name
+    width: 28
+  Version:
+    path: Version
+    width: 10
+  Status:
+    path: Status
+    width: 14
+  Endpoint:
+    path: Endpoint
+    width: 48
+  Platform Version:
+    path: PlatformVersion
+    width: 18
+
+detail:
+  - Name
+  - Version
+  - Status
+  - Endpoint
+  - PlatformVersion
+  - Arn
+  - RoleArn
+  - KubernetesNetworkConfig
+  - ResourcesVpcConfig
+  - Logging
+  - Identity
+  - CreatedAt
+  - Tags

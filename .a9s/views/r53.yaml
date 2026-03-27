@@ -1,0 +1,19 @@
+list:
+  Name:
+    path: Name
+    width: 36
+  Zone ID:
+    path: Id
+    width: 30
+  Records:
+    path: ResourceRecordSetCount
+    width: 9
+  Private:
+    path: Config.PrivateZone
+    width: 9
+  Comment:
+    path: Config.Comment
+    width: 30
+
+detail:
+  [Id, Name, CallerReference, ResourceRecordSetCount, Config, LinkedService]

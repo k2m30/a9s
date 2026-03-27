@@ -1,0 +1,13 @@
+list:
+  Policy Name:
+    key: policy_name
+    width: 40
+  Policy ARN:
+    key: policy_arn
+    width: 56
+  Type:
+    key: policy_type
+    width: 10
+
+detail:
+  [PolicyName, PolicyArn, PolicyType]

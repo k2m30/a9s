@@ -1,0 +1,27 @@
+list:
+  Rule Name:
+    path: Name
+    width: 28
+  State:
+    path: State
+    width: 10
+  Event Bus:
+    path: EventBusName
+    width: 18
+  Schedule:
+    path: ScheduleExpression
+    width: 24
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - Name
+  - Arn
+  - State
+  - Description
+  - EventBusName
+  - ScheduleExpression
+  - EventPattern
+  - ManagedBy
+  - RoleArn

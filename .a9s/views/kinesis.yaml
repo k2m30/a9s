@@ -1,0 +1,16 @@
+list:
+  Stream Name:
+    path: StreamName
+    width: 36
+  Status:
+    path: StreamStatus
+    width: 12
+  Mode:
+    path: StreamModeDetails.StreamMode
+    width: 14
+  Created:
+    path: StreamCreationTimestamp
+    width: 22
+
+detail:
+  [StreamName, StreamARN, StreamStatus, StreamModeDetails, StreamCreationTimestamp]

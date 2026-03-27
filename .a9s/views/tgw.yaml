@@ -1,0 +1,25 @@
+list:
+  Name:
+    width: 28
+  TGW ID:
+    path: TransitGatewayId
+    width: 26
+  State:
+    path: State
+    width: 12
+  Owner:
+    path: OwnerId
+    width: 14
+  Description:
+    path: Description
+    width: 30
+
+detail:
+  - TransitGatewayId
+  - TransitGatewayArn
+  - State
+  - OwnerId
+  - Description
+  - Options
+  - CreationTime
+  - Tags

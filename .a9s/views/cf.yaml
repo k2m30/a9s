@@ -1,0 +1,33 @@
+list:
+  Domain Name:
+    path: DomainName
+    width: 40
+  Distribution ID:
+    path: Id
+    width: 16
+  Status:
+    path: Status
+    width: 12
+  Enabled:
+    path: Enabled
+    width: 9
+  Aliases:
+    path: Aliases.Items
+    width: 30
+  Price Class:
+    path: PriceClass
+    width: 16
+
+detail:
+  - Id
+  - DomainName
+  - Status
+  - Enabled
+  - Comment
+  - ARN
+  - Aliases
+  - Origins
+  - PriceClass
+  - HttpVersion
+  - LastModifiedTime
+  - DefaultCacheBehavior

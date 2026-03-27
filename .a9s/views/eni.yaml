@@ -1,0 +1,38 @@
+list:
+  Name:
+    width: 24
+  ENI ID:
+    path: NetworkInterfaceId
+    width: 26
+  Status:
+    path: Status
+    width: 12
+  Type:
+    path: InterfaceType
+    width: 14
+  VPC ID:
+    path: VpcId
+    width: 24
+  Private IP:
+    path: PrivateIpAddress
+    width: 16
+
+detail:
+  - NetworkInterfaceId
+  - Status
+  - InterfaceType
+  - VpcId
+  - SubnetId
+  - AvailabilityZone
+  - PrivateIpAddress
+  - PrivateDnsName
+  - MacAddress
+  - Description
+  - OwnerId
+  - RequesterId
+  - RequesterManaged
+  - SourceDestCheck
+  - Groups
+  - Attachment
+  - Association
+  - TagSet

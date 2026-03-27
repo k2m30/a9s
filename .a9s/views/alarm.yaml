@@ -1,0 +1,39 @@
+list:
+  Alarm Name:
+    path: AlarmName
+    width: 36
+  State:
+    path: StateValue
+    width: 12
+  Metric:
+    path: MetricName
+    width: 24
+  Namespace:
+    path: Namespace
+    width: 24
+  Threshold:
+    path: Threshold
+    width: 12
+
+detail:
+  - AlarmName
+  - AlarmArn
+  - StateValue
+  - StateReason
+  - StateUpdatedTimestamp
+  - StateTransitionedTimestamp
+  - MetricName
+  - Namespace
+  - Statistic
+  - Period
+  - EvaluationPeriods
+  - DatapointsToAlarm
+  - Threshold
+  - ComparisonOperator
+  - TreatMissingData
+  - Dimensions
+  - AlarmDescription
+  - AlarmActions
+  - OKActions
+  - InsufficientDataActions
+  - ActionsEnabled

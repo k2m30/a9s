@@ -41,7 +41,7 @@ specs/           # feature specifications
 - `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
 - `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
-- `go run ./cmd/viewsgen/ > .a9s/views.yaml` — regenerate views.yaml from built-in defaults (run after any changes to defaults.go)
+- `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
 

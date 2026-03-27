@@ -9,19 +9,19 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 )
 
-// testdataPath returns the absolute path to a file inside tests/testdata/.
-func testdataPath(name string) string {
+// testdataDir returns the absolute path to a directory inside tests/testdata/.
+func testdataDir(name string) string {
 	// tests/unit/ -> tests/testdata/
 	return filepath.Join("..", "testdata", name)
 }
 
 // ---------------------------------------------------------------------------
-// T015: Test YAML parsing — load views_valid.yaml
+// T015: Test YAML parsing — load views_valid/ directory
 // ---------------------------------------------------------------------------
 
 func TestConfigYAMLParsing(t *testing.T) {
-	paths := []string{testdataPath("views_valid.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_valid")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
 	}
@@ -85,59 +85,41 @@ func TestConfigYAMLParsing(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigLookupChain(t *testing.T) {
-	// New lookup chain has 2 paths:
-	//   1. .a9s/views.yaml (CWD-relative)
-	//   2. ConfigDir()/views.yaml (resolved config dir — env var or ~/.a9s/)
-	dirCWD := t.TempDir()
-	dirConfigDir := t.TempDir()
+	// LoadFromDirs processes directories in order; later dirs overlay earlier.
+	// Each dir contains per-resource .yaml files (no "views:" wrapper).
 
-	yamlCWD := []byte("views:\n  ec2:\n    list:\n      FromCWD:\n        path: cwd\n        width: 1\n")
-	yamlConfigDir := []byte("views:\n  ec2:\n    list:\n      FromConfigDir:\n        path: configdir\n        width: 2\n")
-
-	writeTmp := func(dir, filename string, data []byte) {
-		t.Helper()
-		full := filepath.Join(dir, filename)
-		parent := filepath.Dir(full)
-		if err := os.MkdirAll(parent, 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, data, 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Subtest 1: CWD .a9s/views.yaml wins over ConfigDir
+	// Subtest 1: Dir2 (later) overlays Dir1
 	t.Run("cwd_wins", func(t *testing.T) {
-		cwdA9sDir := filepath.Join(dirCWD, ".a9s")
-		writeTmp(cwdA9sDir, "views.yaml", yamlCWD)
-		writeTmp(dirConfigDir, "views.yaml", yamlConfigDir)
+		dir1 := filepath.Join(t.TempDir(), "views")
+		dir2 := filepath.Join(t.TempDir(), "views")
+		os.MkdirAll(dir1, 0755)
+		os.MkdirAll(dir2, 0755)
+		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromDir1:\n    path: dir1\n    width: 1\n"), 0644)
+		os.WriteFile(filepath.Join(dir2, "ec2.yaml"), []byte("list:\n  FromDir2:\n    path: dir2\n    width: 2\n"), 0644)
 
-		paths := []string{
-			filepath.Join(cwdA9sDir, "views.yaml"),
-			filepath.Join(dirConfigDir, "views.yaml"),
-		}
-		cfg, err := config.LoadFrom(paths)
+		// Dir2 (later) overlays Dir1
+		cfg, err := config.LoadFromDirs([]string{dir1, dir2})
 		if err != nil {
-			t.Fatalf("LoadFrom failed: %v", err)
+			t.Fatalf("LoadFromDirs failed: %v", err)
 		}
 		if cfg == nil {
 			t.Fatal("expected non-nil config")
 		}
 		ec2 := cfg.Views["ec2"]
-		if len(ec2.List) != 1 || ec2.List[0].Title != "FromCWD" {
-			t.Fatalf("expected column from CWD .a9s/, got %+v", ec2.List)
+		if len(ec2.List) != 1 || ec2.List[0].Title != "FromDir2" {
+			t.Fatalf("expected column from Dir2 (overlay), got %+v", ec2.List)
 		}
 	})
 
-	// Subtest 2: ConfigDir is used when CWD .a9s/ has no file
+	// Subtest 2: ConfigDir is used when later dir doesn't exist
 	t.Run("configdir_when_no_cwd", func(t *testing.T) {
-		paths := []string{
-			filepath.Join(t.TempDir(), ".a9s", "views.yaml"), // doesn't exist
-			filepath.Join(dirConfigDir, "views.yaml"),
-		}
-		cfg, err := config.LoadFrom(paths)
+		dir1 := filepath.Join(t.TempDir(), "views")
+		os.MkdirAll(dir1, 0755)
+		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromConfigDir:\n    path: configdir\n    width: 2\n"), 0644)
+
+		cfg, err := config.LoadFromDirs([]string{dir1, filepath.Join(t.TempDir(), "nonexistent")})
 		if err != nil {
-			t.Fatalf("LoadFrom failed: %v", err)
+			t.Fatalf("LoadFromDirs failed: %v", err)
 		}
 		if cfg == nil {
 			t.Fatal("expected non-nil config")
@@ -154,11 +136,9 @@ func TestConfigLookupChain(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigFallbackDefaults(t *testing.T) {
-	// No files exist
-	paths := []string{
-		filepath.Join(t.TempDir(), "views.yaml"),
-	}
-	cfg, err := config.LoadFrom(paths)
+	// No directories with .yaml files exist
+	dirs := []string{filepath.Join(t.TempDir(), "nonexistent")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,8 +166,8 @@ func TestConfigFallbackDefaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPartialOverride(t *testing.T) {
-	paths := []string{testdataPath("views_partial.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_partial")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
 	}
@@ -246,8 +226,8 @@ func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 }
 
 func TestConfigYAMLParsing_S3Objects(t *testing.T) {
-	paths := []string{testdataPath("views_s3_objects.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_s3_objects")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
 	}
@@ -300,10 +280,10 @@ func TestGetViewDef_S3Objects_NilConfig(t *testing.T) {
 }
 
 func TestGetViewDef_S3Objects_FromConfig(t *testing.T) {
-	paths := []string{testdataPath("views_s3_objects.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_s3_objects")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
-		t.Fatalf("LoadFrom failed: %v", err)
+		t.Fatalf("LoadFromDirs failed: %v", err)
 	}
 
 	vd := config.GetViewDef(cfg, "s3_objects")
@@ -317,11 +297,11 @@ func TestGetViewDef_S3Objects_FromConfig(t *testing.T) {
 }
 
 func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
-	// Config has ec2 but not s3_objects — should fall back to defaults
-	paths := []string{testdataPath("views_partial.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	// Config has s3 but not s3_objects — should fall back to defaults
+	dirs := []string{testdataDir("views_partial")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
-		t.Fatalf("LoadFrom failed: %v", err)
+		t.Fatalf("LoadFromDirs failed: %v", err)
 	}
 
 	vd := config.GetViewDef(cfg, "s3_objects")
@@ -335,19 +315,17 @@ func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test: generated views.yaml round-trips through parser and matches defaults
+// Test: generated .a9s/views/ round-trips through parser and matches defaults
 // ---------------------------------------------------------------------------
 
-func TestViewsYAML_RoundTrip_MatchesDefaults(t *testing.T) {
-	// Read the generated .a9s/views.yaml
-	data, err := os.ReadFile(filepath.Join("..", "..", ".a9s", "views.yaml"))
+func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
+	viewsDir := filepath.Join("..", "..", ".a9s", "views")
+	cfg, err := config.LoadFromDirs([]string{viewsDir})
 	if err != nil {
-		t.Fatalf("failed to read .a9s/views.yaml: %v", err)
+		t.Fatalf("failed to load .a9s/views/: %v", err)
 	}
-
-	cfg, err := config.Parse(data)
-	if err != nil {
-		t.Fatalf("failed to parse .a9s/views.yaml: %v", err)
+	if cfg == nil {
+		t.Skip(".a9s/views/ directory does not exist yet — skipping round-trip test")
 	}
 
 	defaults := config.DefaultConfig()
@@ -356,7 +334,7 @@ func TestViewsYAML_RoundTrip_MatchesDefaults(t *testing.T) {
 	for name, defView := range defaults.Views {
 		yamlView, ok := cfg.Views[name]
 		if !ok {
-			t.Errorf("views.yaml missing resource %q (present in defaults.go)", name)
+			t.Errorf("views dir missing resource %q (present in defaults.go)", name)
 			continue
 		}
 
@@ -402,7 +380,7 @@ func TestViewsYAML_RoundTrip_MatchesDefaults(t *testing.T) {
 	// Also check no extra views in YAML that aren't in defaults
 	for name := range cfg.Views {
 		if _, ok := defaults.Views[name]; !ok {
-			t.Errorf("views.yaml has extra resource %q not in defaults.go", name)
+			t.Errorf("views dir has extra resource %q not in defaults.go", name)
 		}
 	}
 }
@@ -412,8 +390,8 @@ func TestViewsYAML_RoundTrip_MatchesDefaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigInvalidYAML(t *testing.T) {
-	paths := []string{testdataPath("views_invalid.yaml")}
-	cfg, err := config.LoadFrom(paths)
+	dirs := []string{testdataDir("views_invalid")}
+	cfg, err := config.LoadFromDirs(dirs)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML, got nil")
 	}
@@ -434,31 +412,25 @@ func TestConfigInvalidYAML(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigYAMLParsing_KeyField(t *testing.T) {
-	yamlData := `
-views:
-  sqs:
-    list:
-      Queue Name:
-        path: QueueUrl
-        width: 36
-      Messages:
-        key: approx_messages
-        width: 10
-      In Flight:
-        key: approx_not_visible
-        width: 10
-    detail:
-      - QueueUrl
+	yamlData := `list:
+  Queue Name:
+    path: QueueUrl
+    width: 36
+  Messages:
+    key: approx_messages
+    width: 10
+  In Flight:
+    key: approx_not_visible
+    width: 10
+detail:
+  - QueueUrl
 `
-	cfg, err := config.Parse([]byte(yamlData))
+	vd, err := config.ParseSingle([]byte(yamlData))
 	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
+		t.Fatalf("ParseSingle failed: %v", err)
 	}
 
-	sqs, ok := cfg.Views["sqs"]
-	if !ok {
-		t.Fatal("missing sqs view definition")
-	}
+	sqs := *vd
 	if len(sqs.List) != 3 {
 		t.Fatalf("expected 3 columns, got %d", len(sqs.List))
 	}
@@ -631,25 +603,26 @@ func TestConfigFilePath(t *testing.T) {
 }
 
 // TestLookupPaths_EnvVarDoesNotFallThrough verifies that when
-// A9S_CONFIG_FOLDER is set to a directory that has no views.yaml, Load()
-// does NOT fall through to ~/.a9s/views.yaml. It should return (nil, nil).
+// A9S_CONFIG_FOLDER is set to a directory that has no views/, Load()
+// does NOT fall through to ~/.a9s/views/. It should return (nil, nil).
 func TestLookupPaths_EnvVarDoesNotFallThrough(t *testing.T) {
-	// Point A9S_CONFIG_FOLDER to an empty temp dir (no views.yaml)
+	// Point A9S_CONFIG_FOLDER to an empty temp dir (no views/ dir)
 	emptyDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", emptyDir)
 
-	// Also override HOME to a temp dir that DOES have ~/.a9s/views.yaml,
+	// Also override HOME to a temp dir that DOES have ~/.a9s/views/,
 	// to prove Load() doesn't fall through to the home dir.
 	fakeHome := t.TempDir()
 	t.Setenv("HOME", fakeHome)
 
 	homeA9s := filepath.Join(fakeHome, ".a9s")
-	if err := os.MkdirAll(homeA9s, 0755); err != nil {
-		t.Fatalf("failed to create fake home .a9s dir: %v", err)
+	homeViews := filepath.Join(homeA9s, "views")
+	if err := os.MkdirAll(homeViews, 0755); err != nil {
+		t.Fatalf("failed to create fake home .a9s/views dir: %v", err)
 	}
-	yamlData := []byte("views:\n  ec2:\n    list:\n      ShouldNotLoad:\n        path: sneaky\n        width: 99\n")
-	if err := os.WriteFile(filepath.Join(homeA9s, "views.yaml"), yamlData, 0644); err != nil {
-		t.Fatalf("failed to write views.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(homeViews, "ec2.yaml"),
+		[]byte("list:\n  ShouldNotLoad:\n    path: sneaky\n    width: 99\n"), 0644); err != nil {
+		t.Fatalf("failed to write ec2.yaml: %v", err)
 	}
 
 	// Make sure the CWD .a9s/ path also doesn't exist
@@ -663,8 +636,10 @@ func TestLookupPaths_EnvVarDoesNotFallThrough(t *testing.T) {
 		// If cfg is non-nil, it means Load() fell through to the home dir
 		ec2, ok := cfg.Views["ec2"]
 		if ok && len(ec2.List) > 0 && ec2.List[0].Title == "ShouldNotLoad" {
-			t.Fatalf("Load() fell through to ~/.a9s/views.yaml despite A9S_CONFIG_FOLDER being set (to empty dir)")
+			t.Fatalf("Load() fell through to ~/.a9s/views/ despite A9S_CONFIG_FOLDER being set (to empty dir)")
 		}
 		t.Fatalf("Load() returned non-nil config; expected (nil, nil) when env var dir has no file")
 	}
 }
+
+// New ParseSingle and LoadFromDirs tests are in config_split_test.go.

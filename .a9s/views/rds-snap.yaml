@@ -1,0 +1,39 @@
+list:
+  Snapshot ID:
+    path: DBSnapshotIdentifier
+    width: 36
+  DB Instance:
+    path: DBInstanceIdentifier
+    width: 28
+  Status:
+    path: Status
+    width: 12
+  Engine:
+    path: Engine
+    width: 12
+  Type:
+    path: SnapshotType
+    width: 12
+  Created:
+    path: SnapshotCreateTime
+    width: 22
+
+detail:
+  - DBSnapshotIdentifier
+  - DBSnapshotArn
+  - DBInstanceIdentifier
+  - Status
+  - Engine
+  - EngineVersion
+  - SnapshotType
+  - SnapshotCreateTime
+  - AllocatedStorage
+  - StorageType
+  - Encrypted
+  - KmsKeyId
+  - AvailabilityZone
+  - MasterUsername
+  - LicenseModel
+  - Iops
+  - PercentProgress
+  - SourceRegion

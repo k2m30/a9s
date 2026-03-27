@@ -1,0 +1,29 @@
+list:
+  Cluster Name:
+    path: ClusterName
+    width: 32
+  Status:
+    path: Status
+    width: 12
+  Running:
+    path: RunningTasksCount
+    width: 9
+  Pending:
+    path: PendingTasksCount
+    width: 9
+  Services:
+    path: ActiveServicesCount
+    width: 10
+
+detail:
+  - ClusterName
+  - ClusterArn
+  - Status
+  - RunningTasksCount
+  - PendingTasksCount
+  - ActiveServicesCount
+  - RegisteredContainerInstancesCount
+  - CapacityProviders
+  - DefaultCapacityProviderStrategy
+  - Settings
+  - Tags

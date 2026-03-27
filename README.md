@@ -224,7 +224,7 @@ All resource short names work as commands.
 
 ## Configuration
 
-a9s stores view configuration in `~/.a9s/views.yaml` (optional — sensible defaults are built-in). AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
+a9s stores view configuration in `~/.a9s/views/` as per-resource YAML files (e.g., `ec2.yaml`, `s3.yaml`) — optional, sensible defaults are built-in. AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
 
 ## AWS Permissions
 

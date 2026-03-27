@@ -1,0 +1,28 @@
+list:
+  Log Group Name:
+    path: LogGroupName
+    width: 48
+  Size:
+    key: stored_bytes
+    width: 14
+  Retention:
+    path: RetentionInDays
+    width: 10
+  Metric Filters:
+    path: MetricFilterCount
+    width: 8
+  Created:
+    key: creation_time
+    width: 16
+
+detail:
+  - LogGroupName
+  - LogGroupArn
+  - LogGroupClass
+  - StoredBytes
+  - RetentionInDays
+  - MetricFilterCount
+  - DeletionProtectionEnabled
+  - CreationTime
+  - KmsKeyId
+  - DataProtectionStatus

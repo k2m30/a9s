@@ -1,0 +1,25 @@
+list:
+  Trail Name:
+    path: Name
+    width: 28
+  S3 Bucket:
+    path: S3BucketName
+    width: 28
+  Home Region:
+    path: HomeRegion
+    width: 16
+  Multi-Region:
+    path: IsMultiRegionTrail
+    width: 14
+
+detail:
+  - Name
+  - TrailARN
+  - S3BucketName
+  - HomeRegion
+  - IsMultiRegionTrail
+  - IsOrganizationTrail
+  - LogFileValidationEnabled
+  - IncludeGlobalServiceEvents
+  - KmsKeyId
+  - CloudWatchLogsLogGroupArn

@@ -1,0 +1,24 @@
+list:
+  Key:
+    path: Key
+    width: 36
+  Size:
+    path: Size
+    width: 12
+  Storage Class:
+    path: StorageClass
+    width: 16
+  Last Modified:
+    path: LastModified
+    width: 22
+
+detail:
+  - Key
+  - Size
+  - LastModified
+  - StorageClass
+  - ETag
+  - ChecksumAlgorithm
+  - ChecksumType
+  - Owner
+  - RestoreStatus

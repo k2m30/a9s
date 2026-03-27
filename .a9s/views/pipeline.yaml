@@ -1,0 +1,19 @@
+list:
+  Pipeline Name:
+    path: Name
+    width: 30
+  Type:
+    path: PipelineType
+    width: 6
+  Version:
+    path: Version
+    width: 9
+  Created:
+    path: Created
+    width: 22
+  Updated:
+    path: Updated
+    width: 22
+
+detail:
+  [Name, PipelineType, Version, Created, Updated, ExecutionMode]
