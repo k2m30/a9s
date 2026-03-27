@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -329,6 +330,97 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 
 	if cmd == nil {
 		t.Error("pressing ctrl+r on main menu in demo mode should trigger availability probes")
+	}
+}
+
+// Bug 4: Demo probe count uses GetResources (all fixtures) instead of
+// GetResourcesPaginated (first page only). The menu shows the total fixture
+// count but the list view only shows DemoPageSize items on the first page.
+// The probe count MUST match what the user actually sees.
+
+func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
+	// Step 1: Find a resource type where GetResources returns more than DemoPageSize items.
+	// This proves the discrepancy between total and paginated counts.
+	var targetType string
+	var totalCount int
+	var paginatedCount int
+	for _, shortName := range resource.AllShortNames() {
+		all, ok := demo.GetResources(shortName)
+		if !ok {
+			continue
+		}
+		if len(all) > demo.DemoPageSize {
+			targetType = shortName
+			totalCount = len(all)
+			result, _ := demo.GetResourcesPaginated(shortName)
+			paginatedCount = len(result.Resources)
+			break
+		}
+	}
+	if targetType == "" {
+		t.Fatal("test requires at least one resource type with more than DemoPageSize fixtures")
+	}
+	if paginatedCount != demo.DemoPageSize {
+		t.Fatalf("expected paginated count %d for %s, got %d", demo.DemoPageSize, targetType, paginatedCount)
+	}
+	if totalCount <= demo.DemoPageSize {
+		t.Fatalf("expected total count > %d for %s, got %d", demo.DemoPageSize, targetType, totalCount)
+	}
+
+	// Step 2: Create a demo-mode model and send ClientsReadyMsg.
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{})
+
+	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
+	// This builds the queue and fires the first 3 probes.
+	m, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+		Entries: make(map[string]int),
+		Expired: true,
+	})
+
+	// Step 4: Walk the full probe cycle. Execute batch cmds to get
+	// AvailabilityCheckedMsg, feed each one back into the model to dequeue
+	// the next probe, and collect all results.
+	collected := make(map[string]int)
+	for cmd != nil {
+		msg := cmd()
+		if acm, ok := msg.(messages.AvailabilityCheckedMsg); ok {
+			collected[acm.ResourceType] = acm.Count
+			m, cmd = rootApplyMsg(m, acm)
+			continue
+		}
+		// Handle BatchMsg: execute each sub-cmd and feed results back
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, subCmd := range batch {
+				if subCmd == nil {
+					continue
+				}
+				subMsg := subCmd()
+				if acm, ok := subMsg.(messages.AvailabilityCheckedMsg); ok {
+					collected[acm.ResourceType] = acm.Count
+					m, cmd = rootApplyMsg(m, acm)
+				}
+			}
+			continue
+		}
+		// Not a batch or AvailabilityCheckedMsg — stop
+		break
+	}
+
+	// Step 5: Verify the target resource type was probed
+	probeCount, found := collected[targetType]
+	if !found {
+		t.Fatalf("probe cycle did not produce AvailabilityCheckedMsg for %s; collected: %v", targetType, collected)
+	}
+
+	// Step 6: Assert the probe count matches the PAGINATED page size, not the total.
+	// With the bug, probeCount == totalCount (e.g. 22 for dbi).
+	// After the fix, probeCount == paginatedCount (DemoPageSize, e.g. 5).
+	if probeCount != paginatedCount {
+		t.Errorf("demo probe for %s reported count=%d, want %d (DemoPageSize); "+
+			"total fixtures=%d — probe must use GetResourcesPaginated, not GetResources",
+			targetType, probeCount, paginatedCount, totalCount)
 	}
 }
 
