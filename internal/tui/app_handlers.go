@@ -157,16 +157,22 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	m.identityFetching = true
 	identityCmd := m.fetchIdentity()
 
+	// Start availability cache loading (unless disabled or demo mode)
+	var availCmd tea.Cmd
+	if !m.noCache && !m.demoMode {
+		availCmd = m.loadAvailabilityCache()
+	}
+
 	if m.pendingRefresh {
 		m.pendingRefresh = false
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
 			cmd := m.fetchResources(rt)
-			return m, tea.Batch(cmd, identityCmd)
+			return m, tea.Batch(cmd, identityCmd, availCmd)
 		}
 	}
-	return m, identityCmd
+	return m, tea.Batch(identityCmd, availCmd)
 }
 
 // handleProfileSelected switches the AWS profile, pops the profile selector,
@@ -178,6 +184,10 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
+	m.availabilityGen++ // cancel in-flight probes
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.ClearAvailability()
+	}
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
@@ -196,6 +206,10 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	}
 	m.region = msg.Region
 	m.identity = nil
+	m.availabilityGen++ // cancel in-flight probes
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.ClearAvailability()
+	}
 	m.pendingRefresh = true
 	if _, ok := m.activeView().(*views.SelectorModel); ok {
 		m.popView()
@@ -357,8 +371,21 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 	return m, copyToClipboard(content, label)
 }
 
-// handleRefresh re-fetches resources when on a resource list view.
+// handleRefresh re-fetches resources when on a resource list view,
+// or restarts availability checks when on the main menu.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
+	// Main menu: restart availability checks
+	if _, ok := m.activeView().(*views.MainMenuModel); ok {
+		if m.noCache || m.demoMode {
+			return m, nil
+		}
+		// Increment gen to cancel any in-flight probes
+		m.availabilityGen++
+		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
+		cmd := m.loadAvailabilityCache()
+		return m, cmd
+	}
+
 	rl, ok := m.activeView().(*views.ResourceListModel)
 	if !ok {
 		return m, nil
@@ -420,6 +447,77 @@ func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, te
 		idView.SetError(msg.Err)
 	}
 	return m, nil
+}
+
+// handleAvailabilityCacheLoaded applies cached entries to the main menu
+// and starts background availability checks.
+func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoadedMsg) (tea.Model, tea.Cmd) {
+	// Apply cached entries to the main menu
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		for shortName, hasResources := range msg.Entries {
+			menu.SetAvailability(shortName, hasResources)
+		}
+	}
+
+	// Build queue of all resource types to check in background
+	allNames := resource.AllShortNames()
+	m.availQueue = allNames
+	m.availChecked = 0
+	m.availTotal = len(allNames)
+
+	// Update menu progress
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.SetCheckProgress(0, m.availTotal)
+	}
+
+	// Fire first batch of concurrent probes (up to 3)
+	var cmds []tea.Cmd
+	for i := 0; i < 3 && len(m.availQueue) > 0; i++ {
+		shortName := m.availQueue[0]
+		m.availQueue = m.availQueue[1:]
+		cmds = append(cmds, m.probeResourceAvailability(shortName, m.availabilityGen))
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// handleAvailabilityChecked processes a single resource type's probe result.
+func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (tea.Model, tea.Cmd) {
+	// Ignore stale results from a previous generation (profile/region switch)
+	if msg.Gen != m.availabilityGen {
+		return m, nil
+	}
+
+	m.availChecked++
+
+	// Update menu availability (only if no error — errors mean "unknown")
+	if msg.Err == nil {
+		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+			menu.SetAvailability(msg.ResourceType, msg.HasResources)
+		}
+	}
+
+	// Update progress on menu
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.SetCheckProgress(m.availChecked, m.availTotal)
+	}
+
+	// If queue has more items, fire next probe
+	if len(m.availQueue) > 0 {
+		next := m.availQueue[0]
+		m.availQueue = m.availQueue[1:]
+		cmd := m.probeResourceAvailability(next, m.availabilityGen)
+		return m, cmd
+	}
+
+	// All checks done — clear progress indicator and save cache
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.SetCheckProgress(0, 0) // 0,0 signals "done"
+	}
+
+	// Save cache to disk
+	cmd := m.saveAvailabilityCache()
+	return m, cmd
 }
 
 func copyToClipboard(content, successLabel string) tea.Cmd {

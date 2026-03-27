@@ -120,6 +120,22 @@ type RevealSecretMsg struct {
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
 
+// AvailabilityCacheLoadedMsg delivers cached availability data loaded from disk.
+// Entries maps resource short names to hasResources booleans.
+// Only entries with a successful check (no error) are included.
+type AvailabilityCacheLoadedMsg struct {
+	Entries map[string]bool // shortName -> hasResources
+	Expired bool            // true if cache was beyond TTL
+}
+
+// AvailabilityCheckedMsg reports one resource type's background probe result.
+type AvailabilityCheckedMsg struct {
+	ResourceType string
+	HasResources bool
+	Err          error // non-nil means "couldn't check" -- treat as unknown, don't grey out
+	Gen          int   // generation counter -- ignore if != current availabilityGen
+}
+
 // IdentityLoadedMsg is sent when the caller identity has been fetched.
 // Identity is typed as interface{} to avoid importing aws/ from the messages package.
 // The root model type-asserts it to *awsclient.CallerIdentity.

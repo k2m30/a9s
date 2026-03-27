@@ -27,6 +27,16 @@ type MainMenuModel struct {
 	// renderLinesCache caches the flat list of render lines (category headers + items).
 	// Invalidated when filteredItems changes (in applyFilter, SetFilter).
 	renderLinesCache []renderLine
+
+	// availability tracks which resource types have resources.
+	// true = has resources, false = empty (will be dimmed).
+	// Absent key = unknown (not yet checked, render normally).
+	availability map[string]bool
+
+	// availChecked / availTotal track background check progress.
+	// Both zero means "not checking" or "done".
+	availChecked int
+	availTotal   int
 }
 
 // NewMainMenu returns an initialized MainMenuModel with all resource types.
@@ -193,9 +203,23 @@ func (m MainMenuModel) View() string {
 			line := styles.RowSelected.Width(m.width).Render(selectedName + dimAlias)
 			sb.WriteString(line)
 		} else {
-			dimAlias := styles.DimText.Render(aliasPadded)
-			name := styles.RowNormal.Render("    " + namePadded + " ")
-			sb.WriteString(name + dimAlias)
+			// Check if this resource type is known-empty (grey it out)
+			isEmpty := false
+			if m.availability != nil {
+				if hasResources, known := m.availability[item.ShortName]; known && !hasResources {
+					isEmpty = true
+				}
+			}
+			if isEmpty {
+				// Both name and alias dimmed for empty resource types
+				dimAlias := styles.DimText.Render(aliasPadded)
+				dimName := styles.DimText.Render("    " + namePadded + " ")
+				sb.WriteString(dimName + dimAlias)
+			} else {
+				dimAlias := styles.DimText.Render(aliasPadded)
+				name := styles.RowNormal.Render("    " + namePadded + " ")
+				sb.WriteString(name + dimAlias)
+			}
 		}
 	}
 
@@ -250,7 +274,40 @@ func (m *MainMenuModel) GetFilter() string {
 	return m.filterText
 }
 
+// SetAvailability marks a resource type as having or not having resources.
+func (m *MainMenuModel) SetAvailability(shortName string, hasResources bool) {
+	if m.availability == nil {
+		m.availability = make(map[string]bool)
+	}
+	m.availability[shortName] = hasResources
+}
 
+// ClearAvailability resets all availability state (e.g., on profile/region switch).
+func (m *MainMenuModel) ClearAvailability() {
+	m.availability = nil
+	m.availChecked = 0
+	m.availTotal = 0
+}
+
+// GetAvailability returns a copy of the availability map for cache persistence.
+// Returns nil if no availability data has been set.
+func (m *MainMenuModel) GetAvailability() map[string]bool {
+	if m.availability == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.availability))
+	for k, v := range m.availability {
+		cp[k] = v
+	}
+	return cp
+}
+
+// SetCheckProgress updates the background check progress indicator.
+// checked=0, total=0 means "not checking" (hides the indicator).
+func (m *MainMenuModel) SetCheckProgress(checked, total int) {
+	m.availChecked = checked
+	m.availTotal = total
+}
 
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.
 // Requires at least 2 characters to actually filter; single chars are too ambiguous

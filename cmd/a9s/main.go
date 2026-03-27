@@ -32,6 +32,7 @@ func main() {
 		showVersion bool
 		showHelp    bool
 		demoMode    bool
+		noCache     bool
 	)
 
 	flag.StringVar(&profile, "profile", "", "AWS profile to use")
@@ -44,6 +45,7 @@ func main() {
 	flag.BoolVar(&showHelp, "h", false, "Print help and exit (shorthand)")
 	flag.BoolVar(&demoMode, "demo", false, "Run with synthetic demo data (no AWS credentials needed)")
 	flag.BoolVar(&demoMode, "d", false, "Run with synthetic demo data (shorthand)")
+	flag.BoolVar(&noCache, "no-cache", false, "Disable resource availability cache")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -52,6 +54,7 @@ func main() {
 		fmt.Println("  -p, --profile  AWS profile to use")
 		fmt.Println("  -r, --region   AWS region override")
 		fmt.Println("  -d, --demo     Run with synthetic demo data (no AWS credentials needed)")
+		fmt.Println("      --no-cache Disable resource availability cache")
 		fmt.Println("  -v, --version  Print version and exit")
 		fmt.Println("  -h, --help     Print this help")
 	}
@@ -88,7 +91,7 @@ func main() {
 
 	tui.Version = version
 
-	model := tui.New(profile, region, tui.WithDemo(demoMode))
+	model := tui.New(profile, region, tui.WithDemo(demoMode), tui.WithNoCache(noCache))
 
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
