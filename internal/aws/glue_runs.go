@@ -62,7 +62,7 @@ func FetchGlueJobRuns(
 
 		output, err := api.GetJobRuns(ctx, input)
 		if err != nil {
-			return resource.FetchResult{}, err
+			return resource.FetchResult{}, fmt.Errorf("fetching Glue job runs: %w", err)
 		}
 
 		for _, run := range output.JobRuns {

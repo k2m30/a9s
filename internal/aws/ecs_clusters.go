@@ -23,17 +23,31 @@ func init() {
 // FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,
 // then DescribeClusters for full details.
 func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListClusters(ctx, &ecs.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing ECS clusters: %w", err)
+	var allClusterArns []string
+	var nextToken *string
+
+	for {
+		listOutput, err := listAPI.ListClusters(ctx, &ecs.ListClustersInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing ECS clusters: %w", err)
+		}
+
+		allClusterArns = append(allClusterArns, listOutput.ClusterArns...)
+
+		if listOutput.NextToken == nil {
+			break
+		}
+		nextToken = listOutput.NextToken
 	}
 
-	if len(listOutput.ClusterArns) == 0 {
+	if len(allClusterArns) == 0 {
 		return nil, nil
 	}
 
 	descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
-		Clusters: listOutput.ClusterArns,
+		Clusters: allClusterArns,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing ECS clusters: %w", err)

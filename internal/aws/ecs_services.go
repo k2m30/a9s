@@ -32,14 +32,28 @@ func FetchECSServices(
 	listServicesAPI ECSListServicesAPI,
 	describeServicesAPI ECSDescribeServicesAPI,
 ) ([]resource.Resource, error) {
-	listOutput, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing ECS clusters: %w", err)
+	var allClusterArns []string
+	var nextToken *string
+
+	for {
+		listOutput, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing ECS clusters: %w", err)
+		}
+
+		allClusterArns = append(allClusterArns, listOutput.ClusterArns...)
+
+		if listOutput.NextToken == nil {
+			break
+		}
+		nextToken = listOutput.NextToken
 	}
 
 	var resources []resource.Resource
 
-	for _, clusterArn := range listOutput.ClusterArns {
+	for _, clusterArn := range allClusterArns {
 		svcListOutput, err := listServicesAPI.ListServices(ctx, &ecs.ListServicesInput{
 			Cluster: aws.String(clusterArn),
 		})

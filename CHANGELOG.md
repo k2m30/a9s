@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Unified pagination for all 62 top-level fetchers and 28 child fetchers (#83, #80)
+- `M` key for load-more in paginated child views
+- RetryOnThrottle infrastructure for AWS API rate limiting
+- Demo mode pagination — ~30% of resources demonstrate load-more UX with 5-item pages
+- 65 QA stories with full test coverage for pagination
+
 ## [3.16.0] - 2026-03-26
 
 ### Added
