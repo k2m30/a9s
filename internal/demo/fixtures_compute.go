@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,7 +24,7 @@ func init() {
 // Includes a mix of running/stopped/pending states and realistic naming for
 // the demo scenario (filter /web must show results).
 func ec2Instances() []resource.Resource {
-	return []resource.Resource{
+	instances := []resource.Resource{
 		makeEC2Instance(
 			"i-0a1b2c3d4e5f60001", "web-prod-01", "running",
 			ec2types.InstanceTypeT3Large, "10.0.1.10", "54.210.33.112",
@@ -95,6 +96,45 @@ func ec2Instances() []resource.Resource {
 			"",
 		),
 	}
+
+	// Generate 15 more instances to reach 25 total
+	ec2Types := []ec2types.InstanceType{
+		ec2types.InstanceTypeT3Medium, ec2types.InstanceTypeM5Large,
+		ec2types.InstanceTypeC5Large, ec2types.InstanceTypeR5Large,
+		ec2types.InstanceTypeT3Large, ec2types.InstanceTypeM5Xlarge,
+		ec2types.InstanceTypeC5Xlarge, ec2types.InstanceTypeT3Small,
+		ec2types.InstanceTypeR5Xlarge, ec2types.InstanceTypeT3Micro,
+		ec2types.InstanceTypeM5Large, ec2types.InstanceTypeC5Large,
+		ec2types.InstanceTypeT3Medium, ec2types.InstanceTypeR5Large,
+		ec2types.InstanceTypeT3Large,
+	}
+	subnets := []string{
+		prodPublicSubnetA, prodPublicSubnetB, prodPrivateSubnetA,
+		prodPrivateSubnetB, stagingSubnetA, stagingSubnetB,
+	}
+	for i := 0; i < 15; i++ {
+		idx := i + 11
+		name := ec2NamePool[i%len(ec2NamePool)]
+		state := ec2StatePool[i%len(ec2StatePool)]
+		ip := fmt.Sprintf("10.0.%d.%d", (idx/10)+1, 10+idx)
+		publicIP := ""
+		if i%5 == 0 {
+			publicIP = fmt.Sprintf("54.210.%d.%d", 34+i, 100+i)
+		}
+		instances = append(instances, makeEC2Instance(
+			fmt.Sprintf("i-0a1b2c3d4e5f6%04d", idx),
+			fmt.Sprintf("%s-%02d", name, idx),
+			state,
+			ec2Types[i],
+			ip, publicIP,
+			prodVPCID,
+			subnets[i%len(subnets)],
+			time.Date(2025, time.Month(6+(i%7)), 1+i, 8+i, 0, 0, 0, time.UTC),
+			"",
+		))
+	}
+
+	return instances
 }
 
 // makeEC2Instance constructs a resource.Resource with a fully populated
@@ -193,7 +233,7 @@ func envFromName(name string) string {
 
 // lambdaFunctions returns demo Lambda function fixtures.
 func lambdaFunctions() []resource.Resource {
-	return []resource.Resource{
+	fns := []resource.Resource{
 		{
 			ID:     "api-gateway-authorizer",
 			Name:   "api-gateway-authorizer",
@@ -357,5 +397,54 @@ func lambdaFunctions() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 19 more functions to reach 25 total
+	runtimeMap := map[string]lambdatypes.Runtime{
+		"nodejs20.x": lambdatypes.RuntimeNodejs20x,
+		"python3.12": lambdatypes.RuntimePython312,
+		"go1.x":      lambdatypes.RuntimeGo1x,
+		"java21":     lambdatypes.RuntimeJava21,
+	}
+	memorySizes := []int32{128, 256, 512, 1024, 256, 512, 128, 256, 512, 128, 256, 1024, 512, 128, 256, 512, 128, 256, 512}
+	timeouts := []int32{10, 30, 60, 300, 15, 120, 10, 30, 60, 10, 30, 300, 60, 10, 15, 120, 30, 60, 10}
+	codeSizes := []int64{524288, 1048576, 2097152, 5242880, 8388608, 1048576, 524288, 2097152, 15728640, 524288,
+		1048576, 31457280, 5242880, 524288, 1048576, 2097152, 8388608, 1048576, 524288}
+
+	for i := 0; i < 19; i++ {
+		name := lambdaNamePool[i]
+		runtime := lambdaRuntimePool[i]
+		handler := lambdaHandlerPool[i]
+		lastMod := fmt.Sprintf("2026-%02d-%02dT%02d:%02d:00+00:00", 1+(i%3), 1+i, 8+(i%14), i*3%60)
+
+		fns = append(fns, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: runtime,
+			Fields: map[string]string{
+				"function_name": name,
+				"runtime":       runtime,
+				"memory":        fmt.Sprintf("%d", memorySizes[i]),
+				"timeout":       fmt.Sprintf("%d", timeouts[i]),
+				"handler":       handler,
+				"last_modified": lastMod,
+				"code_size":     fmt.Sprintf("%d", codeSizes[i]),
+				"log_group":     "/aws/lambda/" + name,
+				"package_type":  "Zip",
+			},
+			RawStruct: lambdatypes.FunctionConfiguration{
+				FunctionName: aws.String(name),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + name),
+				Runtime:      runtimeMap[runtime],
+				MemorySize:   aws.Int32(memorySizes[i]),
+				Timeout:      aws.Int32(timeouts[i]),
+				Handler:      aws.String(handler),
+				LastModified: aws.String(lastMod),
+				CodeSize:     codeSizes[i],
+				State:        lambdatypes.StateActive,
+			},
+		})
+	}
+
+	return fns
 }
 

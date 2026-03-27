@@ -23,55 +23,65 @@ func init() {
 // FetchHostedZones calls the Route53 ListHostedZones API and converts
 // the response into a slice of generic Resource structs.
 func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]resource.Resource, error) {
-	output, err := api.ListHostedZones(ctx, &route53.ListHostedZonesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Route53 hosted zones: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, zone := range output.HostedZones {
-		zoneID := ""
-		if zone.Id != nil {
-			zoneID = *zone.Id
+	for {
+		output, err := api.ListHostedZones(ctx, &route53.ListHostedZonesInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Route53 hosted zones: %w", err)
 		}
 
-		name := ""
-		if zone.Name != nil {
-			name = *zone.Name
-		}
-
-		recordCount := ""
-		if zone.ResourceRecordSetCount != nil {
-			recordCount = fmt.Sprintf("%d", *zone.ResourceRecordSetCount)
-		}
-
-		privateZone := "false"
-		comment := ""
-		if zone.Config != nil {
-			if zone.Config.PrivateZone {
-				privateZone = "true"
+		for _, zone := range output.HostedZones {
+			zoneID := ""
+			if zone.Id != nil {
+				zoneID = *zone.Id
 			}
-			if zone.Config.Comment != nil {
-				comment = *zone.Config.Comment
+
+			name := ""
+			if zone.Name != nil {
+				name = *zone.Name
 			}
+
+			recordCount := ""
+			if zone.ResourceRecordSetCount != nil {
+				recordCount = fmt.Sprintf("%d", *zone.ResourceRecordSetCount)
+			}
+
+			privateZone := "false"
+			comment := ""
+			if zone.Config != nil {
+				if zone.Config.PrivateZone {
+					privateZone = "true"
+				}
+				if zone.Config.Comment != nil {
+					comment = *zone.Config.Comment
+				}
+			}
+
+			r := resource.Resource{
+				ID:     zoneID,
+				Name:   name,
+				Status: "",
+				Fields: map[string]string{
+					"zone_id":      zoneID,
+					"name":         name,
+					"record_count": recordCount,
+					"private_zone": privateZone,
+					"comment":      comment,
+				},
+				RawStruct: zone,
+			}
+
+			resources = append(resources, r)
 		}
 
-		r := resource.Resource{
-			ID:     zoneID,
-			Name:   name,
-			Status: "",
-			Fields: map[string]string{
-				"zone_id":      zoneID,
-				"name":         name,
-				"record_count": recordCount,
-				"private_zone": privateZone,
-				"comment":      comment,
-			},
-			RawStruct:  zone,
+		if !output.IsTruncated {
+			break
 		}
-
-		resources = append(resources, r)
+		marker = output.NextMarker
 	}
 
 	return resources, nil

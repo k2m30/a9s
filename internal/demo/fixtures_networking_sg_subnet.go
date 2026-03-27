@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -18,7 +20,7 @@ func init() {
 // ---------------------------------------------------------------------------
 
 func sgFixtures() []resource.Resource {
-	return []resource.Resource{
+	sgs := []resource.Resource{
 		{
 			ID:     "sg-0aaa111111111111a",
 			Name:   "acme-web-alb-sg",
@@ -180,6 +182,43 @@ func sgFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 20 more security groups to reach 25 total
+	vpcIDs := []string{prodVPCID, prodVPCID, prodVPCID, stagingVPCID}
+	for i := 0; i < 20; i++ {
+		sgID := fmt.Sprintf("sg-0gen%016x", i+100)
+		name := sgNamePool[i%len(sgNamePool)]
+		desc := sgDescriptionPool[i%len(sgDescriptionPool)]
+		vpcID := vpcIDs[i%len(vpcIDs)]
+		env := "prod"
+		if vpcID == stagingVPCID {
+			env = "staging"
+		}
+		sgs = append(sgs, resource.Resource{
+			ID:     sgID,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"group_id":    sgID,
+				"group_name":  name,
+				"vpc_id":      vpcID,
+				"description": desc,
+			},
+			RawStruct: ec2types.SecurityGroup{
+				GroupId:     aws.String(sgID),
+				GroupName:   aws.String(name),
+				VpcId:       aws.String(vpcID),
+				Description: aws.String(desc),
+				OwnerId:     aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String(name)},
+					{Key: aws.String("Environment"), Value: aws.String(env)},
+				},
+			},
+		})
+	}
+
+	return sgs
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +227,7 @@ func sgFixtures() []resource.Resource {
 // ---------------------------------------------------------------------------
 
 func subnetFixtures() []resource.Resource {
-	return []resource.Resource{
+	subnets := []resource.Resource{
 		{
 			ID:     prodPublicSubnetA,
 			Name:   "prod-public-1a",
@@ -349,4 +388,62 @@ func subnetFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 17 more subnets to reach 22 total
+	azs := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
+	azIDs := []string{"use1-az1", "use1-az2", "use1-az4"}
+	for i := 0; i < 17; i++ {
+		subnetID := fmt.Sprintf("subnet-0gen%013x", i+100)
+		name := subnetNamePool[i%len(subnetNamePool)]
+		vpcID := prodVPCID
+		env := "prod"
+		if i >= 12 {
+			vpcID = stagingVPCID
+			env = "staging"
+		}
+		cidr := fmt.Sprintf("10.%d.%d.0/24", i/6, 10+i)
+		az := azs[i%len(azs)]
+		azID := azIDs[i%len(azIDs)]
+		availIPs := int32(220 + (i * 3 % 30))
+		isPublic := i%4 == 0
+		tier := "private"
+		if isPublic {
+			tier = "public"
+		}
+
+		subnets = append(subnets, resource.Resource{
+			ID:     subnetID,
+			Name:   name,
+			Status: "available",
+			Fields: map[string]string{
+				"subnet_id":         subnetID,
+				"name":              name,
+				"vpc_id":            vpcID,
+				"cidr_block":        cidr,
+				"availability_zone": az,
+				"state":             "available",
+				"available_ips":     fmt.Sprintf("%d", availIPs),
+			},
+			RawStruct: ec2types.Subnet{
+				SubnetId:                aws.String(subnetID),
+				VpcId:                   aws.String(vpcID),
+				CidrBlock:              aws.String(cidr),
+				AvailabilityZone:        aws.String(az),
+				AvailabilityZoneId:      aws.String(azID),
+				State:                   ec2types.SubnetStateAvailable,
+				AvailableIpAddressCount: aws.Int32(availIPs),
+				MapPublicIpOnLaunch:     aws.Bool(isPublic),
+				DefaultForAz:            aws.Bool(false),
+				SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + subnetID),
+				OwnerId:                 aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String(name)},
+					{Key: aws.String("Environment"), Value: aws.String(env)},
+					{Key: aws.String("Tier"), Value: aws.String(tier)},
+				},
+			},
+		})
+	}
+
+	return subnets
 }

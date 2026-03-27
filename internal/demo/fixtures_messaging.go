@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,7 +44,7 @@ func init() {
 // SQS RawStruct is a string (fmt.Sprintf of attrs map), matching the production
 // fetcher behavior in internal/aws/sqs.go.
 func sqsQueues() []resource.Resource {
-	return []resource.Resource{
+	queues := []resource.Resource{
 		{
 			ID:     "order-processing-queue",
 			Name:   "order-processing-queue",
@@ -97,11 +98,37 @@ func sqsQueues() []resource.Resource {
 			RawStruct: "map[ApproximateNumberOfMessages:5 ApproximateNumberOfMessagesNotVisible:2 ContentBasedDeduplication:true CreatedTimestamp:1715000000 DelaySeconds:0 FifoQueue:true MaximumMessageSize:262144 MessageRetentionPeriod:345600 QueueArn:arn:aws:sqs:us-east-1:123456789012:webhook-ingest-queue.fifo ReceiveMessageWaitTimeSeconds:10 VisibilityTimeout:120]",
 		},
 	}
+
+	// Generate 18 more queues to reach 22 total
+	msgCounts := []string{"0", "57", "0", "1203", "0", "12", "0", "89", "0", "345", "0", "0", "7", "0", "234", "0", "0", "45"}
+	notVisible := []string{"0", "3", "0", "45", "0", "1", "0", "12", "0", "23", "0", "0", "2", "0", "8", "0", "0", "3"}
+	delays := []string{"0", "0", "5", "0", "0", "10", "0", "0", "0", "0", "5", "0", "0", "0", "0", "10", "0", "0"}
+	for i := 0; i < 18; i++ {
+		name := sqsNamePool[i]
+		queueURL := fmt.Sprintf("https://sqs.us-east-1.amazonaws.com/123456789012/%s", name)
+		ts := 1700000000 + i*100000
+		queues = append(queues, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"queue_name":         name,
+				"queue_url":          queueURL,
+				"approx_messages":    msgCounts[i],
+				"approx_not_visible": notVisible[i],
+				"delay_seconds":      delays[i],
+			},
+			RawStruct: fmt.Sprintf("map[ApproximateNumberOfMessages:%s ApproximateNumberOfMessagesNotVisible:%s CreatedTimestamp:%d DelaySeconds:%s MaximumMessageSize:262144 MessageRetentionPeriod:345600 QueueArn:arn:aws:sqs:us-east-1:123456789012:%s ReceiveMessageWaitTimeSeconds:0 VisibilityTimeout:30]",
+				msgCounts[i], notVisible[i], ts, delays[i], name),
+		})
+	}
+
+	return queues
 }
 
 // snsTopics returns demo SNS topic fixtures.
 func snsTopics() []resource.Resource {
-	return []resource.Resource{
+	topics := []resource.Resource{
 		{
 			ID:     "arn:aws:sns:us-east-1:123456789012:alarm-notifications",
 			Name:   "alarm-notifications",
@@ -139,6 +166,26 @@ func snsTopics() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 19 more topics to reach 22 total
+	for i := 0; i < 19; i++ {
+		name := snsNamePool[i]
+		arn := fmt.Sprintf("arn:aws:sns:us-east-1:123456789012:%s", name)
+		topics = append(topics, resource.Resource{
+			ID:     arn,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"topic_arn":    arn,
+				"display_name": name,
+			},
+			RawStruct: snstypes.Topic{
+				TopicArn: aws.String(arn),
+			},
+		})
+	}
+
+	return topics
 }
 
 // snsSubscriptions returns demo SNS subscription fixtures.

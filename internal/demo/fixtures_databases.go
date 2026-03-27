@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -224,7 +225,7 @@ func docdbClusterFixtures() []resource.Resource {
 
 // s3Buckets returns demo S3 bucket fixtures.
 func s3Buckets() []resource.Resource {
-	return []resource.Resource{
+	buckets := []resource.Resource{
 		{
 			ID:     "data-pipeline-logs",
 			Name:   "data-pipeline-logs",
@@ -316,6 +317,29 @@ func s3Buckets() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 16 more buckets to reach 22 total
+	for i := 0; i < 16; i++ {
+		name := s3NamePool[i]
+		createDate := fmt.Sprintf("2025-%02d-%02dT%02d:%02d:00+00:00", 1+(i%12), 1+i, 8+(i%12), (i*7)%60)
+		buckets = append(buckets, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"name":          name,
+				"bucket_name":   name,
+				"creation_date": createDate,
+			},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String(name),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime(createDate)),
+			},
+		})
+	}
+
+	return buckets
 }
 
 func s3ObjDataPipeline() []resource.Resource {
@@ -450,7 +474,7 @@ func s3ObjBackups() []resource.Resource {
 }
 // rdsInstances returns demo RDS (DB Instance) fixtures.
 func rdsInstances() []resource.Resource {
-	return []resource.Resource{
+	instances := []resource.Resource{
 		{
 			ID:     "prod-api-primary",
 			Name:   "prod-api-primary",
@@ -574,11 +598,60 @@ func rdsInstances() []resource.Resource {
 				EngineVersion:        aws.String("16.4"),
 				DBInstanceStatus:     aws.String("creating"),
 				DBInstanceClass:      aws.String("db.t3.medium"),
-				// Endpoint is nil for creating instances
-				MultiAZ: aws.Bool(false),
+				MultiAZ:              aws.Bool(false),
 			},
 		},
 	}
+
+	// Generate 17 more instances to reach 22 total
+	rdsStatuses := []string{
+		"available", "available", "available", "available", "stopped",
+		"available", "available", "backing-up", "available", "available",
+		"available", "modifying", "available", "available", "available",
+		"stopped", "available",
+	}
+	for i := 0; i < 17; i++ {
+		eng := rdsEnginePool[i]
+		name := rdsNamePool[i]
+		class := rdsClassPool[i]
+		status := rdsStatuses[i]
+		multiAZ := "No"
+		if i%3 == 0 {
+			multiAZ = "Yes"
+		}
+		endpoint := fmt.Sprintf("%s.c9xyz123.us-east-1.rds.amazonaws.com", name)
+		if status == "creating" {
+			endpoint = ""
+		}
+		instances = append(instances, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: status,
+			Fields: map[string]string{
+				"db_identifier":  name,
+				"engine":         eng.Engine,
+				"engine_version": eng.EngineVersion,
+				"status":         status,
+				"class":          class,
+				"endpoint":       endpoint,
+				"multi_az":       multiAZ,
+			},
+			RawStruct: rdstypes.DBInstance{
+				DBInstanceIdentifier: aws.String(name),
+				Engine:               aws.String(eng.Engine),
+				EngineVersion:        aws.String(eng.EngineVersion),
+				DBInstanceStatus:     aws.String(status),
+				DBInstanceClass:      aws.String(class),
+				Endpoint: &rdstypes.Endpoint{
+					Address: aws.String(endpoint),
+					Port:    aws.Int32(eng.Port),
+				},
+				MultiAZ: aws.Bool(multiAZ == "Yes"),
+			},
+		})
+	}
+
+	return instances
 }
 
 // dbiEventFixtures returns demo RDS DB instance event fixtures.

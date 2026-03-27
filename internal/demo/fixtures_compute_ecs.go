@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -25,7 +27,7 @@ const (
 // ecsServiceFixtures returns demo ECS service fixtures.
 // Services reference the two ECS clusters "acme-services" and "acme-batch".
 func ecsServiceFixtures() []resource.Resource {
-	return []resource.Resource{
+	services := []resource.Resource{
 		{
 			ID:     "api-gateway",
 			Name:   "api-gateway",
@@ -174,6 +176,59 @@ func ecsServiceFixtures() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 17 more ECS services to reach 22 total
+	ecsLaunchTypes := []ecstypes.LaunchType{ecstypes.LaunchTypeFargate, ecstypes.LaunchTypeEc2}
+	ecsClusters := []string{"acme-services", "acme-batch", "acme-staging"}
+	ecsClusterArns := []string{ecsClusterArnServices, ecsClusterArnBatch, "arn:aws:ecs:us-east-1:123456789012:cluster/acme-staging"}
+	ecsStatuses := []string{"ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE"}
+	for i := 0; i < 17; i++ {
+		name := ecsServiceNamePool[i]
+		clusterIdx := i % len(ecsClusters)
+		cluster := ecsClusters[clusterIdx]
+		clusterArn := ecsClusterArns[clusterIdx]
+		launchType := ecsLaunchTypes[i%len(ecsLaunchTypes)]
+		desired := int32(1 + i%4)
+		running := desired
+		if i == 8 {
+			running = desired - 1 // one service scaling up
+		}
+		pending := desired - running
+		createdAt := fmt.Sprintf("2025-%02d-%02dT%02d:00:00Z", 3+(i%10), 1+i, 8+(i%12))
+		tdVersion := i + 1
+
+		services = append(services, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: ecsStatuses[i],
+			Fields: map[string]string{
+				"service_name":  name,
+				"cluster":       cluster,
+				"status":        ecsStatuses[i],
+				"desired_count": fmt.Sprintf("%d", desired),
+				"running_count": fmt.Sprintf("%d", running),
+				"launch_type":   string(launchType),
+			},
+			RawStruct: ecstypes.Service{
+				ServiceName:        aws.String(name),
+				ServiceArn:         aws.String(fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:service/%s/%s", cluster, name)),
+				ClusterArn:         aws.String(clusterArn),
+				Status:             aws.String(ecsStatuses[i]),
+				DesiredCount:       desired,
+				RunningCount:       running,
+				PendingCount:       pending,
+				LaunchType:         launchType,
+				TaskDefinition:     aws.String(fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/%s:%d", name, tdVersion)),
+				SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+				CreatedAt:          aws.Time(mustParseTime(createdAt)),
+				Tags: []ecstypes.Tag{
+					{Key: aws.String("Environment"), Value: aws.String("prod")},
+				},
+			},
+		})
+	}
+
+	return services
 }
 
 // ---------------------------------------------------------------------------

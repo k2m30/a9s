@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,7 +20,7 @@ func init() {
 
 // secretsManagerSecrets returns demo Secrets Manager fixtures.
 func secretsManagerSecrets() []resource.Resource {
-	return []resource.Resource{
+	secrets := []resource.Resource{
 		{
 			ID:     "prod/database/primary",
 			Name:   "prod/database/primary",
@@ -102,11 +103,49 @@ func secretsManagerSecrets() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more secrets to reach 22 total
+	for i := 0; i < 18; i++ {
+		name := secretNamePool[i]
+		desc := secretDescPool[i]
+		rotation := i%3 == 0
+		rotationStr := "No"
+		if rotation {
+			rotationStr = "Yes"
+		}
+		lastAccessed := time.Date(2026, 3, 15+i%7, 0, 0, 0, 0, time.UTC)
+		lastChanged := time.Date(2026, time.Month(1+i%3), 1+i, 0, 0, 0, 0, time.UTC)
+		created := time.Date(2025, time.Month(1+i%12), 1+i, 10, 0, 0, 0, time.UTC)
+		suffix := fmt.Sprintf("%06x", i+1000)
+		secrets = append(secrets, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"secret_name":      name,
+				"description":      desc,
+				"last_accessed":    lastAccessed.Format("2006-01-02"),
+				"last_changed":     lastChanged.Format("2006-01-02"),
+				"rotation_enabled": rotationStr,
+			},
+			RawStruct: smtypes.SecretListEntry{
+				Name:             aws.String(name),
+				ARN:              aws.String(fmt.Sprintf("arn:aws:secretsmanager:us-east-1:123456789012:secret:%s-%s", name, suffix)),
+				Description:      aws.String(desc),
+				LastAccessedDate: aws.Time(lastAccessed),
+				LastChangedDate:  aws.Time(lastChanged),
+				RotationEnabled:  aws.Bool(rotation),
+				CreatedDate:      aws.Time(created),
+			},
+		})
+	}
+
+	return secrets
 }
 
 // ssmParameters returns demo SSM Parameter Store fixtures.
 func ssmParameters() []resource.Resource {
-	return []resource.Resource{
+	params := []resource.Resource{
 		{
 			ID:     "/acme/prod/app/config",
 			Name:   "/acme/prod/app/config",
@@ -193,6 +232,43 @@ func ssmParameters() []resource.Resource {
 			},
 		},
 	}
+
+	// Generate 18 more parameters to reach 22 total
+	ssmTypeMap := map[string]ssmtypes.ParameterType{
+		"String":       ssmtypes.ParameterTypeString,
+		"SecureString": ssmtypes.ParameterTypeSecureString,
+		"StringList":   ssmtypes.ParameterTypeStringList,
+	}
+	for i := 0; i < 18; i++ {
+		name := ssmNamePool[i]
+		paramType := ssmTypePool[i]
+		version := int64(1 + (i * 3 % 20))
+		lastMod := fmt.Sprintf("2026-%02d-%02dT%02d:00:00+00:00", 1+(i%3), 1+i, 8+(i%12))
+		desc := fmt.Sprintf("Parameter %s", name)
+		params = append(params, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"name":          name,
+				"type":          paramType,
+				"version":       fmt.Sprintf("%d", version),
+				"last_modified": mustParseTime(lastMod).Format("2006-01-02T15:04:05Z"),
+				"description":   desc,
+			},
+			RawStruct: ssmtypes.ParameterMetadata{
+				Name:             aws.String(name),
+				ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter" + name),
+				Type:             ssmTypeMap[paramType],
+				Version:          version,
+				LastModifiedDate: aws.Time(mustParseTime(lastMod)),
+				Description:      aws.String(desc),
+				DataType:         aws.String("text"),
+			},
+		})
+	}
+
+	return params
 }
 
 // kmsKeys returns demo KMS key fixtures.
