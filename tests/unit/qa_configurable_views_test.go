@@ -331,6 +331,13 @@ func TestQA_ListViewColumns_S3ObjectFile(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			if col.Path == "" {
+				// Key-based column (e.g. Size with Key="size") — no Path to extract
+				if col.Key == "" {
+					t.Errorf("column %q has neither Path nor Key set", col.Title)
+				}
+				return
+			}
 			result := fieldpath.ExtractScalar(obj, col.Path)
 			if result == "" {
 				t.Errorf("ExtractScalar(%q) returned empty for realistic S3 Object (file)", col.Path)
@@ -350,6 +357,10 @@ func TestQA_DetailViewPaths_S3ObjectFile(t *testing.T) {
 
 	// s3_objects has no Detail paths defined in defaults, but test list paths with ExtractSubtree
 	for _, col := range vd.List {
+		if col.Path == "" {
+			// Key-based column (e.g. Size with Key="size") — no Path to extract
+			continue
+		}
 		t.Run(col.Path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(obj, col.Path)
 			if result == "" {

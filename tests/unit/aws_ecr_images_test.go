@@ -113,8 +113,8 @@ func TestFetchECRImages_Basic(t *testing.T) {
 	})
 
 	t.Run("Fields_pushed_at", func(t *testing.T) {
-		if r.Fields["pushed_at"] != "2024-06-15 10:00:00" {
-			t.Errorf("Fields[pushed_at]: expected %q, got %q", "2024-06-15 10:00:00", r.Fields["pushed_at"])
+		if r.Fields["pushed_at"] != "2024-06-15 10:00" {
+			t.Errorf("Fields[pushed_at]: expected %q, got %q", "2024-06-15 10:00", r.Fields["pushed_at"])
 		}
 	})
 

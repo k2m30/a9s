@@ -80,7 +80,7 @@ func FetchCodeBuildProjects(
 
 		lastModified := ""
 		if project.LastModified != nil {
-			lastModified = project.LastModified.Format("2006-01-02T15:04:05Z07:00")
+			lastModified = project.LastModified.Format("2006-01-02 15:04")
 		}
 
 		r := resource.Resource{

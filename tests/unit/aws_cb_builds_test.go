@@ -115,8 +115,8 @@ func TestFetchCBBuilds_Basic(t *testing.T) {
 		if r.Fields["start_time"] == "" {
 			t.Error("Fields[start_time] should not be empty")
 		}
-		if !strings.Contains(r.Fields["start_time"], "2024-06-15 10:00:00") {
-			t.Errorf("Fields[start_time] expected '2024-06-15 10:00:00', got %q", r.Fields["start_time"])
+		if !strings.Contains(r.Fields["start_time"], "2024-06-15 10:00") {
+			t.Errorf("Fields[start_time] expected '2024-06-15 10:00', got %q", r.Fields["start_time"])
 		}
 	})
 

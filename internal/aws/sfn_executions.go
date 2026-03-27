@@ -125,12 +125,12 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 
 	startDate := ""
 	if item.StartDate != nil {
-		startDate = item.StartDate.UTC().Format("2006-01-02 15:04:05")
+		startDate = item.StartDate.UTC().Format("2006-01-02 15:04")
 	}
 
 	stopDate := ""
 	if item.StopDate != nil {
-		stopDate = item.StopDate.UTC().Format("2006-01-02 15:04:05")
+		stopDate = item.StopDate.UTC().Format("2006-01-02 15:04")
 	}
 
 	duration := ""
@@ -172,7 +172,7 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 
 	redriveDate := ""
 	if item.RedriveDate != nil {
-		redriveDate = item.RedriveDate.UTC().Format("2006-01-02 15:04:05")
+		redriveDate = item.RedriveDate.UTC().Format("2006-01-02 15:04")
 	}
 
 	return resource.Resource{

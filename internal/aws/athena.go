@@ -49,7 +49,7 @@ func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]
 
 			creationTime := ""
 			if wg.CreationTime != nil {
-				creationTime = wg.CreationTime.Format("2006-01-02 15:04:05")
+				creationTime = wg.CreationTime.Format("2006-01-02 15:04")
 			}
 
 			engineVersion := ""

@@ -67,7 +67,7 @@ func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositorie
 
 			createdTime := ""
 			if repo.CreatedTime != nil {
-				createdTime = repo.CreatedTime.Format("2006-01-02 15:04:05")
+				createdTime = repo.CreatedTime.Format("2006-01-02 15:04")
 			}
 
 			r := resource.Resource{

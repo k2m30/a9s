@@ -182,7 +182,7 @@ func databasesDefaultViews() map[string]ViewDef {
 		"s3_objects": {
 			List: []ListColumn{
 				{Title: "Key", Path: "Key", Width: 36},
-				{Title: "Size", Path: "Size", Width: 12},
+				{Title: "Size", Key: "size", Width: 12},
 				{Title: "Storage Class", Path: "StorageClass", Width: 16},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},

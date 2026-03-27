@@ -73,7 +73,7 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 
 		createTime := ""
 		if cluster.ClusterCreateTime != nil {
-			createTime = cluster.ClusterCreateTime.Format("2006-01-02 15:04:05")
+			createTime = cluster.ClusterCreateTime.Format("2006-01-02 15:04")
 		}
 
 		r := resource.Resource{

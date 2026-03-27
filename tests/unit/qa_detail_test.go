@@ -40,7 +40,7 @@ func TestQA_Detail_S3Bucket_ViewContainsExpectedFields(t *testing.T) {
 	if !strings.Contains(view, "CreationDate") {
 		t.Error("S3 bucket detail should contain CreationDate")
 	}
-	if !strings.Contains(view, "2025-06-15 10:30:00") {
+	if !strings.Contains(view, "2025-06-15 10:30") {
 		t.Errorf("S3 bucket detail should contain formatted timestamp, got:\n%s", view)
 	}
 }
@@ -86,7 +86,7 @@ func TestQA_Detail_S3Object_ViewContainsExpectedFields(t *testing.T) {
 	if !strings.Contains(view, "data/report-2025.csv") {
 		t.Errorf("S3 object detail should contain key, got:\n%s", view)
 	}
-	if !strings.Contains(view, "2025-06-15 10:30:00") {
+	if !strings.Contains(view, "2025-06-15 10:30") {
 		t.Errorf("S3 object detail should contain formatted LastModified, got:\n%s", view)
 	}
 }
@@ -121,7 +121,7 @@ func TestQA_Detail_EC2_ViewContainsExpectedFields(t *testing.T) {
 		"PrivateIpAddress", "10.0.1.42",
 		"PublicIpAddress", "54.123.45.67",
 		"Architecture", "x86_64",
-		"LaunchTime", "2025-06-15 10:30:00",
+		"LaunchTime", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("EC2 detail should contain %q, got:\n%s", expected, view)
@@ -1124,8 +1124,8 @@ func TestQA_Detail_CrossCutting_TimestampFormat(t *testing.T) {
 	m := newDetailModel(res, "s3", cfg)
 
 	view := m.View()
-	if !strings.Contains(view, "2025-06-15 10:30:00") {
-		t.Errorf("timestamp should be formatted as 'YYYY-MM-DD HH:MM:SS', got:\n%s", view)
+	if !strings.Contains(view, "2025-06-15 10:30") {
+		t.Errorf("timestamp should be formatted as 'YYYY-MM-DD HH:MM', got:\n%s", view)
 	}
 	if strings.Contains(view, "T10:30:00") {
 		t.Error("timestamp should not use ISO 8601 format with T separator")

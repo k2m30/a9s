@@ -105,8 +105,8 @@ func TestFetchCfnEvents_Basic(t *testing.T) {
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
-		if !strings.Contains(r.Fields["timestamp"], "2024-03-22 10:00:00") {
-			t.Errorf("Fields[timestamp] expected '2024-03-22 10:00:00', got %q", r.Fields["timestamp"])
+		if !strings.Contains(r.Fields["timestamp"], "2024-03-22 10:00") {
+			t.Errorf("Fields[timestamp] expected '2024-03-22 10:00', got %q", r.Fields["timestamp"])
 		}
 	})
 
@@ -311,7 +311,7 @@ func TestFetchCfnEvents_NewlineStripping(t *testing.T) {
 }
 
 // TestFetchCfnEvents_TimestampFormatting verifies that a known time.Time
-// produces the "2006-01-02 15:04:05" format in Fields.
+// produces the "2006-01-02 15:04" format in Fields.
 func TestFetchCfnEvents_TimestampFormatting(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 14, 30, 45, 0, time.UTC)
 
@@ -347,8 +347,8 @@ func TestFetchCfnEvents_TimestampFormatting(t *testing.T) {
 	}
 
 	ts_field := resources[0].Fields["timestamp"]
-	if ts_field != "2024-12-25 14:30:45" {
-		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30:45", ts_field)
+	if ts_field != "2024-12-25 14:30" {
+		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30", ts_field)
 	}
 }
 

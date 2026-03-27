@@ -165,12 +165,12 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 
 	startTime := ""
 	if build.StartTime != nil {
-		startTime = build.StartTime.UTC().Format("2006-01-02 15:04:05")
+		startTime = build.StartTime.UTC().Format("2006-01-02 15:04")
 	}
 
 	endTime := ""
 	if build.EndTime != nil {
-		endTime = build.EndTime.UTC().Format("2006-01-02 15:04:05")
+		endTime = build.EndTime.UTC().Format("2006-01-02 15:04")
 	}
 
 	duration := ""

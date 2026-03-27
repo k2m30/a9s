@@ -169,7 +169,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 
 	startedAt := ""
 	if task.StartedAt != nil {
-		startedAt = task.StartedAt.UTC().Format("2006-01-02 15:04:05")
+		startedAt = task.StartedAt.UTC().Format("2006-01-02 15:04")
 	}
 
 	stoppedReason := ""

@@ -62,7 +62,7 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 
 		created := ""
 		if snap.SnapshotCreateTime != nil {
-			created = snap.SnapshotCreateTime.Format("2006-01-02T15:04:05Z07:00")
+			created = snap.SnapshotCreateTime.Format("2006-01-02 15:04")
 		}
 
 		r := resource.Resource{

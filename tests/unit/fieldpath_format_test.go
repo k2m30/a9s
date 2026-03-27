@@ -20,7 +20,7 @@ func TestFormatValue_TimeValue(t *testing.T) {
 	val := reflect.ValueOf(ts)
 
 	got := fieldpath.FormatValue(val)
-	expected := "2025-06-15 10:30:00"
+	expected := "2025-06-15 10:30"
 	if got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
@@ -31,7 +31,7 @@ func TestFormatValue_TimePointer(t *testing.T) {
 	val := reflect.ValueOf(&ts)
 
 	got := fieldpath.FormatValue(val)
-	expected := "2024-01-02 03:04:05"
+	expected := "2024-01-02 03:04"
 	if got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}

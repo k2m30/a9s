@@ -41,35 +41,35 @@ func sortTestResources() []resource.Resource {
 			ID: "i-001", Name: "echo", Status: "terminated",
 			Fields: map[string]string{
 				"instance_id": "i-001", "name": "echo", "state": "terminated",
-				"launch_time": "2026-01-05T00:00:00Z",
+				"launch_time": "2026-01-05 00:00",
 			},
 		},
 		{
 			ID: "i-002", Name: "alpha", Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-002", "name": "alpha", "state": "running",
-				"launch_time": "2026-01-01T00:00:00Z",
+				"launch_time": "2026-01-01 00:00",
 			},
 		},
 		{
 			ID: "i-003", Name: "delta", Status: "stopped",
 			Fields: map[string]string{
 				"instance_id": "i-003", "name": "delta", "state": "stopped",
-				"launch_time": "2026-01-04T00:00:00Z",
+				"launch_time": "2026-01-04 00:00",
 			},
 		},
 		{
 			ID: "i-004", Name: "bravo", Status: "pending",
 			Fields: map[string]string{
 				"instance_id": "i-004", "name": "bravo", "state": "pending",
-				"launch_time": "2026-01-02T00:00:00Z",
+				"launch_time": "2026-01-02 00:00",
 			},
 		},
 		{
 			ID: "i-005", Name: "charlie", Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-005", "name": "charlie", "state": "running",
-				"launch_time": "2026-01-03T00:00:00Z",
+				"launch_time": "2026-01-03 00:00",
 			},
 		},
 	}
@@ -133,7 +133,7 @@ func extractDataTimestamps(rendered string) []string {
 		// Look for ISO timestamps
 		if idx := strings.Index(plain, "2026-01-0"); idx >= 0 {
 			// Extract the timestamp substring
-			end := idx + len("2026-01-05T00:00:00Z")
+			end := idx + len("2026-01-05 00:00")
 			if end <= len(plain) {
 				timestamps = append(timestamps, plain[idx:end])
 			}

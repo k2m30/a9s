@@ -164,7 +164,7 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 	// pushed_at
 	pushedAt := ""
 	if img.ImagePushedAt != nil {
-		pushedAt = img.ImagePushedAt.UTC().Format("2006-01-02 15:04:05")
+		pushedAt = img.ImagePushedAt.UTC().Format("2006-01-02 15:04")
 	}
 
 	// image_size

@@ -110,8 +110,8 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 		if r.Fields["start_date"] == "" {
 			t.Error("Fields[start_date] should not be empty")
 		}
-		if !strings.Contains(r.Fields["start_date"], "2024-06-15 10:00:00") {
-			t.Errorf("Fields[start_date] expected '2024-06-15 10:00:00', got %q", r.Fields["start_date"])
+		if !strings.Contains(r.Fields["start_date"], "2024-06-15 10:00") {
+			t.Errorf("Fields[start_date] expected '2024-06-15 10:00', got %q", r.Fields["start_date"])
 		}
 	})
 
@@ -119,8 +119,8 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 		if r.Fields["stop_date"] == "" {
 			t.Error("Fields[stop_date] should not be empty")
 		}
-		if !strings.Contains(r.Fields["stop_date"], "2024-06-15 10:02:47") {
-			t.Errorf("Fields[stop_date] expected '2024-06-15 10:02:47', got %q", r.Fields["stop_date"])
+		if !strings.Contains(r.Fields["stop_date"], "2024-06-15 10:02") {
+			t.Errorf("Fields[stop_date] expected '2024-06-15 10:02', got %q", r.Fields["stop_date"])
 		}
 	})
 

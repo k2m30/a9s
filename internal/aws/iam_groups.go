@@ -52,7 +52,7 @@ func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resou
 
 			createDate := ""
 			if group.CreateDate != nil {
-				createDate = group.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+				createDate = group.CreateDate.Format("2006-01-02 15:04")
 			}
 
 			arn := ""

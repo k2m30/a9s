@@ -309,7 +309,7 @@ func TestExtractSubtree_TimeScalar(t *testing.T) {
 	inst := testInstance{LaunchTime: timePtr(ts)}
 
 	got := fieldpath.ExtractSubtree(inst, "launchTime")
-	expected := "2025-06-15 10:30:00"
+	expected := "2025-06-15 10:30"
 	if got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}

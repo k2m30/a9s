@@ -44,12 +44,12 @@ func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([
 
 			creationTime := ""
 			if stack.CreationTime != nil {
-				creationTime = stack.CreationTime.Format("2006-01-02T15:04:05Z07:00")
+				creationTime = stack.CreationTime.Format("2006-01-02 15:04")
 			}
 
 			lastUpdated := ""
 			if stack.LastUpdatedTime != nil {
-				lastUpdated = stack.LastUpdatedTime.Format("2006-01-02T15:04:05Z07:00")
+				lastUpdated = stack.LastUpdatedTime.Format("2006-01-02 15:04")
 			}
 
 			description := ""

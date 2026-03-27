@@ -74,7 +74,7 @@ func fixtureECRs() []resource.Resource {
 				"uri":             "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app",
 				"tag_mutability":  "IMMUTABLE",
 				"scan_on_push":    "true",
-				"created_at":      "2025-06-15 10:30:00",
+				"created_at":      "2025-06-15 10:30",
 			},
 		},
 	}
@@ -125,7 +125,7 @@ func fixtureSFNs() []resource.Resource {
 				"name":          "order-processing",
 				"type":          "STANDARD",
 				"arn":           "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing",
-				"creation_date": "2025-06-15 10:30:00",
+				"creation_date": "2025-06-15 10:30",
 			},
 		},
 	}
@@ -141,8 +141,8 @@ func fixturePipelines() []resource.Resource {
 				"name":          "deploy-pipeline",
 				"pipeline_type": "V2",
 				"version":       "3",
-				"created":       "2025-06-15 10:30:00",
-				"updated":       "2025-06-15 10:30:00",
+				"created":       "2025-06-15 10:30",
+				"updated":       "2025-06-15 10:30",
 			},
 		},
 	}
@@ -158,7 +158,7 @@ func fixtureKinesisStreams() []resource.Resource {
 				"stream_name":   "events-stream",
 				"status":        "ACTIVE",
 				"stream_mode":   "ON_DEMAND",
-				"creation_time": "2025-06-15 10:30:00",
+				"creation_time": "2025-06-15 10:30",
 			},
 		},
 	}
@@ -190,7 +190,7 @@ func fixtureGlueJobs() []resource.Resource {
 				"glue_version":  "4.0",
 				"worker_type":   "G.2X",
 				"num_workers":   "10",
-				"last_modified": "2025-06-15 10:30:00",
+				"last_modified": "2025-06-15 10:30",
 			},
 		},
 	}
@@ -305,7 +305,7 @@ func fixtureCBs() []resource.Resource {
 				"name":          "build-project",
 				"source_type":   "CODECOMMIT",
 				"description":   "CI build project",
-				"last_modified": "2025-06-15T10:30:00Z",
+				"last_modified": "2025-06-15 10:30",
 			},
 		},
 	}
@@ -369,8 +369,8 @@ func fixtureBackups() []resource.Resource {
 			Fields: map[string]string{
 				"plan_name":      "daily-backup-plan",
 				"plan_id":        "abc12345-1234-1234-1234-123456789012",
-				"creation_date":  "2025-06-15T10:30:00Z",
-				"last_execution": "2025-06-15T10:30:00Z",
+				"creation_date":  "2025-06-15 10:30",
+				"last_execution": "2025-06-15 10:30",
 			},
 		},
 	}

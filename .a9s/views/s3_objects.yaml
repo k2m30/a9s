@@ -3,7 +3,7 @@ list:
     path: Key
     width: 36
   Size:
-    path: Size
+    key: size
     width: 12
   Storage Class:
     path: StorageClass

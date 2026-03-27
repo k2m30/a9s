@@ -44,12 +44,12 @@ func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) (
 
 			created := ""
 			if pl.Created != nil {
-				created = pl.Created.Format("2006-01-02 15:04:05")
+				created = pl.Created.Format("2006-01-02 15:04")
 			}
 
 			updated := ""
 			if pl.Updated != nil {
-				updated = pl.Updated.Format("2006-01-02 15:04:05")
+				updated = pl.Updated.Format("2006-01-02 15:04")
 			}
 
 			version := ""

@@ -52,12 +52,12 @@ func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resourc
 
 			createDate := ""
 			if user.CreateDate != nil {
-				createDate = user.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+				createDate = user.CreateDate.Format("2006-01-02 15:04")
 			}
 
 			passwordLastUsed := "Never"
 			if user.PasswordLastUsed != nil {
-				passwordLastUsed = user.PasswordLastUsed.Format("2006-01-02T15:04:05Z07:00")
+				passwordLastUsed = user.PasswordLastUsed.Format("2006-01-02 15:04")
 			}
 
 			r := resource.Resource{

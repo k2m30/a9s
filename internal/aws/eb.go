@@ -75,7 +75,7 @@ func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]
 
 			dateCreated := ""
 			if env.DateCreated != nil {
-				dateCreated = env.DateCreated.Format("2006-01-02 15:04:05")
+				dateCreated = env.DateCreated.Format("2006-01-02 15:04")
 			}
 
 			envArn := ""
