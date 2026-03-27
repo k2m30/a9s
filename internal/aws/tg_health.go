@@ -13,12 +13,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("tg_health", []string{"target_id", "port", "az", "health", "reason", "description"})
 
-	resource.RegisterChildFetcher("tg_health", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("tg_health", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"])
+		return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
 	})
 	resource.RegisterChildType(resource.ResourceTypeDef{
 		Name:      "Target Health",
@@ -28,14 +28,14 @@ func init() {
 }
 
 // FetchTargetHealth calls the ELBv2 DescribeTargetHealth API for a given
-// target group ARN and converts the response into a slice of generic Resource structs.
+// target group ARN and converts the response into a FetchResult.
 // No pagination — a single API call returns all targets.
-func FetchTargetHealth(ctx context.Context, api ELBv2DescribeTargetHealthAPI, targetGroupArn string) ([]resource.Resource, error) {
+func FetchTargetHealth(ctx context.Context, api ELBv2DescribeTargetHealthAPI, targetGroupArn string, continuationToken string) (resource.FetchResult, error) {
 	output, err := api.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{
 		TargetGroupArn: &targetGroupArn,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("fetching target health: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("fetching target health: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -44,7 +44,14 @@ func FetchTargetHealth(ctx context.Context, api ELBv2DescribeTargetHealthAPI, ta
 		resources = append(resources, convertTargetHealth(thd))
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertTargetHealth converts a single ELBv2 TargetHealthDescription into a generic Resource.

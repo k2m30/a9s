@@ -67,11 +67,14 @@ func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:my-sm:exec-001",
 	}
 
-	resources, err := awsclient.FetchSFNExecutionHistory(
+	resultSFN, err := awsclient.FetchSFNExecutionHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
+	resources := resultSFN.Resources
+	_ = resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -193,11 +196,14 @@ func TestFetchSFNExecutionHistory_Empty(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-empty",
 	}
 
-	resources, err := awsclient.FetchSFNExecutionHistory(
+	resultSFN, err := awsclient.FetchSFNExecutionHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
+	resources := resultSFN.Resources
+	_ = resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -216,11 +222,14 @@ func TestFetchSFNExecutionHistory_APIError(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-err",
 	}
 
-	resources, err := awsclient.FetchSFNExecutionHistory(
+	resultSFN, err := awsclient.FetchSFNExecutionHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
+	resources := resultSFN.Resources
+	_ = resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -276,11 +285,14 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-paginated",
 	}
 
-	resources, err := awsclient.FetchSFNExecutionHistory(
+	resultSFN, err := awsclient.FetchSFNExecutionHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
+	resources := resultSFN.Resources
+	_ = resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -322,11 +334,14 @@ func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-big",
 	}
 
-	resources, err := awsclient.FetchSFNExecutionHistory(
+	resultSFN, err := awsclient.FetchSFNExecutionHistory(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
+	resources := resultSFN.Resources
+	_ = resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -636,12 +651,12 @@ func TestSFNExecutionHistory_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutionHistory_ChildFetcherRegistered verifies that the child
-// fetcher is registered under the correct short name.
-func TestSFNExecutionHistory_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("sfn_execution_history")
+// TestSFNExecutionHistory_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestSFNExecutionHistory_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("sfn_execution_history")
 	if f == nil {
-		t.Fatal("sfn_execution_history child fetcher not registered")
+		t.Fatal("sfn_execution_history paginated child fetcher not registered")
 	}
 }
 

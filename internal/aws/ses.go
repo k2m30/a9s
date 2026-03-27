@@ -23,37 +23,47 @@ func init() {
 // FetchSESIdentities calls the SES v2 ListEmailIdentities API and converts the
 // response into a slice of generic Resource structs.
 func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([]resource.Resource, error) {
-	output, err := api.ListEmailIdentities(ctx, &sesv2.ListEmailIdentitiesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching SES identities: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, identity := range output.EmailIdentities {
-		identityName := ""
-		if identity.IdentityName != nil {
-			identityName = *identity.IdentityName
+	for {
+		output, err := api.ListEmailIdentities(ctx, &sesv2.ListEmailIdentitiesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching SES identities: %w", err)
 		}
 
-		identityType := string(identity.IdentityType)
-		sendingEnabled := fmt.Sprintf("%t", identity.SendingEnabled)
-		verificationStatus := string(identity.VerificationStatus)
+		for _, identity := range output.EmailIdentities {
+			identityName := ""
+			if identity.IdentityName != nil {
+				identityName = *identity.IdentityName
+			}
 
-		r := resource.Resource{
-			ID:     identityName,
-			Name:   identityName,
-			Status: "",
-			Fields: map[string]string{
-				"identity_name":       identityName,
-				"identity_type":       identityType,
-				"sending_enabled":     sendingEnabled,
-				"verification_status": verificationStatus,
-			},
-			RawStruct: identity,
+			identityType := string(identity.IdentityType)
+			sendingEnabled := fmt.Sprintf("%t", identity.SendingEnabled)
+			verificationStatus := string(identity.VerificationStatus)
+
+			r := resource.Resource{
+				ID:     identityName,
+				Name:   identityName,
+				Status: "",
+				Fields: map[string]string{
+					"identity_name":       identityName,
+					"identity_type":       identityType,
+					"sending_enabled":     sendingEnabled,
+					"verification_status": verificationStatus,
+				},
+				RawStruct: identity,
+			}
+
+			resources = append(resources, r)
 		}
 
-		resources = append(resources, r)
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

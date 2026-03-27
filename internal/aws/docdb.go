@@ -24,14 +24,18 @@ func init() {
 // the response into a slice of generic Resource structs.
 // Returns all DB clusters (Aurora, DocumentDB, Neptune) — no engine filter.
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching DocumentDB clusters: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, cluster := range output.DBClusters {
+	for {
+		output, err := api.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching DocumentDB clusters: %w", err)
+		}
+
+		for _, cluster := range output.DBClusters {
 		clusterID := ""
 		if cluster.DBClusterIdentifier != nil {
 			clusterID = *cluster.DBClusterIdentifier
@@ -69,6 +73,12 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

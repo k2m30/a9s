@@ -106,15 +106,17 @@ func TestFetchRolePolicies_Basic(t *testing.T) {
 
 	parentCtx := map[string]string{"role_name": "my-service-role"}
 
-	resources, err := awsclient.FetchRolePolicies(
+	result, err := awsclient.FetchRolePolicies(
 		context.Background(),
 		attachedMock,
 		inlineMock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	// 3 managed + 2 inline = 5 total
 	if len(resources) != 5 {
@@ -204,10 +206,11 @@ func TestFetchRolePolicies_ManagedOnly(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "managed-only-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -231,10 +234,11 @@ func TestFetchRolePolicies_InlineOnly(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "inline-only-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -258,12 +262,12 @@ func TestFetchRolePolicies_Empty(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "empty-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -280,7 +284,7 @@ func TestFetchRolePolicies_AttachedAPIError(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "error-role"}
-	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -302,7 +306,7 @@ func TestFetchRolePolicies_InlineAPIError(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "error-role"}
-	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -331,12 +335,12 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "nil-fields-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 }
 
@@ -363,10 +367,11 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "admin-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -398,10 +403,11 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "power-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -425,10 +431,11 @@ func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "inline-dim-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -459,10 +466,11 @@ func TestFetchRolePolicies_RawStruct(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "rawstruct-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -521,10 +529,11 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"role_name": "paginated-role"}
-	resources, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx)
+	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 4 {
 		t.Fatalf("expected 4 resources (2 managed + 2 inline), got %d", len(resources))
 	}
@@ -580,12 +589,12 @@ func TestRolePolicyColumns(t *testing.T) {
 	}
 }
 
-// TestRolePolicies_ChildFetcherRegistered verifies that the child fetcher
-// is registered under the correct short name.
-func TestRolePolicies_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("role_policies")
+// TestRolePolicies_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestRolePolicies_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("role_policies")
 	if f == nil {
-		t.Fatal("role_policies child fetcher not registered")
+		t.Fatal("role_policies paginated child fetcher not registered")
 	}
 }
 

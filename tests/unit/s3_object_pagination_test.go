@@ -50,10 +50,11 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchS3Objects(context.Background(), mock, "test-bucket", "")
+	s3result, err := awsclient.FetchS3Objects(context.Background(), mock, "test-bucket", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := s3result.Resources
 
 	// Page 1: 1 folder + 1 file = 2
 	// Page 2: 1 folder + 2 files = 3

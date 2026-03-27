@@ -23,83 +23,93 @@ func init() {
 // FetchEBEnvironments calls the Elastic Beanstalk DescribeEnvironments API and converts
 // the response into a slice of generic Resource structs.
 func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeEnvironments(ctx, &elasticbeanstalk.DescribeEnvironmentsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Elastic Beanstalk environments: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, env := range output.Environments {
-		envName := ""
-		if env.EnvironmentName != nil {
-			envName = *env.EnvironmentName
+	for {
+		output, err := api.DescribeEnvironments(ctx, &elasticbeanstalk.DescribeEnvironmentsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Elastic Beanstalk environments: %w", err)
 		}
 
-		envID := ""
-		if env.EnvironmentId != nil {
-			envID = *env.EnvironmentId
+		for _, env := range output.Environments {
+			envName := ""
+			if env.EnvironmentName != nil {
+				envName = *env.EnvironmentName
+			}
+
+			envID := ""
+			if env.EnvironmentId != nil {
+				envID = *env.EnvironmentId
+			}
+
+			appName := ""
+			if env.ApplicationName != nil {
+				appName = *env.ApplicationName
+			}
+
+			status := string(env.Status)
+			health := string(env.Health)
+
+			versionLabel := ""
+			if env.VersionLabel != nil {
+				versionLabel = *env.VersionLabel
+			}
+
+			solutionStack := ""
+			if env.SolutionStackName != nil {
+				solutionStack = *env.SolutionStackName
+			}
+
+			platformArn := ""
+			if env.PlatformArn != nil {
+				platformArn = *env.PlatformArn
+			}
+
+			endpointURL := ""
+			if env.EndpointURL != nil {
+				endpointURL = *env.EndpointURL
+			}
+
+			dateCreated := ""
+			if env.DateCreated != nil {
+				dateCreated = env.DateCreated.Format("2006-01-02 15:04:05")
+			}
+
+			envArn := ""
+			if env.EnvironmentArn != nil {
+				envArn = *env.EnvironmentArn
+			}
+
+			r := resource.Resource{
+				ID:     envID,
+				Name:   envName,
+				Status: status,
+				Fields: map[string]string{
+					"environment_name": envName,
+					"environment_id":   envID,
+					"application_name": appName,
+					"status":           status,
+					"health":           health,
+					"version_label":    versionLabel,
+					"solution_stack":   solutionStack,
+					"platform_arn":     platformArn,
+					"endpoint_url":     endpointURL,
+					"date_created":     dateCreated,
+					"environment_arn":  envArn,
+				},
+				RawStruct: env,
+			}
+
+			resources = append(resources, r)
 		}
 
-		appName := ""
-		if env.ApplicationName != nil {
-			appName = *env.ApplicationName
+		if output.NextToken == nil {
+			break
 		}
-
-		status := string(env.Status)
-		health := string(env.Health)
-
-		versionLabel := ""
-		if env.VersionLabel != nil {
-			versionLabel = *env.VersionLabel
-		}
-
-		solutionStack := ""
-		if env.SolutionStackName != nil {
-			solutionStack = *env.SolutionStackName
-		}
-
-		platformArn := ""
-		if env.PlatformArn != nil {
-			platformArn = *env.PlatformArn
-		}
-
-		endpointURL := ""
-		if env.EndpointURL != nil {
-			endpointURL = *env.EndpointURL
-		}
-
-		dateCreated := ""
-		if env.DateCreated != nil {
-			dateCreated = env.DateCreated.Format("2006-01-02 15:04:05")
-		}
-
-		envArn := ""
-		if env.EnvironmentArn != nil {
-			envArn = *env.EnvironmentArn
-		}
-
-		r := resource.Resource{
-			ID:     envID,
-			Name:   envName,
-			Status: status,
-			Fields: map[string]string{
-				"environment_name": envName,
-				"environment_id":   envID,
-				"application_name": appName,
-				"status":           status,
-				"health":           health,
-				"version_label":    versionLabel,
-				"solution_stack":   solutionStack,
-				"platform_arn":     platformArn,
-				"endpoint_url":     endpointURL,
-				"date_created":     dateCreated,
-				"environment_arn":  envArn,
-			},
-			RawStruct: env,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -100,7 +100,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.allResources = msg.Resources
 		}
 		m.pagination = msg.Pagination
-		m.applyFilter()
+		m.applySortAndFilter()
 		m.rowTextCache = nil
 		m.styledRowCache = nil
 		return m, nil

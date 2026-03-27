@@ -23,14 +23,18 @@ func init() {
 // FetchTransitGateways calls the EC2 DescribeTransitGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching transit gateways: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, tgw := range output.TransitGateways {
+	for {
+		output, err := api.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching transit gateways: %w", err)
+		}
+
+		for _, tgw := range output.TransitGateways {
 		tgwID := ""
 		if tgw.TransitGatewayId != nil {
 			tgwID = *tgw.TransitGatewayId
@@ -74,6 +78,12 @@ func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -21,24 +21,40 @@ func init() {
 }
 
 // FetchCodeBuildProjects performs a two-step fetch:
-// 1. ListProjects to get project names
+// 1. ListProjects to get project names (paginated via NextToken)
 // 2. BatchGetProjects to get full project details
 func FetchCodeBuildProjects(
 	ctx context.Context,
 	listAPI CodeBuildListProjectsAPI,
 	batchAPI CodeBuildBatchGetProjectsAPI,
 ) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListProjects(ctx, &codebuild.ListProjectsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing CodeBuild projects: %w", err)
+	// Step 1: Collect all project names across pages
+	var allNames []string
+	var nextToken *string
+
+	for {
+		listOutput, err := listAPI.ListProjects(ctx, &codebuild.ListProjectsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing CodeBuild projects: %w", err)
+		}
+
+		allNames = append(allNames, listOutput.Projects...)
+
+		if listOutput.NextToken == nil {
+			break
+		}
+		nextToken = listOutput.NextToken
 	}
 
-	if len(listOutput.Projects) == 0 {
+	if len(allNames) == 0 {
 		return []resource.Resource{}, nil
 	}
 
+	// Step 2: BatchGetProjects for all collected names
 	batchOutput, err := batchAPI.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{
-		Names: listOutput.Projects,
+		Names: allNames,
 	})
 	if err != nil {
 		return nil, err
@@ -77,7 +93,7 @@ func FetchCodeBuildProjects(
 				"description":   description,
 				"last_modified": lastModified,
 			},
-			RawStruct:  project,
+			RawStruct: project,
 		}
 
 		resources = append(resources, r)

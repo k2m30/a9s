@@ -23,14 +23,18 @@ func init() {
 // FetchNatGateways calls the EC2 DescribeNatGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeNatGateways(ctx, &ec2.DescribeNatGatewaysInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching NAT gateways: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, nat := range output.NatGateways {
+	for {
+		output, err := api.DescribeNatGateways(ctx, &ec2.DescribeNatGatewaysInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching NAT gateways: %w", err)
+		}
+
+		for _, nat := range output.NatGateways {
 		natID := ""
 		if nat.NatGatewayId != nil {
 			natID = *nat.NatGatewayId
@@ -82,6 +86,12 @@ func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]res
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -80,14 +80,16 @@ func TestFetchIAMGroupMembers_Basic(t *testing.T) {
 
 	parentCtx := map[string]string{"group_name": "developers"}
 
-	resources, err := awsclient.FetchIAMGroupMembers(
+	result, err := awsclient.FetchIAMGroupMembers(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
@@ -144,12 +146,12 @@ func TestFetchIAMGroupMembers_Empty(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "empty-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -160,7 +162,7 @@ func TestFetchIAMGroupMembers_APIError(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "bad-group"}
-	_, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	_, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -184,12 +186,12 @@ func TestFetchIAMGroupMembers_NilFields(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "nil-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 }
 
@@ -220,12 +222,12 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "big-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
 	}
 }
 
@@ -253,10 +255,11 @@ func TestFetchIAMGroupMembers_DateFormat(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "date-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -294,10 +297,11 @@ func TestFetchIAMGroupMembers_PasswordLastUsedAlwaysNA(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "pw-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -332,10 +336,11 @@ func TestFetchIAMGroupMembers_RawStruct(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"group_name": "raw-group"}
-	resources, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -389,12 +394,12 @@ func TestIAMGroupMemberColumns(t *testing.T) {
 	}
 }
 
-// TestIAMGroupMembers_ChildFetcherRegistered verifies that the child fetcher
-// is registered under the correct short name.
-func TestIAMGroupMembers_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("iam_group_members")
+// TestIAMGroupMembers_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestIAMGroupMembers_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("iam_group_members")
 	if f == nil {
-		t.Fatal("iam_group_members child fetcher not registered")
+		t.Fatal("iam_group_members paginated child fetcher not registered")
 	}
 }
 

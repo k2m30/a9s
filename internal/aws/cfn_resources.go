@@ -16,12 +16,12 @@ func init() {
 		"resource_status", "drift_status", "last_updated",
 	})
 
-	resource.RegisterChildFetcher("cfn_resources", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("cfn_resources", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"])
+		return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -32,15 +32,19 @@ func init() {
 }
 
 // FetchCfnResources calls the CloudFormation ListStackResources API and converts
-// the response into a slice of generic Resource structs. Pagination is followed
-// via NextToken to collect all resources.
+// the response into a FetchResult with pagination support. Pagination is followed
+// via NextToken. When a continuation token is provided, fetching resumes from that page.
 func FetchCfnResources(
 	ctx context.Context,
 	api CFNListStackResourcesAPI,
 	stackName string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &cloudformation.ListStackResourcesInput{
@@ -50,7 +54,7 @@ func FetchCfnResources(
 
 		output, err := api.ListStackResources(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("listing CloudFormation stack resources for %s: %w", stackName, err)
+			return resource.FetchResult{}, fmt.Errorf("listing CloudFormation stack resources for %s: %w", stackName, err)
 		}
 
 		for _, summary := range output.StackResourceSummaries {
@@ -63,7 +67,14 @@ func FetchCfnResources(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertCfnResource converts a single CloudFormation StackResourceSummary into a generic Resource.

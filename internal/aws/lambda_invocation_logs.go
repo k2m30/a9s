@@ -14,12 +14,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("lambda_invocation_logs", []string{"timestamp", "message"})
 
-	resource.RegisterChildFetcher("lambda_invocation_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("lambda_invocation_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"])
+		return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -31,8 +31,8 @@ func init() {
 
 // FetchLambdaInvocationLogs calls the CloudWatchLogs FilterLogEvents API with
 // a filter pattern containing the request ID, returning individual log lines
-// for a specific Lambda invocation.
-func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, requestID string) ([]resource.Resource, error) {
+// for a specific Lambda invocation as a FetchResult.
+func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, requestID string, continuationToken string) (resource.FetchResult, error) {
 	filterPattern := fmt.Sprintf("%q", requestID)
 	startTime := time.Now().Add(-24 * time.Hour).UnixMilli()
 
@@ -44,7 +44,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 
 	output, err := api.FilterLogEvents(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching lambda invocation logs: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -91,5 +91,12 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }

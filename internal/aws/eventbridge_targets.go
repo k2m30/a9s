@@ -16,12 +16,12 @@ func init() {
 		"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary",
 	})
 
-	resource.RegisterChildFetcher("eb_rule_targets", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("eb_rule_targets", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx)
+		return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -33,13 +33,14 @@ func init() {
 }
 
 // FetchEventBridgeRuleTargets calls the EventBridge ListTargetsByRule API
-// and converts the response into a slice of generic Resource structs.
-// This is a child fetcher: it reads rule_name and event_bus from parentCtx.
+// and converts the response into a FetchResult. This is a single-call API,
+// but uses FetchResult for consistency with the paginated child fetcher interface.
 func FetchEventBridgeRuleTargets(
 	ctx context.Context,
 	api EventBridgeListTargetsByRuleAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	ruleName := parentCtx["rule_name"]
 	eventBus := parentCtx["event_bus"]
 
@@ -50,7 +51,7 @@ func FetchEventBridgeRuleTargets(
 
 	output, err := api.ListTargetsByRule(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("listing targets for rule %s: %w", ruleName, err)
+		return resource.FetchResult{}, fmt.Errorf("listing targets for rule %s: %w", ruleName, err)
 	}
 
 	resources := make([]resource.Resource, 0, len(output.Targets))
@@ -59,7 +60,14 @@ func FetchEventBridgeRuleTargets(
 		resources = append(resources, convertEventBridgeTarget(target))
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertEventBridgeTarget converts a single EventBridge Target into a generic Resource.
@@ -139,14 +147,10 @@ func ArnToResourceName(arn string) string {
 }
 
 // ComputeInputSummary returns a human-readable summary of the target's input
-// configuration. Priority: InputTransformer → InputPath → Input (truncated) → em-dash.
+// configuration. Priority: InputTransformer → Input (truncated) → InputPath → em-dash.
 func ComputeInputSummary(target ebtypes.Target) string {
 	if target.InputTransformer != nil {
-		return "InputTransformer"
-	}
-
-	if target.InputPath != nil && *target.InputPath != "" {
-		return *target.InputPath
+		return "transformer"
 	}
 
 	if target.Input != nil && *target.Input != "" {
@@ -155,6 +159,10 @@ func ComputeInputSummary(target ebtypes.Target) string {
 			return input[:34] + "..."
 		}
 		return input
+	}
+
+	if target.InputPath != nil && *target.InputPath != "" {
+		return *target.InputPath
 	}
 
 	return "\u2014"

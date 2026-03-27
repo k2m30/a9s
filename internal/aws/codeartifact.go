@@ -23,66 +23,76 @@ func init() {
 // FetchCodeArtifactRepos calls the CodeArtifact ListRepositories API and converts the
 // response into a slice of generic Resource structs.
 func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositoriesAPI) ([]resource.Resource, error) {
-	output, err := api.ListRepositories(ctx, &codeartifact.ListRepositoriesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching CodeArtifact repositories: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, repo := range output.Repositories {
-		repoName := ""
-		if repo.Name != nil {
-			repoName = *repo.Name
+	for {
+		output, err := api.ListRepositories(ctx, &codeartifact.ListRepositoriesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching CodeArtifact repositories: %w", err)
 		}
 
-		domainName := ""
-		if repo.DomainName != nil {
-			domainName = *repo.DomainName
+		for _, repo := range output.Repositories {
+			repoName := ""
+			if repo.Name != nil {
+				repoName = *repo.Name
+			}
+
+			domainName := ""
+			if repo.DomainName != nil {
+				domainName = *repo.DomainName
+			}
+
+			domainOwner := ""
+			if repo.DomainOwner != nil {
+				domainOwner = *repo.DomainOwner
+			}
+
+			arn := ""
+			if repo.Arn != nil {
+				arn = *repo.Arn
+			}
+
+			description := ""
+			if repo.Description != nil {
+				description = *repo.Description
+			}
+
+			adminAccount := ""
+			if repo.AdministratorAccount != nil {
+				adminAccount = *repo.AdministratorAccount
+			}
+
+			createdTime := ""
+			if repo.CreatedTime != nil {
+				createdTime = repo.CreatedTime.Format("2006-01-02 15:04:05")
+			}
+
+			r := resource.Resource{
+				ID:     repoName,
+				Name:   repoName,
+				Status: "",
+				Fields: map[string]string{
+					"repo_name":     repoName,
+					"domain_name":   domainName,
+					"domain_owner":  domainOwner,
+					"arn":           arn,
+					"description":   description,
+					"admin_account": adminAccount,
+					"created_time":  createdTime,
+				},
+				RawStruct: repo,
+			}
+
+			resources = append(resources, r)
 		}
 
-		domainOwner := ""
-		if repo.DomainOwner != nil {
-			domainOwner = *repo.DomainOwner
+		if output.NextToken == nil {
+			break
 		}
-
-		arn := ""
-		if repo.Arn != nil {
-			arn = *repo.Arn
-		}
-
-		description := ""
-		if repo.Description != nil {
-			description = *repo.Description
-		}
-
-		adminAccount := ""
-		if repo.AdministratorAccount != nil {
-			adminAccount = *repo.AdministratorAccount
-		}
-
-		createdTime := ""
-		if repo.CreatedTime != nil {
-			createdTime = repo.CreatedTime.Format("2006-01-02 15:04:05")
-		}
-
-		r := resource.Resource{
-			ID:     repoName,
-			Name:   repoName,
-			Status: "",
-			Fields: map[string]string{
-				"repo_name":     repoName,
-				"domain_name":   domainName,
-				"domain_owner":  domainOwner,
-				"arn":           arn,
-				"description":   description,
-				"admin_account": adminAccount,
-				"created_time":  createdTime,
-			},
-			RawStruct: repo,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

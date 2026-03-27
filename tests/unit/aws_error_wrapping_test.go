@@ -45,7 +45,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "S3 objects",
 			contains: "fetching S3 objects",
 			call: func() error {
-				_, err := awsclient.FetchS3Objects(ctx, &mockS3ListObjectsV2Client{err: sentinel}, "test-bucket", "")
+				_, err := awsclient.FetchS3Objects(ctx, &mockS3ListObjectsV2Client{err: sentinel}, "test-bucket", "", "")
 				return err
 			},
 		},

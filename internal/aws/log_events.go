@@ -13,12 +13,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("log_events", []string{"timestamp", "message", "ingestion_time", "event_id"})
 
-	resource.RegisterChildFetcher("log_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("log_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"])
+		return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 	})
 	resource.RegisterChildType(resource.ResourceTypeDef{
 		Name:      "Log Events",
@@ -28,8 +28,9 @@ func init() {
 }
 
 // FetchLogEvents calls the CloudWatchLogs GetLogEvents API for a given
-// log group and stream, converting the response into a slice of generic Resource structs.
-func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName, logStreamName string) ([]resource.Resource, error) {
+// log group and stream, converting the response into a FetchResult.
+// This is a single-call API, but uses FetchResult for consistency.
+func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName, logStreamName string, continuationToken string) (resource.FetchResult, error) {
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  &logGroupName,
 		LogStreamName: &logStreamName,
@@ -38,7 +39,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 
 	output, err := api.GetLogEvents(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching log events: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("fetching log events: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -89,7 +90,14 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // classifyLogEventStatus classifies a log event message into a status category.

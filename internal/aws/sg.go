@@ -23,14 +23,18 @@ func init() {
 // FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and converts
 // the response into a slice of generic Resource structs.
 func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching security groups: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, sg := range output.SecurityGroups {
+	for {
+		output, err := api.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching security groups: %w", err)
+		}
+
+		for _, sg := range output.SecurityGroups {
 		// Extract GroupId
 		groupID := ""
 		if sg.GroupId != nil {
@@ -69,6 +73,12 @@ func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) 
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

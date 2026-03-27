@@ -40,15 +40,17 @@ func TestFetchCBBuildLogs_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/my-project",
 		"build-id-001",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -140,17 +142,18 @@ func TestFetchCBBuildLogs_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/empty",
 		"stream-empty",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -160,11 +163,12 @@ func TestFetchCBBuildLogs_Error(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/err",
 		"stream-err",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -172,8 +176,8 @@ func TestFetchCBBuildLogs_Error(t *testing.T) {
 	if !strings.Contains(err.Error(), "access denied") {
 		t.Errorf("error should contain 'access denied', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -191,15 +195,17 @@ func TestFetchCBBuildLogs_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/nil",
 		"stream-nil",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -226,15 +232,17 @@ func TestFetchCBBuildLogs_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/ts-test",
 		"stream-ts",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -271,7 +279,7 @@ func TestFetchCBBuildLogs_StatusClassification(t *testing.T) {
 		{"Entering_phase", "Entering phase BUILD", "IN_PROGRESS"},
 		{"Running_command", "Running command echo hello", "IN_PROGRESS"},
 
-		// Default — empty status
+		// Default -- empty status
 		{"plain_message", "Just a regular log line", ""},
 	}
 
@@ -288,15 +296,17 @@ func TestFetchCBBuildLogs_StatusClassification(t *testing.T) {
 				},
 			}
 
-			resources, err := awsclient.FetchCBBuildLogs(
+			result, err := awsclient.FetchCBBuildLogs(
 				context.Background(),
 				mock,
 				"/aws/codebuild/status-test",
 				"stream-status",
+				"",
 			)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
+			resources := result.Resources
 			if len(resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(resources))
 			}
@@ -322,15 +332,17 @@ func TestFetchCBBuildLogs_MessageStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/strip-test",
 		"stream-strip",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -356,15 +368,17 @@ func TestFetchCBBuildLogs_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCBBuildLogs(
+	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
 		"/aws/codebuild/raw-test",
 		"stream-raw",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -424,12 +438,12 @@ func TestCBBuildLogColumns(t *testing.T) {
 	}
 }
 
-// TestCBBuildLogs_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
-func TestCBBuildLogs_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("cb_build_logs")
+// TestCBBuildLogs_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestCBBuildLogs_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("cb_build_logs")
 	if f == nil {
-		t.Fatal("cb_build_logs child fetcher not registered")
+		t.Fatal("cb_build_logs paginated child fetcher not registered")
 	}
 }
 

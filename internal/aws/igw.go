@@ -23,14 +23,18 @@ func init() {
 // FetchInternetGateways calls the EC2 DescribeInternetGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeInternetGateways(ctx, &ec2.DescribeInternetGatewaysInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching internet gateways: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, igw := range output.InternetGateways {
+	for {
+		output, err := api.DescribeInternetGateways(ctx, &ec2.DescribeInternetGatewaysInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching internet gateways: %w", err)
+		}
+
+		for _, igw := range output.InternetGateways {
 		igwID := ""
 		if igw.InternetGatewayId != nil {
 			igwID = *igw.InternetGatewayId
@@ -70,6 +74,12 @@ func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysA
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

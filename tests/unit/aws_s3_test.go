@@ -117,7 +117,8 @@ func TestFetchS3Objects_ParsesFoldersAndFiles(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "")
+	s3result, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "", "")
+	resources := s3result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -156,7 +157,8 @@ func TestFetchS3Objects_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "")
+	s3result, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "", "")
+	resources := s3result.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -173,7 +175,8 @@ func TestFetchS3Objects_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "")
+	s3result, err := awsclient.FetchS3Objects(context.Background(), mock, "my-bucket", "", "")
+	resources := s3result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

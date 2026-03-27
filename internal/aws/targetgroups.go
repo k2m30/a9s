@@ -23,14 +23,18 @@ func init() {
 // FetchTargetGroups calls the ELBv2 DescribeTargetGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching target groups: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, tg := range output.TargetGroups {
+	for {
+		output, err := api.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching target groups: %w", err)
+		}
+
+		for _, tg := range output.TargetGroups {
 		tgName := ""
 		if tg.TargetGroupName != nil {
 			tgName = *tg.TargetGroupName
@@ -77,6 +81,12 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextMarker == nil {
+			break
+		}
+		marker = output.NextMarker
 	}
 
 	return resources, nil

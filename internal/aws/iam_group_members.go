@@ -14,12 +14,12 @@ func init() {
 		"user_name", "user_id", "arn", "path", "create_date", "password_last_used",
 	})
 
-	resource.RegisterChildFetcher("iam_group_members", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("iam_group_members", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchIAMGroupMembers(ctx, c.IAM, parentCtx)
+		return FetchIAMGroupMembers(ctx, c.IAM, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -31,16 +31,20 @@ func init() {
 }
 
 // FetchIAMGroupMembers calls the IAM GetGroup API and converts the response
-// into a slice of generic Resource structs representing group members.
+// into a FetchResult of generic Resource structs representing group members.
 func FetchIAMGroupMembers(
 	ctx context.Context,
 	api IAMGetGroupAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	groupName := parentCtx["group_name"]
 
 	var resources []resource.Resource
 	var marker *string
+	if continuationToken != "" {
+		marker = &continuationToken
+	}
 
 	for {
 		input := &iam.GetGroupInput{
@@ -50,7 +54,7 @@ func FetchIAMGroupMembers(
 
 		output, err := api.GetGroup(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("getting group %s: %w", groupName, err)
+			return resource.FetchResult{}, fmt.Errorf("getting group %s: %w", groupName, err)
 		}
 
 		for _, user := range output.Users {
@@ -101,5 +105,12 @@ func FetchIAMGroupMembers(
 		marker = output.Marker
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }

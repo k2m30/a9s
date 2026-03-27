@@ -46,14 +46,16 @@ func TestFetchELBListeners_Basic(t *testing.T) {
 		"lb_name":           "api-prod-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -157,16 +159,17 @@ func TestFetchELBListeners_Empty(t *testing.T) {
 		"lb_name":           "empty-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -181,16 +184,17 @@ func TestFetchELBListeners_APIError(t *testing.T) {
 		"lb_name":           "err-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -218,14 +222,16 @@ func TestFetchELBListeners_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -316,14 +322,16 @@ func TestFetchELBListeners_ComputedFields(t *testing.T) {
 		"lb_name":           "api-prod-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -393,14 +401,16 @@ func TestFetchELBListeners_CertificateShort(t *testing.T) {
 		"lb_name":           "cert-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -441,14 +451,16 @@ func TestFetchELBListeners_RawStruct(t *testing.T) {
 		"lb_name":           "raw-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -573,14 +585,16 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		"lb_name":           "pag-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 3 {
@@ -655,14 +669,16 @@ func TestFetchELBListeners_MaxCap(t *testing.T) {
 		"lb_name":           "cap-alb",
 	}
 
-	resources, err := awsclient.FetchELBListeners(
+	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("capped_at_200", func(t *testing.T) {
 		if len(resources) != 200 {
@@ -755,12 +771,12 @@ func TestELBListeners_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestELBListeners_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
-func TestELBListeners_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("elb_listeners")
+// TestELBListeners_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestELBListeners_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("elb_listeners")
 	if f == nil {
-		t.Fatal("elb_listeners child fetcher not registered")
+		t.Fatal("elb_listeners paginated child fetcher not registered")
 	}
 }
 

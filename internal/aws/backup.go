@@ -23,48 +23,58 @@ func init() {
 // FetchBackupPlans calls the Backup ListBackupPlans API and returns a slice of
 // generic Resource structs.
 func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]resource.Resource, error) {
-	output, err := api.ListBackupPlans(ctx, &backup.ListBackupPlansInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Backup plans: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, plan := range output.BackupPlansList {
-		planName := ""
-		if plan.BackupPlanName != nil {
-			planName = *plan.BackupPlanName
+	for {
+		output, err := api.ListBackupPlans(ctx, &backup.ListBackupPlansInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Backup plans: %w", err)
 		}
 
-		planID := ""
-		if plan.BackupPlanId != nil {
-			planID = *plan.BackupPlanId
+		for _, plan := range output.BackupPlansList {
+			planName := ""
+			if plan.BackupPlanName != nil {
+				planName = *plan.BackupPlanName
+			}
+
+			planID := ""
+			if plan.BackupPlanId != nil {
+				planID = *plan.BackupPlanId
+			}
+
+			creationDate := ""
+			if plan.CreationDate != nil {
+				creationDate = plan.CreationDate.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			lastExecution := ""
+			if plan.LastExecutionDate != nil {
+				lastExecution = plan.LastExecutionDate.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			r := resource.Resource{
+				ID:     planID,
+				Name:   planName,
+				Status: "",
+				Fields: map[string]string{
+					"plan_name":      planName,
+					"plan_id":        planID,
+					"creation_date":  creationDate,
+					"last_execution": lastExecution,
+				},
+				RawStruct: plan,
+			}
+
+			resources = append(resources, r)
 		}
 
-		creationDate := ""
-		if plan.CreationDate != nil {
-			creationDate = plan.CreationDate.Format("2006-01-02T15:04:05Z07:00")
+		if output.NextToken == nil {
+			break
 		}
-
-		lastExecution := ""
-		if plan.LastExecutionDate != nil {
-			lastExecution = plan.LastExecutionDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		r := resource.Resource{
-			ID:     planID,
-			Name:   planName,
-			Status: "",
-			Fields: map[string]string{
-				"plan_name":      planName,
-				"plan_id":        planID,
-				"creation_date":  creationDate,
-				"last_execution": lastExecution,
-			},
-			RawStruct:  plan,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

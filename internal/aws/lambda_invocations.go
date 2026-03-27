@@ -119,7 +119,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 			return resource.FetchResult{
 				Resources: resources,
 				Pagination: &resource.PaginationMeta{
-					IsTruncated: apiNextToken != "",
+					IsTruncated: true,
 					NextToken:   apiNextToken,
 					PageSize:    len(resources),
 				},

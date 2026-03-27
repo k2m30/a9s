@@ -17,12 +17,12 @@ func init() {
 		"resource_status", "resource_status_reason",
 	})
 
-	resource.RegisterChildFetcher("cfn_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("cfn_events", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"])
+		return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -33,17 +33,22 @@ func init() {
 }
 
 // FetchCfnEvents calls the CloudFormation DescribeStackEvents API and converts
-// the response into a slice of generic Resource structs. Pagination is followed
-// via NextToken, capped at 200 events.
+// the response into a FetchResult with pagination support. Each call returns up
+// to maxEvents (200) items. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
 func FetchCfnEvents(
 	ctx context.Context,
 	api CFNDescribeStackEventsAPI,
 	stackName string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	const maxEvents = 200
 
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 
 	for {
 		input := &cloudformation.DescribeStackEventsInput{
@@ -53,14 +58,25 @@ func FetchCfnEvents(
 
 		output, err := api.DescribeStackEvents(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("describing CloudFormation stack events for %s: %w", stackName, err)
+			return resource.FetchResult{}, fmt.Errorf("describing CloudFormation stack events for %s: %w", stackName, err)
 		}
 
 		for _, event := range output.StackEvents {
 			resources = append(resources, convertCfnEvent(event))
 
 			if len(resources) >= maxEvents {
-				return resources, nil
+				apiNextToken := ""
+				if output.NextToken != nil {
+					apiNextToken = *output.NextToken
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextToken != "",
+						NextToken:   apiNextToken,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -70,7 +86,14 @@ func FetchCfnEvents(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertCfnEvent converts a single CloudFormation StackEvent into a generic Resource.

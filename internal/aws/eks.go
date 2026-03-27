@@ -21,17 +21,33 @@ func init() {
 	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
 }
 
-// FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names,
-// then DescribeCluster for each name to get full details.
+// FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names
+// (paginated via NextToken), then DescribeCluster for each name to get full details.
 func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeAPI EKSDescribeClusterAPI) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListClusters(ctx, &eks.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing EKS clusters: %w", err)
+	// Step 1: Collect all cluster names across pages
+	var allClusters []string
+	var nextToken *string
+
+	for {
+		listOutput, err := listAPI.ListClusters(ctx, &eks.ListClustersInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing EKS clusters: %w", err)
+		}
+
+		allClusters = append(allClusters, listOutput.Clusters...)
+
+		if listOutput.NextToken == nil {
+			break
+		}
+		nextToken = listOutput.NextToken
 	}
 
+	// Step 2: Describe each cluster
 	var resources []resource.Resource
 
-	for _, clusterName := range listOutput.Clusters {
+	for _, clusterName := range allClusters {
 		descOutput, err := describeAPI.DescribeCluster(ctx, &eks.DescribeClusterInput{
 			Name: aws.String(clusterName),
 		})
@@ -74,7 +90,7 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 				"endpoint":         endpoint,
 				"platform_version": platformVersion,
 			},
-			RawStruct:  cluster,
+			RawStruct: cluster,
 		}
 
 		resources = append(resources, r)

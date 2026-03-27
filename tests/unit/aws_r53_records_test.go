@@ -56,10 +56,11 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/Z123")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/Z123", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -186,10 +187,11 @@ func TestFetchR53Records_AliasRecord(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZALIAS")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZALIAS", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -292,10 +294,11 @@ func TestFetchR53Records_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZPAGE")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZPAGE", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 3 {
@@ -368,10 +371,11 @@ func TestFetchR53Records_SetIdentifier(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZWEIGHT")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZWEIGHT", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -405,12 +409,12 @@ func TestFetchR53Records_Error(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZERR")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZERR", "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -426,12 +430,12 @@ func TestFetchR53Records_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZEMPTY")
+	result, err := awsclient.FetchR53Records(context.Background(), mock, "/hostedzone/ZEMPTY", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
