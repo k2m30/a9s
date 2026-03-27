@@ -251,8 +251,8 @@ func TestFetchCBBuildLogs_TimestampFormatting(t *testing.T) {
 	if !strings.Contains(ts, "2024-06-15") {
 		t.Errorf("Fields[timestamp] should contain '2024-06-15', got %q", ts)
 	}
-	if !strings.Contains(ts, "10:00:00") {
-		t.Errorf("Fields[timestamp] should contain '10:00:00', got %q", ts)
+	if !strings.Contains(ts, "10:00") {
+		t.Errorf("Fields[timestamp] should contain '10:00', got %q", ts)
 	}
 }
 

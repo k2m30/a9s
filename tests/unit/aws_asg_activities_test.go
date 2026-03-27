@@ -92,8 +92,8 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 		if r.Fields["start_time"] == "" {
 			t.Error("Fields[start_time] should not be empty")
 		}
-		if !strings.Contains(r.Fields["start_time"], "2024-03-22 10:00:00") {
-			t.Errorf("Fields[start_time] expected '2024-03-22 10:00:00', got %q", r.Fields["start_time"])
+		if !strings.Contains(r.Fields["start_time"], "2024-03-22 10:00") {
+			t.Errorf("Fields[start_time] expected '2024-03-22 10:00', got %q", r.Fields["start_time"])
 		}
 	})
 
@@ -299,7 +299,7 @@ func TestFetchAsgActivities_NewlineStripping(t *testing.T) {
 }
 
 // TestFetchAsgActivities_TimestampFormatting verifies that a known time.Time
-// produces the "2006-01-02 15:04:05" format in Fields.
+// produces the "2006-01-02 15:04" format in Fields.
 func TestFetchAsgActivities_TimestampFormatting(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 14, 30, 45, 0, time.UTC)
 
@@ -336,8 +336,8 @@ func TestFetchAsgActivities_TimestampFormatting(t *testing.T) {
 	}
 
 	tsField := result.Resources[0].Fields["start_time"]
-	if tsField != "2024-12-25 14:30:45" {
-		t.Errorf("Fields[start_time]: expected %q, got %q", "2024-12-25 14:30:45", tsField)
+	if tsField != "2024-12-25 14:30" {
+		t.Errorf("Fields[start_time]: expected %q, got %q", "2024-12-25 14:30", tsField)
 	}
 }
 

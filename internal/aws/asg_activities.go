@@ -108,7 +108,7 @@ func convertAsgActivity(activity asgtypes.Activity) resource.Resource {
 	startTime := ""
 	name := ""
 	if activity.StartTime != nil {
-		startTime = activity.StartTime.UTC().Format("2006-01-02 15:04:05")
+		startTime = activity.StartTime.UTC().Format("2006-01-02 15:04")
 		name = startTime
 	}
 

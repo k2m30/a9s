@@ -52,7 +52,7 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 
 		createDate := ""
 		if role.CreateDate != nil {
-			createDate = role.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+			createDate = role.CreateDate.Format("2006-01-02 15:04")
 		}
 
 		description := ""

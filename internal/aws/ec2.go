@@ -74,7 +74,7 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 				// Format launch time
 				launchTime := ""
 				if inst.LaunchTime != nil {
-					launchTime = inst.LaunchTime.Format("2006-01-02T15:04:05Z07:00")
+					launchTime = inst.LaunchTime.Format("2006-01-02 15:04")
 				}
 
 				// Extract lifecycle (on-demand if empty)

@@ -211,7 +211,7 @@ func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 		width int
 	}{
 		{"Key", "Key", 36},
-		{"Size", "Size", 12},
+		{"Size", "", 12},
 		{"Storage Class", "StorageClass", 16},
 		{"Last Modified", "LastModified", 22},
 	}

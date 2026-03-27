@@ -130,8 +130,8 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		}
 	})
 	t.Run("row0_last_change_time", func(t *testing.T) {
-		if r0.Fields["last_change_time"] != "2024-06-15 10:00:00" {
-			t.Errorf("Fields[last_change_time]: expected %q, got %q", "2024-06-15 10:00:00", r0.Fields["last_change_time"])
+		if r0.Fields["last_change_time"] != "2024-06-15 10:00" {
+			t.Errorf("Fields[last_change_time]: expected %q, got %q", "2024-06-15 10:00", r0.Fields["last_change_time"])
 		}
 	})
 	t.Run("row0_external_url", func(t *testing.T) {
@@ -567,7 +567,7 @@ func TestFetchPipelineStages_ExternalURL(t *testing.T) {
 }
 
 // TestFetchPipelineStages_LastChangeTime verifies that LastStatusChange
-// is formatted as "2006-01-02 15:04:05" in UTC.
+// is formatted as "2006-01-02 15:04" in UTC.
 func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 23, 59, 59, 0, time.UTC)
 
@@ -600,7 +600,7 @@ func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	expected := "2024-12-25 23:59:59"
+	expected := "2024-12-25 23:59"
 	if resources[0].Fields["last_change_time"] != expected {
 		t.Errorf("Fields[last_change_time]: expected %q, got %q", expected, resources[0].Fields["last_change_time"])
 	}

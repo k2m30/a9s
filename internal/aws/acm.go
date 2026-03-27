@@ -45,7 +45,7 @@ func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]re
 
 			notAfter := ""
 			if cert.NotAfter != nil {
-				notAfter = cert.NotAfter.Format("2006-01-02T15:04:05Z07:00")
+				notAfter = cert.NotAfter.Format("2006-01-02 15:04")
 			}
 
 			inUse := "false"

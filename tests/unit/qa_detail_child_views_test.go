@@ -505,11 +505,11 @@ func TestCfnEventsDetailViewContainsExpectedFields(t *testing.T) {
 	}
 	res := buildResource(
 		"evt-detail-001",
-		"2024-03-22 10:00:00",
+		"2024-03-22 10:00",
 		ev,
 	)
 	res.Fields = map[string]string{
-		"timestamp":              "2024-03-22 10:00:00",
+		"timestamp":              "2024-03-22 10:00",
 		"logical_resource_id":    "MyBucket",
 		"resource_type":          "AWS::S3::Bucket",
 		"resource_status":        "CREATE_COMPLETE",
@@ -571,7 +571,7 @@ func TestCfnResourcesDetailViewContainsExpectedFields(t *testing.T) {
 		"resource_type":        "AWS::S3::Bucket",
 		"resource_status":      "CREATE_COMPLETE",
 		"drift_status":         "IN_SYNC",
-		"last_updated":         "2024-03-22 10:00:00",
+		"last_updated":         "2024-03-22 10:00",
 	}
 	cfg := detailConfigForType("cfn_resources")
 	m := newDetailModel(res, "cfn_resources", cfg)
@@ -625,11 +625,11 @@ func TestAsgActivityDetailViewContainsExpectedFields(t *testing.T) {
 	}
 	res := buildResource(
 		"act-detail-001",
-		"2024-03-22 10:00:00",
+		"2024-03-22 10:00",
 		activity,
 	)
 	res.Fields = map[string]string{
-		"start_time":  "2024-03-22 10:00:00",
+		"start_time":  "2024-03-22 10:00",
 		"status_code": "Successful",
 		"description": "Launching a new EC2 instance: i-0abc1234",
 		"cause":       "At 2024-03-22T10:00:00Z an instance was started",
@@ -679,10 +679,10 @@ func TestAlarmHistoryDetailViewContainsExpectedFields(t *testing.T) {
 		HistorySummary:  ptrString("Alarm updated from OK to ALARM"),
 		Timestamp:       &ts,
 	}
-	res := buildResource("2024-03-22 10:00:00", "2024-03-22 10:00:00", item)
+	res := buildResource("2024-03-22 10:00", "2024-03-22 10:00", item)
 	res.Status = "StateUpdate"
 	res.Fields = map[string]string{
-		"timestamp":         "2024-03-22 10:00:00",
+		"timestamp":         "2024-03-22 10:00",
 		"history_item_type": "StateUpdate",
 		"history_summary":   "Alarm updated from OK to ALARM",
 	}
@@ -798,8 +798,8 @@ func TestQA_Detail_SFNExecutions_ViewContainsExpectedFields(t *testing.T) {
 		"execution_arn":             "arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001",
 		"name":                      "exec-001",
 		"status":                    "SUCCEEDED",
-		"start_date":                "2024-06-15 10:00:00",
-		"stop_date":                 "2024-06-15 10:02:47",
+		"start_date":                "2024-06-15 10:00",
+		"stop_date":                 "2024-06-15 10:02",
 		"duration":                  "2m 47s",
 		"state_machine_arn":         "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine",
 		"state_machine_alias_arn":   "arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:prod",
@@ -807,7 +807,7 @@ func TestQA_Detail_SFNExecutions_ViewContainsExpectedFields(t *testing.T) {
 		"map_run_arn":               "arn:aws:states:us-east-1:123456789012:mapRun:my-state-machine/exec-001:map-run-id",
 		"item_count":                "42",
 		"redrive_count":             "1",
-		"redrive_date":              "2024-06-15 11:00:00",
+		"redrive_date":              "2024-06-15 11:00",
 	}
 	cfg := detailConfigForType("sfn_executions")
 	m := newDetailModel(res, "sfn_executions", cfg)
@@ -860,7 +860,7 @@ func TestQA_Detail_SFNExecutionHistory_ViewContainsExpectedFields(t *testing.T) 
 	res := buildResource("1", "Task State Entered", event)
 	res.Status = "pending"
 	res.Fields = map[string]string{
-		"timestamp":         "2024-06-15 10:00:00",
+		"timestamp":         "2024-06-15 10:00",
 		"event_type":        "TaskStateEntered",
 		"event_type_short":  "Task State Entered",
 		"state_name":        "ProcessOrder",
@@ -902,7 +902,7 @@ func TestQA_Detail_SFNExecutionHistory_FailedEvent(t *testing.T) {
 	res := buildResource("5", "Task Failed", event)
 	res.Status = "failed"
 	res.Fields = map[string]string{
-		"timestamp":         "2024-06-15 10:00:05",
+		"timestamp":         "2024-06-15 10:00",
 		"event_type":        "TaskFailed",
 		"event_type_short":  "Task Failed",
 		"state_name":        "ProcessOrder",
@@ -969,8 +969,8 @@ func TestQA_Detail_CBBuilds_ViewContainsExpectedFields(t *testing.T) {
 	res.Fields = map[string]string{
 		"build_number":            "142",
 		"build_status":            "SUCCEEDED",
-		"start_time":              "2024-06-15 10:00:00",
-		"end_time":                "2024-06-15 10:04:12",
+		"start_time":              "2024-06-15 10:00",
+		"end_time":                "2024-06-15 10:04",
 		"duration":                "4m 12s",
 		"source_version_short":    "abc123de",
 		"initiator":               "codepipeline/my-pipeline",
@@ -1028,9 +1028,9 @@ func TestQA_Detail_CBBuildLogs_ViewContainsExpectedFields(t *testing.T) {
 	)
 	res.Status = "IN_PROGRESS"
 	res.Fields = map[string]string{
-		"timestamp":      "2024-06-15 10:00:00",
+		"timestamp":      "2024-06-15 10:00",
 		"message":        "[Container] Running command echo hello",
-		"ingestion_time": "2024-06-15 10:00:01",
+		"ingestion_time": "2024-06-15 10:00",
 		"event_id":       "evt-1718445600000-0",
 	}
 	cfg := detailConfigForType("cb_build_logs")
@@ -1088,7 +1088,7 @@ func TestQA_Detail_ECRImages_ViewContainsExpectedFields(t *testing.T) {
 	res.Fields = map[string]string{
 		"image_tags":     "latest, v1.0.0",
 		"digest_short":   "abcdef123456",
-		"pushed_at":      "2024-06-15 10:00:00",
+		"pushed_at":      "2024-06-15 10:00",
 		"image_size":     "50.0 MB",
 		"scan_status":    "COMPLETE",
 		"finding_counts": "3H 5M",
@@ -1149,7 +1149,7 @@ func TestQA_Detail_PipelineStages_ViewContainsExpectedFields(t *testing.T) {
 		"stage_status":         "Succeeded",
 		"action_name":          "GitHub",
 		"action_status":        "Succeeded",
-		"last_change_time":     "2024-06-15 10:00:00",
+		"last_change_time":     "2024-06-15 10:00",
 		"external_url":         "https://github.com/org/repo/commit/abc123",
 		"action_token":         "approval-token-xyz",
 		"action_error_details": "",
@@ -1355,12 +1355,12 @@ func TestDbiEventsDetailViewContainsExpectedFields(t *testing.T) {
 		SourceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
 	}
 	res := buildResource(
-		"2024-06-15 10:00:00/my-db-instance",
-		"2024-06-15 10:00:00",
+		"2024-06-15 10:00/my-db-instance",
+		"2024-06-15 10:00",
 		ev,
 	)
 	res.Fields = map[string]string{
-		"timestamp":         "2024-06-15 10:00:00",
+		"timestamp":         "2024-06-15 10:00",
 		"event_categories":  "maintenance",
 		"message":           "Applying offline patches to DB instance",
 		"source_identifier": "my-db-instance",
@@ -1375,7 +1375,7 @@ func TestDbiEventsDetailViewContainsExpectedFields(t *testing.T) {
 		"my-db-instance",
 		"maintenance",
 		"Applying offline patches to DB instance",
-		"2024-06-15 10:00:00",
+		"2024-06-15 10:00",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("DbiEvents detail should contain %q, got:\n%s", expected, view)
@@ -1519,12 +1519,12 @@ func TestGlueRunsDetailViewContainsExpectedFields(t *testing.T) {
 		ErrorMessage:  ptrString(""),
 		DPUSeconds:    &dpuSec,
 	}
-	res := buildResource("jr_abc12345-6789-0abc-def0-123456789012", "2024-08-10 14:30:00", run)
+	res := buildResource("jr_abc12345-6789-0abc-def0-123456789012", "2024-08-10 14:30", run)
 	res.Status = "SUCCEEDED"
 	res.Fields = map[string]string{
 		"run_id_short":        "jr_abc12",
 		"job_run_state":       "SUCCEEDED",
-		"started_on":          "2024-08-10 14:30:00",
+		"started_on":          "2024-08-10 14:30",
 		"execution_time_human": "47m 23s",
 		"error_message":       "",
 		"dpu_hours":           "12.5",

@@ -47,12 +47,12 @@ func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]reso
 
 			creationDate := ""
 			if plan.CreationDate != nil {
-				creationDate = plan.CreationDate.Format("2006-01-02T15:04:05Z07:00")
+				creationDate = plan.CreationDate.Format("2006-01-02 15:04")
 			}
 
 			lastExecution := ""
 			if plan.LastExecutionDate != nil {
-				lastExecution = plan.LastExecutionDate.Format("2006-01-02T15:04:05Z07:00")
+				lastExecution = plan.LastExecutionDate.Format("2006-01-02 15:04")
 			}
 
 			r := resource.Resource{

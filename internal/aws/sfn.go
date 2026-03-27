@@ -49,7 +49,7 @@ func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]res
 
 			creationDate := ""
 			if sm.CreationDate != nil {
-				creationDate = sm.CreationDate.Format("2006-01-02 15:04:05")
+				creationDate = sm.CreationDate.Format("2006-01-02 15:04")
 			}
 
 			r := resource.Resource{

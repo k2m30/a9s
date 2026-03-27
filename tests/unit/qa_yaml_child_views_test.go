@@ -438,10 +438,10 @@ func fixtureCfnEvents() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID:     "evt-yaml-cfn-001",
-			Name:   "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00",
 			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
-				"timestamp":              "2024-03-22 10:00:00",
+				"timestamp":              "2024-03-22 10:00",
 				"logical_resource_id":    "MyBucket",
 				"resource_type":          "AWS::S3::Bucket",
 				"resource_status":        "CREATE_COMPLETE",
@@ -500,7 +500,7 @@ func fixtureCfnResources() []resource.Resource {
 				"resource_type":        "AWS::S3::Bucket",
 				"resource_status":      "CREATE_COMPLETE",
 				"drift_status":         "IN_SYNC",
-				"last_updated":         "2024-03-22 10:00:00",
+				"last_updated":         "2024-03-22 10:00",
 			},
 		},
 	}
@@ -547,10 +547,10 @@ func fixtureAsgActivities() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID:     "act-yaml-001",
-			Name:   "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00",
 			Status: "Successful",
 			Fields: map[string]string{
-				"start_time":  "2024-03-22 10:00:00",
+				"start_time":  "2024-03-22 10:00",
 				"status_code": "Successful",
 				"description": "Launching a new EC2 instance: i-0abc1234",
 				"cause":       "At 2024-03-22T10:00:00Z an instance was started",
@@ -558,10 +558,10 @@ func fixtureAsgActivities() []resource.Resource {
 		},
 		{
 			ID:     "act-yaml-002",
-			Name:   "2024-03-22 10:05:00",
+			Name:   "2024-03-22 10:05",
 			Status: "Failed",
 			Fields: map[string]string{
-				"start_time":  "2024-03-22 10:05:00",
+				"start_time":  "2024-03-22 10:05",
 				"status_code": "Failed",
 				"description": "Terminating EC2 instance: i-0def5678",
 				"cause":       "At 2024-03-22T10:05:00Z an instance was terminated due to health check failure",
@@ -610,21 +610,21 @@ func TestQA_YAML_AsgActivities_RawContentUncolored(t *testing.T) {
 func fixtureAlarmHistory() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "2024-03-22 10:00:00",
-			Name:   "2024-03-22 10:00:00",
+			ID:     "2024-03-22 10:00",
+			Name:   "2024-03-22 10:00",
 			Status: "StateUpdate",
 			Fields: map[string]string{
-				"timestamp":         "2024-03-22 10:00:00",
+				"timestamp":         "2024-03-22 10:00",
 				"history_item_type": "StateUpdate",
 				"history_summary":   "Alarm updated from OK to ALARM",
 			},
 		},
 		{
-			ID:     "2024-03-22 10:05:00",
-			Name:   "2024-03-22 10:05:00",
+			ID:     "2024-03-22 10:05",
+			Name:   "2024-03-22 10:05",
 			Status: "ConfigurationUpdate",
 			Fields: map[string]string{
-				"timestamp":         "2024-03-22 10:05:00",
+				"timestamp":         "2024-03-22 10:05",
 				"history_item_type": "ConfigurationUpdate",
 				"history_summary":   "Alarm threshold changed from 80 to 90",
 			},
@@ -746,8 +746,8 @@ func fixtureCBBuilds() []resource.Resource {
 			Fields: map[string]string{
 				"build_number":            "142",
 				"build_status":            "SUCCEEDED",
-				"start_time":              "2024-06-15 10:00:00",
-				"end_time":                "2024-06-15 10:04:12",
+				"start_time":              "2024-06-15 10:00",
+				"end_time":                "2024-06-15 10:04",
 				"duration":                "4m 12s",
 				"source_version_short":    "abc123de",
 				"initiator":               "codepipeline/my-pipeline",
@@ -807,9 +807,9 @@ func fixtureCBBuildLogs() []resource.Resource {
 			Name:   "[Container] Running command echo hello",
 			Status: "IN_PROGRESS",
 			Fields: map[string]string{
-				"timestamp":      "2024-06-15 10:00:00",
+				"timestamp":      "2024-06-15 10:00",
 				"message":        "[Container] Running command echo hello",
-				"ingestion_time": "2024-06-15 10:00:01",
+				"ingestion_time": "2024-06-15 10:00",
 				"event_id":       "evt-1718445600000-0",
 			},
 		},
@@ -862,7 +862,7 @@ func fixtureECRImages() []resource.Resource {
 			Fields: map[string]string{
 				"image_tags":     "latest, v1.0.0",
 				"digest_short":   "abcdef123456",
-				"pushed_at":      "2024-06-15 10:00:00",
+				"pushed_at":      "2024-06-15 10:00",
 				"image_size":     "50.0 MB",
 				"scan_status":    "COMPLETE",
 				"finding_counts": "3H 5M",
@@ -920,7 +920,7 @@ func fixturePipelineStages() []resource.Resource {
 				"stage_status":         "Succeeded",
 				"action_name":          "GitHub",
 				"action_status":        "Succeeded",
-				"last_change_time":     "2024-06-15 10:00:00",
+				"last_change_time":     "2024-06-15 10:00",
 				"external_url":         "https://github.com/org/repo/commit/abc123",
 				"action_token":         "approval-token-xyz",
 				"action_error_details": "",
@@ -1139,10 +1139,10 @@ func TestQA_YAML_ELBListenerRules_NoANSI(t *testing.T) {
 func fixtureDbiEvents() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:   "2024-06-15 10:00:00/my-db-instance",
-			Name: "2024-06-15 10:00:00",
+			ID:   "2024-06-15 10:00/my-db-instance",
+			Name: "2024-06-15 10:00",
 			Fields: map[string]string{
-				"timestamp":         "2024-06-15 10:00:00",
+				"timestamp":         "2024-06-15 10:00",
 				"event_categories":  "maintenance",
 				"message":           "Applying offline patches to DB instance",
 				"source_identifier": "my-db-instance",
@@ -1314,12 +1314,12 @@ func fixtureGlueRuns() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
-			Name:   "2024-08-10 14:30:00",
+			Name:   "2024-08-10 14:30",
 			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"run_id_short":         "jr_abc12",
 				"job_run_state":        "SUCCEEDED",
-				"started_on":           "2024-08-10 14:30:00",
+				"started_on":           "2024-08-10 14:30",
 				"execution_time_human": "47m 23s",
 				"error_message":        "",
 				"dpu_hours":            "12.5",

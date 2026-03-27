@@ -1052,7 +1052,7 @@ func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 			"type":        "t3.medium",
 			"private_ip":  "10.0.0.1",
 			"public_ip":   "54.1.2.3",
-			"launch_time": "2026-01-01T00:00:00Z",
+			"launch_time": "2026-01-01 00:00",
 		},
 	}
 

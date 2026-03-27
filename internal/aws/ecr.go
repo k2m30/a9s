@@ -54,7 +54,7 @@ func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) (
 
 			createdAt := ""
 			if repo.CreatedAt != nil {
-				createdAt = repo.CreatedAt.Format("2006-01-02 15:04:05")
+				createdAt = repo.CreatedAt.Format("2006-01-02 15:04")
 			}
 
 			r := resource.Resource{

@@ -62,12 +62,12 @@ func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource
 
 			createdOn := ""
 			if job.CreatedOn != nil {
-				createdOn = job.CreatedOn.Format("2006-01-02 15:04:05")
+				createdOn = job.CreatedOn.Format("2006-01-02 15:04")
 			}
 
 			lastModified := ""
 			if job.LastModifiedOn != nil {
-				lastModified = job.LastModifiedOn.Format("2006-01-02 15:04:05")
+				lastModified = job.LastModifiedOn.Format("2006-01-02 15:04")
 			}
 
 			commandName := ""

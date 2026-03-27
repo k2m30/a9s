@@ -106,7 +106,7 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 	timestamp := ""
 	name := ""
 	if event.Timestamp != nil {
-		timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04:05")
+		timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04")
 		name = timestamp
 	}
 

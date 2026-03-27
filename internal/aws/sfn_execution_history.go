@@ -111,7 +111,7 @@ func ConvertHistoryEvent(event sfntypes.HistoryEvent, lastStateName *string) res
 
 	timestamp := ""
 	if event.Timestamp != nil {
-		timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04:05")
+		timestamp = event.Timestamp.UTC().Format("2006-01-02 15:04")
 	}
 
 	stateName := resolveStateName(event, lastStateName)

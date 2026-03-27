@@ -103,7 +103,7 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem) resource.Resource {
 	timestamp := ""
 	id := ""
 	if item.Timestamp != nil {
-		timestamp = item.Timestamp.UTC().Format("2006-01-02 15:04:05")
+		timestamp = item.Timestamp.UTC().Format("2006-01-02 15:04")
 		id = timestamp
 	}
 

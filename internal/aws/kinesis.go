@@ -50,7 +50,7 @@ func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]reso
 
 			creationTime := ""
 			if stream.StreamCreationTimestamp != nil {
-				creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04:05")
+				creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04")
 			}
 
 			streamMode := ""

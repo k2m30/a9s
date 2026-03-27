@@ -100,7 +100,7 @@ func FetchRDSEvents(ctx context.Context, api RDSDescribeEventsAPI, dbIdentifier 
 func convertRDSEvent(event rdstypes.Event) resource.Resource {
 	timestamp := ""
 	if event.Date != nil {
-		timestamp = event.Date.UTC().Format("2006-01-02 15:04:05")
+		timestamp = event.Date.UTC().Format("2006-01-02 15:04")
 	}
 
 	categories := strings.Join(event.EventCategories, ", ")

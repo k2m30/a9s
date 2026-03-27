@@ -618,7 +618,7 @@ func TestQA_Detail_NAT_ViewContainsExpectedFields(t *testing.T) {
 		"SubnetId", "subnet-0abc1234",
 		"State", "available",
 		"ConnectivityType", "public",
-		"CreateTime", "2025-06-15 10:30:00",
+		"CreateTime", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("NAT detail should contain %q, got:\n%s", expected, view)
@@ -764,7 +764,7 @@ func TestQA_Detail_TGW_ViewContainsExpectedFields(t *testing.T) {
 		"State", "available",
 		"OwnerId", "123456789012",
 		"Description", "Production transit gateway",
-		"CreationTime", "2025-06-15 10:30:00",
+		"CreationTime", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("TGW detail should contain %q, got:\n%s", expected, view)
@@ -813,7 +813,7 @@ func TestQA_Detail_VPCE_ViewContainsExpectedFields(t *testing.T) {
 		"ServiceName", "com.amazonaws.us-east-1.s3",
 		"VpcEndpointType", "Gateway",
 		"VpcId", "vpc-0abc1234",
-		"CreationTimestamp", "2025-06-15 10:30:00",
+		"CreationTimestamp", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("VPCE detail should contain %q, got:\n%s", expected, view)
@@ -916,7 +916,7 @@ func TestQA_Detail_RDSSnap_ViewContainsExpectedFields(t *testing.T) {
 		"Engine", "mysql",
 		"EngineVersion", "8.0.35",
 		"SnapshotType", "automated",
-		"SnapshotCreateTime", "2025-06-15 10:30:00",
+		"SnapshotCreateTime", "2025-06-15 10:30",
 		"AllocatedStorage", "100",
 	} {
 		if !strings.Contains(view, expected) {
@@ -967,7 +967,7 @@ func TestQA_Detail_DocDBSnap_ViewContainsExpectedFields(t *testing.T) {
 		"Status", "available",
 		"Engine", "docdb",
 		"SnapshotType", "automated",
-		"SnapshotCreateTime", "2025-06-15 10:30:00",
+		"SnapshotCreateTime", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("DocDBSnap detail should contain %q, got:\n%s", expected, view)
@@ -1065,7 +1065,7 @@ func TestQA_Detail_Policy_ViewContainsExpectedFields(t *testing.T) {
 		"Arn", "arn:aws:iam::123456789012:policy/ReadOnlyAccess",
 		"Path", "/",
 		"AttachmentCount", "5",
-		"CreateDate", "2025-06-15 10:30:00",
+		"CreateDate", "2025-06-15 10:30",
 		"Description", "Provides read-only access",
 	} {
 		if !strings.Contains(view, expected) {

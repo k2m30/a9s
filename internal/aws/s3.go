@@ -65,7 +65,7 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 
 		creationDate := ""
 		if bucket.CreationDate != nil {
-			creationDate = bucket.CreationDate.Format("2006-01-02T15:04:05Z07:00")
+			creationDate = bucket.CreationDate.Format("2006-01-02 15:04")
 		}
 
 		r := resource.Resource{
@@ -152,7 +152,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 
 			lastModified := ""
 			if obj.LastModified != nil {
-				lastModified = obj.LastModified.Format("2006-01-02T15:04:05Z07:00")
+				lastModified = obj.LastModified.Format("2006-01-02 15:04")
 			}
 
 			storageClass := string(obj.StorageClass)

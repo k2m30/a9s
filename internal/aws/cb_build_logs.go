@@ -109,7 +109,7 @@ func FetchCBBuildLogs(
 // formatEpochMillisSec converts epoch milliseconds to a human-readable
 // timestamp string including seconds.
 func formatEpochMillisSec(ms int64) string {
-	return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04:05")
+	return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04")
 }
 
 // classifyBuildLogStatus classifies a build log message into a status category.

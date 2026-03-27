@@ -22,7 +22,7 @@ func generateResources(n int) []resource.Resource {
 				"type":        "t3.medium",
 				"private_ip":  fmt.Sprintf("10.0.%d.%d", i/256, i%256),
 				"public_ip":   fmt.Sprintf("54.%d.%d.%d", i/65536, (i/256)%256, i%256),
-				"launch_time": "2026-01-15T10:30:00Z",
+				"launch_time": "2026-01-15 10:30",
 			},
 		}
 	}

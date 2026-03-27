@@ -73,7 +73,7 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 
 	t.Run("event_0_ID", func(t *testing.T) {
 		// ID format: "timestamp/source_identifier"
-		expected := "2024-06-15 10:00:00/my-db-instance"
+		expected := "2024-06-15 10:00/my-db-instance"
 		if result.Resources[0].ID != expected {
 			t.Errorf("ID: expected %q, got %q", expected, result.Resources[0].ID)
 		}
@@ -93,8 +93,8 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
-		if !strings.Contains(r.Fields["timestamp"], "2024-06-15 10:00:00") {
-			t.Errorf("Fields[timestamp] expected '2024-06-15 10:00:00', got %q", r.Fields["timestamp"])
+		if !strings.Contains(r.Fields["timestamp"], "2024-06-15 10:00") {
+			t.Errorf("Fields[timestamp] expected '2024-06-15 10:00', got %q", r.Fields["timestamp"])
 		}
 	})
 
@@ -321,7 +321,7 @@ func TestFetchRDSEvents_NewlineStripping(t *testing.T) {
 }
 
 // TestFetchRDSEvents_TimestampFormatting verifies that a known time.Time
-// produces the "2006-01-02 15:04:05" format in Fields.
+// produces the "2006-01-02 15:04" format in Fields.
 func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 14, 30, 45, 0, time.UTC)
 
@@ -354,8 +354,8 @@ func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 	}
 
 	tsField := result.Resources[0].Fields["timestamp"]
-	if tsField != "2024-12-25 14:30:45" {
-		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30:45", tsField)
+	if tsField != "2024-12-25 14:30" {
+		t.Errorf("Fields[timestamp]: expected %q, got %q", "2024-12-25 14:30", tsField)
 	}
 }
 

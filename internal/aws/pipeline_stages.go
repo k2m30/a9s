@@ -126,7 +126,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 		actionStatus = string(action.LatestExecution.Status)
 		if action.LatestExecution.LastStatusChange != nil {
 			lastStatusChange = action.LatestExecution.LastStatusChange
-			lastChangeTime = action.LatestExecution.LastStatusChange.UTC().Format("2006-01-02 15:04:05")
+			lastChangeTime = action.LatestExecution.LastStatusChange.UTC().Format("2006-01-02 15:04")
 		}
 		if action.LatestExecution.ExternalExecutionUrl != nil {
 			externalURL = *action.LatestExecution.ExternalExecutionUrl

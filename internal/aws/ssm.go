@@ -49,7 +49,7 @@ func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]re
 
 			lastModified := ""
 			if param.LastModifiedDate != nil {
-				lastModified = param.LastModifiedDate.Format("2006-01-02T15:04:05Z07:00")
+				lastModified = param.LastModifiedDate.Format("2006-01-02 15:04")
 			}
 
 			description := ""

@@ -59,7 +59,7 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 
 		createDate := ""
 		if policy.CreateDate != nil {
-			createDate = policy.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+			createDate = policy.CreateDate.Format("2006-01-02 15:04")
 		}
 
 		r := resource.Resource{

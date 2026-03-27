@@ -64,8 +64,8 @@ func FetchEcsSvcEvents(
 		timestamp := ""
 		name := ""
 		if event.CreatedAt != nil {
-			timestamp = event.CreatedAt.UTC().Format("2006-01-02 15:04:05")
-			name = event.CreatedAt.UTC().Format("2006-01-02 15:04:05")
+			timestamp = event.CreatedAt.UTC().Format("2006-01-02 15:04")
+			name = event.CreatedAt.UTC().Format("2006-01-02 15:04")
 		}
 
 		message := ""

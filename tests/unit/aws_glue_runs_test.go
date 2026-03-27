@@ -66,8 +66,8 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 	})
 
 	t.Run("Name_is_started_on_timestamp", func(t *testing.T) {
-		if r.Name != "2024-08-10 14:30:00" {
-			t.Errorf("Name: expected %q, got %q", "2024-08-10 14:30:00", r.Name)
+		if r.Name != "2024-08-10 14:30" {
+			t.Errorf("Name: expected %q, got %q", "2024-08-10 14:30", r.Name)
 		}
 	})
 
@@ -90,8 +90,8 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 	})
 
 	t.Run("Fields_started_on", func(t *testing.T) {
-		if r.Fields["started_on"] != "2024-08-10 14:30:00" {
-			t.Errorf("Fields[started_on]: expected %q, got %q", "2024-08-10 14:30:00", r.Fields["started_on"])
+		if r.Fields["started_on"] != "2024-08-10 14:30" {
+			t.Errorf("Fields[started_on]: expected %q, got %q", "2024-08-10 14:30", r.Fields["started_on"])
 		}
 	})
 

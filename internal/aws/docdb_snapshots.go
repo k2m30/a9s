@@ -62,7 +62,7 @@ func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterS
 
 		snapshotCreateTime := ""
 		if snapshot.SnapshotCreateTime != nil {
-			snapshotCreateTime = snapshot.SnapshotCreateTime.Format("2006-01-02T15:04:05Z07:00")
+			snapshotCreateTime = snapshot.SnapshotCreateTime.Format("2006-01-02 15:04")
 		}
 
 		storageType := ""

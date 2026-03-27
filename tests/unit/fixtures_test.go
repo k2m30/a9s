@@ -19,7 +19,7 @@ func fixtureS3Buckets() []resource.Resource {
 			Fields: map[string]string{
 				"name":          "test-app-state",
 				"bucket_name":   "test-app-state",
-				"creation_date": "2025-06-20T11:35:46+00:00",
+				"creation_date": "2025-06-20 11:35",
 			},
 		},
 		{
@@ -29,7 +29,7 @@ func fixtureS3Buckets() []resource.Resource {
 			Fields: map[string]string{
 				"name":          "cdn-logs.example.com",
 				"bucket_name":   "cdn-logs.example.com",
-				"creation_date": "2025-05-12T19:24:13+00:00",
+				"creation_date": "2025-05-12 19:24",
 			},
 		},
 		{
@@ -39,7 +39,7 @@ func fixtureS3Buckets() []resource.Resource {
 			Fields: map[string]string{
 				"name":          "cdn-website.example.com",
 				"bucket_name":   "cdn-website.example.com",
-				"creation_date": "2025-05-13T17:36:40+00:00",
+				"creation_date": "2025-05-13 17:36",
 			},
 		},
 		{
@@ -49,7 +49,7 @@ func fixtureS3Buckets() []resource.Resource {
 			Fields: map[string]string{
 				"name":          "dev-fileshare",
 				"bucket_name":   "dev-fileshare",
-				"creation_date": "2025-03-06T11:49:21+00:00",
+				"creation_date": "2025-03-06 11:49",
 			},
 		},
 		{
@@ -59,7 +59,7 @@ func fixtureS3Buckets() []resource.Resource {
 			Fields: map[string]string{
 				"name":          "dev-loki-chunks",
 				"bucket_name":   "dev-loki-chunks",
-				"creation_date": "2025-07-01T13:57:58+00:00",
+				"creation_date": "2025-07-01 13:57",
 			},
 		},
 	}
@@ -76,7 +76,7 @@ func fixtureS3Objects() []resource.Resource {
 			Fields: map[string]string{
 				"key":           "dev/terraform.tfstate",
 				"size":          "61.9 KB",
-				"last_modified": "2025-10-14T08:49:08+00:00",
+				"last_modified": "2025-10-14 08:49",
 				"storage_class": "STANDARD",
 			},
 		},
@@ -98,7 +98,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "g4dn.xlarge",
 				"private_ip":  "10.0.48.186",
 				"public_ip":   "203.0.113.20",
-				"launch_time": "2026-02-25T17:03:15+00:00",
+				"launch_time": "2026-02-25 17:03",
 				"lifecycle":   "spot",
 			},
 		},
@@ -113,7 +113,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "t3.large",
 				"private_ip":  "10.0.48.175",
 				"public_ip":   "203.0.113.10",
-				"launch_time": "2025-07-25T12:26:50+00:00",
+				"launch_time": "2025-07-25 12:26",
 				"lifecycle":   "on-demand",
 			},
 		},
@@ -128,7 +128,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "t3.large",
 				"private_ip":  "10.0.12.47",
 				"public_ip":   "",
-				"launch_time": "2025-09-05T11:53:44+00:00",
+				"launch_time": "2025-09-05 11:53",
 				"lifecycle":   "on-demand",
 			},
 		},
@@ -143,7 +143,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "t3.large",
 				"private_ip":  "10.0.0.32",
 				"public_ip":   "",
-				"launch_time": "2026-03-06T14:06:22+00:00",
+				"launch_time": "2026-03-06 14:06",
 				"lifecycle":   "on-demand",
 			},
 		},
@@ -158,7 +158,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "t3.xlarge",
 				"private_ip":  "10.0.3.140",
 				"public_ip":   "",
-				"launch_time": "2026-03-17T14:17:19+00:00",
+				"launch_time": "2026-03-17 14:17",
 				"lifecycle":   "on-demand",
 			},
 		},
@@ -173,7 +173,7 @@ func fixtureEC2Instances() []resource.Resource {
 				"type":        "t3.large",
 				"private_ip":  "",
 				"public_ip":   "",
-				"launch_time": "2026-03-18T01:00:03+00:00",
+				"launch_time": "2026-03-18 01:00",
 				"lifecycle":   "on-demand",
 			},
 		},

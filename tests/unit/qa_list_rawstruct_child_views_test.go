@@ -441,10 +441,10 @@ func TestQA_ListRawStruct_CfnEvents(t *testing.T) {
 	resources := []resource.Resource{
 		{
 			ID:     "evt-list-cfn-001",
-			Name:   "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00",
 			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
-				"timestamp":              "2024-03-22 10:00:00",
+				"timestamp":              "2024-03-22 10:00",
 				"logical_resource_id":    "MyBucket",
 				"resource_type":          "AWS::S3::Bucket",
 				"resource_status":        "CREATE_COMPLETE",
@@ -502,7 +502,7 @@ func TestQA_ListRawStruct_CfnResources(t *testing.T) {
 				"resource_type":        "AWS::S3::Bucket",
 				"resource_status":      "CREATE_COMPLETE",
 				"drift_status":         "IN_SYNC",
-				"last_updated":         "2024-03-22 10:00:00",
+				"last_updated":         "2024-03-22 10:00",
 			},
 			RawStruct: summary,
 		},
@@ -546,10 +546,10 @@ func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
 	resources := []resource.Resource{
 		{
 			ID:     "act-list-001",
-			Name:   "2024-03-22 10:00:00",
+			Name:   "2024-03-22 10:00",
 			Status: "Successful",
 			Fields: map[string]string{
-				"start_time":  "2024-03-22 10:00:00",
+				"start_time":  "2024-03-22 10:00",
 				"status_code": "Successful",
 				"description": "Launching a new EC2 instance: i-0abc1234",
 				"cause":       "At 2024-03-22T10:00:00Z an instance was started",
@@ -594,11 +594,11 @@ func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
 
 	resources := []resource.Resource{
 		{
-			ID:     "2024-03-22 10:00:00",
-			Name:   "2024-03-22 10:00:00",
+			ID:     "2024-03-22 10:00",
+			Name:   "2024-03-22 10:00",
 			Status: "StateUpdate",
 			Fields: map[string]string{
-				"timestamp":         "2024-03-22 10:00:00",
+				"timestamp":         "2024-03-22 10:00",
 				"history_item_type": "StateUpdate",
 				"history_summary":   "Alarm updated from OK to ALARM",
 			},
@@ -719,7 +719,7 @@ func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
 			Fields: map[string]string{
 				"build_number":         "142",
 				"build_status":         "SUCCEEDED",
-				"start_time":           "2024-06-15 10:00:00",
+				"start_time":           "2024-06-15 10:00",
 				"duration":             "4m 12s",
 				"source_version_short": "abc123de",
 				"initiator":            "codepipeline/my-pipeline",
@@ -768,9 +768,9 @@ func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
 			Name:   "[Container] Running command echo hello",
 			Status: "IN_PROGRESS",
 			Fields: map[string]string{
-				"timestamp":      "2024-06-15 10:00:00",
+				"timestamp":      "2024-06-15 10:00",
 				"message":        "[Container] Running command echo hello",
-				"ingestion_time": "2024-06-15 10:00:01",
+				"ingestion_time": "2024-06-15 10:00",
 				"event_id":       "evt-1718445600000-0",
 			},
 			RawStruct: ev,
@@ -827,7 +827,7 @@ func TestQA_ListRawStruct_ECRImages(t *testing.T) {
 			Fields: map[string]string{
 				"image_tags":     "latest, v1.0.0",
 				"digest_short":   "abcdef123456",
-				"pushed_at":      "2024-06-15 10:00:00",
+				"pushed_at":      "2024-06-15 10:00",
 				"image_size":     "50.0 MB",
 				"scan_status":    "COMPLETE",
 				"finding_counts": "3H 5M",
@@ -882,7 +882,7 @@ func TestQA_ListRawStruct_PipelineStages(t *testing.T) {
 				"stage_status":     "Succeeded",
 				"action_name":      "GitHub",
 				"action_status":    "Succeeded",
-				"last_change_time": "2024-06-15 10:00:00",
+				"last_change_time": "2024-06-15 10:00",
 				"external_url":     "https://github.com/org/repo/commit/abc123",
 			},
 			RawStruct: row,
@@ -1028,10 +1028,10 @@ func TestQA_ListRawStruct_DbiEvents(t *testing.T) {
 
 	resources := []resource.Resource{
 		{
-			ID:   "2024-06-15 10:00:00/my-db-instance",
-			Name: "2024-06-15 10:00:00",
+			ID:   "2024-06-15 10:00/my-db-instance",
+			Name: "2024-06-15 10:00",
 			Fields: map[string]string{
-				"timestamp":         "2024-06-15 10:00:00",
+				"timestamp":         "2024-06-15 10:00",
 				"event_categories":  "maintenance",
 				"message":           "Applying offline patches to DB instance",
 				"source_identifier": "my-db-instance",
@@ -1134,12 +1134,12 @@ func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
 	resources := []resource.Resource{
 		{
 			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
-			Name:   "2024-08-10 14:30:00",
+			Name:   "2024-08-10 14:30",
 			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"run_id_short":         "jr_abc12",
 				"job_run_state":        "SUCCEEDED",
-				"started_on":           "2024-08-10 14:30:00",
+				"started_on":           "2024-08-10 14:30",
 				"execution_time_human": "47m 23s",
 				"error_message":        "",
 				"dpu_hours":            "12.5",
