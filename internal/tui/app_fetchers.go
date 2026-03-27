@@ -385,7 +385,11 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 }
 
 // saveAvailabilityCache returns a tea.Cmd that persists the current availability state to disk.
+// No-op in demo mode (no cache files for synthetic data).
 func (m *Model) saveAvailabilityCache() tea.Cmd {
+	if m.demoMode {
+		return nil
+	}
 	profile := m.profile
 	region := m.region
 
@@ -411,5 +415,16 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 		// Best-effort save — don't flash errors for cache write failures
 		_ = cache.Save(cf)
 		return nil
+	}
+}
+
+// startAvailabilityProbes returns a tea.Cmd that triggers the probe pipeline
+// without loading from disk. Used in demo mode where cache files aren't needed.
+func (m *Model) startAvailabilityProbes() tea.Cmd {
+	return func() tea.Msg {
+		return messages.AvailabilityCacheLoadedMsg{
+			Entries: make(map[string]int),
+			Expired: true,
+		}
 	}
 }
