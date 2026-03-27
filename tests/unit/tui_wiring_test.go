@@ -204,6 +204,134 @@ func TestWiring_RefreshOnMainMenu_NoCacheMode_NoOp(t *testing.T) {
 	}
 }
 
+// ── Availability pipeline wiring tests (#68) ─────────────────────────────────
+
+// Bug 1: Demo mode excluded from availability probes.
+// ClientsReadyMsg in demo mode should trigger availability probes (via
+// startAvailabilityProbes), not skip them.
+
+func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// Send ClientsReadyMsg — demo mode should still fire availability probes
+	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{})
+
+	if cmd == nil {
+		t.Fatal("ClientsReadyMsg in demo mode should return non-nil cmd (identity + availability probes)")
+	}
+
+	// Execute the batch and look for an AvailabilityCacheLoadedMsg
+	found := extractMsg(t, cmd, func(msg tea.Msg) bool {
+		_, ok := msg.(messages.AvailabilityCacheLoadedMsg)
+		return ok
+	})
+	if found == nil {
+		t.Error("ClientsReadyMsg in demo mode should produce AvailabilityCacheLoadedMsg from startAvailabilityProbes")
+	}
+}
+
+func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true), tui.WithNoCache(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// Send ClientsReadyMsg — with --no-cache, should only produce identity, NOT availability
+	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{})
+
+	if cmd == nil {
+		t.Fatal("ClientsReadyMsg in demo+no-cache should still return identity cmd")
+	}
+
+	// Walk batch and verify NO AvailabilityCacheLoadedMsg is present
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, subCmd := range batch {
+			if subCmd == nil {
+				continue
+			}
+			subMsg := subCmd()
+			if _, isAvail := subMsg.(messages.AvailabilityCacheLoadedMsg); isAvail {
+				t.Error("ClientsReadyMsg in demo+no-cache mode should NOT produce AvailabilityCacheLoadedMsg")
+			}
+		}
+	} else {
+		// Not a batch — check the single message
+		if _, isAvail := msg.(messages.AvailabilityCacheLoadedMsg); isAvail {
+			t.Error("ClientsReadyMsg in demo+no-cache mode should NOT produce AvailabilityCacheLoadedMsg")
+		}
+	}
+}
+
+// Bug 2: Flash never cleared after all checks complete.
+// Walk the full probe cycle: send AvailabilityCacheLoadedMsg, then feed
+// AvailabilityCheckedMsg for every resource type. After the last one, verify
+// flash is cleared.
+
+func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
+	m := newRootSizedModel()
+
+	// Set flash to simulate "Refreshing availability..." state
+	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Refreshing availability...", IsError: false})
+
+	// Verify flash is active
+	rendered := stripANSI(rootViewContent(m))
+	if !strings.Contains(rendered, "Refreshing availability...") {
+		t.Fatal("flash should be visible before availability cycle")
+	}
+
+	// Send AvailabilityCacheLoadedMsg to build the queue and fire first 3 probes
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+		Entries: make(map[string]int),
+		Expired: true,
+	})
+
+	// Now drain the queue by sending AvailabilityCheckedMsg for all resource types.
+	// The queue was built from AllShortNames(). First 3 were dequeued by the cache
+	// loaded handler. Each AvailabilityCheckedMsg dequeues one more. So we need to
+	// send len(AllShortNames()) messages total to drain everything.
+	allNames := resource.AllShortNames()
+	var lastCmd tea.Cmd
+	for _, name := range allNames {
+		m, lastCmd = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+			ResourceType: name,
+			HasResources: true,
+			Count:        1,
+			Gen:          0,
+		})
+	}
+
+	// After the LAST AvailabilityCheckedMsg, the returned cmd should be non-nil
+	// (saveAvailabilityCache).
+	if lastCmd == nil {
+		t.Error("last AvailabilityCheckedMsg should return non-nil cmd (saveCache)")
+	}
+
+	// Render View() — "Refreshing availability..." should NOT be present anymore
+	rendered = stripANSI(rootViewContent(m))
+	if strings.Contains(rendered, "Refreshing availability...") {
+		t.Error("flash should be cleared after all availability checks complete")
+	}
+}
+
+// Bug 3: Ctrl+R on main menu in demo mode was a no-op.
+// After ClientsReadyMsg, pressing ctrl+r on the main menu in demo mode should
+// trigger availability probes.
+
+func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	// First send ClientsReadyMsg so probes can run
+	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{})
+
+	// Press ctrl+r on the main menu
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+
+	if cmd == nil {
+		t.Error("pressing ctrl+r on main menu in demo mode should trigger availability probes")
+	}
+}
+
 // ── Reveal (x key) tests ────────────────────────────────────────────────────
 
 func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
