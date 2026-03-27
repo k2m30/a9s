@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -61,6 +62,27 @@ func menuKeyPageDown() tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: tea.KeyPgDown}
 }
 
+// availItoa is a test helper to convert int to string without importing strconv.
+func availItoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := ""
+	neg := false
+	if n < 0 {
+		neg = true
+		n = -n
+	}
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		s = "-" + s
+	}
+	return s
+}
+
 // ---------------------------------------------------------------------------
 // Normal render (no availability set)
 // ---------------------------------------------------------------------------
@@ -83,12 +105,12 @@ func TestQA_Availability_NormalRender(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SetAvailability: empty type is greyed out
+// SetAvailability: empty type (count=0) is greyed out
 // ---------------------------------------------------------------------------
 
 func TestQA_Availability_EmptyTypeGreyedOut(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
-	m.SetAvailability("ec2", false)
+	m.SetAvailability("ec2", 0)
 
 	output := m.View()
 
@@ -102,22 +124,22 @@ func TestQA_Availability_EmptyTypeGreyedOut(t *testing.T) {
 	if avail == nil {
 		t.Fatal("GetAvailability() should not return nil after SetAvailability")
 	}
-	hasResources, ok := avail["ec2"]
+	count, ok := avail["ec2"]
 	if !ok {
 		t.Fatal("GetAvailability() missing ec2 entry")
 	}
-	if hasResources {
-		t.Error("ec2 availability should be false")
+	if count != 0 {
+		t.Errorf("ec2 count should be 0, got %d", count)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// SetAvailability: present type renders normally
+// SetAvailability: present type (count>0) renders normally
 // ---------------------------------------------------------------------------
 
 func TestQA_Availability_PresentTypeNormal(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
-	m.SetAvailability("ec2", true)
+	m.SetAvailability("ec2", 5)
 
 	output := m.View()
 
@@ -126,8 +148,8 @@ func TestQA_Availability_PresentTypeNormal(t *testing.T) {
 	}
 
 	avail := m.GetAvailability()
-	if !avail["ec2"] {
-		t.Error("ec2 availability should be true")
+	if avail["ec2"] != 5 {
+		t.Errorf("ec2 count should be 5, got %d", avail["ec2"])
 	}
 }
 
@@ -138,7 +160,7 @@ func TestQA_Availability_PresentTypeNormal(t *testing.T) {
 func TestQA_Availability_UnknownTypeNormal(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
 	// Set availability for some type but NOT ec2.
-	m.SetAvailability("s3", false)
+	m.SetAvailability("s3", 0)
 
 	output := m.View()
 
@@ -164,8 +186,8 @@ func TestQA_Availability_CursorCannotLandOnEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark the second item as empty. Cursor starts at items[0].
-	m.SetAvailability(allTypes[1].ShortName, false)
+	// Mark the second item as empty (count=0). Cursor starts at items[0].
+	m.SetAvailability(allTypes[1].ShortName, 0)
 
 	// Press Down — should skip items[1] and land on items[2].
 	m, _ = m.Update(menuKeyDown())
@@ -185,8 +207,8 @@ func TestQA_Availability_CursorCannotLandOnEmpty(t *testing.T) {
 
 func TestQA_Availability_ClearAvailability(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
-	m.SetAvailability("ec2", false)
-	m.SetAvailability("s3", true)
+	m.SetAvailability("ec2", 0)
+	m.SetAvailability("s3", 7)
 
 	// Verify availability was set.
 	avail := m.GetAvailability()
@@ -225,33 +247,33 @@ func TestQA_Availability_GetAvailability(t *testing.T) {
 	}
 
 	// Set some values.
-	m.SetAvailability("ec2", true)
-	m.SetAvailability("s3", false)
-	m.SetAvailability("rds", true)
+	m.SetAvailability("ec2", 12)
+	m.SetAvailability("s3", 0)
+	m.SetAvailability("rds", 3)
 
 	avail = m.GetAvailability()
 	if len(avail) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(avail))
 	}
 
-	// Verify values.
-	if !avail["ec2"] {
-		t.Error("ec2 should be true")
+	// Verify exact values.
+	if avail["ec2"] != 12 {
+		t.Errorf("ec2 should be 12, got %d", avail["ec2"])
 	}
-	if avail["s3"] {
-		t.Error("s3 should be false")
+	if avail["s3"] != 0 {
+		t.Errorf("s3 should be 0, got %d", avail["s3"])
 	}
-	if !avail["rds"] {
-		t.Error("rds should be true")
+	if avail["rds"] != 3 {
+		t.Errorf("rds should be 3, got %d", avail["rds"])
 	}
 
 	// Mutating the returned map should not affect the model.
-	avail["ec2"] = false
-	avail["new_type"] = true
+	avail["ec2"] = 0
+	avail["new_type"] = 99
 
 	fresh := m.GetAvailability()
-	if !fresh["ec2"] {
-		t.Error("mutating GetAvailability() return value should not affect model: ec2 should still be true")
+	if fresh["ec2"] != 12 {
+		t.Errorf("mutating GetAvailability() return value should not affect model: ec2 should still be 12, got %d", fresh["ec2"])
 	}
 	if _, ok := fresh["new_type"]; ok {
 		t.Error("mutating GetAvailability() return value should not affect model: new_type should not exist")
@@ -283,7 +305,7 @@ func TestQA_Availability_SetCheckProgress(t *testing.T) {
 
 func TestQA_Availability_FilterWithGreyedOut(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
-	m.SetAvailability("ec2", false)
+	m.SetAvailability("ec2", 0)
 	m.SetFilter("ec2")
 
 	output := m.View()
@@ -295,8 +317,8 @@ func TestQA_Availability_FilterWithGreyedOut(t *testing.T) {
 
 	// Availability state should be preserved through filtering.
 	avail := m.GetAvailability()
-	if avail["ec2"] {
-		t.Error("ec2 availability should still be false after filtering")
+	if avail["ec2"] != 0 {
+		t.Errorf("ec2 count should still be 0 after filtering, got %d", avail["ec2"])
 	}
 }
 
@@ -309,7 +331,7 @@ func TestQA_Availability_MultipleEmpty(t *testing.T) {
 
 	emptyTypes := []string{"ec2", "rds", "lambda", "eks", "vpc"}
 	for _, shortName := range emptyTypes {
-		m.SetAvailability(shortName, false)
+		m.SetAvailability(shortName, 0)
 	}
 
 	avail := m.GetAvailability()
@@ -318,8 +340,8 @@ func TestQA_Availability_MultipleEmpty(t *testing.T) {
 	}
 
 	for _, shortName := range emptyTypes {
-		if avail[shortName] {
-			t.Errorf("%s should be false (empty)", shortName)
+		if avail[shortName] != 0 {
+			t.Errorf("%s should be 0 (empty), got %d", shortName, avail[shortName])
 		}
 	}
 
@@ -340,16 +362,16 @@ func TestQA_Availability_MultipleEmpty(t *testing.T) {
 func TestQA_Availability_OverwriteValue(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 40)
 
-	m.SetAvailability("ec2", false)
+	m.SetAvailability("ec2", 0)
 	avail := m.GetAvailability()
-	if avail["ec2"] {
-		t.Error("ec2 should be false initially")
+	if avail["ec2"] != 0 {
+		t.Errorf("ec2 should be 0 initially, got %d", avail["ec2"])
 	}
 
-	m.SetAvailability("ec2", true)
+	m.SetAvailability("ec2", 15)
 	avail = m.GetAvailability()
-	if !avail["ec2"] {
-		t.Error("ec2 should be true after overwrite")
+	if avail["ec2"] != 15 {
+		t.Errorf("ec2 should be 15 after overwrite, got %d", avail["ec2"])
 	}
 }
 
@@ -361,9 +383,13 @@ func TestQA_Availability_AllResourceTypes(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
 
 	allTypes := resource.AllResourceTypes()
-	// Mark every other type as empty.
+	// Mark every other type: even indices get count=i+1, odd indices get count=0.
 	for i, rt := range allTypes {
-		m.SetAvailability(rt.ShortName, i%2 == 0)
+		if i%2 == 0 {
+			m.SetAvailability(rt.ShortName, i+1)
+		} else {
+			m.SetAvailability(rt.ShortName, 0)
+		}
 	}
 
 	avail := m.GetAvailability()
@@ -372,9 +398,13 @@ func TestQA_Availability_AllResourceTypes(t *testing.T) {
 	}
 
 	for i, rt := range allTypes {
-		expected := i%2 == 0
-		if avail[rt.ShortName] != expected {
-			t.Errorf("%s: availability = %v, want %v", rt.ShortName, avail[rt.ShortName], expected)
+		if i%2 == 0 {
+			expected := i + 1
+			if avail[rt.ShortName] != expected {
+				t.Errorf("%s: count = %d, want %d", rt.ShortName, avail[rt.ShortName], expected)
+			}
+		} else if avail[rt.ShortName] != 0 {
+			t.Errorf("%s: count = %d, want 0", rt.ShortName, avail[rt.ShortName])
 		}
 	}
 
@@ -393,8 +423,8 @@ func TestQA_Availability_AllResourceTypes(t *testing.T) {
 
 func TestQA_Availability_SmallTerminal(t *testing.T) {
 	m := newSizedMainMenu(t, 40, 10)
-	m.SetAvailability("ec2", false)
-	m.SetAvailability("s3", true)
+	m.SetAvailability("ec2", 0)
+	m.SetAvailability("s3", 3)
 
 	// Should not panic at small terminal size.
 	output := m.View()
@@ -405,7 +435,7 @@ func TestQA_Availability_SmallTerminal(t *testing.T) {
 
 func TestQA_Availability_LargeTerminal(t *testing.T) {
 	m := newSizedMainMenu(t, 200, 50)
-	m.SetAvailability("ec2", false)
+	m.SetAvailability("ec2", 0)
 
 	output := m.View()
 	if !strings.Contains(output, "EC2 Instances") {
@@ -415,7 +445,7 @@ func TestQA_Availability_LargeTerminal(t *testing.T) {
 
 func TestQA_Availability_ZeroSize(t *testing.T) {
 	m := newSizedMainMenu(t, 0, 0)
-	m.SetAvailability("ec2", false)
+	m.SetAvailability("ec2", 0)
 
 	// Should not panic.
 	output := m.View()
@@ -434,8 +464,8 @@ func TestQA_Availability_DownSkipsEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark items[1] as empty. Cursor starts at items[0].
-	m.SetAvailability(allTypes[1].ShortName, false)
+	// Mark items[1] as empty (count=0). Cursor starts at items[0].
+	m.SetAvailability(allTypes[1].ShortName, 0)
 
 	m, _ = m.Update(menuKeyDown())
 
@@ -457,8 +487,8 @@ func TestQA_Availability_UpSkipsEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark items[1] as empty.
-	m.SetAvailability(allTypes[1].ShortName, false)
+	// Mark items[1] as empty (count=0).
+	m.SetAvailability(allTypes[1].ShortName, 0)
 
 	// Move cursor to items[2] (Down once skips items[1], lands on items[2]).
 	m, _ = m.Update(menuKeyDown())
@@ -488,9 +518,9 @@ func TestQA_Availability_DownSkipsMultipleEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark items[1] and items[2] as empty. Cursor starts at items[0].
-	m.SetAvailability(allTypes[1].ShortName, false)
-	m.SetAvailability(allTypes[2].ShortName, false)
+	// Mark items[1] and items[2] as empty (count=0). Cursor starts at items[0].
+	m.SetAvailability(allTypes[1].ShortName, 0)
+	m.SetAvailability(allTypes[2].ShortName, 0)
 
 	m, _ = m.Update(menuKeyDown())
 
@@ -512,9 +542,9 @@ func TestQA_Availability_TopSkipsEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark items[0] and items[1] as empty.
-	m.SetAvailability(allTypes[0].ShortName, false)
-	m.SetAvailability(allTypes[1].ShortName, false)
+	// Mark items[0] and items[1] as empty (count=0).
+	m.SetAvailability(allTypes[0].ShortName, 0)
+	m.SetAvailability(allTypes[1].ShortName, 0)
 
 	// Move cursor past the empty items first.
 	for i := 0; i < 5; i++ {
@@ -543,9 +573,9 @@ func TestQA_Availability_BottomSkipsEmpty(t *testing.T) {
 
 	m := newSizedMainMenu(t, 80, 200)
 	lastIdx := len(allTypes) - 1
-	// Mark the last 2 items as empty.
-	m.SetAvailability(allTypes[lastIdx].ShortName, false)
-	m.SetAvailability(allTypes[lastIdx-1].ShortName, false)
+	// Mark the last 2 items as empty (count=0).
+	m.SetAvailability(allTypes[lastIdx].ShortName, 0)
+	m.SetAvailability(allTypes[lastIdx-1].ShortName, 0)
 
 	// Press Bottom (G).
 	m, _ = m.Update(menuKeyBottom())
@@ -569,9 +599,9 @@ func TestQA_Availability_AllEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark ALL items as empty.
+	// Mark ALL items as empty (count=0).
 	for _, rt := range allTypes {
-		m.SetAvailability(rt.ShortName, false)
+		m.SetAvailability(rt.ShortName, 0)
 	}
 
 	// When ALL items are empty, skipUnavailable gives up (no infinite loop).
@@ -638,10 +668,10 @@ func TestQA_Availability_UnknownItemsNavigable(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark items[0] as available and items[2] as empty.
+	// Mark items[0] as available (count=5) and items[2] as empty (count=0).
 	// items[1] is NOT in the map — should be treated as navigable.
-	m.SetAvailability(allTypes[0].ShortName, true)
-	m.SetAvailability(allTypes[2].ShortName, false)
+	m.SetAvailability(allTypes[0].ShortName, 5)
+	m.SetAvailability(allTypes[2].ShortName, 0)
 
 	// Cursor at items[0], press Down.
 	m, _ = m.Update(menuKeyDown())
@@ -664,9 +694,9 @@ func TestQA_Availability_EnterBlockedOnEmpty(t *testing.T) {
 	}
 
 	m := newSizedMainMenu(t, 80, 200)
-	// Mark ALL items as empty so cursor is stuck on an empty item.
+	// Mark ALL items as empty (count=0) so cursor is stuck on an empty item.
 	for _, rt := range allTypes {
-		m.SetAvailability(rt.ShortName, false)
+		m.SetAvailability(rt.ShortName, 0)
 	}
 
 	// Press Enter — should return nil cmd (no NavigateMsg).
@@ -694,8 +724,8 @@ func TestQA_Availability_PageDownSkipsEmpty(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 5)
 
 	// With height=5, pageSize = height-1 = 4, so PageDown lands near items[4].
-	// Mark items[4] as empty.
-	m.SetAvailability(allTypes[4].ShortName, false)
+	// Mark items[4] as empty (count=0).
+	m.SetAvailability(allTypes[4].ShortName, 0)
 
 	m, _ = m.Update(menuKeyPageDown())
 
@@ -706,8 +736,8 @@ func TestQA_Availability_PageDownSkipsEmpty(t *testing.T) {
 
 	// Cursor should have landed on a non-empty item.
 	avail := m.GetAvailability()
-	hasRes, known := avail[selected.ShortName]
-	if known && !hasRes {
+	count, known := avail[selected.ShortName]
+	if known && count == 0 {
 		t.Errorf("PageDown landed on known-empty item %s", selected.ShortName)
 	}
 }
@@ -742,8 +772,8 @@ func TestQA_Availability_FilterWithSkip(t *testing.T) {
 		t.Skip("filter 'ec' matched only 1 item")
 	}
 
-	// Mark the second filtered item as empty on the original menu.
-	m.SetAvailability(secondFiltered.ShortName, false)
+	// Mark the second filtered item as empty (count=0) on the original menu.
+	m.SetAvailability(secondFiltered.ShortName, 0)
 
 	// Press Down — should skip the empty second item.
 	m, _ = m.Update(menuKeyDown())
@@ -767,8 +797,8 @@ func TestQA_Availability_DownAtEndStays(t *testing.T) {
 	m := newSizedMainMenu(t, 80, 200)
 	lastIdx := len(allTypes) - 1
 
-	// Mark the last item as empty.
-	m.SetAvailability(allTypes[lastIdx].ShortName, false)
+	// Mark the last item as empty (count=0).
+	m.SetAvailability(allTypes[lastIdx].ShortName, 0)
 
 	// Press Bottom to get near the end.
 	m, _ = m.Update(menuKeyBottom())
@@ -800,8 +830,8 @@ func TestQA_Availability_UpAtTopStays(t *testing.T) {
 
 	m := newSizedMainMenu(t, 80, 200)
 
-	// Mark items[0] as empty.
-	m.SetAvailability(allTypes[0].ShortName, false)
+	// Mark items[0] as empty (count=0).
+	m.SetAvailability(allTypes[0].ShortName, 0)
 
 	// Press Top — should skip items[0] and land on items[1].
 	m, _ = m.Update(menuKeyTop())
@@ -833,12 +863,12 @@ func TestQA_Availability_NavigateAllResourceTypes(t *testing.T) {
 
 	m := newSizedMainMenu(t, 80, 200)
 
-	// Mark every other item as empty (odd indices).
+	// Mark every other item as empty (odd indices get count=0).
 	for i, rt := range allTypes {
 		if i%2 == 1 {
-			m.SetAvailability(rt.ShortName, false)
+			m.SetAvailability(rt.ShortName, 0)
 		} else {
-			m.SetAvailability(rt.ShortName, true)
+			m.SetAvailability(rt.ShortName, i+1)
 		}
 	}
 
@@ -865,6 +895,141 @@ func TestQA_Availability_NavigateAllResourceTypes(t *testing.T) {
 	for _, shortName := range visited {
 		if emptySet[shortName] {
 			t.Errorf("cursor visited empty item %s during navigation", shortName)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: count appears in View() output
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_CountDisplayed(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 12)
+
+	output := m.View()
+
+	// The count "(12)" should appear near the EC2 row.
+	if !strings.Contains(output, "(12)") {
+		t.Errorf("View() should contain count '(12)' for ec2 with count=12, output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: zero count appears for empty types
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_ZeroCountDisplayed(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 0)
+
+	output := m.View()
+
+	// The count "(0)" should appear near the EC2 row.
+	if !strings.Contains(output, "(0)") {
+		t.Errorf("View() should contain count '(0)' for ec2 with count=0, output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: unknown types show no count
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_UnknownNoCount(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	// Don't set availability for any type.
+
+	output := m.View()
+
+	// Output should NOT contain any "(N)" patterns (parenthesized numbers).
+	countPattern := regexp.MustCompile(`\(\d+\)`)
+	if countPattern.MatchString(output) {
+		t.Errorf("View() should not contain any count patterns when no availability is set, found match in output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: count appears on selected row too
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_CountInSelectedRow(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	allTypes := resource.AllResourceTypes()
+	if len(allTypes) == 0 {
+		t.Skip("no resource types registered")
+	}
+
+	// Set count for the first item (which is selected by default).
+	m.SetAvailability(allTypes[0].ShortName, 5)
+
+	output := m.View()
+
+	// The count "(5)" should appear even on the selected (highlighted) row.
+	if !strings.Contains(output, "(5)") {
+		t.Errorf("View() should contain count '(5)' on selected row for %s, output:\n%s",
+			allTypes[0].ShortName, output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: various count values
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_CountDisplayVariousValues(t *testing.T) {
+	// Use actual registered resource type short names from AllResourceTypes().
+	allTypes := resource.AllResourceTypes()
+	if len(allTypes) < 4 {
+		t.Skip("need at least 4 resource types")
+	}
+
+	testCases := []struct {
+		name     string
+		index    int
+		count    int
+		expected string
+	}{
+		{"single digit", 0, 1, "(1)"},
+		{"double digit", 1, 42, "(42)"},
+		{"triple digit", 2, 100, "(100)"},
+		{"large count", 3, 1000, "(1000)"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newSizedMainMenu(t, 80, 200)
+			shortName := allTypes[tc.index].ShortName
+			m.SetAvailability(shortName, tc.count)
+
+			output := m.View()
+			if !strings.Contains(output, tc.expected) {
+				t.Errorf("View() should contain %q for %s with count=%d",
+					tc.expected, shortName, tc.count)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count display: all resource types show their counts
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_CountDisplayAllResourceTypes(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	allTypes := resource.AllResourceTypes()
+
+	// Set unique counts for every resource type.
+	for i, rt := range allTypes {
+		m.SetAvailability(rt.ShortName, (i+1)*10)
+	}
+
+	output := m.View()
+
+	// Verify each count appears in the output.
+	for i, rt := range allTypes {
+		expected := "(" + availItoa((i+1)*10) + ")"
+		if !strings.Contains(output, expected) {
+			t.Errorf("View() should contain %q for %s (count=%d)",
+				expected, rt.ShortName, (i+1)*10)
 		}
 	}
 }
