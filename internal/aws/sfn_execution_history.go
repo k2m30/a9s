@@ -22,12 +22,12 @@ func init() {
 		"state_name", "event_detail", "event_id", "previous_event_id",
 	})
 
-	resource.RegisterChildFetcher("sfn_execution_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("sfn_execution_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx)
+		return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -39,17 +39,22 @@ func init() {
 }
 
 // FetchSFNExecutionHistory calls the SFN GetExecutionHistory API and converts
-// the response into a slice of generic Resource structs. Pagination is followed
-// via NextToken, capped at maxSFNHistoryEvents (500) items.
+// the response into a FetchResult with pagination support. Each call returns up to
+// maxSFNHistoryEvents (500) items. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
 func FetchSFNExecutionHistory(
 	ctx context.Context,
 	api SFNGetExecutionHistoryAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	executionArn := parentCtx["execution_arn"]
 
 	var resources []resource.Resource
 	var nextToken *string
+	if continuationToken != "" {
+		nextToken = &continuationToken
+	}
 	var lastStateName string
 
 	for {
@@ -60,14 +65,25 @@ func FetchSFNExecutionHistory(
 
 		output, err := api.GetExecutionHistory(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("getting execution history for %s: %w", executionArn, err)
+			return resource.FetchResult{}, fmt.Errorf("getting execution history for %s: %w", executionArn, err)
 		}
 
 		for _, event := range output.Events {
 			resources = append(resources, ConvertHistoryEvent(event, &lastStateName))
 
 			if len(resources) >= maxSFNHistoryEvents {
-				return resources, nil
+				apiNextToken := ""
+				if output.NextToken != nil {
+					apiNextToken = *output.NextToken
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextToken != "",
+						NextToken:   apiNextToken,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -77,7 +93,14 @@ func FetchSFNExecutionHistory(
 		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // ConvertHistoryEvent converts a single SFN HistoryEvent into a generic Resource.

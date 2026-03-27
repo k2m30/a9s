@@ -23,14 +23,18 @@ func init() {
 // FetchRouteTables calls the EC2 DescribeRouteTables API and converts the
 // response into a slice of generic Resource structs.
 func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching route tables: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, rtb := range output.RouteTables {
+	for {
+		output, err := api.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching route tables: %w", err)
+		}
+
+		for _, rtb := range output.RouteTables {
 		rtbID := ""
 		if rtb.RouteTableId != nil {
 			rtbID = *rtb.RouteTableId
@@ -78,6 +82,12 @@ func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]res
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

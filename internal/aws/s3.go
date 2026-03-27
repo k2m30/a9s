@@ -21,12 +21,12 @@ func init() {
 	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
 
 	// Register S3 objects as a child type with its own fetcher.
-	resource.RegisterChildFetcher("s3_objects", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("s3_objects", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"])
+		return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"], continuationToken)
 	})
 	resource.RegisterChildType(resource.ResourceTypeDef{
 		Name:      "S3 Objects",
@@ -94,23 +94,26 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 }
 
 // FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.
-// It returns folders (CommonPrefixes) and files (Contents) as Resource structs.
+// It returns folders (CommonPrefixes) and files (Contents) as a FetchResult.
 // It paginates using IsTruncated and NextContinuationToken until all pages are fetched.
-func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string) ([]resource.Resource, error) {
+func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string, continuationToken string) (resource.FetchResult, error) {
 	var resources []resource.Resource
-	var continuationToken *string
+	var awsContinuationToken *string
+	if continuationToken != "" {
+		awsContinuationToken = &continuationToken
+	}
 
 	for {
 		input := &s3.ListObjectsV2Input{
 			Bucket:            aws.String(bucket),
 			Prefix:            aws.String(prefix),
 			Delimiter:         aws.String("/"),
-			ContinuationToken: continuationToken,
+			ContinuationToken: awsContinuationToken,
 		}
 
 		output, err := api.ListObjectsV2(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("fetching S3 objects: %w", err)
+			return resource.FetchResult{}, fmt.Errorf("fetching S3 objects: %w", err)
 		}
 
 		// Add folders (CommonPrefixes) first
@@ -130,7 +133,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 					"last_modified": "",
 					"storage_class": "",
 				},
-				RawStruct:  cp,
+				RawStruct: cp,
 			}
 			resources = append(resources, r)
 		}
@@ -164,7 +167,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 					"last_modified": lastModified,
 					"storage_class": storageClass,
 				},
-				RawStruct:  obj,
+				RawStruct: obj,
 			}
 			resources = append(resources, r)
 		}
@@ -173,10 +176,17 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 		if output.IsTruncated == nil || !*output.IsTruncated || output.NextContinuationToken == nil {
 			break
 		}
-		continuationToken = output.NextContinuationToken
+		awsContinuationToken = output.NextContinuationToken
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // formatSize converts a byte count to a human-readable string.

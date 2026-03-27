@@ -67,14 +67,16 @@ func TestFetchCfnResources_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"my-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -183,16 +185,17 @@ func TestFetchCfnResources_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"empty-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -202,16 +205,17 @@ func TestFetchCfnResources_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: stack not found"),
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"err-stack",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -235,14 +239,16 @@ func TestFetchCfnResources_NilDriftInformation(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"nodrift-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -275,14 +281,16 @@ func TestFetchCfnResources_NilOptionalFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"nil-fields-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil optional fields, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -314,14 +322,16 @@ func TestFetchCfnResources_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"ts-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -356,14 +366,16 @@ func TestFetchCfnResources_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"raw-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -466,12 +478,12 @@ func TestCfnResources_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestCfnResources_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
-func TestCfnResources_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("cfn_resources")
+// TestCfnResources_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestCfnResources_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("cfn_resources")
 	if f == nil {
-		t.Fatal("cfn_resources child fetcher not registered")
+		t.Fatal("cfn_resources paginated child fetcher not registered")
 	}
 }
 
@@ -558,14 +570,16 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnResources(
+	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
 		"paginated-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 5 {

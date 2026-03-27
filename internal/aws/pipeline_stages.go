@@ -34,12 +34,12 @@ func init() {
 		"action_error_details", "revision_id", "revision_summary",
 	})
 
-	resource.RegisterChildFetcher("pipeline_stages", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("pipeline_stages", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchPipelineStages(ctx, c.CodePipeline, parentCtx)
+		return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -58,14 +58,15 @@ func FetchPipelineStages(
 	ctx context.Context,
 	api CodePipelineGetPipelineStateAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	pipelineName := parentCtx["pipeline_name"]
 
 	output, err := api.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
 		Name: &pipelineName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting pipeline state for %s: %w", pipelineName, err)
+		return resource.FetchResult{}, fmt.Errorf("getting pipeline state for %s: %w", pipelineName, err)
 	}
 
 	var resources []resource.Resource
@@ -87,7 +88,14 @@ func FetchPipelineStages(
 		}
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertPipelineStageAction converts a single stage-action pair into a Resource.

@@ -23,54 +23,64 @@ func init() {
 // FetchIAMGroups calls the IAM ListGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resource, error) {
-	output, err := api.ListGroups(ctx, &iam.ListGroupsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching IAM groups: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, group := range output.Groups {
-		groupName := ""
-		if group.GroupName != nil {
-			groupName = *group.GroupName
+	for {
+		output, err := api.ListGroups(ctx, &iam.ListGroupsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching IAM groups: %w", err)
 		}
 
-		groupID := ""
-		if group.GroupId != nil {
-			groupID = *group.GroupId
+		for _, group := range output.Groups {
+			groupName := ""
+			if group.GroupName != nil {
+				groupName = *group.GroupName
+			}
+
+			groupID := ""
+			if group.GroupId != nil {
+				groupID = *group.GroupId
+			}
+
+			path := ""
+			if group.Path != nil {
+				path = *group.Path
+			}
+
+			createDate := ""
+			if group.CreateDate != nil {
+				createDate = group.CreateDate.Format("2006-01-02T15:04:05Z07:00")
+			}
+
+			arn := ""
+			if group.Arn != nil {
+				arn = *group.Arn
+			}
+
+			r := resource.Resource{
+				ID:     groupName,
+				Name:   groupName,
+				Status: "",
+				Fields: map[string]string{
+					"group_name":  groupName,
+					"group_id":    groupID,
+					"path":        path,
+					"create_date": createDate,
+					"arn":         arn,
+				},
+				RawStruct: group,
+			}
+
+			resources = append(resources, r)
 		}
 
-		path := ""
-		if group.Path != nil {
-			path = *group.Path
+		if !output.IsTruncated {
+			break
 		}
-
-		createDate := ""
-		if group.CreateDate != nil {
-			createDate = group.CreateDate.Format("2006-01-02T15:04:05Z07:00")
-		}
-
-		arn := ""
-		if group.Arn != nil {
-			arn = *group.Arn
-		}
-
-		r := resource.Resource{
-			ID:     groupName,
-			Name:   groupName,
-			Status: "",
-			Fields: map[string]string{
-				"group_name":  groupName,
-				"group_id":    groupID,
-				"path":        path,
-				"create_date": createDate,
-				"arn":         arn,
-			},
-			RawStruct:  group,
-		}
-
-		resources = append(resources, r)
+		marker = output.Marker
 	}
 
 	return resources, nil

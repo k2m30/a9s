@@ -58,15 +58,17 @@ func TestFetchLambdaInvocationLogs_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/my-func",
 		"12345678-1234-1234-1234-123456789012",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 4 {
 		t.Fatalf("expected 4 resources, got %d", len(resources))
@@ -141,15 +143,17 @@ func TestFetchLambdaInvocationLogs_StatusClassification(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/status-func",
 		"abc",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 6 {
 		t.Fatalf("expected 6 resources, got %d", len(resources))
@@ -190,17 +194,18 @@ func TestFetchLambdaInvocationLogs_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/empty-func",
 		"empty-request-id",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -211,17 +216,18 @@ func TestFetchLambdaInvocationLogs_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: resource not found"),
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/err-func",
 		"err-request-id",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -242,15 +248,17 @@ func TestFetchLambdaInvocationLogs_MessageNewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/newline-func",
 		"newline-request-id",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -277,15 +285,17 @@ func TestFetchLambdaInvocationLogs_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/nil-func",
 		"nil-request-id",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -329,15 +339,17 @@ func TestFetchLambdaInvocationLogs_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/raw-func",
 		"raw-request-id",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -397,6 +409,7 @@ func TestFetchLambdaInvocationLogs_ParentContextKeys(t *testing.T) {
 		mock,
 		logGroup,
 		requestID,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -436,15 +449,17 @@ func TestFetchLambdaInvocationLogs_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLambdaInvocationLogs(
+	result, err := awsclient.FetchLambdaInvocationLogs(
 		context.Background(),
 		mock,
 		"/aws/lambda/ts-func",
 		"ts-request-id",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -477,6 +492,7 @@ func TestFetchLambdaInvocationLogs_StartTimeBound(t *testing.T) {
 		mock,
 		"/aws/lambda/time-bound-func",
 		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

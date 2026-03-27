@@ -23,51 +23,61 @@ func init() {
 // FetchAPIGateways calls the API Gateway V2 GetApis API and converts
 // the response into a slice of generic Resource structs.
 func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resource.Resource, error) {
-	output, err := api.GetApis(ctx, &apigatewayv2.GetApisInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching API gateways: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, item := range output.Items {
-		apiID := ""
-		if item.ApiId != nil {
-			apiID = *item.ApiId
+	for {
+		output, err := api.GetApis(ctx, &apigatewayv2.GetApisInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching API gateways: %w", err)
 		}
 
-		name := ""
-		if item.Name != nil {
-			name = *item.Name
+		for _, item := range output.Items {
+			apiID := ""
+			if item.ApiId != nil {
+				apiID = *item.ApiId
+			}
+
+			name := ""
+			if item.Name != nil {
+				name = *item.Name
+			}
+
+			protocol := string(item.ProtocolType)
+
+			endpoint := ""
+			if item.ApiEndpoint != nil {
+				endpoint = *item.ApiEndpoint
+			}
+
+			description := ""
+			if item.Description != nil {
+				description = *item.Description
+			}
+
+			r := resource.Resource{
+				ID:     apiID,
+				Name:   name,
+				Status: "",
+				Fields: map[string]string{
+					"api_id":      apiID,
+					"name":        name,
+					"protocol":    protocol,
+					"endpoint":    endpoint,
+					"description": description,
+				},
+				RawStruct: item,
+			}
+
+			resources = append(resources, r)
 		}
 
-		protocol := string(item.ProtocolType)
-
-		endpoint := ""
-		if item.ApiEndpoint != nil {
-			endpoint = *item.ApiEndpoint
+		if output.NextToken == nil {
+			break
 		}
-
-		description := ""
-		if item.Description != nil {
-			description = *item.Description
-		}
-
-		r := resource.Resource{
-			ID:     apiID,
-			Name:   name,
-			Status: "",
-			Fields: map[string]string{
-				"api_id":      apiID,
-				"name":        name,
-				"protocol":    protocol,
-				"endpoint":    endpoint,
-				"description": description,
-			},
-			RawStruct:  item,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

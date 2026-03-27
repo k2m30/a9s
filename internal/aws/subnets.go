@@ -23,14 +23,18 @@ func init() {
 // FetchSubnets calls the EC2 DescribeSubnets API and converts the
 // response into a slice of generic Resource structs.
 func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching subnets: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, subnet := range output.Subnets {
+	for {
+		output, err := api.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching subnets: %w", err)
+		}
+
+		for _, subnet := range output.Subnets {
 		subnetID := ""
 		if subnet.SubnetId != nil {
 			subnetID = *subnet.SubnetId
@@ -85,6 +89,12 @@ func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Re
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

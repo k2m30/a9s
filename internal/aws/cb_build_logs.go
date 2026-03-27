@@ -15,12 +15,12 @@ import (
 func init() {
 	resource.RegisterFieldKeys("cb_build_logs", []string{"timestamp", "message", "ingestion_time", "event_id"})
 
-	resource.RegisterChildFetcher("cb_build_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("cb_build_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCBBuildLogs(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"])
+		return FetchCBBuildLogs(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -33,12 +33,13 @@ func init() {
 
 // FetchCBBuildLogs calls the CloudWatch Logs GetLogEvents API for a given
 // log group and stream (from a CodeBuild build), converting the response
-// into a slice of generic Resource structs.
+// into a FetchResult. This is a single-call API, but uses FetchResult for consistency.
 func FetchCBBuildLogs(
 	ctx context.Context,
 	api CWLogsGetLogEventsAPI,
 	logGroupName, logStreamName string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  &logGroupName,
 		LogStreamName: &logStreamName,
@@ -47,7 +48,7 @@ func FetchCBBuildLogs(
 
 	output, err := api.GetLogEvents(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching build log events: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("fetching build log events: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -95,7 +96,14 @@ func FetchCBBuildLogs(
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // formatEpochMillisSec converts epoch milliseconds to a human-readable

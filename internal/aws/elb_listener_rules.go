@@ -16,12 +16,12 @@ func init() {
 		"priority", "conditions_summary", "action_type", "action_target", "is_default",
 	})
 
-	resource.RegisterChildFetcher("elb_listener_rules", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("elb_listener_rules", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchELBListenerRules(ctx, c.ELBv2, parentCtx)
+		return FetchELBListenerRules(ctx, c.ELBv2, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -33,12 +33,14 @@ func init() {
 }
 
 // FetchELBListenerRules calls the ELBv2 DescribeRules API and converts the
-// response into a slice of generic Resource structs.
+// response into a FetchResult. This is a single-call API (no pagination from AWS),
+// but uses FetchResult for consistency with the paginated child fetcher interface.
 func FetchELBListenerRules(
 	ctx context.Context,
 	api ELBv2DescribeRulesAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	const maxRules = 200
 
 	listenerArn := parentCtx["listener_arn"]
@@ -49,7 +51,7 @@ func FetchELBListenerRules(
 
 	output, err := api.DescribeRules(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("describing rules for listener %s: %w", listenerArn, err)
+		return resource.FetchResult{}, fmt.Errorf("describing rules for listener %s: %w", listenerArn, err)
 	}
 
 	var resources []resource.Resource
@@ -60,7 +62,14 @@ func FetchELBListenerRules(
 		}
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 func convertRule(rule elbtypes.Rule) resource.Resource {

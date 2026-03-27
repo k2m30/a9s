@@ -23,14 +23,18 @@ func init() {
 // FetchRDSSnapshots calls the RDS DescribeDBSnapshots API and converts the
 // response into a slice of generic Resource structs.
 func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching RDS snapshots: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, snap := range output.DBSnapshots {
+	for {
+		output, err := api.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching RDS snapshots: %w", err)
+		}
+
+		for _, snap := range output.DBSnapshots {
 		snapshotID := ""
 		if snap.DBSnapshotIdentifier != nil {
 			snapshotID = *snap.DBSnapshotIdentifier
@@ -77,6 +81,12 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

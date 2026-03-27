@@ -78,14 +78,16 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := resultTH.Resources
 
 	if len(resources) != 4 {
 		t.Fatalf("expected 4 resources, got %d", len(resources))
@@ -190,16 +192,17 @@ func TestFetchTargetHealth_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/empty-tg/xyz",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(resultTH.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(resultTH.Resources))
 	}
 }
 
@@ -209,16 +212,17 @@ func TestFetchTargetHealth_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err-tg/xyz",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(resultTH.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(resultTH.Resources))
 	}
 }
 
@@ -258,14 +262,16 @@ func TestFetchTargetHealth_AllStates(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/all-states-tg/xyz",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := resultTH.Resources
 
 	if len(resources) != len(states) {
 		t.Fatalf("expected %d resources, got %d", len(states), len(resources))
@@ -317,14 +323,16 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/ip-tg/xyz",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := resultTH.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -406,14 +414,16 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/nil-tg/xyz",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := resultTH.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -479,14 +489,16 @@ func TestFetchTargetHealth_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetHealth(
+	resultTH, err := awsclient.FetchTargetHealth(
 		context.Background(),
 		mock,
 		"arn:aws:elasticloadbalancing:eu-west-1:123456789012:targetgroup/raw-tg/xyz",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := resultTH.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))

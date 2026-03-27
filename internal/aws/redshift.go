@@ -24,14 +24,18 @@ func init() {
 // FetchRedshiftClusters calls the Redshift DescribeClusters API and converts the
 // response into a slice of generic Resource structs.
 func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeClusters(ctx, &redshift.DescribeClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Redshift clusters: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, cluster := range output.Clusters {
+	for {
+		output, err := api.DescribeClusters(ctx, &redshift.DescribeClustersInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Redshift clusters: %w", err)
+		}
+
+		for _, cluster := range output.Clusters {
 		clusterID := ""
 		if cluster.ClusterIdentifier != nil {
 			clusterID = *cluster.ClusterIdentifier
@@ -90,6 +94,12 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

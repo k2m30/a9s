@@ -92,14 +92,16 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		"pipeline_name": "deploy-prod",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 4 {
 		t.Fatalf("expected 4 resources (2 stages x 2 actions each), got %d", len(resources))
@@ -249,14 +251,16 @@ func TestFetchPipelineStages_MultiAction(t *testing.T) {
 		"pipeline_name": "multi-action-pipeline",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources for 3 actions, got %d", len(resources))
@@ -301,16 +305,17 @@ func TestFetchPipelineStages_Empty(t *testing.T) {
 		"pipeline_name": "empty-pipeline",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -325,10 +330,11 @@ func TestFetchPipelineStages_Error(t *testing.T) {
 		"pipeline_name": "nonexistent-pipeline",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -336,8 +342,8 @@ func TestFetchPipelineStages_Error(t *testing.T) {
 	if !strings.Contains(err.Error(), "pipeline not found") {
 		t.Errorf("error should contain 'pipeline not found', got %q", err.Error())
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -366,14 +372,16 @@ func TestFetchPipelineStages_NilExecution(t *testing.T) {
 		"pipeline_name": "nil-exec-pipeline",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -436,17 +444,18 @@ func TestFetchPipelineStages_NilActionStates(t *testing.T) {
 		"pipeline_name": "nil-actions-pipeline",
 	}
 
-	resources, err := awsclient.FetchPipelineStages(
+	result, err := awsclient.FetchPipelineStages(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources for stages with no actions, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources for stages with no actions, got %d", len(result.Resources))
 	}
 }
 
@@ -500,10 +509,11 @@ func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 			}
 
 			parentCtx := map[string]string{"pipeline_name": "status-test"}
-			resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+			result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			resources := result.Resources
 			if len(resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(resources))
 			}
@@ -543,10 +553,11 @@ func TestFetchPipelineStages_ExternalURL(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"pipeline_name": "url-test"}
-	resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -581,10 +592,11 @@ func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"pipeline_name": "time-test"}
-	resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -626,10 +638,11 @@ func TestFetchPipelineStages_DetailFields(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"pipeline_name": "detail-test"}
-	resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -687,10 +700,11 @@ func TestFetchPipelineStages_ErrorDetails(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"pipeline_name": "error-detail-test"}
-	resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -720,6 +734,7 @@ func TestFetchPipelineStages_ParentContext(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -758,10 +773,11 @@ func TestFetchPipelineStages_RawStruct(t *testing.T) {
 	}
 
 	parentCtx := map[string]string{"pipeline_name": "rawstruct-test"}
-	resources, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx)
+	result, err := awsclient.FetchPipelineStages(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -840,12 +856,12 @@ func TestPipelineStageColumns(t *testing.T) {
 	}
 }
 
-// TestPipelineStages_ChildFetcherRegistered verifies that the child fetcher
-// is registered under the correct short name.
-func TestPipelineStages_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("pipeline_stages")
+// TestPipelineStages_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestPipelineStages_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("pipeline_stages")
 	if f == nil {
-		t.Fatal("pipeline_stages child fetcher not registered")
+		t.Fatal("pipeline_stages paginated child fetcher not registered")
 	}
 }
 

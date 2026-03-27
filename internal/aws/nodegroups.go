@@ -23,8 +23,8 @@ func init() {
 }
 
 // FetchNodeGroups performs a three-step fetch:
-// 1. ListClusters to get cluster names
-// 2. ListNodegroups per cluster to get node group names
+// 1. ListClusters to get cluster names (paginated)
+// 2. ListNodegroups per cluster to get node group names (paginated)
 // 3. DescribeNodegroup per node group to get full details
 func FetchNodeGroups(
 	ctx context.Context,
@@ -32,25 +32,52 @@ func FetchNodeGroups(
 	listNodegroupsAPI EKSListNodegroupsAPI,
 	describeNodegroupAPI EKSDescribeNodegroupAPI,
 ) ([]resource.Resource, error) {
-	// Step 1: List all clusters
-	listOutput, err := listClustersAPI.ListClusters(ctx, &eks.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("listing EKS clusters: %w", err)
+	// Step 1: List all clusters (paginated)
+	var allClusters []string
+	var clusterNextToken *string
+
+	for {
+		listOutput, err := listClustersAPI.ListClusters(ctx, &eks.ListClustersInput{
+			NextToken: clusterNextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing EKS clusters: %w", err)
+		}
+
+		allClusters = append(allClusters, listOutput.Clusters...)
+
+		if listOutput.NextToken == nil {
+			break
+		}
+		clusterNextToken = listOutput.NextToken
 	}
 
 	var resources []resource.Resource
 
-	// Step 2: For each cluster, list its node groups
-	for _, clusterName := range listOutput.Clusters {
-		ngListOutput, err := listNodegroupsAPI.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-			ClusterName: aws.String(clusterName),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("listing node groups for cluster %s: %w", clusterName, err)
+	// Step 2: For each cluster, list its node groups (paginated)
+	for _, clusterName := range allClusters {
+		var allNodegroups []string
+		var ngNextToken *string
+
+		for {
+			ngListOutput, err := listNodegroupsAPI.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+				ClusterName: aws.String(clusterName),
+				NextToken:   ngNextToken,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("listing node groups for cluster %s: %w", clusterName, err)
+			}
+
+			allNodegroups = append(allNodegroups, ngListOutput.Nodegroups...)
+
+			if ngListOutput.NextToken == nil {
+				break
+			}
+			ngNextToken = ngListOutput.NextToken
 		}
 
 		// Step 3: For each node group, describe it
-		for _, ngName := range ngListOutput.Nodegroups {
+		for _, ngName := range allNodegroups {
 			descOutput, err := describeNodegroupAPI.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
 				ClusterName:   aws.String(clusterName),
 				NodegroupName: aws.String(ngName),
@@ -94,7 +121,7 @@ func FetchNodeGroups(
 					"instance_types": instanceTypes,
 					"desired_size":   desiredSize,
 				},
-				RawStruct:  ng,
+				RawStruct: ng,
 			}
 
 			resources = append(resources, r)

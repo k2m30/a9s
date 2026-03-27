@@ -23,14 +23,18 @@ func init() {
 // FetchVPCEndpoints calls the EC2 DescribeVpcEndpoints API and converts the
 // response into a slice of generic Resource structs.
 func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeVpcEndpoints(ctx, &ec2.DescribeVpcEndpointsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching VPC endpoints: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, vpce := range output.VpcEndpoints {
+	for {
+		output, err := api.DescribeVpcEndpoints(ctx, &ec2.DescribeVpcEndpointsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching VPC endpoints: %w", err)
+		}
+
+		for _, vpce := range output.VpcEndpoints {
 		vpceID := ""
 		if vpce.VpcEndpointId != nil {
 			vpceID = *vpce.VpcEndpointId
@@ -64,6 +68,12 @@ func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]r
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

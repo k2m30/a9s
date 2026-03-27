@@ -23,14 +23,18 @@ func init() {
 // FetchNetworkInterfaces calls the EC2 DescribeNetworkInterfaces API and converts the
 // response into a slice of generic Resource structs.
 func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterfacesAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching network interfaces: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, eni := range output.NetworkInterfaces {
+	for {
+		output, err := api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching network interfaces: %w", err)
+		}
+
+		for _, eni := range output.NetworkInterfaces {
 		eniID := ""
 		if eni.NetworkInterfaceId != nil {
 			eniID = *eni.NetworkInterfaceId
@@ -76,6 +80,12 @@ func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterface
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextToken == nil {
+			break
+		}
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

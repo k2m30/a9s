@@ -23,14 +23,18 @@ func init() {
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
 // response into a slice of generic Resource structs.
 func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching DocumentDB cluster snapshots: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, snapshot := range output.DBClusterSnapshots {
+	for {
+		output, err := api.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching DocumentDB cluster snapshots: %w", err)
+		}
+
+		for _, snapshot := range output.DBClusterSnapshots {
 		snapshotID := ""
 		if snapshot.DBClusterSnapshotIdentifier != nil {
 			snapshotID = *snapshot.DBClusterSnapshotIdentifier
@@ -83,6 +87,12 @@ func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterS
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

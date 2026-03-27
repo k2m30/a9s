@@ -17,12 +17,12 @@ func init() {
 		"ssl_policy", "certificate_short", "listener_display",
 	})
 
-	resource.RegisterChildFetcher("elb_listeners", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("elb_listeners", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchELBListeners(ctx, c.ELBv2, parentCtx)
+		return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
 	})
 
 	resource.RegisterChildType(resource.ResourceTypeDef{
@@ -41,18 +41,24 @@ func init() {
 }
 
 // FetchELBListeners calls the ELBv2 DescribeListeners API and converts the
-// response into a slice of generic Resource structs.
+// response into a FetchResult with pagination support. Each call returns up to
+// maxListeners (200) items. When the cap is reached and more pages exist,
+// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
 func FetchELBListeners(
 	ctx context.Context,
 	api ELBv2DescribeListenersAPI,
 	parentCtx map[string]string,
-) ([]resource.Resource, error) {
+	continuationToken string,
+) (resource.FetchResult, error) {
 	const maxListeners = 200
 
 	lbArn := parentCtx["load_balancer_arn"]
 
 	var resources []resource.Resource
 	var marker *string
+	if continuationToken != "" {
+		marker = &continuationToken
+	}
 
 	for {
 		input := &elbv2.DescribeListenersInput{
@@ -62,14 +68,25 @@ func FetchELBListeners(
 
 		output, err := api.DescribeListeners(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("describing listeners for %s: %w", lbArn, err)
+			return resource.FetchResult{}, fmt.Errorf("describing listeners for %s: %w", lbArn, err)
 		}
 
 		for _, listener := range output.Listeners {
 			resources = append(resources, convertListener(listener))
 
 			if len(resources) >= maxListeners {
-				return resources, nil
+				apiNextMarker := ""
+				if output.NextMarker != nil {
+					apiNextMarker = *output.NextMarker
+				}
+				return resource.FetchResult{
+					Resources: resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: apiNextMarker != "",
+						NextToken:   apiNextMarker,
+						PageSize:    len(resources),
+					},
+				}, nil
 			}
 		}
 
@@ -79,7 +96,14 @@ func FetchELBListeners(
 		marker = output.NextMarker
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 func convertListener(listener elbtypes.Listener) resource.Resource {

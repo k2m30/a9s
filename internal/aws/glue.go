@@ -24,72 +24,82 @@ func init() {
 // FetchGlueJobs calls the Glue GetJobs API and converts the response
 // into a slice of generic Resource structs.
 func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource, error) {
-	output, err := api.GetJobs(ctx, &glue.GetJobsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Glue jobs: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, job := range output.Jobs {
-		jobName := ""
-		if job.Name != nil {
-			jobName = *job.Name
+	for {
+		output, err := api.GetJobs(ctx, &glue.GetJobsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Glue jobs: %w", err)
 		}
 
-		role := ""
-		if job.Role != nil {
-			role = *job.Role
+		for _, job := range output.Jobs {
+			jobName := ""
+			if job.Name != nil {
+				jobName = *job.Name
+			}
+
+			role := ""
+			if job.Role != nil {
+				role = *job.Role
+			}
+
+			glueVersion := ""
+			if job.GlueVersion != nil {
+				glueVersion = *job.GlueVersion
+			}
+
+			workerType := string(job.WorkerType)
+
+			numWorkers := ""
+			if job.NumberOfWorkers != nil {
+				numWorkers = strconv.Itoa(int(*job.NumberOfWorkers))
+			}
+
+			maxRetries := strconv.Itoa(int(job.MaxRetries))
+
+			createdOn := ""
+			if job.CreatedOn != nil {
+				createdOn = job.CreatedOn.Format("2006-01-02 15:04:05")
+			}
+
+			lastModified := ""
+			if job.LastModifiedOn != nil {
+				lastModified = job.LastModifiedOn.Format("2006-01-02 15:04:05")
+			}
+
+			commandName := ""
+			if job.Command != nil && job.Command.Name != nil {
+				commandName = *job.Command.Name
+			}
+
+			r := resource.Resource{
+				ID:     jobName,
+				Name:   jobName,
+				Status: "",
+				Fields: map[string]string{
+					"job_name":      jobName,
+					"role":          role,
+					"glue_version":  glueVersion,
+					"worker_type":   workerType,
+					"num_workers":   numWorkers,
+					"max_retries":   maxRetries,
+					"created_on":    createdOn,
+					"last_modified": lastModified,
+					"command":       commandName,
+				},
+				RawStruct: job,
+			}
+
+			resources = append(resources, r)
 		}
 
-		glueVersion := ""
-		if job.GlueVersion != nil {
-			glueVersion = *job.GlueVersion
+		if output.NextToken == nil {
+			break
 		}
-
-		workerType := string(job.WorkerType)
-
-		numWorkers := ""
-		if job.NumberOfWorkers != nil {
-			numWorkers = strconv.Itoa(int(*job.NumberOfWorkers))
-		}
-
-		maxRetries := strconv.Itoa(int(job.MaxRetries))
-
-		createdOn := ""
-		if job.CreatedOn != nil {
-			createdOn = job.CreatedOn.Format("2006-01-02 15:04:05")
-		}
-
-		lastModified := ""
-		if job.LastModifiedOn != nil {
-			lastModified = job.LastModifiedOn.Format("2006-01-02 15:04:05")
-		}
-
-		commandName := ""
-		if job.Command != nil && job.Command.Name != nil {
-			commandName = *job.Command.Name
-		}
-
-		r := resource.Resource{
-			ID:     jobName,
-			Name:   jobName,
-			Status: "",
-			Fields: map[string]string{
-				"job_name":      jobName,
-				"role":          role,
-				"glue_version":  glueVersion,
-				"worker_type":   workerType,
-				"num_workers":   numWorkers,
-				"max_retries":   maxRetries,
-				"created_on":    createdOn,
-				"last_modified": lastModified,
-				"command":       commandName,
-			},
-			RawStruct: job,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil

@@ -24,56 +24,65 @@ func init() {
 // FetchWAFWebACLs calls the WAFv2 ListWebACLs API with Scope=REGIONAL and converts
 // the response into a slice of generic Resource structs.
 func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.Resource, error) {
-	output, err := api.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
-		Scope: wafv2types.ScopeRegional,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fetching WAF web ACLs: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextMarker *string
 
-	for _, acl := range output.WebACLs {
-		name := ""
-		if acl.Name != nil {
-			name = *acl.Name
+	for {
+		output, err := api.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
+			Scope:      wafv2types.ScopeRegional,
+			NextMarker: nextMarker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching WAF web ACLs: %w", err)
 		}
 
-		id := ""
-		if acl.Id != nil {
-			id = *acl.Id
+		for _, acl := range output.WebACLs {
+			name := ""
+			if acl.Name != nil {
+				name = *acl.Name
+			}
+
+			id := ""
+			if acl.Id != nil {
+				id = *acl.Id
+			}
+
+			arn := ""
+			if acl.ARN != nil {
+				arn = *acl.ARN
+			}
+
+			description := ""
+			if acl.Description != nil {
+				description = *acl.Description
+			}
+
+			lockToken := ""
+			if acl.LockToken != nil {
+				lockToken = *acl.LockToken
+			}
+
+			r := resource.Resource{
+				ID:     id,
+				Name:   name,
+				Status: "",
+				Fields: map[string]string{
+					"name":        name,
+					"id":          id,
+					"arn":         arn,
+					"description": description,
+					"lock_token":  lockToken,
+				},
+				RawStruct: acl,
+			}
+
+			resources = append(resources, r)
 		}
 
-		arn := ""
-		if acl.ARN != nil {
-			arn = *acl.ARN
+		if output.NextMarker == nil {
+			break
 		}
-
-		description := ""
-		if acl.Description != nil {
-			description = *acl.Description
-		}
-
-		lockToken := ""
-		if acl.LockToken != nil {
-			lockToken = *acl.LockToken
-		}
-
-		r := resource.Resource{
-			ID:     id,
-			Name:   name,
-			Status: "",
-			Fields: map[string]string{
-				"name":        name,
-				"id":          id,
-				"arn":         arn,
-				"description": description,
-				"lock_token":  lockToken,
-			},
-			RawStruct: acl,
-		}
-
-		resources = append(resources, r)
+		nextMarker = output.NextMarker
 	}
 
 	return resources, nil

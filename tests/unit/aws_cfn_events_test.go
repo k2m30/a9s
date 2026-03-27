@@ -64,14 +64,16 @@ func TestFetchCfnEvents_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"my-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -172,16 +174,17 @@ func TestFetchCfnEvents_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"empty-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -191,16 +194,17 @@ func TestFetchCfnEvents_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"err-stack",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -234,14 +238,16 @@ func TestFetchCfnEvents_NilOptionalFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"nil-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -283,14 +289,16 @@ func TestFetchCfnEvents_NewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"nl-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -323,14 +331,16 @@ func TestFetchCfnEvents_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"ts-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -366,14 +376,16 @@ func TestFetchCfnEvents_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"raw-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -473,12 +485,12 @@ func TestCfnEvents_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestCfnEvents_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
-func TestCfnEvents_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("cfn_events")
+// TestCfnEvents_PaginatedChildFetcherRegistered verifies that the paginated
+// child fetcher is registered under the correct short name.
+func TestCfnEvents_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("cfn_events")
 	if f == nil {
-		t.Fatal("cfn_events child fetcher not registered")
+		t.Fatal("cfn_events paginated child fetcher not registered")
 	}
 }
 
@@ -575,14 +587,16 @@ func TestFetchCfnEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"paginated-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("total_count", func(t *testing.T) {
 		if len(resources) != 6 {
@@ -656,14 +670,16 @@ func TestFetchCfnEvents_MaxEventsCap(t *testing.T) {
 
 	mock := &mockCFNDescribeStackEventsClient{outputs: outputs}
 
-	resources, err := awsclient.FetchCfnEvents(
+	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
 		"big-stack",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	t.Run("capped_at_200", func(t *testing.T) {
 		if len(resources) != 200 {

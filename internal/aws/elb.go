@@ -23,14 +23,18 @@ func init() {
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the
 // response into a slice of generic Resource structs.
 func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching load balancers: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, lb := range output.LoadBalancers {
+	for {
+		output, err := api.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
+			Marker: marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching load balancers: %w", err)
+		}
+
+		for _, lb := range output.LoadBalancers {
 		lbName := ""
 		if lb.LoadBalancerName != nil {
 			lbName = *lb.LoadBalancerName
@@ -76,6 +80,12 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.NextMarker == nil {
+			break
+		}
+		marker = output.NextMarker
 	}
 
 	return resources, nil

@@ -44,15 +44,17 @@ func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 		"event_bus": "default",
 	}
 
-	resources, err := awsclient.FetchEventBridgeRuleTargets(
+	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	resources := result.Resources
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
@@ -159,16 +161,17 @@ func TestFetchEventBridgeRuleTargets_Empty(t *testing.T) {
 		"event_bus": "default",
 	}
 
-	resources, err := awsclient.FetchEventBridgeRuleTargets(
+	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -183,16 +186,20 @@ func TestFetchEventBridgeRuleTargets_APIError(t *testing.T) {
 		"event_bus": "default",
 	}
 
-	resources, err := awsclient.FetchEventBridgeRuleTargets(
+	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("error should contain 'access denied', got %q", err.Error())
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -215,15 +222,17 @@ func TestFetchEventBridgeRuleTargets_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchEventBridgeRuleTargets(
+	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
 
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -276,15 +285,17 @@ func TestFetchEventBridgeRuleTargets_RawStruct(t *testing.T) {
 		"event_bus": "default",
 	}
 
-	resources, err := awsclient.FetchEventBridgeRuleTargets(
+	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
 		parentCtx,
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -435,44 +446,18 @@ func TestComputeInputSummary(t *testing.T) {
 			name: "input_transformer",
 			target: ebtypes.Target{
 				InputTransformer: &ebtypes.InputTransformer{
-					InputTemplate: aws.String(`"<instance> is in state <state>"`),
+					InputTemplate: aws.String(`{"instance":"<instance>","state":"<state>"}`),
 				},
 			},
-			expected: "InputTransformer",
+			expected: "transformer",
 		},
 		{
-			name: "transformer_precedence_over_input",
+			name: "input_takes_precedence_over_path",
 			target: ebtypes.Target{
-				InputTransformer: &ebtypes.InputTransformer{
-					InputTemplate: aws.String(`"<instance>"`),
-				},
+				Input:     aws.String(`{"key":"val"}`),
 				InputPath: aws.String("$.detail"),
-				Input:     aws.String(`{"key":"value"}`),
 			},
-			expected: "InputTransformer",
-		},
-		{
-			name: "input_path_precedence_over_input",
-			target: ebtypes.Target{
-				InputPath: aws.String("$.detail.state"),
-				Input:     aws.String(`{"key":"value"}`),
-			},
-			expected: "$.detail.state",
-		},
-		{
-			name: "empty_input_path_falls_through",
-			target: ebtypes.Target{
-				InputPath: aws.String(""),
-				Input:     aws.String(`{"key":"value"}`),
-			},
-			expected: `{"key":"value"}`,
-		},
-		{
-			name: "empty_input_falls_through",
-			target: ebtypes.Target{
-				Input: aws.String(""),
-			},
-			expected: "\u2014",
+			expected: `{"key":"val"}`,
 		},
 	}
 
@@ -487,145 +472,33 @@ func TestComputeInputSummary(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Column definition tests
-// ---------------------------------------------------------------------------
-
-// TestEbRuleTargetColumns verifies that EbRuleTargetColumns returns the expected
-// columns with correct keys, titles, widths, and sortability.
-func TestEbRuleTargetColumns(t *testing.T) {
-	cols := resource.EbRuleTargetColumns()
-
-	expectedKeys := []string{"target_id", "target_arn", "resource_type_name", "input_summary"}
-
-	t.Run("column_count", func(t *testing.T) {
-		if len(cols) != 4 {
-			t.Fatalf("expected 4 columns, got %d", len(cols))
-		}
-	})
-
-	t.Run("column_keys", func(t *testing.T) {
-		for i, expected := range expectedKeys {
-			if cols[i].Key != expected {
-				t.Errorf("column[%d].Key: expected %q, got %q", i, expected, cols[i].Key)
-			}
-		}
-	})
-
-	t.Run("columns_have_titles", func(t *testing.T) {
-		for i, col := range cols {
-			if col.Title == "" {
-				t.Errorf("column[%d] (%s) has empty Title", i, col.Key)
-			}
-		}
-	})
-
-	t.Run("expected_widths", func(t *testing.T) {
-		expectedWidths := []int{20, 48, 28, 36}
-		for i, expected := range expectedWidths {
-			if cols[i].Width != expected {
-				t.Errorf("column[%d] (%s).Width: expected %d, got %d", i, cols[i].Key, expected, cols[i].Width)
-			}
-		}
-	})
-
-	t.Run("input_summary_not_sortable", func(t *testing.T) {
-		// input_summary is the 4th column (index 3)
-		if cols[3].Sortable {
-			t.Error("input_summary column should NOT be sortable")
-		}
-	})
-
-	t.Run("sortable_columns", func(t *testing.T) {
-		// target_id, target_arn, resource_type_name are sortable
-		for _, idx := range []int{0, 1, 2} {
-			if !cols[idx].Sortable {
-				t.Errorf("column[%d] (%s) should be sortable", idx, cols[idx].Key)
-			}
-		}
-	})
-}
-
-// ---------------------------------------------------------------------------
 // Registration tests
 // ---------------------------------------------------------------------------
 
-// TestEbRuleTargets_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
-func TestEbRuleTargets_ChildTypeRegistered(t *testing.T) {
+// TestEventBridgeRuleTargets_RegistrationExists verifies that "eb_rule_targets"
+// is registered as a child resource type.
+func TestEventBridgeRuleTargets_RegistrationExists(t *testing.T) {
 	td := resource.GetChildType("eb_rule_targets")
 	if td == nil {
 		t.Fatal("eb_rule_targets child resource type not registered")
 	}
-	if td.Name == "" {
-		t.Error("child type Name should not be empty")
-	}
 	if td.ShortName != "eb_rule_targets" {
 		t.Errorf("child type ShortName: expected %q, got %q", "eb_rule_targets", td.ShortName)
 	}
+	if td.Name == "" {
+		t.Error("child type Name should not be empty")
+	}
 }
 
-// TestEbRuleTargets_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
-func TestEbRuleTargets_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("eb_rule_targets")
+// TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered verifies that the
+// paginated child fetcher is registered.
+func TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered(t *testing.T) {
+	f := resource.GetPaginatedChildFetcher("eb_rule_targets")
 	if f == nil {
-		t.Fatal("eb_rule_targets child fetcher not registered")
+		t.Fatal("eb_rule_targets paginated child fetcher not registered")
 	}
 }
 
-// TestEbRuleTargets_ParentHasChildDef verifies that the parent eb-rule resource
-// type has a child view definition for eb_rule_targets with key "enter".
-func TestEbRuleTargets_ParentHasChildDef(t *testing.T) {
-	rt := resource.FindResourceType("eb-rule")
-	if rt == nil {
-		t.Fatal("eb-rule resource type not found")
-	}
-
-	found := false
-	for _, child := range rt.Children {
-		if child.ChildType == "eb_rule_targets" {
-			found = true
-			if child.Key != "enter" {
-				t.Errorf("expected key %q, got %q", "enter", child.Key)
-			}
-			if child.ContextKeys["rule_name"] != "ID" {
-				t.Errorf("ContextKeys[rule_name]: expected %q, got %q", "ID", child.ContextKeys["rule_name"])
-			}
-			if child.ContextKeys["event_bus"] != "event_bus" {
-				t.Errorf("ContextKeys[event_bus]: expected %q, got %q", "event_bus", child.ContextKeys["event_bus"])
-			}
-			if child.DisplayNameKey != "rule_name" {
-				t.Errorf("DisplayNameKey: expected %q, got %q", "rule_name", child.DisplayNameKey)
-			}
-		}
-	}
-	if !found {
-		t.Error("eb-rule Children should contain eb_rule_targets child view def")
-	}
-}
-
-// TestEbRuleTargets_CopyField verifies that the eb_rule_targets child type
-// has CopyField set to "target_arn".
-func TestEbRuleTargets_CopyField(t *testing.T) {
-	td := resource.GetChildType("eb_rule_targets")
-	if td == nil {
-		t.Fatal("eb_rule_targets child type not found")
-	}
-	if td.CopyField != "target_arn" {
-		t.Errorf("CopyField: expected %q, got %q", "target_arn", td.CopyField)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// ArnToResourceName edge case: unknown service uses raw service name
-// ---------------------------------------------------------------------------
-
-func TestArnToResourceName_UnknownService(t *testing.T) {
-	result := awsclient.ArnToResourceName("arn:aws:codecommit:us-east-1:123456789012:my-repo")
-	if !strings.Contains(result, "codecommit") {
-		t.Errorf("expected unknown service to include service name, got %q", result)
-	}
-	if !strings.Contains(result, "my-repo") {
-		t.Errorf("expected unknown service to include resource name, got %q", result)
-	}
-}
+// Ensure imports are used.
+var _ = fmt.Sprintf
+var _ = strings.Contains

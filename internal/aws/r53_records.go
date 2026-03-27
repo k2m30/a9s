@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,12 +16,12 @@ func init() {
 	resource.RegisterFieldKeys("r53_records", []string{"name", "type", "ttl", "values"})
 
 	// Register R53 records as a child type with its own fetcher.
-	resource.RegisterChildFetcher("r53_records", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("r53_records", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"])
+		return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"], continuationToken)
 	})
 	resource.RegisterChildType(resource.ResourceTypeDef{
 		Name:      "R53 Records",
@@ -29,14 +30,37 @@ func init() {
 	})
 }
 
+// r53ContinuationToken encodes the three Route53 pagination cursors into a single
+// JSON string for use as a continuation token.
+type r53ContinuationToken struct {
+	NextRecordName       string `json:"n,omitempty"`
+	NextRecordType       string `json:"t,omitempty"`
+	NextRecordIdentifier string `json:"i,omitempty"`
+}
+
 // FetchR53Records calls the Route53 ListResourceRecordSets API for a given
-// hosted zone and converts the response into a slice of generic Resource structs.
+// hosted zone and converts the response into a FetchResult with pagination support.
 // It paginates using IsTruncated/NextRecordName/NextRecordType/NextRecordIdentifier.
-func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, hostedZoneId string) ([]resource.Resource, error) {
+func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, hostedZoneId string, continuationToken string) (resource.FetchResult, error) {
 	var resources []resource.Resource
 	var nextName *string
 	var nextType r53types.RRType
 	var nextIdentifier *string
+
+	if continuationToken != "" {
+		var ct r53ContinuationToken
+		if err := json.Unmarshal([]byte(continuationToken), &ct); err == nil {
+			if ct.NextRecordName != "" {
+				nextName = &ct.NextRecordName
+			}
+			if ct.NextRecordType != "" {
+				nextType = r53types.RRType(ct.NextRecordType)
+			}
+			if ct.NextRecordIdentifier != "" {
+				nextIdentifier = &ct.NextRecordIdentifier
+			}
+		}
+	}
 
 	for {
 		input := &route53.ListResourceRecordSetsInput{
@@ -54,7 +78,7 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 
 		output, err := api.ListResourceRecordSets(ctx, input)
 		if err != nil {
-			return nil, fmt.Errorf("fetching R53 records: %w", err)
+			return resource.FetchResult{}, fmt.Errorf("fetching R53 records: %w", err)
 		}
 
 		for _, record := range output.ResourceRecordSets {
@@ -69,7 +93,14 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 		nextIdentifier = output.NextRecordIdentifier
 	}
 
-	return resources, nil
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
+	}, nil
 }
 
 // convertR53Record converts a single Route53 ResourceRecordSet into a generic Resource.

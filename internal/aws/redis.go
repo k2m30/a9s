@@ -25,16 +25,19 @@ func init() {
 // the response into a slice of generic Resource structs.
 // Only clusters with engine "redis" are returned (client-side filter).
 func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheClustersAPI) ([]resource.Resource, error) {
-	output, err := api.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
-		ShowCacheNodeInfo: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Redis clusters: %w", err)
-	}
-
 	var resources []resource.Resource
+	var marker *string
 
-	for _, cluster := range output.CacheClusters {
+	for {
+		output, err := api.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
+			ShowCacheNodeInfo: aws.Bool(true),
+			Marker:           marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Redis clusters: %w", err)
+		}
+
+		for _, cluster := range output.CacheClusters {
 		// Client-side filter: only include redis clusters
 		if cluster.Engine == nil || *cluster.Engine != "redis" {
 			continue
@@ -86,6 +89,12 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 		}
 
 		resources = append(resources, r)
+		}
+
+		if output.Marker == nil {
+			break
+		}
+		marker = output.Marker
 	}
 
 	return resources, nil

@@ -43,10 +43,11 @@ func TestFetchLogEvents_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/my-func", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/my-func", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -118,12 +119,12 @@ func TestFetchLogEvents_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/empty", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/empty", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 
@@ -133,12 +134,12 @@ func TestFetchLogEvents_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: resource not found"),
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/err", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/err", "stream-1", "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result.Resources))
 	}
 }
 
@@ -166,10 +167,11 @@ func TestFetchLogEvents_StatusClassification(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/status", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/status", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 9 {
 		t.Fatalf("expected 9 resources, got %d", len(resources))
@@ -218,10 +220,11 @@ func TestFetchLogEvents_MessageTruncation(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/trunc", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/trunc", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -254,10 +257,11 @@ func TestFetchLogEvents_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/nil", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/nil", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -303,10 +307,11 @@ func TestFetchLogEvents_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/raw", "stream-1")
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/raw", "stream-1", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -411,7 +416,7 @@ func TestFetchLogEvents_NewestFirst(t *testing.T) {
 		output: &cloudwatchlogs.GetLogEventsOutput{},
 	}
 
-	_, _ = awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/test", "stream-1")
+	_, _ = awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/test", "stream-1", "")
 
 	if mock.lastInput == nil {
 		t.Fatal("expected GetLogEvents to be called")

@@ -53,15 +53,17 @@ func TestFetchEcsSvcEvents_Basic(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result_svcevt.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -137,17 +139,18 @@ func TestFetchEcsSvcEvents_Empty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"empty-service",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result_svcevt.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result_svcevt.Resources))
 	}
 }
 
@@ -157,17 +160,18 @@ func TestFetchEcsSvcEvents_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
+		"",
 	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(resources))
+	if len(result_svcevt.Resources) != 0 {
+		t.Errorf("expected 0 resources on error, got %d", len(result_svcevt.Resources))
 	}
 }
 
@@ -193,15 +197,17 @@ func TestFetchEcsSvcEvents_NewlineStripping(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"newline-svc",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result_svcevt.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -236,15 +242,17 @@ func TestFetchEcsSvcEvents_NilFields(t *testing.T) {
 	}
 
 	// Should not panic
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"nil-svc",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
+	resources := result_svcevt.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -285,15 +293,17 @@ func TestFetchEcsSvcEvents_RawStruct(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEcsSvcEvents(
+	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"raw-svc",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result_svcevt.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -384,7 +394,7 @@ func TestEcsSvcEvents_ChildTypeRegistered(t *testing.T) {
 // TestEcsSvcEvents_ChildFetcherRegistered verifies that the child fetcher is
 // registered under the correct short name.
 func TestEcsSvcEvents_ChildFetcherRegistered(t *testing.T) {
-	f := resource.GetChildFetcher("ecs_svc_events")
+	f := resource.GetPaginatedChildFetcher("ecs_svc_events")
 	if f == nil {
 		t.Fatal("ecs_svc_events child fetcher not registered")
 	}

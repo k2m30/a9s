@@ -23,51 +23,61 @@ func init() {
 // FetchAthenaWorkgroups calls the Athena ListWorkGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]resource.Resource, error) {
-	output, err := api.ListWorkGroups(ctx, &athena.ListWorkGroupsInput{})
-	if err != nil {
-		return nil, fmt.Errorf("fetching Athena workgroups: %w", err)
-	}
-
 	var resources []resource.Resource
+	var nextToken *string
 
-	for _, wg := range output.WorkGroups {
-		wgName := ""
-		if wg.Name != nil {
-			wgName = *wg.Name
+	for {
+		output, err := api.ListWorkGroups(ctx, &athena.ListWorkGroupsInput{
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fetching Athena workgroups: %w", err)
 		}
 
-		state := string(wg.State)
+		for _, wg := range output.WorkGroups {
+			wgName := ""
+			if wg.Name != nil {
+				wgName = *wg.Name
+			}
 
-		description := ""
-		if wg.Description != nil {
-			description = *wg.Description
+			state := string(wg.State)
+
+			description := ""
+			if wg.Description != nil {
+				description = *wg.Description
+			}
+
+			creationTime := ""
+			if wg.CreationTime != nil {
+				creationTime = wg.CreationTime.Format("2006-01-02 15:04:05")
+			}
+
+			engineVersion := ""
+			if wg.EngineVersion != nil && wg.EngineVersion.EffectiveEngineVersion != nil {
+				engineVersion = *wg.EngineVersion.EffectiveEngineVersion
+			}
+
+			r := resource.Resource{
+				ID:     wgName,
+				Name:   wgName,
+				Status: state,
+				Fields: map[string]string{
+					"workgroup_name": wgName,
+					"state":          state,
+					"description":    description,
+					"creation_time":  creationTime,
+					"engine_version": engineVersion,
+				},
+				RawStruct: wg,
+			}
+
+			resources = append(resources, r)
 		}
 
-		creationTime := ""
-		if wg.CreationTime != nil {
-			creationTime = wg.CreationTime.Format("2006-01-02 15:04:05")
+		if output.NextToken == nil {
+			break
 		}
-
-		engineVersion := ""
-		if wg.EngineVersion != nil && wg.EngineVersion.EffectiveEngineVersion != nil {
-			engineVersion = *wg.EngineVersion.EffectiveEngineVersion
-		}
-
-		r := resource.Resource{
-			ID:     wgName,
-			Name:   wgName,
-			Status: state,
-			Fields: map[string]string{
-				"workgroup_name": wgName,
-				"state":          state,
-				"description":    description,
-				"creation_time":  creationTime,
-				"engine_version": engineVersion,
-			},
-			RawStruct: wg,
-		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
 	return resources, nil
