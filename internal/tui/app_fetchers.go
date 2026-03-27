@@ -335,10 +335,10 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 	if m.demoMode {
 		return func() tea.Msg {
-			resources, ok := demo.GetResources(shortName)
+			result, ok := demo.GetResourcesPaginated(shortName)
 			count := 0
 			if ok {
-				count = len(resources)
+				count = len(result.Resources)
 			}
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
