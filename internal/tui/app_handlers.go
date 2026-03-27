@@ -510,10 +510,11 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		return m, cmd
 	}
 
-	// All checks done — clear progress indicator and save cache
+	// All checks done — clear progress indicator, flash, and save cache
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.SetCheckProgress(0, 0) // 0,0 signals "done"
 	}
+	m.flash.active = false
 
 	// Save cache to disk
 	cmd := m.saveAvailabilityCache()
