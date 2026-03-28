@@ -738,10 +738,10 @@ func TestStoryG3_SwitchingResourceType_ResetsPagination(t *testing.T) {
 // ===========================================================================
 // Section H: Demo Mode
 //
-// Demo mode uses paginated fetchers with DemoPageSize=5. Types with >5 items
-// return the first page with IsTruncated=true, showing the + suffix and
-// enabling the M key for load-more. Types with ≤5 items return all items
-// without truncation.
+// These tests verify ResourceList pagination UX by simulating first-page
+// pagination (page size 5) from demo fixture data. Types with >5 items show
+// the + suffix and enable the M key for load-more. Types with ≤5 items return
+// all items without truncation.
 // ===========================================================================
 
 func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
@@ -750,15 +750,29 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName, func(t *testing.T) {
-			// Use paginated demo fetch (as the app actually does now).
-			result, ok := demo.GetResourcesPaginated(rt.ShortName)
+			// Simulate first-page pagination from demo fixture data.
+			allResources, ok := demo.GetResources(rt.ShortName)
 			if !ok {
 				t.Skipf("no demo data for %s", rt.ShortName)
 			}
-
-			// Also get the full count to determine expected behavior.
-			allResources, _ := demo.GetResources(rt.ShortName)
 			total := len(allResources)
+
+			// Simulate first-page pagination (matches old DemoPageSize=5)
+			pageSize := 5
+			page := allResources
+			isTruncated := false
+			if total > pageSize {
+				page = allResources[:pageSize]
+				isTruncated = true
+			}
+			result := resource.FetchResult{
+				Resources: page,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: isTruncated,
+					TotalHint:   total,
+					PageSize:    len(page),
+				},
+			}
 
 			// Create a model and load demo data (as the app does)
 			k := keys.Default()
@@ -776,7 +790,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 			title := m.FrameTitle()
 			pageCount := len(result.Resources)
 
-			if total <= demo.DemoPageSize {
+			if total <= pageSize {
 				// Small type: all items returned, no truncation
 				expected := fmt.Sprintf("%s(%d)", rt.ShortName, pageCount)
 				if title != expected {
@@ -826,15 +840,28 @@ func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
 
 	for _, tc := range childTypes {
 		t.Run(tc.childType, func(t *testing.T) {
-			// Use paginated child fetch (as the app now does in demo mode).
-			result, ok := demo.GetChildResourcesPaginated(tc.childType, tc.parentCtx)
+			// Simulate first-page pagination from demo fixture data.
+			allResources, ok := demo.GetChildResources(tc.childType, tc.parentCtx)
 			if !ok {
 				t.Skipf("no demo data for child type %s", tc.childType)
 			}
-
-			// Get full count to determine expected behavior.
-			allResources, _ := demo.GetChildResources(tc.childType, tc.parentCtx)
 			total := len(allResources)
+
+			pageSize := 5
+			page := allResources
+			isTruncated := false
+			if total > pageSize {
+				page = allResources[:pageSize]
+				isTruncated = true
+			}
+			result := resource.FetchResult{
+				Resources: page,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: isTruncated,
+					TotalHint:   total,
+					PageSize:    len(page),
+				},
+			}
 
 			rt := resource.FindResourceType(tc.childType)
 			if rt == nil {
@@ -860,7 +887,7 @@ func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
 
 			title := m.FrameTitle()
 
-			if total <= demo.DemoPageSize {
+			if total <= pageSize {
 				// Small child type: no truncation
 				if strings.Contains(title, "+)") {
 					t.Errorf("demo child %s (small, total=%d): title %q should not contain truncation indicator",
