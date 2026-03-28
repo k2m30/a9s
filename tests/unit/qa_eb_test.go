@@ -62,8 +62,9 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	if r.ID != "e-abc123" {
 		t.Errorf("expected ID 'e-abc123', got %q", r.ID)
 	}
-	if r.Status != "Ready" {
-		t.Errorf("expected Status 'Ready', got %q", r.Status)
+	// EB fetcher uses Health (not operational Status) for row coloring (#61).
+	if r.Status != "Green" {
+		t.Errorf("expected Status 'Green' (from Health field), got %q", r.Status)
 	}
 	if r.Fields["environment_name"] != "my-env-prod" {
 		t.Errorf("expected Fields[environment_name] 'my-env-prod', got %q", r.Fields["environment_name"])
@@ -84,8 +85,8 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 
 	// Second env
 	r2 := resources[1]
-	if r2.Status != "Updating" {
-		t.Errorf("expected Status 'Updating', got %q", r2.Status)
+	if r2.Status != "Yellow" {
+		t.Errorf("expected Status 'Yellow' (from Health field), got %q", r2.Status)
 	}
 }
 

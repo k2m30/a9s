@@ -86,7 +86,7 @@ func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]
 			r := resource.Resource{
 				ID:     envID,
 				Name:   envName,
-				Status: status,
+				Status: health,
 				Fields: map[string]string{
 					"environment_name": envName,
 					"environment_id":   envID,

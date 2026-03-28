@@ -422,3 +422,408 @@ func TestQA_StatusColor_NoColorDisablesANSI(t *testing.T) {
 		}
 	}
 }
+
+// ===========================================================================
+// CloudFormation pattern-based matching (suffix: _COMPLETE, _IN_PROGRESS, _FAILED)
+// ===========================================================================
+
+func TestQA_StatusColor_CFN_CompleteIsGreen(t *testing.T) {
+	completeStatuses := []string{
+		"CREATE_COMPLETE",
+		"UPDATE_COMPLETE",
+		"DELETE_COMPLETE",
+		"IMPORT_COMPLETE",
+		"UPDATE_ROLLBACK_COMPLETE",
+	}
+	for _, s := range completeStatuses {
+		style := styles.RowColorStyle(s)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, styles.ColRunning) {
+			t.Errorf("RowColorStyle(%q) should use ColRunning (green), got different color", s)
+		}
+	}
+}
+
+func TestQA_StatusColor_CFN_InProgressIsYellow(t *testing.T) {
+	inProgressStatuses := []string{
+		"CREATE_IN_PROGRESS",
+		"UPDATE_IN_PROGRESS",
+		"DELETE_IN_PROGRESS",
+		"ROLLBACK_IN_PROGRESS",
+		"UPDATE_ROLLBACK_IN_PROGRESS",
+		"IMPORT_IN_PROGRESS",
+		"UPDATE_COMPLETE_CLEANUP_IN_PROGRESS",
+		"UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS",
+	}
+	for _, s := range inProgressStatuses {
+		style := styles.RowColorStyle(s)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, styles.ColPending) {
+			t.Errorf("RowColorStyle(%q) should use ColPending (yellow), got different color", s)
+		}
+	}
+}
+
+func TestQA_StatusColor_CFN_FailedIsRed(t *testing.T) {
+	failedStatuses := []string{
+		"CREATE_FAILED",
+		"UPDATE_FAILED",
+		"DELETE_FAILED",
+		"ROLLBACK_FAILED",
+		"UPDATE_ROLLBACK_FAILED",
+		"IMPORT_ROLLBACK_FAILED",
+	}
+	for _, s := range failedStatuses {
+		style := styles.RowColorStyle(s)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, styles.ColStopped) {
+			t.Errorf("RowColorStyle(%q) should use ColStopped (red), got different color", s)
+		}
+	}
+}
+
+func TestQA_StatusColor_CFN_RollbackCompleteIsRed(t *testing.T) {
+	// ROLLBACK_COMPLETE and IMPORT_ROLLBACK_COMPLETE are special cases:
+	// the rollback itself completed, but it means the original operation FAILED.
+	// These should be RED, not green.
+	rollbackStatuses := []string{
+		"ROLLBACK_COMPLETE",
+		"IMPORT_ROLLBACK_COMPLETE",
+	}
+	for _, s := range rollbackStatuses {
+		style := styles.RowColorStyle(s)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, styles.ColStopped) {
+			t.Errorf("RowColorStyle(%q) should use ColStopped (red) because rollback means failure, got different color", s)
+		}
+	}
+}
+
+func TestQA_StatusColor_CFN_CaseInsensitive(t *testing.T) {
+	// CloudFormation statuses are UPPER_CASE from AWS but matching should be case-insensitive
+	cases := []struct {
+		input    string
+		expected color.Color
+	}{
+		{"create_complete", styles.ColRunning},
+		{"Create_Complete", styles.ColRunning},
+		{"update_in_progress", styles.ColPending},
+		{"Update_In_Progress", styles.ColPending},
+		{"create_failed", styles.ColStopped},
+		{"Create_Failed", styles.ColStopped},
+		{"rollback_complete", styles.ColStopped},
+		{"Rollback_Complete", styles.ColStopped},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.input)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q): expected matching color, got different", tc.input)
+		}
+	}
+}
+
+// ===========================================================================
+// New simple status mappings — per-resource verification
+// ===========================================================================
+
+func TestQA_StatusColor_TargetGroupHealth(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"healthy", styles.ColRunning},
+		{"unhealthy", styles.ColStopped},
+		{"draining", styles.ColPending},
+		{"initial", styles.ColPending},
+		{"unused", styles.ColTerminated},
+		{"unavailable", styles.ColStopped},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [TG Health]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_CloudWatchAlarms(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"OK", styles.ColRunning},
+		{"ALARM", styles.ColStopped},
+		{"INSUFFICIENT_DATA", styles.ColPending},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [CloudWatch]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_ACMCertificates(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"ISSUED", styles.ColRunning},
+		{"PENDING_VALIDATION", styles.ColPending},
+		{"EXPIRED", styles.ColStopped},
+		{"REVOKED", styles.ColStopped},
+		{"FAILED", styles.ColStopped},
+		{"INACTIVE", styles.ColTerminated},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [ACM]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_CloudFront(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"Deployed", styles.ColRunning},
+		{"InProgress", styles.ColPending},
+		{"Disabled", styles.ColTerminated},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [CloudFront]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_EventBridgeAndKMS(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"ENABLED", styles.ColRunning},
+		{"DISABLED", styles.ColTerminated},
+		{"PendingDeletion", styles.ColStopped},
+		{"PendingImport", styles.ColPending},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [EventBridge/KMS]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_MSK(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"HEALING", styles.ColPending},
+		{"REBOOTING_BROKER", styles.ColPending},
+		{"MAINTENANCE", styles.ColPending},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [MSK]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_Redshift(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"rebooting", styles.ColPending},
+		{"resizing", styles.ColPending},
+		{"paused", styles.ColTerminated},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [Redshift]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_SES(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"SUCCESS", styles.ColRunning},
+		{"PENDING", styles.ColPending},
+		{"FAILED", styles.ColStopped},
+		{"TEMPORARY_FAILURE", styles.ColPending},
+		{"NOT_STARTED", styles.ColTerminated},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [SES]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_ElasticBeanstalkHealth(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"Green", styles.ColRunning},
+		{"Yellow", styles.ColPending},
+		{"Red", styles.ColStopped},
+		{"Grey", styles.ColTerminated},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [EB Health]: unexpected color", tc.status)
+		}
+	}
+}
+
+func TestQA_StatusColor_VPCEndpoints(t *testing.T) {
+	cases := []struct {
+		status   string
+		expected color.Color
+	}{
+		{"rejected", styles.ColStopped},
+		{"expired", styles.ColStopped},
+		{"pendingAcceptance", styles.ColPending},
+	}
+	for _, tc := range cases {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [VPC Endpoints]: unexpected color", tc.status)
+		}
+	}
+}
+
+// ===========================================================================
+// NO_COLOR disables all new status colors too
+// ===========================================================================
+
+func TestQA_StatusColor_NoColorDisablesNewStatuses(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	styles.Reinit()
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.Reinit()
+	})
+
+	newStatuses := []string{
+		"healthy", "ok", "alarm", "deployed", "enabled", "disabled",
+		"CREATE_COMPLETE", "UPDATE_IN_PROGRESS", "CREATE_FAILED",
+		"healing", "paused", "pendingdeletion",
+	}
+	for _, status := range newStatuses {
+		rendered := styles.RowColorStyle(status).Render("testdata")
+		if strings.Contains(rendered, "\x1b[") {
+			t.Errorf("with NO_COLOR set, RowColorStyle(%q).Render() should not contain ANSI codes", status)
+		}
+	}
+}
+
+// ===========================================================================
+// Complete coverage: ALL 52 status mappings resolve to correct color
+// ===========================================================================
+
+func TestQA_StatusColor_CompleteMappingTable(t *testing.T) {
+	// Exhaustive table of every status→color mapping after #61 expansion.
+	// This is the single source of truth for status color coverage.
+	allMappings := []struct {
+		status   string
+		expected color.Color
+		label    string
+	}{
+		// Green (ColRunning)
+		{"running", styles.ColRunning, "baseline"},
+		{"available", styles.ColRunning, "baseline"},
+		{"active", styles.ColRunning, "baseline"},
+		{"in-use", styles.ColRunning, "baseline"},
+		{"succeeded", styles.ColRunning, "baseline"},
+		{"healthy", styles.ColRunning, "TG Health"},
+		{"ok", styles.ColRunning, "CloudWatch"},
+		{"issued", styles.ColRunning, "ACM"},
+		{"deployed", styles.ColRunning, "CloudFront"},
+		{"enabled", styles.ColRunning, "EventBridge/KMS/Athena"},
+		{"green", styles.ColRunning, "EB Health"},
+		{"success", styles.ColRunning, "SES"},
+
+		// Red (ColStopped)
+		{"stopped", styles.ColStopped, "baseline"},
+		{"failed", styles.ColStopped, "baseline"},
+		{"error", styles.ColStopped, "baseline"},
+		{"deleting", styles.ColStopped, "baseline"},
+		{"deleted", styles.ColStopped, "baseline"},
+		{"timed_out", styles.ColStopped, "baseline"},
+		{"unhealthy", styles.ColStopped, "TG Health"},
+		{"unavailable", styles.ColStopped, "TG Health"},
+		{"alarm", styles.ColStopped, "CloudWatch"},
+		{"expired", styles.ColStopped, "ACM/VPC Endpoints"},
+		{"revoked", styles.ColStopped, "ACM"},
+		{"rejected", styles.ColStopped, "VPC Endpoints"},
+		{"pendingdeletion", styles.ColStopped, "KMS"},
+		{"rollback_complete", styles.ColStopped, "CFN special"},
+		{"import_rollback_complete", styles.ColStopped, "CFN special"},
+		{"red", styles.ColStopped, "EB Health"},
+
+		// Yellow (ColPending)
+		{"pending", styles.ColPending, "baseline"},
+		{"creating", styles.ColPending, "baseline"},
+		{"modifying", styles.ColPending, "baseline"},
+		{"updating", styles.ColPending, "baseline"},
+		{"pending_redrive", styles.ColPending, "baseline"},
+		{"draining", styles.ColPending, "TG Health"},
+		{"initial", styles.ColPending, "TG Health"},
+		{"insufficient_data", styles.ColPending, "CloudWatch"},
+		{"pending_validation", styles.ColPending, "ACM"},
+		{"inprogress", styles.ColPending, "CloudFront"},
+		{"healing", styles.ColPending, "MSK"},
+		{"rebooting_broker", styles.ColPending, "MSK"},
+		{"maintenance", styles.ColPending, "MSK"},
+		{"rebooting", styles.ColPending, "Redshift"},
+		{"resizing", styles.ColPending, "Redshift"},
+		{"pendingimport", styles.ColPending, "KMS"},
+		{"pendingacceptance", styles.ColPending, "VPC Endpoints"},
+		{"yellow", styles.ColPending, "EB Health"},
+		{"temporary_failure", styles.ColPending, "SES"},
+
+		// Dim (ColTerminated)
+		{"terminated", styles.ColTerminated, "baseline"},
+		{"shutting-down", styles.ColTerminated, "baseline"},
+		{"aborted", styles.ColTerminated, "baseline"},
+		{"unused", styles.ColTerminated, "TG Health"},
+		{"disabled", styles.ColTerminated, "EventBridge/KMS/Athena/CloudFront"},
+		{"inactive", styles.ColTerminated, "ACM"},
+		{"grey", styles.ColTerminated, "EB Health"},
+		{"not_started", styles.ColTerminated, "SES"},
+		{"paused", styles.ColTerminated, "Redshift"},
+	}
+
+	for _, tc := range allMappings {
+		style := styles.RowColorStyle(tc.status)
+		fg := style.GetForeground()
+		if !statusColorsEqual(fg, tc.expected) {
+			t.Errorf("RowColorStyle(%q) [%s]: foreground does not match expected color", tc.status, tc.label)
+		}
+	}
+}

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.0] - 2026-03-28
+
+### Added
+- Status color-coding expanded from 20 to 52 mappings across 16 resource types (#61)
+- CloudFormation pattern-based color matching — `*_COMPLETE` green, `*_IN_PROGRESS` yellow, `*_FAILED` red (#61)
+- Target Group Health colors: healthy/unhealthy/draining/initial/unused/unavailable (#61)
+- CloudWatch Alarm colors: OK/ALARM/INSUFFICIENT_DATA (#61)
+- ACM, CloudFront, EventBridge, KMS, MSK, Redshift, SES, Athena, VPC Endpoint status colors (#61)
+- Elastic Beanstalk health-based row coloring (Green/Yellow/Red/Grey) (#61)
+
+### Changed
+- SES row coloring now uses verification status (was empty) (#61)
+- CloudFront disabled distributions show dim/grey rows instead of deployed green (#61)
+- Elastic Beanstalk row coloring uses Health field instead of operational Status (#61)
+
 ## [3.20.0] - 2026-03-28
 
 ### Added

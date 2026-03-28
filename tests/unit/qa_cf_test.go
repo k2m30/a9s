@@ -108,10 +108,11 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"aliases\"]: expected %q, got %q", "cdn.example.com", r0.Fields["aliases"])
 	}
 
-	// Verify second distribution (disabled, no aliases)
+	// Verify second distribution (disabled, no aliases).
+	// CloudFront fetcher synthesizes "Disabled" status when Enabled=false for row coloring (#61).
 	r1 := resources[1]
-	if r1.Status != "InProgress" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "InProgress", r1.Status)
+	if r1.Status != "Disabled" {
+		t.Errorf("resource[1].Status: expected %q, got %q", "Disabled", r1.Status)
 	}
 	if r1.Fields["enabled"] != "false" {
 		t.Errorf("resource[1].Fields[\"enabled\"]: expected %q, got %q", "false", r1.Fields["enabled"])

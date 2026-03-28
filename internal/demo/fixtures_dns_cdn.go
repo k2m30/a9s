@@ -279,7 +279,7 @@ func cloudFrontDistributions() []resource.Resource {
 		{
 			ID:     "E3C4D5E6F7G8H9",
 			Name:   "E3C4D5E6F7G8H9",
-			Status: "InProgress",
+			Status: "Disabled",
 			Fields: map[string]string{
 				"distribution_id": "E3C4D5E6F7G8H9",
 				"domain_name":     "d333333cdefgh0.cloudfront.net",

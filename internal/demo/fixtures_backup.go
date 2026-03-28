@@ -79,7 +79,7 @@ func sesFixtures() []resource.Resource {
 		{
 			ID:     "acmecorp.com",
 			Name:   "acmecorp.com",
-			Status: "",
+			Status: "SUCCESS",
 			Fields: map[string]string{
 				"identity_name":       "acmecorp.com",
 				"identity_type":       "DOMAIN",
@@ -96,7 +96,7 @@ func sesFixtures() []resource.Resource {
 		{
 			ID:     "noreply@acmecorp.com",
 			Name:   "noreply@acmecorp.com",
-			Status: "",
+			Status: "SUCCESS",
 			Fields: map[string]string{
 				"identity_name":       "noreply@acmecorp.com",
 				"identity_type":       "EMAIL_ADDRESS",
@@ -113,7 +113,7 @@ func sesFixtures() []resource.Resource {
 		{
 			ID:     "alerts@acmecorp.com",
 			Name:   "alerts@acmecorp.com",
-			Status: "",
+			Status: "PENDING",
 			Fields: map[string]string{
 				"identity_name":       "alerts@acmecorp.com",
 				"identity_type":       "EMAIL_ADDRESS",

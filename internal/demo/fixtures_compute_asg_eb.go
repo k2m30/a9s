@@ -305,7 +305,7 @@ func ebFixtures() []resource.Resource {
 		{
 			ID:     "e-acmeprodapi",
 			Name:   "acme-prod-api",
-			Status: "Ready",
+			Status: "Green",
 			Fields: map[string]string{
 				"environment_name": "acme-prod-api",
 				"environment_id":   "e-acmeprodapi",
@@ -339,7 +339,7 @@ func ebFixtures() []resource.Resource {
 		{
 			ID:     "e-acmestagapi",
 			Name:   "acme-staging-api",
-			Status: "Ready",
+			Status: "Yellow",
 			Fields: map[string]string{
 				"environment_name": "acme-staging-api",
 				"environment_id":   "e-acmestagapi",
@@ -373,7 +373,7 @@ func ebFixtures() []resource.Resource {
 		{
 			ID:     "e-acmeprodweb",
 			Name:   "acme-prod-web",
-			Status: "Updating",
+			Status: "Green",
 			Fields: map[string]string{
 				"environment_name": "acme-prod-web",
 				"environment_id":   "e-acmeprodweb",
@@ -408,7 +408,7 @@ func ebFixtures() []resource.Resource {
 		{
 			ID:     "e-acmelegacy",
 			Name:   "acme-legacy-worker",
-			Status: "Terminating",
+			Status: "Grey",
 			Fields: map[string]string{
 				"environment_name": "acme-legacy-worker",
 				"environment_id":   "e-acmelegacy",
