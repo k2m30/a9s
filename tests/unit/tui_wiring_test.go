@@ -209,7 +209,7 @@ func TestWiring_RefreshOnMainMenu_NoCacheMode_NoOp(t *testing.T) {
 
 // Bug 1: Demo mode excluded from availability probes.
 // ClientsReadyMsg in demo mode should trigger availability probes (via
-// startAvailabilityProbes), not skip them.
+// loadAvailabilityCache), not skip them.
 
 func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
@@ -228,7 +228,7 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 		return ok
 	})
 	if found == nil {
-		t.Error("ClientsReadyMsg in demo mode should produce AvailabilityCacheLoadedMsg from startAvailabilityProbes")
+		t.Error("ClientsReadyMsg in demo mode should produce AvailabilityCacheLoadedMsg from loadAvailabilityCache")
 	}
 }
 
