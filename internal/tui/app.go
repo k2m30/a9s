@@ -10,6 +10,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -124,7 +125,9 @@ func New(profile, region string, opts ...Option) Model {
 func (m Model) Init() tea.Cmd {
 	if m.demoMode {
 		demoCmd := func() tea.Msg {
-			return messages.ClientsReadyMsg{}
+			cfg := demo.NewDemoAWSConfig()
+			clients := awsclient.CreateServiceClients(cfg)
+			return messages.ClientsReadyMsg{Clients: clients}
 		}
 		if m.configErr != nil {
 			return tea.Batch(demoCmd, func() tea.Msg {
@@ -173,9 +176,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
-		if m.demoMode {
-			return m, nil
-		}
 		cmd := m.connectAWS(msg.Profile, msg.Region)
 		return m, cmd
 	case messages.ClientsReadyMsg:

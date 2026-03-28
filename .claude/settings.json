@@ -5,6 +5,7 @@
       "Read(~/.claude/**)",
       "Read(~/go/pkg/**)",
       "Edit(//tmp/**)",
+      "Write(//tmp/**)",
       "Read(//Users/k2m30/projects/**)",
       "Bash(ls *)",
       "Bash(cat *)",

@@ -714,7 +714,7 @@ func TestQA_R53_E1_DemoMode_FetchR53Records(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to R53 zone list
 	var cmd tea.Cmd
@@ -744,7 +744,7 @@ func TestQA_R53_E2_DemoMode_FetchR53RecordsDrillDown(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to R53 zone list
 	m, cmd := m.Update(messages.NavigateMsg{
@@ -787,7 +787,7 @@ func TestQA_R53_E3_DemoMode_UnknownZone_EmptyRecords(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to R53 zones first
 	m, cmd := m.Update(messages.NavigateMsg{
