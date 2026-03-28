@@ -1033,3 +1033,166 @@ func TestQA_Availability_CountDisplayAllResourceTypes(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Truncated count display: "(5+)" when probe returned a truncated first page
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_TruncatedCountDisplay(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 5)
+	m.SetTruncated("ec2", true)
+
+	output := m.View()
+
+	// Must contain "(5+)" — the plus indicates more resources exist.
+	if !strings.Contains(output, "(5+)") {
+		t.Errorf("View() should contain '(5+)' for truncated ec2 count=5, output:\n%s", output)
+	}
+
+	// Must NOT contain "(5)" without the plus — verify it's the truncated form.
+	// We do this by checking that "(5)" only ever appears as part of "(5+)".
+	withoutPlus := strings.ReplaceAll(output, "(5+)", "")
+	if strings.Contains(withoutPlus, "(5)") {
+		t.Errorf("View() should NOT contain bare '(5)' without plus for truncated ec2, output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Non-truncated count display: "(3)" without plus when not truncated
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_NonTruncatedCountDisplay(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 3)
+	// Don't call SetTruncated — defaults to not truncated.
+
+	output := m.View()
+
+	// Must contain "(3)" — no plus suffix.
+	if !strings.Contains(output, "(3)") {
+		t.Errorf("View() should contain '(3)' for non-truncated ec2 count=3, output:\n%s", output)
+	}
+
+	// Must NOT contain "(3+)".
+	if strings.Contains(output, "(3+)") {
+		t.Errorf("View() should NOT contain '(3+)' for non-truncated ec2, output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Truncated zero count: zero + truncated should not crash, shows "(0)"
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_TruncatedZeroCount(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 0)
+	m.SetTruncated("ec2", true)
+
+	// Must not panic — zero + truncated is illogical but should be safe.
+	output := m.View()
+
+	// Zero count should display as "(0)" — truncation is irrelevant for zero.
+	if !strings.Contains(output, "(0)") {
+		t.Errorf("View() should contain '(0)' for ec2 with count=0 even if truncated, output:\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetTruncated returns a copy of the truncated state map
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_GetTruncated(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+
+	// Before setting anything, GetTruncated should return nil.
+	if got := m.GetTruncated(); got != nil {
+		t.Errorf("GetTruncated() should return nil before any SetTruncated calls, got: %v", got)
+	}
+
+	// Set truncated for some types, not others.
+	m.SetTruncated("ec2", true)
+	m.SetTruncated("rds", true)
+	m.SetTruncated("s3", false)
+
+	got := m.GetTruncated()
+	if got == nil {
+		t.Fatal("GetTruncated() should not return nil after SetTruncated calls")
+	}
+
+	// Verify correct values.
+	if !got["ec2"] {
+		t.Errorf("GetTruncated()[\"ec2\"] = false, want true")
+	}
+	if !got["rds"] {
+		t.Errorf("GetTruncated()[\"rds\"] = false, want true")
+	}
+	if got["s3"] {
+		t.Errorf("GetTruncated()[\"s3\"] = true, want false")
+	}
+
+	// Verify it's a copy — mutation should not affect the model.
+	got["ec2"] = false
+	got2 := m.GetTruncated()
+	if !got2["ec2"] {
+		t.Errorf("GetTruncated() returned a reference, not a copy — mutation propagated")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ClearAvailability also clears truncated state
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_ClearAvailability_ClearsTruncated(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	m.SetAvailability("ec2", 5)
+	m.SetTruncated("ec2", true)
+	m.SetAvailability("rds", 10)
+	m.SetTruncated("rds", true)
+
+	// Verify state is set.
+	if avail := m.GetAvailability(); avail == nil || avail["ec2"] != 5 {
+		t.Fatal("precondition: availability should be set before clear")
+	}
+	if trunc := m.GetTruncated(); trunc == nil || !trunc["ec2"] {
+		t.Fatal("precondition: truncated should be set before clear")
+	}
+
+	m.ClearAvailability()
+
+	// Both maps should be nil after clear.
+	if avail := m.GetAvailability(); avail != nil {
+		t.Errorf("GetAvailability() should return nil after ClearAvailability(), got: %v", avail)
+	}
+	if trunc := m.GetTruncated(); trunc != nil {
+		t.Errorf("GetTruncated() should return nil after ClearAvailability(), got: %v", trunc)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Truncated count display: all resource types show "(N+)" when truncated
+// ---------------------------------------------------------------------------
+
+func TestQA_Availability_TruncatedCountAllResourceTypes(t *testing.T) {
+	m := newSizedMainMenu(t, 80, 200)
+	allTypes := resource.AllResourceTypes()
+
+	// Set unique counts with truncation for every resource type.
+	for i, rt := range allTypes {
+		count := (i + 1) * 10
+		m.SetAvailability(rt.ShortName, count)
+		m.SetTruncated(rt.ShortName, true)
+	}
+
+	output := m.View()
+
+	// Verify each count appears with "+" suffix in the output.
+	for i, rt := range allTypes {
+		count := (i + 1) * 10
+		expected := "(" + availItoa(count) + "+)"
+		if !strings.Contains(output, expected) {
+			t.Errorf("View() should contain %q for truncated %s (count=%d)",
+				expected, rt.ShortName, count)
+		}
+	}
+}

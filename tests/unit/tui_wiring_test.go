@@ -382,11 +382,15 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	// Step 4: Walk the full probe cycle. Execute batch cmds to get
 	// AvailabilityCheckedMsg, feed each one back into the model to dequeue
 	// the next probe, and collect all results.
-	collected := make(map[string]int)
+	type probeResult struct {
+		Count     int
+		Truncated bool
+	}
+	collected := make(map[string]probeResult)
 	for cmd != nil {
 		msg := cmd()
 		if acm, ok := msg.(messages.AvailabilityCheckedMsg); ok {
-			collected[acm.ResourceType] = acm.Count
+			collected[acm.ResourceType] = probeResult{Count: acm.Count, Truncated: acm.Truncated}
 			m, cmd = rootApplyMsg(m, acm)
 			continue
 		}
@@ -398,7 +402,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 				}
 				subMsg := subCmd()
 				if acm, ok := subMsg.(messages.AvailabilityCheckedMsg); ok {
-					collected[acm.ResourceType] = acm.Count
+					collected[acm.ResourceType] = probeResult{Count: acm.Count, Truncated: acm.Truncated}
 					m, cmd = rootApplyMsg(m, acm)
 				}
 			}
@@ -409,7 +413,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	}
 
 	// Step 5: Verify the target resource type was probed
-	probeCount, found := collected[targetType]
+	result, found := collected[targetType]
 	if !found {
 		t.Fatalf("probe cycle did not produce AvailabilityCheckedMsg for %s; collected: %v", targetType, collected)
 	}
@@ -417,10 +421,17 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	// Step 6: Assert the probe count matches the PAGINATED page size, not the total.
 	// With the bug, probeCount == totalCount (e.g. 22 for dbi).
 	// After the fix, probeCount == paginatedCount (DemoPageSize, e.g. 5).
-	if probeCount != paginatedCount {
+	if result.Count != paginatedCount {
 		t.Errorf("demo probe for %s reported count=%d, want %d (DemoPageSize); "+
 			"total fixtures=%d — probe must use GetResourcesPaginated, not GetResources",
-			targetType, probeCount, paginatedCount, totalCount)
+			targetType, result.Count, paginatedCount, totalCount)
+	}
+
+	// Step 7: Assert the Truncated flag is true for types with more than DemoPageSize fixtures.
+	// The target type has totalCount > DemoPageSize, so its probe result must be truncated.
+	if !result.Truncated {
+		t.Errorf("demo probe for %s should have Truncated=true (total=%d > DemoPageSize=%d), got false",
+			targetType, totalCount, demo.DemoPageSize)
 	}
 }
 

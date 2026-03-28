@@ -1097,44 +1097,36 @@ func TestStoryI2_RapidMPresses_Debounced(t *testing.T) {
 // ===========================================================================
 // Section C: Help View -- M Key Visibility
 //
-// The help view should conditionally show "M" / "Load More" only when the
-// active resource list is truncated (IsTruncated=true). These tests verify
-// the help view output for both truncated and non-truncated states.
-//
-// NOTE: The HelpModel currently does NOT receive pagination state from the
-// resource list. It is a static view keyed by HelpContext. The "M" / "Load
-// More" binding is NOT present in the resource list help groups. These tests
-// document the current behavior and will reveal if/when the feature is added.
+// The help view conditionally shows "M" / "load more" only when the active
+// resource list is truncated (IsTruncated=true). This is achieved via
+// pagination-aware HelpContext variants: HelpFromResourceListPaginated and
+// HelpFromSecretsListPaginated. Non-paginated contexts omit the M binding.
 // ===========================================================================
 
 // TestStoryC1_HelpView_ShowsMKey_WhenTruncated verifies the help view output
-// for resource lists. Per the QA story, the help view should conditionally
-// show "M" / "Load More" when the resource list is truncated.
-//
-// KNOWN GAP: The HelpModel does not currently receive pagination state.
-// It is a static view keyed by HelpContext enum. The "M"/"Load More"
-// binding is NOT present in any help group. This test documents the gap
-// and will start passing when conditional M key is added to help.
+// for paginated resource lists. When the resource list is truncated, the help
+// view (opened via HelpFromResourceListPaginated context) should show the
+// "M" / "load more" key binding.
 func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	// The help model is created from a HelpContext, not from the resource list
-	// model directly. When opened from a resource list, it uses HelpFromResourceList.
-	help := views.NewHelp(keys.Default(), views.HelpFromResourceList)
+	// When opened from a truncated resource list, help uses HelpFromResourceListPaginated.
+	help := views.NewHelp(keys.Default(), views.HelpFromResourceListPaginated)
 	help.SetSize(120, 30)
 
 	output := help.View()
+	outputLower := strings.ToLower(output)
 
-	// Story C.1: When list is truncated, help should show "M" / "Load More".
-	// Currently the help view does NOT show this binding because it's static.
-	if !strings.Contains(output, "Load More") && !strings.Contains(output, "load more") {
-		t.Logf("C.1: KNOWN GAP — help view from resource list does not contain 'Load More'. "+
-			"The HelpModel is static and does not reflect pagination state. "+
-			"To fix: add pagination-aware HelpContext or pass truncation state to help.")
+	// Story C.1: paginated help MUST show "load more" binding.
+	if !strings.Contains(outputLower, "load more") {
+		t.Errorf("C.1: paginated help view must contain 'load more', got:\n%s", output)
+	}
+	if !strings.Contains(output, "M") {
+		t.Errorf("C.1: paginated help view must contain 'M' key, got:\n%s", output)
 	}
 
-	// Verify the help view at least renders all expected static sections
+	// Verify all expected static sections are still present
 	expectedSections := []string{"NAVIGATION", "ACTIONS", "SORT", "OTHER"}
 	for _, section := range expectedSections {
 		if !strings.Contains(output, section) {
@@ -1157,9 +1149,8 @@ func TestStoryC2_HelpView_HidesMKey_WhenNotTruncated(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	// For a non-truncated list, help should NOT show "Load More".
-	// Since the help view is currently static and never shows "Load More",
-	// this test passes by default — but it documents the expected behavior.
+	// For a non-truncated list, help uses HelpFromResourceList (non-paginated),
+	// which should NOT show "Load More".
 	help := views.NewHelp(keys.Default(), views.HelpFromResourceList)
 	help.SetSize(120, 30)
 
@@ -1189,12 +1180,7 @@ func TestStoryC2_HelpView_HidesMKey_WhenNotTruncated(t *testing.T) {
 
 // TestStoryE4_ErrorDuringLoadMore_PreservesData verifies that when a load-more
 // fetch fails, the existing resources and pagination state remain intact.
-//
-// BUG FOUND: ClearLoading() (called by app handleAPIError) only clears the
-// `loading` flag, not `loadingMore`. After an error during load-more, the model
-// is stuck with loadingMore=true, meaning the M key becomes a permanent no-op
-// and the frame title perpetually shows "loading...". The test documents this
-// behavior so the bug can be tracked and fixed.
+// ClearLoading() must clear both `loading` and `loadingMore` flags.
 func TestStoryE4_ErrorDuringLoadMore_PreservesData(t *testing.T) {
 	m := storyNewModel(t)
 
@@ -1234,20 +1220,18 @@ func TestStoryE4_ErrorDuringLoadMore_PreservesData(t *testing.T) {
 		t.Errorf("E.4: expected frame title to still contain '200' after error, got %q", title)
 	}
 
-	// BUG: ClearLoading() doesn't clear loadingMore, so the model is stuck.
-	// The frame title shows "loading..." and M key becomes a no-op.
-	// When fixed, the frame title should revert to "ec2(200+)" and M should
-	// produce a retry command. For now we document the current (broken) behavior.
-	if strings.Contains(title, "loading...") {
-		t.Logf("E.4: BUG CONFIRMED — ClearLoading() does not clear loadingMore flag; "+
-			"frame title stuck at %q (should be 'ec2(200+)')", title)
+	// After ClearLoading(), loadingMore must be cleared too.
+	// Frame title should revert to "ec2(200+)" — NOT contain "loading...".
+	if title != "ec2(200+)" {
+		t.Errorf("E.4: after ClearLoading(), frame title should be %q, got %q",
+			"ec2(200+)", title)
 	}
 
-	// Attempt retry with M — currently fails due to loadingMore=true
+	// Retry with M should work — ClearLoading() must clear loadingMore
+	// so the M key can trigger another load-more command.
 	_, retryCmd := m.Update(pgKeyPress("M"))
 	if retryCmd == nil {
-		t.Logf("E.4: BUG CONFIRMED — M key is no-op after error during load-more " +
-			"because loadingMore is still true (should allow retry)")
+		t.Errorf("E.4: M key should produce a retry command after ClearLoading(), but got nil")
 	}
 }
 
@@ -1625,12 +1609,9 @@ func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 // TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination verifies that
 // after a load-more error, the model retains resources and pagination metadata.
 //
-// BUG NOTE: ClearLoading() only clears `loading`, not `loadingMore`.
-// After an error during load-more, loadingMore stays true, the frame title
-// shows "loading..." permanently, and M key becomes a permanent no-op.
-// This test documents the current behavior. The core data-preservation
-// aspect (resources not lost) is verified. The loadingMore stuck state
-// is logged as a known bug (same as E.4).
+// TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination verifies that
+// after a load-more error, the model retains resources and pagination metadata.
+// ClearLoading() must clear both loading and loadingMore flags.
 func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
@@ -1678,12 +1659,12 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 				t.Errorf("L.2/%s: resource count lost after error, got %q", rt.ShortName, title)
 			}
 
-			// BUG: ClearLoading() doesn't clear loadingMore — frame title still
-			// shows "loading..." and M key is stuck. Log but don't fail the test
-			// for this known issue (tracked via E.4 bug report).
-			if strings.Contains(title, "loading...") {
-				t.Logf("L.2/%s: BUG — ClearLoading() does not clear loadingMore; "+
-					"frame title stuck at %q", rt.ShortName, title)
+			// After ClearLoading(), loadingMore must be cleared.
+			// Frame title should NOT contain "loading..." — it should be "rt(100+)".
+			expectedTitle := rt.ShortName + "(100+)"
+			if title != expectedTitle {
+				t.Errorf("L.2/%s: after ClearLoading(), frame title should be %q, got %q",
+					rt.ShortName, expectedTitle, title)
 			}
 		})
 	}
@@ -2033,6 +2014,169 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 			output := m.View()
 			if len(output) == 0 {
 				t.Error("View() returned empty after appending and sorting")
+			}
+		})
+	}
+}
+
+// ===========================================================================
+// Load More Indicator in View()
+//
+// When a resource list is truncated (IsTruncated=true), the View() output
+// must show a "load more" indicator with the M key hint. This indicator
+// disappears when all pages are loaded, or changes to a loading indicator
+// while loadingMore is in progress.
+// ===========================================================================
+
+// TestStory_LoadMoreIndicator_ShownWhenTruncated verifies that the resource
+// list View() contains a "load more" indicator when the page is truncated.
+func TestStory_LoadMoreIndicator_ShownWhenTruncated(t *testing.T) {
+	m := storyNewModel(t)
+
+	// Load 5 resources with truncation
+	m = storyLoadResources(m, pgTestResources(5), &resource.PaginationMeta{
+		IsTruncated: true,
+		NextToken:   "tok",
+	}, false)
+
+	output := m.View()
+	outputLower := strings.ToLower(output)
+
+	if !strings.Contains(outputLower, "load more") {
+		t.Errorf("View() for truncated list must contain 'load more', got:\n%s", output)
+	}
+	if !strings.Contains(output, "M") {
+		t.Errorf("View() for truncated list must contain 'M' key hint, got:\n%s", output)
+	}
+}
+
+// TestStory_LoadMoreIndicator_HiddenWhenNotTruncated verifies that the
+// resource list View() does NOT contain a "load more" indicator when
+// the page is not truncated.
+func TestStory_LoadMoreIndicator_HiddenWhenNotTruncated(t *testing.T) {
+	m := storyNewModel(t)
+
+	// Load 5 resources without truncation
+	m = storyLoadResources(m, pgTestResources(5), &resource.PaginationMeta{
+		IsTruncated: false,
+	}, false)
+
+	output := m.View()
+	outputLower := strings.ToLower(output)
+
+	if strings.Contains(outputLower, "load more") {
+		t.Errorf("View() for non-truncated list must NOT contain 'load more', got:\n%s", output)
+	}
+}
+
+// TestStory_LoadMoreIndicator_ShowsLoadingWhenLoadingMore verifies that
+// while loading more pages, the View() shows a loading indicator instead
+// of the idle "load more" indicator.
+func TestStory_LoadMoreIndicator_ShowsLoadingWhenLoadingMore(t *testing.T) {
+	m := storyNewModel(t)
+
+	// Load 5 resources with truncation
+	m = storyLoadResources(m, pgTestResources(5), &resource.PaginationMeta{
+		IsTruncated: true,
+		NextToken:   "tok",
+	}, false)
+
+	// Press M to trigger loadingMore
+	m, _ = m.Update(pgKeyPress("M"))
+
+	output := m.View()
+	outputLower := strings.ToLower(output)
+
+	// Should show a loading indicator
+	if !strings.Contains(outputLower, "loading") {
+		t.Errorf("View() during loadingMore must contain 'loading', got:\n%s", output)
+	}
+
+	// Should NOT show the idle "load more" indicator
+	if strings.Contains(outputLower, "load more") {
+		t.Errorf("View() during loadingMore must NOT contain 'load more', got:\n%s", output)
+	}
+}
+
+// TestStory_LoadMoreIndicator_HiddenAfterAllPagesLoaded verifies that
+// the "load more" indicator disappears after the final page is appended.
+func TestStory_LoadMoreIndicator_HiddenAfterAllPagesLoaded(t *testing.T) {
+	m := storyNewModel(t)
+
+	// Load 5 resources with truncation
+	m = storyLoadResources(m, pgTestResources(5), &resource.PaginationMeta{
+		IsTruncated: true,
+		NextToken:   "tok",
+	}, false)
+
+	// Press M to start loading more
+	m, _ = m.Update(pgKeyPress("M"))
+
+	// Receive final page (Append=true, IsTruncated=false)
+	m = storyLoadResources(m, pgTestResources(3), &resource.PaginationMeta{
+		IsTruncated: false,
+	}, true)
+
+	output := m.View()
+	outputLower := strings.ToLower(output)
+
+	if strings.Contains(outputLower, "load more") {
+		t.Errorf("View() after all pages loaded must NOT contain 'load more', got:\n%s", output)
+	}
+}
+
+// TestStory_LoadMoreIndicator_AllResourceTypes verifies the load-more
+// indicator for every resource type: shown when truncated, hidden when complete.
+func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	for _, rt := range resource.AllResourceTypes() {
+		t.Run(rt.ShortName+"_load_more_indicator", func(t *testing.T) {
+			k := keys.Default()
+			m := views.NewResourceList(rt, nil, k)
+			m.SetSize(120, 30)
+			m, _ = m.Init()
+
+			// Create 5 resources with proper fields
+			resources := make([]resource.Resource, 5)
+			for i := range 5 {
+				fields := make(map[string]string)
+				for _, col := range rt.Columns {
+					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
+				}
+				resources[i] = resource.Resource{
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
+					Status: "running", Fields: fields,
+				}
+			}
+
+			// Load truncated page
+			m, _ = m.Update(messages.ResourcesLoadedMsg{
+				ResourceType: rt.ShortName,
+				Resources:    resources,
+				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
+			})
+
+			output := m.View()
+			if !strings.Contains(strings.ToLower(output), "load more") {
+				t.Errorf("%s: truncated View() must contain 'load more', got:\n%s",
+					rt.ShortName, output)
+			}
+
+			// Load final page (complete)
+			m, _ = m.Update(pgKeyPress("M"))
+			m, _ = m.Update(messages.ResourcesLoadedMsg{
+				ResourceType: rt.ShortName,
+				Resources:    resources[:2],
+				Pagination:   &resource.PaginationMeta{IsTruncated: false},
+				Append:       true,
+			})
+
+			outputFinal := m.View()
+			if strings.Contains(strings.ToLower(outputFinal), "load more") {
+				t.Errorf("%s: completed View() must NOT contain 'load more', got:\n%s",
+					rt.ShortName, outputFinal)
 			}
 		})
 	}

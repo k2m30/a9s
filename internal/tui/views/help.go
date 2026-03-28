@@ -16,13 +16,15 @@ import (
 type HelpContext int
 
 const (
-	HelpFromMainMenu     HelpContext = iota // main menu view
-	HelpFromResourceList                    // resource list (non-secrets)
-	HelpFromSecretsList                     // secrets resource list (includes reveal)
-	HelpFromDetail                          // detail view
-	HelpFromYAML                            // yaml view
-	HelpFromSelector                        // profile or region selector
-	HelpFromReveal                          // reveal view
+	HelpFromMainMenu              HelpContext = iota // main menu view
+	HelpFromResourceList                             // resource list (non-secrets)
+	HelpFromSecretsList                              // secrets resource list (includes reveal)
+	HelpFromDetail                                   // detail view
+	HelpFromYAML                                     // yaml view
+	HelpFromSelector                                 // profile or region selector
+	HelpFromReveal                                   // reveal view
+	HelpFromResourceListPaginated                    // paginated resource list (includes M)
+	HelpFromSecretsListPaginated                     // paginated secrets list (includes M and x)
 )
 
 // HelpModel renders context-sensitive keybinding reference inside the frame.
@@ -150,9 +152,13 @@ func (m HelpModel) buildGroups() []helpGroup {
 	case HelpFromMainMenu:
 		return m.mainMenuGroups()
 	case HelpFromResourceList:
-		return m.resourceListGroups(false)
+		return m.resourceListGroups(false, false)
 	case HelpFromSecretsList:
-		return m.resourceListGroups(true)
+		return m.resourceListGroups(true, false)
+	case HelpFromResourceListPaginated:
+		return m.resourceListGroups(false, true)
+	case HelpFromSecretsListPaginated:
+		return m.resourceListGroups(true, true)
 	case HelpFromDetail:
 		return m.detailGroups()
 	case HelpFromYAML:
@@ -199,7 +205,7 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 	}
 }
 
-func (m HelpModel) resourceListGroups(secrets bool) []helpGroup {
+func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 	nav := helpGroup{
 		title: "NAVIGATION",
 		bindings: []helpBinding{
@@ -220,6 +226,9 @@ func (m HelpModel) resourceListGroups(secrets bool) []helpGroup {
 			{"/", "filter"},
 			{":", "command"},
 		},
+	}
+	if paginated {
+		actions.bindings = append(actions.bindings, helpBinding{"M", "load more"})
 	}
 	if secrets {
 		actions.bindings = append(actions.bindings, helpBinding{"x", "reveal"})

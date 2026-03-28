@@ -124,8 +124,9 @@ type RefreshMsg struct{}
 // Entries maps resource short names to resource counts.
 // Only entries with a successful check (no error) are included.
 type AvailabilityCacheLoadedMsg struct {
-	Entries map[string]int // shortName -> resource count
-	Expired bool           // true if cache was beyond TTL
+	Entries   map[string]int  // shortName -> resource count
+	Truncated map[string]bool // shortName -> true if truncated
+	Expired   bool            // true if cache was beyond TTL
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
@@ -133,6 +134,7 @@ type AvailabilityCheckedMsg struct {
 	ResourceType string
 	HasResources bool
 	Count        int   // number of resources found
+	Truncated    bool  // true if count is from a truncated first page
 	Err          error // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          int   // generation counter -- ignore if != current availabilityGen
 }

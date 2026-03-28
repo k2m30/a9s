@@ -466,6 +466,9 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		for shortName, count := range msg.Entries {
 			menu.SetAvailability(shortName, count)
 		}
+		for shortName, trunc := range msg.Truncated {
+			menu.SetTruncated(shortName, trunc)
+		}
 	}
 
 	// Build queue of all resource types to check in background
@@ -503,6 +506,7 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 	if msg.Err == nil {
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			menu.SetAvailability(msg.ResourceType, msg.Count)
+			menu.SetTruncated(msg.ResourceType, msg.Truncated)
 		}
 	}
 

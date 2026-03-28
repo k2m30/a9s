@@ -20,6 +20,7 @@ const DefaultTTL = 1 * time.Hour
 type Entry struct {
 	HasResources bool   `yaml:"has_resources"`
 	Count        int    `yaml:"count"`
+	Truncated    bool   `yaml:"truncated,omitempty"`
 	Error        string `yaml:"error,omitempty"`
 }
 

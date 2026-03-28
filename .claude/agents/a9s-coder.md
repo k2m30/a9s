@@ -1,7 +1,7 @@
 ---
 name: a9s-coder
 description: "Writes Go implementation code ONLY — no tests. Receives exact file scope from architect. Rejects tasks without scope.\n\nExamples:\n\n- user: \"implement RenderFrame in layout/frame.go\"\n  assistant: \"Let me use the a9s-coder agent to implement the frame rendering.\"\n\n- user: \"add Lambda as a new resource type\"\n  assistant: \"Let me use the a9s-coder agent to create the fetcher, type def, and all supporting files.\"\n\n- user: \"implement the resource list View() method\"\n  assistant: \"Let me use the a9s-coder agent to build the table rendering with status colors and horizontal scroll.\""
-model: opus
+model: sonnet
 color: yellow
 memory: project
 skills:
