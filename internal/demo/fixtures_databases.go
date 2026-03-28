@@ -472,6 +472,121 @@ func s3ObjBackups() []resource.Resource {
 		{ID: "rds/prod-api-primary-2026-03-19.snap", Name: "rds/prod-api-primary-2026-03-19.snap", Status: "file", Fields: map[string]string{"key": "rds/prod-api-primary-2026-03-19.snap", "size": "2.3 GB", "last_modified": "2026-03-19T04:15:00+00:00", "storage_class": "GLACIER"}, RawStruct: s3types.Object{Key: aws.String("rds/prod-api-primary-2026-03-19.snap"), Size: aws.Int64(2469606195), StorageClass: s3types.ObjectStorageClassGlacier, LastModified: aws.Time(mustParseTime("2026-03-19T04:15:00+00:00"))}},
 	}
 }
+
+// data-pipeline-logs sub-folder fixtures
+
+func s3ObjDataPipelineLogs() []resource.Resource {
+	return []resource.Resource{
+		{ID: "logs/2026/", Name: "logs/2026/", Status: "folder", Fields: map[string]string{"key": "logs/2026/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("logs/2026/")}},
+		{ID: "logs/2025/", Name: "logs/2025/", Status: "folder", Fields: map[string]string{"key": "logs/2025/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("logs/2025/")}},
+	}
+}
+
+func s3ObjDataPipelineLogs2026() []resource.Resource {
+	return []resource.Resource{
+		{ID: "logs/2026/03/", Name: "logs/2026/03/", Status: "folder", Fields: map[string]string{"key": "logs/2026/03/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("logs/2026/03/")}},
+		{ID: "logs/2026/02/", Name: "logs/2026/02/", Status: "folder", Fields: map[string]string{"key": "logs/2026/02/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("logs/2026/02/")}},
+		{ID: "logs/2026/01/", Name: "logs/2026/01/", Status: "folder", Fields: map[string]string{"key": "logs/2026/01/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("logs/2026/01/")}},
+	}
+}
+
+func s3ObjDataPipelineLogs202603() []resource.Resource {
+	return []resource.Resource{
+		{ID: "logs/2026/03/access-2026-03-21.log", Name: "logs/2026/03/access-2026-03-21.log", Status: "file", Fields: map[string]string{"key": "logs/2026/03/access-2026-03-21.log", "size": "4.7 MB", "last_modified": "2026-03-21T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/03/access-2026-03-21.log"), Size: aws.Int64(4928307), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-21T06:00:00Z"))}},
+		{ID: "logs/2026/03/access-2026-03-20.log", Name: "logs/2026/03/access-2026-03-20.log", Status: "file", Fields: map[string]string{"key": "logs/2026/03/access-2026-03-20.log", "size": "5.1 MB", "last_modified": "2026-03-20T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/03/access-2026-03-20.log"), Size: aws.Int64(5347737), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T06:00:00Z"))}},
+		{ID: "logs/2026/03/error-2026-03-21.log", Name: "logs/2026/03/error-2026-03-21.log", Status: "file", Fields: map[string]string{"key": "logs/2026/03/error-2026-03-21.log", "size": "128 KB", "last_modified": "2026-03-21T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/03/error-2026-03-21.log"), Size: aws.Int64(131072), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-21T06:00:00Z"))}},
+		{ID: "logs/2026/03/error-2026-03-20.log", Name: "logs/2026/03/error-2026-03-20.log", Status: "file", Fields: map[string]string{"key": "logs/2026/03/error-2026-03-20.log", "size": "96 KB", "last_modified": "2026-03-20T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/03/error-2026-03-20.log"), Size: aws.Int64(98304), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T06:00:00Z"))}},
+	}
+}
+
+func s3ObjDataPipelineLogs202602() []resource.Resource {
+	return []resource.Resource{
+		{ID: "logs/2026/02/access-2026-02-28.log", Name: "logs/2026/02/access-2026-02-28.log", Status: "file", Fields: map[string]string{"key": "logs/2026/02/access-2026-02-28.log", "size": "3.9 MB", "last_modified": "2026-02-28T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/02/access-2026-02-28.log"), Size: aws.Int64(4089446), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-02-28T06:00:00Z"))}},
+		{ID: "logs/2026/02/access-2026-02-27.log", Name: "logs/2026/02/access-2026-02-27.log", Status: "file", Fields: map[string]string{"key": "logs/2026/02/access-2026-02-27.log", "size": "4.2 MB", "last_modified": "2026-02-27T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/02/access-2026-02-27.log"), Size: aws.Int64(4404019), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-02-27T06:00:00Z"))}},
+		{ID: "logs/2026/02/error-2026-02-28.log", Name: "logs/2026/02/error-2026-02-28.log", Status: "file", Fields: map[string]string{"key": "logs/2026/02/error-2026-02-28.log", "size": "67 KB", "last_modified": "2026-02-28T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("logs/2026/02/error-2026-02-28.log"), Size: aws.Int64(68608), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-02-28T06:00:00Z"))}},
+	}
+}
+
+// webapp-assets-prod sub-folder fixtures
+
+func s3ObjWebappCSS() []resource.Resource {
+	return []resource.Resource{
+		{ID: "css/main.css", Name: "css/main.css", Status: "file", Fields: map[string]string{"key": "css/main.css", "size": "24.3 KB", "last_modified": "2026-03-20T10:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("css/main.css"), Size: aws.Int64(24883), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T10:00:00Z"))}},
+		{ID: "css/vendor.css", Name: "css/vendor.css", Status: "file", Fields: map[string]string{"key": "css/vendor.css", "size": "156 KB", "last_modified": "2026-03-15T09:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("css/vendor.css"), Size: aws.Int64(159744), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-15T09:00:00Z"))}},
+	}
+}
+
+func s3ObjWebappJS() []resource.Resource {
+	return []resource.Resource{
+		{ID: "js/app.bundle.js", Name: "js/app.bundle.js", Status: "file", Fields: map[string]string{"key": "js/app.bundle.js", "size": "342 KB", "last_modified": "2026-03-20T10:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("js/app.bundle.js"), Size: aws.Int64(350208), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-20T10:00:00Z"))}},
+		{ID: "js/vendor.bundle.js", Name: "js/vendor.bundle.js", Status: "file", Fields: map[string]string{"key": "js/vendor.bundle.js", "size": "1.2 MB", "last_modified": "2026-03-15T09:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("js/vendor.bundle.js"), Size: aws.Int64(1258291), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-15T09:00:00Z"))}},
+	}
+}
+
+func s3ObjWebappImages() []resource.Resource {
+	return []resource.Resource{
+		{ID: "images/logo.png", Name: "images/logo.png", Status: "file", Fields: map[string]string{"key": "images/logo.png", "size": "18.4 KB", "last_modified": "2026-01-15T12:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("images/logo.png"), Size: aws.Int64(18841), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-01-15T12:00:00Z"))}},
+		{ID: "images/hero-banner.jpg", Name: "images/hero-banner.jpg", Status: "file", Fields: map[string]string{"key": "images/hero-banner.jpg", "size": "245 KB", "last_modified": "2026-03-19T15:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("images/hero-banner.jpg"), Size: aws.Int64(250880), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-19T15:30:00Z"))}},
+		{ID: "images/favicon-32x32.png", Name: "images/favicon-32x32.png", Status: "file", Fields: map[string]string{"key": "images/favicon-32x32.png", "size": "1.4 KB", "last_modified": "2026-01-15T12:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("images/favicon-32x32.png"), Size: aws.Int64(1434), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-01-15T12:00:00Z"))}},
+	}
+}
+
+// ml-training-data sub-folder fixtures
+
+func s3ObjMLDatasets() []resource.Resource {
+	return []resource.Resource{
+		{ID: "datasets/train.csv", Name: "datasets/train.csv", Status: "file", Fields: map[string]string{"key": "datasets/train.csv", "size": "1.8 GB", "last_modified": "2026-03-15T09:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("datasets/train.csv"), Size: aws.Int64(1932735283), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-15T09:00:00Z"))}},
+		{ID: "datasets/validation.csv", Name: "datasets/validation.csv", Status: "file", Fields: map[string]string{"key": "datasets/validation.csv", "size": "450 MB", "last_modified": "2026-03-15T09:05:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("datasets/validation.csv"), Size: aws.Int64(471859200), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-15T09:05:00Z"))}},
+		{ID: "datasets/test.csv", Name: "datasets/test.csv", Status: "file", Fields: map[string]string{"key": "datasets/test.csv", "size": "220 MB", "last_modified": "2026-03-15T09:10:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("datasets/test.csv"), Size: aws.Int64(230686720), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-15T09:10:00Z"))}},
+	}
+}
+
+func s3ObjMLModels() []resource.Resource {
+	return []resource.Resource{
+		{ID: "models/v3-final.tar.gz", Name: "models/v3-final.tar.gz", Status: "file", Fields: map[string]string{"key": "models/v3-final.tar.gz", "size": "892 MB", "last_modified": "2026-03-18T14:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("models/v3-final.tar.gz"), Size: aws.Int64(935329792), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-18T14:00:00Z"))}},
+		{ID: "models/v2-baseline.tar.gz", Name: "models/v2-baseline.tar.gz", Status: "file", Fields: map[string]string{"key": "models/v2-baseline.tar.gz", "size": "756 MB", "last_modified": "2026-02-20T11:00:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("models/v2-baseline.tar.gz"), Size: aws.Int64(792723456), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-02-20T11:00:00Z"))}},
+	}
+}
+
+func s3ObjMLNotebooks() []resource.Resource {
+	return []resource.Resource{
+		{ID: "notebooks/exploration.ipynb", Name: "notebooks/exploration.ipynb", Status: "file", Fields: map[string]string{"key": "notebooks/exploration.ipynb", "size": "342 KB", "last_modified": "2026-03-10T11:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("notebooks/exploration.ipynb"), Size: aws.Int64(350208), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-10T11:00:00Z"))}},
+		{ID: "notebooks/feature-engineering.ipynb", Name: "notebooks/feature-engineering.ipynb", Status: "file", Fields: map[string]string{"key": "notebooks/feature-engineering.ipynb", "size": "567 KB", "last_modified": "2026-03-12T16:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("notebooks/feature-engineering.ipynb"), Size: aws.Int64(580608), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-12T16:30:00Z"))}},
+	}
+}
+
+// terraform-state-prod sub-folder fixture
+
+func s3ObjTerraformEnv() []resource.Resource {
+	return []resource.Resource{
+		{ID: "env:/prod/", Name: "env:/prod/", Status: "folder", Fields: map[string]string{"key": "env:/prod/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("env:/prod/")}},
+		{ID: "env:/staging/", Name: "env:/staging/", Status: "folder", Fields: map[string]string{"key": "env:/staging/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("env:/staging/")}},
+	}
+}
+
+// cloudtrail-audit-logs sub-folder fixture
+
+func s3ObjCloudtrailAWSLogs() []resource.Resource {
+	return []resource.Resource{
+		{ID: "AWSLogs/123456789012/", Name: "AWSLogs/123456789012/", Status: "folder", Fields: map[string]string{"key": "AWSLogs/123456789012/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("AWSLogs/123456789012/")}},
+	}
+}
+
+// backup-db-snapshots sub-folder fixtures
+
+func s3ObjBackupsRDS() []resource.Resource {
+	return []resource.Resource{
+		{ID: "rds/prod-api-primary-2026-03-20.snap", Name: "rds/prod-api-primary-2026-03-20.snap", Status: "file", Fields: map[string]string{"key": "rds/prod-api-primary-2026-03-20.snap", "size": "2.3 GB", "last_modified": "2026-03-20T04:15:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("rds/prod-api-primary-2026-03-20.snap"), Size: aws.Int64(2469606195), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-03-20T04:15:00Z"))}},
+		{ID: "rds/prod-api-primary-2026-03-19.snap", Name: "rds/prod-api-primary-2026-03-19.snap", Status: "file", Fields: map[string]string{"key": "rds/prod-api-primary-2026-03-19.snap", "size": "2.3 GB", "last_modified": "2026-03-19T04:15:00+00:00", "storage_class": "GLACIER"}, RawStruct: s3types.Object{Key: aws.String("rds/prod-api-primary-2026-03-19.snap"), Size: aws.Int64(2469606195), StorageClass: s3types.ObjectStorageClassGlacier, LastModified: aws.Time(mustParseTime("2026-03-19T04:15:00Z"))}},
+	}
+}
+
+func s3ObjBackupsDocDB() []resource.Resource {
+	return []resource.Resource{
+		{ID: "docdb/orders-cluster-2026-03-19.snap", Name: "docdb/orders-cluster-2026-03-19.snap", Status: "file", Fields: map[string]string{"key": "docdb/orders-cluster-2026-03-19.snap", "size": "1.1 GB", "last_modified": "2026-03-19T04:30:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("docdb/orders-cluster-2026-03-19.snap"), Size: aws.Int64(1181116006), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-03-19T04:30:00Z"))}},
+	}
+}
+
 // rdsInstances returns demo RDS (DB Instance) fixtures.
 func rdsInstances() []resource.Resource {
 	instances := []resource.Resource{

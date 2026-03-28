@@ -34,24 +34,55 @@ func GetResources(resourceType string) ([]resource.Resource, bool) {
 	return gen(), true
 }
 
-// GetS3Objects returns fixture data for S3 objects within a bucket.
-// Returns nil, false if the bucket is not in demo data.
+// GetS3Objects returns fixture data for S3 objects within a bucket at the given prefix.
+// Returns nil, false if the bucket or prefix is not in demo data.
 func GetS3Objects(bucket, prefix string) ([]resource.Resource, bool) {
-	gen, ok := s3ObjectData[bucket]
+	bucketData, ok := s3ObjectData[bucket]
+	if !ok {
+		return nil, false
+	}
+	gen, ok := bucketData[prefix]
 	if !ok {
 		return nil, false
 	}
 	return gen(), true
 }
 
-// s3ObjectData maps bucket names to their object fixture generators.
-var s3ObjectData = map[string]func() []resource.Resource{
-	"data-pipeline-logs":  s3ObjDataPipeline,
-	"webapp-assets-prod":  s3ObjWebapp,
-	"ml-training-data":    s3ObjMLTraining,
-	"terraform-state-prod": s3ObjTerraform,
-	"cloudtrail-audit-logs": s3ObjCloudtrail,
-	"backup-db-snapshots": s3ObjBackups,
+// s3ObjectData maps bucket names to prefix-keyed fixture generators.
+// Empty string prefix "" means the top-level listing.
+var s3ObjectData = map[string]map[string]func() []resource.Resource{
+	"data-pipeline-logs": {
+		"":              s3ObjDataPipeline,
+		"logs/":         s3ObjDataPipelineLogs,
+		"logs/2026/":    s3ObjDataPipelineLogs2026,
+		"logs/2026/03/": s3ObjDataPipelineLogs202603,
+		"logs/2026/02/": s3ObjDataPipelineLogs202602,
+	},
+	"webapp-assets-prod": {
+		"":        s3ObjWebapp,
+		"css/":    s3ObjWebappCSS,
+		"js/":     s3ObjWebappJS,
+		"images/": s3ObjWebappImages,
+	},
+	"ml-training-data": {
+		"":           s3ObjMLTraining,
+		"datasets/":  s3ObjMLDatasets,
+		"models/":    s3ObjMLModels,
+		"notebooks/": s3ObjMLNotebooks,
+	},
+	"terraform-state-prod": {
+		"":      s3ObjTerraform,
+		"env:/": s3ObjTerraformEnv,
+	},
+	"cloudtrail-audit-logs": {
+		"":         s3ObjCloudtrail,
+		"AWSLogs/": s3ObjCloudtrailAWSLogs,
+	},
+	"backup-db-snapshots": {
+		"":       s3ObjBackups,
+		"rds/":   s3ObjBackupsRDS,
+		"docdb/": s3ObjBackupsDocDB,
+	},
 }
 
 // GetR53Records returns fixture data for Route53 records within a hosted zone.
