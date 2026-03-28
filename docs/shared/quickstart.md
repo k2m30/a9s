@@ -8,4 +8,6 @@ a9s                       # use default profile
 a9s -p production         # use a specific profile
 a9s -r eu-west-1          # override region
 a9s --version             # print version
+a9s --demo                # run with synthetic demo data (no AWS credentials needed)
+a9s --no-cache            # disable resource availability cache
 ```

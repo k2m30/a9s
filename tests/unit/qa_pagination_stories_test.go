@@ -757,7 +757,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 			}
 			total := len(allResources)
 
-			// Simulate first-page pagination (matches old DemoPageSize=5)
+			// Simulate first-page pagination (page size 5)
 			pageSize := 5
 			page := allResources
 			isTruncated := false
