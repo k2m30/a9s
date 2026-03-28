@@ -41,8 +41,20 @@ func RowColorStyle(status string) lipgloss.Style {
 	if NoColorActive() {
 		return lipgloss.NewStyle()
 	}
-	if s, ok := rowColorCache[strings.ToLower(status)]; ok {
+	lower := strings.ToLower(status)
+	if s, ok := rowColorCache[lower]; ok {
 		return s
+	}
+	// CloudFormation pattern-based matching: check suffixes.
+	// Order matters: _in_progress before _complete because
+	// UPDATE_COMPLETE_CLEANUP_IN_PROGRESS should match yellow, not green.
+	switch {
+	case strings.HasSuffix(lower, "_in_progress"):
+		return lipgloss.NewStyle().Foreground(ColPending)
+	case strings.HasSuffix(lower, "_failed"):
+		return lipgloss.NewStyle().Foreground(ColStopped)
+	case strings.HasSuffix(lower, "_complete"):
+		return lipgloss.NewStyle().Foreground(ColRunning)
 	}
 	return lipgloss.NewStyle().Foreground(ColHeaderFg)
 }
@@ -101,6 +113,51 @@ func initStyles() {
 		"timed_out":       lipgloss.NewStyle().Foreground(ColStopped),
 		"aborted":         lipgloss.NewStyle().Foreground(ColTerminated),
 		"pending_redrive": lipgloss.NewStyle().Foreground(ColPending),
+
+		// --- Green (ColRunning) ---
+		"healthy":  lipgloss.NewStyle().Foreground(ColRunning), // TG Health
+		"ok":       lipgloss.NewStyle().Foreground(ColRunning), // CloudWatch Alarms
+		"issued":   lipgloss.NewStyle().Foreground(ColRunning), // ACM
+		"deployed": lipgloss.NewStyle().Foreground(ColRunning), // CloudFront
+		"enabled":  lipgloss.NewStyle().Foreground(ColRunning), // EventBridge, KMS, Athena
+		"green":    lipgloss.NewStyle().Foreground(ColRunning), // EB Health
+		"success":  lipgloss.NewStyle().Foreground(ColRunning), // SES
+
+		// --- Red (ColStopped) ---
+		"unhealthy":                  lipgloss.NewStyle().Foreground(ColStopped), // TG Health
+		"unavailable":                lipgloss.NewStyle().Foreground(ColStopped), // TG Health
+		"alarm":                      lipgloss.NewStyle().Foreground(ColStopped), // CloudWatch
+		"expired":                    lipgloss.NewStyle().Foreground(ColStopped), // ACM, VPC Endpoints
+		"revoked":                    lipgloss.NewStyle().Foreground(ColStopped), // ACM
+		"rejected":                   lipgloss.NewStyle().Foreground(ColStopped), // VPC Endpoints
+		"pendingdeletion":            lipgloss.NewStyle().Foreground(ColStopped), // KMS
+		"rollback_complete":          lipgloss.NewStyle().Foreground(ColStopped), // CFN: rollback = original op failed
+		"import_rollback_complete":   lipgloss.NewStyle().Foreground(ColStopped), // CFN: import rollback = failure
+		"red":                        lipgloss.NewStyle().Foreground(ColStopped), // EB Health
+
+		// --- Yellow (ColPending) ---
+		"draining":           lipgloss.NewStyle().Foreground(ColPending), // TG Health
+		"initial":            lipgloss.NewStyle().Foreground(ColPending), // TG Health
+		"insufficient_data":  lipgloss.NewStyle().Foreground(ColPending), // CloudWatch
+		"pending_validation": lipgloss.NewStyle().Foreground(ColPending), // ACM
+		"inprogress":         lipgloss.NewStyle().Foreground(ColPending), // CloudFront
+		"healing":            lipgloss.NewStyle().Foreground(ColPending), // MSK
+		"rebooting_broker":   lipgloss.NewStyle().Foreground(ColPending), // MSK
+		"maintenance":        lipgloss.NewStyle().Foreground(ColPending), // MSK
+		"rebooting":          lipgloss.NewStyle().Foreground(ColPending), // Redshift
+		"resizing":           lipgloss.NewStyle().Foreground(ColPending), // Redshift
+		"pendingimport":      lipgloss.NewStyle().Foreground(ColPending), // KMS
+		"pendingacceptance":  lipgloss.NewStyle().Foreground(ColPending), // VPC Endpoints
+		"yellow":             lipgloss.NewStyle().Foreground(ColPending), // EB Health
+		"temporary_failure":  lipgloss.NewStyle().Foreground(ColPending), // SES
+
+		// --- Dim (ColTerminated) ---
+		"unused":      lipgloss.NewStyle().Foreground(ColTerminated), // TG Health
+		"disabled":    lipgloss.NewStyle().Foreground(ColTerminated), // EventBridge, KMS, Athena, CloudFront
+		"inactive":    lipgloss.NewStyle().Foreground(ColTerminated), // ACM
+		"grey":        lipgloss.NewStyle().Foreground(ColTerminated), // EB Health
+		"not_started": lipgloss.NewStyle().Foreground(ColTerminated), // SES
+		"paused":      lipgloss.NewStyle().Foreground(ColTerminated), // Redshift
 	}
 
 	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)

@@ -68,10 +68,15 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 
 			priceClass := string(dist.PriceClass)
 
+			colorStatus := status
+			if dist.Enabled != nil && !*dist.Enabled {
+				colorStatus = "Disabled"
+			}
+
 			r := resource.Resource{
 				ID:     distID,
 				Name:   distID,
-				Status: status,
+				Status: colorStatus,
 				Fields: map[string]string{
 					"distribution_id": distID,
 					"domain_name":     domainName,

@@ -47,7 +47,7 @@ func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([
 			r := resource.Resource{
 				ID:     identityName,
 				Name:   identityName,
-				Status: "",
+				Status: verificationStatus,
 				Fields: map[string]string{
 					"identity_name":       identityName,
 					"identity_type":       identityType,

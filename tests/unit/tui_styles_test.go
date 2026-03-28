@@ -37,7 +37,10 @@ func isStyleInitialized(s lipgloss.Style) bool {
 // ===========================================================================
 
 func TestRowColorStyle_GreenStatuses(t *testing.T) {
-	greenStatuses := []string{"running", "available", "active", "in-use"}
+	greenStatuses := []string{
+		"running", "available", "active", "in-use",
+		"healthy", "ok", "issued", "deployed", "enabled", "green", "success", "succeeded",
+	}
 	for _, s := range greenStatuses {
 		style := styles.RowColorStyle(s)
 		fg := style.GetForeground()
@@ -48,7 +51,10 @@ func TestRowColorStyle_GreenStatuses(t *testing.T) {
 }
 
 func TestRowColorStyle_RedStatuses(t *testing.T) {
-	redStatuses := []string{"stopped", "failed", "error", "deleting", "deleted"}
+	redStatuses := []string{
+		"stopped", "failed", "error", "deleting", "deleted",
+		"unhealthy", "unavailable", "alarm", "expired", "revoked", "rejected", "pendingdeletion", "timed_out",
+	}
 	for _, s := range redStatuses {
 		style := styles.RowColorStyle(s)
 		fg := style.GetForeground()
@@ -59,7 +65,12 @@ func TestRowColorStyle_RedStatuses(t *testing.T) {
 }
 
 func TestRowColorStyle_YellowStatuses(t *testing.T) {
-	yellowStatuses := []string{"pending", "creating", "modifying", "updating"}
+	yellowStatuses := []string{
+		"pending", "creating", "modifying", "updating",
+		"draining", "initial", "insufficient_data", "pending_validation", "inprogress",
+		"healing", "rebooting_broker", "maintenance", "rebooting", "resizing",
+		"pendingimport", "pendingacceptance", "yellow", "temporary_failure", "pending_redrive",
+	}
 	for _, s := range yellowStatuses {
 		style := styles.RowColorStyle(s)
 		fg := style.GetForeground()
@@ -70,7 +81,10 @@ func TestRowColorStyle_YellowStatuses(t *testing.T) {
 }
 
 func TestRowColorStyle_DimStatuses(t *testing.T) {
-	dimStatuses := []string{"terminated", "shutting-down"}
+	dimStatuses := []string{
+		"terminated", "shutting-down",
+		"unused", "disabled", "inactive", "grey", "not_started", "paused", "aborted",
+	}
 	for _, s := range dimStatuses {
 		style := styles.RowColorStyle(s)
 		fg := style.GetForeground()
@@ -132,6 +146,29 @@ func TestRowColorStyle_CaseInsensitive(t *testing.T) {
 		{"TERMINATED", styles.ColTerminated},
 		{"Shutting-Down", styles.ColTerminated},
 		{"SHUTTING-DOWN", styles.ColTerminated},
+		// New status mappings — case insensitivity verification
+		{"Healthy", styles.ColRunning},
+		{"HEALTHY", styles.ColRunning},
+		{"Ok", styles.ColRunning},
+		{"OK", styles.ColRunning},
+		{"ALARM", styles.ColStopped},
+		{"Alarm", styles.ColStopped},
+		{"INSUFFICIENT_DATA", styles.ColPending},
+		{"Insufficient_Data", styles.ColPending},
+		{"Deployed", styles.ColRunning},
+		{"DEPLOYED", styles.ColRunning},
+		{"InProgress", styles.ColPending},
+		{"INPROGRESS", styles.ColPending},
+		{"PendingDeletion", styles.ColStopped},
+		{"PENDINGDELETION", styles.ColStopped},
+		{"PendingImport", styles.ColPending},
+		{"PENDINGIMPORT", styles.ColPending},
+		{"Disabled", styles.ColTerminated},
+		{"DISABLED", styles.ColTerminated},
+		{"Enabled", styles.ColRunning},
+		{"ENABLED", styles.ColRunning},
+		{"Paused", styles.ColTerminated},
+		{"PAUSED", styles.ColTerminated},
 	}
 	for _, tc := range cases {
 		style := styles.RowColorStyle(tc.input)
@@ -153,6 +190,9 @@ func TestRowColorStyle_NeverReturnsZeroStyle(t *testing.T) {
 		"pending", "creating", "modifying", "updating",
 		"terminated", "shutting-down",
 		"unknown", "", "anything", "RUNNING", "Stopped",
+		// New status mappings
+		"healthy", "alarm", "deployed", "enabled", "disabled", "paused", "healing",
+		"CREATE_COMPLETE", "UPDATE_IN_PROGRESS", "CREATE_FAILED",
 	}
 	for _, s := range allStatuses {
 		style := styles.RowColorStyle(s)
