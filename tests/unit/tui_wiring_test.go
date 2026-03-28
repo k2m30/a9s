@@ -339,49 +339,38 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 // The probe count MUST match what the user actually sees.
 
 func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
-	// Step 1: Find a resource type where GetResources returns more than DemoPageSize items.
-	// This proves the discrepancy between total and paginated counts.
+	// Step 1: Find a resource type with known fixture count.
 	var targetType string
 	var totalCount int
-	var paginatedCount int
 	for _, shortName := range resource.AllShortNames() {
 		all, ok := demo.GetResources(shortName)
 		if !ok {
 			continue
 		}
-		if len(all) > demo.DemoPageSize {
+		if len(all) > 0 {
 			targetType = shortName
 			totalCount = len(all)
-			result, _ := demo.GetResourcesPaginated(shortName)
-			paginatedCount = len(result.Resources)
 			break
 		}
 	}
 	if targetType == "" {
-		t.Fatal("test requires at least one resource type with more than DemoPageSize fixtures")
-	}
-	if paginatedCount != demo.DemoPageSize {
-		t.Fatalf("expected paginated count %d for %s, got %d", demo.DemoPageSize, targetType, paginatedCount)
-	}
-	if totalCount <= demo.DemoPageSize {
-		t.Fatalf("expected total count > %d for %s, got %d", demo.DemoPageSize, targetType, totalCount)
+		t.Fatal("test requires at least one resource type with demo fixtures")
 	}
 
-	// Step 2: Create a demo-mode model and send ClientsReadyMsg.
+	// Step 2: Create a demo-mode model with real clients backed by the demo transport.
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{})
+	m, _ = rootApplyMsg(m, demoClientsReadyMsg())
 
 	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
-	// This builds the queue and fires the first 3 probes.
+	// In demo mode, loadAvailabilityCache returns Expired: true (no cache file),
+	// so we can send the message directly to start probes.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
 
-	// Step 4: Walk the full probe cycle. Execute batch cmds to get
-	// AvailabilityCheckedMsg, feed each one back into the model to dequeue
-	// the next probe, and collect all results.
+	// Step 4: Walk probe cycle, collect results.
 	type probeResult struct {
 		Count     int
 		Truncated bool
@@ -394,7 +383,6 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 			m, cmd = rootApplyMsg(m, acm)
 			continue
 		}
-		// Handle BatchMsg: execute each sub-cmd and feed results back
 		if batch, ok := msg.(tea.BatchMsg); ok {
 			for _, subCmd := range batch {
 				if subCmd == nil {
@@ -408,30 +396,17 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 			}
 			continue
 		}
-		// Not a batch or AvailabilityCheckedMsg — stop
 		break
 	}
 
-	// Step 5: Verify the target resource type was probed
+	// Step 5: Verify probe count matches total fixtures (real fetcher returns all, no pagination).
 	result, found := collected[targetType]
 	if !found {
-		t.Fatalf("probe cycle did not produce AvailabilityCheckedMsg for %s; collected: %v", targetType, collected)
+		t.Fatalf("probe cycle did not produce AvailabilityCheckedMsg for %s", targetType)
 	}
-
-	// Step 6: Assert the probe count matches the PAGINATED page size, not the total.
-	// With the bug, probeCount == totalCount (e.g. 22 for dbi).
-	// After the fix, probeCount == paginatedCount (DemoPageSize, e.g. 5).
-	if result.Count != paginatedCount {
-		t.Errorf("demo probe for %s reported count=%d, want %d (DemoPageSize); "+
-			"total fixtures=%d — probe must use GetResourcesPaginated, not GetResources",
-			targetType, result.Count, paginatedCount, totalCount)
-	}
-
-	// Step 7: Assert the Truncated flag is true for types with more than DemoPageSize fixtures.
-	// The target type has totalCount > DemoPageSize, so its probe result must be truncated.
-	if !result.Truncated {
-		t.Errorf("demo probe for %s should have Truncated=true (total=%d > DemoPageSize=%d), got false",
-			targetType, totalCount, demo.DemoPageSize)
+	if result.Count != totalCount {
+		t.Errorf("demo probe for %s reported count=%d, want %d (total fixtures)",
+			targetType, result.Count, totalCount)
 	}
 }
 

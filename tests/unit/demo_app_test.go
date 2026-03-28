@@ -5,9 +5,19 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
+
+// demoClientsReadyMsg creates a ClientsReadyMsg backed by the demo transport.
+// Used in tests that need real demo clients after Init() wiring change.
+func demoClientsReadyMsg() messages.ClientsReadyMsg {
+	cfg := demo.NewDemoAWSConfig()
+	clients := awsclient.CreateServiceClients(cfg)
+	return messages.ClientsReadyMsg{Clients: clients}
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Demo mode app.go integration tests — verify root model demo-mode behavior.
@@ -28,8 +38,8 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 	if !ok {
 		t.Fatalf("Init() cmd produced %T; expected messages.ClientsReadyMsg", msg)
 	}
-	if crm.Clients != nil {
-		t.Error("ClientsReadyMsg.Clients should be nil in demo mode")
+	if crm.Clients == nil {
+		t.Error("ClientsReadyMsg.Clients should be non-nil in demo mode (backed by demo transport)")
 	}
 	if crm.Err != nil {
 		t.Errorf("ClientsReadyMsg.Err should be nil in demo mode; got %v", crm.Err)
@@ -45,7 +55,7 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to EC2 resource list
 	_, cmd := m.Update(messages.NavigateMsg{
@@ -80,7 +90,7 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to a non-demo resource type (nonexistent-type)
 	_, cmd := m.Update(messages.NavigateMsg{
@@ -122,7 +132,7 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Execute :ctx command via NavigateMsg (same path as executeCommand)
 	_, cmd := m.Update(messages.NavigateMsg{Target: messages.TargetProfile})
@@ -150,7 +160,7 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Execute :region command via NavigateMsg
 	_, cmd := m.Update(messages.NavigateMsg{Target: messages.TargetRegion})
@@ -178,7 +188,7 @@ func TestDemoMode_BlockedReveal(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to secrets resource list
 	m, cmd := m.Update(messages.NavigateMsg{
@@ -224,7 +234,7 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
-	m, _ = m.Update(messages.ClientsReadyMsg{})
+	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to EC2
 	m, cmd := m.Update(messages.NavigateMsg{

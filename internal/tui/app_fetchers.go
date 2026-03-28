@@ -9,7 +9,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -19,9 +18,6 @@ import (
 // using the resource registry. Child resource types (S3 objects, R53 records)
 // are handled by fetchChildResources instead.
 func (m *Model) fetchResources(resourceType string) tea.Cmd {
-	if m.demoMode {
-		return m.fetchDemoResources(resourceType)
-	}
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -51,9 +47,6 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 // It checks the paginated child registry first (passing empty continuation token
 // for the initial page), then falls back to the legacy child fetcher registry.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
-	if m.demoMode {
-		return m.fetchDemoChildResources(childType, parentCtx)
-	}
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -100,37 +93,6 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 // fetchMoreResources returns a tea.Cmd that fetches the next page of a paginated
 // resource list using the continuation token from LoadMoreMsg.
 func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
-	if m.demoMode {
-		rt := msg.ResourceType
-		parentCtx := msg.ParentContext
-		return func() tea.Msg {
-			var result resource.FetchResult
-			var ok bool
-			if len(parentCtx) > 0 {
-				result, ok = demo.GetMoreChildResources(rt, parentCtx)
-			} else {
-				canonicalType := rt
-				rtDef := resource.FindResourceType(rt)
-				if rtDef != nil {
-					canonicalType = rtDef.ShortName
-				}
-				result, ok = demo.GetMoreResources(canonicalType)
-			}
-			if !ok {
-				return messages.ResourcesLoadedMsg{
-					ResourceType: rt,
-					Append:       true,
-					Pagination:   &resource.PaginationMeta{IsTruncated: false},
-				}
-			}
-			return messages.ResourcesLoadedMsg{
-				ResourceType: rt,
-				Resources:    result.Resources,
-				Append:       true,
-				Pagination:   result.Pagination,
-			}
-		}
-	}
 	clients := m.clients
 	rt := msg.ResourceType
 	token := msg.ContinuationToken
@@ -185,61 +147,8 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 	}
 }
 
-// fetchDemoChildResources returns synthetic fixture data for child views in demo mode.
-// Uses paginated demo fetcher so child views show truncation + load-more UX.
-func (m *Model) fetchDemoChildResources(childType string, parentCtx map[string]string) tea.Cmd {
-	return func() tea.Msg {
-		result, ok := demo.GetChildResourcesPaginated(childType, parentCtx)
-		if !ok {
-			return messages.ResourcesLoadedMsg{
-				ResourceType: childType,
-				Resources:    nil,
-			}
-		}
-		return messages.ResourcesLoadedMsg{
-			ResourceType: childType,
-			Resources:    result.Resources,
-			Pagination:   result.Pagination,
-		}
-	}
-}
-
-// fetchDemoResources returns a tea.Cmd that provides synthetic fixture data
-// instead of calling AWS APIs. Uses paginated demo fetcher so types with >5
-// items show truncation + load-more UX. Maintains the async message contract.
-func (m *Model) fetchDemoResources(resourceType string) tea.Cmd {
-	return func() tea.Msg {
-		// Resolve alias to canonical short name
-		canonicalType := resourceType
-		rt := resource.FindResourceType(resourceType)
-		if rt != nil {
-			canonicalType = rt.ShortName
-		}
-		result, _ := demo.GetResourcesPaginated(canonicalType)
-		return messages.ResourcesLoadedMsg{
-			ResourceType: resourceType,
-			Resources:    result.Resources,
-			Pagination:   result.Pagination,
-		}
-	}
-}
 
 func (m *Model) fetchIdentity() tea.Cmd {
-	if m.demoMode {
-		return func() tea.Msg {
-			return messages.IdentityLoadedMsg{
-				Identity: &awsclient.CallerIdentity{
-					AccountID:     "123456789012",
-					AccountAlias:  "demo-account",
-					Arn:           "arn:aws:sts::123456789012:assumed-role/demo-admin/session",
-					RoleName:      "demo-admin",
-					SessionName:   "session",
-					IdentityName:  "demo-admin",
-					IsAssumedRole: true,
-				},
-			}
-		}
-	}
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -338,26 +247,6 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 // probeResourceAvailability returns a tea.Cmd that checks if a resource type
 // has any resources by calling its registered fetcher with a timeout.
 func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
-	if m.demoMode {
-		return func() tea.Msg {
-			result, ok := demo.GetResourcesPaginated(shortName)
-			count := 0
-			truncated := false
-			if ok {
-				count = len(result.Resources)
-				if result.Pagination != nil {
-					truncated = result.Pagination.IsTruncated
-				}
-			}
-			return messages.AvailabilityCheckedMsg{
-				ResourceType: shortName,
-				HasResources: ok,
-				Count:        count,
-				Truncated:    truncated,
-				Gen:          gen,
-			}
-		}
-	}
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
@@ -434,13 +323,3 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 	}
 }
 
-// startAvailabilityProbes returns a tea.Cmd that triggers the probe pipeline
-// without loading from disk. Used in demo mode where cache files aren't needed.
-func (m *Model) startAvailabilityProbes() tea.Cmd {
-	return func() tea.Msg {
-		return messages.AvailabilityCacheLoadedMsg{
-			Entries: make(map[string]int),
-			Expired: true,
-		}
-	}
-}

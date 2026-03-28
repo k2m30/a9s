@@ -360,11 +360,11 @@ func eniFixtures() []resource.Resource {
 		},
 		{
 			ID:     "eni-0ggg777777777777g",
-			Name:   "",
+			Name:   "detached-eni",
 			Status: "available",
 			Fields: map[string]string{
 				"eni_id":     "eni-0ggg777777777777g",
-				"name":       "",
+				"name":       "detached-eni",
 				"status":     "available",
 				"type":       "interface",
 				"vpc_id":     prodVPCID,
@@ -384,6 +384,9 @@ func eniFixtures() []resource.Resource {
 				OwnerId:            aws.String("123456789012"),
 				RequesterManaged:   aws.Bool(false),
 				SourceDestCheck:    aws.Bool(true),
+				TagSet: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("detached-eni")},
+				},
 			},
 		},
 	}
