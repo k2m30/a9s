@@ -31,7 +31,7 @@
 | `M` | Load more (paginated lists, also in demo mode) |
 | `r` | Open Stack Resources (CFN Stacks) |
 | `s` | Open source view (reserved for future child views) |
-| `w` | Toggle line wrap (in YAML view) |
+| `w` | Toggle line wrap (in YAML, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) |
 
 ### Sorting

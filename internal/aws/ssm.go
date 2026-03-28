@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -18,6 +19,13 @@ func init() {
 		return FetchSSMParameters(ctx, c.SSM)
 	})
 	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description"})
+	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return "", fmt.Errorf("AWS clients not initialized")
+		}
+		return RevealSSMParameter(ctx, c.SSM, resourceID)
+	})
 }
 
 // FetchSSMParameters calls the SSM DescribeParameters API and converts the
@@ -81,4 +89,20 @@ func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]re
 	}
 
 	return resources, nil
+}
+
+// RevealSSMParameter calls the SSM GetParameter API with decryption enabled
+// and returns the parameter value string.
+func RevealSSMParameter(ctx context.Context, api SSMGetParameterAPI, paramName string) (string, error) {
+	output, err := api.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           &paramName,
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		return "", fmt.Errorf("revealing SSM parameter: %w", err)
+	}
+	if output.Parameter == nil || output.Parameter.Value == nil {
+		return "", nil
+	}
+	return *output.Parameter.Value, nil
 }

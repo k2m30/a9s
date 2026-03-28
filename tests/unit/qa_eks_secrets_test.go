@@ -379,7 +379,7 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 	// Press x to trigger reveal
 	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
 
-	// The x key should return a command (fetchSecretValue)
+	// The x key should return a command (fetchRevealValue)
 	if cmd == nil {
 		t.Error("pressing 'x' on secrets list should return a command to fetch the secret value")
 	}
@@ -543,7 +543,7 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 // ===========================================================================
 
 // TestQA_Secrets_RevealViewShowsSecretValue verifies that the reveal view
-// displays the secret value after receiving SecretRevealedMsg.
+// displays the secret value after receiving ValueRevealedMsg.
 func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -561,9 +561,10 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	})
 
 	// Simulate receiving the secret value
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "test/integration",
-		Value:      "super-secret-password-123",
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+		ResourceType: "secrets",
+		ResourceID:   "test/integration",
+		Value:        "super-secret-password-123",
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -598,9 +599,10 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 	})
 
 	// Trigger reveal
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "test/integration",
-		Value:      "my-secret-value",
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+		ResourceType: "secrets",
+		ResourceID:   "test/integration",
+		Value:        "my-secret-value",
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -638,9 +640,10 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 	})
 
 	// Open reveal view
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "test/integration",
-		Value:      "copy-me-secret",
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+		ResourceType: "secrets",
+		ResourceID:   "test/integration",
+		Value:        "copy-me-secret",
 	})
 
 	// Press c to copy
@@ -670,9 +673,10 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	})
 
 	// Open reveal view
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "test/integration",
-		Value:      "my-secret-value",
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+		ResourceType: "secrets",
+		ResourceID:   "test/integration",
+		Value:        "my-secret-value",
 	})
 
 	// Verify we are in reveal view (warning text present)
@@ -862,5 +866,76 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 
 	if !strings.Contains(plain, "eks(1)") {
 		t.Errorf("after Escape from YAML, should return to EKS list, got: %s", plain)
+	}
+}
+
+// ===========================================================================
+// SSM Parameter — Reveal (x key) — #104
+// ===========================================================================
+
+// TestQA_SSM_XKeyTriggersReveal verifies that pressing x on the SSM parameter
+// list returns a non-nil command (to fetch the parameter value).
+// Before #104 this returned nil because only "secrets" was wired.
+func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Navigate to SSM resource list.
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ssm",
+	})
+
+	params := fixtureSSMParameters()
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ssm",
+		Resources:    params,
+	})
+
+	// Press x to trigger reveal.
+	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
+
+	// After #104 the x key must produce a command — previously it returned nil.
+	if cmd == nil {
+		t.Error("pressing 'x' on SSM parameter list should return a command to fetch the parameter value")
+	}
+}
+
+// TestQA_SSM_RevealViewShowsParameterValue verifies that the reveal view
+// displays the SSM parameter value after receiving ValueRevealedMsg with
+// ResourceType "ssm".
+func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	// Navigate to SSM parameter list first.
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ssm",
+	})
+
+	params := fixtureSSMParameters()
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ssm",
+		Resources:    params,
+	})
+
+	// Simulate receiving the parameter value via the generalised message.
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+		ResourceType: "ssm",
+		ResourceID:   "/app/db/password",
+		Value:        "s3cr3t-db-pass!",
+	})
+
+	plain := stripANSI(rootViewContent(m))
+
+	// The reveal view must show the parameter value.
+	if !strings.Contains(plain, "s3cr3t-db-pass!") {
+		t.Errorf("reveal view should contain the parameter value, got: %s", plain)
+	}
+
+	// The frame title or body should reference the parameter name.
+	if !strings.Contains(plain, "/app/db/password") {
+		t.Errorf("reveal view should contain the parameter name, got: %s", plain)
 	}
 }

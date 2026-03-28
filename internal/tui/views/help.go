@@ -27,6 +27,10 @@ const (
 	HelpFromSecretsListPaginated                     // paginated secrets list (includes M and x)
 )
 
+// Aliases: reveal-list help contexts (resource types with reveal fetchers).
+const HelpFromRevealList = HelpFromSecretsList
+const HelpFromRevealListPaginated = HelpFromSecretsListPaginated
+
 // HelpModel renders context-sensitive keybinding reference inside the frame.
 // Any key press closes help (parent pops the view).
 type HelpModel struct {
@@ -347,7 +351,8 @@ func (m HelpModel) revealGroups() []helpGroup {
 		{
 			title: "ACTIONS",
 			bindings: []helpBinding{
-				{"c", "copy secret"},
+				{"c", "copy value"},
+				{"w", "wrap toggle"},
 				{"esc", "close"},
 			},
 		},

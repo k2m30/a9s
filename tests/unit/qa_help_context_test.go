@@ -414,7 +414,6 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 		"detail",  // d key
 		"yaml",    // y key
 		"reveal",  // x key
-		"wrap",    // w key
 		"refresh", // ctrl+r
 		"pgup",    // pagination
 		"pgdn",    // pagination
@@ -425,6 +424,11 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 		if strings.Contains(strings.ToLower(plain), text) {
 			t.Errorf("HC-08: reveal help should NOT contain %q, got:\n%s", text, plain)
 		}
+	}
+
+	// Reveal view supports wrap toggle (w key)
+	if !strings.Contains(strings.ToLower(plain), "wrap") {
+		t.Error("HC-08: reveal help should contain wrap toggle (w key)")
 	}
 }
 
@@ -669,10 +673,11 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 				}
 			}
 
-			// Only secrets should show reveal
-			if rt == "secrets" {
+			// Secrets and SSM should show reveal (x key); all others should not.
+			revealTypes := map[string]bool{"secrets": true, "ssm": true}
+			if revealTypes[rt] {
 				if !strings.Contains(plain, "reveal") {
-					t.Errorf("HC-03: secrets help should contain 'reveal'")
+					t.Errorf("HC-03: %s help should contain 'reveal'", rt)
 				}
 			} else {
 				if strings.Contains(plain, "reveal") {

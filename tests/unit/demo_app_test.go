@@ -181,10 +181,10 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. TestDemoMode_BlockedReveal
+// 6. TestDemoMode_RevealWorks
 // ---------------------------------------------------------------------------
 
-func TestDemoMode_BlockedReveal(t *testing.T) {
+func TestDemoMode_RevealWorks(t *testing.T) {
 	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
 
 	var m tea.Model = model
@@ -206,23 +206,88 @@ func TestDemoMode_BlockedReveal(t *testing.T) {
 	}
 
 	// Simulate pressing 'x' key — this triggers handleReveal via handleKeyMsg.
-	// In demo mode, handleReveal returns a FlashMsg immediately (before checking
-	// if we're on a secrets view or have a selected resource).
+	// The demo-mode block has been removed: reveal now goes through fetchRevealValue
+	// which calls the registry-based reveal fetcher. The cmd may succeed or fail
+	// depending on whether the demo transport handles the API call, but it must
+	// NOT return a FlashMsg with "not available in demo mode".
 	xKey := tea.KeyPressMsg{Code: -1, Text: "x"}
 	_, cmd = m.Update(xKey)
 	if cmd == nil {
-		t.Fatal("reveal key in demo mode returned nil cmd; expected FlashMsg")
+		t.Fatal("reveal key returned nil cmd; expected reveal pathway to be invoked")
 	}
 	revealMsg := cmd()
-	flash, ok := revealMsg.(messages.FlashMsg)
+
+	// The result must be ValueRevealedMsg (either Err==nil or Err!=nil).
+	// A FlashMsg would mean the reveal was blocked — which is no longer expected.
+	revealed, ok := revealMsg.(messages.ValueRevealedMsg)
 	if !ok {
-		t.Fatalf("expected FlashMsg from blocked reveal; got %T", revealMsg)
+		// If it is a FlashMsg, surface the text to make failures self-explanatory.
+		if flash, isFlash := revealMsg.(messages.FlashMsg); isFlash {
+			t.Fatalf("reveal pathway was blocked; got FlashMsg{Text:%q, IsError:%v} — expected ValueRevealedMsg", flash.Text, flash.IsError)
+		}
+		t.Fatalf("expected ValueRevealedMsg from reveal pathway; got %T", revealMsg)
 	}
-	if !flash.IsError {
-		t.Error("expected IsError=true for blocked reveal command")
+	// ResourceType and ResourceID must be populated regardless of whether the
+	// underlying API call succeeded.
+	if revealed.ResourceType == "" {
+		t.Error("ValueRevealedMsg.ResourceType must not be empty")
 	}
-	if flash.Text == "" {
-		t.Error("expected non-empty flash text for blocked reveal")
+	if revealed.ResourceID == "" {
+		t.Error("ValueRevealedMsg.ResourceID must not be empty")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 7. TestDemoMode_SSMRevealWorks
+// ---------------------------------------------------------------------------
+
+func TestDemoMode_SSMRevealWorks(t *testing.T) {
+	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+
+	var m tea.Model = model
+	m, _ = m.Update(demoClientsReadyMsg())
+
+	// Navigate to SSM parameter list
+	m, cmd := m.Update(messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ssm",
+	})
+
+	// Execute only the ResourcesLoadedMsg from fetch (skip timer cmds)
+	if cmd != nil {
+		msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
+			_, ok := msg.(messages.ResourcesLoadedMsg)
+			return ok
+		})
+		m, _ = m.Update(msg)
+	}
+
+	// Simulate pressing 'x' key — this triggers the SSM GetParameter demo handler
+	// via the registry-based reveal fetcher. The result must be ValueRevealedMsg,
+	// not a FlashMsg blocking the reveal.
+	xKey := tea.KeyPressMsg{Code: -1, Text: "x"}
+	_, cmd = m.Update(xKey)
+	if cmd == nil {
+		t.Fatal("reveal key returned nil cmd; expected SSM reveal pathway to be invoked")
+	}
+	revealMsg := cmd()
+
+	// The result must be ValueRevealedMsg (either Err==nil or Err!=nil).
+	// A FlashMsg would mean the reveal was blocked — which is not expected.
+	revealed, ok := revealMsg.(messages.ValueRevealedMsg)
+	if !ok {
+		if flash, isFlash := revealMsg.(messages.FlashMsg); isFlash {
+			t.Fatalf("SSM reveal pathway was blocked; got FlashMsg{Text:%q, IsError:%v} — expected ValueRevealedMsg", flash.Text, flash.IsError)
+		}
+		t.Fatalf("expected ValueRevealedMsg from SSM reveal pathway; got %T", revealMsg)
+	}
+	// ResourceType and ResourceID must be populated regardless of whether the
+	// underlying API call succeeded.
+	if revealed.ResourceType == "" {
+		t.Error("ValueRevealedMsg.ResourceType must not be empty")
+	}
+	if revealed.ResourceID == "" {
+		t.Error("ValueRevealedMsg.ResourceID must not be empty")
 	}
 }
 

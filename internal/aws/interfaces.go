@@ -230,6 +230,11 @@ type SSMDescribeParametersAPI interface {
 	DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
 }
 
+// SSMGetParameterAPI defines the interface for the SSM GetParameter operation.
+type SSMGetParameterAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+}
+
 // DDBListTablesAPI defines the interface for the DynamoDB ListTables operation.
 type DDBListTablesAPI interface {
 	ListTables(ctx context.Context, params *dynamodb.ListTablesInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error)

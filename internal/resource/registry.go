@@ -139,3 +139,34 @@ func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
 func UnregisterPaginatedChild(shortName string) {
 	delete(paginatedChildRegistry, shortName)
 }
+
+// RevealFetcher is the function signature for reveal value fetchers.
+// Each resource type that supports reveal (x key) registers a fetcher
+// that takes a context, clients, and resource ID, returning the value string.
+type RevealFetcher func(ctx context.Context, clients interface{}, resourceID string) (string, error)
+
+// revealRegistry maps resource short names to their reveal fetcher functions.
+var revealRegistry = map[string]RevealFetcher{}
+
+// RegisterRevealFetcher adds a reveal fetcher for the given resource short name.
+// Called from init() in each aws/*.go file for resource types that support reveal.
+func RegisterRevealFetcher(shortName string, f RevealFetcher) {
+	revealRegistry[shortName] = f
+}
+
+// GetRevealFetcher returns the reveal fetcher for the given resource short name,
+// or nil if no reveal fetcher is registered.
+func GetRevealFetcher(shortName string) RevealFetcher {
+	return revealRegistry[shortName]
+}
+
+// UnregisterRevealFetcher removes a reveal fetcher. Used only in tests for cleanup.
+func UnregisterRevealFetcher(shortName string) {
+	delete(revealRegistry, shortName)
+}
+
+// HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
+func HasRevealFetcher(shortName string) bool {
+	_, ok := revealRegistry[shortName]
+	return ok
+}
