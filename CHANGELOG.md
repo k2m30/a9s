@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.20.0] - 2026-03-28
+
+### Added
+- Resource counts in main menu — each service shows live count, e.g. "EC2 Instances (25)" (#68)
+- Resource availability caching — grey out empty resource types, cursor skips them (#68)
+- Pagination UX — help context shows load-more hint, availability truncation indicator (#68)
+- Demo mode via mock AWS transport — app code is 100% identical in demo and real modes (#103)
+- 63 SDK-level transport tests covering all 62 resource types through real AWS SDK clients (#103)
+- S3 folder drill-down with prefix-filtered fixtures for all 6 demo buckets (#103)
+- Annotated demo GIF with 9 scene overlays explaining navigation and key bindings
+
+### Changed
+- Demo mode now uses real SDK clients with an in-process mock `http.RoundTripper` instead of separate fetch code paths (#103)
+- Removed 140+ lines of `if m.demoMode` branches from app.go, app_fetchers.go, app_handlers.go (#103)
+- Deleted old demo pagination engine (pagination.go) — SDK handles pagination natively now (#103)
+
+### Fixed
+- S3 folder navigation in demo mode — drilling into folders no longer shows the same top-level listing (#103)
+- ECS services/tasks duplicate IDs — handlers now filter by cluster from request body (#103)
+- KMS DescribeKey returns matching key instead of always the first one (#103)
+- API Gateway handler uses correct camelCase keys for SDK deserialization (#103)
+- ASG handler no longer emits empty `<NextToken>` that caused infinite pagination loops (#103)
+- EC2 instances missing names — tag serialization added to XML response (#103)
+- Demo probe counts match paginated page size (#68)
+- "Refreshing availability..." flash auto-clears when all checks complete (#68)
+- Cursor skips greyed-out empty resource types in main menu (#68)
+
 ## [3.17.0] - 2026-03-27
 
 ### Added

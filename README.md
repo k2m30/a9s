@@ -35,7 +35,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 - Tokyo Night Dark color theme
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
-- 2,600+ unit tests
+- 2,750+ unit tests
 
 ## Installation
 
@@ -102,6 +102,8 @@ a9s                       # use default profile
 a9s -p production         # use a specific profile
 a9s -r eu-west-1          # override region
 a9s --version             # print version
+a9s --demo                # run with synthetic demo data (no AWS credentials needed)
+a9s --no-cache            # disable resource availability cache
 ```
 
 ## Supported AWS Services
@@ -155,6 +157,7 @@ a9s --version             # print version
 | `L` | Open Container Logs (ECS Services) |
 | `M` | Load more (paginated lists, also in demo mode) |
 | `r` | Open Stack Resources (CFN Stacks) |
+| `s` | Open source view (reserved for future child views) |
 | `w` | Toggle line wrap (in YAML view) |
 | `Tab` | Autocomplete (in command mode) |
 

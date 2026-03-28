@@ -333,9 +333,9 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 	}
 }
 
-// Bug 4: Demo probe count uses GetResources (all fixtures) instead of
-// GetResourcesPaginated (first page only). The menu shows the total fixture
-// count but the list view only shows DemoPageSize items on the first page.
+// Bug 4: Demo probe count must match what the user sees on the first page.
+// With SDK-level pagination, the transport returns a page of items; the probe
+// count should reflect that page size, not the total fixture count.
 // The probe count MUST match what the user actually sees.
 
 func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
