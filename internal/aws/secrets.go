@@ -18,6 +18,13 @@ func init() {
 		return FetchSecrets(ctx, c.SecretsManager)
 	})
 	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
+	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return "", fmt.Errorf("AWS clients not initialized")
+		}
+		return RevealSecret(ctx, c.SecretsManager, resourceID)
+	})
 }
 
 // FetchSecrets calls the SecretsManager ListSecrets API and converts the

@@ -105,7 +105,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleRefresh()
 	}
 
-	// Reveal (x) — reveal secret value (only for secrets)
+	// Reveal (x) — fetch and display value via registered reveal fetcher
 	if key.Matches(msg, m.keys.Reveal) {
 		return m.handleReveal()
 	}
@@ -228,15 +228,20 @@ func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-// handleSecretRevealed pushes the secret reveal view or flashes an error.
-func (m Model) handleSecretRevealed(msg messages.SecretRevealedMsg) (tea.Model, tea.Cmd) {
+// handleValueRevealed pushes the reveal view or flashes an error.
+func (m Model) handleValueRevealed(msg messages.ValueRevealedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		errText := "reveal failed: " + msg.Err.Error()
 		return m, func() tea.Msg {
 			return messages.FlashMsg{Text: errText, IsError: true}
 		}
 	}
-	rv := views.NewReveal(msg.SecretName, msg.Value, m.keys)
+	// ResourceID is the canonical field; fall back to SecretName for backward compatibility.
+	id := msg.ResourceID
+	if id == "" {
+		id = msg.SecretName
+	}
+	rv := views.NewReveal(id, msg.Value, m.keys)
 	rv.SetSize(m.innerSize())
 	m.pushView(&rv)
 	return m, nil
@@ -355,7 +360,13 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if msg.Resource == nil {
 			return m, nil
 		}
-		cmd := m.fetchSecretValue(msg.Resource.ID)
+		rt := msg.ResourceType
+		if rt == "" {
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				rt = rl.ResourceType()
+			}
+		}
+		cmd := m.fetchRevealValue(rt, msg.Resource.ID)
 		return m, cmd
 	}
 	return m, nil
@@ -404,25 +415,21 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// handleReveal fetches a secret value (only for secrets resource type).
+// handleReveal fetches a revealed value using the resource type's registered reveal fetcher.
 func (m Model) handleReveal() (tea.Model, tea.Cmd) {
-	if m.demoMode {
-		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: "Secret reveal disabled in demo mode", IsError: true}
-		}
-	}
 	rl, ok := m.activeView().(*views.ResourceListModel)
 	if !ok {
 		return m, nil
 	}
-	if rl.ResourceType() != "secrets" {
+	rt := rl.ResourceType()
+	if !resource.HasRevealFetcher(rt) {
 		return m, nil
 	}
 	r := rl.SelectedResource()
 	if r == nil {
 		return m, nil
 	}
-	cmd := m.fetchSecretValue(r.ID)
+	cmd := m.fetchRevealValue(rt, r.ID)
 	return m, cmd
 }
 

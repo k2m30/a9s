@@ -70,12 +70,17 @@ type RegionSelectedMsg struct {
 	Region string
 }
 
-// SecretRevealedMsg is sent when a secret value has been fetched.
-type SecretRevealedMsg struct {
-	SecretName string
-	Value      string
-	Err        error
+// ValueRevealedMsg is sent when a resource value has been fetched via reveal (x key).
+type ValueRevealedMsg struct {
+	ResourceType string // e.g., "secrets", "ssm"
+	ResourceID   string // secret name or parameter name
+	SecretName   string // deprecated: use ResourceID; retained for backwards compatibility
+	Value        string
+	Err          error
 }
+
+// SecretRevealedMsg is a backwards-compatibility alias for ValueRevealedMsg.
+type SecretRevealedMsg = ValueRevealedMsg
 
 // CopiedMsg is sent after a successful clipboard copy.
 type CopiedMsg struct {
@@ -112,10 +117,6 @@ type LoadResourcesMsg struct {
 	ParentContext map[string]string
 }
 
-// RevealSecretMsg triggers an async fetch of a secret's value.
-type RevealSecretMsg struct {
-	SecretName string
-}
 
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}

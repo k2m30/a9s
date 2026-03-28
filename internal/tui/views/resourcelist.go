@@ -147,8 +147,15 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			if m.hScrollOffset < len(cols) {
 				visible = cols[m.hScrollOffset:]
 			}
-			// Only scroll if there are columns hidden beyond the right edge.
-			if len(m.fitColumns(visible)) < len(visible) {
+			fitted := m.fitColumns(visible)
+			// Allow scroll if: columns were dropped, OR last column was shrunk.
+			canScroll := len(fitted) < len(visible)
+			if !canScroll && len(fitted) > 0 && len(visible) > 0 {
+				lastFit := fitted[len(fitted)-1]
+				lastOrig := visible[len(fitted)-1]
+				canScroll = lastFit.width < lastOrig.width
+			}
+			if canScroll {
 				m.hScrollOffset++
 				m.rowTextCache = nil
 				m.styledRowCache = nil
@@ -397,11 +404,12 @@ func (m ResourceListModel) CopyContent() (string, string) {
 // GetHelpContext returns the appropriate help context based on resource type and pagination state.
 func (m ResourceListModel) GetHelpContext() HelpContext {
 	truncated := m.pagination != nil && m.pagination.IsTruncated
-	if m.typeDef.ShortName == "secrets" {
+	hasReveal := resource.HasRevealFetcher(m.typeDef.ShortName)
+	if hasReveal {
 		if truncated {
-			return HelpFromSecretsListPaginated
+			return HelpFromRevealListPaginated
 		}
-		return HelpFromSecretsList
+		return HelpFromRevealList
 	}
 	if truncated {
 		return HelpFromResourceListPaginated

@@ -148,6 +148,19 @@ func (m *mockSSMDescribeParametersClient) DescribeParameters(ctx context.Context
 	return m.output, m.err
 }
 
+// mockSSMGetParameterClient implements awsclient.SSMGetParameterAPI.
+// capturedInput stores the input for assertions (e.g., WithDecryption check).
+type mockSSMGetParameterClient struct {
+	output        *ssm.GetParameterOutput
+	err           error
+	capturedInput *ssm.GetParameterInput
+}
+
+func (m *mockSSMGetParameterClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	m.capturedInput = params
+	return m.output, m.err
+}
+
 // ---------------------------------------------------------------------------
 // DynamoDB mocks
 // ---------------------------------------------------------------------------

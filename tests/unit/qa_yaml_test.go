@@ -544,24 +544,62 @@ func TestQA_YAML_WrapToggle_AllTypes(t *testing.T) {
 
 			viewNoWrap := m.View()
 
-			// Toggle wrap on
+			// Toggle wrap on — must not panic.
 			m, _ = m.Update(yamlKeyPress("w"))
 			viewWrapped := m.View()
 
-			// Toggle wrap off
+			// Toggle wrap off — must not panic.
 			m, _ = m.Update(yamlKeyPress("w"))
 			viewUnwrapped := m.View()
 
-			// Wrap toggle should not crash; views may or may not differ depending on content length
-			_ = viewNoWrap
-			_ = viewWrapped
-			_ = viewUnwrapped
-
-			// After double-toggle, should match original
+			// After double-toggle the view must be identical to the original (unwrapped) state.
 			if viewNoWrap != viewUnwrapped {
-				t.Logf("%s: double-toggle wrap does not restore identical view (may be viewport state)", tc.name)
+				t.Errorf("%s: double-toggle wrap should restore the original view, but it differs", tc.name)
+			}
+
+			// We record whether wrapping changed the view for informational purposes,
+			// but do NOT assert it must differ — fixture values vary in width.
+			// TestQA_YAML_WrapToggle_KnownLongValue asserts the "must differ" property
+			// with a resource whose content is guaranteed to be wider than the viewport.
+			if viewNoWrap != viewWrapped {
+				t.Logf("%s: wrap toggle changed the view (content wider than 40 cols)", tc.name)
 			}
 		})
+	}
+}
+
+// TestQA_YAML_WrapToggle_KnownLongValue verifies wrap behaviour with a
+// resource that has a KNOWN 200-char field value, making the assertion
+// unconditionally reliable.
+func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
+	longValue := strings.Repeat("A", 200)
+	res := resource.Resource{
+		ID:     "wrap-yaml-test",
+		Name:   "wrap-yaml-test",
+		Fields: map[string]string{"description": longValue},
+	}
+
+	k := keys.Default()
+	m := views.NewYAML(res, k)
+	m.SetSize(40, 30) // narrow: 40 cols, the 200-char value must wrap
+
+	viewNoWrap := m.View()
+
+	// Toggle wrap on.
+	m, _ = m.Update(yamlKeyPress("w"))
+	viewWrapped := m.View()
+
+	// Must differ — the 200-char value absolutely forces additional lines.
+	if viewNoWrap == viewWrapped {
+		t.Error("toggling wrap on should change the YAML view for a resource with a 200-char field value, but the view was identical")
+	}
+
+	// Toggle wrap off — must restore original.
+	m, _ = m.Update(yamlKeyPress("w"))
+	viewRestored := m.View()
+
+	if viewNoWrap != viewRestored {
+		t.Error("double-toggle wrap should restore the original YAML view")
 	}
 }
 

@@ -33,6 +33,41 @@ func registerSSMHandlers(t *Transport) {
 		}
 		return JSONResponse(out)
 	})
+
+	// GetParameter — return a demo parameter value for reveal (x key).
+	t.Handle("ssm", "GetParameter", func(req *http.Request) (*http.Response, error) {
+		var body map[string]interface{}
+		if b, err := io.ReadAll(req.Body); err == nil {
+			_ = json.Unmarshal(b, &body)
+		}
+		paramName, _ := body["Name"].(string)
+		if paramName == "" {
+			paramName = "/app/demo/parameter"
+		}
+
+		paramType := ssmtypes.ParameterTypeString
+		// Check if the requested parameter is a SecureString in our fixtures.
+		resources := demoData["ssm"]()
+		metas := ExtractSDK[ssmtypes.ParameterMetadata](resources)
+		for _, meta := range metas {
+			if meta.Name != nil && *meta.Name == paramName {
+				if meta.Type == ssmtypes.ParameterTypeSecureString {
+					paramType = ssmtypes.ParameterTypeSecureString
+				}
+				break
+			}
+		}
+
+		demoValue := "demo-value-for-" + paramName
+		out := &ssm.GetParameterOutput{
+			Parameter: &ssmtypes.Parameter{
+				Name:  &paramName,
+				Type:  paramType,
+				Value: &demoValue,
+			},
+		}
+		return JSONResponse(out)
+	})
 }
 
 // ---------------------------------------------------------------------------

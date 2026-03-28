@@ -180,18 +180,22 @@ type profilesLoadedMsg struct {
 	profiles []string
 }
 
-func (m *Model) fetchSecretValue(secretName string) tea.Cmd {
+func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 	clients := m.clients
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.FlashMsg{Text: "AWS clients not initialized", IsError: true}
 		}
 		ctx := context.Background()
-		value, err := awsclient.RevealSecret(ctx, clients.SecretsManager, secretName)
-		if err != nil {
-			return messages.FlashMsg{Text: "failed to reveal secret: " + err.Error(), IsError: true}
+		fetcher := resource.GetRevealFetcher(resourceType)
+		if fetcher == nil {
+			return messages.FlashMsg{Text: "no reveal support for " + resourceType, IsError: true}
 		}
-		return messages.SecretRevealedMsg{SecretName: secretName, Value: value}
+		value, err := fetcher(ctx, clients, resourceID)
+		if err != nil {
+			return messages.ValueRevealedMsg{ResourceType: resourceType, ResourceID: resourceID, Err: err}
+		}
+		return messages.ValueRevealedMsg{ResourceType: resourceType, ResourceID: resourceID, Value: value}
 	}
 }
 

@@ -1,7 +1,9 @@
 package demo
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -75,6 +77,25 @@ func registerSecretsManagerHandlers(t *Transport) {
 
 		out := &secretsmanager.ListSecretsOutput{
 			SecretList: secrets,
+		}
+		return JSONResponse(out)
+	})
+
+	// GetSecretValue — return a demo secret value for reveal (x key).
+	t.Handle("secretsmanager", "GetSecretValue", func(req *http.Request) (*http.Response, error) {
+		var body map[string]interface{}
+		if b, err := io.ReadAll(req.Body); err == nil {
+			_ = json.Unmarshal(b, &body)
+		}
+		secretID, _ := body["SecretId"].(string)
+		if secretID == "" {
+			secretID = "demo/secret"
+		}
+
+		demoValue := `{"username":"demo-user","password":"demo-p@ssw0rd!","host":"demo-db.example.com","port":"5432"}`
+		out := &secretsmanager.GetSecretValueOutput{
+			Name:         &secretID,
+			SecretString: &demoValue,
 		}
 		return JSONResponse(out)
 	})

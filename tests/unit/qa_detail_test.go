@@ -793,25 +793,40 @@ func TestQA_Detail_ScrollBottom_ShiftG(t *testing.T) {
 
 func TestQA_Detail_WrapToggle(t *testing.T) {
 	ensureNoColor(t)
-	cluster := realisticEKSCluster()
-	res := buildResource("prod-cluster", "prod-cluster", cluster)
-	cfg := configForType("eks")
-	m := newDetailModelSmall(res, "eks", cfg)
 
-	viewBefore := m.View()
+	// Use a resource with a KNOWN very long field value so wrap assertions are
+	// reliable regardless of the resource type's config.  The field value
+	// is 200 chars — far wider than the 40-column viewport used below.
+	// Pass nil viewConfig so the fallback Fields-map rendering path is used
+	// (config-driven paths would show "-" since this resource has no RawStruct).
+	longValue := strings.Repeat("x", 200)
+	res := buildResourceWithFields("wrap-test", "wrap-test", map[string]string{
+		"description": longValue,
+	})
 
-	// Toggle wrap on
+	k := keys.Default()
+	m := views.NewDetail(res, "test", nil, k)
+	m.SetSize(40, 20) // narrow viewport: 40 cols forces long values to be truncated without wrap
+
+	viewUnwrapped := m.View()
+
+	// Toggle wrap on.
 	m, _ = detailApplyMsg(m, detailKeyPress("w"))
 	viewWrapped := m.View()
 
-	// Toggle wrap off
-	m, _ = detailApplyMsg(m, detailKeyPress("w"))
-	viewUnwrapped := m.View()
+	// Wrapped view must be DIFFERENT from unwrapped — the 200-char value should
+	// produce more lines when wrapped at 40 columns.
+	if viewUnwrapped == viewWrapped {
+		t.Error("toggling wrap on should change the view for a resource with very long field values (200 chars), but the view was identical")
+	}
 
-	// Wrap toggle should not crash, views may differ
-	_ = viewBefore
-	_ = viewWrapped
-	_ = viewUnwrapped
+	// Toggle wrap off — should return to the original appearance.
+	m, _ = detailApplyMsg(m, detailKeyPress("w"))
+	viewRestored := m.View()
+
+	if viewUnwrapped != viewRestored {
+		t.Error("double-toggling wrap should restore the original (unwrapped) view")
+	}
 }
 
 // ---------------------------------------------------------------------------

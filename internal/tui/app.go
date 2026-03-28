@@ -186,8 +186,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRegionSelected(msg)
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
-	case messages.SecretRevealedMsg:
-		return m.handleSecretRevealed(msg)
+	case messages.ValueRevealedMsg:
+		return m.handleValueRevealed(msg)
 	case messages.EnterChildViewMsg:
 		return m.handleEnterChildView(msg)
 	case messages.LoadResourcesMsg:

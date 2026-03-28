@@ -1,6 +1,7 @@
 package views
 
 import (
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
@@ -14,6 +15,7 @@ type RevealModel struct {
 	value      string
 	viewport   viewport.Model
 	ready      bool
+	wrap       bool
 	width      int
 	height     int
 	keys       keys.Map
@@ -33,8 +35,18 @@ func (m RevealModel) Init() (RevealModel, tea.Cmd) {
 	return m, nil
 }
 
-// Update delegates scroll to viewport; esc pops.
+// Update handles wrap toggle (w) and delegates scroll to viewport.
 func (m RevealModel) Update(msg tea.Msg) (RevealModel, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if key.Matches(msg, m.keys.ToggleWrap) {
+			m.wrap = !m.wrap
+			m.viewport.SoftWrap = m.wrap
+			m.viewport.SetContent(m.value)
+			return m, nil
+		}
+	}
+
 	if m.ready {
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)

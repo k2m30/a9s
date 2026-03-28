@@ -378,3 +378,34 @@ func fixtureSecrets() []resource.Resource {
 		},
 	}
 }
+
+// fixtureSSMParameters returns a small slice of SSM parameter resources for
+// use in reveal and list tests.
+func fixtureSSMParameters() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "/app/db/password",
+			Name:   "/app/db/password",
+			Status: "",
+			Fields: map[string]string{
+				"name":          "/app/db/password",
+				"type":          "SecureString",
+				"version":       "2",
+				"last_modified": "2026-01-15 10:00",
+				"description":   "Application database password",
+			},
+		},
+		{
+			ID:     "/app/api-key",
+			Name:   "/app/api-key",
+			Status: "",
+			Fields: map[string]string{
+				"name":          "/app/api-key",
+				"type":          "SecureString",
+				"version":       "1",
+				"last_modified": "2026-02-20 14:30",
+				"description":   "External API key",
+			},
+		},
+	}
+}
