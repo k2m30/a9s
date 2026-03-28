@@ -1659,3 +1659,209 @@ func TestDemoTransport_ChildViews_DataQuality(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test 66: S3 folder drill-down navigation via demo transport
+// ---------------------------------------------------------------------------
+
+func TestDemoTransport_S3FolderNavigation(t *testing.T) {
+	cfg := demo.NewDemoAWSConfig()
+	clients := awsclient.CreateServiceClients(cfg)
+	ctx := context.Background()
+
+	pf := resource.GetPaginatedChildFetcher("s3_objects")
+	if pf == nil {
+		t.Fatal("no paginated child fetcher registered for s3_objects")
+	}
+
+	// Helper: validate common invariants on a slice of resources.
+	validateResources := func(t *testing.T, label string, resources []resource.Resource) {
+		t.Helper()
+		ids := make(map[string]bool, len(resources))
+		for i, r := range resources {
+			if r.ID == "" {
+				t.Errorf("%s: resource[%d] has empty ID", label, i)
+			}
+			if r.Name == "" {
+				t.Errorf("%s: resource[%d] has empty Name", label, i)
+			}
+			if ids[r.ID] {
+				t.Errorf("%s: duplicate ID %q", label, r.ID)
+			}
+			ids[r.ID] = true
+			if r.Status != "folder" && r.Status != "file" {
+				t.Errorf("%s: resource[%d] ID=%q has unexpected Status %q (want 'folder' or 'file')", label, i, r.ID, r.Status)
+			}
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// 1. Top-level bucket listing for data-pipeline-logs
+	// -------------------------------------------------------------------------
+	t.Run("top_level_data_pipeline_logs", func(t *testing.T) {
+		result, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": ""}, "")
+		if err != nil {
+			t.Fatalf("fetch error: %v", err)
+		}
+		if len(result.Resources) == 0 {
+			t.Fatal("no resources returned for top-level data-pipeline-logs")
+		}
+		validateResources(t, "data-pipeline-logs/", result.Resources)
+
+		// Must have at least one folder and at least one file
+		hasFolders := false
+		hasFiles := false
+		for _, r := range result.Resources {
+			if r.Status == "folder" {
+				hasFolders = true
+			}
+			if r.Status == "file" {
+				hasFiles = true
+			}
+		}
+		if !hasFolders {
+			t.Error("top-level listing returned no folders")
+		}
+		if !hasFiles {
+			t.Error("top-level listing returned no files")
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// 2. First-level drill-down: logs/
+	// -------------------------------------------------------------------------
+	t.Run("first_level_logs/", func(t *testing.T) {
+		topResult, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": ""}, "")
+		if err != nil {
+			t.Fatalf("top-level fetch error: %v", err)
+		}
+		topIDs := make(map[string]bool, len(topResult.Resources))
+		for _, r := range topResult.Resources {
+			topIDs[r.ID] = true
+		}
+
+		result, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": "logs/"}, "")
+		if err != nil {
+			t.Fatalf("fetch error: %v", err)
+		}
+		if len(result.Resources) == 0 {
+			t.Fatal("no resources returned for prefix logs/")
+		}
+		validateResources(t, "data-pipeline-logs/logs/", result.Resources)
+
+		// Content at logs/ must differ from top-level
+		allSame := true
+		for _, r := range result.Resources {
+			if !topIDs[r.ID] {
+				allSame = false
+				break
+			}
+		}
+		if allSame {
+			t.Error("first-level drill-down returned identical content to top-level listing")
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// 3. Second-level drill-down: logs/2026/
+	// -------------------------------------------------------------------------
+	t.Run("second_level_logs/2026/", func(t *testing.T) {
+		result, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": "logs/2026/"}, "")
+		if err != nil {
+			t.Fatalf("fetch error: %v", err)
+		}
+		if len(result.Resources) == 0 {
+			t.Fatal("no resources returned for prefix logs/2026/")
+		}
+		validateResources(t, "data-pipeline-logs/logs/2026/", result.Resources)
+	})
+
+	// -------------------------------------------------------------------------
+	// 4. Third-level drill-down (leaf): logs/2026/03/ — all must be files
+	// -------------------------------------------------------------------------
+	t.Run("leaf_logs/2026/03/", func(t *testing.T) {
+		result, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": "logs/2026/03/"}, "")
+		if err != nil {
+			t.Fatalf("fetch error: %v", err)
+		}
+		if len(result.Resources) == 0 {
+			t.Fatal("no resources returned for prefix logs/2026/03/")
+		}
+		validateResources(t, "data-pipeline-logs/logs/2026/03/", result.Resources)
+		for _, r := range result.Resources {
+			if r.Status != "file" {
+				t.Errorf("leaf resource %q has Status=%q; want 'file'", r.ID, r.Status)
+			}
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// 5. All 6 buckets top-level must return at least one resource
+	// -------------------------------------------------------------------------
+	allBuckets := []string{
+		"data-pipeline-logs",
+		"webapp-assets-prod",
+		"ml-training-data",
+		"terraform-state-prod",
+		"cloudtrail-audit-logs",
+		"backup-db-snapshots",
+	}
+
+	t.Run("all_buckets_top_level", func(t *testing.T) {
+		for _, bucket := range allBuckets {
+			bucket := bucket
+			t.Run(bucket, func(t *testing.T) {
+				result, err := pf(ctx, clients, resource.ParentContext{"bucket": bucket, "prefix": ""}, "")
+				if err != nil {
+					t.Fatalf("fetch error for bucket %q: %v", bucket, err)
+				}
+				if len(result.Resources) == 0 {
+					t.Fatalf("no resources returned for top-level of bucket %q", bucket)
+				}
+				validateResources(t, bucket+"/", result.Resources)
+			})
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// 6. All navigable sub-folders: for each bucket, drill into each top-level
+	//    folder and verify at least one resource is returned.
+	// -------------------------------------------------------------------------
+	t.Run("all_navigable_subfolders", func(t *testing.T) {
+		for _, bucket := range allBuckets {
+			bucket := bucket
+			topResult, err := pf(ctx, clients, resource.ParentContext{"bucket": bucket, "prefix": ""}, "")
+			if err != nil {
+				t.Fatalf("top-level fetch error for bucket %q: %v", bucket, err)
+			}
+			for _, r := range topResult.Resources {
+				if r.Status != "folder" {
+					continue
+				}
+				folderPrefix := r.ID
+				subResult, err := pf(ctx, clients, resource.ParentContext{"bucket": bucket, "prefix": folderPrefix}, "")
+				if err != nil {
+					t.Errorf("bucket=%q prefix=%q: fetch error: %v", bucket, folderPrefix, err)
+					continue
+				}
+				if len(subResult.Resources) == 0 {
+					t.Errorf("bucket=%q prefix=%q: folder is not navigable (returned 0 resources)", bucket, folderPrefix)
+				}
+				validateResources(t, bucket+"/"+folderPrefix, subResult.Resources)
+			}
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// 7. Unknown prefix returns 0 resources, not an error
+	// -------------------------------------------------------------------------
+	t.Run("unknown_prefix_returns_empty", func(t *testing.T) {
+		result, err := pf(ctx, clients, resource.ParentContext{"bucket": "data-pipeline-logs", "prefix": "nonexistent/"}, "")
+		if err != nil {
+			t.Fatalf("unknown prefix should not return an error, got: %v", err)
+		}
+		if len(result.Resources) != 0 {
+			t.Errorf("unknown prefix returned %d resources; want 0", len(result.Resources))
+		}
+	})
+}
