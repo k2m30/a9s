@@ -294,6 +294,12 @@ func (m *ResourceListModel) View() string {
 		visibleRows = 1
 	}
 
+	// Reserve one row for the "load more" indicator when paginated and truncated.
+	showLoadMore := m.pagination != nil && m.pagination.IsTruncated
+	if showLoadMore && visibleRows > 2 {
+		visibleRows--
+	}
+
 	// Determine the window of rows to display, keeping cursor centered.
 	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
 
@@ -327,6 +333,16 @@ func (m *ResourceListModel) View() string {
 			m.styledRowCache[i] = styled
 		}
 		sb.WriteString(styled)
+	}
+
+	// Append "load more" or "loading..." indicator when truncated.
+	if showLoadMore {
+		sb.WriteString("\n")
+		hint := "── M: load more ──"
+		if m.loadingMore {
+			hint = "── loading... ──"
+		}
+		sb.WriteString(styles.DimText.Render(hint))
 	}
 
 	return sb.String()
@@ -378,10 +394,17 @@ func (m ResourceListModel) CopyContent() (string, string) {
 	return "", ""
 }
 
-// GetHelpContext returns HelpFromSecretsList for secrets, HelpFromResourceList otherwise.
+// GetHelpContext returns the appropriate help context based on resource type and pagination state.
 func (m ResourceListModel) GetHelpContext() HelpContext {
+	truncated := m.pagination != nil && m.pagination.IsTruncated
 	if m.typeDef.ShortName == "secrets" {
+		if truncated {
+			return HelpFromSecretsListPaginated
+		}
 		return HelpFromSecretsList
+	}
+	if truncated {
+		return HelpFromResourceListPaginated
 	}
 	return HelpFromResourceList
 }
@@ -469,6 +492,7 @@ func (m ResourceListModel) buildChildContext(child resource.ChildViewDef, r *res
 // ClearLoading clears the loading state so the view no longer shows a spinner.
 func (m *ResourceListModel) ClearLoading() {
 	m.loading = false
+	m.loadingMore = false
 }
 
 // FrameTitle returns e.g. "ec2(42)" or "ec2(3/42)" when filtered.

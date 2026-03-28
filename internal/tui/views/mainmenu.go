@@ -34,6 +34,10 @@ type MainMenuModel struct {
 	// Value > 0 = has resources (normal style, count shown).
 	availability map[string]int
 
+	// truncated tracks which resource types have truncated counts.
+	// true means the count is from a first page only ("5+" style).
+	truncated map[string]bool
+
 	// availChecked / availTotal track background check progress.
 	// Both zero means "not checking" or "done".
 	availChecked int
@@ -250,7 +254,11 @@ func (m MainMenuModel) View() string {
 			nameStr := item.Name
 			if m.availability != nil {
 				if count, known := m.availability[item.ShortName]; known {
-					nameStr += " (" + itoa(count) + ")"
+					countSuffix := " (" + itoa(count) + ")"
+					if m.truncated != nil && m.truncated[item.ShortName] && count > 0 {
+						countSuffix = " (" + itoa(count) + "+)"
+					}
+					nameStr += countSuffix
 				}
 			}
 			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
@@ -270,7 +278,11 @@ func (m MainMenuModel) View() string {
 			// Build name with count suffix if known
 			nameStr := item.Name
 			if known {
-				nameStr += " (" + itoa(count) + ")"
+				countSuffix := " (" + itoa(count) + ")"
+				if m.truncated != nil && m.truncated[item.ShortName] && count > 0 {
+					countSuffix = " (" + itoa(count) + "+)"
+				}
+				nameStr += countSuffix
 			}
 			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
 
@@ -349,6 +361,7 @@ func (m *MainMenuModel) SetAvailability(shortName string, count int) {
 // ClearAvailability resets all availability state (e.g., on profile/region switch).
 func (m *MainMenuModel) ClearAvailability() {
 	m.availability = nil
+	m.truncated = nil
 	m.availChecked = 0
 	m.availTotal = 0
 }
@@ -361,6 +374,27 @@ func (m *MainMenuModel) GetAvailability() map[string]int {
 	}
 	cp := make(map[string]int, len(m.availability))
 	for k, v := range m.availability {
+		cp[k] = v
+	}
+	return cp
+}
+
+// SetTruncated records whether a resource type's count is truncated.
+func (m *MainMenuModel) SetTruncated(shortName string, truncated bool) {
+	if m.truncated == nil {
+		m.truncated = make(map[string]bool)
+	}
+	m.truncated[shortName] = truncated
+}
+
+// GetTruncated returns a copy of the truncated map for cache persistence.
+// Returns nil if no truncation data has been set.
+func (m *MainMenuModel) GetTruncated() map[string]bool {
+	if m.truncated == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.truncated))
+	for k, v := range m.truncated {
 		cp[k] = v
 	}
 	return cp

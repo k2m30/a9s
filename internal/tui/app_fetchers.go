@@ -318,14 +318,19 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 			}
 		}
 		entries := make(map[string]int, len(cf.Resources))
+		truncated := make(map[string]bool)
 		for name, entry := range cf.Resources {
 			if entry.Error == "" {
 				entries[name] = entry.Count
+				if entry.Truncated {
+					truncated[name] = true
+				}
 			}
 		}
 		return messages.AvailabilityCacheLoadedMsg{
-			Entries: entries,
-			Expired: cf.IsExpired(cache.DefaultTTL),
+			Entries:   entries,
+			Truncated: truncated,
+			Expired:   cf.IsExpired(cache.DefaultTTL),
 		}
 	}
 }
@@ -337,13 +342,18 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 		return func() tea.Msg {
 			result, ok := demo.GetResourcesPaginated(shortName)
 			count := 0
+			truncated := false
 			if ok {
 				count = len(result.Resources)
+				if result.Pagination != nil {
+					truncated = result.Pagination.IsTruncated
+				}
 			}
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
 				HasResources: ok,
 				Count:        count,
+				Truncated:    truncated,
 				Gen:          gen,
 			}
 		}
@@ -393,10 +403,12 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 	profile := m.profile
 	region := m.region
 
-	// Collect availability from main menu
+	// Collect availability and truncation from main menu
 	var entries map[string]int
+	var truncatedMap map[string]bool
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		entries = menu.GetAvailability()
+		truncatedMap = menu.GetTruncated()
 	}
 	if entries == nil {
 		return nil
@@ -410,7 +422,11 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 			Resources: make(map[string]cache.Entry, len(entries)),
 		}
 		for name, count := range entries {
-			cf.Resources[name] = cache.Entry{HasResources: count > 0, Count: count}
+			trunc := false
+			if truncatedMap != nil {
+				trunc = truncatedMap[name]
+			}
+			cf.Resources[name] = cache.Entry{HasResources: count > 0, Count: count, Truncated: trunc}
 		}
 		// Best-effort save — don't flash errors for cache write failures
 		_ = cache.Save(cf)
