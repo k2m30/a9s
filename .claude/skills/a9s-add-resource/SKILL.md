@@ -1,6 +1,6 @@
 ---
 name: a9s-add-resource
-description: Blueprint for adding a new AWS resource type to a9s — split into CODER steps (1-7) and QA steps (8-12) with templates
+description: Blueprint for adding a new AWS resource type to a9s — split into CODER steps (1-8) and QA steps (9-13) with templates
 disable-model-invocation: true
 ---
 
@@ -11,11 +11,12 @@ Two agents, two tracks. The architect scopes both tasks. Coder and QA can run in
 ## Prerequisites
 
 You MUST have a scoped task from the architect with:
-- ShortName, Aliases, Display Name
+- ShortName, Aliases, Display Name, Category
 - AWS SDK import, SDK Type, API call
 - Pattern: A, B, or C (see below)
 - List columns (field keys, titles, widths)
 - Detail paths
+- FieldKeys list (for `RegisterFieldKeys`)
 - **Exact files to create and modify** (with append points)
 
 **If you don't have this, STOP.** Reply with REJECTED and ask for architect scope.
@@ -24,8 +25,8 @@ You MUST have a scoped task from the architect with:
 
 | Steps | Owner | Writes to |
 |-------|-------|-----------|
-| 1-7 (implementation) | **a9s-coder** | `internal/`, `cmd/`, `.a9s/` |
-| 8-12 (tests) | **a9s-qa** | `tests/unit/` |
+| 1-8 (implementation) | **a9s-coder** | `internal/`, `cmd/`, `.a9s/` |
+| 9-13 (tests) | **a9s-qa** | `tests/unit/` |
 
 **Coder MUST NOT write test files. QA MUST NOT write production code.**
 
@@ -55,6 +56,7 @@ Pick the right pattern based on the architect spec:
 ```go
 // Pattern B init() — note c.EC2 not c.VPC
 func init() {
+    resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "state", "cidr", "is_default"})
     resource.Register("vpc", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
@@ -74,6 +76,7 @@ func init() {
 ```go
 // Pattern C init() — same client passed 3 times for 3 interfaces
 func init() {
+    resource.RegisterFieldKeys("ng", []string{"name", "cluster", "status", "instance_types", "desired", "min", "max"})
     resource.Register("ng", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
@@ -148,49 +151,30 @@ if ng.ScalingConfig != nil {
 }
 ```
 
-### Count-Based Display (SG detail pattern)
-Singular/plural for counts in DetailData:
-```go
-count := len(sg.IpPermissions)
-if count == 1 {
-    detail["Inbound Rules"] = "1 rule"
-} else {
-    detail["Inbound Rules"] = fmt.Sprintf("%d rules", count)
-}
-```
-
-### Label/Tag Map Iteration (Node Groups pattern)
-For map-type labels/tags:
-```go
-for k, v := range ng.Labels {
-    detail["Label: "+k] = v
-}
-for k, v := range ng.Tags {
-    detail["Tag: "+k] = v
-}
-```
-
 ---
 
-# CODER STEPS (1-7) — a9s-coder agent only
+# CODER STEPS (1-8) — a9s-coder agent only
 
 ### 1. Fetcher: `internal/aws/{type}.go` (NEW FILE)
+
+**IMPORTANT:** Module path is `github.com/k2m30/a9s/v3/...` (the `/v3` suffix is required).
+
+The `Resource` struct has exactly 5 fields: `ID`, `Name`, `Status`, `Fields`, `RawStruct`. There is NO `DetailData` or `RawJSON` field. Detail/YAML views use `RawStruct` + `fieldpath.ExtractSubtree` for rendering.
 
 ```go
 package aws
 
 import (
     "context"
-    "encoding/json"
     "fmt"
 
     "github.com/aws/aws-sdk-go-v2/service/{service}"
-    {service}types "github.com/aws/aws-sdk-go-v2/service/{service}/types"
 
-    "github.com/k2m30/a9s/internal/resource"
+    "github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
+    resource.RegisterFieldKeys("{shortname}", []string{"key1", "key2", ...})
     resource.Register("{shortname}", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
@@ -201,40 +185,41 @@ func init() {
 }
 
 func Fetch{TypeName}(ctx context.Context, api {InterfaceName}) ([]resource.Resource, error) {
-    output, err := api.{APICall}(ctx, &{service}.{APICall}Input{})
-    if err != nil {
-        return nil, err
-    }
-
     var resources []resource.Resource
-    for _, item := range output.{ResultField} {
-        // Extract ID, Name, Status from SDK struct
-        id := /* ... */
-        name := /* ... */
-        status := /* ... */
+    var nextToken *string
 
-        // Build Fields map matching column keys from types.go
-        fields := map[string]string{
-            "key1": /* ... */,
-        }
-
-        // Build DetailData map
-        detail := map[string]string{ /* ... */ }
-
-        rawJSON := ""
-        if jsonBytes, err := json.MarshalIndent(item, "", "  "); err == nil {
-            rawJSON = string(jsonBytes)
-        }
-
-        resources = append(resources, resource.Resource{
-            ID:         id,
-            Name:       name,
-            Status:     status,
-            Fields:     fields,
-            DetailData: detail,
-            RawJSON:    rawJSON,
-            RawStruct:  item,
+    for {
+        output, err := api.{APICall}(ctx, &{service}.{APICall}Input{
+            NextToken: nextToken,
         })
+        if err != nil {
+            return nil, fmt.Errorf("fetching {TypeName}: %w", err)
+        }
+
+        for _, item := range output.{ResultField} {
+            // Extract ID, Name, Status from SDK struct
+            id := /* ... */
+            name := /* ... */
+            status := /* ... */
+
+            // Build Fields map matching column keys from types_{category}.go
+            fields := map[string]string{
+                "key1": /* ... */,
+            }
+
+            resources = append(resources, resource.Resource{
+                ID:        id,
+                Name:      name,
+                Status:    status,
+                Fields:    fields,
+                RawStruct: item,
+            })
+        }
+
+        if output.NextToken == nil {
+            break
+        }
+        nextToken = output.NextToken
     }
     return resources, nil
 }
@@ -267,13 +252,28 @@ Add import if new service.
 
 **If the service already exists** (Pattern B), skip this step.
 
-### 4. Resource type def: `internal/resource/types.go` (APPEND to resourceTypes slice)
+### 4. Resource type def: `internal/resource/types_{category}.go` (APPEND to category function)
+
+The type definitions are split by category. Append to the correct file:
+- Compute: `types_compute.go` → `computeResourceTypes()`
+- Containers: `types_containers.go` → `containersResourceTypes()`
+- Networking: `types_networking.go` → `networkingResourceTypes()`
+- Databases: `types_databases.go` → `databasesResourceTypes()`
+- Monitoring: `types_monitoring.go` → `monitoringResourceTypes()`
+- Messaging: `types_messaging.go` → `messagingResourceTypes()`
+- Secrets: `types_secrets.go` → `secretsResourceTypes()`
+- DNS & CDN: `types_dns_cdn.go` → `dnsCdnResourceTypes()`
+- Security: `types_security.go` → `securityResourceTypes()`
+- CI/CD: `types_cicd.go` → `cicdResourceTypes()`
+- Data: `types_data.go` → `dataResourceTypes()`
+- Backup: `types_backup.go` → `backupResourceTypes()`
 
 ```go
 {
     Name:      "{Display Name}",
     ShortName: "{shortname}",
     Aliases:   []string{"{alias1}", "{alias2}"},
+    Category:  "{CATEGORY}",
     Columns: []Column{
         {Key: "key1", Title: "Title1", Width: 28, Sortable: true},
         // ... from architect spec
@@ -281,13 +281,15 @@ Add import if new service.
 },
 ```
 
-### 5. Default view config: `internal/config/defaults.go` (ADD to defaultViews.Views map)
+### 5. Default view config: `internal/config/defaults_{category}.go` (ADD to category function)
+
+The defaults are split by category. Append to the matching `defaults_{category}.go` file's `{category}DefaultViews()` map:
 
 ```go
 "{shortname}": {
     List: []ListColumn{
         {Title: "Title1", Path: "SDKFieldName", Width: 28},
-        // ... matching types.go columns
+        // ... matching types_{category}.go columns
     },
     Detail: []string{
         "SDKField1", "SDKField2", // from architect spec
@@ -307,11 +309,43 @@ Run: `go run ./cmd/viewsgen/`
 
 Add import if new service types package.
 
+### 8. Demo fixtures: `internal/demo/fixtures_{category}.go` (ADD to init + fixture function)
+
+Every resource type needs demo mode fixtures. Add to the appropriate category file's `init()`:
+
+```go
+demoData["{shortname}"] = {shortname}Fixtures
+```
+
+Then add the fixture function returning `[]resource.Resource` with realistic synthetic data:
+
+```go
+func {shortname}Fixtures() []resource.Resource {
+    return []resource.Resource{
+        {
+            ID:     "synthetic-id-1",
+            Name:   "synthetic-name-1",
+            Status: "active",
+            Fields: map[string]string{
+                "key1": "value1",
+                // all column keys from types_{category}.go
+            },
+            RawStruct: {service}types.{SDKType}{
+                // populate SDK struct fields for detail/YAML views
+            },
+        },
+        // 3-5 fixtures with varied realistic data
+    }
+}
+```
+
+**Reference:** See `internal/demo/fixtures_backup.go` for the canonical pattern with `aws.String()`, `aws.Time()`, and `RawStruct` population.
+
 ---
 
-# QA STEPS (8-12) — a9s-qa agent only
+# QA STEPS (9-13) — a9s-qa agent only
 
-### 8. Mock: `tests/unit/mocks_test.go` (APPEND)
+### 9. Mock: `tests/unit/mocks_test.go` (APPEND)
 
 ```go
 // mock{TypeName}Client implements awsclient.{InterfaceName} for testing.
@@ -329,27 +363,26 @@ func (m *mock{TypeName}Client) {APICall}(
 }
 ```
 
-### 9. Fetcher tests: `tests/unit/aws_{shortname}_test.go` (NEW FILE)
+### 10. Fetcher tests: `tests/unit/aws_{shortname}_test.go` (NEW FILE)
 
 Write tests covering:
 - Happy path: fetcher returns correct resources with expected fields
 - Empty response: fetcher returns empty slice, no error
-- API error: fetcher returns the error
+- API error: fetcher returns the error (wrapped with `fmt.Errorf`)
 - Field extraction: all column keys populated correctly
-- RawJSON: valid JSON marshaled
 - RawStruct: original SDK struct preserved
 
 **CRITICAL — use exact mock value assertions, NOT `== ""`:**
 
 ```go
-// BAD — weak assertion, caught by coverage analysis as a gap:
-if r.DetailData["VPC"] == "" {
-    t.Error("DetailData[VPC] must not be empty")
+// BAD — weak assertion:
+if r.Fields["vpc_id"] == "" {
+    t.Error("Fields[vpc_id] must not be empty")
 }
 
 // GOOD — exact mock value comparison:
-if r.DetailData["VPC"] != "vpc-111" {
-    t.Errorf("DetailData[VPC] = %q, want %q", r.DetailData["VPC"], "vpc-111")
+if r.Fields["vpc_id"] != "vpc-111" {
+    t.Errorf("Fields[vpc_id] = %q, want %q", r.Fields["vpc_id"], "vpc-111")
 }
 ```
 
@@ -357,12 +390,12 @@ Every mock sets specific values (e.g., `VpcId: aws.String("vpc-111")`). The test
 
 ---
 
-### 10. Detail view tests: `tests/unit/qa_detail_new_types_test.go` (APPEND — package `unit_test`)
+### 11. Detail view tests: `tests/unit/qa_detail_v220_test.go` (APPEND — package `unit_test`)
 
-**Pattern file:** `tests/unit/qa_detail_test.go`
+**Pattern file:** `tests/unit/qa_detail_v220_test.go` (see `realisticBackup` + `TestQA_Detail_Backup_*`)
 **Helpers:** `tests/unit/helpers_external_test.go` (`buildResource`, `configForType`, `newDetailModel`, `ensureNoColor`)
 
-Add 3 tests per resource type:
+Add 1 realistic builder + 3 tests per resource type:
 
 ```go
 // 1. realistic SDK struct builder
@@ -370,7 +403,7 @@ func realistic{TypeName}() {service}types.{SDKType} {
     return {service}types.{SDKType}{
         {Field1}: ptrString("value1"),
         {Field2}: ptrString("value2"),
-        // populate all fields used by DefaultViewDef detail paths
+        // populate all fields used by defaults_{category}.go detail paths
     }
 }
 
@@ -412,15 +445,17 @@ func TestQA_Detail_{TypeName}_FrameTitle(t *testing.T) {
 }
 ```
 
-**For types without SDK structs** (e.g., SQS uses attribute maps, ECS uses ARN strings):
+**Append point:** After the last `TestQA_Detail_*` function in `qa_detail_v220_test.go` (currently `TestQA_Detail_Backup_FrameTitle`).
+
+**For types without SDK structs** (e.g., SQS uses attribute maps):
 use `buildResourceWithFields` and pass `nil` for RawStruct. The detail view falls back to Fields rendering.
 
-### 11. YAML view tests: `tests/unit/qa_yaml_new_types_test.go` (APPEND — package `unit`)
+### 12. YAML view tests: `tests/unit/qa_yaml_v220_test.go` (APPEND — package `unit`)
 
-**Pattern file:** `tests/unit/qa_yaml_test.go`
-**Helpers:** `yamlView()` and `yamlModel()` from `qa_yaml_test.go`
+**Pattern file:** `tests/unit/qa_yaml_v220_test.go` (see `fixtureBackup` + `TestQA_YAML_Backup_*`)
+**Helpers:** `yamlView()` and `yamlModel()` from `tests/unit/qa_yaml_test.go`
 
-Add 3 tests per resource type + a fixture function:
+Add 1 fixture function + 3 tests per resource type:
 
 ```go
 // Fixture returning []resource.Resource with Fields map
@@ -430,7 +465,7 @@ func fixture{TypeName}() []resource.Resource {
         Fields: map[string]string{
             "key1": "value1",
             "key2": "value2",
-            // all column keys from types.go
+            // all column keys from types_{category}.go
         },
     }}
 }
@@ -472,7 +507,9 @@ func TestQA_YAML_{TypeName}_RawContentUncolored(t *testing.T) {
 }
 ```
 
-### 12. List RawStruct test: `tests/unit/qa_list_rawstruct_test.go` (APPEND — package `unit_test`)
+**Append point:** After the last `TestQA_YAML_*` function in `qa_yaml_v220_test.go` (currently `TestQA_YAML_Backup_RawContentUncolored`).
+
+### 13. List RawStruct test: `tests/unit/qa_list_rawstruct_test.go` (APPEND — package `unit_test`)
 
 **Pattern file:** `tests/unit/qa_list_rawstruct_test.go` (see `TestQA_ListRawStruct_EC2`)
 **Helper:** `newListModel()` from the same file
@@ -484,11 +521,11 @@ func TestQA_ListRawStruct_{TypeName}(t *testing.T) {
     ensureNoColor(t)
     cfg := configForType("{shortname}")
 
-    raw := realistic{TypeName}() // from step 10's builder
+    raw := realistic{TypeName}() // from step 11's builder
     res := resource.Resource{
         ID: "test-id", Name: "test-name", Status: "active",
         Fields: map[string]string{
-            "key1": "value1", // matching types.go column keys
+            "key1": "value1", // matching types_{category}.go column keys
         },
         RawStruct: raw,
     }
@@ -502,22 +539,24 @@ func TestQA_ListRawStruct_{TypeName}(t *testing.T) {
 }
 ```
 
-**Note:** The `realistic{TypeName}()` function from step 10 is reused here. Both files are in package `unit_test`, so they share builders.
+**Append point:** After the last `TestQA_ListRawStruct_*` function in `qa_list_rawstruct_test.go`.
+
+**Note:** The `realistic{TypeName}()` function from step 11 is reused here. Both files are in package `unit_test`, so they share builders.
 
 ---
 
-## Why Steps 10-12 Matter
+## Why Steps 11-13 Matter
 
-Coverage analysis found these gaps when steps 10-12 were missing:
+Coverage analysis found these gaps when steps 11-13 were missing:
 - **22+ types with zero view-layer tests** — detail/YAML rendering was never verified
 - **NilFields panics go undetected** — zero-value SDK structs can crash `fieldpath.ExtractSubtree`
-- **Config-driven paths not exercised** — list columns from `defaults.go` might reference non-existent struct fields
+- **Config-driven paths not exercised** — list columns from `defaults_{category}.go` might reference non-existent struct fields
 - **Cross-cutting tests only covered types with explicit test functions** — adding RawStruct tests ensures the new type is exercised end-to-end
 
 ## Post-Implementation Steps (run by whichever agent finishes last)
 
-1. Run refgen: `go run ./cmd/refgen/ > .a9s/views_reference.yaml`
-2. Run tests: `go test ./tests/unit/ -count=1 -timeout 120s`
-3. Build: `go build -o a9s ./cmd/a9s/`
-4. Bump version in `cmd/a9s/main.go`
-5. Rebuild: `go build -o a9s ./cmd/a9s/`
+1. Run viewsgen: `go run ./cmd/viewsgen/`
+2. Run refgen: `go run ./cmd/refgen/ > .a9s/views_reference.yaml`
+3. Run tests: `go test ./tests/unit/ -count=1 -timeout 120s`
+4. Run linter: `golangci-lint run ./...`
+5. Build: `go build -o a9s ./cmd/a9s/`
