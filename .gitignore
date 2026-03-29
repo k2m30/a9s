@@ -9,6 +9,7 @@ vendor/
 /a9s
 /preview
 /preview_detail
+/preview-pagination
 
 # IDE
 .vscode/
