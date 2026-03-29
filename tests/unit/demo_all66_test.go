@@ -8,7 +8,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestDemoFixtures_All62Types(t *testing.T) {
+func TestDemoFixtures_All66Types(t *testing.T) {
 	var missing []string
 	for _, rt := range resource.AllResourceTypes() {
 		resources, ok := demo.GetResources(rt.ShortName)

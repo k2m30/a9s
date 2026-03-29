@@ -1491,12 +1491,13 @@ func realisticImage() ec2types.Image {
 func realisticCloudTrailEvent() cloudtrailtypes.Event {
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 	return cloudtrailtypes.Event{
-		EventId:     ptrString("evt-0001-abcd-1234-5678-abcdef012345"),
-		EventName:   ptrString("RunInstances"),
-		EventTime:   &eventTime,
-		EventSource: ptrString("ec2.amazonaws.com"),
-		Username:    ptrString("admin"),
-		ReadOnly:    ptrString("false"),
+		EventId:         ptrString("evt-0001-abcd-1234-5678-abcdef012345"),
+		EventName:       ptrString("RunInstances"),
+		EventTime:       &eventTime,
+		EventSource:     ptrString("ec2.amazonaws.com"),
+		Username:        ptrString("admin"),
+		ReadOnly:        ptrString("false"),
+		CloudTrailEvent: ptrString(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE123","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2025-03-15T12:00:00Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instanceType":"t3.micro","instancesSet":{"items":[{"imageId":"ami-0abc123456def789"}]}},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0abc123456def789"}]}},"requestID":"req-0001-abcd-1234","eventID":"evt-0001-abcd-1234-5678-abcdef012345","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 		Resources: []cloudtrailtypes.Resource{
 			{
 				ResourceType: ptrString("AWS::EC2::Instance"),
@@ -1691,5 +1692,74 @@ func TestQA_Detail_CloudTrailEvent_FrameTitle(t *testing.T) {
 
 	if title := m.FrameTitle(); title != "RunInstances" {
 		t.Errorf("CloudTrail Event FrameTitle expected %q, got %q", "RunInstances", title)
+	}
+}
+
+func TestQA_Detail_CloudTrailEvent_JSONFieldRenderedStructured(t *testing.T) {
+	ensureNoColor(t)
+
+	cloudTrailEventJSON := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2026-03-28T14:30:15Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","requestParameters":{"instanceType":"t3.micro"},"responseElements":null,"readOnly":false,"eventType":"AwsApiCall"}`
+
+	eventTime := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
+	event := cloudtrailtypes.Event{
+		EventId:          ptrString("evt-json-0001"),
+		EventName:        ptrString("RunInstances"),
+		EventTime:        &eventTime,
+		EventSource:      ptrString("ec2.amazonaws.com"),
+		Username:         ptrString("test-user"),
+		CloudTrailEvent:  ptrString(cloudTrailEventJSON),
+	}
+
+	res := buildResource("evt-json-0001", "RunInstances", event)
+	cfg := detailConfigForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	view := m.View()
+
+	// CloudTrailEvent JSON should render as structured YAML keys, not a raw blob
+	for _, want := range []string{
+		"eventVersion", "1.08",
+		"userIdentity",
+		"AssumedRole",
+		"eventSource", "ec2.amazonaws.com",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("CloudTrail Event JSON detail: expected %q in structured output, got:\n%s", want, view)
+		}
+	}
+
+	// Must NOT contain the raw JSON blob as a single line
+	if strings.Contains(view, `{"eventVersion"`) {
+		t.Errorf("CloudTrail Event JSON detail: view contains raw JSON blob, expected structured YAML:\n%s", view)
+	}
+}
+
+func TestQA_Detail_CloudTrailEvent_NilCloudTrailEventField(t *testing.T) {
+	ensureNoColor(t)
+
+	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
+	event := cloudtrailtypes.Event{
+		EventId:         ptrString("evt-nil-ct-field"),
+		EventName:       ptrString("GetObject"),
+		EventTime:       &eventTime,
+		EventSource:     ptrString("s3.amazonaws.com"),
+		Username:        ptrString("readonly-user"),
+		CloudTrailEvent: nil,
+	}
+
+	res := buildResource("evt-nil-ct-field", "GetObject", event)
+	cfg := detailConfigForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	// Must not panic
+	view := m.View()
+
+	if view == "" {
+		t.Error("CloudTrail Event detail with nil CloudTrailEvent: view must not be empty")
+	}
+
+	// Other fields should still be present
+	if !strings.Contains(view, "EventName") {
+		t.Errorf("CloudTrail Event detail with nil CloudTrailEvent: expected 'EventName' in view, got:\n%s", view)
 	}
 }

@@ -1,6 +1,7 @@
 package fieldpath
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -117,8 +118,16 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 		val = val.Elem()
 	}
 
-	// Scalar types: format directly
+	// Scalar types: format directly (but try JSON parsing for strings first)
 	if isScalar(val) {
+		if val.Kind() == reflect.String {
+			if parsed := tryParseJSON(val.String()); parsed != nil {
+				out, err := yaml.Marshal(parsed)
+				if err == nil {
+					return strings.TrimRight(string(out), "\n")
+				}
+			}
+		}
 		return FormatValue(val)
 	}
 
@@ -211,6 +220,11 @@ func ToSafeValue(val reflect.Value) interface{} {
 
 	default:
 		if isScalar(val) {
+			if val.Kind() == reflect.String {
+				if parsed := tryParseJSON(val.String()); parsed != nil {
+					return parsed
+				}
+			}
 			return FormatValue(val)
 		}
 		if val.CanInterface() {
@@ -230,4 +244,19 @@ func isZeroOrNil(v reflect.Value) bool {
 	default:
 		return v.IsZero()
 	}
+}
+
+// tryParseJSON attempts to parse s as JSON. Returns the parsed structure
+// (map/slice/scalar) on success, or nil on failure.
+// Only attempts parsing if s starts with '{' or '[' (quick rejection for non-JSON strings).
+func tryParseJSON(s string) interface{} {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
+		return nil
+	}
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return nil
+	}
+	return parsed
 }
