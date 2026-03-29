@@ -4,7 +4,7 @@ title = 'a9s — Terminal UI for AWS'
 theme = 'a9s-theme'
 
 [params]
-  description = 'Terminal UI AWS Resource Manager — browse, inspect, and manage 60+ AWS resource types'
+  description = 'Terminal UI AWS Resource Manager — browse, inspect, and manage 66 AWS resource types'
 
 [module]
   [[module.mounts]]

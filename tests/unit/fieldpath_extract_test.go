@@ -325,6 +325,240 @@ func TestExtractSubtree_MissingFieldReturnsEmpty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// T-JSON — JSON-in-string detection via ExtractSubtree and ToSafeValue
+// ---------------------------------------------------------------------------
+
+// testJSONHolder has a *string field that can hold JSON content.
+type testJSONHolder struct {
+	Name     string  `json:"name"`
+	JSONData *string `json:"jsonData"`
+}
+
+func TestExtractSubtree_JSONStringObject(t *testing.T) {
+	raw := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","accountId":"123456789012"},"eventName":"CreateBucket"}`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	for _, want := range []string{"eventVersion", "1.08", "userIdentity", "AssumedRole", "CreateBucket"} {
+		if !containsSubstring(got, want) {
+			t.Errorf("ExtractSubtree JSON object: expected %q in output, got:\n%s", want, got)
+		}
+	}
+	// Must NOT return the raw JSON blob as a single line
+	if containsSubstring(got, `{"eventVersion"`) {
+		t.Errorf("ExtractSubtree JSON object: output contains raw JSON blob, expected structured YAML:\n%s", got)
+	}
+}
+
+func TestExtractSubtree_JSONStringArray(t *testing.T) {
+	raw := `[{"name":"bucket1"},{"name":"bucket2"}]`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	for _, want := range []string{"bucket1", "bucket2"} {
+		if !containsSubstring(got, want) {
+			t.Errorf("ExtractSubtree JSON array: expected %q in output, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestExtractSubtree_JSONStringMalformed(t *testing.T) {
+	raw := `{not valid json}`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if got != raw {
+		t.Errorf("ExtractSubtree malformed JSON: expected raw string %q, got %q", raw, got)
+	}
+}
+
+func TestExtractSubtree_PlainStringUnchanged(t *testing.T) {
+	raw := "t3.medium"
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if got != raw {
+		t.Errorf("ExtractSubtree plain string: expected %q unchanged, got %q", raw, got)
+	}
+}
+
+func TestExtractSubtree_JSONStringEmpty(t *testing.T) {
+	raw := ""
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if got != "" {
+		t.Errorf("ExtractSubtree empty string: expected %q, got %q", "", got)
+	}
+}
+
+func TestExtractSubtree_JSONStringNilPointer(t *testing.T) {
+	holder := testJSONHolder{Name: "test", JSONData: nil}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if got != "" {
+		t.Errorf("ExtractSubtree nil pointer: expected empty string, got %q", got)
+	}
+}
+
+func TestExtractSubtree_JSONStringDeeplyNested(t *testing.T) {
+	raw := `{"a":{"b":{"c":{"d":{"e":"deep"}}}}}`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if !containsSubstring(got, "deep") {
+		t.Errorf("ExtractSubtree deeply nested JSON: expected %q in nested YAML output, got:\n%s", "deep", got)
+	}
+}
+
+func TestExtractSubtree_JSONStringWithNulls(t *testing.T) {
+	raw := `{"key1":"value1","key2":null}`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	if !containsSubstring(got, "key1") {
+		t.Errorf("ExtractSubtree JSON with nulls: expected %q in output, got:\n%s", "key1", got)
+	}
+	if !containsSubstring(got, "value1") {
+		t.Errorf("ExtractSubtree JSON with nulls: expected %q in output, got:\n%s", "value1", got)
+	}
+	// key2 null is acceptable as empty or omitted — no assertion on it
+}
+
+func TestExtractSubtree_JSONStringWhitespace(t *testing.T) {
+	raw := `  {"key":"value"}  `
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+	for _, want := range []string{"key", "value"} {
+		if !containsSubstring(got, want) {
+			t.Errorf("ExtractSubtree whitespace-padded JSON: expected %q in output, got:\n%s", want, got)
+		}
+	}
+	// Should be structured YAML, not the padded raw JSON
+	if containsSubstring(got, `  {"key"`) {
+		t.Errorf("ExtractSubtree whitespace-padded JSON: output contains unstripped JSON blob:\n%s", got)
+	}
+}
+
+func TestToSafeValue_JSONStringParsedToMap(t *testing.T) {
+	raw := `{"eventVersion":"1.08","eventName":"CreateBucket"}`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
+
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
+	}
+
+	jsonDataVal, exists := m["jsonData"]
+	if !exists {
+		t.Fatalf("ToSafeValue: expected 'jsonData' key in result map, got keys: %v", mapKeys(m))
+	}
+
+	parsed, ok := jsonDataVal.(map[string]interface{})
+	if !ok {
+		t.Fatalf("ToSafeValue JSON string: expected jsonData to be map[string]interface{} (parsed JSON), got %T: %v", jsonDataVal, jsonDataVal)
+	}
+
+	if _, hasVersion := parsed["eventVersion"]; !hasVersion {
+		t.Errorf("ToSafeValue JSON string: parsed map missing 'eventVersion' key, got: %v", parsed)
+	}
+	if _, hasName := parsed["eventName"]; !hasName {
+		t.Errorf("ToSafeValue JSON string: parsed map missing 'eventName' key, got: %v", parsed)
+	}
+}
+
+func TestToSafeValue_JSONStringMalformedFallback(t *testing.T) {
+	raw := `{broken`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
+
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
+	}
+
+	jsonDataVal, exists := m["jsonData"]
+	if !exists {
+		t.Fatalf("ToSafeValue malformed JSON: expected 'jsonData' key in result map")
+	}
+
+	if _, isMap := jsonDataVal.(map[string]interface{}); isMap {
+		t.Errorf("ToSafeValue malformed JSON: expected string fallback, got a map")
+	}
+	if _, isString := jsonDataVal.(string); !isString {
+		t.Errorf("ToSafeValue malformed JSON: expected string fallback, got %T: %v", jsonDataVal, jsonDataVal)
+	}
+}
+
+func TestToSafeValue_PlainStringUnchanged(t *testing.T) {
+	raw := "just-a-string"
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
+
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
+	}
+
+	jsonDataVal, exists := m["jsonData"]
+	if !exists {
+		t.Fatalf("ToSafeValue plain string: expected 'jsonData' key in result map")
+	}
+
+	s, ok := jsonDataVal.(string)
+	if !ok {
+		t.Fatalf("ToSafeValue plain string: expected string, got %T: %v", jsonDataVal, jsonDataVal)
+	}
+	if s != "just-a-string" {
+		t.Errorf("ToSafeValue plain string: expected %q, got %q", "just-a-string", s)
+	}
+}
+
+func TestToSafeValue_JSONStringArrayParsed(t *testing.T) {
+	raw := `["a","b","c"]`
+	holder := testJSONHolder{Name: "test", JSONData: &raw}
+
+	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
+
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
+	}
+
+	jsonDataVal, exists := m["jsonData"]
+	if !exists {
+		t.Fatalf("ToSafeValue JSON array: expected 'jsonData' key in result map")
+	}
+
+	if _, isSlice := jsonDataVal.([]interface{}); !isSlice {
+		t.Errorf("ToSafeValue JSON array: expected []interface{} (parsed JSON array), got %T: %v", jsonDataVal, jsonDataVal)
+	}
+}
+
+// mapKeys returns the keys of a map for use in error messages.
+func mapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
