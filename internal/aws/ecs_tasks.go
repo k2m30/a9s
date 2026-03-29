@@ -12,53 +12,45 @@ import (
 )
 
 func init() {
-	resource.Register("ecs-task", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "status", "task_definition", "launch_type", "cpu", "memory"})
+
+	resource.RegisterPaginated("ecs-task", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchECSTasks(ctx, c.ECS, c.ECS, c.ECS)
+		return FetchECSTasksPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
 	})
-	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "status", "task_definition", "launch_type", "cpu", "memory"})
 }
 
-// FetchECSTasks performs a three-step fetch:
-// 1. ListClusters to get cluster ARNs
-// 2. ListTasks per cluster to get task ARNs
-// 3. DescribeTasks per cluster to get full details
-func FetchECSTasks(
+// FetchECSTasksPage fetches one page of ECS clusters using the continuationToken,
+// then for each cluster in that page fetches all tasks via ListTasks+DescribeTasks.
+// IsTruncated reflects whether ListClusters has more pages beyond this one.
+func FetchECSTasksPage(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,
 	listTasksAPI ECSListTasksAPI,
 	describeTasksAPI ECSDescribeTasksAPI,
-) ([]resource.Resource, error) {
-	var allClusterArns []string
-	var nextToken *string
+	continuationToken string,
+) (resource.FetchResult, error) {
+	input := &ecs.ListClustersInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
 
-	for {
-		listOutput, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{
-			NextToken: nextToken,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("listing ECS clusters: %w", err)
-		}
-
-		allClusterArns = append(allClusterArns, listOutput.ClusterArns...)
-
-		if listOutput.NextToken == nil {
-			break
-		}
-		nextToken = listOutput.NextToken
+	listOutput, err := listClustersAPI.ListClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing ECS clusters: %w", err)
 	}
 
 	var resources []resource.Resource
 
-	for _, clusterArn := range allClusterArns {
+	for _, clusterArn := range listOutput.ClusterArns {
 		taskListOutput, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
 			Cluster: aws.String(clusterArn),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("listing ECS tasks: %w", err)
+			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks: %w", err)
 		}
 
 		if len(taskListOutput.TaskArns) == 0 {
@@ -70,7 +62,7 @@ func FetchECSTasks(
 			Tasks:   taskListOutput.TaskArns,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("describing ECS tasks: %w", err)
+			return resource.FetchResult{}, fmt.Errorf("describing ECS tasks: %w", err)
 		}
 
 		for _, task := range descOutput.Tasks {
@@ -121,12 +113,57 @@ func FetchECSTasks(
 					"cpu":             cpu,
 					"memory":          memory,
 				},
-				RawStruct:  task,
+				RawStruct: task,
 			}
 
 			resources = append(resources, r)
 		}
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   -1,
+		},
+	}, nil
+}
+
+// FetchECSTasks performs a three-step fetch:
+// 1. ListClusters to get cluster ARNs
+// 2. ListTasks per cluster to get task ARNs
+// 3. DescribeTasks per cluster to get full details
+func FetchECSTasks(
+	ctx context.Context,
+	listClustersAPI ECSListClustersAPI,
+	listTasksAPI ECSListTasksAPI,
+	describeTasksAPI ECSDescribeTasksAPI,
+) ([]resource.Resource, error) {
+	var allResources []resource.Resource
+	continuationToken := ""
+
+	for {
+		result, err := FetchECSTasksPage(ctx, listClustersAPI, listTasksAPI, describeTasksAPI, continuationToken)
+		if err != nil {
+			return nil, err
+		}
+
+		allResources = append(allResources, result.Resources...)
+
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		continuationToken = result.Pagination.NextToken
+	}
+
+	return allResources, nil
 }

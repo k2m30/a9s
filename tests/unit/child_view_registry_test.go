@@ -124,48 +124,56 @@ func TestUnregisterChildType(t *testing.T) {
 
 func TestRegisterChildFetcher(t *testing.T) {
 	called := false
-	resource.RegisterChildFetcher("test_child_fetch", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("test_child_fetch", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		called = true
-		return []resource.Resource{{ID: "test-1", Name: "Test"}}, nil
+		resources := []resource.Resource{{ID: "test-1", Name: "Test"}}
+		return resource.FetchResult{
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				TotalHint:   len(resources),
+				PageSize:    len(resources),
+			},
+		}, nil
 	})
-	defer resource.UnregisterChildFetcher("test_child_fetch")
+	defer resource.UnregisterPaginatedChild("test_child_fetch")
 
-	fetcher := resource.GetChildFetcher("test_child_fetch")
+	fetcher := resource.GetPaginatedChildFetcher("test_child_fetch")
 	if fetcher == nil {
-		t.Fatal("GetChildFetcher returned nil for registered fetcher")
+		t.Fatal("GetPaginatedChildFetcher returned nil for registered fetcher")
 	}
 
-	resources, err := fetcher(context.Background(), nil, resource.ParentContext{"bucket": "test"})
+	result, err := fetcher(context.Background(), nil, resource.ParentContext{"bucket": "test"}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
 		t.Error("fetcher was not called")
 	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if resources[0].ID != "test-1" {
-		t.Errorf("resources[0].ID = %q, want %q", resources[0].ID, "test-1")
+	if result.Resources[0].ID != "test-1" {
+		t.Errorf("result.Resources[0].ID = %q, want %q", result.Resources[0].ID, "test-1")
 	}
 }
 
 func TestGetChildFetcher_NotRegistered(t *testing.T) {
-	got := resource.GetChildFetcher("nonexistent_fetcher")
+	got := resource.GetPaginatedChildFetcher("nonexistent_fetcher")
 	if got != nil {
-		t.Errorf("GetChildFetcher should return nil for unregistered fetcher, got non-nil")
+		t.Errorf("GetPaginatedChildFetcher should return nil for unregistered fetcher, got non-nil")
 	}
 }
 
 func TestUnregisterChildFetcher(t *testing.T) {
-	resource.RegisterChildFetcher("temp_fetcher", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
-		return nil, nil
+	resource.RegisterPaginatedChild("temp_fetcher", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, nil
 	})
-	resource.UnregisterChildFetcher("temp_fetcher")
+	resource.UnregisterPaginatedChild("temp_fetcher")
 
-	got := resource.GetChildFetcher("temp_fetcher")
+	got := resource.GetPaginatedChildFetcher("temp_fetcher")
 	if got != nil {
-		t.Error("GetChildFetcher should return nil after UnregisterChildFetcher")
+		t.Error("GetPaginatedChildFetcher should return nil after UnregisterPaginatedChild")
 	}
 }
 
@@ -213,18 +221,18 @@ func TestResourceTypeDef_MultipleChildren(t *testing.T) {
 
 func TestChildFetcher_ReceivesParentContext(t *testing.T) {
 	var receivedCtx resource.ParentContext
-	resource.RegisterChildFetcher("ctx_test", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild("ctx_test", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		receivedCtx = parentCtx
-		return nil, nil
+		return resource.FetchResult{}, nil
 	})
-	defer resource.UnregisterChildFetcher("ctx_test")
+	defer resource.UnregisterPaginatedChild("ctx_test")
 
-	fetcher := resource.GetChildFetcher("ctx_test")
+	fetcher := resource.GetPaginatedChildFetcher("ctx_test")
 	expectedCtx := resource.ParentContext{
 		"zone_id":   "/hostedzone/Z123",
 		"zone_name": "example.com.",
 	}
-	_, _ = fetcher(context.Background(), nil, expectedCtx)
+	_, _ = fetcher(context.Background(), nil, expectedCtx, "")
 
 	if receivedCtx["zone_id"] != "/hostedzone/Z123" {
 		t.Errorf("parentCtx[zone_id] = %q, want %q", receivedCtx["zone_id"], "/hostedzone/Z123")

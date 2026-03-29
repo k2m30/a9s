@@ -12,78 +12,113 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("waf", []string{"name", "id", "description"})
-	resource.Register("waf", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("waf", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchWAFWebACLs(ctx, c.WAFv2)
+		return FetchWAFWebACLsPage(ctx, c.WAFv2, continuationToken)
 	})
 }
 
 // FetchWAFWebACLs calls the WAFv2 ListWebACLs API with Scope=REGIONAL and converts
 // the response into a slice of generic Resource structs.
 func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextMarker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
-			Scope:      wafv2types.ScopeRegional,
-			NextMarker: nextMarker,
-		})
+		result, err := FetchWAFWebACLsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching WAF web ACLs: %w", err)
+			return nil, err
 		}
-
-		for _, acl := range output.WebACLs {
-			name := ""
-			if acl.Name != nil {
-				name = *acl.Name
-			}
-
-			id := ""
-			if acl.Id != nil {
-				id = *acl.Id
-			}
-
-			arn := ""
-			if acl.ARN != nil {
-				arn = *acl.ARN
-			}
-
-			description := ""
-			if acl.Description != nil {
-				description = *acl.Description
-			}
-
-			lockToken := ""
-			if acl.LockToken != nil {
-				lockToken = *acl.LockToken
-			}
-
-			r := resource.Resource{
-				ID:     id,
-				Name:   name,
-				Status: "",
-				Fields: map[string]string{
-					"name":        name,
-					"id":          id,
-					"arn":         arn,
-					"description": description,
-					"lock_token":  lockToken,
-				},
-				RawStruct: acl,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextMarker == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextMarker = output.NextMarker
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchWAFWebACLsPage fetches a single page of WAF web ACLs.
+func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &wafv2.ListWebACLsInput{
+		Scope: wafv2types.ScopeRegional,
+	}
+	if continuationToken != "" {
+		input.NextMarker = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.ListWebACLs(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching WAF web ACLs: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, acl := range output.WebACLs {
+		name := ""
+		if acl.Name != nil {
+			name = *acl.Name
+		}
+
+		id := ""
+		if acl.Id != nil {
+			id = *acl.Id
+		}
+
+		arn := ""
+		if acl.ARN != nil {
+			arn = *acl.ARN
+		}
+
+		description := ""
+		if acl.Description != nil {
+			description = *acl.Description
+		}
+
+		lockToken := ""
+		if acl.LockToken != nil {
+			lockToken = *acl.LockToken
+		}
+
+		r := resource.Resource{
+			ID:     id,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"name":        name,
+				"id":          id,
+				"arn":         arn,
+				"description": description,
+				"lock_token":  lockToken,
+			},
+			RawStruct: acl,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

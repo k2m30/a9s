@@ -494,9 +494,12 @@ func TestFetchRolePolicies_RawStruct(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_Pagination verifies that the fetcher handles
-// paginated responses from both APIs.
+// TestFetchRolePolicies_Pagination verifies that the fetcher reports
+// IsTruncated=true when either API response is truncated. The fetcher makes
+// exactly one call to each API per invocation (single-page pagination contract).
 func TestFetchRolePolicies_Pagination(t *testing.T) {
+	// Both APIs report IsTruncated=true on the first page.
+	// The fetcher should return 1 managed + 1 inline = 2 resources with IsTruncated=true.
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
 			{
@@ -505,12 +508,6 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 				},
 				IsTruncated: true,
 				Marker:      aws.String("marker1"),
-			},
-			{
-				AttachedPolicies: []iamtypes.AttachedPolicy{
-					{PolicyName: aws.String("Policy2"), PolicyArn: aws.String("arn:aws:iam::aws:policy/Policy2")},
-				},
-				IsTruncated: false,
 			},
 		},
 	}
@@ -521,10 +518,6 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 				IsTruncated: true,
 				Marker:      aws.String("marker2"),
 			},
-			{
-				PolicyNames: []string{"InlineB"},
-				IsTruncated: false,
-			},
 		},
 	}
 
@@ -534,23 +527,33 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	resources := result.Resources
-	if len(resources) != 4 {
-		t.Fatalf("expected 4 resources (2 managed + 2 inline), got %d", len(resources))
+
+	// One API call each → 1 managed + 1 inline = 2 resources
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources (1 managed + 1 inline), got %d", len(resources))
 	}
 
-	// Verify managed come first
+	// Verify managed comes first
 	if resources[0].Fields["policy_type"] != "Managed" {
 		t.Errorf("resources[0] should be Managed, got %q", resources[0].Fields["policy_type"])
 	}
-	if resources[1].Fields["policy_type"] != "Managed" {
-		t.Errorf("resources[1] should be Managed, got %q", resources[1].Fields["policy_type"])
+	if resources[0].Fields["policy_name"] != "Policy1" {
+		t.Errorf("resources[0] policy_name: expected %q, got %q", "Policy1", resources[0].Fields["policy_name"])
 	}
-	// Verify inline come second
-	if resources[2].Fields["policy_type"] != "Inline" {
-		t.Errorf("resources[2] should be Inline, got %q", resources[2].Fields["policy_type"])
+	// Verify inline comes second
+	if resources[1].Fields["policy_type"] != "Inline" {
+		t.Errorf("resources[1] should be Inline, got %q", resources[1].Fields["policy_type"])
 	}
-	if resources[3].Fields["policy_type"] != "Inline" {
-		t.Errorf("resources[3] should be Inline, got %q", resources[3].Fields["policy_type"])
+	if resources[1].Fields["policy_name"] != "InlineA" {
+		t.Errorf("resources[1] policy_name: expected %q, got %q", "InlineA", resources[1].Fields["policy_name"])
+	}
+
+	// IsTruncated should be true because both APIs reported truncation
+	if result.Pagination == nil {
+		t.Fatal("Pagination is nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true when both APIs report truncation")
 	}
 }
 

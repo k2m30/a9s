@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("tgw", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("tgw", []string{"tgw_id", "name", "state", "owner_id", "description"})
+
+	resource.RegisterPaginated("tgw", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchTransitGateways(ctx, c.EC2)
+		return FetchTransitGatewaysPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("tgw", []string{"tgw_id", "name", "state", "owner_id", "description"})
 }
 
 // FetchTransitGateways calls the EC2 DescribeTransitGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchTransitGatewaysPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching transit gateways: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, tgw := range output.TransitGateways {
+// FetchTransitGatewaysPage fetches a single page of transit gateways.
+func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeTransitGatewaysInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeTransitGateways(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching transit gateways: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, tgw := range output.TransitGateways {
 		tgwID := ""
 		if tgw.TransitGatewayId != nil {
 			tgwID = *tgw.TransitGatewayId
@@ -74,17 +94,31 @@ func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI
 				"owner_id":    ownerID,
 				"description": description,
 			},
-			RawStruct:  tgw,
+			RawStruct: tgw,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

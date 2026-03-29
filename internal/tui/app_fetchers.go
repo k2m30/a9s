@@ -29,39 +29,27 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 
 		ctx := context.Background()
 
-		// Try paginated fetcher first (initial page with empty token).
 		pf := resource.GetPaginatedFetcher(resourceType)
-		if pf != nil {
-			result, err := pf(ctx, clients, "")
-			if err != nil {
-				return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
-			}
-			return messages.ResourcesLoadedMsg{
-				ResourceType: resourceType,
-				Resources:    result.Resources,
-				Pagination:   result.Pagination,
-			}
-		}
-
-		// Fall back to legacy (non-paginated) fetcher.
-		fetcher := resource.GetFetcher(resourceType)
-		if fetcher == nil {
+		if pf == nil {
 			return messages.APIErrorMsg{
 				ResourceType: resourceType,
 				Err:          fmt.Errorf("unsupported resource type: %s", resourceType),
 			}
 		}
-		resources, err := fetcher(ctx, clients)
+		result, err := pf(ctx, clients, "")
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{ResourceType: resourceType, Resources: resources}
+		return messages.ResourcesLoadedMsg{
+			ResourceType: resourceType,
+			Resources:    result.Resources,
+			Pagination:   result.Pagination,
+		}
 	}
 }
 
-// fetchChildResources returns a tea.Cmd that calls the appropriate child fetcher.
-// It checks the paginated child registry first (passing empty continuation token
-// for the initial page), then falls back to the legacy child fetcher registry.
+// fetchChildResources returns a tea.Cmd that calls the paginated child fetcher
+// for the given child type, passing an empty continuation token for the initial page.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	clients := m.clients
 	return func() tea.Msg {
@@ -75,34 +63,22 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 		ctx := context.Background()
 		pc := resource.ParentContext(parentCtx)
 
-		// Try paginated child fetcher first (initial page with empty token).
 		pf := resource.GetPaginatedChildFetcher(childType)
-		if pf != nil {
-			result, err := pf(ctx, clients, pc, "")
-			if err != nil {
-				return messages.APIErrorMsg{ResourceType: childType, Err: err}
-			}
-			return messages.ResourcesLoadedMsg{
-				ResourceType: childType,
-				Resources:    result.Resources,
-				Pagination:   result.Pagination,
-			}
-		}
-
-		// Fall back to legacy (non-paginated) child fetcher.
-		fetcher := resource.GetChildFetcher(childType)
-		if fetcher == nil {
+		if pf == nil {
 			return messages.APIErrorMsg{
 				ResourceType: childType,
 				Err:          fmt.Errorf("unsupported child type: %s", childType),
 			}
 		}
-
-		resources, err := fetcher(ctx, clients, pc)
+		result, err := pf(ctx, clients, pc, "")
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: childType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{ResourceType: childType, Resources: resources}
+		return messages.ResourcesLoadedMsg{
+			ResourceType: childType,
+			Resources:    result.Resources,
+			Pagination:   result.Pagination,
+		}
 	}
 }
 
@@ -281,37 +257,15 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Try paginated fetcher first — gets truncation info.
 		pf := resource.GetPaginatedFetcher(shortName)
-		if pf != nil {
-			result, err := pf(ctx, clients, "")
-			if err != nil {
-				return messages.AvailabilityCheckedMsg{
-					ResourceType: shortName,
-					Err:          err,
-					Gen:          gen,
-				}
-			}
-			truncated := result.Pagination != nil && result.Pagination.IsTruncated
-			return messages.AvailabilityCheckedMsg{
-				ResourceType: shortName,
-				HasResources: len(result.Resources) > 0,
-				Count:        len(result.Resources),
-				Truncated:    truncated,
-				Gen:          gen,
-			}
-		}
-
-		// Fall back to legacy fetcher.
-		fetcher := resource.GetFetcher(shortName)
-		if fetcher == nil {
+		if pf == nil {
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
 				Err:          fmt.Errorf("no fetcher for %s", shortName),
 				Gen:          gen,
 			}
 		}
-		resources, err := fetcher(ctx, clients)
+		result, err := pf(ctx, clients, "")
 		if err != nil {
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
@@ -319,10 +273,12 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 				Gen:          gen,
 			}
 		}
+		truncated := result.Pagination != nil && result.Pagination.IsTruncated
 		return messages.AvailabilityCheckedMsg{
 			ResourceType: shortName,
-			HasResources: len(resources) > 0,
-			Count:        len(resources),
+			HasResources: len(result.Resources) > 0,
+			Count:        len(result.Resources),
+			Truncated:    truncated,
 			Gen:          gen,
 		}
 	}

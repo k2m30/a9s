@@ -33,59 +33,46 @@ func init() {
 }
 
 // FetchSNSTopicSubscriptions calls the SNS ListSubscriptionsByTopic API and
-// converts the response into a FetchResult with pagination support. Each call
-// returns up to 200 results. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
-// continuation.
+// converts the response into a FetchResult with pagination support. A single
+// API call is made per invocation; IsTruncated and NextToken are forwarded as
+// pagination metadata for the caller to request the next page.
 func FetchSNSTopicSubscriptions(ctx context.Context, api SNSListSubscriptionsByTopicAPI, topicArn string, continuationToken string) (resource.FetchResult, error) {
-	const maxSubscriptions = 200
-
-	var resources []resource.Resource
-	var nextToken *string
+	input := &sns.ListSubscriptionsByTopicInput{
+		TopicArn: &topicArn,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		output, err := api.ListSubscriptionsByTopic(ctx, &sns.ListSubscriptionsByTopicInput{
-			TopicArn:  &topicArn,
-			NextToken: nextToken,
-		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching SNS topic subscriptions: %w", err)
-		}
+	output, err := api.ListSubscriptionsByTopic(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching SNS topic subscriptions: %w", err)
+	}
 
-		for _, sub := range output.Subscriptions {
-			resources = append(resources, convertSNSSubscription(sub))
-		}
+	var resources []resource.Resource
+	for _, sub := range output.Subscriptions {
+		resources = append(resources, convertSNSSubscription(sub))
+	}
 
-		if len(resources) >= maxSubscriptions {
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: apiNextToken != "",
-					NextToken:   apiNextToken,
-					PageSize:    len(resources),
-				},
-			}, nil
-		}
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

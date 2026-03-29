@@ -12,75 +12,111 @@ import (
 )
 
 func init() {
-	resource.Register("sqs", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
+
+	resource.RegisterPaginated("sqs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSQSQueues(ctx, c.SQS, c.SQS)
+		return FetchSQSQueuesPage(ctx, c.SQS, c.SQS, continuationToken)
 	})
-	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
 }
 
-// FetchSQSQueues performs a two-step fetch: ListQueues to get URLs,
-// then GetQueueAttributes per queue for details.
+// FetchSQSQueues calls the SQS ListQueues/GetQueueAttributes APIs and returns
+// all pages of queues. Used by existing tests and the legacy fetcher.
 func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		listOutput, err := listAPI.ListQueues(ctx, &sqs.ListQueuesInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSQSQueuesPage(ctx, listAPI, attrAPI, token)
 		if err != nil {
-			return nil, fmt.Errorf("listing SQS queues: %w", err)
+			return nil, err
 		}
-
-		for _, queueURL := range listOutput.QueueUrls {
-			attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-				QueueUrl: &queueURL,
-				AttributeNames: []sqstypes.QueueAttributeName{
-					sqstypes.QueueAttributeNameAll,
-				},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
-			}
-
-			attrs := attrOutput.Attributes
-
-			// Extract queue name from URL (last segment after /)
-			queueName := queueURL
-			if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
-				queueName = parts[len(parts)-1]
-			}
-
-			approxMessages := attrs["ApproximateNumberOfMessages"]
-			approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
-			delaySeconds := attrs["DelaySeconds"]
-
-			r := resource.Resource{
-				ID:     queueName,
-				Name:   queueName,
-				Status: "",
-				Fields: map[string]string{
-					"queue_name":         queueName,
-					"queue_url":          queueURL,
-					"approx_messages":    approxMessages,
-					"approx_not_visible": approxNotVisible,
-					"delay_seconds":      delaySeconds,
-				},
-				RawStruct: fmt.Sprintf("%v", attrs),
-			}
-
-			resources = append(resources, r)
-		}
-
-		if listOutput.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = listOutput.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchSQSQueuesPage performs a two-step fetch: ListQueues (single page) to get
+// URLs, then GetQueueAttributes per queue for details.
+// Pass an empty continuationToken for the first page.
+func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &sqs.ListQueuesInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	listOutput, err := listAPI.ListQueues(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing SQS queues: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, queueURL := range listOutput.QueueUrls {
+		attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+			QueueUrl: &queueURL,
+			AttributeNames: []sqstypes.QueueAttributeName{
+				sqstypes.QueueAttributeNameAll,
+			},
+		})
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
+		}
+
+		attrs := attrOutput.Attributes
+
+		// Extract queue name from URL (last segment after /)
+		queueName := queueURL
+		if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
+			queueName = parts[len(parts)-1]
+		}
+
+		approxMessages := attrs["ApproximateNumberOfMessages"]
+		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
+		delaySeconds := attrs["DelaySeconds"]
+
+		r := resource.Resource{
+			ID:     queueName,
+			Name:   queueName,
+			Status: "",
+			Fields: map[string]string{
+				"queue_name":         queueName,
+				"queue_url":          queueURL,
+				"approx_messages":    approxMessages,
+				"approx_not_visible": approxNotVisible,
+				"delay_seconds":      delaySeconds,
+			},
+			RawStruct: fmt.Sprintf("%v", attrs),
+		}
+
+		resources = append(resources, r)
+	}
+
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

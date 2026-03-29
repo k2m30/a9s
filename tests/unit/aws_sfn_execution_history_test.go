@@ -243,10 +243,20 @@ func TestFetchSFNExecutionHistory_APIError(t *testing.T) {
 
 // TestFetchSFNExecutionHistory_Pagination verifies that paginated responses
 // via NextToken are followed and all events collected across multiple pages.
+// TestFetchSFNExecutionHistory_Pagination verifies the single-page pagination
+// contract: one API call is made per invocation, resources from that page are
+// returned, and IsTruncated/NextToken reflect whether more pages exist. A second
+// call with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockSFNGetExecutionHistoryClient{
+	parentCtx := map[string]string{
+		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-paginated",
+	}
+
+	// Page 1: 2 events with NextToken indicating more pages exist.
+	page1Mock := &mockSFNGetExecutionHistoryClient{
 		outputs: []*sfn.GetExecutionHistoryOutput{
 			{
 				NextToken: aws.String("page2-token"),
@@ -267,8 +277,50 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchSFNExecutionHistory(context.Background(), page1Mock, parentCtx, "")
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_first_event_id", func(t *testing.T) {
+		if result1.Resources[0].ID != "1" {
+			t.Errorf("page 1: first event ID expected %q, got %q", "1", result1.Resources[0].ID)
+		}
+	})
+
+	// Page 2: 1 event with no NextToken — last page.
+	page2Mock := &mockSFNGetExecutionHistoryClient{
+		outputs: []*sfn.GetExecutionHistoryOutput{
 			{
-				// No NextToken -- last page
+				// No NextToken — last page
 				Events: []sfntypes.HistoryEvent{
 					{
 						Id:              3,
@@ -281,41 +333,43 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		},
 	}
 
-	parentCtx := map[string]string{
-		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-paginated",
-	}
-
-	resultSFN, err := awsclient.FetchSFNExecutionHistory(
-		context.Background(),
-		mock,
-		parentCtx,
-		"",
-	)
-	resources := resultSFN.Resources
-	_ = resources
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchSFNExecutionHistory(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
-	}
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 2, got %d", len(result2.Resources))
+		}
+	})
 
-	if resources[0].ID != "1" {
-		t.Errorf("first resource ID: expected %q, got %q", "1", resources[0].ID)
-	}
-	if resources[2].ID != "3" {
-		t.Errorf("last resource ID: expected %q, got %q", "3", resources[2].ID)
-	}
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
+		}
+	})
+
+	t.Run("page2_last_event_id", func(t *testing.T) {
+		if result2.Resources[0].ID != "3" {
+			t.Errorf("page 2: last event ID expected %q, got %q", "3", result2.Resources[0].ID)
+		}
+	})
 }
 
-// TestFetchSFNExecutionHistory_MaxCap verifies that the fetcher caps results
-// at 500 events even when the API returns more.
+// TestFetchSFNExecutionHistory_MaxCap verifies that a single API page of 50
+// events is returned as-is with correct IsTruncated=true metadata when the API
+// indicates more pages exist. The per-page cap no longer applies — each call
+// returns one page and the caller drives pagination via continuation tokens.
 func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
-	// Build a single page with 600 events (exceeds the 500 cap)
-	events := make([]sfntypes.HistoryEvent, 600)
+	// Build one page of 50 events with a NextToken indicating more pages exist.
+	events := make([]sfntypes.HistoryEvent, 50)
 	for i := range events {
 		events[i] = sfntypes.HistoryEvent{
 			Id:        int64(i + 1),
@@ -326,7 +380,8 @@ func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 
 	mock := &mockSFNGetExecutionHistoryClient{
 		output: &sfn.GetExecutionHistoryOutput{
-			Events: events,
+			Events:    events,
+			NextToken: aws.String("token-page-1"),
 		},
 	}
 
@@ -341,14 +396,45 @@ func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 		"",
 	)
 	resources := resultSFN.Resources
-	_ = resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(resources) != 500 {
-		t.Errorf("expected 500 resources (capped), got %d", len(resources))
-	}
+	t.Run("returns_full_page_of_50", func(t *testing.T) {
+		if len(resources) != 50 {
+			t.Errorf("expected exactly 50 resources from single API page, got %d", len(resources))
+		}
+	})
+
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if resultSFN.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !resultSFN.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when API returns NextToken")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if resultSFN.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if resultSFN.Pagination.NextToken != "token-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "token-page-1", resultSFN.Pagination.NextToken)
+		}
+	})
+
+	t.Run("first_event_id", func(t *testing.T) {
+		if resources[0].ID != "1" {
+			t.Errorf("first event ID: expected %q, got %q", "1", resources[0].ID)
+		}
+	})
+
+	t.Run("last_event_id", func(t *testing.T) {
+		if resources[49].ID != "50" {
+			t.Errorf("last event ID: expected %q, got %q", "50", resources[49].ID)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

@@ -57,12 +57,12 @@ Pick the right pattern based on the architect spec:
 // Pattern B init() — note c.EC2 not c.VPC
 func init() {
     resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "state", "cidr", "is_default"})
-    resource.Register("vpc", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+    resource.RegisterPaginated("vpc", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
-            return nil, fmt.Errorf("AWS clients not initialized")
+            return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
         }
-        return FetchVPCs(ctx, c.EC2)  // reuses EC2 client
+        return FetchVPCsPage(ctx, c.EC2, continuationToken)  // reuses EC2 client
     })
 }
 ```
@@ -77,12 +77,20 @@ func init() {
 // Pattern C init() — same client passed 3 times for 3 interfaces
 func init() {
     resource.RegisterFieldKeys("ng", []string{"name", "cluster", "status", "instance_types", "desired", "min", "max"})
-    resource.Register("ng", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+    resource.RegisterPaginated("ng", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
-            return nil, fmt.Errorf("AWS clients not initialized")
+            return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
         }
-        return FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
+        // Multi-step fetchers wrap entire sequence, return IsTruncated: false
+        resources, err := FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
+        if err != nil {
+            return resource.FetchResult{}, err
+        }
+        return resource.FetchResult{
+            Resources: resources,
+            Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+        }, nil
     })
 }
 
@@ -175,23 +183,36 @@ import (
 
 func init() {
     resource.RegisterFieldKeys("{shortname}", []string{"key1", "key2", ...})
-    resource.Register("{shortname}", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+    resource.RegisterPaginated("{shortname}", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
         c, ok := clients.(*ServiceClients)
         if !ok || c == nil {
-            return nil, fmt.Errorf("AWS clients not initialized")
+            return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
         }
-        return Fetch{TypeName}(ctx, c.{ServiceField})
+        return Fetch{TypeName}Page(ctx, c.{ServiceField}, continuationToken)
     })
 }
 
+// Fetch{TypeName} is a backward-compat wrapper that fetches ALL pages.
 func Fetch{TypeName}(ctx context.Context, api {InterfaceName}) ([]resource.Resource, error) {
-    var resources []resource.Resource
-    var nextToken *string
-
+    var all []resource.Resource
+    token := ""
     for {
-        output, err := api.{APICall}(ctx, &{service}.{APICall}Input{
-            NextToken: nextToken,
-        })
+        result, err := Fetch{TypeName}Page(ctx, api, token)
+        if err != nil { return nil, err }
+        all = append(all, result.Resources...)
+        if result.Pagination == nil || !result.Pagination.IsTruncated { break }
+        token = result.Pagination.NextToken
+    }
+    return all, nil
+}
+
+// Fetch{TypeName}Page fetches a single page of resources.
+func Fetch{TypeName}Page(ctx context.Context, api {InterfaceName}, continuationToken string) (resource.FetchResult, error) {
+    input := &{service}.{APICall}Input{}
+    if continuationToken != "" {
+        input.NextToken = &continuationToken
+    }
+    output, err := api.{APICall}(ctx, input)
         if err != nil {
             return nil, fmt.Errorf("fetching {TypeName}: %w", err)
         }

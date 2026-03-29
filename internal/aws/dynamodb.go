@@ -11,31 +11,52 @@ import (
 )
 
 func init() {
-	resource.Register("ddb", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
+
+	resource.RegisterPaginated("ddb", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchDynamoDBTables(ctx, c.DynamoDB, c.DynamoDB)
+		return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 	})
-	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
 }
 
-// FetchDynamoDBTables performs a two-step fetch: ListTables to get names,
-// then DescribeTable per table for full details.
+// FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and
+// returns all pages of tables. Used by existing tests and the legacy fetcher.
 func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var exclusiveStartTableName *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		listOutput, err := listAPI.ListTables(ctx, &dynamodb.ListTablesInput{
-			ExclusiveStartTableName: exclusiveStartTableName,
-		})
+		result, err := FetchDynamoDBTablesPage(ctx, listAPI, describeAPI, token)
 		if err != nil {
-			return nil, fmt.Errorf("listing DynamoDB tables: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, tableName := range listOutput.TableNames {
+// FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get
+// names, then DescribeTable per table for full details.
+// Pass an empty continuationToken for the first page.
+func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &dynamodb.ListTablesInput{}
+	if continuationToken != "" {
+		input.ExclusiveStartTableName = &continuationToken
+	}
+
+	listOutput, err := listAPI.ListTables(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing DynamoDB tables: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, tableName := range listOutput.TableNames {
 		descOutput, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(tableName),
 		})
@@ -78,17 +99,32 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 				"size_bytes":   sizeBytes,
 				"billing_mode": billingMode,
 			},
-			RawStruct:  table,
+			RawStruct: table,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if listOutput.LastEvaluatedTableName == nil {
-			break
-		}
-		exclusiveStartTableName = listOutput.LastEvaluatedTableName
 	}
 
-	return resources, nil
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if listOutput.LastEvaluatedTableName != nil {
+		nextToken = *listOutput.LastEvaluatedTableName
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

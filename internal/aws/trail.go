@@ -11,12 +11,20 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region"})
-	resource.Register("trail", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("trail", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCloudTrailTrails(ctx, c.CloudTrail)
+		resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return resource.FetchResult{
+			Resources:  resources,
+			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+		}, nil
 	})
 }
 

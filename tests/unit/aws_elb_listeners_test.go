@@ -525,10 +525,19 @@ func TestFetchELBListeners_RawStruct(t *testing.T) {
 	})
 }
 
-// TestFetchELBListeners_Pagination verifies that paginated responses via
-// Marker/NextMarker are followed and all listeners collected across multiple pages.
+// TestFetchELBListeners_Pagination verifies the single-page pagination contract:
+// one API call is made per invocation, resources from that page are returned,
+// and IsTruncated/NextToken reflect whether more pages exist. A second call
+// with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchELBListeners_Pagination(t *testing.T) {
-	mock := &mockELBv2DescribeListenersClient{
+	parentCtx := map[string]string{
+		"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/pag-alb/abc123",
+		"lb_name":           "pag-alb",
+	}
+
+	// Page 1: 2 listeners with NextMarker indicating more pages exist.
+	page1Mock := &mockELBv2DescribeListenersClient{
 		outputs: []*elbv2.DescribeListenersOutput{
 			{
 				NextMarker: aws.String("page2-marker"),
@@ -561,6 +570,79 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchELBListeners(
+		context.Background(),
+		page1Mock,
+		parentCtx,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		if page1Mock.callIdx != 1 {
+			t.Errorf("expected 1 API call for page 1, got %d", page1Mock.callIdx)
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextMarker is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-marker" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-marker", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_total_hint_negative", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.TotalHint != -1 {
+			t.Errorf("page 1: TotalHint should be -1 when truncated, got %d", result1.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page1_first_listener_port_80", func(t *testing.T) {
+		if result1.Resources[0].Fields["port"] != "80" {
+			t.Errorf("first resource port: expected %q, got %q", "80", result1.Resources[0].Fields["port"])
+		}
+	})
+
+	t.Run("page1_all_fields_populated", func(t *testing.T) {
+		requiredFields := []string{"port", "protocol", "default_action_type"}
+		for i, r := range result1.Resources {
+			for _, key := range requiredFields {
+				if _, ok := r.Fields[key]; !ok {
+					t.Errorf("page 1: resource[%d].Fields missing key %q", i, key)
+				}
+			}
+		}
+	})
+
+	// Page 2: 1 listener with no NextMarker — last page.
+	page2Mock := &mockELBv2DescribeListenersClient{
+		outputs: []*elbv2.DescribeListenersOutput{
 			{
 				// No NextMarker — last page
 				Listeners: []elbtypes.Listener{
@@ -580,89 +662,87 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		},
 	}
 
-	parentCtx := map[string]string{
-		"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/pag-alb/abc123",
-		"lb_name":           "pag-alb",
-	}
-
-	result, err := awsclient.FetchELBListeners(
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchELBListeners(
 		context.Background(),
-		mock,
+		page2Mock,
 		parentCtx,
-		"",
+		result1.Pagination.NextToken,
 	)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
-	resources := result.Resources
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 2, got %d", len(result2.Resources))
 		}
 	})
 
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
 		}
 	})
 
-	t.Run("all_fields_populated", func(t *testing.T) {
-		requiredFields := []string{"port", "protocol", "default_action_type"}
-		for i, r := range resources {
-			for _, key := range requiredFields {
-				if _, ok := r.Fields[key]; !ok {
-					t.Errorf("resource[%d].Fields missing key %q", i, key)
-				}
-			}
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
 		}
 	})
 
-	t.Run("first_listener_port_80", func(t *testing.T) {
-		if resources[0].Fields["port"] != "80" {
-			t.Errorf("first resource port: expected %q, got %q", "80", resources[0].Fields["port"])
+	t.Run("page2_total_hint_equals_count", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.TotalHint != 1 {
+			t.Errorf("page 2: TotalHint should equal item count (1) on last page, got %d", result2.Pagination.TotalHint)
 		}
 	})
 
-	t.Run("last_listener_port_8080", func(t *testing.T) {
-		if resources[2].Fields["port"] != "8080" {
-			t.Errorf("last resource port: expected %q, got %q", "8080", resources[2].Fields["port"])
+	t.Run("page2_listener_port_8080", func(t *testing.T) {
+		if result2.Resources[0].Fields["port"] != "8080" {
+			t.Errorf("page 2 resource port: expected %q, got %q", "8080", result2.Resources[0].Fields["port"])
 		}
 	})
 }
 
-// TestFetchELBListeners_MaxCap verifies that the fetcher stops
-// collecting listeners once it reaches the 200 cap.
+// TestFetchELBListeners_MaxCap verifies that a single API page of 50 listeners
+// is returned as-is with correct IsTruncated=true metadata when the API
+// indicates more pages exist. The 200-item cap no longer applies — each call
+// returns one page and the caller drives pagination via continuation tokens.
 func TestFetchELBListeners_MaxCap(t *testing.T) {
-	// Build 5 pages of 50 listeners each (250 total). The fetcher should stop at 200.
-	var outputs []*elbv2.DescribeListenersOutput
-	for page := 0; page < 5; page++ {
-		var listeners []elbtypes.Listener
-		for i := 0; i < 50; i++ {
-			portNum := int32(1000 + page*50 + i)
-			listeners = append(listeners, elbtypes.Listener{
-				ListenerArn: aws.String(fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cap-alb/abc123/p%d-l%d", page, i)),
-				Port:        aws.Int32(portNum),
-				Protocol:    elbtypes.ProtocolEnumHttp,
-				DefaultActions: []elbtypes.Action{{
-					Type: elbtypes.ActionTypeEnumFixedResponse,
-					FixedResponseConfig: &elbtypes.FixedResponseActionConfig{
-						StatusCode: aws.String("200"),
-					},
-				}},
-			})
-		}
-		out := &elbv2.DescribeListenersOutput{
-			Listeners: listeners,
-		}
-		if page < 4 {
-			out.NextMarker = aws.String(fmt.Sprintf("marker-page-%d", page+1))
-		}
-		outputs = append(outputs, out)
+	// Build one page of 50 listeners with a NextMarker indicating more pages exist.
+	var listeners []elbtypes.Listener
+	for i := 0; i < 50; i++ {
+		portNum := int32(1000 + i)
+		listeners = append(listeners, elbtypes.Listener{
+			ListenerArn: aws.String(fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cap-alb/abc123/p0-l%d", i)),
+			Port:        aws.Int32(portNum),
+			Protocol:    elbtypes.ProtocolEnumHttp,
+			DefaultActions: []elbtypes.Action{{
+				Type: elbtypes.ActionTypeEnumFixedResponse,
+				FixedResponseConfig: &elbtypes.FixedResponseActionConfig{
+					StatusCode: aws.String("200"),
+				},
+			}},
+		})
 	}
 
-	mock := &mockELBv2DescribeListenersClient{outputs: outputs}
+	mock := &mockELBv2DescribeListenersClient{
+		outputs: []*elbv2.DescribeListenersOutput{
+			{
+				Listeners:  listeners,
+				NextMarker: aws.String("marker-page-1"),
+			},
+		},
+	}
 
 	parentCtx := map[string]string{
 		"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cap-alb/abc123",
@@ -678,32 +758,64 @@ func TestFetchELBListeners_MaxCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	resources := result.Resources
 
-	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (max cap), got %d", len(resources))
+	t.Run("returns_full_page_of_50", func(t *testing.T) {
+		if len(result.Resources) != 50 {
+			t.Errorf("expected exactly 50 resources from single API page, got %d", len(result.Resources))
 		}
 	})
 
-	t.Run("early_termination", func(t *testing.T) {
-		// With 50 items per page, reaching 200 should take exactly 4 pages.
-		// The fetcher should NOT call the 5th page.
-		if mock.callIdx != 4 {
-			t.Errorf("expected 4 API calls (early termination at 200), got %d", mock.callIdx)
+	t.Run("single_api_call", func(t *testing.T) {
+		if mock.callIdx != 1 {
+			t.Errorf("expected 1 API call per invocation, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when API returns NextMarker")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.NextToken != "marker-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "marker-page-1", result.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page_size_equals_item_count", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.PageSize != 50 {
+			t.Errorf("PageSize expected 50, got %d", result.Pagination.PageSize)
+		}
+	})
+
+	t.Run("total_hint_negative_when_truncated", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.TotalHint != -1 {
+			t.Errorf("TotalHint should be -1 when truncated, got %d", result.Pagination.TotalHint)
 		}
 	})
 
 	t.Run("first_listener_correct", func(t *testing.T) {
-		if resources[0].Fields["port"] != "1000" {
-			t.Errorf("first resource port: expected %q, got %q", "1000", resources[0].Fields["port"])
+		if result.Resources[0].Fields["port"] != "1000" {
+			t.Errorf("first resource port: expected %q, got %q", "1000", result.Resources[0].Fields["port"])
 		}
 	})
 
 	t.Run("last_listener_correct", func(t *testing.T) {
-		// Last item should be the 50th item of page 3 (index 199 = port 1199)
-		if resources[199].Fields["port"] != "1199" {
-			t.Errorf("last resource port: expected %q, got %q", "1199", resources[199].Fields["port"])
+		if result.Resources[49].Fields["port"] != "1049" {
+			t.Errorf("last resource port: expected %q, got %q", "1049", result.Resources[49].Fields["port"])
 		}
 	})
 }

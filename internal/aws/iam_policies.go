@@ -11,32 +11,54 @@ import (
 )
 
 func init() {
-	resource.Register("policy", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_id", "attachment_count", "path", "create_date"})
+
+	resource.RegisterPaginated("policy", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchIAMPolicies(ctx, c.IAM)
+		return FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 	})
-	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_id", "attachment_count", "path", "create_date"})
 }
 
-// FetchIAMPolicies calls the IAM ListPolicies API with Scope=Local
-// to return only customer-managed policies.
+// FetchIAMPolicies calls the IAM ListPolicies API and returns all pages of
+// customer-managed policies. Used by existing tests and the legacy fetcher.
 func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
-			Scope:  iamtypes.PolicyScopeTypeLocal,
-			Marker: marker,
-		})
+		result, err := FetchIAMPoliciesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching IAM policies: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, policy := range output.Policies {
+// FetchIAMPoliciesPage calls the IAM ListPolicies API with Scope=Local
+// and returns a single page of customer-managed policies.
+// Pass an empty continuationToken for the first page.
+func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &iam.ListPoliciesInput{
+		Scope: iamtypes.PolicyScopeTypeLocal,
+	}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.ListPolicies(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching IAM policies: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, policy := range output.Policies {
 		policyName := ""
 		if policy.PolicyName != nil {
 			policyName = *policy.PolicyName
@@ -73,17 +95,31 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 				"path":             path,
 				"create_date":      createDate,
 			},
-			RawStruct:  policy,
+			RawStruct: policy,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if !output.IsTruncated {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
+	nextToken := ""
+	isTruncated := output.IsTruncated
+	if isTruncated && output.Marker != nil {
+		nextToken = *output.Marker
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

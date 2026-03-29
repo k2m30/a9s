@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("vpc", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "cidr_block", "state", "is_default"})
+
+	resource.RegisterPaginated("vpc", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchVPCs(ctx, c.EC2)
+		return FetchVPCsPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "cidr_block", "state", "is_default"})
 }
 
 // FetchVPCs calls the EC2 DescribeVpcs API and converts the
 // response into a slice of generic Resource structs.
 func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeVpcs(ctx, &ec2.DescribeVpcsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchVPCsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching VPCs: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, vpc := range output.Vpcs {
+// FetchVPCsPage fetches a single page of VPCs.
+func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeVpcsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeVpcs(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching VPCs: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, vpc := range output.Vpcs {
 		// Extract VPC ID
 		vpcID := ""
 		if vpc.VpcId != nil {
@@ -78,17 +98,31 @@ func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource
 				"state":      state,
 				"is_default": isDefault,
 			},
-			RawStruct:  vpc,
+			RawStruct: vpc,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

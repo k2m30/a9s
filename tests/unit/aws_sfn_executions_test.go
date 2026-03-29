@@ -356,11 +356,21 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 
 // TestFetchSFNExecutions_Pagination verifies that paginated responses via
 // NextToken are followed and all executions collected across multiple pages.
+// TestFetchSFNExecutions_Pagination verifies the single-page pagination contract:
+// one API call is made per invocation, resources from that page are returned,
+// and IsTruncated/NextToken reflect whether more pages exist. A second call
+// with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchSFNExecutions_Pagination(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
 
-	mock := &mockSFNListExecutionsClient{
+	parentCtx := map[string]string{
+		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
+	}
+
+	// Page 1: 3 executions with NextToken indicating more pages exist.
+	page1Mock := &mockSFNListExecutionsClient{
 		outputs: []*sfn.ListExecutionsOutput{
 			{
 				NextToken: aws.String("page2-token"),
@@ -390,8 +400,78 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchSFNExecutions(context.Background(), page1Mock, parentCtx, "")
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 3 {
+			t.Fatalf("expected 3 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		if page1Mock.callIdx != 1 {
+			t.Errorf("expected 1 API call for page 1, got %d", page1Mock.callIdx)
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_execution_ids", func(t *testing.T) {
+		expectedIDs := []string{"exec-p1-1", "exec-p1-2", "exec-p1-3"}
+		for i, expectedID := range expectedIDs {
+			if result1.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result1.Resources[i].ID)
+			}
+		}
+	})
+
+	t.Run("page1_all_have_status", func(t *testing.T) {
+		for i, r := range result1.Resources {
+			if r.Status == "" {
+				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			}
+		}
+	})
+
+	t.Run("page1_all_fields_populated", func(t *testing.T) {
+		requiredFields := []string{"execution_arn", "name", "status", "start_date"}
+		for i, r := range result1.Resources {
+			for _, key := range requiredFields {
+				if _, ok := r.Fields[key]; !ok {
+					t.Errorf("page 1: resource[%d].Fields missing key %q", i, key)
+				}
+			}
+		}
+	})
+
+	// Page 2: 2 executions with no NextToken — last page.
+	page2Mock := &mockSFNListExecutionsClient{
+		outputs: []*sfn.ListExecutionsOutput{
 			{
-				// No NextToken -- last page
+				// No NextToken — last page
 				Executions: []sfntypes.ExecutionListItem{
 					{
 						ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p2-1"),
@@ -414,126 +494,103 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		},
 	}
 
-	parentCtx := map[string]string{
-		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
-	}
-
-	result, err := awsclient.FetchSFNExecutions(
-		context.Background(),
-		mock,
-		parentCtx,
-			"",
-)
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchSFNExecutions(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(result.Resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(result.Resources))
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 2, got %d", len(result2.Resources))
 		}
 	})
 
-	t.Run("page1_executions", func(t *testing.T) {
-		expectedIDs := []string{"exec-p1-1", "exec-p1-2", "exec-p1-3"}
-		for i, expectedID := range expectedIDs {
-			if result.Resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
-			}
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
 		}
 	})
 
-	t.Run("page2_executions", func(t *testing.T) {
+	t.Run("page2_execution_ids", func(t *testing.T) {
 		expectedIDs := []string{"exec-p2-1", "exec-p2-2"}
 		for i, expectedID := range expectedIDs {
-			if result.Resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, result.Resources[i+3].ID)
-			}
-		}
-	})
-
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
-		}
-	})
-
-	t.Run("all_have_status", func(t *testing.T) {
-		for i, r := range result.Resources {
-			if r.Status == "" {
-				t.Errorf("resources[%d].Status should not be empty", i)
-			}
-		}
-	})
-
-	t.Run("all_fields_populated", func(t *testing.T) {
-		requiredFields := []string{"execution_arn", "name", "status", "start_date"}
-		for i, r := range result.Resources {
-			for _, key := range requiredFields {
-				if _, ok := r.Fields[key]; !ok {
-					t.Errorf("resource[%d].Fields missing key %q", i, key)
-				}
+			if result2.Resources[i].ID != expectedID {
+				t.Errorf("page 2: resources[%d].ID: expected %q, got %q", i, expectedID, result2.Resources[i].ID)
 			}
 		}
 	})
 }
 
-// TestFetchSFNExecutions_MaxCap verifies that the fetcher stops collecting
-// executions once it reaches the maxExecutions=200 cap.
+// TestFetchSFNExecutions_MaxCap verifies that a single API page of 50
+// executions is returned as-is with correct IsTruncated=true metadata when the
+// API indicates more pages exist. The 200-item cap no longer applies — each
+// call returns one page and the caller drives pagination via continuation tokens.
 func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 12, 5, 0, 0, time.UTC)
 
-	// Build 5 pages of 50 executions each (250 total). The fetcher should stop at 200.
-	var outputs []*sfn.ListExecutionsOutput
-	for page := 0; page < 5; page++ {
-		var executions []sfntypes.ExecutionListItem
-		for i := 0; i < 50; i++ {
-			executions = append(executions, sfntypes.ExecutionListItem{
-				ExecutionArn:    aws.String(fmt.Sprintf("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p%d-%d", page, i)),
-				Name:            aws.String(fmt.Sprintf("exec-p%d-%d", page, i)),
-				StartDate:       &startTs,
-				StopDate:        &stopTs,
-				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:sm"),
-				Status:          sfntypes.ExecutionStatusSucceeded,
-			})
-		}
-		out := &sfn.ListExecutionsOutput{
-			Executions: executions,
-		}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
-		}
-		outputs = append(outputs, out)
+	// Build one page of 50 executions with a NextToken indicating more pages exist.
+	var executions []sfntypes.ExecutionListItem
+	for i := 0; i < 50; i++ {
+		executions = append(executions, sfntypes.ExecutionListItem{
+			ExecutionArn:    aws.String(fmt.Sprintf("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p0-%d", i)),
+			Name:            aws.String(fmt.Sprintf("exec-p0-%d", i)),
+			StartDate:       &startTs,
+			StopDate:        &stopTs,
+			StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:sm"),
+			Status:          sfntypes.ExecutionStatusSucceeded,
+		})
 	}
 
-	mock := &mockSFNListExecutionsClient{outputs: outputs}
+	mock := &mockSFNListExecutionsClient{
+		outputs: []*sfn.ListExecutionsOutput{
+			{
+				Executions: executions,
+				NextToken:  aws.String("token-page-1"),
+			},
+		},
+	}
 
 	parentCtx := map[string]string{
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	result, err := awsclient.FetchSFNExecutions(
-		context.Background(),
-		mock,
-		parentCtx,
-			"",
-)
+	result, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	t.Run("capped_at_200", func(t *testing.T) {
-		if len(result.Resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxExecutions cap), got %d", len(result.Resources))
+	t.Run("returns_full_page_of_50", func(t *testing.T) {
+		if len(result.Resources) != 50 {
+			t.Errorf("expected exactly 50 resources from single API page, got %d", len(result.Resources))
 		}
 	})
 
-	t.Run("early_termination", func(t *testing.T) {
-		// With 50 executions per page, reaching 200 should take exactly 4 pages.
-		// The fetcher should NOT call the 5th page.
-		if mock.callIdx != 4 {
-			t.Errorf("expected 4 API calls (early termination at 200), got %d", mock.callIdx)
+	t.Run("single_api_call", func(t *testing.T) {
+		if mock.callIdx != 1 {
+			t.Errorf("expected 1 API call per invocation, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when API returns NextToken")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.NextToken != "token-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "token-page-1", result.Pagination.NextToken)
 		}
 	})
 
@@ -544,9 +601,8 @@ func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 	})
 
 	t.Run("last_execution_correct", func(t *testing.T) {
-		// Last execution should be the 50th of page 3 (index 199 = page3, item49)
-		if result.Resources[199].ID != "exec-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "exec-p3-49", result.Resources[199].ID)
+		if result.Resources[49].ID != "exec-p0-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "exec-p0-49", result.Resources[49].ID)
 		}
 	})
 }

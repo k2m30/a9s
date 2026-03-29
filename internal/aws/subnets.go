@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("subnet", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("subnet", []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"})
+
+	resource.RegisterPaginated("subnet", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSubnets(ctx, c.EC2)
+		return FetchSubnetsPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("subnet", []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"})
 }
 
 // FetchSubnets calls the EC2 DescribeSubnets API and converts the
 // response into a slice of generic Resource structs.
 func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSubnetsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching subnets: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, subnet := range output.Subnets {
+// FetchSubnetsPage fetches a single page of subnets.
+func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeSubnetsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeSubnets(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching subnets: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, subnet := range output.Subnets {
 		subnetID := ""
 		if subnet.SubnetId != nil {
 			subnetID = *subnet.SubnetId
@@ -85,17 +105,31 @@ func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Re
 				"state":             state,
 				"available_ips":     availableIPs,
 			},
-			RawStruct:  subnet,
+			RawStruct: subnet,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

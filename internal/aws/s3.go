@@ -11,14 +11,15 @@ import (
 )
 
 func init() {
-	resource.Register("s3", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
+
+	resource.RegisterPaginated("s3", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchS3Buckets(ctx, c.S3)
+		return FetchS3BucketsPage(ctx, c.S3, continuationToken)
 	})
-	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
 
 	// Register S3 objects as a child type with its own fetcher.
 	resource.RegisterPaginatedChild("s3_objects", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
@@ -42,22 +43,42 @@ func init() {
 	})
 }
 
-// FetchS3Buckets calls the S3 ListBuckets API and returns a slice of
-// generic Resource structs. Region is whatever AWS returns — no extra
-// GetBucketLocation calls (region is a pass-through API parameter).
+// FetchS3Buckets calls the S3 ListBuckets API and returns all pages of buckets.
+// Used by existing tests and the legacy fetcher.
 func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var continuationToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := listAPI.ListBuckets(ctx, &s3.ListBucketsInput{
-			ContinuationToken: continuationToken,
-		})
+		result, err := FetchS3BucketsPage(ctx, listAPI, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching S3 buckets: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, bucket := range output.Buckets {
+// FetchS3BucketsPage calls the S3 ListBuckets API and returns a single page
+// of buckets. Pass an empty continuationToken for the first page.
+func FetchS3BucketsPage(ctx context.Context, listAPI S3ListBucketsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &s3.ListBucketsInput{
+		MaxBuckets: aws.Int32(200),
+	}
+	if continuationToken != "" {
+		input.ContinuationToken = &continuationToken
+	}
+
+	output, err := listAPI.ListBuckets(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching S3 buckets: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, bucket := range output.Buckets {
 		bucketName := ""
 		if bucket.Name != nil {
 			bucketName = *bucket.Name
@@ -77,114 +98,132 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 				"bucket_name":   bucketName,
 				"creation_date": creationDate,
 			},
-			RawStruct:  bucket,
+			RawStruct: bucket,
 		}
 
 		resources = append(resources, r)
-		}
-
-		// Check for more pages
-		if output.ContinuationToken == nil || *output.ContinuationToken == "" {
-			break
-		}
-		continuationToken = output.ContinuationToken
 	}
 
-	return resources, nil
-}
-
-// FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.
-// It returns folders (CommonPrefixes) and files (Contents) as a FetchResult.
-// It paginates using IsTruncated and NextContinuationToken until all pages are fetched.
-func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string, continuationToken string) (resource.FetchResult, error) {
-	var resources []resource.Resource
-	var awsContinuationToken *string
-	if continuationToken != "" {
-		awsContinuationToken = &continuationToken
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.ContinuationToken != nil && *output.ContinuationToken != "" {
+		nextToken = *output.ContinuationToken
+		isTruncated = true
 	}
 
-	for {
-		input := &s3.ListObjectsV2Input{
-			Bucket:            aws.String(bucket),
-			Prefix:            aws.String(prefix),
-			Delimiter:         aws.String("/"),
-			ContinuationToken: awsContinuationToken,
-		}
-
-		output, err := api.ListObjectsV2(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching S3 objects: %w", err)
-		}
-
-		// Add folders (CommonPrefixes) first
-		for _, cp := range output.CommonPrefixes {
-			folderKey := ""
-			if cp.Prefix != nil {
-				folderKey = *cp.Prefix
-			}
-
-			r := resource.Resource{
-				ID:     folderKey,
-				Name:   folderKey,
-				Status: "folder",
-				Fields: map[string]string{
-					"key":           folderKey,
-					"size":          "",
-					"last_modified": "",
-					"storage_class": "",
-				},
-				RawStruct: cp,
-			}
-			resources = append(resources, r)
-		}
-
-		// Add files (Contents)
-		for _, obj := range output.Contents {
-			objKey := ""
-			if obj.Key != nil {
-				objKey = *obj.Key
-			}
-
-			size := ""
-			if obj.Size != nil {
-				size = formatSize(*obj.Size)
-			}
-
-			lastModified := ""
-			if obj.LastModified != nil {
-				lastModified = obj.LastModified.Format("2006-01-02 15:04")
-			}
-
-			storageClass := string(obj.StorageClass)
-
-			r := resource.Resource{
-				ID:     objKey,
-				Name:   objKey,
-				Status: "file",
-				Fields: map[string]string{
-					"key":           objKey,
-					"size":          size,
-					"last_modified": lastModified,
-					"storage_class": storageClass,
-				},
-				RawStruct: obj,
-			}
-			resources = append(resources, r)
-		}
-
-		// Check for more pages
-		if output.IsTruncated == nil || !*output.IsTruncated || output.NextContinuationToken == nil {
-			break
-		}
-		awsContinuationToken = output.NextContinuationToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
+}
+
+// FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.
+// It returns folders (CommonPrefixes) and files (Contents) as a FetchResult.
+// A single API call is made per invocation; IsTruncated and NextContinuationToken
+// are forwarded as pagination metadata for the caller to request the next page.
+func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string, continuationToken string) (resource.FetchResult, error) {
+	input := &s3.ListObjectsV2Input{
+		Bucket:    aws.String(bucket),
+		Prefix:    aws.String(prefix),
+		Delimiter: aws.String("/"),
+	}
+	if continuationToken != "" {
+		input.ContinuationToken = &continuationToken
+	}
+
+	output, err := api.ListObjectsV2(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching S3 objects: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	// Add folders (CommonPrefixes) first
+	for _, cp := range output.CommonPrefixes {
+		folderKey := ""
+		if cp.Prefix != nil {
+			folderKey = *cp.Prefix
+		}
+
+		r := resource.Resource{
+			ID:     folderKey,
+			Name:   folderKey,
+			Status: "folder",
+			Fields: map[string]string{
+				"key":           folderKey,
+				"size":          "",
+				"last_modified": "",
+				"storage_class": "",
+			},
+			RawStruct: cp,
+		}
+		resources = append(resources, r)
+	}
+
+	// Add files (Contents)
+	for _, obj := range output.Contents {
+		objKey := ""
+		if obj.Key != nil {
+			objKey = *obj.Key
+		}
+
+		size := ""
+		if obj.Size != nil {
+			size = formatSize(*obj.Size)
+		}
+
+		lastModified := ""
+		if obj.LastModified != nil {
+			lastModified = obj.LastModified.Format("2006-01-02 15:04")
+		}
+
+		storageClass := string(obj.StorageClass)
+
+		r := resource.Resource{
+			ID:     objKey,
+			Name:   objKey,
+			Status: "file",
+			Fields: map[string]string{
+				"key":           objKey,
+				"size":          size,
+				"last_modified": lastModified,
+				"storage_class": storageClass,
+			},
+			RawStruct: obj,
+		}
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.IsTruncated != nil && *output.IsTruncated && output.NextContinuationToken != nil {
+		nextToken = *output.NextContinuationToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

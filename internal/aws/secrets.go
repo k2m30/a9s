@@ -10,13 +10,6 @@ import (
 )
 
 func init() {
-	resource.Register("secrets", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSecrets(ctx, c.SecretsManager)
-	})
 	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
 	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
@@ -25,72 +18,114 @@ func init() {
 		}
 		return RevealSecret(ctx, c.SecretsManager, resourceID)
 	})
+
+	resource.RegisterPaginated("secrets", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
+	})
 }
 
-// FetchSecrets calls the SecretsManager ListSecrets API and converts the
-// response into a slice of generic Resource structs.
+// FetchSecrets calls the SecretsManager ListSecrets API and returns all pages
+// of secrets. Used by existing tests and the legacy fetcher.
 func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListSecrets(ctx, &secretsmanager.ListSecretsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSecretsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching secrets: %w", err)
+			return nil, err
 		}
-
-		for _, secret := range output.SecretList {
-			secretName := ""
-			if secret.Name != nil {
-				secretName = *secret.Name
-			}
-
-			description := ""
-			if secret.Description != nil {
-				description = *secret.Description
-			}
-
-			lastAccessed := ""
-			if secret.LastAccessedDate != nil {
-				lastAccessed = secret.LastAccessedDate.Format("2006-01-02")
-			}
-
-			lastChanged := ""
-			if secret.LastChangedDate != nil {
-				lastChanged = secret.LastChangedDate.Format("2006-01-02")
-			}
-
-			rotationEnabled := "No"
-			if secret.RotationEnabled != nil && *secret.RotationEnabled {
-				rotationEnabled = "Yes"
-			}
-
-			r := resource.Resource{
-				ID:     secretName,
-				Name:   secretName,
-				Status: "",
-				Fields: map[string]string{
-					"secret_name":      secretName,
-					"description":      description,
-					"last_accessed":    lastAccessed,
-					"last_changed":     lastChanged,
-					"rotation_enabled": rotationEnabled,
-				},
-				RawStruct: secret,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchSecretsPage calls the SecretsManager ListSecrets API and returns a single
+// page of secrets. Pass an empty continuationToken for the first page.
+func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &secretsmanager.ListSecretsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.ListSecrets(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching secrets: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, secret := range output.SecretList {
+		secretName := ""
+		if secret.Name != nil {
+			secretName = *secret.Name
+		}
+
+		description := ""
+		if secret.Description != nil {
+			description = *secret.Description
+		}
+
+		lastAccessed := ""
+		if secret.LastAccessedDate != nil {
+			lastAccessed = secret.LastAccessedDate.Format("2006-01-02")
+		}
+
+		lastChanged := ""
+		if secret.LastChangedDate != nil {
+			lastChanged = secret.LastChangedDate.Format("2006-01-02")
+		}
+
+		rotationEnabled := "No"
+		if secret.RotationEnabled != nil && *secret.RotationEnabled {
+			rotationEnabled = "Yes"
+		}
+
+		r := resource.Resource{
+			ID:     secretName,
+			Name:   secretName,
+			Status: "",
+			Fields: map[string]string{
+				"secret_name":      secretName,
+				"description":      description,
+				"last_accessed":    lastAccessed,
+				"last_changed":     lastChanged,
+				"rotation_enabled": rotationEnabled,
+			},
+			RawStruct: secret,
+		}
+
+		resources = append(resources, r)
+	}
+
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }
 
 // RevealSecret calls the SecretsManager GetSecretValue API and returns the

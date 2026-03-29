@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("igw", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state"})
+
+	resource.RegisterPaginated("igw", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchInternetGateways(ctx, c.EC2)
+		return FetchInternetGatewaysPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state"})
 }
 
 // FetchInternetGateways calls the EC2 DescribeInternetGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeInternetGateways(ctx, &ec2.DescribeInternetGatewaysInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchInternetGatewaysPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching internet gateways: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, igw := range output.InternetGateways {
+// FetchInternetGatewaysPage fetches a single page of internet gateways.
+func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeInternetGatewaysInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeInternetGateways(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching internet gateways: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, igw := range output.InternetGateways {
 		igwID := ""
 		if igw.InternetGatewayId != nil {
 			igwID = *igw.InternetGatewayId
@@ -70,17 +90,31 @@ func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysA
 				"vpc_id": vpcID,
 				"state":  state,
 			},
-			RawStruct:  igw,
+			RawStruct: igw,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

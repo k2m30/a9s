@@ -11,33 +11,54 @@ import (
 )
 
 func init() {
-	resource.Register("redis", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("redis", []string{"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"})
+
+	resource.RegisterPaginated("redis", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRedisClusters(ctx, c.ElastiCache)
+		return FetchRedisClustersPage(ctx, c.ElastiCache, continuationToken)
 	})
-	resource.RegisterFieldKeys("redis", []string{"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"})
 }
 
 // FetchRedisClusters calls the ElastiCache DescribeCacheClusters API and converts
 // the response into a slice of generic Resource structs.
 // Only clusters with engine "redis" are returned (client-side filter).
 func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheClustersAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
-			ShowCacheNodeInfo: aws.Bool(true),
-			Marker:           marker,
-		})
+		result, err := FetchRedisClustersPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching Redis clusters: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, cluster := range output.CacheClusters {
+// FetchRedisClustersPage fetches a single page of Redis clusters.
+func FetchRedisClustersPage(ctx context.Context, api ElastiCacheDescribeCacheClustersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &elasticache.DescribeCacheClustersInput{
+		ShowCacheNodeInfo: aws.Bool(true),
+	}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeCacheClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching Redis clusters: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, cluster := range output.CacheClusters {
 		// Client-side filter: only include redis clusters
 		if cluster.Engine == nil || *cluster.Engine != "redis" {
 			continue
@@ -85,17 +106,31 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 				"nodes":          nodes,
 				"endpoint":       endpoint,
 			},
-			RawStruct:  cluster,
+			RawStruct: cluster,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

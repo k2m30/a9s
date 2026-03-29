@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("logs", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time"})
+
+	resource.RegisterPaginated("logs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCloudWatchLogGroups(ctx, c.CloudWatchLogs)
+		return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 	})
-	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time"})
 }
 
-// FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and converts the
-// response into a slice of generic Resource structs.
+// FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
+// returns all pages of log groups. Used by existing tests and the legacy fetcher.
 func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchCloudWatchLogGroupsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching CloudWatch log groups: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, lg := range output.LogGroups {
+// FetchCloudWatchLogGroupsPage calls the CloudWatchLogs DescribeLogGroups API and returns
+// a single page of log groups. Pass an empty continuationToken for the first page.
+func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGroupsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &cloudwatchlogs.DescribeLogGroupsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeLogGroups(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching CloudWatch log groups: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, lg := range output.LogGroups {
 		logGroupName := ""
 		if lg.LogGroupName != nil {
 			logGroupName = *lg.LogGroupName
@@ -65,17 +85,32 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 				"retention_days": retentionDays,
 				"creation_time":  creationTime,
 			},
-			RawStruct:  lg,
+			RawStruct: lg,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

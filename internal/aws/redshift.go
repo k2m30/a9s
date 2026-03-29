@@ -12,30 +12,50 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("redshift", []string{"cluster_id", "status", "node_type", "num_nodes", "db_name", "endpoint"})
-	resource.Register("redshift", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("redshift", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRedshiftClusters(ctx, c.Redshift)
+		return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
 	})
 }
 
 // FetchRedshiftClusters calls the Redshift DescribeClusters API and converts the
 // response into a slice of generic Resource structs.
 func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeClusters(ctx, &redshift.DescribeClustersInput{
-			Marker: marker,
-		})
+		result, err := FetchRedshiftClustersPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching Redshift clusters: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, cluster := range output.Clusters {
+// FetchRedshiftClustersPage fetches a single page of Redshift clusters.
+func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClustersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &redshift.DescribeClustersInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching Redshift clusters: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, cluster := range output.Clusters {
 		clusterID := ""
 		if cluster.ClusterIdentifier != nil {
 			clusterID = *cluster.ClusterIdentifier
@@ -94,13 +114,27 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

@@ -10,75 +10,109 @@ import (
 )
 
 func init() {
-	resource.Register("cfn", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("cfn", []string{"stack_name", "status", "creation_time", "last_updated", "description"})
+
+	resource.RegisterPaginated("cfn", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCloudFormationStacks(ctx, c.CloudFormation)
+		return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
 	})
-	resource.RegisterFieldKeys("cfn", []string{"stack_name", "status", "creation_time", "last_updated", "description"})
 }
 
 // FetchCloudFormationStacks calls the CloudFormation DescribeStacks API and converts the
 // response into a slice of generic Resource structs.
 func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchCloudFormationStacksPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching CloudFormation stacks: %w", err)
+			return nil, err
 		}
-
-		for _, stack := range output.Stacks {
-			stackName := ""
-			if stack.StackName != nil {
-				stackName = *stack.StackName
-			}
-
-			status := string(stack.StackStatus)
-
-			creationTime := ""
-			if stack.CreationTime != nil {
-				creationTime = stack.CreationTime.Format("2006-01-02 15:04")
-			}
-
-			lastUpdated := ""
-			if stack.LastUpdatedTime != nil {
-				lastUpdated = stack.LastUpdatedTime.Format("2006-01-02 15:04")
-			}
-
-			description := ""
-			if stack.Description != nil {
-				description = *stack.Description
-			}
-
-			r := resource.Resource{
-				ID:     stackName,
-				Name:   stackName,
-				Status: status,
-				Fields: map[string]string{
-					"stack_name":    stackName,
-					"status":        status,
-					"creation_time": creationTime,
-					"last_updated":  lastUpdated,
-					"description":   description,
-				},
-				RawStruct: stack,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchCloudFormationStacksPage fetches a single page of CloudFormation stacks.
+func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &cloudformation.DescribeStacksInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.DescribeStacks(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching CloudFormation stacks: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, stack := range output.Stacks {
+		stackName := ""
+		if stack.StackName != nil {
+			stackName = *stack.StackName
+		}
+
+		status := string(stack.StackStatus)
+
+		creationTime := ""
+		if stack.CreationTime != nil {
+			creationTime = stack.CreationTime.Format("2006-01-02 15:04")
+		}
+
+		lastUpdated := ""
+		if stack.LastUpdatedTime != nil {
+			lastUpdated = stack.LastUpdatedTime.Format("2006-01-02 15:04")
+		}
+
+		description := ""
+		if stack.Description != nil {
+			description = *stack.Description
+		}
+
+		r := resource.Resource{
+			ID:     stackName,
+			Name:   stackName,
+			Status: status,
+			Fields: map[string]string{
+				"stack_name":    stackName,
+				"status":        status,
+				"creation_time": creationTime,
+				"last_updated":  lastUpdated,
+				"description":   description,
+			},
+			RawStruct: stack,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

@@ -195,12 +195,18 @@ func TestFetchIAMGroupMembers_NilFields(t *testing.T) {
 	}
 }
 
-// TestFetchIAMGroupMembers_Pagination verifies that the fetcher handles
-// Marker/IsTruncated pagination from GetGroup.
+// TestFetchIAMGroupMembers_Pagination verifies the single-page pagination
+// contract: one API call is made per invocation, resources from that page are
+// returned, and IsTruncated/NextToken (Marker) reflect whether more pages exist.
+// A second call with the continuation token verifies the final page sets
+// IsTruncated=false.
 func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 	createDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	mock := &mockIAMGetGroupClient{
+	parentCtx := map[string]string{"group_name": "big-group"}
+
+	// Page 1: 1 user with IsTruncated=true and Marker indicating more pages.
+	page1Mock := &mockIAMGetGroupClient{
 		outputs: []*iam.GetGroupOutput{
 			{
 				Group: &iamtypes.Group{GroupName: aws.String("big-group")},
@@ -210,6 +216,48 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 				IsTruncated: true,
 				Marker:      aws.String("marker1"),
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchIAMGroupMembers(context.Background(), page1Mock, parentCtx, "")
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when Marker is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "marker1" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "marker1", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_user_name", func(t *testing.T) {
+		if result1.Resources[0].Name != "user1" {
+			t.Errorf("page 1: resource[0].Name expected %q, got %q", "user1", result1.Resources[0].Name)
+		}
+	})
+
+	// Page 2: 2 users with IsTruncated=false — last page.
+	page2Mock := &mockIAMGetGroupClient{
+		outputs: []*iam.GetGroupOutput{
 			{
 				Group: &iamtypes.Group{GroupName: aws.String("big-group")},
 				Users: []iamtypes.User{
@@ -221,14 +269,44 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 		},
 	}
 
-	parentCtx := map[string]string{"group_name": "big-group"}
-	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchIAMGroupMembers(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
-	if len(result.Resources) != 3 {
-		t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
-	}
+
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 2, got %d", len(result2.Resources))
+		}
+	})
+
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
+		}
+	})
+
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page2_user_names", func(t *testing.T) {
+		if result2.Resources[0].Name != "user2" {
+			t.Errorf("page 2: resource[0].Name expected %q, got %q", "user2", result2.Resources[0].Name)
+		}
+		if result2.Resources[1].Name != "user3" {
+			t.Errorf("page 2: resource[1].Name expected %q, got %q", "user3", result2.Resources[1].Name)
+		}
+	})
 }
 
 // TestFetchIAMGroupMembers_DateFormat verifies that CreateDate is formatted

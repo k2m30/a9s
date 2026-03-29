@@ -11,31 +11,51 @@ import (
 )
 
 func init() {
-	resource.Register("sns", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("sns", []string{"topic_arn", "display_name"})
+
+	resource.RegisterPaginated("sns", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSNSTopics(ctx, c.SNS)
+		return FetchSNSTopicsPage(ctx, c.SNS, continuationToken)
 	})
-	resource.RegisterFieldKeys("sns", []string{"topic_arn", "display_name"})
 }
 
-// FetchSNSTopics calls the SNS ListTopics API and converts the
-// response into a slice of generic Resource structs.
+// FetchSNSTopics calls the SNS ListTopics API and returns all pages of topics.
+// Used by existing tests and the legacy fetcher.
 func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListTopics(ctx, &sns.ListTopicsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSNSTopicsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching SNS topics: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, topic := range output.Topics {
+// FetchSNSTopicsPage calls the SNS ListTopics API and returns a single page
+// of topics. Pass an empty continuationToken for the first page.
+func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &sns.ListTopicsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.ListTopics(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching SNS topics: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, topic := range output.Topics {
 		topicArn := ""
 		if topic.TopicArn != nil {
 			topicArn = *topic.TopicArn
@@ -55,17 +75,32 @@ func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resou
 				"topic_arn":    topicArn,
 				"display_name": displayName,
 			},
-			RawStruct:  topic,
+			RawStruct: topic,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

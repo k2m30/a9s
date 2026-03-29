@@ -570,6 +570,7 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 		},
 	}
 
+	// Page 1: first call with empty token
 	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
@@ -579,28 +580,65 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	resources := result.Resources
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(resources))
+	t.Run("page1_count", func(t *testing.T) {
+		if len(result.Resources) != 3 {
+			t.Fatalf("expected 3 resources on page 1, got %d", len(result.Resources))
+		}
+	})
+
+	t.Run("page1_truncated", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("expected Pagination, got nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("expected IsTruncated=true on page 1")
+		}
+		if result.Pagination.NextToken != "page2-token" {
+			t.Errorf("NextToken: expected %q, got %q", "page2-token", result.Pagination.NextToken)
 		}
 	})
 
 	t.Run("page1_resources", func(t *testing.T) {
 		expectedIDs := []string{"Bucket1", "Function1", "Table1"}
 		for i, expectedID := range expectedIDs {
-			if resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, resources[i].ID)
+			if result.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
 			}
+		}
+	})
+
+	// Page 2: second call with continuation token
+	result2, err := awsclient.FetchCfnResources(
+		context.Background(),
+		mock,
+		"paginated-stack",
+		"page2-token",
+	)
+	if err != nil {
+		t.Fatalf("page 2: expected no error, got %v", err)
+	}
+
+	t.Run("page2_count", func(t *testing.T) {
+		if len(result2.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 2, got %d", len(result2.Resources))
+		}
+	})
+
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("expected Pagination, got nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("expected IsTruncated=false on page 2")
 		}
 	})
 
 	t.Run("page2_resources", func(t *testing.T) {
 		expectedIDs := []string{"Queue1", "Topic1"}
 		for i, expectedID := range expectedIDs {
-			if resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, resources[i+3].ID)
+			if result2.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result2.Resources[i].ID)
 			}
 		}
 	})
@@ -613,7 +651,10 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"logical_resource_id", "physical_resource_id", "resource_type", "resource_status", "drift_status", "last_updated"}
-		for i, r := range resources {
+		allResources := make([]resource.Resource, 0, len(result.Resources)+len(result2.Resources))
+		allResources = append(allResources, result.Resources...)
+		allResources = append(allResources, result2.Resources...)
+		for i, r := range allResources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
 					t.Errorf("resource[%d].Fields missing key %q", i, key)
@@ -630,9 +671,12 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 			"AWS::SQS::Queue",
 			"AWS::SNS::Topic",
 		}
+		allResources := make([]resource.Resource, 0, len(result.Resources)+len(result2.Resources))
+		allResources = append(allResources, result.Resources...)
+		allResources = append(allResources, result2.Resources...)
 		for i, expectedType := range expectedTypes {
-			if resources[i].Fields["resource_type"] != expectedType {
-				t.Errorf("resources[%d].Fields[resource_type]: expected %q, got %q", i, expectedType, resources[i].Fields["resource_type"])
+			if allResources[i].Fields["resource_type"] != expectedType {
+				t.Errorf("resources[%d].Fields[resource_type]: expected %q, got %q", i, expectedType, allResources[i].Fields["resource_type"])
 			}
 		}
 	})

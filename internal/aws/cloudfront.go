@@ -12,33 +12,50 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("cf", []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class"})
-	resource.Register("cf", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("cf", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCloudFrontDistributions(ctx, c.CloudFront)
+		return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
 	})
 }
 
 // FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts
 // the response into a slice of generic Resource structs.
 func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistributionsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListDistributions(ctx, &cloudfront.ListDistributionsInput{
-			Marker: marker,
-		})
+		result, err := FetchCloudFrontDistributionsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching CloudFront distributions: %w", err)
+			return nil, err
 		}
-
-		if output.DistributionList == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
+// FetchCloudFrontDistributionsPage fetches a single page of CloudFront distributions.
+func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDistributionsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &cloudfront.ListDistributionsInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.ListDistributions(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching CloudFront distributions: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	if output.DistributionList != nil {
 		for _, dist := range output.DistributionList.Items {
 			distID := ""
 			if dist.Id != nil {
@@ -90,12 +107,29 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 
 			resources = append(resources, r)
 		}
-
-		if output.DistributionList.IsTruncated == nil || !*output.DistributionList.IsTruncated {
-			break
-		}
-		marker = output.DistributionList.NextMarker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.DistributionList != nil && output.DistributionList.IsTruncated != nil && *output.DistributionList.IsTruncated {
+		isTruncated = true
+		if output.DistributionList.NextMarker != nil {
+			nextToken = *output.DistributionList.NextMarker
+		}
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

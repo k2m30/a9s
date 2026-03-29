@@ -10,47 +10,66 @@ import (
 )
 
 func init() {
-	resource.Register("ecs", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("ecs", []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"})
+
+	resource.RegisterPaginated("ecs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchECSClusters(ctx, c.ECS, c.ECS)
+		return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
 	})
-	resource.RegisterFieldKeys("ecs", []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"})
 }
 
 // FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,
 // then DescribeClusters for full details.
 func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI) ([]resource.Resource, error) {
-	var allClusterArns []string
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		listOutput, err := listAPI.ListClusters(ctx, &ecs.ListClustersInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchECSClustersPage(ctx, listAPI, describeAPI, token)
 		if err != nil {
-			return nil, fmt.Errorf("listing ECS clusters: %w", err)
+			return nil, err
 		}
-
-		allClusterArns = append(allClusterArns, listOutput.ClusterArns...)
-
-		if listOutput.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = listOutput.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchECSClustersPage fetches a single page of ECS clusters.
+// It paginates ListClusters using continuationToken, then calls DescribeClusters
+// for the batch of ARNs returned on that page.
+func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ecs.ListClustersInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	if len(allClusterArns) == 0 {
-		return nil, nil
+	listOutput, err := listAPI.ListClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing ECS clusters: %w", err)
+	}
+
+	if len(listOutput.ClusterArns) == 0 {
+		return resource.FetchResult{
+			Resources: nil,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				TotalHint:   0,
+				PageSize:    0,
+			},
+		}, nil
 	}
 
 	descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
-		Clusters: allClusterArns,
+		Clusters: listOutput.ClusterArns,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("describing ECS clusters: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("describing ECS clusters: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -81,11 +100,31 @@ func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeA
 				"pending_tasks":  pendingTasks,
 				"services_count": servicesCount,
 			},
-			RawStruct:  cluster,
+			RawStruct: cluster,
 		}
 
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

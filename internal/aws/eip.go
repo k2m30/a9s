@@ -10,14 +10,22 @@ import (
 )
 
 func init() {
-	resource.Register("eip", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("eip", []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain"})
+
+	resource.RegisterPaginated("eip", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchElasticIPs(ctx, c.EC2)
+		resources, err := FetchElasticIPs(ctx, c.EC2)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return resource.FetchResult{
+			Resources:  resources,
+			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+		}, nil
 	})
-	resource.RegisterFieldKeys("eip", []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain"})
 }
 
 // FetchElasticIPs calls the EC2 DescribeAddresses API and converts the

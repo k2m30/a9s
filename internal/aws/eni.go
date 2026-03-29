@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("eni", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("eni", []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip"})
+
+	resource.RegisterPaginated("eni", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchNetworkInterfaces(ctx, c.EC2)
+		return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("eni", []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip"})
 }
 
 // FetchNetworkInterfaces calls the EC2 DescribeNetworkInterfaces API and converts the
 // response into a slice of generic Resource structs.
 func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterfacesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchNetworkInterfacesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching network interfaces: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, eni := range output.NetworkInterfaces {
+// FetchNetworkInterfacesPage fetches a single page of network interfaces.
+func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInterfacesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeNetworkInterfacesInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeNetworkInterfaces(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching network interfaces: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, eni := range output.NetworkInterfaces {
 		eniID := ""
 		if eni.NetworkInterfaceId != nil {
 			eniID = *eni.NetworkInterfaceId
@@ -76,17 +96,31 @@ func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterface
 				"vpc_id":     vpcID,
 				"private_ip": privateIP,
 			},
-			RawStruct:  eni,
+			RawStruct: eni,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

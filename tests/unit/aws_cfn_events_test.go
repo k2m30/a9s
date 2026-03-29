@@ -519,156 +519,232 @@ func TestCfnEvents_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestFetchCfnEvents_Pagination verifies that paginated responses via NextToken
-// are followed and all events collected across multiple pages.
+// TestFetchCfnEvents_Pagination verifies the single-page pagination contract:
+// one API call is made, resources from that page are returned, and IsTruncated/NextToken
+// reflect whether more pages exist. A second call with the continuation token verifies
+// that the token is forwarded and the final page sets IsTruncated=false.
 func TestFetchCfnEvents_Pagination(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockCFNDescribeStackEventsClient{
-		outputs: []*cloudformation.DescribeStackEventsOutput{
-			{
-				NextToken: aws.String("page2-token"),
-				StackEvents: []cfntypes.StackEvent{
-					{
-						EventId:           aws.String("evt-p1-1"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource1"),
-						ResourceType:      aws.String("AWS::S3::Bucket"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-					},
-					{
-						EventId:           aws.String("evt-p1-2"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource2"),
-						ResourceType:      aws.String("AWS::Lambda::Function"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-					},
-					{
-						EventId:           aws.String("evt-p1-3"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource3"),
-						ResourceType:      aws.String("AWS::EC2::Instance"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateInProgress,
-					},
+	// Page 1: 3 items with NextToken indicating more pages exist.
+	page1Mock := &mockCFNDescribeStackEventsClient{
+		output: &cloudformation.DescribeStackEventsOutput{
+			NextToken: aws.String("page2-token"),
+			StackEvents: []cfntypes.StackEvent{
+				{
+					EventId:           aws.String("evt-p1-1"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource1"),
+					ResourceType:      aws.String("AWS::S3::Bucket"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
 				},
-			},
-			{
-				// No NextToken — last page
-				StackEvents: []cfntypes.StackEvent{
-					{
-						EventId:           aws.String("evt-p2-1"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource4"),
-						ResourceType:      aws.String("AWS::DynamoDB::Table"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-					},
-					{
-						EventId:           aws.String("evt-p2-2"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource5"),
-						ResourceType:      aws.String("AWS::SNS::Topic"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-					},
-					{
-						EventId:           aws.String("evt-p2-3"),
-						StackName:         aws.String("paginated-stack"),
-						Timestamp:         &ts,
-						LogicalResourceId: aws.String("Resource6"),
-						ResourceType:      aws.String("AWS::SQS::Queue"),
-						ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-					},
+				{
+					EventId:           aws.String("evt-p1-2"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource2"),
+					ResourceType:      aws.String("AWS::Lambda::Function"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+				},
+				{
+					EventId:           aws.String("evt-p1-3"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource3"),
+					ResourceType:      aws.String("AWS::EC2::Instance"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateInProgress,
 				},
 			},
 		},
 	}
 
-	result, err := awsclient.FetchCfnEvents(
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchCfnEvents(
 		context.Background(),
-		mock,
+		page1Mock,
 		"paginated-stack",
 		"",
 	)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 1: expected no error, got %v", err)
 	}
-	resources := result.Resources
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 6 {
-			t.Fatalf("expected 6 resources across 2 pages, got %d", len(resources))
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 3 {
+			t.Fatalf("expected 3 resources on page 1, got %d", len(result1.Resources))
 		}
 	})
 
-	t.Run("page1_events", func(t *testing.T) {
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_page_size", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.PageSize != 3 {
+			t.Errorf("page 1: PageSize expected 3, got %d", result1.Pagination.PageSize)
+		}
+	})
+
+	t.Run("page1_total_hint_negative", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.TotalHint != -1 {
+			t.Errorf("page 1: TotalHint should be -1 when truncated, got %d", result1.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page1_event_ids", func(t *testing.T) {
 		expectedIDs := []string{"evt-p1-1", "evt-p1-2", "evt-p1-3"}
 		for i, expectedID := range expectedIDs {
-			if resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, resources[i].ID)
+			if result1.Resources[i].ID != expectedID {
+				t.Errorf("page 1: resources[%d].ID: expected %q, got %q", i, expectedID, result1.Resources[i].ID)
 			}
 		}
 	})
 
-	t.Run("page2_events", func(t *testing.T) {
-		expectedIDs := []string{"evt-p2-1", "evt-p2-2", "evt-p2-3"}
-		for i, expectedID := range expectedIDs {
-			if resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, resources[i+3].ID)
-			}
-		}
-	})
-
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
-		}
-	})
-
-	t.Run("all_fields_populated", func(t *testing.T) {
+	t.Run("page1_all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "logical_resource_id", "resource_type", "resource_status", "resource_status_reason"}
-		for i, r := range resources {
+		for i, r := range result1.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
-					t.Errorf("resource[%d].Fields missing key %q", i, key)
+					t.Errorf("page 1: resource[%d].Fields missing key %q", i, key)
 				}
+			}
+		}
+	})
+
+	// Page 2: 3 items with no NextToken — last page.
+	page2Mock := &mockCFNDescribeStackEventsClient{
+		output: &cloudformation.DescribeStackEventsOutput{
+			// No NextToken — last page
+			StackEvents: []cfntypes.StackEvent{
+				{
+					EventId:           aws.String("evt-p2-1"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource4"),
+					ResourceType:      aws.String("AWS::DynamoDB::Table"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+				},
+				{
+					EventId:           aws.String("evt-p2-2"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource5"),
+					ResourceType:      aws.String("AWS::SNS::Topic"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+				},
+				{
+					EventId:           aws.String("evt-p2-3"),
+					StackName:         aws.String("paginated-stack"),
+					Timestamp:         &ts,
+					LogicalResourceId: aws.String("Resource6"),
+					ResourceType:      aws.String("AWS::SQS::Queue"),
+					ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+				},
+			},
+		},
+	}
+
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchCfnEvents(
+		context.Background(),
+		page2Mock,
+		"paginated-stack",
+		result1.Pagination.NextToken,
+	)
+	if err != nil {
+		t.Fatalf("page 2: expected no error, got %v", err)
+	}
+
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 3 {
+			t.Fatalf("expected 3 resources on page 2, got %d", len(result2.Resources))
+		}
+	})
+
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
+		}
+	})
+
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page2_total_hint_equals_count", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.TotalHint != 3 {
+			t.Errorf("page 2: TotalHint should equal item count (3) on last page, got %d", result2.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page2_event_ids", func(t *testing.T) {
+		expectedIDs := []string{"evt-p2-1", "evt-p2-2", "evt-p2-3"}
+		for i, expectedID := range expectedIDs {
+			if result2.Resources[i].ID != expectedID {
+				t.Errorf("page 2: resources[%d].ID: expected %q, got %q", i, expectedID, result2.Resources[i].ID)
 			}
 		}
 	})
 }
 
-// TestFetchCfnEvents_MaxEventsCap verifies that the fetcher stops collecting
-// events once it reaches the maxEvents=200 cap, even if more pages are available.
-func TestFetchCfnEvents_MaxEventsCap(t *testing.T) {
+// TestFetchCfnEvents_MaxCap verifies that a single API page of 50 items is
+// returned as-is with correct IsTruncated=true metadata when the API indicates
+// more pages exist. The 200-item cap no longer applies — each call returns one
+// page and the caller drives pagination via continuation tokens.
+func TestFetchCfnEvents_MaxCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	// Build 5 pages of 50 events each (250 total). The fetcher should stop at 200.
-	var outputs []*cloudformation.DescribeStackEventsOutput
-	for page := 0; page < 5; page++ {
-		var events []cfntypes.StackEvent
-		for i := 0; i < 50; i++ {
-			events = append(events, cfntypes.StackEvent{
-				EventId:           aws.String(fmt.Sprintf("evt-p%d-%d", page, i)),
-				StackName:         aws.String("big-stack"),
-				Timestamp:         &ts,
-				LogicalResourceId: aws.String(fmt.Sprintf("Resource-p%d-%d", page, i)),
-				ResourceType:      aws.String("AWS::EC2::Instance"),
-				ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
-			})
-		}
-		out := &cloudformation.DescribeStackEventsOutput{
-			StackEvents: events,
-		}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
-		}
-		outputs = append(outputs, out)
+	// Build one page of 50 events with a NextToken indicating more pages exist.
+	var events []cfntypes.StackEvent
+	for i := 0; i < 50; i++ {
+		events = append(events, cfntypes.StackEvent{
+			EventId:           aws.String(fmt.Sprintf("evt-p0-%d", i)),
+			StackName:         aws.String("big-stack"),
+			Timestamp:         &ts,
+			LogicalResourceId: aws.String(fmt.Sprintf("Resource-p0-%d", i)),
+			ResourceType:      aws.String("AWS::EC2::Instance"),
+			ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+		})
 	}
 
-	mock := &mockCFNDescribeStackEventsClient{outputs: outputs}
+	mock := &mockCFNDescribeStackEventsClient{
+		output: &cloudformation.DescribeStackEventsOutput{
+			NextToken:   aws.String("token-page-1"),
+			StackEvents: events,
+		},
+	}
 
 	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
@@ -681,17 +757,45 @@ func TestFetchCfnEvents_MaxEventsCap(t *testing.T) {
 	}
 	resources := result.Resources
 
-	t.Run("capped_at_200", func(t *testing.T) {
-		if len(resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxEvents cap), got %d", len(resources))
+	t.Run("single_page_returned", func(t *testing.T) {
+		if len(resources) != 50 {
+			t.Errorf("expected exactly 50 resources (one page), got %d", len(resources))
 		}
 	})
 
-	t.Run("early_termination", func(t *testing.T) {
-		// With 50 events per page, reaching 200 should take exactly 4 pages.
-		// The fetcher should NOT call the 5th page.
-		if mock.callIdx != 4 {
-			t.Errorf("expected 4 API calls (early termination at 200), got %d", mock.callIdx)
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.NextToken != "token-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "token-page-1", result.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page_size_correct", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.PageSize != 50 {
+			t.Errorf("PageSize expected 50, got %d", result.Pagination.PageSize)
+		}
+	})
+
+	t.Run("total_hint_negative_when_truncated", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.TotalHint != -1 {
+			t.Errorf("TotalHint should be -1 when truncated, got %d", result.Pagination.TotalHint)
 		}
 	})
 
@@ -702,9 +806,8 @@ func TestFetchCfnEvents_MaxEventsCap(t *testing.T) {
 	})
 
 	t.Run("last_event_correct", func(t *testing.T) {
-		// Last event should be the 50th event of page 3 (index 199 = page3, event49)
-		if resources[199].ID != "evt-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "evt-p3-49", resources[199].ID)
+		if resources[49].ID != "evt-p0-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "evt-p0-49", resources[49].ID)
 		}
 	})
 }

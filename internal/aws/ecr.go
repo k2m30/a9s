@@ -11,74 +11,108 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("ecr", []string{"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at"})
-	resource.Register("ecr", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("ecr", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchECRRepositories(ctx, c.ECR)
+		return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
 	})
 }
 
 // FetchECRRepositories calls the ECR DescribeRepositories API and converts
 // the response into a slice of generic Resource structs.
 func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchECRRepositoriesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching ECR repositories: %w", err)
+			return nil, err
 		}
-
-		for _, repo := range output.Repositories {
-			repoName := ""
-			if repo.RepositoryName != nil {
-				repoName = *repo.RepositoryName
-			}
-
-			uri := ""
-			if repo.RepositoryUri != nil {
-				uri = *repo.RepositoryUri
-			}
-
-			tagMutability := string(repo.ImageTagMutability)
-
-			scanOnPush := "false"
-			if repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush {
-				scanOnPush = "true"
-			}
-
-			createdAt := ""
-			if repo.CreatedAt != nil {
-				createdAt = repo.CreatedAt.Format("2006-01-02 15:04")
-			}
-
-			r := resource.Resource{
-				ID:     repoName,
-				Name:   repoName,
-				Status: "",
-				Fields: map[string]string{
-					"repository_name": repoName,
-					"uri":             uri,
-					"tag_mutability":  tagMutability,
-					"scan_on_push":    scanOnPush,
-					"created_at":      createdAt,
-				},
-				RawStruct: repo,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchECRRepositoriesPage fetches a single page of ECR repositories.
+func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ecr.DescribeRepositoriesInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.DescribeRepositories(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching ECR repositories: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, repo := range output.Repositories {
+		repoName := ""
+		if repo.RepositoryName != nil {
+			repoName = *repo.RepositoryName
+		}
+
+		uri := ""
+		if repo.RepositoryUri != nil {
+			uri = *repo.RepositoryUri
+		}
+
+		tagMutability := string(repo.ImageTagMutability)
+
+		scanOnPush := "false"
+		if repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush {
+			scanOnPush = "true"
+		}
+
+		createdAt := ""
+		if repo.CreatedAt != nil {
+			createdAt = repo.CreatedAt.Format("2006-01-02 15:04")
+		}
+
+		r := resource.Resource{
+			ID:     repoName,
+			Name:   repoName,
+			Status: "",
+			Fields: map[string]string{
+				"repository_name": repoName,
+				"uri":             uri,
+				"tag_mutability":  tagMutability,
+				"scan_on_push":    scanOnPush,
+				"created_at":      createdAt,
+			},
+			RawStruct: repo,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("sg", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description"})
+
+	resource.RegisterPaginated("sg", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSecurityGroups(ctx, c.EC2)
+		return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description"})
 }
 
-// FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and converts
-// the response into a slice of generic Resource structs.
+// FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and returns all
+// pages of security groups. Used by existing tests and the legacy fetcher.
 func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSecurityGroupsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching security groups: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, sg := range output.SecurityGroups {
+// FetchSecurityGroupsPage calls the EC2 DescribeSecurityGroups API and returns
+// a single page of security groups. Pass an empty continuationToken for the first page.
+func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeSecurityGroupsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeSecurityGroups(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching security groups: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, sg := range output.SecurityGroups {
 		// Extract GroupId
 		groupID := ""
 		if sg.GroupId != nil {
@@ -69,18 +89,33 @@ func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) 
 				"vpc_id":      vpcID,
 				"description": description,
 			},
-			RawStruct:  sg,
+			RawStruct: sg,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }
 

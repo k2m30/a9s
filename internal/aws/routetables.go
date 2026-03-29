@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("rtb", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("rtb", []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count"})
+
+	resource.RegisterPaginated("rtb", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRouteTables(ctx, c.EC2)
+		return FetchRouteTablesPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("rtb", []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count"})
 }
 
 // FetchRouteTables calls the EC2 DescribeRouteTables API and converts the
 // response into a slice of generic Resource structs.
 func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchRouteTablesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching route tables: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, rtb := range output.RouteTables {
+// FetchRouteTablesPage fetches a single page of route tables.
+func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeRouteTablesInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeRouteTables(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching route tables: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, rtb := range output.RouteTables {
 		rtbID := ""
 		if rtb.RouteTableId != nil {
 			rtbID = *rtb.RouteTableId
@@ -72,23 +92,37 @@ func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]res
 			Name:   name,
 			Status: isMain,
 			Fields: map[string]string{
-				"route_table_id":    rtbID,
-				"name":              name,
-				"vpc_id":            vpcID,
-				"routes_count":      routesCount,
+				"route_table_id":     rtbID,
+				"name":               name,
+				"vpc_id":             vpcID,
+				"routes_count":       routesCount,
 				"associations_count": associationsCount,
 			},
-			RawStruct:  rtb,
+			RawStruct: rtb,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }
