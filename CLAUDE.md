@@ -29,7 +29,7 @@ internal/
     styles/      # Tokyo Night Dark palette
     views/       # view models (menu, list, detail, yaml, help, etc.)
 tests/
-  unit/          # 2,600+ unit tests
+  unit/          # 3,100+ unit tests
   integration/   # integration tests
 docs/
   design/        # visual design spec (incl. child-views/ with 24 view levels)
@@ -168,4 +168,5 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+- 003-cloudtrail-json-parsing: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, AWS SDK Go v2, yaml.v3
 - 002-paginated-fetcher-migration: Paginated fetcher migration (#107, #108, #109)
