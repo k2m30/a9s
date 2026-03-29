@@ -11,7 +11,7 @@
 
 ![a9s demo](docs/demos/demo.gif)
 
-Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
+Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
 
 **Read-only by design.** a9s never makes write calls to AWS. Safe to use in production. Write operations are on the [roadmap](ROADMAP.md) only after the project has proven itself as a trusted tool (10k+ stars).
 
@@ -23,7 +23,7 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 ## Features
 
-- **62 AWS resource types** across 12 service categories
+- **66 AWS resource types** across 12 service categories
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
 - Multi-profile and multi-region support
@@ -49,11 +49,11 @@ Browse, inspect, and manage 62 AWS resource types from your terminal. a9s gives 
 
 | Category | Resource Types |
 |----------|---------------|
-| **Compute** | EC2 Instances, ECS Services, ECS Clusters, ECS Tasks, Lambda Functions, Auto Scaling Groups, Elastic Beanstalk |
+| **Compute** | EC2 Instances, ECS Services, ECS Clusters, ECS Tasks, Lambda Functions, Auto Scaling Groups, Elastic Beanstalk, EBS Volumes, EBS Snapshots, AMIs |
 | **Containers** | EKS Clusters, EKS Node Groups |
 | **Networking** | Load Balancers, Target Groups, Security Groups, VPCs, Subnets, Route Tables, NAT Gateways, Internet Gateways, Elastic IPs, VPC Endpoints, Transit Gateways, Network Interfaces |
 | **Databases & Storage** | DB Instances, S3 Buckets, ElastiCache Redis, DB Clusters, DynamoDB Tables, OpenSearch Domains, Redshift Clusters, EFS File Systems, RDS Snapshots, DocDB Snapshots |
-| **Monitoring** | CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails |
+| **Monitoring** | CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails, CloudTrail Events |
 | **Messaging** | SQS Queues, SNS Topics, SNS Subscriptions, EventBridge Rules, Kinesis Streams, MSK Clusters, Step Functions |
 | **Secrets & Config** | Secrets Manager, SSM Parameters, KMS Keys |
 | **DNS & CDN** | Route 53 Hosted Zones, CloudFront Distributions, ACM Certificates, API Gateways |

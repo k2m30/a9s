@@ -1,0 +1,45 @@
+list:
+  Name:
+    width: 24
+  Volume ID:
+    path: VolumeId
+    width: 22
+  State:
+    path: State
+    width: 12
+  Size (GiB):
+    path: Size
+    width: 10
+  Type:
+    path: VolumeType
+    width: 8
+  IOPS:
+    path: Iops
+    width: 8
+  Encrypted:
+    path: Encrypted
+    width: 10
+  Attached To:
+    path: Attachments
+    width: 20
+  AZ:
+    path: AvailabilityZone
+    width: 16
+  Created:
+    path: CreateTime
+    width: 18
+
+detail:
+  - VolumeId
+  - State
+  - Size
+  - VolumeType
+  - Iops
+  - Throughput
+  - Encrypted
+  - KmsKeyId
+  - MultiAttachEnabled
+  - AvailabilityZone
+  - CreateTime
+  - Attachments
+  - Tags

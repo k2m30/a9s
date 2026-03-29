@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -590,5 +591,45 @@ type mockECSDescribeServicesClient struct {
 }
 
 func (m *mockECSDescribeServicesClient) DescribeServices(ctx context.Context, params *ecs.DescribeServicesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+	return m.output, m.err
+}
+
+// mockEC2DescribeVolumesClient implements awsclient.EC2DescribeVolumesAPI for testing.
+type mockEC2DescribeVolumesClient struct {
+	output *ec2.DescribeVolumesOutput
+	err    error
+}
+
+func (m *mockEC2DescribeVolumesClient) DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error) {
+	return m.output, m.err
+}
+
+// mockEC2DescribeSnapshotsClient implements awsclient.EC2DescribeSnapshotsAPI for testing.
+type mockEC2DescribeSnapshotsClient struct {
+	output *ec2.DescribeSnapshotsOutput
+	err    error
+}
+
+func (m *mockEC2DescribeSnapshotsClient) DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
+	return m.output, m.err
+}
+
+// mockEC2DescribeImagesClient implements awsclient.EC2DescribeImagesAPI for testing.
+type mockEC2DescribeImagesClient struct {
+	output *ec2.DescribeImagesOutput
+	err    error
+}
+
+func (m *mockEC2DescribeImagesClient) DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
+	return m.output, m.err
+}
+
+// mockCloudTrailLookupEventsClient implements awsclient.CloudTrailLookupEventsAPI for testing.
+type mockCloudTrailLookupEventsClient struct {
+	output *cloudtrail.LookupEventsOutput
+	err    error
+}
+
+func (m *mockCloudTrailLookupEventsClient) LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
 	return m.output, m.err
 }
