@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
@@ -14,6 +15,7 @@ import (
 func init() {
 	demoData["alarm"] = cloudwatchAlarmFixtures
 	demoData["logs"] = cloudwatchLogGroupFixtures
+	demoData["ct-events"] = cloudTrailEventFixtures
 
 	RegisterChildDemo("log_streams", func(parentCtx map[string]string) []resource.Resource {
 		return logStreamFixtures(parentCtx["log_group_name"])
@@ -695,6 +697,187 @@ func lambdaInvocationLogFixtures(_, _ string) []resource.Resource {
 				Timestamp: aws.Int64(1711065602000),
 				Message:   aws.String("END RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
 				EventId:   aws.String("log-demo-003"),
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CloudTrail Events
+// ---------------------------------------------------------------------------
+
+// cloudTrailEventFixtures returns demo CloudTrail Event fixtures with populated RawStruct.
+// Includes a mix of write and read-only events across common AWS services.
+func cloudTrailEventFixtures() []resource.Resource {
+	t1 := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
+	t2 := time.Date(2026, 3, 28, 13, 45, 22, 0, time.UTC)
+	t3 := time.Date(2026, 3, 28, 12, 10, 5, 0, time.UTC)
+	t4 := time.Date(2026, 3, 28, 11, 55, 48, 0, time.UTC)
+	t5 := time.Date(2026, 3, 28, 10, 20, 33, 0, time.UTC)
+	t6 := time.Date(2026, 3, 28, 9, 5, 11, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "evt-0a1b2c3d4e5f60001",
+			Name:   "CreateBucket",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "CreateBucket",
+				"time":          t1.Format("2006-01-02 15:04:05"),
+				"user":          "deploy-bot",
+				"source":        "s3.amazonaws.com",
+				"resource_type": "AWS::S3::Bucket",
+				"resource_name": "acme-prod-assets-2026",
+				"read_only":     "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60001"),
+				EventName:   aws.String("CreateBucket"),
+				EventTime:   aws.Time(t1),
+				EventSource: aws.String("s3.amazonaws.com"),
+				Username:    aws.String("deploy-bot"),
+				ReadOnly:    aws.String("false"),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::S3::Bucket"),
+						ResourceName: aws.String("acme-prod-assets-2026"),
+					},
+				},
+			},
+		},
+		{
+			ID:     "evt-0a1b2c3d4e5f60002",
+			Name:   "RunInstances",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "RunInstances",
+				"time":          t2.Format("2006-01-02 15:04:05"),
+				"user":          "admin",
+				"source":        "ec2.amazonaws.com",
+				"resource_type": "AWS::EC2::Instance",
+				"resource_name": "i-0a1b2c3d4e5f60007",
+				"read_only":     "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60002"),
+				EventName:   aws.String("RunInstances"),
+				EventTime:   aws.Time(t2),
+				EventSource: aws.String("ec2.amazonaws.com"),
+				Username:    aws.String("admin"),
+				ReadOnly:    aws.String("false"),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::EC2::Instance"),
+						ResourceName: aws.String("i-0a1b2c3d4e5f60007"),
+					},
+				},
+			},
+		},
+		{
+			ID:     "evt-0a1b2c3d4e5f60003",
+			Name:   "StopInstances",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "StopInstances",
+				"time":          t3.Format("2006-01-02 15:04:05"),
+				"user":          "admin",
+				"source":        "ec2.amazonaws.com",
+				"resource_type": "AWS::EC2::Instance",
+				"resource_name": "i-0a1b2c3d4e5f60004",
+				"read_only":     "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60003"),
+				EventName:   aws.String("StopInstances"),
+				EventTime:   aws.Time(t3),
+				EventSource: aws.String("ec2.amazonaws.com"),
+				Username:    aws.String("admin"),
+				ReadOnly:    aws.String("false"),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::EC2::Instance"),
+						ResourceName: aws.String("i-0a1b2c3d4e5f60004"),
+					},
+				},
+			},
+		},
+		{
+			ID:     "evt-0a1b2c3d4e5f60004",
+			Name:   "DeleteTable",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "DeleteTable",
+				"time":          t4.Format("2006-01-02 15:04:05"),
+				"user":          "ci-runner",
+				"source":        "dynamodb.amazonaws.com",
+				"resource_type": "AWS::DynamoDB::Table",
+				"resource_name": "acme-sessions-staging",
+				"read_only":     "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60004"),
+				EventName:   aws.String("DeleteTable"),
+				EventTime:   aws.Time(t4),
+				EventSource: aws.String("dynamodb.amazonaws.com"),
+				Username:    aws.String("ci-runner"),
+				ReadOnly:    aws.String("false"),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::DynamoDB::Table"),
+						ResourceName: aws.String("acme-sessions-staging"),
+					},
+				},
+			},
+		},
+		{
+			ID:     "evt-0a1b2c3d4e5f60005",
+			Name:   "AssumeRole",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "AssumeRole",
+				"time":          t5.Format("2006-01-02 15:04:05"),
+				"user":          "deploy-bot",
+				"source":        "sts.amazonaws.com",
+				"resource_type": "AWS::IAM::Role",
+				"resource_name": "acme-deploy-role",
+				"read_only":     "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60005"),
+				EventName:   aws.String("AssumeRole"),
+				EventTime:   aws.Time(t5),
+				EventSource: aws.String("sts.amazonaws.com"),
+				Username:    aws.String("deploy-bot"),
+				ReadOnly:    aws.String("false"),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::IAM::Role"),
+						ResourceName: aws.String("acme-deploy-role"),
+					},
+				},
+			},
+		},
+		{
+			ID:     "evt-0a1b2c3d4e5f60006",
+			Name:   "DescribeInstances",
+			Status: "true",
+			Fields: map[string]string{
+				"event_name":    "DescribeInstances",
+				"time":          t6.Format("2006-01-02 15:04:05"),
+				"user":          "monitoring-agent",
+				"source":        "ec2.amazonaws.com",
+				"resource_type": "",
+				"resource_name": "",
+				"read_only":     "true",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("evt-0a1b2c3d4e5f60006"),
+				EventName:   aws.String("DescribeInstances"),
+				EventTime:   aws.Time(t6),
+				EventSource: aws.String("ec2.amazonaws.com"),
+				Username:    aws.String("monitoring-agent"),
+				ReadOnly:    aws.String("true"),
+				Resources:   []cloudtrailtypes.Resource{},
 			},
 		},
 	}

@@ -1,0 +1,44 @@
+list:
+  Name:
+    path: Name
+    width: 32
+  Image ID:
+    path: ImageId
+    width: 22
+  State:
+    path: State
+    width: 12
+  Arch:
+    path: Architecture
+    width: 10
+  Platform:
+    path: PlatformDetails
+    width: 16
+  Root Device:
+    path: RootDeviceType
+    width: 14
+  Created:
+    path: CreationDate
+    width: 22
+  Public:
+    path: Public
+    width: 8
+
+detail:
+  - ImageId
+  - Name
+  - State
+  - Description
+  - Architecture
+  - PlatformDetails
+  - RootDeviceType
+  - VirtualizationType
+  - EnaSupport
+  - BootMode
+  - CreationDate
+  - DeprecationTime
+  - Public
+  - OwnerId
+  - ImageLocation
+  - BlockDeviceMappings
+  - Tags

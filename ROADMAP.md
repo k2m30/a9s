@@ -4,7 +4,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Already Implemented
 
-- **62 AWS resource types** across 12 categories
+- **66 AWS resource types** across 12 categories
 - **Search and filter** -- `/` to filter resource lists by name
 - **Sort columns** -- `N`/`I`/`A` to sort by name, ID, or date
 - **Customizable columns** -- `~/.a9s/views/` overrides which fields are displayed per resource type

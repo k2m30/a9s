@@ -1,0 +1,40 @@
+list:
+  Name:
+    width: 24
+  Snapshot ID:
+    path: SnapshotId
+    width: 24
+  State:
+    path: State
+    width: 12
+  Volume ID:
+    path: VolumeId
+    width: 22
+  Size (GiB):
+    path: VolumeSize
+    width: 10
+  Encrypted:
+    path: Encrypted
+    width: 10
+  Description:
+    path: Description
+    width: 30
+  Started:
+    path: StartTime
+    width: 18
+  Progress:
+    path: Progress
+    width: 10
+
+detail:
+  - SnapshotId
+  - State
+  - VolumeId
+  - VolumeSize
+  - Description
+  - Encrypted
+  - KmsKeyId
+  - OwnerId
+  - Progress
+  - StartTime
+  - Tags

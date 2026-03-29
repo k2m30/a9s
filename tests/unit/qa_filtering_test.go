@@ -96,9 +96,9 @@ func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 	if !strings.Contains(plain, "/ec2") {
 		t.Error("header should show /ec2")
 	}
-	// Frame title should show resource-types(1/62)
-	if !strings.Contains(plain, "resource-types(1/62)") {
-		t.Errorf("frame title should show resource-types(1/62), got: %s", plain)
+	// Frame title should show resource-types(1/66)
+	if !strings.Contains(plain, "resource-types(1/66)") {
+		t.Errorf("frame title should show resource-types(1/66), got: %s", plain)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 	if !strings.Contains(plain, "S3 Buckets") {
 		t.Error("filter 's3' should show S3 Buckets")
 	}
-	if !strings.Contains(plain, "resource-types(1/62)") {
-		t.Errorf("frame title should show resource-types(1/62), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/66)") {
+		t.Errorf("frame title should show resource-types(1/66), got: %s", plain)
 	}
 }
 
@@ -134,9 +134,9 @@ func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 			t.Errorf("filter 'xxx' should NOT show %s", name)
 		}
 	}
-	// Frame title should show resource-types(0/62)
-	if !strings.Contains(plain, "resource-types(0/62)") {
-		t.Errorf("frame title should show resource-types(0/62), got: %s", plain)
+	// Frame title should show resource-types(0/66)
+	if !strings.Contains(plain, "resource-types(0/66)") {
+		t.Errorf("frame title should show resource-types(0/66), got: %s", plain)
 	}
 }
 
@@ -162,8 +162,8 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(1/62)") {
-		t.Fatalf("precondition: filter 'ec2' should show 1/7, got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/66)") {
+		t.Fatalf("precondition: filter 'ec2' should show 1/66, got: %s", plain)
 	}
 
 	// Press backspace to remove '2' -> filter is "ec"
@@ -177,9 +177,9 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	plain = stripANSI(rootViewContent(m))
-	// All 7 items should be back
-	if !strings.Contains(plain, "resource-types(62)") {
-		t.Errorf("after clearing filter, frame should show resource-types(62), got: %s", plain)
+	// All 66 items should be back
+	if !strings.Contains(plain, "resource-types(66)") {
+		t.Errorf("after clearing filter, frame should show resource-types(66), got: %s", plain)
 	}
 }
 
@@ -193,9 +193,9 @@ func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 	m = typeFilter(m, "e")
 	plain := stripANSI(rootViewContent(m))
 
-	// Must have format resource-types(N/62) where N < 10
-	if !strings.Contains(plain, "/62)") {
-		t.Errorf("filtered frame title should contain /62) showing filtered count, got: %s", plain)
+	// Must have format resource-types(N/66) where N < 10
+	if !strings.Contains(plain, "/66)") {
+		t.Errorf("filtered frame title should contain /66) showing filtered count, got: %s", plain)
 	}
 }
 
@@ -211,8 +211,8 @@ func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 
 	// All items should reappear
-	if !strings.Contains(plain, "resource-types(62)") {
-		t.Errorf("after Esc, frame title should be resource-types(62), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(66)") {
+		t.Errorf("after Esc, frame title should be resource-types(66), got: %s", plain)
 	}
 	// Header should show ? for help
 	if !strings.Contains(plain, "? for help") {
@@ -695,8 +695,8 @@ func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "resource-types(62)") {
-		t.Errorf("Esc should clear confirmed filter, showing all 30 types, got: %s", plain)
+	if !strings.Contains(plain, "resource-types(66)") {
+		t.Errorf("Esc should clear confirmed filter, showing all 66 types, got: %s", plain)
 	}
 }
 

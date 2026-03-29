@@ -28,6 +28,22 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 		}
 
 		ctx := context.Background()
+
+		// Try paginated fetcher first (initial page with empty token).
+		pf := resource.GetPaginatedFetcher(resourceType)
+		if pf != nil {
+			result, err := pf(ctx, clients, "")
+			if err != nil {
+				return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
+			}
+			return messages.ResourcesLoadedMsg{
+				ResourceType: resourceType,
+				Resources:    result.Resources,
+				Pagination:   result.Pagination,
+			}
+		}
+
+		// Fall back to legacy (non-paginated) fetcher.
 		fetcher := resource.GetFetcher(resourceType)
 		if fetcher == nil {
 			return messages.APIErrorMsg{
@@ -250,6 +266,8 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 
 // probeResourceAvailability returns a tea.Cmd that checks if a resource type
 // has any resources by calling its registered fetcher with a timeout.
+// Paginated fetchers are tried first so that truncation can be detected and
+// reported as "(N+)" in the main menu.
 func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 	clients := m.clients
 	return func() tea.Msg {
@@ -262,6 +280,29 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
+		// Try paginated fetcher first — gets truncation info.
+		pf := resource.GetPaginatedFetcher(shortName)
+		if pf != nil {
+			result, err := pf(ctx, clients, "")
+			if err != nil {
+				return messages.AvailabilityCheckedMsg{
+					ResourceType: shortName,
+					Err:          err,
+					Gen:          gen,
+				}
+			}
+			truncated := result.Pagination != nil && result.Pagination.IsTruncated
+			return messages.AvailabilityCheckedMsg{
+				ResourceType: shortName,
+				HasResources: len(result.Resources) > 0,
+				Count:        len(result.Resources),
+				Truncated:    truncated,
+				Gen:          gen,
+			}
+		}
+
+		// Fall back to legacy fetcher.
 		fetcher := resource.GetFetcher(shortName)
 		if fetcher == nil {
 			return messages.AvailabilityCheckedMsg{
