@@ -80,9 +80,14 @@ type Model struct {
 type Option func(*Model)
 
 // WithDemo enables demo mode with synthetic fixture data.
+// Overrides profile and region to demo values regardless of CLI flags.
 func WithDemo(enabled bool) Option {
 	return func(m *Model) {
 		m.demoMode = enabled
+		if enabled {
+			m.profile = demo.DemoProfile
+			m.region = demo.DemoRegion
+		}
 	}
 }
 
