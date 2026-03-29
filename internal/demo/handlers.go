@@ -131,6 +131,202 @@ func registerEC2Handlers(t *Transport) {
 		xml := buildDescribeInstancesXML(instances)
 		return XMLResponse(xml), nil
 	})
+
+	t.Handle("ec2", "DescribeVolumes", func(_ *http.Request) (*http.Response, error) {
+		resources := demoData["ebs"]()
+		volumes := ExtractSDK[ec2types.Volume](resources)
+
+		var items strings.Builder
+		for _, v := range volumes {
+			volumeID := ""
+			if v.VolumeId != nil {
+				volumeID = *v.VolumeId
+			}
+			state := string(v.State)
+			volumeType := string(v.VolumeType)
+			az := ""
+			if v.AvailabilityZone != nil {
+				az = *v.AvailabilityZone
+			}
+			size := int32(0)
+			if v.Size != nil {
+				size = *v.Size
+			}
+			iops := int32(0)
+			if v.Iops != nil {
+				iops = *v.Iops
+			}
+			throughput := int32(0)
+			if v.Throughput != nil {
+				throughput = *v.Throughput
+			}
+			encrypted := "false"
+			if v.Encrypted != nil && *v.Encrypted {
+				encrypted = "true"
+			}
+			createTime := ""
+			if v.CreateTime != nil {
+				createTime = v.CreateTime.UTC().Format("2006-01-02T15:04:05.000Z")
+			}
+
+			fmt.Fprintf(&items, `<item>`)
+			fmt.Fprintf(&items, `<volumeId>%s</volumeId>`, xmlEscape(volumeID))
+			fmt.Fprintf(&items, `<status>%s</status>`, xmlEscape(state))
+			fmt.Fprintf(&items, `<volumeType>%s</volumeType>`, xmlEscape(volumeType))
+			fmt.Fprintf(&items, `<availabilityZone>%s</availabilityZone>`, xmlEscape(az))
+			fmt.Fprintf(&items, `<size>%d</size>`, size)
+			fmt.Fprintf(&items, `<iops>%d</iops>`, iops)
+			if throughput > 0 {
+				fmt.Fprintf(&items, `<throughput>%d</throughput>`, throughput)
+			}
+			fmt.Fprintf(&items, `<encrypted>%s</encrypted>`, encrypted)
+			if createTime != "" {
+				fmt.Fprintf(&items, `<createTime>%s</createTime>`, createTime)
+			}
+			// attachmentSet
+			items.WriteString(`<attachmentSet>`)
+			for _, att := range v.Attachments {
+				instanceID := ""
+				if att.InstanceId != nil {
+					instanceID = *att.InstanceId
+				}
+				device := ""
+				if att.Device != nil {
+					device = *att.Device
+				}
+				attState := string(att.State)
+				fmt.Fprintf(&items, `<item><instanceId>%s</instanceId><device>%s</device><status>%s</status></item>`,
+					xmlEscape(instanceID), xmlEscape(device), xmlEscape(attState))
+			}
+			items.WriteString(`</attachmentSet>`)
+			items.WriteString(buildTagSetXML(v.Tags))
+			fmt.Fprintf(&items, `</item>`)
+		}
+
+		return XMLResponse(ec2QueryXML("DescribeVolumes", "volumeSet", items.String())), nil
+	})
+
+	t.Handle("ec2", "DescribeSnapshots", func(_ *http.Request) (*http.Response, error) {
+		resources := demoData["ebs-snap"]()
+		snapshots := ExtractSDK[ec2types.Snapshot](resources)
+
+		var items strings.Builder
+		for _, s := range snapshots {
+			snapshotID := ""
+			if s.SnapshotId != nil {
+				snapshotID = *s.SnapshotId
+			}
+			state := string(s.State)
+			volumeID := ""
+			if s.VolumeId != nil {
+				volumeID = *s.VolumeId
+			}
+			volumeSize := int32(0)
+			if s.VolumeSize != nil {
+				volumeSize = *s.VolumeSize
+			}
+			desc := ""
+			if s.Description != nil {
+				desc = *s.Description
+			}
+			progress := ""
+			if s.Progress != nil {
+				progress = *s.Progress
+			}
+			ownerID := ""
+			if s.OwnerId != nil {
+				ownerID = *s.OwnerId
+			}
+			encrypted := "false"
+			if s.Encrypted != nil && *s.Encrypted {
+				encrypted = "true"
+			}
+			startTime := ""
+			if s.StartTime != nil {
+				startTime = s.StartTime.UTC().Format("2006-01-02T15:04:05.000Z")
+			}
+
+			fmt.Fprintf(&items, `<item>`)
+			fmt.Fprintf(&items, `<snapshotId>%s</snapshotId>`, xmlEscape(snapshotID))
+			fmt.Fprintf(&items, `<status>%s</status>`, xmlEscape(state))
+			fmt.Fprintf(&items, `<volumeId>%s</volumeId>`, xmlEscape(volumeID))
+			fmt.Fprintf(&items, `<volumeSize>%d</volumeSize>`, volumeSize)
+			fmt.Fprintf(&items, `<description>%s</description>`, xmlEscape(desc))
+			fmt.Fprintf(&items, `<progress>%s</progress>`, xmlEscape(progress))
+			fmt.Fprintf(&items, `<ownerId>%s</ownerId>`, xmlEscape(ownerID))
+			fmt.Fprintf(&items, `<encrypted>%s</encrypted>`, encrypted)
+			if startTime != "" {
+				fmt.Fprintf(&items, `<startTime>%s</startTime>`, startTime)
+			}
+			items.WriteString(buildTagSetXML(s.Tags))
+			fmt.Fprintf(&items, `</item>`)
+		}
+
+		return XMLResponse(ec2QueryXML("DescribeSnapshots", "snapshotSet", items.String())), nil
+	})
+
+	t.Handle("ec2", "DescribeImages", func(_ *http.Request) (*http.Response, error) {
+		resources := demoData["ami"]()
+		images := ExtractSDK[ec2types.Image](resources)
+
+		var items strings.Builder
+		for _, img := range images {
+			imageID := ""
+			if img.ImageId != nil {
+				imageID = *img.ImageId
+			}
+			name := ""
+			if img.Name != nil {
+				name = *img.Name
+			}
+			state := string(img.State)
+			arch := string(img.Architecture)
+			platformDetails := ""
+			if img.PlatformDetails != nil {
+				platformDetails = *img.PlatformDetails
+			}
+			rootDeviceType := string(img.RootDeviceType)
+			creationDate := ""
+			if img.CreationDate != nil {
+				creationDate = *img.CreationDate
+			}
+			isPublic := "false"
+			if img.Public != nil && *img.Public {
+				isPublic = "true"
+			}
+			desc := ""
+			if img.Description != nil {
+				desc = *img.Description
+			}
+			enaSupport := "false"
+			if img.EnaSupport != nil && *img.EnaSupport {
+				enaSupport = "true"
+			}
+			ownerID := ""
+			if img.OwnerId != nil {
+				ownerID = *img.OwnerId
+			}
+
+			fmt.Fprintf(&items, `<item>`)
+			fmt.Fprintf(&items, `<imageId>%s</imageId>`, xmlEscape(imageID))
+			fmt.Fprintf(&items, `<name>%s</name>`, xmlEscape(name))
+			fmt.Fprintf(&items, `<imageState>%s</imageState>`, xmlEscape(state))
+			fmt.Fprintf(&items, `<architecture>%s</architecture>`, xmlEscape(arch))
+			fmt.Fprintf(&items, `<platformDetails>%s</platformDetails>`, xmlEscape(platformDetails))
+			fmt.Fprintf(&items, `<rootDeviceType>%s</rootDeviceType>`, xmlEscape(rootDeviceType))
+			if creationDate != "" {
+				fmt.Fprintf(&items, `<creationDate>%s</creationDate>`, xmlEscape(creationDate))
+			}
+			fmt.Fprintf(&items, `<isPublic>%s</isPublic>`, isPublic)
+			fmt.Fprintf(&items, `<description>%s</description>`, xmlEscape(desc))
+			fmt.Fprintf(&items, `<enaSupport>%s</enaSupport>`, enaSupport)
+			fmt.Fprintf(&items, `<imageOwnerId>%s</imageOwnerId>`, xmlEscape(ownerID))
+			items.WriteString(buildTagSetXML(img.Tags))
+			fmt.Fprintf(&items, `</item>`)
+		}
+
+		return XMLResponse(ec2QueryXML("DescribeImages", "imagesSet", items.String())), nil
+	})
 }
 
 func buildDescribeInstancesXML(instances []ec2types.Instance) string {
