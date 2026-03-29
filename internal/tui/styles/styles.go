@@ -115,13 +115,14 @@ func initStyles() {
 		"pending_redrive": lipgloss.NewStyle().Foreground(ColPending),
 
 		// --- Green (ColRunning) ---
-		"healthy":  lipgloss.NewStyle().Foreground(ColRunning), // TG Health
-		"ok":       lipgloss.NewStyle().Foreground(ColRunning), // CloudWatch Alarms
-		"issued":   lipgloss.NewStyle().Foreground(ColRunning), // ACM
-		"deployed": lipgloss.NewStyle().Foreground(ColRunning), // CloudFront
-		"enabled":  lipgloss.NewStyle().Foreground(ColRunning), // EventBridge, KMS, Athena
-		"green":    lipgloss.NewStyle().Foreground(ColRunning), // EB Health
-		"success":  lipgloss.NewStyle().Foreground(ColRunning), // SES
+		"healthy":   lipgloss.NewStyle().Foreground(ColRunning), // TG Health
+		"ok":        lipgloss.NewStyle().Foreground(ColRunning), // CloudWatch Alarms
+		"issued":    lipgloss.NewStyle().Foreground(ColRunning), // ACM
+		"deployed":  lipgloss.NewStyle().Foreground(ColRunning), // CloudFront
+		"enabled":   lipgloss.NewStyle().Foreground(ColRunning), // EventBridge, KMS, Athena
+		"green":     lipgloss.NewStyle().Foreground(ColRunning), // EB Health
+		"success":   lipgloss.NewStyle().Foreground(ColRunning), // SES
+		"completed": lipgloss.NewStyle().Foreground(ColRunning), // EBS Snapshot
 
 		// --- Red (ColStopped) ---
 		"unhealthy":                  lipgloss.NewStyle().Foreground(ColStopped), // TG Health
@@ -134,6 +135,7 @@ func initStyles() {
 		"rollback_complete":          lipgloss.NewStyle().Foreground(ColStopped), // CFN: rollback = original op failed
 		"import_rollback_complete":   lipgloss.NewStyle().Foreground(ColStopped), // CFN: import rollback = failure
 		"red":                        lipgloss.NewStyle().Foreground(ColStopped), // EB Health
+		"deregistered":               lipgloss.NewStyle().Foreground(ColStopped), // AMI
 
 		// --- Yellow (ColPending) ---
 		"draining":           lipgloss.NewStyle().Foreground(ColPending), // TG Health
@@ -150,6 +152,8 @@ func initStyles() {
 		"pendingacceptance":  lipgloss.NewStyle().Foreground(ColPending), // VPC Endpoints
 		"yellow":             lipgloss.NewStyle().Foreground(ColPending), // EB Health
 		"temporary_failure":  lipgloss.NewStyle().Foreground(ColPending), // SES
+		"recovering":         lipgloss.NewStyle().Foreground(ColPending), // EBS Snapshot
+		"recoverable":        lipgloss.NewStyle().Foreground(ColPending), // EBS Snapshot
 
 		// --- Dim (ColTerminated) ---
 		"unused":      lipgloss.NewStyle().Foreground(ColTerminated), // TG Health

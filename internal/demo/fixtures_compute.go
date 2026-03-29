@@ -14,6 +14,9 @@ import (
 func init() {
 	demoData["ec2"] = ec2Instances
 	demoData["lambda"] = lambdaFunctions
+	demoData["ebs"] = ebsVolumeFixtures
+	demoData["ebs-snap"] = ebsSnapshotFixtures
+	demoData["ami"] = amiFixtures
 }
 
 // ---------------------------------------------------------------------------
@@ -446,5 +449,437 @@ func lambdaFunctions() []resource.Resource {
 	}
 
 	return fns
+}
+
+// ---------------------------------------------------------------------------
+// EBS Volumes
+// ---------------------------------------------------------------------------
+
+// ebsVolumeFixtures returns demo EBS Volume fixtures with populated RawStruct.
+// Includes a mix of in-use, available, and creating states.
+func ebsVolumeFixtures() []resource.Resource {
+	t1 := time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)
+	t2 := time.Date(2025, 11, 15, 8, 30, 0, 0, time.UTC)
+	t3 := time.Date(2026, 1, 20, 14, 15, 0, 0, time.UTC)
+	t4 := time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC)
+	t5 := time.Date(2026, 3, 28, 9, 30, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "vol-0a1b2c3d4e5f60001",
+			Name:   "web-prod-01-root",
+			Status: "in-use",
+			Fields: map[string]string{
+				"volume_id":   "vol-0a1b2c3d4e5f60001",
+				"name":        "web-prod-01-root",
+				"state":       "in-use",
+				"size":        "50",
+				"type":        "gp3",
+				"iops":        "3000",
+				"encrypted":   "true",
+				"attached_to": "i-0a1b2c3d4e5f60001",
+				"az":          "us-east-1a",
+				"created":     t2.Format("2006-01-02 15:04"),
+			},
+			RawStruct: ec2types.Volume{
+				VolumeId:         aws.String("vol-0a1b2c3d4e5f60001"),
+				State:            ec2types.VolumeStateInUse,
+				Size:             aws.Int32(50),
+				VolumeType:       ec2types.VolumeTypeGp3,
+				Iops:             aws.Int32(3000),
+				Throughput:       aws.Int32(125),
+				Encrypted:        aws.Bool(true),
+				AvailabilityZone: aws.String("us-east-1a"),
+				CreateTime:       aws.Time(t2),
+				Attachments: []ec2types.VolumeAttachment{
+					{InstanceId: aws.String("i-0a1b2c3d4e5f60001")},
+				},
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")},
+				},
+			},
+		},
+		{
+			ID:     "vol-0a1b2c3d4e5f60002",
+			Name:   "api-staging-data",
+			Status: "in-use",
+			Fields: map[string]string{
+				"volume_id":   "vol-0a1b2c3d4e5f60002",
+				"name":        "api-staging-data",
+				"state":       "in-use",
+				"size":        "200",
+				"type":        "io1",
+				"iops":        "6000",
+				"encrypted":   "true",
+				"attached_to": "i-0a1b2c3d4e5f60003",
+				"az":          "us-east-1b",
+				"created":     t1.Format("2006-01-02 15:04"),
+			},
+			RawStruct: ec2types.Volume{
+				VolumeId:         aws.String("vol-0a1b2c3d4e5f60002"),
+				State:            ec2types.VolumeStateInUse,
+				Size:             aws.Int32(200),
+				VolumeType:       ec2types.VolumeTypeIo1,
+				Iops:             aws.Int32(6000),
+				Encrypted:        aws.Bool(true),
+				AvailabilityZone: aws.String("us-east-1b"),
+				CreateTime:       aws.Time(t1),
+				Attachments: []ec2types.VolumeAttachment{
+					{InstanceId: aws.String("i-0a1b2c3d4e5f60003")},
+				},
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("api-staging-data")},
+				},
+			},
+		},
+		{
+			ID:     "vol-0a1b2c3d4e5f60003",
+			Name:   "orphaned-backup-vol",
+			Status: "available",
+			Fields: map[string]string{
+				"volume_id":   "vol-0a1b2c3d4e5f60003",
+				"name":        "orphaned-backup-vol",
+				"state":       "available",
+				"size":        "100",
+				"type":        "gp2",
+				"iops":        "300",
+				"encrypted":   "false",
+				"attached_to": "",
+				"az":          "us-east-1a",
+				"created":     t3.Format("2006-01-02 15:04"),
+			},
+			RawStruct: ec2types.Volume{
+				VolumeId:         aws.String("vol-0a1b2c3d4e5f60003"),
+				State:            ec2types.VolumeStateAvailable,
+				Size:             aws.Int32(100),
+				VolumeType:       ec2types.VolumeTypeGp2,
+				Iops:             aws.Int32(300),
+				Encrypted:        aws.Bool(false),
+				AvailabilityZone: aws.String("us-east-1a"),
+				CreateTime:       aws.Time(t3),
+				Attachments:      []ec2types.VolumeAttachment{},
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("orphaned-backup-vol")},
+				},
+			},
+		},
+		{
+			ID:     "vol-0a1b2c3d4e5f60004",
+			Name:   "",
+			Status: "available",
+			Fields: map[string]string{
+				"volume_id":   "vol-0a1b2c3d4e5f60004",
+				"name":        "",
+				"state":       "available",
+				"size":        "500",
+				"type":        "gp3",
+				"iops":        "3000",
+				"encrypted":   "true",
+				"attached_to": "",
+				"az":          "us-east-1c",
+				"created":     t4.Format("2006-01-02 15:04"),
+			},
+			RawStruct: ec2types.Volume{
+				VolumeId:         aws.String("vol-0a1b2c3d4e5f60004"),
+				State:            ec2types.VolumeStateAvailable,
+				Size:             aws.Int32(500),
+				VolumeType:       ec2types.VolumeTypeGp3,
+				Iops:             aws.Int32(3000),
+				Encrypted:        aws.Bool(true),
+				AvailabilityZone: aws.String("us-east-1c"),
+				CreateTime:       aws.Time(t4),
+				Attachments:      []ec2types.VolumeAttachment{},
+				Tags:             []ec2types.Tag{},
+			},
+		},
+		{
+			ID:     "vol-0a1b2c3d4e5f60005",
+			Name:   "new-db-volume",
+			Status: "creating",
+			Fields: map[string]string{
+				"volume_id":   "vol-0a1b2c3d4e5f60005",
+				"name":        "new-db-volume",
+				"state":       "creating",
+				"size":        "1000",
+				"type":        "io2",
+				"iops":        "16000",
+				"encrypted":   "true",
+				"attached_to": "",
+				"az":          "us-east-1b",
+				"created":     t5.Format("2006-01-02 15:04"),
+			},
+			RawStruct: ec2types.Volume{
+				VolumeId:         aws.String("vol-0a1b2c3d4e5f60005"),
+				State:            ec2types.VolumeStateCreating,
+				Size:             aws.Int32(1000),
+				VolumeType:       ec2types.VolumeTypeIo2,
+				Iops:             aws.Int32(16000),
+				Encrypted:        aws.Bool(true),
+				AvailabilityZone: aws.String("us-east-1b"),
+				CreateTime:       aws.Time(t5),
+				Attachments:      []ec2types.VolumeAttachment{},
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("new-db-volume")},
+				},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EBS Snapshots
+// ---------------------------------------------------------------------------
+
+// ebsSnapshotFixtures returns demo EBS Snapshot fixtures with populated RawStruct.
+// Includes a mix of completed and pending states.
+func ebsSnapshotFixtures() []resource.Resource {
+	t1 := time.Date(2025, 9, 1, 2, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 1, 1, 3, 0, 0, 0, time.UTC)
+	t3 := time.Date(2026, 3, 21, 4, 0, 0, 0, time.UTC)
+	t4 := time.Date(2026, 3, 28, 4, 0, 0, 0, time.UTC)
+
+	return []resource.Resource{
+		{
+			ID:     "snap-0a1b2c3d4e5f60001",
+			Name:   "web-prod-snapshot-2025q3",
+			Status: "completed",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0a1b2c3d4e5f60001",
+				"name":        "web-prod-snapshot-2025q3",
+				"state":       "completed",
+				"volume_id":   "vol-0a1b2c3d4e5f60001",
+				"size":        "50",
+				"encrypted":   "true",
+				"description": "Quarterly backup of web-prod-01 root volume",
+				"started":     t1.Format("2006-01-02 15:04"),
+				"progress":    "100%",
+			},
+			RawStruct: ec2types.Snapshot{
+				SnapshotId:  aws.String("snap-0a1b2c3d4e5f60001"),
+				State:       ec2types.SnapshotStateCompleted,
+				VolumeId:    aws.String("vol-0a1b2c3d4e5f60001"),
+				VolumeSize:  aws.Int32(50),
+				Encrypted:   aws.Bool(true),
+				Description: aws.String("Quarterly backup of web-prod-01 root volume"),
+				StartTime:   aws.Time(t1),
+				Progress:    aws.String("100%"),
+				OwnerId:     aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")},
+				},
+			},
+		},
+		{
+			ID:     "snap-0a1b2c3d4e5f60002",
+			Name:   "api-data-snapshot-2026q1",
+			Status: "completed",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0a1b2c3d4e5f60002",
+				"name":        "api-data-snapshot-2026q1",
+				"state":       "completed",
+				"volume_id":   "vol-0a1b2c3d4e5f60002",
+				"size":        "200",
+				"encrypted":   "true",
+				"description": "Q1 2026 backup of api-staging-data volume",
+				"started":     t2.Format("2006-01-02 15:04"),
+				"progress":    "100%",
+			},
+			RawStruct: ec2types.Snapshot{
+				SnapshotId:  aws.String("snap-0a1b2c3d4e5f60002"),
+				State:       ec2types.SnapshotStateCompleted,
+				VolumeId:    aws.String("vol-0a1b2c3d4e5f60002"),
+				VolumeSize:  aws.Int32(200),
+				Encrypted:   aws.Bool(true),
+				Description: aws.String("Q1 2026 backup of api-staging-data volume"),
+				StartTime:   aws.Time(t2),
+				Progress:    aws.String("100%"),
+				OwnerId:     aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("api-data-snapshot-2026q1")},
+				},
+			},
+		},
+		{
+			ID:     "snap-0a1b2c3d4e5f60003",
+			Name:   "orphaned-vol-snapshot",
+			Status: "completed",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0a1b2c3d4e5f60003",
+				"name":        "orphaned-vol-snapshot",
+				"state":       "completed",
+				"volume_id":   "vol-0a1b2c3d4e5f60003",
+				"size":        "100",
+				"encrypted":   "false",
+				"description": "Pre-deletion backup",
+				"started":     t3.Format("2006-01-02 15:04"),
+				"progress":    "100%",
+			},
+			RawStruct: ec2types.Snapshot{
+				SnapshotId:  aws.String("snap-0a1b2c3d4e5f60003"),
+				State:       ec2types.SnapshotStateCompleted,
+				VolumeId:    aws.String("vol-0a1b2c3d4e5f60003"),
+				VolumeSize:  aws.Int32(100),
+				Encrypted:   aws.Bool(false),
+				Description: aws.String("Pre-deletion backup"),
+				StartTime:   aws.Time(t3),
+				Progress:    aws.String("100%"),
+				OwnerId:     aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("orphaned-vol-snapshot")},
+				},
+			},
+		},
+		{
+			ID:     "snap-0a1b2c3d4e5f60004",
+			Name:   "",
+			Status: "pending",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0a1b2c3d4e5f60004",
+				"name":        "",
+				"state":       "pending",
+				"volume_id":   "vol-0a1b2c3d4e5f60005",
+				"size":        "1000",
+				"encrypted":   "true",
+				"description": "Initial snapshot of new-db-volume",
+				"started":     t4.Format("2006-01-02 15:04"),
+				"progress":    "23%",
+			},
+			RawStruct: ec2types.Snapshot{
+				SnapshotId:  aws.String("snap-0a1b2c3d4e5f60004"),
+				State:       ec2types.SnapshotStatePending,
+				VolumeId:    aws.String("vol-0a1b2c3d4e5f60005"),
+				VolumeSize:  aws.Int32(1000),
+				Encrypted:   aws.Bool(true),
+				Description: aws.String("Initial snapshot of new-db-volume"),
+				StartTime:   aws.Time(t4),
+				Progress:    aws.String("23%"),
+				OwnerId:     aws.String("123456789012"),
+				Tags:        []ec2types.Tag{},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// AMIs
+// ---------------------------------------------------------------------------
+
+// amiFixtures returns demo AMI fixtures with populated RawStruct.
+// Includes a mix of x86_64 and arm64 architectures, varying ages.
+func amiFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "ami-0a1b2c3d4e5f60001",
+			Name:   "acme-app-server-x86-v2.3.1",
+			Status: "available",
+			Fields: map[string]string{
+				"image_id":         "ami-0a1b2c3d4e5f60001",
+				"name":             "acme-app-server-x86-v2.3.1",
+				"state":            "available",
+				"architecture":     "x86_64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2026-02-15T10:30:00.000Z",
+				"public":           "false",
+			},
+			RawStruct: ec2types.Image{
+				ImageId:         aws.String("ami-0a1b2c3d4e5f60001"),
+				Name:            aws.String("acme-app-server-x86-v2.3.1"),
+				State:           ec2types.ImageStateAvailable,
+				Architecture:    ec2types.ArchitectureValuesX8664,
+				PlatformDetails: aws.String("Linux/UNIX"),
+				RootDeviceType:  ec2types.DeviceTypeEbs,
+				CreationDate:    aws.String("2026-02-15T10:30:00.000Z"),
+				Public:          aws.Bool(false),
+				OwnerId:         aws.String("123456789012"),
+				Description:     aws.String("Production app server image x86_64 v2.3.1"),
+				EnaSupport:      aws.Bool(true),
+			},
+		},
+		{
+			ID:     "ami-0a1b2c3d4e5f60002",
+			Name:   "acme-app-server-arm64-v2.3.1",
+			Status: "available",
+			Fields: map[string]string{
+				"image_id":         "ami-0a1b2c3d4e5f60002",
+				"name":             "acme-app-server-arm64-v2.3.1",
+				"state":            "available",
+				"architecture":     "arm64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2026-02-15T10:35:00.000Z",
+				"public":           "false",
+			},
+			RawStruct: ec2types.Image{
+				ImageId:         aws.String("ami-0a1b2c3d4e5f60002"),
+				Name:            aws.String("acme-app-server-arm64-v2.3.1"),
+				State:           ec2types.ImageStateAvailable,
+				Architecture:    ec2types.ArchitectureValuesArm64,
+				PlatformDetails: aws.String("Linux/UNIX"),
+				RootDeviceType:  ec2types.DeviceTypeEbs,
+				CreationDate:    aws.String("2026-02-15T10:35:00.000Z"),
+				Public:          aws.Bool(false),
+				OwnerId:         aws.String("123456789012"),
+				Description:     aws.String("Production app server image arm64 v2.3.1"),
+				EnaSupport:      aws.Bool(true),
+			},
+		},
+		{
+			ID:     "ami-0a1b2c3d4e5f60003",
+			Name:   "acme-worker-x86-v1.8.0",
+			Status: "available",
+			Fields: map[string]string{
+				"image_id":         "ami-0a1b2c3d4e5f60003",
+				"name":             "acme-worker-x86-v1.8.0",
+				"state":            "available",
+				"architecture":     "x86_64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2025-09-10T08:00:00.000Z",
+				"public":           "false",
+			},
+			RawStruct: ec2types.Image{
+				ImageId:         aws.String("ami-0a1b2c3d4e5f60003"),
+				Name:            aws.String("acme-worker-x86-v1.8.0"),
+				State:           ec2types.ImageStateAvailable,
+				Architecture:    ec2types.ArchitectureValuesX8664,
+				PlatformDetails: aws.String("Linux/UNIX"),
+				RootDeviceType:  ec2types.DeviceTypeEbs,
+				CreationDate:    aws.String("2025-09-10T08:00:00.000Z"),
+				Public:          aws.Bool(false),
+				OwnerId:         aws.String("123456789012"),
+				Description:     aws.String("Batch worker image x86_64 v1.8.0"),
+				EnaSupport:      aws.Bool(true),
+			},
+		},
+		{
+			ID:     "ami-0a1b2c3d4e5f60004",
+			Name:   "acme-bastion-x86-v3.0.0-deprecated",
+			Status: "deregistered",
+			Fields: map[string]string{
+				"image_id":         "ami-0a1b2c3d4e5f60004",
+				"name":             "acme-bastion-x86-v3.0.0-deprecated",
+				"state":            "deregistered",
+				"architecture":     "x86_64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2024-06-01T12:00:00.000Z",
+				"public":           "false",
+			},
+			RawStruct: ec2types.Image{
+				ImageId:         aws.String("ami-0a1b2c3d4e5f60004"),
+				Name:            aws.String("acme-bastion-x86-v3.0.0-deprecated"),
+				State:           ec2types.ImageStateDeregistered,
+				Architecture:    ec2types.ArchitectureValuesX8664,
+				PlatformDetails: aws.String("Linux/UNIX"),
+				RootDeviceType:  ec2types.DeviceTypeEbs,
+				CreationDate:    aws.String("2024-06-01T12:00:00.000Z"),
+				Public:          aws.Bool(false),
+				OwnerId:         aws.String("123456789012"),
+				Description:     aws.String("Deprecated bastion host image"),
+				EnaSupport:      aws.Bool(true),
+			},
+		},
+	}
 }
 

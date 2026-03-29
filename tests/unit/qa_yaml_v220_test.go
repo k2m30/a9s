@@ -1101,3 +1101,279 @@ func TestQA_YAML_Backup_RawContentUncolored(t *testing.T) {
 		t.Error("Backup RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
+
+// ===========================================================================
+// 23. EBS Volume — YAML fixture + tests
+// ===========================================================================
+
+func fixtureEBSVolumes() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "vol-111aabbcc",
+			Name:   "prod-data-vol",
+			Status: "in-use",
+			Fields: map[string]string{
+				"volume_id":   "vol-111aabbcc",
+				"name":        "prod-data-vol",
+				"state":       "in-use",
+				"size":        "100",
+				"type":        "gp3",
+				"iops":        "3000",
+				"encrypted":   "true",
+				"attached_to": "i-0abc123456def789",
+				"az":          "us-east-1a",
+				"created":     "2025-03-10 14:00",
+			},
+		},
+		{
+			ID:     "vol-222ddeeff",
+			Name:   "",
+			Status: "available",
+			Fields: map[string]string{
+				"volume_id":   "vol-222ddeeff",
+				"name":        "",
+				"state":       "available",
+				"size":        "50",
+				"type":        "gp2",
+				"iops":        "150",
+				"encrypted":   "false",
+				"attached_to": "",
+				"az":          "us-east-1b",
+				"created":     "2025-03-10 14:00",
+			},
+		},
+	}
+}
+
+func TestQA_YAML_EBSVolume_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEBSVolumes() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EBS Volume YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EBS Volume YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EBSVolume_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEBSVolumes()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EBS Volume FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EBSVolume_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEBSVolumes()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EBS Volume RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// 24. EBS Snapshot — YAML fixture + tests
+// ===========================================================================
+
+func fixtureEBSSnapshots() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "snap-0aabb11cc",
+			Name:   "prod-snap-daily",
+			Status: "completed",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0aabb11cc",
+				"name":        "prod-snap-daily",
+				"state":       "completed",
+				"volume_id":   "vol-111aabbcc",
+				"size":        "100",
+				"encrypted":   "true",
+				"description": "Daily backup snapshot",
+				"started":     "2025-02-20 09:15",
+				"progress":    "100%",
+			},
+		},
+		{
+			ID:     "snap-0ccdd22ee",
+			Name:   "",
+			Status: "pending",
+			Fields: map[string]string{
+				"snapshot_id": "snap-0ccdd22ee",
+				"name":        "",
+				"state":       "pending",
+				"volume_id":   "vol-222ddeeff",
+				"size":        "50",
+				"encrypted":   "false",
+				"description": "",
+				"started":     "2025-02-20 09:15",
+				"progress":    "42%",
+			},
+		},
+	}
+}
+
+func TestQA_YAML_EBSSnapshot_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureEBSSnapshots() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("EBS Snapshot YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("EBS Snapshot YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_EBSSnapshot_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureEBSSnapshots()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("EBS Snapshot FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_EBSSnapshot_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureEBSSnapshots()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("EBS Snapshot RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// 25. AMI — YAML fixture + tests
+// ===========================================================================
+
+func fixtureAMIs() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "ami-0abc111222333444a",
+			Name:   "my-web-server-ami",
+			Status: "available",
+			Fields: map[string]string{
+				"image_id":         "ami-0abc111222333444a",
+				"name":             "my-web-server-ami",
+				"state":            "available",
+				"architecture":     "x86_64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2025-01-15T10:30:00.000Z",
+				"public":           "false",
+			},
+		},
+		{
+			ID:     "ami-0xyz999888777666b",
+			Name:   "my-arm64-ami",
+			Status: "available",
+			Fields: map[string]string{
+				"image_id":         "ami-0xyz999888777666b",
+				"name":             "my-arm64-ami",
+				"state":            "available",
+				"architecture":     "arm64",
+				"platform":         "Linux/UNIX",
+				"root_device_type": "ebs",
+				"creation_date":    "2025-02-01T08:00:00.000Z",
+				"public":           "true",
+			},
+		},
+	}
+}
+
+func TestQA_YAML_AMI_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureAMIs() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("AMI YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("AMI YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_AMI_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureAMIs()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("AMI FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_AMI_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureAMIs()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("AMI RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
+
+// ===========================================================================
+// 26. CloudTrail Event — YAML fixture + tests
+// ===========================================================================
+
+func fixtureCloudTrailEvents() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "evt-0001-abcd-1234-5678-abcdef012345",
+			Name:   "RunInstances",
+			Status: "false",
+			Fields: map[string]string{
+				"event_name":    "RunInstances",
+				"time":          "2025-03-15 12:00:00",
+				"user":          "admin",
+				"source":        "ec2.amazonaws.com",
+				"resource_type": "AWS::EC2::Instance",
+				"resource_name": "i-0abc123456def789",
+				"read_only":     "false",
+			},
+		},
+		{
+			ID:     "evt-0002-efgh-5678-9abc-def012345678",
+			Name:   "GetObject",
+			Status: "true",
+			Fields: map[string]string{
+				"event_name":    "GetObject",
+				"time":          "2025-03-15 11:30:00",
+				"user":          "readonly-user",
+				"source":        "s3.amazonaws.com",
+				"resource_type": "",
+				"resource_name": "",
+				"read_only":     "true",
+			},
+		},
+	}
+}
+
+func TestQA_YAML_CloudTrailEvent_ViewContainsFields(t *testing.T) {
+	for _, r := range fixtureCloudTrailEvents() {
+		out := yamlView(t, r, 120, 40)
+		for k, val := range r.Fields {
+			if !strings.Contains(out, k) {
+				t.Errorf("CloudTrail Event YAML for %q missing key %q", r.ID, k)
+			}
+			if val != "" && !strings.Contains(out, val) {
+				t.Errorf("CloudTrail Event YAML for %q missing value %q", r.ID, val)
+			}
+		}
+	}
+}
+
+func TestQA_YAML_CloudTrailEvent_FrameTitle(t *testing.T) {
+	m := yamlModel(fixtureCloudTrailEvents()[0], 120, 40)
+	if title := m.FrameTitle(); !strings.Contains(title, "yaml") {
+		t.Errorf("CloudTrail Event FrameTitle() = %q, want 'yaml' in title", title)
+	}
+}
+
+func TestQA_YAML_CloudTrailEvent_RawContentUncolored(t *testing.T) {
+	m := yamlModel(fixtureCloudTrailEvents()[0], 120, 40)
+	raw := m.RawContent()
+	if raw != stripANSI(raw) {
+		t.Error("CloudTrail Event RawContent() contains ANSI codes, expected plain YAML")
+	}
+}
