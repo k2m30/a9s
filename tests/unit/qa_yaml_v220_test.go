@@ -3,6 +3,10 @@ package unit
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -1331,6 +1335,21 @@ func fixtureCloudTrailEvents() []resource.Resource {
 				"resource_name": "i-0abc123456def789",
 				"read_only":     "false",
 			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:         aws.String("evt-0001-abcd-1234-5678-abcdef012345"),
+				EventName:       aws.String("RunInstances"),
+				EventTime:       func() *time.Time { t := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC); return &t }(),
+				EventSource:     aws.String("ec2.amazonaws.com"),
+				Username:        aws.String("admin"),
+				ReadOnly:        aws.String("false"),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE123","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2025-03-15T12:00:00Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","requestParameters":{"instanceType":"t3.micro"},"responseElements":null,"readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				Resources: []cloudtrailtypes.Resource{
+					{
+						ResourceType: aws.String("AWS::EC2::Instance"),
+						ResourceName: aws.String("i-0abc123456def789"),
+					},
+				},
+			},
 		},
 		{
 			ID:     "evt-0002-efgh-5678-9abc-def012345678",
@@ -1345,20 +1364,49 @@ func fixtureCloudTrailEvents() []resource.Resource {
 				"resource_name": "",
 				"read_only":     "true",
 			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:         aws.String("evt-0002-efgh-5678-9abc-def012345678"),
+				EventName:       aws.String("GetObject"),
+				EventTime:       func() *time.Time { t := time.Date(2025, 3, 15, 11, 30, 0, 0, time.UTC); return &t }(),
+				EventSource:     aws.String("s3.amazonaws.com"),
+				Username:        aws.String("readonly-user"),
+				ReadOnly:        aws.String("true"),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE456","arn":"arn:aws:iam::123456789012:user/readonly-user","accountId":"123456789012"},"eventTime":"2025-03-15T11:30:00Z","eventSource":"s3.amazonaws.com","eventName":"GetObject","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.2","requestParameters":{"bucketName":"example-bucket","key":"data/report.csv"},"responseElements":null,"readOnly":true,"eventType":"AwsApiCall","managementEvent":false}`),
+				Resources:       []cloudtrailtypes.Resource{},
+			},
 		},
 	}
 }
 
 func TestQA_YAML_CloudTrailEvent_ViewContainsFields(t *testing.T) {
-	for _, r := range fixtureCloudTrailEvents() {
-		out := yamlView(t, r, 120, 40)
-		for k, val := range r.Fields {
-			if !strings.Contains(out, k) {
-				t.Errorf("CloudTrail Event YAML for %q missing key %q", r.ID, k)
-			}
-			if val != "" && !strings.Contains(out, val) {
-				t.Errorf("CloudTrail Event YAML for %q missing value %q", r.ID, val)
-			}
+	// Fixtures include RawStruct (cloudtrailtypes.Event), so YAML renders from the
+	// SDK struct fields (PascalCase — AWS SDK Go v2 has no JSON tags).
+	// Assertions use SDK field names and values from the RawStruct.
+	fixtures := fixtureCloudTrailEvents()
+
+	// fixture[0]: RunInstances event
+	out0 := yamlView(t, fixtures[0], 120, 40)
+	for _, want := range []string{
+		"EventId", "evt-0001-abcd-1234-5678-abcdef012345",
+		"EventName", "RunInstances",
+		"EventSource", "ec2.amazonaws.com",
+		"Username", "admin",
+	} {
+		if !strings.Contains(out0, want) {
+			t.Errorf("CloudTrail Event YAML for %q missing %q", fixtures[0].ID, want)
+		}
+	}
+
+	// fixture[1]: GetObject event
+	out1 := yamlView(t, fixtures[1], 120, 40)
+	for _, want := range []string{
+		"EventId", "evt-0002-efgh-5678-9abc-def012345678",
+		"EventName", "GetObject",
+		"EventSource", "s3.amazonaws.com",
+		"Username", "readonly-user",
+	} {
+		if !strings.Contains(out1, want) {
+			t.Errorf("CloudTrail Event YAML for %q missing %q", fixtures[1].ID, want)
 		}
 	}
 }
@@ -1376,4 +1424,70 @@ func TestQA_YAML_CloudTrailEvent_RawContentUncolored(t *testing.T) {
 	if raw != stripANSI(raw) {
 		t.Error("CloudTrail Event RawContent() contains ANSI codes, expected plain YAML")
 	}
+}
+
+func TestQA_YAML_CloudTrailEvent_JSONFieldRenderedAsNestedYAML(t *testing.T) {
+	cloudTrailEventJSON := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2026-03-28T14:30:15Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","requestParameters":{"instanceType":"t3.micro"},"responseElements":null,"readOnly":false,"eventType":"AwsApiCall"}`
+
+	eventTime := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
+	event := cloudtrailtypes.Event{
+		EventId:         aws.String("evt-yaml-json-0001"),
+		EventName:       aws.String("RunInstances"),
+		EventTime:       &eventTime,
+		EventSource:     aws.String("ec2.amazonaws.com"),
+		Username:        aws.String("test-user"),
+		CloudTrailEvent: aws.String(cloudTrailEventJSON),
+	}
+
+	res := resource.Resource{
+		ID:        "evt-yaml-json-0001",
+		Name:      "RunInstances",
+		RawStruct: event,
+	}
+
+	out := yamlView(t, res, 120, 40)
+
+	// CloudTrailEvent JSON must be rendered as nested YAML keys, not a raw JSON blob
+	for _, want := range []string{
+		"eventVersion",
+		"userIdentity",
+		"AssumedRole",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("CloudTrail Event YAML JSON field: expected %q in nested YAML output, got:\n%s", want, out)
+		}
+	}
+
+	// Must NOT contain the raw JSON blob starting with {"eventVersion"
+	if strings.Contains(out, `{"eventVersion"`) {
+		t.Errorf("CloudTrail Event YAML JSON field: output contains raw JSON blob, expected nested YAML:\n%s", out)
+	}
+}
+
+func TestQA_YAML_CloudTrailEvent_NullValuesInJSON(t *testing.T) {
+	cloudTrailEventJSON := `{"requestParameters":{"bucketName":"test-bucket"},"responseElements":null}`
+
+	eventTime := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
+	event := cloudtrailtypes.Event{
+		EventId:         aws.String("evt-yaml-json-0002"),
+		EventName:       aws.String("GetObject"),
+		EventTime:       &eventTime,
+		CloudTrailEvent: aws.String(cloudTrailEventJSON),
+	}
+
+	res := resource.Resource{
+		ID:        "evt-yaml-json-0002",
+		Name:      "GetObject",
+		RawStruct: event,
+	}
+
+	out := yamlView(t, res, 120, 40)
+
+	// requestParameters must appear as a YAML key
+	if !strings.Contains(out, "requestParameters") {
+		t.Errorf("CloudTrail Event YAML null values: expected 'requestParameters' in output, got:\n%s", out)
+	}
+
+	// responseElements with null is acceptable as null, empty, or omitted — no strict assertion
+	// The test just verifies it doesn't crash and that the non-null content is present
 }
