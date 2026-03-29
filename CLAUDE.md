@@ -2,6 +2,9 @@
 
 Auto-generated from all feature plans. Last updated: 2026-03-29
 
+## GitHub
+- Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
+
 ## Active Technologies
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 
