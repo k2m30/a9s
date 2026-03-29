@@ -11,12 +11,13 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_mode", "creation_time"})
-	resource.Register("kinesis", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("kinesis", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchKinesisStreams(ctx, c.Kinesis)
+		return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
 	})
 }
 
@@ -24,62 +25,94 @@ func init() {
 // response into a slice of generic Resource structs.
 // Uses the StreamSummaries field (not the legacy StreamNames).
 func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListStreams(ctx, &kinesis.ListStreamsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchKinesisStreamsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching Kinesis streams: %w", err)
+			return nil, err
 		}
-
-		for _, stream := range output.StreamSummaries {
-			streamName := ""
-			if stream.StreamName != nil {
-				streamName = *stream.StreamName
-			}
-
-			streamARN := ""
-			if stream.StreamARN != nil {
-				streamARN = *stream.StreamARN
-			}
-
-			status := string(stream.StreamStatus)
-
-			creationTime := ""
-			if stream.StreamCreationTimestamp != nil {
-				creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04")
-			}
-
-			streamMode := ""
-			if stream.StreamModeDetails != nil {
-				streamMode = string(stream.StreamModeDetails.StreamMode)
-			}
-
-			r := resource.Resource{
-				ID:     streamName,
-				Name:   streamName,
-				Status: status,
-				Fields: map[string]string{
-					"stream_name":   streamName,
-					"status":        status,
-					"stream_arn":    streamARN,
-					"creation_time": creationTime,
-					"stream_mode":   streamMode,
-				},
-				RawStruct: stream,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.HasMoreStreams == nil || !*output.HasMoreStreams {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchKinesisStreamsPage fetches a single page of Kinesis streams.
+func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &kinesis.ListStreamsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.ListStreams(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching Kinesis streams: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, stream := range output.StreamSummaries {
+		streamName := ""
+		if stream.StreamName != nil {
+			streamName = *stream.StreamName
+		}
+
+		streamARN := ""
+		if stream.StreamARN != nil {
+			streamARN = *stream.StreamARN
+		}
+
+		status := string(stream.StreamStatus)
+
+		creationTime := ""
+		if stream.StreamCreationTimestamp != nil {
+			creationTime = stream.StreamCreationTimestamp.Format("2006-01-02 15:04")
+		}
+
+		streamMode := ""
+		if stream.StreamModeDetails != nil {
+			streamMode = string(stream.StreamModeDetails.StreamMode)
+		}
+
+		r := resource.Resource{
+			ID:     streamName,
+			Name:   streamName,
+			Status: status,
+			Fields: map[string]string{
+				"stream_name":   streamName,
+				"status":        status,
+				"stream_arn":    streamARN,
+				"creation_time": creationTime,
+				"stream_mode":   streamMode,
+			},
+			RawStruct: stream,
+		}
+
+		resources = append(resources, r)
+	}
+
+	isTruncated := output.HasMoreStreams != nil && *output.HasMoreStreams
+	nextToken := ""
+	if isTruncated && output.NextToken != nil {
+		nextToken = *output.NextToken
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

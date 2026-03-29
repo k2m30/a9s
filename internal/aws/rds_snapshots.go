@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("rds-snap", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created"})
+
+	resource.RegisterPaginated("rds-snap", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRDSSnapshots(ctx, c.RDS)
+		return FetchRDSSnapshotsPage(ctx, c.RDS, continuationToken)
 	})
-	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created"})
 }
 
 // FetchRDSSnapshots calls the RDS DescribeDBSnapshots API and converts the
 // response into a slice of generic Resource structs.
 func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{
-			Marker: marker,
-		})
+		result, err := FetchRDSSnapshotsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching RDS snapshots: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, snap := range output.DBSnapshots {
+// FetchRDSSnapshotsPage fetches a single page of RDS snapshots.
+func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &rds.DescribeDBSnapshotsInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeDBSnapshots(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching RDS snapshots: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, snap := range output.DBSnapshots {
 		snapshotID := ""
 		if snap.DBSnapshotIdentifier != nil {
 			snapshotID = *snap.DBSnapshotIdentifier
@@ -77,17 +97,31 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 				"snapshot_type": snapshotType,
 				"created":       created,
 			},
-			RawStruct:  snap,
+			RawStruct: snap,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

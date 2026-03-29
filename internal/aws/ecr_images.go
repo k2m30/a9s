@@ -12,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-const maxECRImages = 500
-
 func init() {
 	resource.RegisterFieldKeys("ecr_images", []string{
 		"image_tags", "digest_short", "pushed_at", "image_size",
@@ -37,71 +35,30 @@ func init() {
 	})
 }
 
-// FetchECRImages calls the ECR DescribeImages API with pagination and converts
-// the response into a FetchResult with pagination support. Each call returns
-// up to maxECRImages (500) items sorted by push time (newest first). When the
-// cap is reached and more pages exist, FetchResult.Pagination.IsTruncated is
-// set to true with a NextToken for continuation.
+// FetchECRImages calls the ECR DescribeImages API and converts the response into
+// a FetchResult with pagination support. A single API call is made per invocation;
+// images are sorted by push time (newest first) before being returned. IsTruncated
+// and NextToken are forwarded as pagination metadata for the caller to request the
+// next page.
 func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map[string]string, continuationToken string) (resource.FetchResult, error) {
 	repositoryName := parentCtx["repository_name"]
 	repositoryURI := parentCtx["repository_uri"]
 
-	var allImages []ecrtypes.ImageDetail
-	var nextToken *string
+	input := &ecr.DescribeImagesInput{
+		RepositoryName: &repositoryName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &ecr.DescribeImagesInput{
-			RepositoryName: &repositoryName,
-			NextToken:      nextToken,
-		}
-
-		output, err := api.DescribeImages(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing images for %s: %w", repositoryName, err)
-		}
-
-		allImages = append(allImages, output.ImageDetails...)
-
-		if len(allImages) >= maxECRImages {
-			allImages = allImages[:maxECRImages]
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			// Sort by ImagePushedAt descending (newest first)
-			sort.Slice(allImages, func(i, j int) bool {
-				if allImages[i].ImagePushedAt == nil {
-					return false
-				}
-				if allImages[j].ImagePushedAt == nil {
-					return true
-				}
-				return allImages[i].ImagePushedAt.After(*allImages[j].ImagePushedAt)
-			})
-			resources := make([]resource.Resource, 0, len(allImages))
-			for _, img := range allImages {
-				resources = append(resources, convertECRImage(img, repositoryURI, repositoryName))
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: apiNextToken != "",
-					NextToken:   apiNextToken,
-					PageSize:    len(resources),
-				},
-			}, nil
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	output, err := api.DescribeImages(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("describing images for %s: %w", repositoryName, err)
 	}
 
-	if len(allImages) == 0 {
+	pageImages := output.ImageDetails
+
+	if len(pageImages) == 0 {
 		return resource.FetchResult{
 			Resources: []resource.Resource{},
 			Pagination: &resource.PaginationMeta{
@@ -113,27 +70,40 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 	}
 
 	// Sort by ImagePushedAt descending (newest first)
-	sort.Slice(allImages, func(i, j int) bool {
-		if allImages[i].ImagePushedAt == nil {
+	sort.Slice(pageImages, func(i, j int) bool {
+		if pageImages[i].ImagePushedAt == nil {
 			return false
 		}
-		if allImages[j].ImagePushedAt == nil {
+		if pageImages[j].ImagePushedAt == nil {
 			return true
 		}
-		return allImages[i].ImagePushedAt.After(*allImages[j].ImagePushedAt)
+		return pageImages[i].ImagePushedAt.After(*pageImages[j].ImagePushedAt)
 	})
 
-	resources := make([]resource.Resource, 0, len(allImages))
-	for _, img := range allImages {
+	resources := make([]resource.Resource, 0, len(pageImages))
+	for _, img := range pageImages {
 		resources = append(resources, convertECRImage(img, repositoryURI, repositoryName))
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

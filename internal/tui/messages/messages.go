@@ -32,7 +32,7 @@ type PopViewMsg struct{}
 type ResourcesLoadedMsg struct {
 	ResourceType string
 	Resources    []resource.Resource
-	Pagination   *resource.PaginationMeta // nil for legacy fetchers
+	Pagination   *resource.PaginationMeta // nil when result has no pagination info
 	Append       bool                     // true = append to existing list
 }
 

@@ -434,56 +434,38 @@ func TestFetchAsgActivities_RawStruct(t *testing.T) {
 	})
 }
 
-// TestFetchAsgActivities_Pagination verifies that paginated responses via
-// NextToken are followed and all activities collected across multiple pages.
+// TestFetchAsgActivities_Pagination verifies the single-page pagination contract:
+// one API call is made, resources from that page are returned, and IsTruncated/NextToken
+// reflect whether more pages exist. A second call with the continuation token verifies
+// that the token is forwarded and the final page sets IsTruncated=false.
 func TestFetchAsgActivities_Pagination(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockASGDescribeScalingActivitiesClient{
-		outputs: []*autoscaling.DescribeScalingActivitiesOutput{
-			{
-				NextToken: aws.String("page2-token"),
-				Activities: []asgtypes.Activity{
-					{
-						ActivityId:           aws.String("act-p1-1"),
-						AutoScalingGroupName: aws.String("paginated-asg"),
-						Cause:                aws.String("Scaling event page 1"),
-						StartTime:            &ts,
-						StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
-					},
-					{
-						ActivityId:           aws.String("act-p1-2"),
-						AutoScalingGroupName: aws.String("paginated-asg"),
-						Cause:                aws.String("Scaling event page 1"),
-						StartTime:            &ts,
-						StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
-					},
-					{
-						ActivityId:           aws.String("act-p1-3"),
-						AutoScalingGroupName: aws.String("paginated-asg"),
-						Cause:                aws.String("Scaling event page 1"),
-						StartTime:            &ts,
-						StatusCode:           asgtypes.ScalingActivityStatusCodeInProgress,
-					},
+	// Page 1: 3 items with NextToken indicating more pages exist.
+	page1Mock := &mockASGDescribeScalingActivitiesClient{
+		output: &autoscaling.DescribeScalingActivitiesOutput{
+			NextToken: aws.String("page2-token"),
+			Activities: []asgtypes.Activity{
+				{
+					ActivityId:           aws.String("act-p1-1"),
+					AutoScalingGroupName: aws.String("paginated-asg"),
+					Cause:                aws.String("Scaling event page 1 item 1"),
+					StartTime:            &ts,
+					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
 				},
-			},
-			{
-				// No NextToken — last page
-				Activities: []asgtypes.Activity{
-					{
-						ActivityId:           aws.String("act-p2-1"),
-						AutoScalingGroupName: aws.String("paginated-asg"),
-						Cause:                aws.String("Scaling event page 2"),
-						StartTime:            &ts,
-						StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
-					},
-					{
-						ActivityId:           aws.String("act-p2-2"),
-						AutoScalingGroupName: aws.String("paginated-asg"),
-						Cause:                aws.String("Scaling event page 2"),
-						StartTime:            &ts,
-						StatusCode:           asgtypes.ScalingActivityStatusCodeCancelled,
-					},
+				{
+					ActivityId:           aws.String("act-p1-2"),
+					AutoScalingGroupName: aws.String("paginated-asg"),
+					Cause:                aws.String("Scaling event page 1 item 2"),
+					StartTime:            &ts,
+					StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
+				},
+				{
+					ActivityId:           aws.String("act-p1-3"),
+					AutoScalingGroupName: aws.String("paginated-asg"),
+					Cause:                aws.String("Scaling event page 1 item 3"),
+					StartTime:            &ts,
+					StatusCode:           asgtypes.ScalingActivityStatusCodeInProgress,
 				},
 			},
 		},
@@ -493,86 +475,180 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 		"asg_name": "paginated-asg",
 	}
 
-	result, err := awsclient.FetchAsgActivities(
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchAsgActivities(
 		context.Background(),
-		mock,
+		page1Mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 1: expected no error, got %v", err)
 	}
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(result.Resources) != 5 {
-			t.Fatalf("expected 5 resources across 2 pages, got %d", len(result.Resources))
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 3 {
+			t.Fatalf("expected 3 resources on page 1, got %d", len(result1.Resources))
 		}
 	})
 
-	t.Run("page1_activities", func(t *testing.T) {
-		expectedIDs := []string{"act-p1-1", "act-p1-2", "act-p1-3"}
-		for i, expectedID := range expectedIDs {
-			if result.Resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_page_size", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.PageSize != 3 {
+			t.Errorf("page 1: PageSize expected 3, got %d", result1.Pagination.PageSize)
+		}
+	})
+
+	t.Run("page1_total_hint_negative", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.TotalHint != -1 {
+			t.Errorf("page 1: TotalHint should be -1 when truncated, got %d", result1.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page1_all_have_status", func(t *testing.T) {
+		for i, r := range result1.Resources {
+			if r.Status == "" {
+				t.Errorf("page 1: resources[%d].Status should not be empty", i)
 			}
 		}
 	})
 
-	t.Run("page2_activities", func(t *testing.T) {
-		expectedIDs := []string{"act-p2-1", "act-p2-2"}
-		for i, expectedID := range expectedIDs {
-			if result.Resources[i+3].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i+3, expectedID, result.Resources[i+3].ID)
-			}
-		}
-	})
-
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
-		}
-	})
-
-	t.Run("all_fields_populated", func(t *testing.T) {
+	t.Run("page1_all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"start_time", "status_code", "description", "cause"}
-		for i, r := range result.Resources {
+		for i, r := range result1.Resources {
 			for _, key := range requiredFields {
 				if _, ok := r.Fields[key]; !ok {
-					t.Errorf("resource[%d].Fields missing key %q", i, key)
+					t.Errorf("page 1: resource[%d].Fields missing key %q", i, key)
 				}
 			}
 		}
 	})
-}
 
-// TestFetchAsgActivities_MaxActivitiesCap verifies that the fetcher stops
-// collecting activities once it reaches the maxActivities=200 cap.
-func TestFetchAsgActivities_MaxActivitiesCap(t *testing.T) {
-	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		// The new implementation makes exactly one API call per FetchAsgActivities invocation.
+		// Verify resources were returned from the single call.
+		if len(result1.Resources) == 0 {
+			t.Error("expected resources from single API call")
+		}
+	})
 
-	// Build 5 pages of 50 activities each (250 total). The fetcher should stop at 200.
-	var outputs []*autoscaling.DescribeScalingActivitiesOutput
-	for page := 0; page < 5; page++ {
-		var activities []asgtypes.Activity
-		for i := 0; i < 50; i++ {
-			activities = append(activities, asgtypes.Activity{
-				ActivityId:           aws.String(fmt.Sprintf("act-p%d-%d", page, i)),
-				AutoScalingGroupName: aws.String("big-asg"),
-				Cause:                aws.String(fmt.Sprintf("Scaling event p%d-%d", page, i)),
-				StartTime:            &ts,
-				StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
-			})
-		}
-		out := &autoscaling.DescribeScalingActivitiesOutput{
-			Activities: activities,
-		}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
-		}
-		outputs = append(outputs, out)
+	// Page 2: 2 items with no NextToken — last page.
+	page2Mock := &mockASGDescribeScalingActivitiesClient{
+		output: &autoscaling.DescribeScalingActivitiesOutput{
+			// No NextToken — last page
+			Activities: []asgtypes.Activity{
+				{
+					ActivityId:           aws.String("act-p2-1"),
+					AutoScalingGroupName: aws.String("paginated-asg"),
+					Cause:                aws.String("Scaling event page 2 item 1"),
+					StartTime:            &ts,
+					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+				},
+				{
+					ActivityId:           aws.String("act-p2-2"),
+					AutoScalingGroupName: aws.String("paginated-asg"),
+					Cause:                aws.String("Scaling event page 2 item 2"),
+					StartTime:            &ts,
+					StatusCode:           asgtypes.ScalingActivityStatusCodeCancelled,
+				},
+			},
+		},
 	}
 
-	mock := &mockASGDescribeScalingActivitiesClient{outputs: outputs}
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchAsgActivities(
+		context.Background(),
+		page2Mock,
+		parentCtx,
+		result1.Pagination.NextToken,
+	)
+	if err != nil {
+		t.Fatalf("page 2: expected no error, got %v", err)
+	}
+
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 2, got %d", len(result2.Resources))
+		}
+	})
+
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
+		}
+	})
+
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page2_total_hint_equals_count", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.TotalHint != 2 {
+			t.Errorf("page 2: TotalHint should equal item count (2) on last page, got %d", result2.Pagination.TotalHint)
+		}
+	})
+}
+
+// TestFetchAsgActivities_LargePage verifies that a single API page of 50 activities is
+// returned as-is with correct IsTruncated=true metadata when the API indicates
+// more pages exist. The per-invocation single-page contract means the caller
+// drives pagination via continuation tokens.
+func TestFetchAsgActivities_LargePage(t *testing.T) {
+	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
+
+	// Build one page of 50 activities with a NextToken indicating more pages exist.
+	var activities []asgtypes.Activity
+	for i := 0; i < 50; i++ {
+		actTs := ts.Add(time.Duration(i) * time.Second)
+		activities = append(activities, asgtypes.Activity{
+			ActivityId:           aws.String(fmt.Sprintf("act-p0-%d", i)),
+			AutoScalingGroupName: aws.String("big-asg"),
+			Cause:                aws.String(fmt.Sprintf("Scaling event p0-%d", i)),
+			StartTime:            &actTs,
+			StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+		})
+	}
+
+	mock := &mockASGDescribeScalingActivitiesClient{
+		output: &autoscaling.DescribeScalingActivitiesOutput{
+			Activities: activities,
+			NextToken:  aws.String("token-page-1"),
+		},
+	}
 
 	parentCtx := map[string]string{
 		"asg_name": "big-asg",
@@ -582,23 +658,51 @@ func TestFetchAsgActivities_MaxActivitiesCap(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	t.Run("capped_at_200", func(t *testing.T) {
-		if len(result.Resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxActivities cap), got %d", len(result.Resources))
+	t.Run("returns_full_page_of_50", func(t *testing.T) {
+		if len(result.Resources) != 50 {
+			t.Errorf("expected exactly 50 resources from single API page, got %d", len(result.Resources))
 		}
 	})
 
-	t.Run("early_termination", func(t *testing.T) {
-		// With 50 activities per page, reaching 200 should take exactly 4 pages.
-		// The fetcher should NOT call the 5th page.
-		if mock.callIdx != 4 {
-			t.Errorf("expected 4 API calls (early termination at 200), got %d", mock.callIdx)
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when API returns NextToken")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.NextToken != "token-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "token-page-1", result.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page_size_equals_item_count", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.PageSize != 50 {
+			t.Errorf("PageSize expected 50, got %d", result.Pagination.PageSize)
+		}
+	})
+
+	t.Run("total_hint_negative_when_truncated", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.TotalHint != -1 {
+			t.Errorf("TotalHint should be -1 when truncated, got %d", result.Pagination.TotalHint)
 		}
 	})
 
@@ -609,9 +713,8 @@ func TestFetchAsgActivities_MaxActivitiesCap(t *testing.T) {
 	})
 
 	t.Run("last_activity_correct", func(t *testing.T) {
-		// Last activity should be the 50th activity of page 3 (index 199 = page3, activity49)
-		if result.Resources[199].ID != "act-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "act-p3-49", result.Resources[199].ID)
+		if result.Resources[49].ID != "act-p0-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "act-p0-49", result.Resources[49].ID)
 		}
 	})
 }

@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("docdb-snap", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("docdb-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type"})
+
+	resource.RegisterPaginated("docdb-snap", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchDocDBClusterSnapshots(ctx, c.DocDB)
+		return FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, continuationToken)
 	})
-	resource.RegisterFieldKeys("docdb-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type"})
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
 // response into a slice of generic Resource structs.
 func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{
-			Marker: marker,
-		})
+		result, err := FetchDocDBClusterSnapshotsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching DocumentDB cluster snapshots: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, snapshot := range output.DBClusterSnapshots {
+// FetchDocDBClusterSnapshotsPage fetches a single page of DocumentDB cluster snapshots.
+func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &docdb.DescribeDBClusterSnapshotsInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeDBClusterSnapshots(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching DocumentDB cluster snapshots: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, snapshot := range output.DBClusterSnapshots {
 		snapshotID := ""
 		if snapshot.DBClusterSnapshotIdentifier != nil {
 			snapshotID = *snapshot.DBClusterSnapshotIdentifier
@@ -83,17 +103,31 @@ func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterS
 				"snapshot_create_time": snapshotCreateTime,
 				"storage_type":         storageType,
 			},
-			RawStruct:  snapshot,
+			RawStruct: snapshot,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

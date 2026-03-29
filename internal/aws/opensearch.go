@@ -11,12 +11,20 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("opensearch", []string{"domain_name", "engine_version", "instance_type", "instance_count", "endpoint"})
-	resource.Register("opensearch", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("opensearch", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
+		resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return resource.FetchResult{
+			Resources:  resources,
+			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+		}, nil
 	})
 }
 

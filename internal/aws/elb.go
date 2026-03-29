@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("elb", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"})
+
+	resource.RegisterPaginated("elb", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLoadBalancers(ctx, c.ELBv2)
+		return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 	})
-	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"})
 }
 
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the
 // response into a slice of generic Resource structs.
 func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
-			Marker: marker,
-		})
+		result, err := FetchLoadBalancersPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching load balancers: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, lb := range output.LoadBalancers {
+// FetchLoadBalancersPage fetches a single page of load balancers.
+func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &elbv2.DescribeLoadBalancersInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeLoadBalancers(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching load balancers: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, lb := range output.LoadBalancers {
 		lbName := ""
 		if lb.LoadBalancerName != nil {
 			lbName = *lb.LoadBalancerName
@@ -76,17 +96,31 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 				"vpc_id":            vpcID,
 				"load_balancer_arn": lbArn,
 			},
-			RawStruct:  lb,
+			RawStruct: lb,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextMarker == nil {
-			break
-		}
-		marker = output.NextMarker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

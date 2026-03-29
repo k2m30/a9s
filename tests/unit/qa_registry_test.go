@@ -14,20 +14,20 @@ import (
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestRegistry_GetFetcher_ReturnsNilForUnregistered(t *testing.T) {
-	f := resource.GetFetcher("nonexistent")
+	f := resource.GetPaginatedFetcher("nonexistent")
 	if f != nil {
-		t.Error("GetFetcher should return nil for unregistered resource type")
+		t.Error("GetPaginatedFetcher should return nil for unregistered resource type")
 	}
 }
 
 func TestRegistry_GetFetcher_ReturnsRegisteredFetcher(t *testing.T) {
-	// All 10 types should be registered via init() in the aws package
+	// All types should be registered via init() in the aws package (spot-check 10)
 	types := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
 	for _, rt := range types {
 		t.Run(rt, func(t *testing.T) {
-			f := resource.GetFetcher(rt)
+			f := resource.GetPaginatedFetcher(rt)
 			if f == nil {
-				t.Errorf("GetFetcher(%q) should return a non-nil fetcher", rt)
+				t.Errorf("GetPaginatedFetcher(%q) should return a non-nil fetcher", rt)
 			}
 		})
 	}
@@ -39,40 +39,47 @@ func TestRegistry_MockFetcher_CanBeCalledAndReturnsResources(t *testing.T) {
 		{ID: "test-1", Name: "Test Resource 1"},
 		{ID: "test-2", Name: "Test Resource 2"},
 	}
-	resource.Register("_test_mock", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
-		return testResources, nil
+	resource.RegisterPaginated("_test_mock", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources: testResources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				TotalHint:   len(testResources),
+				PageSize:    len(testResources),
+			},
+		}, nil
 	})
-	defer resource.Unregister("_test_mock") // clean up
+	defer resource.UnregisterPaginated("_test_mock") // clean up
 
-	f := resource.GetFetcher("_test_mock")
+	f := resource.GetPaginatedFetcher("_test_mock")
 	if f == nil {
-		t.Fatal("GetFetcher('_test_mock') should return the registered fetcher")
+		t.Fatal("GetPaginatedFetcher('_test_mock') should return the registered fetcher")
 	}
 
-	results, err := f(context.Background(), nil)
+	result, err := f(context.Background(), nil, "")
 	if err != nil {
 		t.Fatalf("mock fetcher should not return error, got: %v", err)
 	}
-	if len(results) != 2 {
-		t.Fatalf("expected 2 resources, got %d", len(results))
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
-	if results[0].ID != "test-1" {
-		t.Errorf("expected first resource ID 'test-1', got %q", results[0].ID)
+	if result.Resources[0].ID != "test-1" {
+		t.Errorf("expected first resource ID 'test-1', got %q", result.Resources[0].ID)
 	}
 }
 
 func TestRegistry_MockFetcher_CanReturnError(t *testing.T) {
-	resource.Register("_test_err", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
-		return nil, fmt.Errorf("simulated AWS error")
+	resource.RegisterPaginated("_test_err", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, fmt.Errorf("simulated AWS error")
 	})
-	defer resource.Unregister("_test_err")
+	defer resource.UnregisterPaginated("_test_err")
 
-	f := resource.GetFetcher("_test_err")
+	f := resource.GetPaginatedFetcher("_test_err")
 	if f == nil {
-		t.Fatal("GetFetcher should return registered fetcher")
+		t.Fatal("GetPaginatedFetcher should return registered fetcher")
 	}
 
-	_, err := f(context.Background(), nil)
+	_, err := f(context.Background(), nil, "")
 	if err == nil {
 		t.Fatal("error-returning fetcher should return an error")
 	}
@@ -83,14 +90,14 @@ func TestRegistry_MockFetcher_CanReturnError(t *testing.T) {
 
 func TestRegistry_NilClients_FetcherReceivesNil(t *testing.T) {
 	var receivedClients interface{}
-	resource.Register("_test_nil_clients", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterPaginated("_test_nil_clients", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		receivedClients = clients
-		return nil, nil
+		return resource.FetchResult{}, nil
 	})
-	defer resource.Unregister("_test_nil_clients")
+	defer resource.UnregisterPaginated("_test_nil_clients")
 
-	f := resource.GetFetcher("_test_nil_clients")
-	_, _ = f(context.Background(), nil)
+	f := resource.GetPaginatedFetcher("_test_nil_clients")
+	_, _ = f(context.Background(), nil, "")
 	if receivedClients != nil {
 		t.Error("fetcher should receive nil clients when passed nil")
 	}
@@ -106,9 +113,9 @@ func TestRegistry_AllSevenTypes_HaveFetchers(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	for _, rt := range allTypes {
 		t.Run(rt.ShortName, func(t *testing.T) {
-			f := resource.GetFetcher(rt.ShortName)
+			f := resource.GetPaginatedFetcher(rt.ShortName)
 			if f == nil {
-				t.Errorf("resource type %q should have a registered fetcher", rt.ShortName)
+				t.Errorf("resource type %q should have a registered paginated fetcher", rt.ShortName)
 			}
 		})
 	}

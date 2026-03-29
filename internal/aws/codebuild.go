@@ -11,53 +11,58 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("cb", []string{"name", "source_type", "description", "last_modified"})
-	resource.Register("cb", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("cb", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchCodeBuildProjects(ctx, c.CodeBuild, c.CodeBuild)
+		return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 	})
 }
 
-// FetchCodeBuildProjects performs a two-step fetch:
-// 1. ListProjects to get project names (paginated via NextToken)
-// 2. BatchGetProjects to get full project details
-func FetchCodeBuildProjects(
+// FetchCodeBuildProjectsPage fetches one page of project names from ListProjects
+// using the continuationToken, then calls BatchGetProjects for that page's names.
+// IsTruncated reflects whether ListProjects has more pages beyond this one.
+func FetchCodeBuildProjectsPage(
 	ctx context.Context,
 	listAPI CodeBuildListProjectsAPI,
 	batchAPI CodeBuildBatchGetProjectsAPI,
-) ([]resource.Resource, error) {
-	// Step 1: Collect all project names across pages
-	var allNames []string
-	var nextToken *string
-
-	for {
-		listOutput, err := listAPI.ListProjects(ctx, &codebuild.ListProjectsInput{
-			NextToken: nextToken,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("listing CodeBuild projects: %w", err)
-		}
-
-		allNames = append(allNames, listOutput.Projects...)
-
-		if listOutput.NextToken == nil {
-			break
-		}
-		nextToken = listOutput.NextToken
+	continuationToken string,
+) (resource.FetchResult, error) {
+	input := &codebuild.ListProjectsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	if len(allNames) == 0 {
-		return []resource.Resource{}, nil
+	listOutput, err := listAPI.ListProjects(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing CodeBuild projects: %w", err)
 	}
 
-	// Step 2: BatchGetProjects for all collected names
+	if len(listOutput.Projects) == 0 {
+		nextToken := ""
+		isTruncated := false
+		if listOutput.NextToken != nil {
+			nextToken = *listOutput.NextToken
+			isTruncated = true
+		}
+		return resource.FetchResult{
+			Resources: []resource.Resource{},
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    0,
+				TotalHint:   -1,
+			},
+		}, nil
+	}
+
 	batchOutput, err := batchAPI.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{
-		Names: allNames,
+		Names: listOutput.Projects,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("batch getting CodeBuild projects: %w", err)
+		return resource.FetchResult{}, fmt.Errorf("batch getting CodeBuild projects: %w", err)
 	}
 
 	var resources []resource.Resource
@@ -99,5 +104,48 @@ func FetchCodeBuildProjects(
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   -1,
+		},
+	}, nil
+}
+
+// FetchCodeBuildProjects performs a two-step fetch:
+// 1. ListProjects to get project names (paginated via NextToken)
+// 2. BatchGetProjects to get full project details
+func FetchCodeBuildProjects(
+	ctx context.Context,
+	listAPI CodeBuildListProjectsAPI,
+	batchAPI CodeBuildBatchGetProjectsAPI,
+) ([]resource.Resource, error) {
+	var allResources []resource.Resource
+	continuationToken := ""
+
+	for {
+		result, err := FetchCodeBuildProjectsPage(ctx, listAPI, batchAPI, continuationToken)
+		if err != nil {
+			return nil, err
+		}
+
+		allResources = append(allResources, result.Resources...)
+
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		continuationToken = result.Pagination.NextToken
+	}
+
+	return allResources, nil
 }

@@ -10,32 +10,52 @@ import (
 )
 
 func init() {
-	resource.Register("dbc", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint"})
+
+	resource.RegisterPaginated("dbc", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchDocDBClusters(ctx, c.DocDB)
+		return FetchDocDBClustersPage(ctx, c.DocDB, continuationToken)
 	})
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint"})
 }
 
 // FetchDocDBClusters calls the DescribeDBClusters API and converts
 // the response into a slice of generic Resource structs.
 // Returns all DB clusters (Aurora, DocumentDB, Neptune) — no engine filter.
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{
-			Marker: marker,
-		})
+		result, err := FetchDocDBClustersPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching DocumentDB clusters: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, cluster := range output.DBClusters {
+// FetchDocDBClustersPage fetches a single page of DocumentDB clusters.
+func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &docdb.DescribeDBClustersInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeDBClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching DocumentDB clusters: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, cluster := range output.DBClusters {
 		clusterID := ""
 		if cluster.DBClusterIdentifier != nil {
 			clusterID = *cluster.DBClusterIdentifier
@@ -69,17 +89,31 @@ func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]
 				"instances":      instances,
 				"endpoint":       endpoint,
 			},
-			RawStruct:  cluster,
+			RawStruct: cluster,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

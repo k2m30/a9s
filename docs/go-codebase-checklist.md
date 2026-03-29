@@ -49,7 +49,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 **Liskov Substitution:**
 - [ ] All views satisfy the `View` interface — root model treats them uniformly via the view stack
-- [ ] All AWS fetchers satisfy the `FetchFunc` signature — registry dispatches without type knowledge
+- [ ] All AWS fetchers satisfy the `PaginatedFetcher` signature — registry dispatches without type knowledge
 
 **Interface Segregation:**
 - [ ] AWS interfaces are single-method — mocks implement exactly what they test
@@ -151,8 +151,8 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## AWS Resource Types
 - [ ] Each resource type has a `ResourceTypeDef` in `internal/resource/types.go`
-- [ ] Each fetcher registered via `resource.Register()` in an `init()` function
-- [ ] Fetcher signature is `func(ctx context.Context, clients interface{}) ([]Resource, error)`
+- [ ] Each fetcher registered via `resource.RegisterPaginated()` in an `init()` function
+- [ ] Fetcher signature is `func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)`
 - [ ] Fetcher type-asserts `clients` to `*awsclient.ServiceClients` internally
 - [ ] Column keys in `ResourceTypeDef` match the field keys populated by the fetcher
 - [ ] Default view definitions in `internal/config/defaults.go` exist for every resource type
@@ -245,7 +245,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] Subtests use `t.Run(tc.name, ...)` for parallel-safe isolation
 - [ ] AWS mocks implement single-method interfaces from `interfaces.go`
 - [ ] Mocks return canned data — no real AWS calls in unit tests
-- [ ] `resource.Register()` / `resource.Unregister()` used for test isolation
+- [ ] `resource.RegisterPaginated()` / `resource.UnregisterPaginated()` used for test isolation
 - [ ] View tests construct models directly and call `Update()` / `View()` — no `tea.Program`
 - [ ] Integration tests behind `//go:build integration` tag
 - [ ] `go test -race ./...` should pass (no data races in unit tests)

@@ -12,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-const maxSFNHistoryEvents = 500
-
 var camelSplitter = regexp.MustCompile("([a-z])([A-Z])")
 
 func init() {
@@ -39,9 +37,9 @@ func init() {
 }
 
 // FetchSFNExecutionHistory calls the SFN GetExecutionHistory API and converts
-// the response into a FetchResult with pagination support. Each call returns up to
-// maxSFNHistoryEvents (500) items. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
+// the response into a FetchResult with pagination support. A single API call is
+// made per invocation; IsTruncated and NextToken are forwarded as pagination
+// metadata for the caller to request the next page.
 func FetchSFNExecutionHistory(
 	ctx context.Context,
 	api SFNGetExecutionHistoryAPI,
@@ -50,55 +48,43 @@ func FetchSFNExecutionHistory(
 ) (resource.FetchResult, error) {
 	executionArn := parentCtx["execution_arn"]
 
-	var resources []resource.Resource
-	var nextToken *string
-	if continuationToken != "" {
-		nextToken = &continuationToken
+	input := &sfn.GetExecutionHistoryInput{
+		ExecutionArn: &executionArn,
 	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.GetExecutionHistory(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("getting execution history for %s: %w", executionArn, err)
+	}
+
+	var resources []resource.Resource
 	var lastStateName string
+	for _, event := range output.Events {
+		resources = append(resources, ConvertHistoryEvent(event, &lastStateName))
+	}
 
-	for {
-		input := &sfn.GetExecutionHistoryInput{
-			ExecutionArn: &executionArn,
-			NextToken:    nextToken,
-		}
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-		output, err := api.GetExecutionHistory(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("getting execution history for %s: %w", executionArn, err)
-		}
-
-		for _, event := range output.Events {
-			resources = append(resources, ConvertHistoryEvent(event, &lastStateName))
-
-			if len(resources) >= maxSFNHistoryEvents {
-				apiNextToken := ""
-				if output.NextToken != nil {
-					apiNextToken = *output.NextToken
-				}
-				return resource.FetchResult{
-					Resources: resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: apiNextToken != "",
-						NextToken:   apiNextToken,
-						PageSize:    len(resources),
-					},
-				}, nil
-			}
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

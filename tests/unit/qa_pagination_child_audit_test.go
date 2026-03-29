@@ -47,18 +47,17 @@ import (
 // ===========================================================================
 
 // TestStory_B3_SFNExecutions_LoadMore verifies the two-call Load More flow
-// for SFN executions. The mock returns enough items to exceed the max cap
-// (200), forcing IsTruncated=true on call 1. Call 2 with the continuation
-// token returns the remaining items.
+// for SFN executions. Each fetcher invocation makes exactly one API call and
+// returns one page of items. Call 1 returns page 0 with IsTruncated=true.
+// Call 2 (using the NextToken from call 1) returns page 1 with IsTruncated=false.
 func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 items each (250 total). Cap is 200.
-	// Page 1-4 each have NextToken, page 5 does not.
+	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sfn.ListExecutionsOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var executions []sfntypes.ExecutionListItem
 		for i := 0; i < 50; i++ {
 			executions = append(executions, sfntypes.ExecutionListItem{
@@ -71,8 +70,8 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 			})
 		}
 		out := &sfn.ListExecutionsOutput{Executions: executions}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
@@ -81,7 +80,7 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	// Call 1: continuationToken="" — should get 200 items with IsTruncated=true
+	// Call 1: continuationToken="" — one API call, returns page 0 with IsTruncated=true
 	mock := &mockSFNListExecutionsClient{outputs: outputs}
 	result1, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -89,8 +88,8 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -106,17 +105,16 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: use NextToken from call 1 — should get remaining items
-	// Reset mock for the second call (the continuation mock delivers remaining pages)
-	mock2 := &mockSFNListExecutionsClient{outputs: outputs[4:]} // page 5 only (50 items)
+	// Call 2: use NextToken from call 1 — one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockSFNListExecutionsClient{outputs: outputs[1:]} // page 1 only
 	result2, err := awsclient.FetchSFNExecutions(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -131,20 +129,21 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_LogStreams_LoadMore verifies the two-call Load More flow for
-// CloudWatch Log Streams (max cap 500).
+// CloudWatch Log Streams. Each fetcher invocation makes exactly one API call
+// and returns one page of items (single-page pagination contract).
 func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
-	const maxCap = 500
+	const pageSize = 50
 
-	// Build mock: 12 pages of 50 streams each (600 total). Cap is 500.
+	// Build mock: 2 pages of 50 streams each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
-	for page := 0; page < 12; page++ {
+	for page := 0; page < 2; page++ {
 		var streams []cwlogstypes.LogStream
 		for i := 0; i < 50; i++ {
 			streams = append(streams, cwlogstypes.LogStream{
@@ -153,13 +152,13 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 			})
 		}
 		out := &cloudwatchlogs.DescribeLogStreamsOutput{LogStreams: streams}
-		if page < 11 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
-	// Call 1: should get 500 items (10 pages consumed) with IsTruncated=true
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockCWLogsDescribeLogStreamsClient{outputs: outputs}
 	result1, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
 	if err != nil {
@@ -167,8 +166,8 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -184,16 +183,16 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: use the continuation token — get remaining 100 items
-	mock2 := &mockCWLogsDescribeLogStreamsClient{outputs: outputs[10:]}
+	// Call 2: use the continuation token — one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockCWLogsDescribeLogStreamsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchLogStreams(context.Background(), mock2, "/aws/lambda/my-func", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 100 {
-			t.Errorf("call 2: expected 100 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -208,21 +207,22 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 600 {
-			t.Errorf("expected total 600 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_AsgActivities_LoadMore verifies the two-call Load More flow
-// for ASG scaling activities (max cap 200).
+// for ASG scaling activities. Each fetcher invocation makes exactly one API
+// call and returns one page of items (single-page pagination contract).
 func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 activities each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 activities each. Page 0 has NextToken, page 1 does not.
 	var outputs []*autoscaling.DescribeScalingActivitiesOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var activities []asgtypes.Activity
 		for i := 0; i < 50; i++ {
 			activities = append(activities, asgtypes.Activity{
@@ -234,15 +234,15 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 			})
 		}
 		out := &autoscaling.DescribeScalingActivitiesOutput{Activities: activities}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
 	parentCtx := map[string]string{"asg_name": "test-asg"}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockASGDescribeScalingActivitiesClient{outputs: outputs}
 	result1, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -250,8 +250,8 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -264,16 +264,16 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockASGDescribeScalingActivitiesClient{outputs: outputs[4:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockASGDescribeScalingActivitiesClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchAsgActivities(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -288,30 +288,31 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_CBBuilds_LoadMore verifies the two-call Load More flow for
-// CodeBuild builds (max cap 200). This fetcher uses two APIs: ListBuildsForProject
-// to get IDs, then BatchGetBuilds to get details.
+// CodeBuild builds. This fetcher uses two APIs: ListBuildsForProject to get
+// IDs, then BatchGetBuilds to get details. Each invocation makes one list
+// call plus one batch call (single-page pagination contract).
 func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	startTs := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 build IDs each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 build IDs each. Page 0 has NextToken, page 1 does not.
 	var listOutputs []*codebuild.ListBuildsForProjectOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var ids []string
 		for i := 0; i < 50; i++ {
 			ids = append(ids, fmt.Sprintf("my-project:build-p%d-%d", page, i))
 		}
 		out := &codebuild.ListBuildsForProjectOutput{Ids: ids}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		listOutputs = append(listOutputs, out)
 	}
@@ -326,7 +327,7 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "my-project"}
 
-	// Call 1
+	// Call 1: one list API call, returns page 0 with IsTruncated=true
 	listMock := &mockCodeBuildListBuildsForProjectClient{outputs: listOutputs}
 	result1, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "")
 	if err != nil {
@@ -334,8 +335,8 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -348,8 +349,8 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: use continuation token
-	listMock2 := &mockCodeBuildListBuildsForProjectClient{outputs: listOutputs[4:]}
+	// Call 2: one list API call, returns page 1 with IsTruncated=false
+	listMock2 := &mockCodeBuildListBuildsForProjectClient{outputs: listOutputs[1:]}
 	batchMock2 := &b3CBBatchGetBuildsMock{
 		startTs:  &startTs,
 		endTs:    &endTs,
@@ -361,8 +362,8 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -377,8 +378,8 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
@@ -410,15 +411,16 @@ func (m *b3CBBatchGetBuildsMock) BatchGetBuilds(ctx context.Context, params *cod
 }
 
 // TestStory_B3_GlueJobRuns_LoadMore verifies the two-call Load More flow
-// for Glue job runs (max cap 200).
+// for Glue job runs. Each fetcher invocation makes exactly one API call and
+// returns one page of items (single-page pagination contract).
 func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	startTs := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 runs each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 runs each. Page 0 has NextToken, page 1 does not.
 	var outputs []*glue.GetJobRunsOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var runs []gluetypes.JobRun
 		for i := 0; i < 50; i++ {
 			runs = append(runs, gluetypes.JobRun{
@@ -431,13 +433,13 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 			})
 		}
 		out := &glue.GetJobRunsOutput{JobRuns: runs}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockGlueGetJobRunsClient{outputs: outputs}
 	result1, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "test-etl-job", "")
 	if err != nil {
@@ -445,8 +447,8 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -459,16 +461,16 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockGlueGetJobRunsClient{outputs: outputs[4:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockGlueGetJobRunsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchGlueJobRuns(context.Background(), mock2, "test-etl-job", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -483,21 +485,22 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_AlarmHistory_LoadMore verifies the two-call Load More flow
-// for CloudWatch alarm history (max cap 200).
+// for CloudWatch alarm history. Each fetcher invocation makes exactly one API
+// call and returns one page of items (single-page pagination contract).
 func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 items each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatch.DescribeAlarmHistoryOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var items []cwtypes.AlarmHistoryItem
 		for i := 0; i < 50; i++ {
 			items = append(items, cwtypes.AlarmHistoryItem{
@@ -509,15 +512,15 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 			})
 		}
 		out := &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: items}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
 	parentCtx := map[string]string{"alarm_name": "test-alarm"}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockCloudWatchDescribeAlarmHistoryClient{outputs: outputs}
 	result1, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -525,8 +528,8 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -539,16 +542,16 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockCloudWatchDescribeAlarmHistoryClient{outputs: outputs[4:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockCloudWatchDescribeAlarmHistoryClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchAlarmHistory(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -563,34 +566,35 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_ECRImages_LoadMore verifies the two-call Load More flow
-// for ECR images (max cap 500).
+// for ECR images. Each fetcher invocation makes exactly one API call and
+// returns one page of items (single-page pagination contract).
 func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
-	const maxCap = 500
+	const pageSize = 50
 	pushTime := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 12 pages of 50 images each (600 total). Cap is 500.
+	// Build mock: 2 pages of 50 images each. Page 0 has NextToken, page 1 does not.
 	var pages []*ecr.DescribeImagesOutput
-	for page := 0; page < 12; page++ {
+	for page := 0; page < 2; page++ {
 		var images []ecrtypes.ImageDetail
 		for i := 0; i < 50; i++ {
-			pt := pushTime.Add(time.Duration(-(page*50 + i)) * time.Second) // Descending push times
+			pt := pushTime.Add(time.Duration(-(page*50 + i)) * time.Second)
 			images = append(images, ecrtypes.ImageDetail{
-				ImageDigest:   aws.String(fmt.Sprintf("sha256:p%d-img%d", page, i)),
-				ImageTags:     []string{fmt.Sprintf("v%d.%d", page, i)},
-				ImagePushedAt: &pt,
+				ImageDigest:      aws.String(fmt.Sprintf("sha256:p%d-img%d", page, i)),
+				ImageTags:        []string{fmt.Sprintf("v%d.%d", page, i)},
+				ImagePushedAt:    &pt,
 				ImageSizeInBytes: aws.Int64(int64((page*50 + i + 1) * 1024)),
 			})
 		}
 		out := &ecr.DescribeImagesOutput{ImageDetails: images}
-		if page < 11 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		pages = append(pages, out)
 	}
@@ -600,7 +604,7 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/test-repo",
 	}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockECRDescribeImagesClient{pages: pages}
 	result1, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -608,8 +612,8 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -622,16 +626,16 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockECRDescribeImagesClient{pages: pages[10:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockECRDescribeImagesClient{pages: pages[1:]}
 	result2, err := awsclient.FetchECRImages(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 100 {
-			t.Errorf("call 2: expected 100 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -646,8 +650,8 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 600 {
-			t.Errorf("expected total 600 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
@@ -754,14 +758,16 @@ func TestStory_B3_EcsSvcLogs_LoadMore(t *testing.T) {
 }
 
 // TestStory_B3_RDSEvents_LoadMore verifies the two-call Load More flow
-// for RDS instance events (max cap 200). RDS uses Marker instead of NextToken.
+// for RDS instance events. RDS uses Marker instead of NextToken. Each fetcher
+// invocation makes exactly one API call and returns one page of items
+// (single-page pagination contract).
 func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 5 pages of 50 events each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 events each. Page 0 has Marker, page 1 does not.
 	var outputs []*rds.DescribeEventsOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var events []rdstypes.Event
 		for i := 0; i < 50; i++ {
 			events = append(events, rdstypes.Event{
@@ -772,13 +778,13 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 			})
 		}
 		out := &rds.DescribeEventsOutput{Events: events}
-		if page < 4 {
-			out.Marker = aws.String(fmt.Sprintf("marker-page-%d", page+1))
+		if page == 0 {
+			out.Marker = aws.String("marker-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockRDSDescribeEventsClient{outputs: outputs}
 	result1, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db-instance", "")
 	if err != nil {
@@ -786,8 +792,8 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -800,16 +806,16 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockRDSDescribeEventsClient{outputs: outputs[4:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockRDSDescribeEventsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchRDSEvents(context.Background(), mock2, "my-db-instance", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -824,21 +830,22 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }
 
 // TestStory_B3_SNSTopicSubscriptions_LoadMore verifies the two-call Load More
-// flow for SNS topic subscriptions (max cap 200).
+// flow for SNS topic subscriptions. Each fetcher invocation makes exactly one
+// API call and returns one page of items (single-page pagination contract).
 func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
-	const maxCap = 200
+	const pageSize = 50
 	topicArn := "arn:aws:sns:us-east-1:123456789012:test-topic"
 
-	// Build mock: 5 pages of 50 subscriptions each (250 total). Cap is 200.
+	// Build mock: 2 pages of 50 subscriptions each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sns.ListSubscriptionsByTopicOutput
-	for page := 0; page < 5; page++ {
+	for page := 0; page < 2; page++ {
 		var subs []snstypes.Subscription
 		for i := 0; i < 50; i++ {
 			subs = append(subs, snstypes.Subscription{
@@ -850,13 +857,13 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 			})
 		}
 		out := &sns.ListSubscriptionsByTopicOutput{Subscriptions: subs}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
+		if page == 0 {
+			out.NextToken = aws.String("token-page-1")
 		}
 		outputs = append(outputs, out)
 	}
 
-	// Call 1
+	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockSNSListSubscriptionsByTopicClient{outputs: outputs}
 	result1, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "")
 	if err != nil {
@@ -864,8 +871,8 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 	}
 
 	t.Run("call1_count", func(t *testing.T) {
-		if len(result1.Resources) != maxCap {
-			t.Errorf("call 1: expected %d resources, got %d", maxCap, len(result1.Resources))
+		if len(result1.Resources) != pageSize {
+			t.Errorf("call 1: expected %d resources, got %d", pageSize, len(result1.Resources))
 		}
 	})
 
@@ -878,16 +885,16 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
-	mock2 := &mockSNSListSubscriptionsByTopicClient{outputs: outputs[4:]}
+	// Call 2: one API call, returns page 1 with IsTruncated=false
+	mock2 := &mockSNSListSubscriptionsByTopicClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock2, topicArn, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
 	t.Run("call2_count", func(t *testing.T) {
-		if len(result2.Resources) != 50 {
-			t.Errorf("call 2: expected 50 resources, got %d", len(result2.Resources))
+		if len(result2.Resources) != pageSize {
+			t.Errorf("call 2: expected %d resources, got %d", pageSize, len(result2.Resources))
 		}
 	})
 
@@ -902,8 +909,8 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 
 	t.Run("total_items", func(t *testing.T) {
 		total := len(result1.Resources) + len(result2.Resources)
-		if total != 250 {
-			t.Errorf("expected total 250 items across 2 calls, got %d", total)
+		if total != 100 {
+			t.Errorf("expected total 100 items across 2 calls, got %d", total)
 		}
 	})
 }

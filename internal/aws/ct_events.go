@@ -13,19 +13,6 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "user", "source", "resource_type", "resource_name", "read_only"})
 
-	// Legacy fetcher for availability probe (one page only).
-	resource.Register("ct-events", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		result, err := FetchCloudTrailEventsPage(ctx, c.CloudTrail, "")
-		if err != nil {
-			return nil, err
-		}
-		return result.Resources, nil
-	})
-
 	// Paginated fetcher for resource list browsing (M key load-more).
 	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)

@@ -39,7 +39,10 @@ func init() {
 
 // FetchRolePolicies calls ListAttachedRolePolicies and ListRolePolicies to
 // retrieve both managed and inline policies attached to the given IAM role.
-// Managed policies appear first, followed by inline policies.
+// A single API call is made for each list per invocation. Managed policies
+// appear first, followed by inline policies. If either list has more pages,
+// IsTruncated is set to true. (IAM role policies are limited to 20 managed +
+// 10 inline per role so truncation is extremely rare in practice.)
 func FetchRolePolicies(
 	ctx context.Context,
 	attachedAPI IAMListAttachedRolePoliciesAPI,
@@ -49,89 +52,69 @@ func FetchRolePolicies(
 ) (resource.FetchResult, error) {
 	roleName := parentCtx["role_name"]
 
-	// Fetch managed (attached) policies with pagination
-	var managed []resource.Resource
-	var attachedMarker *string
-	for {
-		input := &iam.ListAttachedRolePoliciesInput{
-			RoleName: &roleName,
-			Marker:   attachedMarker,
-		}
-		output, err := attachedAPI.ListAttachedRolePolicies(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing attached policies for %s: %w", roleName, err)
-		}
-
-		for _, p := range output.AttachedPolicies {
-			policyName := ""
-			if p.PolicyName != nil {
-				policyName = *p.PolicyName
-			}
-			policyArn := ""
-			if p.PolicyArn != nil {
-				policyArn = *p.PolicyArn
-			}
-
-			status := rolePolicyStatus(policyName)
-
-			managed = append(managed, resource.Resource{
-				ID:     policyArn,
-				Name:   policyName,
-				Status: status,
-				Fields: map[string]string{
-					"policy_name": policyName,
-					"policy_arn":  policyArn,
-					"policy_type": "Managed",
-				},
-				RawStruct: RolePolicyRow{
-					PolicyName: policyName,
-					PolicyArn:  policyArn,
-					PolicyType: "Managed",
-				},
-			})
-		}
-
-		if !output.IsTruncated {
-			break
-		}
-		attachedMarker = output.Marker
+	// Fetch one page of managed (attached) policies
+	attachedOutput, err := attachedAPI.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+		RoleName: &roleName,
+	})
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing attached policies for %s: %w", roleName, err)
 	}
 
-	// Fetch inline policies with pagination
+	var managed []resource.Resource
+	for _, p := range attachedOutput.AttachedPolicies {
+		policyName := ""
+		if p.PolicyName != nil {
+			policyName = *p.PolicyName
+		}
+		policyArn := ""
+		if p.PolicyArn != nil {
+			policyArn = *p.PolicyArn
+		}
+
+		status := rolePolicyStatus(policyName)
+
+		managed = append(managed, resource.Resource{
+			ID:     policyArn,
+			Name:   policyName,
+			Status: status,
+			Fields: map[string]string{
+				"policy_name": policyName,
+				"policy_arn":  policyArn,
+				"policy_type": "Managed",
+			},
+			RawStruct: RolePolicyRow{
+				PolicyName: policyName,
+				PolicyArn:  policyArn,
+				PolicyType: "Managed",
+			},
+		})
+	}
+
+	// Fetch one page of inline policies
+	inlineOutput, err := inlineAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
+		RoleName: &roleName,
+	})
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing inline policies for %s: %w", roleName, err)
+	}
+
 	var inline []resource.Resource
-	var inlineMarker *string
-	for {
-		input := &iam.ListRolePoliciesInput{
-			RoleName: &roleName,
-			Marker:   inlineMarker,
-		}
-		output, err := inlineAPI.ListRolePolicies(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing inline policies for %s: %w", roleName, err)
-		}
-
-		for _, name := range output.PolicyNames {
-			inline = append(inline, resource.Resource{
-				ID:     name,
-				Name:   name,
-				Status: "terminated",
-				Fields: map[string]string{
-					"policy_name": name,
-					"policy_arn":  "",
-					"policy_type": "Inline",
-				},
-				RawStruct: RolePolicyRow{
-					PolicyName: name,
-					PolicyArn:  "",
-					PolicyType: "Inline",
-				},
-			})
-		}
-
-		if !output.IsTruncated {
-			break
-		}
-		inlineMarker = output.Marker
+	for _, name := range inlineOutput.PolicyNames {
+		inline = append(inline, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "terminated",
+			Fields: map[string]string{
+				"policy_name": name,
+				"policy_arn":  "",
+				"policy_type": "Inline",
+			},
+			RawStruct: RolePolicyRow{
+				PolicyName: name,
+				PolicyArn:  "",
+				PolicyType: "Inline",
+			},
+		})
 	}
 
 	// Managed first, then inline
@@ -139,12 +122,19 @@ func FetchRolePolicies(
 	resources = append(resources, managed...)
 	resources = append(resources, inline...)
 
+	isTruncated := attachedOutput.IsTruncated || inlineOutput.IsTruncated
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

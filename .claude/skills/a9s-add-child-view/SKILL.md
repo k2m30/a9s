@@ -67,7 +67,7 @@ DETAIL PATHS:
 
 ### CODER TASK:
 Files to create:
-  internal/aws/{child_type}.go — child fetcher + init() with RegisterChildType/RegisterChildFetcher/RegisterFieldKeys
+  internal/aws/{child_type}.go — child fetcher + init() with RegisterChildType/RegisterPaginatedChild/RegisterFieldKeys
 Files to modify:
   internal/aws/interfaces.go — append {InterfaceName}
     Append point: last interface in file
@@ -161,7 +161,7 @@ type {InterfaceName} interface {
 **2. Client field** (IF new service): `internal/aws/client.go`
 
 **3. Child fetcher:** `internal/aws/{child_type}.go` (CREATE)
-- `init()` registers: `RegisterFieldKeys`, `RegisterChildFetcher`, `RegisterChildType`
+- `init()` registers: `RegisterFieldKeys`, `RegisterPaginatedChild`, `RegisterChildType`
 - Fetcher function with proper formatting:
   - Timestamps: `formatEpochMillis(*field)` — NEVER `fmt.Sprintf("%d", *field)`
   - Bytes: `formatBytes(*field)` — NEVER `fmt.Sprintf("%d", *field)`

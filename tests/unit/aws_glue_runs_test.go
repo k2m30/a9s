@@ -494,10 +494,16 @@ func TestFetchGlueJobRuns_ErrorMessageNewlineStripping(t *testing.T) {
 
 // TestFetchGlueJobRuns_Pagination verifies that paginated responses via
 // NextToken are followed and all job runs collected across multiple pages.
+// TestFetchGlueJobRuns_Pagination verifies the single-page pagination contract:
+// one API call is made per invocation, resources from that page are returned,
+// and IsTruncated/NextToken reflect whether more pages exist. A second call
+// with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 
-	mock := &mockGlueGetJobRunsClient{
+	// Page 1: 2 runs with NextToken indicating more pages exist.
+	page1Mock := &mockGlueGetJobRunsClient{
 		outputs: []*glue.GetJobRunsOutput{
 			{
 				NextToken: aws.String("page2-token"),
@@ -514,8 +520,81 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchGlueJobRuns(
+		context.Background(),
+		page1Mock,
+		"paginated-job",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		if page1Mock.callIdx != 1 {
+			t.Errorf("expected 1 API call for page 1, got %d", page1Mock.callIdx)
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_total_hint_negative", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.TotalHint != -1 {
+			t.Errorf("page 1: TotalHint should be -1 when truncated, got %d", result1.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page1_run_ids", func(t *testing.T) {
+		expectedIDs := []string{"run-p1-1", "run-p1-2"}
+		for i, expectedID := range expectedIDs {
+			if result1.Resources[i].ID != expectedID {
+				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result1.Resources[i].ID)
+			}
+		}
+	})
+
+	t.Run("page1_all_have_status", func(t *testing.T) {
+		for i, r := range result1.Resources {
+			if r.Status == "" {
+				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			}
+		}
+	})
+
+	// Page 2: 1 run with no NextToken — last page.
+	page2Mock := &mockGlueGetJobRunsClient{
+		outputs: []*glue.GetJobRunsOutput{
 			{
-				// No NextToken -- last page
+				// No NextToken — last page
 				JobRuns: []gluetypes.JobRun{
 					{
 						Id:          aws.String("run-p2-1"),
@@ -527,100 +606,138 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchGlueJobRuns(
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
-		mock,
+		page2Mock,
 		"paginated-job",
-			"",
-)
+		result1.Pagination.NextToken,
+	)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(result.Resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 2, got %d", len(result2.Resources))
 		}
 	})
 
-	t.Run("page1_runs", func(t *testing.T) {
-		expectedIDs := []string{"run-p1-1", "run-p1-2"}
-		for i, expectedID := range expectedIDs {
-			if result.Resources[i].ID != expectedID {
-				t.Errorf("resources[%d].ID: expected %q, got %q", i, expectedID, result.Resources[i].ID)
-			}
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
 		}
 	})
 
-	t.Run("page2_runs", func(t *testing.T) {
-		if result.Resources[2].ID != "run-p2-1" {
-			t.Errorf("resources[2].ID: expected %q, got %q", "run-p2-1", result.Resources[2].ID)
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
 		}
 	})
 
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
+	t.Run("page2_total_hint_equals_count", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.TotalHint != 1 {
+			t.Errorf("page 2: TotalHint should equal item count (1) on last page, got %d", result2.Pagination.TotalHint)
 		}
 	})
 
-	t.Run("all_have_status", func(t *testing.T) {
-		for i, r := range result.Resources {
-			if r.Status == "" {
-				t.Errorf("resources[%d].Status should not be empty", i)
-			}
+	t.Run("page2_run_id", func(t *testing.T) {
+		if result2.Resources[0].ID != "run-p2-1" {
+			t.Errorf("page 2 run ID: expected %q, got %q", "run-p2-1", result2.Resources[0].ID)
 		}
 	})
 }
 
-// TestFetchGlueJobRuns_MaxRunsCap verifies that the fetcher stops collecting
-// runs once it reaches the maxRuns=200 cap.
+// TestFetchGlueJobRuns_MaxRunsCap verifies that a single API page of 50 runs
+// is returned as-is with correct IsTruncated=true metadata when the API
+// indicates more pages exist. The 200-item cap no longer applies — each call
+// returns one page and the caller drives pagination via continuation tokens.
 func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 
-	// Build 5 pages of 50 runs each (250 total). The fetcher should stop at 200.
-	var outputs []*glue.GetJobRunsOutput
-	for page := 0; page < 5; page++ {
-		var runs []gluetypes.JobRun
-		for i := 0; i < 50; i++ {
-			runs = append(runs, gluetypes.JobRun{
-				Id:          aws.String(fmt.Sprintf("run-p%d-%d", page, i)),
-				JobRunState: gluetypes.JobRunStateSucceeded,
-				StartedOn:   &startTs,
-			})
-		}
-		out := &glue.GetJobRunsOutput{
-			JobRuns: runs,
-		}
-		if page < 4 {
-			out.NextToken = aws.String(fmt.Sprintf("token-page-%d", page+1))
-		}
-		outputs = append(outputs, out)
+	// Build one page of 50 runs with a NextToken indicating more pages exist.
+	var runs []gluetypes.JobRun
+	for i := 0; i < 50; i++ {
+		runs = append(runs, gluetypes.JobRun{
+			Id:          aws.String(fmt.Sprintf("run-p0-%d", i)),
+			JobRunState: gluetypes.JobRunStateSucceeded,
+			StartedOn:   &startTs,
+		})
 	}
 
-	mock := &mockGlueGetJobRunsClient{outputs: outputs}
+	mock := &mockGlueGetJobRunsClient{
+		outputs: []*glue.GetJobRunsOutput{
+			{
+				JobRuns:   runs,
+				NextToken: aws.String("token-page-1"),
+			},
+		},
+	}
 
 	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
 		"capped-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	t.Run("capped_at_200", func(t *testing.T) {
-		if len(result.Resources) != 200 {
-			t.Errorf("expected exactly 200 resources (maxRuns cap), got %d", len(result.Resources))
+	t.Run("returns_full_page_of_50", func(t *testing.T) {
+		if len(result.Resources) != 50 {
+			t.Errorf("expected exactly 50 resources from single API page, got %d", len(result.Resources))
 		}
 	})
 
-	t.Run("early_termination", func(t *testing.T) {
-		// With 50 runs per page, reaching 200 should take exactly 4 pages.
-		// The fetcher should NOT call the 5th page.
-		if mock.callIdx != 4 {
-			t.Errorf("expected 4 API calls (early termination at 200), got %d", mock.callIdx)
+	t.Run("single_api_call", func(t *testing.T) {
+		if mock.callIdx != 1 {
+			t.Errorf("expected 1 API call per invocation, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("is_truncated_true", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result.Pagination.IsTruncated {
+			t.Error("IsTruncated should be true when API returns NextToken")
+		}
+	})
+
+	t.Run("next_token_forwarded", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.NextToken != "token-page-1" {
+			t.Errorf("NextToken expected %q, got %q", "token-page-1", result.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page_size_equals_item_count", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.PageSize != 50 {
+			t.Errorf("PageSize expected 50, got %d", result.Pagination.PageSize)
+		}
+	})
+
+	t.Run("total_hint_negative_when_truncated", func(t *testing.T) {
+		if result.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result.Pagination.TotalHint != -1 {
+			t.Errorf("TotalHint should be -1 when truncated, got %d", result.Pagination.TotalHint)
 		}
 	})
 
@@ -631,9 +748,8 @@ func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 	})
 
 	t.Run("last_run_correct", func(t *testing.T) {
-		// Last run should be the 50th of page 3 (index 199 = page3, item49)
-		if result.Resources[199].ID != "run-p3-49" {
-			t.Errorf("last resource ID: expected %q, got %q", "run-p3-49", result.Resources[199].ID)
+		if result.Resources[49].ID != "run-p0-49" {
+			t.Errorf("last resource ID: expected %q, got %q", "run-p0-49", result.Resources[49].ID)
 		}
 	})
 }

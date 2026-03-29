@@ -11,8 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-const maxCBBuilds = 200
-
 func init() {
 	resource.RegisterFieldKeys("cb_builds", []string{
 		"build_number", "build_status", "start_time", "end_time",
@@ -48,13 +46,13 @@ func init() {
 }
 
 // FetchCBBuilds performs a two-step fetch:
-// 1. ListBuildsForProject (paginated) to collect build IDs up to maxCBBuilds
+// 1. ListBuildsForProject (single page) to collect build IDs
 // 2. BatchGetBuilds in chunks of 100 (API limit) to get full build details
 //
 // When continuationToken is provided, it resumes ListBuildsForProject from
-// that token. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
-// continuation.
+// that token. A single ListBuildsForProject call is made per invocation;
+// IsTruncated and NextToken are forwarded as pagination metadata for the
+// caller to request the next page.
 func FetchCBBuilds(
 	ctx context.Context,
 	listAPI CodeBuildListBuildsForProjectAPI,
@@ -64,46 +62,22 @@ func FetchCBBuilds(
 ) (resource.FetchResult, error) {
 	projectName := parentCtx["project_name"]
 
-	// Step 1: Collect all build IDs via pagination
-	var allIDs []string
-	var nextToken *string
+	// Step 1: Fetch one page of build IDs
+	listInput := &codebuild.ListBuildsForProjectInput{
+		ProjectName: &projectName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		listInput.NextToken = &continuationToken
 	}
 
-	var lastAPINextToken string
-
-	for {
-		input := &codebuild.ListBuildsForProjectInput{
-			ProjectName: &projectName,
-			NextToken:   nextToken,
-		}
-
-		output, err := listAPI.ListBuildsForProject(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing builds for %s: %w", projectName, err)
-		}
-
-		allIDs = append(allIDs, output.Ids...)
-
-		if output.NextToken != nil {
-			lastAPINextToken = *output.NextToken
-		} else {
-			lastAPINextToken = ""
-		}
-
-		if len(allIDs) >= maxCBBuilds {
-			allIDs = allIDs[:maxCBBuilds]
-			break
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	listOutput, err := listAPI.ListBuildsForProject(ctx, listInput)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing builds for %s: %w", projectName, err)
 	}
 
-	if len(allIDs) == 0 {
+	pageIDs := listOutput.Ids
+
+	if len(pageIDs) == 0 {
 		return resource.FetchResult{
 			Resources: []resource.Resource{},
 			Pagination: &resource.PaginationMeta{
@@ -117,12 +91,12 @@ func FetchCBBuilds(
 	// Step 2: BatchGetBuilds in chunks of 100
 	var resources []resource.Resource
 
-	for i := 0; i < len(allIDs); i += 100 {
+	for i := 0; i < len(pageIDs); i += 100 {
 		end := i + 100
-		if end > len(allIDs) {
-			end = len(allIDs)
+		if end > len(pageIDs) {
+			end = len(pageIDs)
 		}
-		chunk := allIDs[i:end]
+		chunk := pageIDs[i:end]
 
 		batchOutput, err := batchAPI.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 			Ids: chunk,
@@ -136,13 +110,25 @@ func FetchCBBuilds(
 		}
 	}
 
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: lastAPINextToken != "",
-			NextToken:   lastAPINextToken,
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
-			TotalHint:   len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

@@ -11,14 +11,22 @@ import (
 )
 
 func init() {
-	resource.Register("eks", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
+
+	resource.RegisterPaginated("eks", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEKSClusters(ctx, c.EKS, c.EKS)
+		resources, err := FetchEKSClusters(ctx, c.EKS, c.EKS)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return resource.FetchResult{
+			Resources:  resources,
+			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+		}, nil
 	})
-	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
 }
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names

@@ -32,68 +32,53 @@ func init() {
 }
 
 // FetchAlarmHistory calls the CloudWatch DescribeAlarmHistory API and
-// converts the response into a FetchResult with pagination support. Each call
-// returns up to maxAlarmHistoryItems (200) items. When the cap is reached and
-// more pages exist, FetchResult.Pagination.IsTruncated is set to true with a
-// NextToken for continuation.
+// converts the response into a FetchResult with pagination support. A single
+// API call is made per invocation; IsTruncated and NextToken are forwarded as
+// pagination metadata for the caller to request the next page.
 func FetchAlarmHistory(
 	ctx context.Context,
 	api CloudWatchDescribeAlarmHistoryAPI,
 	parentCtx map[string]string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	const maxItems = 200
-
 	alarmName := parentCtx["alarm_name"]
 
-	var resources []resource.Resource
-	var nextToken *string
+	input := &cloudwatch.DescribeAlarmHistoryInput{
+		AlarmName: &alarmName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &cloudwatch.DescribeAlarmHistoryInput{
-			AlarmName: &alarmName,
-			NextToken: nextToken,
-		}
+	output, err := api.DescribeAlarmHistory(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("describing alarm history for %s: %w", alarmName, err)
+	}
 
-		output, err := api.DescribeAlarmHistory(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing alarm history for %s: %w", alarmName, err)
-		}
+	var resources []resource.Resource
+	for _, item := range output.AlarmHistoryItems {
+		resources = append(resources, convertAlarmHistoryItem(item))
+	}
 
-		for _, item := range output.AlarmHistoryItems {
-			resources = append(resources, convertAlarmHistoryItem(item))
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-			if len(resources) >= maxItems {
-				apiNextToken := ""
-				if output.NextToken != nil {
-					apiNextToken = *output.NextToken
-				}
-				return resource.FetchResult{
-					Resources: resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: apiNextToken != "",
-						NextToken:   apiNextToken,
-						PageSize:    len(resources),
-					},
-				}, nil
-			}
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

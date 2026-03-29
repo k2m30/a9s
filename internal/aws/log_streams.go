@@ -35,67 +35,49 @@ func init() {
 	})
 }
 
-// maxLogStreams is the maximum number of log streams to fetch per log group.
-// Large log groups can have thousands of streams; loading all of them is slow
-// and rarely useful since streams are ordered by most-recent-event-first.
-const maxLogStreams = 500
-
 // FetchLogStreams calls the CloudWatchLogs DescribeLogStreams API for a given
 // log group and converts the response into a FetchResult with pagination
-// support. Each call returns up to maxLogStreams (500) items. When the cap is
-// reached and more pages exist, FetchResult.Pagination.IsTruncated is set to
-// true with a NextToken for continuation.
+// support. A single API call is made per invocation; IsTruncated and NextToken
+// are forwarded as pagination metadata for the caller to request the next page.
 func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string, continuationToken string) (resource.FetchResult, error) {
-	var resources []resource.Resource
-	var nextToken *string
+	input := &cloudwatchlogs.DescribeLogStreamsInput{
+		LogGroupName: &logGroupName,
+		OrderBy:      cwlogstypes.OrderByLastEventTime,
+		Descending:   aws.Bool(true),
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &cloudwatchlogs.DescribeLogStreamsInput{
-			LogGroupName: &logGroupName,
-			OrderBy:      cwlogstypes.OrderByLastEventTime,
-			Descending:   aws.Bool(true),
-			NextToken:    nextToken,
-		}
+	output, err := api.DescribeLogStreams(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching log streams: %w", err)
+	}
 
-		output, err := api.DescribeLogStreams(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching log streams: %w", err)
-		}
+	var resources []resource.Resource
+	for _, s := range output.LogStreams {
+		resources = append(resources, convertLogStream(s))
+	}
 
-		for _, s := range output.LogStreams {
-			resources = append(resources, convertLogStream(s))
-		}
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-		if len(resources) >= maxLogStreams {
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: apiNextToken != "",
-					NextToken:   apiNextToken,
-					PageSize:    len(resources),
-				},
-			}, nil
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

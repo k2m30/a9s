@@ -32,68 +32,53 @@ func init() {
 }
 
 // FetchAsgActivities calls the AutoScaling DescribeScalingActivities API and
-// converts the response into a FetchResult with pagination support. Each call
-// returns up to 200 activities. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
-// continuation.
+// converts the response into a FetchResult with pagination support. A single
+// API call is made per invocation; IsTruncated and NextToken are forwarded as
+// pagination metadata for the caller to request the next page.
 func FetchAsgActivities(
 	ctx context.Context,
 	api ASGDescribeScalingActivitiesAPI,
 	parentCtx map[string]string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	const maxActivities = 200
-
 	asgName := parentCtx["asg_name"]
 
-	var resources []resource.Resource
-	var nextToken *string
+	input := &autoscaling.DescribeScalingActivitiesInput{
+		AutoScalingGroupName: &asgName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &autoscaling.DescribeScalingActivitiesInput{
-			AutoScalingGroupName: &asgName,
-			NextToken:            nextToken,
-		}
+	output, err := api.DescribeScalingActivities(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("describing scaling activities for %s: %w", asgName, err)
+	}
 
-		output, err := api.DescribeScalingActivities(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing scaling activities for %s: %w", asgName, err)
-		}
+	var resources []resource.Resource
+	for _, activity := range output.Activities {
+		resources = append(resources, convertAsgActivity(activity))
+	}
 
-		for _, activity := range output.Activities {
-			resources = append(resources, convertAsgActivity(activity))
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-			if len(resources) >= maxActivities {
-				apiNextToken := ""
-				if output.NextToken != nil {
-					apiNextToken = *output.NextToken
-				}
-				return resource.FetchResult{
-					Resources: resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: apiNextToken != "",
-						NextToken:   apiNextToken,
-						PageSize:    len(resources),
-					},
-				}, nil
-			}
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

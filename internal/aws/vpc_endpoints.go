@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("vpce", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("vpce", []string{"vpce_id", "service_name", "type", "state", "vpc_id"})
+
+	resource.RegisterPaginated("vpce", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchVPCEndpoints(ctx, c.EC2)
+		return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
 	})
-	resource.RegisterFieldKeys("vpce", []string{"vpce_id", "service_name", "type", "state", "vpc_id"})
 }
 
 // FetchVPCEndpoints calls the EC2 DescribeVpcEndpoints API and converts the
 // response into a slice of generic Resource structs.
 func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeVpcEndpoints(ctx, &ec2.DescribeVpcEndpointsInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchVPCEndpointsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching VPC endpoints: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, vpce := range output.VpcEndpoints {
+// FetchVPCEndpointsPage fetches a single page of VPC endpoints.
+func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeVpcEndpointsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeVpcEndpoints(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching VPC endpoints: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, vpce := range output.VpcEndpoints {
 		vpceID := ""
 		if vpce.VpcEndpointId != nil {
 			vpceID = *vpce.VpcEndpointId
@@ -64,17 +84,31 @@ func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]r
 				"state":        state,
 				"vpc_id":       vpcID,
 			},
-			RawStruct:  vpce,
+			RawStruct: vpce,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

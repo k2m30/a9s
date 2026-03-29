@@ -13,12 +13,20 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("kms", []string{"alias", "key_id", "status", "description"})
-	resource.Register("kms", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("kms", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchKMSKeys(ctx, c.KMS, c.KMS, c.KMS)
+		resources, err := FetchKMSKeys(ctx, c.KMS, c.KMS, c.KMS)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return resource.FetchResult{
+			Resources:  resources,
+			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+		}, nil
 	})
 }
 

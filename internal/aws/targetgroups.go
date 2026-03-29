@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("tg", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("tg", []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"})
+
+	resource.RegisterPaginated("tg", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchTargetGroups(ctx, c.ELBv2)
+		return FetchTargetGroupsPage(ctx, c.ELBv2, continuationToken)
 	})
-	resource.RegisterFieldKeys("tg", []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"})
 }
 
 // FetchTargetGroups calls the ELBv2 DescribeTargetGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
-			Marker: marker,
-		})
+		result, err := FetchTargetGroupsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching target groups: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, tg := range output.TargetGroups {
+// FetchTargetGroupsPage fetches a single page of target groups.
+func FetchTargetGroupsPage(ctx context.Context, api ELBv2DescribeTargetGroupsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &elbv2.DescribeTargetGroupsInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeTargetGroups(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching target groups: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, tg := range output.TargetGroups {
 		tgName := ""
 		if tg.TargetGroupName != nil {
 			tgName = *tg.TargetGroupName
@@ -77,17 +97,31 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 				"target_type":       targetType,
 				"health_check_path": healthCheckPath,
 			},
-			RawStruct:  tg,
+			RawStruct: tg,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.NextMarker == nil {
-			break
-		}
-		marker = output.NextMarker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

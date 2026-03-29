@@ -110,7 +110,7 @@ internal/demo/      synthetic fixture data for --demo mode
 internal/fieldpath/ struct field extraction via reflection
 internal/resource/  generic resource model and registry
 internal/tui/       Bubble Tea views, keys, layout, styles, messages
-tests/unit/         unit tests (2,750+)
+tests/unit/         unit tests (3,100+)
 tests/integration/  integration tests
 ```
 

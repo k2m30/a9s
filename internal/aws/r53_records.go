@@ -40,65 +40,69 @@ type r53ContinuationToken struct {
 
 // FetchR53Records calls the Route53 ListResourceRecordSets API for a given
 // hosted zone and converts the response into a FetchResult with pagination support.
-// It paginates using IsTruncated/NextRecordName/NextRecordType/NextRecordIdentifier.
+// A single API call is made per invocation. The compound continuation token encodes
+// all three Route53 pagination cursors (NextRecordName, NextRecordType,
+// NextRecordIdentifier) as a JSON string.
 func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, hostedZoneId string, continuationToken string) (resource.FetchResult, error) {
-	var resources []resource.Resource
-	var nextName *string
-	var nextType r53types.RRType
-	var nextIdentifier *string
+	input := &route53.ListResourceRecordSetsInput{
+		HostedZoneId: &hostedZoneId,
+	}
 
 	if continuationToken != "" {
 		var ct r53ContinuationToken
 		if err := json.Unmarshal([]byte(continuationToken), &ct); err == nil {
 			if ct.NextRecordName != "" {
-				nextName = &ct.NextRecordName
+				input.StartRecordName = &ct.NextRecordName
 			}
 			if ct.NextRecordType != "" {
-				nextType = r53types.RRType(ct.NextRecordType)
+				input.StartRecordType = r53types.RRType(ct.NextRecordType)
 			}
 			if ct.NextRecordIdentifier != "" {
-				nextIdentifier = &ct.NextRecordIdentifier
+				input.StartRecordIdentifier = &ct.NextRecordIdentifier
 			}
 		}
 	}
 
-	for {
-		input := &route53.ListResourceRecordSetsInput{
-			HostedZoneId: &hostedZoneId,
-		}
-		if nextName != nil {
-			input.StartRecordName = nextName
-		}
-		if nextType != "" {
-			input.StartRecordType = nextType
-		}
-		if nextIdentifier != nil {
-			input.StartRecordIdentifier = nextIdentifier
-		}
+	output, err := api.ListResourceRecordSets(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching R53 records: %w", err)
+	}
 
-		output, err := api.ListResourceRecordSets(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching R53 records: %w", err)
-		}
+	var resources []resource.Resource
+	for _, record := range output.ResourceRecordSets {
+		resources = append(resources, convertR53Record(record))
+	}
 
-		for _, record := range output.ResourceRecordSets {
-			resources = append(resources, convertR53Record(record))
+	nextToken := ""
+	isTruncated := output.IsTruncated
+	if isTruncated {
+		ct := r53ContinuationToken{}
+		if output.NextRecordName != nil {
+			ct.NextRecordName = *output.NextRecordName
 		}
+		if output.NextRecordType != "" {
+			ct.NextRecordType = string(output.NextRecordType)
+		}
+		if output.NextRecordIdentifier != nil {
+			ct.NextRecordIdentifier = *output.NextRecordIdentifier
+		}
+		if b, err := json.Marshal(ct); err == nil {
+			nextToken = string(b)
+		}
+	}
 
-		if !output.IsTruncated {
-			break
-		}
-		nextName = output.NextRecordName
-		nextType = output.NextRecordType
-		nextIdentifier = output.NextRecordIdentifier
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

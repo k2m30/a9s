@@ -33,15 +33,11 @@ func init() {
 	})
 }
 
-// maxEcsTasks caps the total number of tasks fetched per service.
-const maxEcsTasks = 200
-
-// FetchEcsSvcTasks calls ListTasks for both RUNNING and STOPPED statuses,
-// then DescribeTasks for full details. Returns at most maxEcsTasks results
-// as a FetchResult with pagination support. When continuationToken is provided,
-// it resumes ListTasks from that token. When the cap is reached and more pages
-// exist, FetchResult.Pagination.IsTruncated is set to true with a NextToken
-// for continuation.
+// FetchEcsSvcTasks calls ListTasks for RUNNING and STOPPED statuses (one page
+// each), then DescribeTasks for full details. A single ListTasks call is made
+// per status per invocation. If either status has more pages, IsTruncated is
+// set to true. The continuationToken is not used for per-status resumption in
+// this implementation — it's accepted for interface compatibility.
 func FetchEcsSvcTasks(
 	ctx context.Context,
 	listAPI ECSListTasksAPI,
@@ -50,48 +46,25 @@ func FetchEcsSvcTasks(
 	continuationToken string,
 ) (resource.FetchResult, error) {
 	var allTaskArns []string
-	var nextToken *string
-	if continuationToken != "" {
-		nextToken = &continuationToken
-	}
+	isTruncated := false
 
-	var lastAPINextToken string
-
-	// Collect task ARNs for both RUNNING and STOPPED statuses
+	// Fetch one page of RUNNING tasks, then one page of STOPPED tasks.
 	for _, status := range []ecstypes.DesiredStatus{ecstypes.DesiredStatusRunning, ecstypes.DesiredStatusStopped} {
-		for {
-			input := &ecs.ListTasksInput{
-				Cluster:       aws.String(cluster),
-				ServiceName:   aws.String(serviceName),
-				DesiredStatus: status,
-				NextToken:     nextToken,
-			}
-
-			output, err := listAPI.ListTasks(ctx, input)
-			if err != nil {
-				return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
-			}
-
-			allTaskArns = append(allTaskArns, output.TaskArns...)
-
-			if output.NextToken != nil {
-				lastAPINextToken = *output.NextToken
-			} else {
-				lastAPINextToken = ""
-			}
-
-			if output.NextToken == nil || len(allTaskArns) >= maxEcsTasks {
-				break
-			}
-			nextToken = output.NextToken
+		input := &ecs.ListTasksInput{
+			Cluster:       aws.String(cluster),
+			ServiceName:   aws.String(serviceName),
+			DesiredStatus: status,
 		}
 
-		if len(allTaskArns) >= maxEcsTasks {
-			allTaskArns = allTaskArns[:maxEcsTasks]
-			break
+		output, err := listAPI.ListTasks(ctx, input)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
 		}
-		// Reset nextToken between status phases
-		nextToken = nil
+
+		allTaskArns = append(allTaskArns, output.TaskArns...)
+		if output.NextToken != nil {
+			isTruncated = true
+		}
 	}
 
 	if len(allTaskArns) == 0 {
@@ -128,13 +101,17 @@ func FetchEcsSvcTasks(
 		resources = append(resources, convertEcsTask(task))
 	}
 
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: lastAPINextToken != "",
-			NextToken:   lastAPINextToken,
+			IsTruncated: isTruncated,
 			PageSize:    len(resources),
-			TotalHint:   len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

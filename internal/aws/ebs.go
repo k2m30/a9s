@@ -12,210 +12,280 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("ebs", []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"})
-	resource.Register("ebs", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterPaginated("ebs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEBSVolumes(ctx, c.EC2)
+		return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
 	})
 
 	resource.RegisterFieldKeys("ebs-snap", []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"})
-	resource.Register("ebs-snap", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterPaginated("ebs-snap", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEBSSnapshots(ctx, c.EC2)
+		return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
 	})
 }
 
-// FetchEBSVolumes calls the EC2 DescribeVolumes API and returns a slice of
-// generic Resource structs.
+// FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
+// of volumes. Used by existing tests and the legacy fetcher.
 func FetchEBSVolumes(ctx context.Context, api EC2DescribeVolumesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchEBSVolumesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching EBS volumes: %w", err)
+			return nil, err
 		}
-
-		for _, vol := range output.Volumes {
-			volumeID := ""
-			if vol.VolumeId != nil {
-				volumeID = *vol.VolumeId
-			}
-
-			// Extract Name from Tags
-			name := ""
-			for _, tag := range vol.Tags {
-				if tag.Key != nil && *tag.Key == "Name" {
-					if tag.Value != nil {
-						name = *tag.Value
-					}
-					break
-				}
-			}
-
-			state := string(vol.State)
-
-			size := ""
-			if vol.Size != nil {
-				size = strconv.Itoa(int(*vol.Size))
-			}
-
-			volType := string(vol.VolumeType)
-
-			iops := ""
-			if vol.Iops != nil {
-				iops = strconv.Itoa(int(*vol.Iops))
-			}
-
-			encrypted := "false"
-			if vol.Encrypted != nil && *vol.Encrypted {
-				encrypted = "true"
-			}
-
-			attachedTo := ""
-			if len(vol.Attachments) > 0 && vol.Attachments[0].InstanceId != nil {
-				attachedTo = *vol.Attachments[0].InstanceId
-			}
-
-			az := ""
-			if vol.AvailabilityZone != nil {
-				az = *vol.AvailabilityZone
-			}
-
-			created := ""
-			if vol.CreateTime != nil {
-				created = vol.CreateTime.Format("2006-01-02 15:04")
-			}
-
-			r := resource.Resource{
-				ID:     volumeID,
-				Name:   name,
-				Status: state,
-				Fields: map[string]string{
-					"volume_id":   volumeID,
-					"name":        name,
-					"state":       state,
-					"size":        size,
-					"type":        volType,
-					"iops":        iops,
-					"encrypted":   encrypted,
-					"attached_to": attachedTo,
-					"az":          az,
-					"created":     created,
-				},
-				RawStruct: vol,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
 	}
-
-	return resources, nil
+	return all, nil
 }
 
-// FetchEBSSnapshots calls the EC2 DescribeSnapshots API and returns a slice of
-// generic Resource structs. Only returns snapshots owned by the caller ("self").
-func FetchEBSSnapshots(ctx context.Context, api EC2DescribeSnapshotsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
-	for {
-		output, err := api.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{
-			OwnerIds:  []string{"self"},
-			NextToken: nextToken,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("fetching EBS snapshots: %w", err)
-		}
-
-		for _, snap := range output.Snapshots {
-			snapshotID := ""
-			if snap.SnapshotId != nil {
-				snapshotID = *snap.SnapshotId
-			}
-
-			// Extract Name from Tags
-			name := ""
-			for _, tag := range snap.Tags {
-				if tag.Key != nil && *tag.Key == "Name" {
-					if tag.Value != nil {
-						name = *tag.Value
-					}
-					break
-				}
-			}
-
-			state := string(snap.State)
-
-			volumeID := ""
-			if snap.VolumeId != nil {
-				volumeID = *snap.VolumeId
-			}
-
-			size := ""
-			if snap.VolumeSize != nil {
-				size = strconv.Itoa(int(*snap.VolumeSize))
-			}
-
-			encrypted := "false"
-			if snap.Encrypted != nil && *snap.Encrypted {
-				encrypted = "true"
-			}
-
-			description := ""
-			if snap.Description != nil {
-				description = *snap.Description
-			}
-
-			started := ""
-			if snap.StartTime != nil {
-				started = snap.StartTime.Format("2006-01-02 15:04")
-			}
-
-			progress := ""
-			if snap.Progress != nil {
-				progress = *snap.Progress
-			}
-
-			r := resource.Resource{
-				ID:     snapshotID,
-				Name:   name,
-				Status: state,
-				Fields: map[string]string{
-					"snapshot_id": snapshotID,
-					"name":        name,
-					"state":       state,
-					"volume_id":   volumeID,
-					"size":        size,
-					"encrypted":   encrypted,
-					"description": description,
-					"started":     started,
-					"progress":    progress,
-				},
-				RawStruct: snap,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+// FetchEBSVolumesPage calls the EC2 DescribeVolumes API and returns a single
+// page of volumes. Pass an empty continuationToken for the first page.
+func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeVolumesInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.DescribeVolumes(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching EBS volumes: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, vol := range output.Volumes {
+		volumeID := ""
+		if vol.VolumeId != nil {
+			volumeID = *vol.VolumeId
+		}
+
+		// Extract Name from Tags
+		name := ""
+		for _, tag := range vol.Tags {
+			if tag.Key != nil && *tag.Key == "Name" {
+				if tag.Value != nil {
+					name = *tag.Value
+				}
+				break
+			}
+		}
+
+		state := string(vol.State)
+
+		size := ""
+		if vol.Size != nil {
+			size = strconv.Itoa(int(*vol.Size))
+		}
+
+		volType := string(vol.VolumeType)
+
+		iops := ""
+		if vol.Iops != nil {
+			iops = strconv.Itoa(int(*vol.Iops))
+		}
+
+		encrypted := "false"
+		if vol.Encrypted != nil && *vol.Encrypted {
+			encrypted = "true"
+		}
+
+		attachedTo := ""
+		if len(vol.Attachments) > 0 && vol.Attachments[0].InstanceId != nil {
+			attachedTo = *vol.Attachments[0].InstanceId
+		}
+
+		az := ""
+		if vol.AvailabilityZone != nil {
+			az = *vol.AvailabilityZone
+		}
+
+		created := ""
+		if vol.CreateTime != nil {
+			created = vol.CreateTime.Format("2006-01-02 15:04")
+		}
+
+		r := resource.Resource{
+			ID:     volumeID,
+			Name:   name,
+			Status: state,
+			Fields: map[string]string{
+				"volume_id":   volumeID,
+				"name":        name,
+				"state":       state,
+				"size":        size,
+				"type":        volType,
+				"iops":        iops,
+				"encrypted":   encrypted,
+				"attached_to": attachedTo,
+				"az":          az,
+				"created":     created,
+			},
+			RawStruct: vol,
+		}
+
+		resources = append(resources, r)
+	}
+
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
+}
+
+// FetchEBSSnapshots calls the EC2 DescribeSnapshots API and returns all pages
+// of snapshots. Used by existing tests and the legacy fetcher.
+func FetchEBSSnapshots(ctx context.Context, api EC2DescribeSnapshotsAPI) ([]resource.Resource, error) {
+	var all []resource.Resource
+	token := ""
+	for {
+		result, err := FetchEBSSnapshotsPage(ctx, api, token)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchEBSSnapshotsPage calls the EC2 DescribeSnapshots API and returns a single
+// page of snapshots. Only returns snapshots owned by the caller ("self").
+// Pass an empty continuationToken for the first page.
+func FetchEBSSnapshotsPage(ctx context.Context, api EC2DescribeSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ec2.DescribeSnapshotsInput{
+		OwnerIds: []string{"self"},
+	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.DescribeSnapshots(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching EBS snapshots: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, snap := range output.Snapshots {
+		snapshotID := ""
+		if snap.SnapshotId != nil {
+			snapshotID = *snap.SnapshotId
+		}
+
+		// Extract Name from Tags
+		name := ""
+		for _, tag := range snap.Tags {
+			if tag.Key != nil && *tag.Key == "Name" {
+				if tag.Value != nil {
+					name = *tag.Value
+				}
+				break
+			}
+		}
+
+		state := string(snap.State)
+
+		volumeID := ""
+		if snap.VolumeId != nil {
+			volumeID = *snap.VolumeId
+		}
+
+		size := ""
+		if snap.VolumeSize != nil {
+			size = strconv.Itoa(int(*snap.VolumeSize))
+		}
+
+		encrypted := "false"
+		if snap.Encrypted != nil && *snap.Encrypted {
+			encrypted = "true"
+		}
+
+		description := ""
+		if snap.Description != nil {
+			description = *snap.Description
+		}
+
+		started := ""
+		if snap.StartTime != nil {
+			started = snap.StartTime.Format("2006-01-02 15:04")
+		}
+
+		progress := ""
+		if snap.Progress != nil {
+			progress = *snap.Progress
+		}
+
+		r := resource.Resource{
+			ID:     snapshotID,
+			Name:   name,
+			Status: state,
+			Fields: map[string]string{
+				"snapshot_id": snapshotID,
+				"name":        name,
+				"state":       state,
+				"volume_id":   volumeID,
+				"size":        size,
+				"encrypted":   encrypted,
+				"description": description,
+				"started":     started,
+				"progress":    progress,
+			},
+			RawStruct: snap,
+		}
+
+		resources = append(resources, r)
+	}
+
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

@@ -656,12 +656,12 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterChildFetcher(testChildType, func(_ context.Context, clients interface{}, _ resource.ParentContext) ([]resource.Resource, error) {
+	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, clients interface{}, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		// This should not be reached if clients are nil — the model checks first
-		return nil, nil
+		return resource.FetchResult{}, nil
 	})
 	defer resource.UnregisterChildType(testChildType)
-	defer resource.UnregisterChildFetcher(testChildType)
+	defer resource.UnregisterPaginatedChild(testChildType)
 
 	// Create model WITHOUT demo mode and WITHOUT clients (clients == nil)
 	m := newRootSizedModel()
@@ -703,11 +703,11 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterChildFetcher(testChildType, func(_ context.Context, _ interface{}, _ resource.ParentContext) ([]resource.Resource, error) {
-		return nil, nil
+	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, _ interface{}, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, nil
 	})
 	defer resource.UnregisterChildType(testChildType)
-	defer resource.UnregisterChildFetcher(testChildType)
+	defer resource.UnregisterPaginatedChild(testChildType)
 
 	// Create model in demo mode so we don't need real AWS clients
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))

@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("dbi", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"})
+
+	resource.RegisterPaginated("dbi", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRDSInstances(ctx, c.RDS)
+		return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
 	})
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"})
 }
 
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the
 // response into a slice of generic Resource structs.
 func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{
-			Marker: marker,
-		})
+		result, err := FetchRDSInstancesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching RDS instances: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, db := range output.DBInstances {
+// FetchRDSInstancesPage fetches a single page of RDS instances.
+func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &rds.DescribeDBInstancesInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeDBInstances(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching RDS instances: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, db := range output.DBInstances {
 		dbIdentifier := ""
 		if db.DBInstanceIdentifier != nil {
 			dbIdentifier = *db.DBInstanceIdentifier
@@ -83,17 +103,31 @@ func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]re
 				"endpoint":       endpoint,
 				"multi_az":       multiAZ,
 			},
-			RawStruct:  db,
+			RawStruct: db,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if output.Marker == nil {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	nextToken := ""
+	isTruncated := false
+	if output.Marker != nil {
+		nextToken = *output.Marker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

@@ -47,7 +47,7 @@ After expansion, pagination is demonstrated across compute, storage, monitoring,
 - `func RegisterFetchers()`:
   - Iterates `demoData`, calls `resource.RegisterPaginated(shortName, paginatedFetcher)` for each
   - Iterates `childDemoData`, calls `resource.RegisterPaginatedChild(childType, paginatedFetcher)` for each
-  - Also registers non-paginated `resource.Register(shortName, fetcher)` for availability probes (which use `GetFetcher`, not `GetPaginatedFetcher`)
+  - Availability probes now use `GetPaginatedFetcher` (legacy `Register`/`GetFetcher` removed in #107/#109)
 - Token format: `"demo:<offset>"` — stateless, deterministic, survives back-navigation
 - Page size: `const PageSize = 20`
 - Shared pagination helper used by both top-level and child fetchers:

@@ -288,9 +288,16 @@ func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
 
 // TestFetchSNSTopicSubscriptions_Pagination verifies that paginated responses
 // via NextToken are followed and all subscriptions collected across pages.
+// TestFetchSNSTopicSubscriptions_Pagination verifies the single-page pagination
+// contract: one API call is made per invocation, resources from that page are
+// returned, and IsTruncated/NextToken reflect whether more pages exist. A second
+// call with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 	topicArn := "arn:aws:sns:us-east-1:123456789012:paginated-topic"
-	mock := &mockSNSListSubscriptionsByTopicClient{
+
+	// Page 1: 2 subscriptions with NextToken indicating more pages exist.
+	page1Mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
 			{
 				NextToken: aws.String("page2-token"),
@@ -311,6 +318,57 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), page1Mock, topicArn, "")
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		if page1Mock.callIdx != 1 {
+			t.Errorf("expected 1 API call for page 1, got %d", page1Mock.callIdx)
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_subscription_names", func(t *testing.T) {
+		if result1.Resources[0].Name != "page1-user1@example.com" {
+			t.Errorf("resources[0].Name: expected %q, got %q", "page1-user1@example.com", result1.Resources[0].Name)
+		}
+		if result1.Resources[1].Name != "page1-user2@example.com" {
+			t.Errorf("resources[1].Name: expected %q, got %q", "page1-user2@example.com", result1.Resources[1].Name)
+		}
+	})
+
+	// Page 2: 1 subscription with no NextToken — last page.
+	page2Mock := &mockSNSListSubscriptionsByTopicClient{
+		outputs: []*sns.ListSubscriptionsByTopicOutput{
 			{
 				Subscriptions: []snstypes.Subscription{
 					{
@@ -325,41 +383,30 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "",
-)
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), page2Mock, topicArn, result1.Pagination.NextToken)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
 
-		resources := result.Resources
-
-	t.Run("total_count", func(t *testing.T) {
-		if len(resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(resources))
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 2, got %d", len(result2.Resources))
 		}
 	})
 
-	t.Run("page1_first_sub", func(t *testing.T) {
-		if resources[0].Name != "page1-user1@example.com" {
-			t.Errorf("resources[0].Name: expected %q, got %q", "page1-user1@example.com", resources[0].Name)
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
 		}
 	})
 
-	t.Run("page1_second_sub", func(t *testing.T) {
-		if resources[1].Name != "page1-user2@example.com" {
-			t.Errorf("resources[1].Name: expected %q, got %q", "page1-user2@example.com", resources[1].Name)
-		}
-	})
-
-	t.Run("page2_sub", func(t *testing.T) {
-		if resources[2].Name != "https://page2.example.com/webhook" {
-			t.Errorf("resources[2].Name: expected %q, got %q", "https://page2.example.com/webhook", resources[2].Name)
-		}
-	})
-
-	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
+	t.Run("page2_subscription_name", func(t *testing.T) {
+		if result2.Resources[0].Name != "https://page2.example.com/webhook" {
+			t.Errorf("page 2: resource[0].Name expected %q, got %q", "https://page2.example.com/webhook", result2.Resources[0].Name)
 		}
 	})
 }

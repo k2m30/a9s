@@ -11,13 +11,6 @@ import (
 )
 
 func init() {
-	resource.Register("ssm", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSSMParameters(ctx, c.SSM)
-	})
 	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description"})
 	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
@@ -26,69 +19,111 @@ func init() {
 		}
 		return RevealSSMParameter(ctx, c.SSM, resourceID)
 	})
+
+	resource.RegisterPaginated("ssm", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
+	})
 }
 
-// FetchSSMParameters calls the SSM DescribeParameters API and converts the
-// response into a slice of generic Resource structs.
+// FetchSSMParameters calls the SSM DescribeParameters API and returns all pages
+// of parameters. Used by existing tests and the legacy fetcher.
 func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var nextToken *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-			NextToken: nextToken,
-		})
+		result, err := FetchSSMParametersPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching SSM parameters: %w", err)
+			return nil, err
 		}
-
-		for _, param := range output.Parameters {
-			paramName := ""
-			if param.Name != nil {
-				paramName = *param.Name
-			}
-
-			paramType := string(param.Type)
-
-			version := ""
-			if param.Version != 0 {
-				version = fmt.Sprintf("%d", param.Version)
-			}
-
-			lastModified := ""
-			if param.LastModifiedDate != nil {
-				lastModified = param.LastModifiedDate.Format("2006-01-02 15:04")
-			}
-
-			description := ""
-			if param.Description != nil {
-				description = *param.Description
-			}
-
-			r := resource.Resource{
-				ID:     paramName,
-				Name:   paramName,
-				Status: "",
-				Fields: map[string]string{
-					"name":          paramName,
-					"type":          paramType,
-					"version":       version,
-					"last_modified": lastModified,
-					"description":   description,
-				},
-				RawStruct: param,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextToken == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		nextToken = output.NextToken
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchSSMParametersPage calls the SSM DescribeParameters API and returns a single
+// page of parameters. Pass an empty continuationToken for the first page.
+func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &ssm.DescribeParametersInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.DescribeParameters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching SSM parameters: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, param := range output.Parameters {
+		paramName := ""
+		if param.Name != nil {
+			paramName = *param.Name
+		}
+
+		paramType := string(param.Type)
+
+		version := ""
+		if param.Version != 0 {
+			version = fmt.Sprintf("%d", param.Version)
+		}
+
+		lastModified := ""
+		if param.LastModifiedDate != nil {
+			lastModified = param.LastModifiedDate.Format("2006-01-02 15:04")
+		}
+
+		description := ""
+		if param.Description != nil {
+			description = *param.Description
+		}
+
+		r := resource.Resource{
+			ID:     paramName,
+			Name:   paramName,
+			Status: "",
+			Fields: map[string]string{
+				"name":          paramName,
+				"type":          paramType,
+				"version":       version,
+				"last_modified": lastModified,
+				"description":   description,
+			},
+			RawStruct: param,
+		}
+
+		resources = append(resources, r)
+	}
+
+	// Build pagination metadata
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }
 
 // RevealSSMParameter calls the SSM GetParameter API with decryption enabled

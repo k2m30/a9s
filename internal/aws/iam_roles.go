@@ -10,31 +10,51 @@ import (
 )
 
 func init() {
-	resource.Register("role", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description"})
+
+	resource.RegisterPaginated("role", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchIAMRoles(ctx, c.IAM)
+		return FetchIAMRolesPage(ctx, c.IAM, continuationToken)
 	})
-	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description"})
 }
 
-// FetchIAMRoles calls the IAM ListRoles API and converts the
-// response into a slice of generic Resource structs.
+// FetchIAMRoles calls the IAM ListRoles API and returns all pages of roles.
+// Used by existing tests and the legacy fetcher.
 func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.ListRoles(ctx, &iam.ListRolesInput{
-			Marker: marker,
-		})
+		result, err := FetchIAMRolesPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching IAM roles: %w", err)
+			return nil, err
 		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
 
-		for _, role := range output.Roles {
+// FetchIAMRolesPage calls the IAM ListRoles API and returns a single page
+// of roles. Pass an empty continuationToken for the first page.
+func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &iam.ListRolesInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.ListRoles(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching IAM roles: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, role := range output.Roles {
 		roleName := ""
 		if role.RoleName != nil {
 			roleName = *role.RoleName
@@ -71,17 +91,31 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 				"create_date": createDate,
 				"description": description,
 			},
-			RawStruct:  role,
+			RawStruct: role,
 		}
 
 		resources = append(resources, r)
-		}
-
-		if !output.IsTruncated {
-			break
-		}
-		marker = output.Marker
 	}
 
-	return resources, nil
+	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
+	nextToken := ""
+	isTruncated := output.IsTruncated
+	if isTruncated && output.Marker != nil {
+		nextToken = *output.Marker
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

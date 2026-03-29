@@ -32,47 +32,51 @@ func init() {
 }
 
 // FetchCfnResources calls the CloudFormation ListStackResources API and converts
-// the response into a FetchResult with pagination support. Pagination is followed
-// via NextToken. When a continuation token is provided, fetching resumes from that page.
+// the response into a FetchResult with pagination support. A single API call is
+// made per invocation; IsTruncated and NextToken are forwarded as pagination
+// metadata for the caller to request the next page.
 func FetchCfnResources(
 	ctx context.Context,
 	api CFNListStackResourcesAPI,
 	stackName string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	var resources []resource.Resource
-	var nextToken *string
+	input := &cloudformation.ListStackResourcesInput{
+		StackName: &stackName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &cloudformation.ListStackResourcesInput{
-			StackName: &stackName,
-			NextToken: nextToken,
-		}
+	output, err := api.ListStackResources(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing CloudFormation stack resources for %s: %w", stackName, err)
+	}
 
-		output, err := api.ListStackResources(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing CloudFormation stack resources for %s: %w", stackName, err)
-		}
+	var resources []resource.Resource
+	for _, summary := range output.StackResourceSummaries {
+		resources = append(resources, convertCfnResource(summary))
+	}
 
-		for _, summary := range output.StackResourceSummaries {
-			resources = append(resources, convertCfnResource(summary))
-		}
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

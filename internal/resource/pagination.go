@@ -15,5 +15,5 @@ type PaginationMeta struct {
 // FetchResult wraps a resource page with pagination state.
 type FetchResult struct {
 	Resources  []Resource
-	Pagination *PaginationMeta // nil means unpaginated (legacy compatibility)
+	Pagination *PaginationMeta // nil when pagination info is not available
 }

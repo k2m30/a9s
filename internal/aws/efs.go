@@ -11,75 +11,109 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "life_cycle_state", "performance_mode", "encrypted", "mount_targets"})
-	resource.Register("efs", func(ctx context.Context, clients interface{}) ([]resource.Resource, error) {
+
+	resource.RegisterPaginated("efs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchEFSFileSystems(ctx, c.EFS)
+		return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
 	})
 }
 
 // FetchEFSFileSystems calls the EFS DescribeFileSystems API and converts
 // the response into a slice of generic Resource structs.
 func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	var marker *string
-
+	var all []resource.Resource
+	token := ""
 	for {
-		output, err := api.DescribeFileSystems(ctx, &efs.DescribeFileSystemsInput{
-			Marker: marker,
-		})
+		result, err := FetchEFSFileSystemsPage(ctx, api, token)
 		if err != nil {
-			return nil, fmt.Errorf("fetching EFS file systems: %w", err)
+			return nil, err
 		}
-
-		for _, fs := range output.FileSystems {
-			fsID := ""
-			if fs.FileSystemId != nil {
-				fsID = *fs.FileSystemId
-			}
-
-			name := ""
-			if fs.Name != nil {
-				name = *fs.Name
-			}
-
-			lifeCycleState := string(fs.LifeCycleState)
-			performanceMode := string(fs.PerformanceMode)
-			throughputMode := string(fs.ThroughputMode)
-
-			encrypted := "false"
-			if fs.Encrypted != nil && *fs.Encrypted {
-				encrypted = "true"
-			}
-
-			mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
-
-			r := resource.Resource{
-				ID:     fsID,
-				Name:   name,
-				Status: lifeCycleState,
-				Fields: map[string]string{
-					"file_system_id":   fsID,
-					"name":             name,
-					"life_cycle_state": lifeCycleState,
-					"performance_mode": performanceMode,
-					"throughput_mode":  throughputMode,
-					"encrypted":        encrypted,
-					"mount_targets":    mountTargets,
-				},
-				RawStruct: fs,
-			}
-
-			resources = append(resources, r)
-		}
-
-		if output.NextMarker == nil {
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
 			break
 		}
-		marker = output.NextMarker
+		token = result.Pagination.NextToken
+	}
+	return all, nil
+}
+
+// FetchEFSFileSystemsPage fetches a single page of EFS file systems.
+func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &efs.DescribeFileSystemsInput{}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
 	}
 
-	return resources, nil
+	output, err := api.DescribeFileSystems(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching EFS file systems: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, fs := range output.FileSystems {
+		fsID := ""
+		if fs.FileSystemId != nil {
+			fsID = *fs.FileSystemId
+		}
+
+		name := ""
+		if fs.Name != nil {
+			name = *fs.Name
+		}
+
+		lifeCycleState := string(fs.LifeCycleState)
+		performanceMode := string(fs.PerformanceMode)
+		throughputMode := string(fs.ThroughputMode)
+
+		encrypted := "false"
+		if fs.Encrypted != nil && *fs.Encrypted {
+			encrypted = "true"
+		}
+
+		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
+
+		r := resource.Resource{
+			ID:     fsID,
+			Name:   name,
+			Status: lifeCycleState,
+			Fields: map[string]string{
+				"file_system_id":   fsID,
+				"name":             name,
+				"life_cycle_state": lifeCycleState,
+				"performance_mode": performanceMode,
+				"throughput_mode":  throughputMode,
+				"encrypted":        encrypted,
+				"mount_targets":    mountTargets,
+			},
+			RawStruct: fs,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
 }

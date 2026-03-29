@@ -41,67 +41,53 @@ func init() {
 }
 
 // FetchELBListeners calls the ELBv2 DescribeListeners API and converts the
-// response into a FetchResult with pagination support. Each call returns up to
-// maxListeners (200) items. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
+// response into a FetchResult with pagination support. A single API call is
+// made per invocation; IsTruncated and NextToken (Marker) are forwarded as
+// pagination metadata for the caller to request the next page.
 func FetchELBListeners(
 	ctx context.Context,
 	api ELBv2DescribeListenersAPI,
 	parentCtx map[string]string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	const maxListeners = 200
-
 	lbArn := parentCtx["load_balancer_arn"]
 
-	var resources []resource.Resource
-	var marker *string
+	input := &elbv2.DescribeListenersInput{
+		LoadBalancerArn: &lbArn,
+	}
 	if continuationToken != "" {
-		marker = &continuationToken
+		input.Marker = &continuationToken
 	}
 
-	for {
-		input := &elbv2.DescribeListenersInput{
-			LoadBalancerArn: &lbArn,
-			Marker:          marker,
-		}
+	output, err := api.DescribeListeners(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("describing listeners for %s: %w", lbArn, err)
+	}
 
-		output, err := api.DescribeListeners(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing listeners for %s: %w", lbArn, err)
-		}
+	var resources []resource.Resource
+	for _, listener := range output.Listeners {
+		resources = append(resources, convertListener(listener))
+	}
 
-		for _, listener := range output.Listeners {
-			resources = append(resources, convertListener(listener))
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
 
-			if len(resources) >= maxListeners {
-				apiNextMarker := ""
-				if output.NextMarker != nil {
-					apiNextMarker = *output.NextMarker
-				}
-				return resource.FetchResult{
-					Resources: resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: apiNextMarker != "",
-						NextToken:   apiNextMarker,
-						PageSize:    len(resources),
-					},
-				}, nil
-			}
-		}
-
-		if output.NextMarker == nil {
-			break
-		}
-		marker = output.NextMarker
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }

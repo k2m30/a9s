@@ -567,13 +567,21 @@ func TestFetchECRImages_SizeFormatting(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_Pagination verifies that paginated DescribeImages responses
-// via NextToken are followed and all images collected across multiple pages,
-// capped at maxECRImages.
+// TestFetchECRImages_Pagination verifies the single-page pagination contract:
+// one API call is made per invocation, resources from that page are returned,
+// and IsTruncated/NextToken reflect whether more pages exist. A second call
+// with the continuation token verifies the token is forwarded and the final
+// page sets IsTruncated=false.
 func TestFetchECRImages_Pagination(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockECRDescribeImagesClient{
+	parentCtx := map[string]string{
+		"repository_name": "my-repo",
+		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
+	}
+
+	// Page 1: 2 images with NextToken indicating more pages exist.
+	page1Mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
 			{
 				NextToken: aws.String("page2-token"),
@@ -592,8 +600,73 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	// First call: no continuation token — fetches page 1.
+	result1, err := awsclient.FetchECRImages(
+		context.Background(),
+		page1Mock,
+		parentCtx,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("page 1: expected no error, got %v", err)
+	}
+
+	t.Run("page1_item_count", func(t *testing.T) {
+		if len(result1.Resources) != 2 {
+			t.Fatalf("expected 2 resources on page 1, got %d", len(result1.Resources))
+		}
+	})
+
+	t.Run("page1_single_api_call", func(t *testing.T) {
+		if page1Mock.calls != 1 {
+			t.Errorf("expected 1 API call for page 1, got %d", page1Mock.calls)
+		}
+	})
+
+	t.Run("page1_is_truncated", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if !result1.Pagination.IsTruncated {
+			t.Error("page 1: IsTruncated should be true when NextToken is present")
+		}
+	})
+
+	t.Run("page1_next_token", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.NextToken != "page2-token" {
+			t.Errorf("page 1: NextToken expected %q, got %q", "page2-token", result1.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page1_total_hint_negative", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.TotalHint != -1 {
+			t.Errorf("page 1: TotalHint should be -1 when truncated, got %d", result1.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page1_page_size", func(t *testing.T) {
+		if result1.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result1.Pagination.PageSize != 2 {
+			t.Errorf("page 1: PageSize expected 2, got %d", result1.Pagination.PageSize)
+		}
+	})
+
+	// Page 2: 1 image with no NextToken — last page.
+	page2Mock := &mockECRDescribeImagesClient{
+		pages: []*ecr.DescribeImagesOutput{
 			{
-				// No NextToken -- last page
+				// No NextToken — last page
 				ImageDetails: []ecrtypes.ImageDetail{
 					{
 						ImageDigest:      aws.String("sha256:bbbb001234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
@@ -606,30 +679,53 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		},
 	}
 
-	parentCtx := map[string]string{
-		"repository_name": "my-repo",
-		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
-	}
-
-	result, err := awsclient.FetchECRImages(
+	// Second call: pass continuation token from page 1 to fetch page 2.
+	result2, err := awsclient.FetchECRImages(
 		context.Background(),
-		mock,
+		page2Mock,
 		parentCtx,
-			"",
-)
+		result1.Pagination.NextToken,
+	)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("page 2: expected no error, got %v", err)
 	}
 
-	t.Run("total_count", func(t *testing.T) {
-		if len(result.Resources) != 3 {
-			t.Fatalf("expected 3 resources across 2 pages, got %d", len(result.Resources))
+	t.Run("page2_item_count", func(t *testing.T) {
+		if len(result2.Resources) != 1 {
+			t.Fatalf("expected 1 resource on page 2, got %d", len(result2.Resources))
 		}
 	})
 
-	t.Run("mock_called_twice", func(t *testing.T) {
-		if mock.calls != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.calls)
+	t.Run("page2_not_truncated", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.IsTruncated {
+			t.Error("page 2: IsTruncated should be false on last page")
+		}
+	})
+
+	t.Run("page2_empty_next_token", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.NextToken != "" {
+			t.Errorf("page 2: NextToken should be empty on last page, got %q", result2.Pagination.NextToken)
+		}
+	})
+
+	t.Run("page2_total_hint_equals_count", func(t *testing.T) {
+		if result2.Pagination == nil {
+			t.Fatal("Pagination must not be nil")
+		}
+		if result2.Pagination.TotalHint != 1 {
+			t.Errorf("page 2: TotalHint should equal item count (1) on last page, got %d", result2.Pagination.TotalHint)
+		}
+	})
+
+	t.Run("page2_image_tag", func(t *testing.T) {
+		if result2.Resources[0].Fields["image_tags"] != "v3" {
+			t.Errorf("page 2: image_tags expected %q, got %q", "v3", result2.Resources[0].Fields["image_tags"])
 		}
 	})
 }

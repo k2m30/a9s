@@ -33,65 +33,51 @@ func init() {
 }
 
 // FetchCfnEvents calls the CloudFormation DescribeStackEvents API and converts
-// the response into a FetchResult with pagination support. Each call returns up
-// to maxEvents (200) items. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for continuation.
+// the response into a FetchResult with pagination support. A single API call is
+// made per invocation; IsTruncated and NextToken are forwarded as pagination
+// metadata for the caller to request the next page.
 func FetchCfnEvents(
 	ctx context.Context,
 	api CFNDescribeStackEventsAPI,
 	stackName string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	const maxEvents = 200
-
-	var resources []resource.Resource
-	var nextToken *string
+	input := &cloudformation.DescribeStackEventsInput{
+		StackName: &stackName,
+	}
 	if continuationToken != "" {
-		nextToken = &continuationToken
+		input.NextToken = &continuationToken
 	}
 
-	for {
-		input := &cloudformation.DescribeStackEventsInput{
-			StackName: &stackName,
-			NextToken: nextToken,
-		}
+	output, err := api.DescribeStackEvents(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("describing CloudFormation stack events for %s: %w", stackName, err)
+	}
 
-		output, err := api.DescribeStackEvents(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing CloudFormation stack events for %s: %w", stackName, err)
-		}
+	var resources []resource.Resource
+	for _, event := range output.StackEvents {
+		resources = append(resources, convertCfnEvent(event))
+	}
 
-		for _, event := range output.StackEvents {
-			resources = append(resources, convertCfnEvent(event))
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
 
-			if len(resources) >= maxEvents {
-				apiNextToken := ""
-				if output.NextToken != nil {
-					apiNextToken = *output.NextToken
-				}
-				return resource.FetchResult{
-					Resources: resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: apiNextToken != "",
-						NextToken:   apiNextToken,
-						PageSize:    len(resources),
-					},
-				}, nil
-			}
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
 			PageSize:    len(resources),
+			TotalHint:   totalHint,
 		},
 	}, nil
 }
