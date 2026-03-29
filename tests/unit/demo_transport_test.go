@@ -1865,3 +1865,115 @@ func TestDemoTransport_S3FolderNavigation(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Test 67: EC2 DescribeVolumes (ec2query protocol, XML)
+// ---------------------------------------------------------------------------
+
+func TestDemoTransport_DescribeVolumes(t *testing.T) {
+	cfg := demo.NewDemoAWSConfig()
+	client := ec2.NewFromConfig(cfg)
+
+	output, err := client.DescribeVolumes(context.Background(), &ec2.DescribeVolumesInput{})
+	if err != nil {
+		t.Fatalf("DescribeVolumes returned unexpected error: %v", err)
+	}
+	if len(output.Volumes) != 5 {
+		t.Fatalf("DescribeVolumes returned %d volumes; want 5", len(output.Volumes))
+	}
+
+	first := output.Volumes[0]
+	if first.VolumeId == nil {
+		t.Fatal("first volume VolumeId is nil")
+	}
+	if *first.VolumeId != "vol-0a1b2c3d4e5f60001" {
+		t.Errorf("first volume VolumeId = %q; want %q", *first.VolumeId, "vol-0a1b2c3d4e5f60001")
+	}
+	if string(first.State) != "in-use" {
+		t.Errorf("first volume State = %q; want %q", string(first.State), "in-use")
+	}
+	if string(first.VolumeType) != "gp3" {
+		t.Errorf("first volume VolumeType = %q; want %q", string(first.VolumeType), "gp3")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 68: EC2 DescribeSnapshots (ec2query protocol, XML)
+// ---------------------------------------------------------------------------
+
+func TestDemoTransport_DescribeSnapshots(t *testing.T) {
+	cfg := demo.NewDemoAWSConfig()
+	client := ec2.NewFromConfig(cfg)
+
+	output, err := client.DescribeSnapshots(context.Background(), &ec2.DescribeSnapshotsInput{})
+	if err != nil {
+		t.Fatalf("DescribeSnapshots returned unexpected error: %v", err)
+	}
+	if len(output.Snapshots) != 4 {
+		t.Fatalf("DescribeSnapshots returned %d snapshots; want 4", len(output.Snapshots))
+	}
+
+	first := output.Snapshots[0]
+	if first.SnapshotId == nil {
+		t.Fatal("first snapshot SnapshotId is nil")
+	}
+	if *first.SnapshotId != "snap-0a1b2c3d4e5f60001" {
+		t.Errorf("first snapshot SnapshotId = %q; want %q", *first.SnapshotId, "snap-0a1b2c3d4e5f60001")
+	}
+	if string(first.State) != "completed" {
+		t.Errorf("first snapshot State = %q; want %q", string(first.State), "completed")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 69: EC2 DescribeImages (ec2query protocol, XML)
+// ---------------------------------------------------------------------------
+
+func TestDemoTransport_DescribeImages(t *testing.T) {
+	cfg := demo.NewDemoAWSConfig()
+	client := ec2.NewFromConfig(cfg)
+
+	output, err := client.DescribeImages(context.Background(), &ec2.DescribeImagesInput{})
+	if err != nil {
+		t.Fatalf("DescribeImages returned unexpected error: %v", err)
+	}
+	if len(output.Images) != 4 {
+		t.Fatalf("DescribeImages returned %d images; want 4", len(output.Images))
+	}
+
+	first := output.Images[0]
+	if first.ImageId == nil {
+		t.Fatal("first image ImageId is nil")
+	}
+	if *first.ImageId != "ami-0a1b2c3d4e5f60001" {
+		t.Errorf("first image ImageId = %q; want %q", *first.ImageId, "ami-0a1b2c3d4e5f60001")
+	}
+	if string(first.State) != "available" {
+		t.Errorf("first image State = %q; want %q", string(first.State), "available")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 70: CloudTrail LookupEvents (awsjson11 protocol)
+// ---------------------------------------------------------------------------
+
+func TestDemoTransport_LookupEvents(t *testing.T) {
+	cfg := demo.NewDemoAWSConfig()
+	client := cloudtrail.NewFromConfig(cfg)
+
+	output, err := client.LookupEvents(context.Background(), &cloudtrail.LookupEventsInput{})
+	if err != nil {
+		t.Fatalf("LookupEvents returned unexpected error: %v", err)
+	}
+	if len(output.Events) != 6 {
+		t.Fatalf("LookupEvents returned %d events; want 6", len(output.Events))
+	}
+
+	first := output.Events[0]
+	if first.EventName == nil {
+		t.Fatal("first event EventName is nil")
+	}
+	if *first.EventName != "CreateBucket" {
+		t.Errorf("first event EventName = %q; want %q", *first.EventName, "CreateBucket")
+	}
+}

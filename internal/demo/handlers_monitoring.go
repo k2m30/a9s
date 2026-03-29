@@ -112,4 +112,36 @@ func registerCloudTrailHandlers(t *Transport) {
 
 		return JSONResponse(map[string]interface{}{"trailList": list})
 	})
+
+	t.Handle("cloudtrail", "LookupEvents", func(_ *http.Request) (*http.Response, error) {
+		resources := demoData["ct-events"]()
+		events := ExtractSDK[cloudtrailtypes.Event](resources)
+
+		eventList := make([]map[string]interface{}, 0, len(events))
+		for _, ev := range events {
+			m := map[string]interface{}{
+				"EventId":     aws.ToString(ev.EventId),
+				"EventName":   aws.ToString(ev.EventName),
+				"EventSource": aws.ToString(ev.EventSource),
+				"ReadOnly":    aws.ToString(ev.ReadOnly),
+				"Username":    aws.ToString(ev.Username),
+			}
+			if ev.EventTime != nil {
+				m["EventTime"] = float64(ev.EventTime.Unix())
+			}
+			if len(ev.Resources) > 0 {
+				resList := make([]map[string]interface{}, 0, len(ev.Resources))
+				for _, r := range ev.Resources {
+					resList = append(resList, map[string]interface{}{
+						"ResourceType": aws.ToString(r.ResourceType),
+						"ResourceName": aws.ToString(r.ResourceName),
+					})
+				}
+				m["Resources"] = resList
+			}
+			eventList = append(eventList, m)
+		}
+
+		return JSONResponse(map[string]interface{}{"Events": eventList})
+	})
 }
