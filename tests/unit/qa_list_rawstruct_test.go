@@ -1243,3 +1243,169 @@ var (
 	_ ssmtypes.ParameterMetadata
 	_ wafv2types.WebACLSummary
 )
+
+// ---------------------------------------------------------------------------
+// TestQA_ListRawStruct_EBSVolume: VolumeId, State, AvailabilityZone from RawStruct
+// ---------------------------------------------------------------------------
+
+func TestQA_ListRawStruct_EBSVolume(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("ebs")
+
+	vol := realisticVolume()
+	res := resource.Resource{
+		ID:     "vol-111aabbcc",
+		Name:   "prod-data-vol",
+		Status: "in-use",
+		Fields: map[string]string{
+			"volume_id":   "vol-111aabbcc",
+			"name":        "prod-data-vol",
+			"state":       "in-use",
+			"size":        "100",
+			"type":        "gp3",
+			"iops":        "3000",
+			"encrypted":   "true",
+			"attached_to": "i-0abc123456def789",
+			"az":          "us-east-1a",
+			"created":     "2025-03-10 14:00",
+		},
+		RawStruct: vol,
+	}
+
+	view := newListModel(t, "ebs", cfg, []resource.Resource{res})
+
+	// VolumeId from RawStruct
+	if !strings.Contains(view, "vol-111aabbcc") {
+		t.Errorf("EBS Volume list should contain volume ID from RawStruct, got:\n%s", view)
+	}
+	// State from RawStruct (in-use)
+	if !strings.Contains(view, "in-use") {
+		t.Errorf("EBS Volume list should contain 'in-use' state from RawStruct, got:\n%s", view)
+	}
+	// AvailabilityZone from RawStruct
+	if !strings.Contains(view, "us-east-1a") {
+		t.Errorf("EBS Volume list should contain AZ from RawStruct, got:\n%s", view)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestQA_ListRawStruct_EBSSnapshot: SnapshotId, State, VolumeId from RawStruct
+// ---------------------------------------------------------------------------
+
+func TestQA_ListRawStruct_EBSSnapshot(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("ebs-snap")
+
+	snap := realisticSnapshot()
+	res := resource.Resource{
+		ID:     "snap-0aabb11cc",
+		Name:   "prod-snap-daily",
+		Status: "completed",
+		Fields: map[string]string{
+			"snapshot_id": "snap-0aabb11cc",
+			"name":        "prod-snap-daily",
+			"state":       "completed",
+			"volume_id":   "vol-111aabbcc",
+			"size":        "100",
+			"encrypted":   "true",
+			"description": "Daily backup snapshot",
+			"started":     "2025-02-20 09:15",
+			"progress":    "100%",
+		},
+		RawStruct: snap,
+	}
+
+	view := newListModel(t, "ebs-snap", cfg, []resource.Resource{res})
+
+	// SnapshotId from RawStruct
+	if !strings.Contains(view, "snap-0aabb11cc") {
+		t.Errorf("EBS Snapshot list should contain snapshot ID from RawStruct, got:\n%s", view)
+	}
+	// State from RawStruct (completed)
+	if !strings.Contains(view, "completed") {
+		t.Errorf("EBS Snapshot list should contain 'completed' state from RawStruct, got:\n%s", view)
+	}
+	// VolumeId from RawStruct
+	if !strings.Contains(view, "vol-111aabbcc") {
+		t.Errorf("EBS Snapshot list should contain volume ID from RawStruct, got:\n%s", view)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestQA_ListRawStruct_AMI: ImageId, Name, Architecture from RawStruct
+// ---------------------------------------------------------------------------
+
+func TestQA_ListRawStruct_AMI(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("ami")
+
+	img := realisticImage()
+	res := resource.Resource{
+		ID:     "ami-0abc111222333444a",
+		Name:   "my-web-server-ami",
+		Status: "available",
+		Fields: map[string]string{
+			"image_id":         "ami-0abc111222333444a",
+			"name":             "my-web-server-ami",
+			"state":            "available",
+			"architecture":     "x86_64",
+			"platform":         "Linux/UNIX",
+			"root_device_type": "ebs",
+			"creation_date":    "2025-01-15T10:30:00.000Z",
+			"public":           "false",
+		},
+		RawStruct: img,
+	}
+
+	view := newListModel(t, "ami", cfg, []resource.Resource{res})
+
+	// Name from RawStruct (Image.Name is a direct field)
+	if !strings.Contains(view, "my-web-server-ami") {
+		t.Errorf("AMI list should contain AMI name from RawStruct, got:\n%s", view)
+	}
+	// ImageId from RawStruct
+	if !strings.Contains(view, "ami-0abc111222333444a") {
+		t.Errorf("AMI list should contain image ID from RawStruct, got:\n%s", view)
+	}
+	// State from RawStruct
+	if !strings.Contains(view, "available") {
+		t.Errorf("AMI list should contain 'available' state from RawStruct, got:\n%s", view)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestQA_ListRawStruct_CloudTrailEvent: EventName, EventSource from RawStruct
+// ---------------------------------------------------------------------------
+
+func TestQA_ListRawStruct_CloudTrailEvent(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("ct-events")
+
+	event := realisticCloudTrailEvent()
+	res := resource.Resource{
+		ID:     "evt-0001-abcd-1234-5678-abcdef012345",
+		Name:   "RunInstances",
+		Status: "false",
+		Fields: map[string]string{
+			"event_name":    "RunInstances",
+			"time":          "2025-03-15 12:00:00",
+			"user":          "admin",
+			"source":        "ec2.amazonaws.com",
+			"resource_type": "AWS::EC2::Instance",
+			"resource_name": "i-0abc123456def789",
+			"read_only":     "false",
+		},
+		RawStruct: event,
+	}
+
+	view := newListModel(t, "ct-events", cfg, []resource.Resource{res})
+
+	// EventName from RawStruct
+	if !strings.Contains(view, "RunInstances") {
+		t.Errorf("CloudTrail Event list should contain event name from RawStruct, got:\n%s", view)
+	}
+	// EventSource from RawStruct
+	if !strings.Contains(view, "ec2.amazonaws.com") {
+		t.Errorf("CloudTrail Event list should contain event source from RawStruct, got:\n%s", view)
+	}
+}

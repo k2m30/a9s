@@ -204,5 +204,63 @@ func computeDefaultViews() map[string]ViewDef {
 				"timestamp", "message",
 			},
 		},
+		"ebs": {
+			List: []ListColumn{
+				{Title: "Name", Path: "", Width: 24},
+				{Title: "Volume ID", Path: "VolumeId", Width: 22},
+				{Title: "State", Path: "State", Width: 12},
+				{Title: "Size (GiB)", Path: "Size", Width: 10},
+				{Title: "Type", Path: "VolumeType", Width: 8},
+				{Title: "IOPS", Path: "Iops", Width: 8},
+				{Title: "Encrypted", Path: "Encrypted", Width: 10},
+				{Title: "Attached To", Path: "Attachments", Width: 20},
+				{Title: "AZ", Path: "AvailabilityZone", Width: 16},
+				{Title: "Created", Path: "CreateTime", Width: 18},
+			},
+			Detail: []string{
+				"VolumeId", "State", "Size", "VolumeType", "Iops", "Throughput",
+				"Encrypted", "KmsKeyId", "MultiAttachEnabled",
+				"AvailabilityZone", "CreateTime",
+				"Attachments", "Tags",
+			},
+		},
+		"ebs-snap": {
+			List: []ListColumn{
+				{Title: "Name", Path: "", Width: 24},
+				{Title: "Snapshot ID", Path: "SnapshotId", Width: 24},
+				{Title: "State", Path: "State", Width: 12},
+				{Title: "Volume ID", Path: "VolumeId", Width: 22},
+				{Title: "Size (GiB)", Path: "VolumeSize", Width: 10},
+				{Title: "Encrypted", Path: "Encrypted", Width: 10},
+				{Title: "Description", Path: "Description", Width: 30},
+				{Title: "Started", Path: "StartTime", Width: 18},
+				{Title: "Progress", Path: "Progress", Width: 10},
+			},
+			Detail: []string{
+				"SnapshotId", "State", "VolumeId", "VolumeSize",
+				"Description", "Encrypted", "KmsKeyId",
+				"OwnerId", "Progress", "StartTime", "Tags",
+			},
+		},
+		"ami": {
+			List: []ListColumn{
+				{Title: "Name", Path: "Name", Width: 32},
+				{Title: "Image ID", Path: "ImageId", Width: 22},
+				{Title: "State", Path: "State", Width: 12},
+				{Title: "Arch", Path: "Architecture", Width: 10},
+				{Title: "Platform", Path: "PlatformDetails", Width: 16},
+				{Title: "Root Device", Path: "RootDeviceType", Width: 14},
+				{Title: "Created", Path: "CreationDate", Width: 22},
+				{Title: "Public", Path: "Public", Width: 8},
+			},
+			Detail: []string{
+				"ImageId", "Name", "State", "Description",
+				"Architecture", "PlatformDetails", "RootDeviceType",
+				"VirtualizationType", "EnaSupport", "BootMode",
+				"CreationDate", "DeprecationTime", "Public",
+				"OwnerId", "ImageLocation",
+				"BlockDeviceMappings", "Tags",
+			},
+		},
 	}
 }

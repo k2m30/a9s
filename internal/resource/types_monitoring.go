@@ -51,5 +51,20 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 			},
 		},
+		{
+			Name:      "CloudTrail Events",
+			ShortName: "ct-events",
+			Aliases:   []string{"ct-events", "cloudtrail-events", "events"},
+			Category:  "MONITORING",
+			Columns: []Column{
+				{Key: "time", Title: "Time", Width: 22, Sortable: true},
+				{Key: "event_name", Title: "Event Name", Width: 28, Sortable: true},
+				{Key: "user", Title: "User", Width: 24, Sortable: true},
+				{Key: "source", Title: "Source", Width: 28, Sortable: true},
+				{Key: "resource_type", Title: "Resource Type", Width: 20, Sortable: true},
+				{Key: "resource_name", Title: "Resource Name", Width: 24, Sortable: true},
+				{Key: "read_only", Title: "Read Only", Width: 10, Sortable: true},
+			},
+		},
 	}
 }

@@ -9,6 +9,7 @@ import (
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	codepipelinetypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
@@ -1424,3 +1425,271 @@ func TestQA_Detail_Backup_FrameTitle(t *testing.T) {
 // Suppress "imported and not used" for time package (used by testTime)
 // ===========================================================================
 var _ = time.Now
+
+// ===========================================================================
+// Realistic SDK struct builders for EBS, Snapshots, AMIs, CloudTrail Events
+// ===========================================================================
+
+func realisticVolume() ec2types.Volume {
+	createTime := time.Date(2025, 3, 10, 14, 0, 0, 0, time.UTC)
+	return ec2types.Volume{
+		VolumeId:         ptrString("vol-111aabbcc"),
+		State:            ec2types.VolumeStateInUse,
+		Size:             ptrInt32(100),
+		VolumeType:       ec2types.VolumeTypeGp3,
+		Iops:             ptrInt32(3000),
+		Encrypted:        ptrBool(true),
+		AvailabilityZone: ptrString("us-east-1a"),
+		CreateTime:       &createTime,
+		Tags: []ec2types.Tag{
+			{Key: ptrString("Name"), Value: ptrString("prod-data-vol")},
+			{Key: ptrString("env"), Value: ptrString("production")},
+		},
+		Attachments: []ec2types.VolumeAttachment{
+			{
+				InstanceId: ptrString("i-0abc123456def789"),
+				State:      ec2types.VolumeAttachmentStateAttached,
+				Device:     ptrString("/dev/xvdf"),
+			},
+		},
+	}
+}
+
+func realisticSnapshot() ec2types.Snapshot {
+	startTime := time.Date(2025, 2, 20, 9, 15, 0, 0, time.UTC)
+	return ec2types.Snapshot{
+		SnapshotId:  ptrString("snap-0aabb11cc"),
+		State:       ec2types.SnapshotStateCompleted,
+		VolumeId:    ptrString("vol-111aabbcc"),
+		VolumeSize:  ptrInt32(100),
+		Encrypted:   ptrBool(true),
+		Description: ptrString("Daily backup snapshot"),
+		StartTime:   &startTime,
+		Progress:    ptrString("100%"),
+		OwnerId:     ptrString("123456789012"),
+		Tags: []ec2types.Tag{
+			{Key: ptrString("Name"), Value: ptrString("prod-snap-daily")},
+		},
+	}
+}
+
+func realisticImage() ec2types.Image {
+	return ec2types.Image{
+		ImageId:         ptrString("ami-0abc111222333444a"),
+		Name:            ptrString("my-web-server-ami"),
+		State:           ec2types.ImageStateAvailable,
+		Architecture:    ec2types.ArchitectureValuesX8664,
+		PlatformDetails: ptrString("Linux/UNIX"),
+		RootDeviceType:  ec2types.DeviceTypeEbs,
+		CreationDate:    ptrString("2025-01-15T10:30:00.000Z"),
+		Public:          ptrBool(false),
+		OwnerId:         ptrString("123456789012"),
+		Description:     ptrString("Web server base image"),
+	}
+}
+
+func realisticCloudTrailEvent() cloudtrailtypes.Event {
+	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
+	return cloudtrailtypes.Event{
+		EventId:     ptrString("evt-0001-abcd-1234-5678-abcdef012345"),
+		EventName:   ptrString("RunInstances"),
+		EventTime:   &eventTime,
+		EventSource: ptrString("ec2.amazonaws.com"),
+		Username:    ptrString("admin"),
+		ReadOnly:    ptrString("false"),
+		Resources: []cloudtrailtypes.Resource{
+			{
+				ResourceType: ptrString("AWS::EC2::Instance"),
+				ResourceName: ptrString("i-0abc123456def789"),
+			},
+		},
+	}
+}
+
+// ===========================================================================
+// 23. EBS Volume
+// ===========================================================================
+
+func TestQA_Detail_EBSVolume_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	vol := realisticVolume()
+	res := buildResource("vol-111aabbcc", "prod-data-vol", vol)
+	cfg := detailConfigForType("ebs")
+	m := newDetailModel(res, "ebs", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"VolumeId", "vol-111aabbcc",
+		"State", "in-use",
+		"AvailabilityZone", "us-east-1a",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EBS Volume detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_EBSVolume_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	vol := ec2types.Volume{}
+	res := buildResource("empty-vol", "empty-vol", vol)
+	cfg := detailConfigForType("ebs")
+	m := newDetailModel(res, "ebs", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EBS Volume detail should not be empty even with nil fields")
+	}
+}
+
+func TestQA_Detail_EBSVolume_FrameTitle(t *testing.T) {
+	vol := realisticVolume()
+	res := buildResource("vol-111aabbcc", "prod-data-vol", vol)
+	cfg := detailConfigForType("ebs")
+	m := newDetailModel(res, "ebs", cfg)
+
+	if title := m.FrameTitle(); title != "prod-data-vol" {
+		t.Errorf("EBS Volume FrameTitle expected %q, got %q", "prod-data-vol", title)
+	}
+}
+
+// ===========================================================================
+// 24. EBS Snapshot
+// ===========================================================================
+
+func TestQA_Detail_EBSSnapshot_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	snap := realisticSnapshot()
+	res := buildResource("snap-0aabb11cc", "prod-snap-daily", snap)
+	cfg := detailConfigForType("ebs-snap")
+	m := newDetailModel(res, "ebs-snap", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"SnapshotId", "snap-0aabb11cc",
+		"State", "completed",
+		"VolumeId", "vol-111aabbcc",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("EBS Snapshot detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_EBSSnapshot_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	snap := ec2types.Snapshot{}
+	res := buildResource("empty-snap", "empty-snap", snap)
+	cfg := detailConfigForType("ebs-snap")
+	m := newDetailModel(res, "ebs-snap", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("EBS Snapshot detail should not be empty even with nil fields")
+	}
+}
+
+func TestQA_Detail_EBSSnapshot_FrameTitle(t *testing.T) {
+	snap := realisticSnapshot()
+	res := buildResource("snap-0aabb11cc", "prod-snap-daily", snap)
+	cfg := detailConfigForType("ebs-snap")
+	m := newDetailModel(res, "ebs-snap", cfg)
+
+	if title := m.FrameTitle(); title != "prod-snap-daily" {
+		t.Errorf("EBS Snapshot FrameTitle expected %q, got %q", "prod-snap-daily", title)
+	}
+}
+
+// ===========================================================================
+// 25. AMI
+// ===========================================================================
+
+func TestQA_Detail_AMI_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	img := realisticImage()
+	res := buildResource("ami-0abc111222333444a", "my-web-server-ami", img)
+	cfg := detailConfigForType("ami")
+	m := newDetailModel(res, "ami", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"ImageId", "ami-0abc111222333444a",
+		"Name", "my-web-server-ami",
+		"State", "available",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("AMI detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_AMI_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	img := ec2types.Image{}
+	res := buildResource("empty-ami", "empty-ami", img)
+	cfg := detailConfigForType("ami")
+	m := newDetailModel(res, "ami", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("AMI detail should not be empty even with nil fields")
+	}
+}
+
+func TestQA_Detail_AMI_FrameTitle(t *testing.T) {
+	img := realisticImage()
+	res := buildResource("ami-0abc111222333444a", "my-web-server-ami", img)
+	cfg := detailConfigForType("ami")
+	m := newDetailModel(res, "ami", cfg)
+
+	if title := m.FrameTitle(); title != "my-web-server-ami" {
+		t.Errorf("AMI FrameTitle expected %q, got %q", "my-web-server-ami", title)
+	}
+}
+
+// ===========================================================================
+// 26. CloudTrail Event
+// ===========================================================================
+
+func TestQA_Detail_CloudTrailEvent_ViewContainsExpectedFields(t *testing.T) {
+	ensureNoColor(t)
+	event := realisticCloudTrailEvent()
+	res := buildResource("evt-0001-abcd-1234-5678-abcdef012345", "RunInstances", event)
+	cfg := detailConfigForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	view := m.View()
+	for _, expected := range []string{
+		"EventId", "evt-0001-abcd-1234-5678-abcdef012345",
+		"EventName", "RunInstances",
+		"EventSource", "ec2.amazonaws.com",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Errorf("CloudTrail Event detail should contain %q, got:\n%s", expected, view)
+		}
+	}
+}
+
+func TestQA_Detail_CloudTrailEvent_NilFields(t *testing.T) {
+	ensureNoColor(t)
+	event := cloudtrailtypes.Event{}
+	res := buildResource("empty-event", "empty-event", event)
+	cfg := detailConfigForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	view := m.View()
+	if view == "" {
+		t.Error("CloudTrail Event detail should not be empty even with nil fields")
+	}
+}
+
+func TestQA_Detail_CloudTrailEvent_FrameTitle(t *testing.T) {
+	event := realisticCloudTrailEvent()
+	res := buildResource("evt-0001-abcd-1234-5678-abcdef012345", "RunInstances", event)
+	cfg := detailConfigForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	if title := m.FrameTitle(); title != "RunInstances" {
+		t.Errorf("CloudTrail Event FrameTitle expected %q, got %q", "RunInstances", title)
+	}
+}

@@ -570,14 +570,14 @@ func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Move cursor to item index 8 (EKS Node Groups, 0-indexed)
-	for i := 0; i < 8; i++ {
+	// Move cursor to item index 11 (EKS Node Groups, 0-indexed)
+	for i := 0; i < 11; i++ {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "EKS Node Groups") {
-		t.Errorf("item at cursor (index 8) should be visible after scrolling down, got:\n%s", plain)
+		t.Errorf("item at cursor (index 11) should be visible after scrolling down, got:\n%s", plain)
 	}
 }
 
@@ -859,8 +859,8 @@ func TestQA_MainMenu_ScrollAccountsForHeaders(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 8})
 
-	// Navigate to item index 7 (EKS Clusters, first CONTAINERS item)
-	for i := 0; i < 7; i++ {
+	// Navigate to item index 10 (EKS Clusters, first CONTAINERS item)
+	for i := 0; i < 10; i++ {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 

@@ -3,7 +3,7 @@ title: "Resource Types"
 type: resources
 ---
 
-a9s supports **62 AWS resource types** across **12 service categories**. All API calls are read-only.
+a9s supports **66 AWS resource types** across **12 service categories**. All API calls are read-only.
 
 ## Compute
 
@@ -16,6 +16,9 @@ a9s supports **62 AWS resource types** across **12 service categories**. All API
 | Lambda Functions | `lambda` |
 | Auto Scaling Groups | `asg` |
 | Elastic Beanstalk | `eb` |
+| EBS Volumes | `ebs` |
+| EBS Snapshots | `ebs-snap` |
+| AMIs | `ami` |
 
 ## Containers
 
@@ -63,6 +66,7 @@ a9s supports **62 AWS resource types** across **12 service categories**. All API
 | CloudWatch Alarms | `alarm` |
 | CloudWatch Log Groups | `logs` |
 | CloudTrail Trails | `trail` |
+| CloudTrail Events | `ct-events` |
 
 ## Messaging
 

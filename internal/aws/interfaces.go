@@ -584,3 +584,23 @@ type STSGetCallerIdentityAPI interface {
 type IAMListAccountAliasesAPI interface {
 	ListAccountAliases(ctx context.Context, params *iam.ListAccountAliasesInput, optFns ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error)
 }
+
+// EC2DescribeVolumesAPI defines the interface for the EC2 DescribeVolumes operation.
+type EC2DescribeVolumesAPI interface {
+	DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
+}
+
+// EC2DescribeSnapshotsAPI defines the interface for the EC2 DescribeSnapshots operation.
+type EC2DescribeSnapshotsAPI interface {
+	DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
+}
+
+// EC2DescribeImagesAPI defines the interface for the EC2 DescribeImages operation.
+type EC2DescribeImagesAPI interface {
+	DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error)
+}
+
+// CloudTrailLookupEventsAPI defines the interface for the CloudTrail LookupEvents operation.
+type CloudTrailLookupEventsAPI interface {
+	LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error)
+}

@@ -443,7 +443,7 @@ func TestContentReveal_FrameTitle(t *testing.T) {
 func TestContentMainMenu_AllSevenResourceTypes(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)
-	// Use a tall viewport so all 62 resource types + category headers fit
+	// Use a tall viewport so all 66 resource types + category headers fit
 	m.SetSize(80, 100)
 	out := m.View()
 

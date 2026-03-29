@@ -145,6 +145,10 @@ func main() {
 		{"role_policies", "awsclient.RolePolicyRow", reflect.TypeOf(awsclient.RolePolicyRow{})},
 		{"iam_group_members", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
 		{"elb_listener_rules", "elbv2types.Rule", reflect.TypeOf(elbv2types.Rule{})},
+		{"ebs", "ec2types.Volume", reflect.TypeOf(ec2types.Volume{})},
+		{"ebs-snap", "ec2types.Snapshot", reflect.TypeOf(ec2types.Snapshot{})},
+		{"ami", "ec2types.Image", reflect.TypeOf(ec2types.Image{})},
+		{"ct-events", "cloudtrailtypes.Event", reflect.TypeOf(cloudtrailtypes.Event{})},
 	}
 
 	fmt.Println("# views_reference.yaml")
