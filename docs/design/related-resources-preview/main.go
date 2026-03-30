@@ -1,26 +1,23 @@
-// Related Resources View -- static preview mockups.
+// Related Resources: Two-Column Detail View -- static preview mockups.
 // Run with: go run ./docs/design/related-resources-preview/
 //
-// Renders all key states of the related-resources list using Lipgloss v2.
-// The related-resources view reuses the EXACT main menu pattern:
-//   - Resource type name on the left
-//   - Optional count in parentheses inline after the name (cheap lookups only)
-//   - Entire row dimmed if unavailable (cursor skips)
-//   - Normal rendering if available
-//   - NO "Checking...", NO "Unavailable", NO "Search >", NO spinners
+// The related-resources feature embeds a right column INSIDE the detail view.
+// Left column = detail fields with navigable links (underlined).
+// Right column = reverse & algorithmic related resource types.
 //
 // Mockups:
-//   1. List -- Initial load (all rows dim, checks in progress)
-//   2. List -- Partially loaded (some checks complete)
-//   3. List -- Fully loaded (120 cols)
-//   4. List -- Fully loaded (80 cols)
-//   5. List -- Filter active
-//   6. Smart Enter: filtered resource list (multiple results)
-//   7. Smart Enter: direct to detail (single result)
-//   8. Deep navigation with depth indicator (VPC, 18 types)
-//   9. All unavailable state
-//  10. Long list with scroll indicator (27 types, 80 cols)
-//  11. Help screen for related list
+//  1. EC2 detail -- two-column, left focused, dim separator (120 cols)
+//  2. EC2 detail -- two-column, right column focused, accent separator (120 cols)
+//  3. EC2 detail -- right column hidden (r toggled off, 120 cols)
+//  4. RDS detail -- different resource type (120 cols)
+//  5. VPC detail -- heavy right column with scroll (120 cols)
+//  6. Stacked layout (80 cols, narrow terminal)
+//  7. Initial load -- right column all dim (120 cols)
+//  8. Deep navigation -- depth indicator (120 cols)
+//  9. Lambda detail -- algorithmic relationships (120 cols)
+// 10. Smart Enter: filtered list from right column (120 cols)
+// 11. Smart Enter: direct to detail from left column navigable field
+// 12. Help screen for two-column detail view (120 cols)
 package main
 
 import (
@@ -63,10 +60,15 @@ var (
 	secStyle     = lipgloss.NewStyle().Foreground(colDetailSec).Bold(true)
 	kStyle       = lipgloss.NewStyle().Foreground(colDetailKey)
 	vStyle       = lipgloss.NewStyle().Foreground(colDetailVal)
+	navStyle     = lipgloss.NewStyle().Foreground(colAccent).Underline(true) // navigable value
 	greenStyle   = lipgloss.NewStyle().Foreground(colGreen)
 	helpKeyStyle = lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
 	helpCatStyle = lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
 )
+
+// -- Constants --
+
+const rightColWidth = 32 // fixed width for the right column
 
 // -- Helpers --
 
@@ -155,11 +157,6 @@ func renderHeaderDepth(depth int, profile, region string, w int) string {
 		Width(w).Padding(0, 1).Render(content)
 }
 
-func renderHeaderFilter(profile, region, version string, w int, filterText string) string {
-	right := lipgloss.NewStyle().Foreground(colYellow).Bold(true).Render("/" + filterText + "\u2588")
-	return renderHeader(profile, region, version, w, right)
-}
-
 // -- Framed box with centered title in top border --
 
 func renderFramedBox(lines []string, title string, w int) string {
@@ -221,29 +218,83 @@ func divider(label string) string {
 		"\n\n"
 }
 
-// -- Row state --
-// Only three visual states, matching the main menu exactly.
+// -- Detail field types --
+
+type fieldKind int
+
+const (
+	fieldPlain     fieldKind = iota // non-navigable scalar
+	fieldNavigable                  // navigable scalar (value contains a resource ID/ARN)
+	fieldSection                    // section header (e.g., "State:", "Tags:")
+	fieldSubPlain                   // sub-field plain (indented)
+	fieldSubNav                     // sub-field navigable
+	fieldSubText                    // sub-field plain text (no key, just value like array items)
+)
+
+type detailField struct {
+	key   string    // field key (e.g., "InstanceId", "VpcId")
+	value string    // field value (e.g., "i-0abc123", "vpc-0aaa111")
+	kind  fieldKind // determines rendering
+}
+
+// renderDetailField renders a single detail field row padded to leftW.
+// When selected=true, the entire row gets the cursor highlight.
+func renderDetailField(f detailField, leftW int, selected bool) string {
+	keyColW := 22
+
+	var rendered string
+	switch f.kind {
+	case fieldSection:
+		rendered = " " + secStyle.Render(f.key+":")
+	case fieldSubPlain:
+		rendered = "     " + kStyle.Render(padOrTrunc(f.key+":", keyColW-4)) + vStyle.Render(f.value)
+	case fieldSubNav:
+		rendered = "     " + kStyle.Render(padOrTrunc(f.key+":", keyColW-4)) + navStyle.Render(f.value)
+	case fieldSubText:
+		rendered = "     " + vStyle.Render(f.value)
+	case fieldNavigable:
+		rendered = " " + kStyle.Render(padOrTrunc(f.key+":", keyColW)) + navStyle.Render(f.value)
+	default: // fieldPlain
+		rendered = " " + kStyle.Render(padOrTrunc(f.key+":", keyColW)) + vStyle.Render(f.value)
+	}
+
+	if selected {
+		// Build plain text for selection highlighting
+		var plainText string
+		switch f.kind {
+		case fieldSection:
+			plainText = " " + f.key + ":"
+		case fieldSubPlain, fieldSubNav:
+			plainText = "     " + padOrTrunc(f.key+":", keyColW-4) + f.value
+		case fieldSubText:
+			plainText = "     " + f.value
+		default:
+			plainText = " " + padOrTrunc(f.key+":", keyColW) + f.value
+		}
+		return cellSelected.Render(pad(plainText, leftW))
+	}
+
+	return pad(rendered, leftW)
+}
+
+// -- Related row in right column --
 
 type rowState int
 
 const (
-	rowAvailable rowState = iota // normal text, has related resources
-	rowDim                       // dimmed, no related resources or not yet checked
-	rowSelected                  // blue background, cursor is here
+	rowAvailable rowState = iota
+	rowDim
+	rowSelected
 )
 
-type listRow struct {
+type relatedRow struct {
 	label string
-	count string // "(3)", "(1)", "(20+)" for cheap lookups; "" for expensive/no-count
+	count string // "(3)", "(1)", etc. or "" for expensive/no-count
 	state rowState
 }
 
-// renderListRow renders a single row: label left-aligned with count inline after the name.
-// Matches the main menu pattern exactly: "    Security Groups (3)" left-aligned, nothing on the right.
-func renderListRow(r listRow, innerW int) string {
-	indent := "    "
-
-	// Build the text: "    Label" or "    Label (N)"
+func renderRelatedRow(r relatedRow, rightW int) string {
+	indent := "  "
 	text := indent + r.label
 	if r.count != "" {
 		text += " " + r.count
@@ -251,356 +302,595 @@ func renderListRow(r listRow, innerW int) string {
 
 	switch r.state {
 	case rowSelected:
-		return cellSelected.Render(pad(text, innerW))
+		return cellSelected.Render(pad(text, rightW))
 	case rowDim:
-		return cellDim.Render(pad(text, innerW))
-	default: // rowAvailable
-		return cellNormal.Render(pad(text, innerW))
+		return cellDim.Render(pad(text, rightW))
+	default:
+		return cellNormal.Render(pad(text, rightW))
 	}
 }
 
-// renderList renders a complete list of rows inside a framed box
-func renderList(rows []listRow, title string, w int, extraLines []string) string {
+// -- Two-column framed box --
+// Renders a two-column layout inside a framed box.
+// Left column: detail fields. Right column: related resource types.
+// A thin separator (|) divides them. Top/bottom borders span full width.
+
+func renderTwoColBox(
+	leftFields []detailField,
+	selectedIdx int, // which left field has cursor (-1 = none)
+	rightRows []relatedRow,
+	title string,
+	w int,
+	rightFocused bool, // true = right column focused, changes separator color
+) string {
+	// Separator color: dim when left focused, accent when right focused
+	sepColor := colSep // #414868 dim
+	if rightFocused {
+		sepColor = colAccent // #7aa2f7 accent
+	}
+	sepChar := lipgloss.NewStyle().Foreground(sepColor).Render("\u2502")
+	innerW := w - 2
+	rightW := rightColWidth
+	leftW := innerW - rightW - 1 // -1 for separator
+
+	// Determine the number of content lines (max of left and right)
+	numLines := len(leftFields)
+	if len(rightRows) > numLines {
+		numLines = len(rightRows)
+	}
+	numLines++ // bottom padding line
+
+	// Build content lines
+	var contentLines []string
+	for i := 0; i < numLines; i++ {
+		var leftPart string
+		if i < len(leftFields) {
+			leftPart = renderDetailField(leftFields[i], leftW, i == selectedIdx)
+		} else {
+			leftPart = strings.Repeat(" ", leftW)
+		}
+
+		var rightPart string
+		if i < len(rightRows) {
+			rightPart = renderRelatedRow(rightRows[i], rightW)
+		} else {
+			rightPart = strings.Repeat(" ", rightW)
+		}
+
+		contentLines = append(contentLines, leftPart+sepChar+rightPart)
+	}
+
+	return renderFramedBox(contentLines, title, w)
+}
+
+// -- Single-column detail box (right column hidden) --
+
+func renderSingleColBox(
+	fields []detailField,
+	selectedIdx int,
+	title string,
+	w int,
+) string {
 	innerW := w - 2
 	var lines []string
-	for _, r := range rows {
-		lines = append(lines, renderListRow(r, innerW))
-	}
-	if len(extraLines) > 0 {
-		lines = append(lines, extraLines...)
+	for i, f := range fields {
+		lines = append(lines, renderDetailField(f, innerW, i == selectedIdx))
 	}
 	lines = append(lines, "") // bottom padding
 	return renderFramedBox(lines, title, w)
 }
 
-// -- Mockup 1: Initial Load -- all rows dim (checks in progress) --
+// -- Stacked layout (narrow terminal) --
 
-func mockInitialLoad() string {
-	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
-
-	rows := []listRow{
-		{label: "Security Groups", state: rowDim},
-		{label: "VPC", state: rowDim},
-		{label: "Subnet", state: rowDim},
-		{label: "Elastic IPs", state: rowDim},
-		{label: "Network Interfaces", state: rowDim},
-		{label: "Auto Scaling Groups", state: rowDim},
-		{label: "Target Groups", state: rowDim},
-		{label: "CloudWatch Alarms", state: rowDim},
-		{label: "IAM Role", state: rowDim},
-		{label: "EKS Node Groups", state: rowDim},
-		{label: "Elastic Beanstalk", state: rowDim},
-		{label: "CloudTrail Events", state: rowDim},
+func renderStackedBox(
+	fields []detailField,
+	selectedFieldIdx int,
+	relRows []relatedRow,
+	title string,
+	w int,
+) string {
+	innerW := w - 2
+	var lines []string
+	for i, f := range fields {
+		lines = append(lines, renderDetailField(f, innerW, i == selectedFieldIdx))
 	}
 
-	box := renderList(rows, "related -- i-0abc123 (web-prod)", w, nil)
-	return header + "\n" + box
-}
+	// Separator line
+	sepLine := dimStyle.Render(" -- Related " + strings.Repeat("\u2500", innerW-13))
+	lines = append(lines, "")
+	lines = append(lines, sepLine)
+	lines = append(lines, "")
 
-// -- Mockup 2: Partially Loaded -- some forward checks resolved --
-
-func mockPartiallyLoaded() string {
-	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
-
-	rows := []listRow{
-		// Forward lookups resolved (cheap -- counts shown)
-		{label: "Security Groups", count: "(3)", state: rowSelected},
-		{label: "VPC", count: "(1)", state: rowAvailable},
-		{label: "Subnet", count: "(1)", state: rowAvailable},
-		// Still checking (dim)
-		{label: "Elastic IPs", state: rowDim},
-		{label: "Network Interfaces", state: rowDim},
-		{label: "Auto Scaling Groups", state: rowDim},
-		{label: "Target Groups", state: rowDim},
-		{label: "CloudWatch Alarms", state: rowDim},
-		{label: "IAM Role", state: rowDim},
-		{label: "EKS Node Groups", state: rowDim},
-		{label: "Elastic Beanstalk", state: rowDim},
-		{label: "CloudTrail Events", state: rowDim},
+	// Related rows (full width, same indent as right column)
+	for _, r := range relRows {
+		text := "  " + r.label
+		if r.count != "" {
+			text += " " + r.count
+		}
+		switch r.state {
+		case rowSelected:
+			lines = append(lines, cellSelected.Render(pad(text, innerW)))
+		case rowDim:
+			lines = append(lines, cellDim.Render(pad(text, innerW)))
+		default:
+			lines = append(lines, cellNormal.Render(pad(text, innerW)))
+		}
 	}
 
-	box := renderList(rows, "related -- i-0abc123 (web-prod)", w, nil)
-	return header + "\n" + box
+	lines = append(lines, "") // bottom padding
+	return renderFramedBox(lines, title, w)
 }
 
-// -- Mockup 3: Fully Loaded (120 cols) --
+// ============================================================
+// Mockups
+// ============================================================
 
-func mockFullyLoaded120() string {
+// -- Mockup 1: EC2 detail, two-column, left focused, cursor on InstanceId --
+
+func mockEC2LeftFocused() string {
 	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
 
-	rows := []listRow{
-		// Forward relationships -- cheap, counts shown
-		{label: "Security Groups", count: "(3)", state: rowSelected},
-		{label: "VPC", count: "(1)", state: rowAvailable},
-		{label: "Subnet", count: "(1)", state: rowAvailable},
-		{label: "Elastic IPs", count: "(1)", state: rowAvailable},
-		{label: "Network Interfaces", count: "(2)", state: rowAvailable},
-		// Reverse/expensive relationships -- no counts, just available
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupName", value: "web-sg", kind: fieldSubPlain},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "GroupName", value: "db-access-sg", kind: fieldSubPlain},
+		{key: "IamInstanceProfile", value: "", kind: fieldSection},
+		{key: "Arn", value: "arn:aws:iam::123456:role/web-role", kind: fieldSubNav},
+		{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		{key: "KeyName", value: "prod-keypair", kind: fieldPlain},
+		{key: "PrivateIpAddress", value: "10.0.48.175", kind: fieldPlain},
+		{key: "PublicIpAddress", value: "203.0.113.10", kind: fieldPlain},
+		{key: "LaunchTime", value: "2026-03-15 09:22:45", kind: fieldPlain},
+		{key: "Architecture", value: "x86_64", kind: fieldPlain},
+		{key: "Placement", value: "", kind: fieldSection},
+		{key: "AvailabilityZone", value: "us-east-1a", kind: fieldSubPlain},
+		{key: "Tenancy", value: "default", kind: fieldSubPlain},
+		{key: "Tags", value: "", kind: fieldSection},
+		{key: "Key", value: "Name", kind: fieldSubPlain},
+		{key: "Value", value: "web-prod", kind: fieldSubPlain},
+		{key: "Key", value: "Environment", kind: fieldSubPlain},
+		{key: "Value", value: "production", kind: fieldSubPlain},
+	}
+
+	related := []relatedRow{
 		{label: "Auto Scaling Groups", state: rowAvailable},
 		{label: "Target Groups", state: rowAvailable},
 		{label: "CloudWatch Alarms", state: rowAvailable},
-		{label: "IAM Role", state: rowAvailable},
-		// Unavailable -- dim, no text
+		{label: "CloudFormation Stacks", state: rowAvailable},
+		{label: "EBS Snapshots", state: rowAvailable},
+		{label: "Elastic IPs", count: "(1)", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
 		{label: "EKS Node Groups", state: rowDim},
 		{label: "Elastic Beanstalk", state: rowDim},
-		// CloudTrail -- just a normal row
-		{label: "CloudTrail Events", state: rowAvailable},
 	}
 
-	box := renderList(rows, "related -- i-0abc123 (web-prod)", w, nil)
+	box := renderTwoColBox(fields, 0, related, "detail -- i-0abc123 (web-prod)", w, false)
 	return header + "\n" + box
 }
 
-// -- Mockup 4: Fully Loaded (80 cols) --
+// -- Mockup 2: EC2 detail, right column focused --
 
-func mockFullyLoaded80() string {
-	w := 80
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
+func mockEC2RightFocused() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
 
-	rows := []listRow{
-		{label: "Security Groups", count: "(3)", state: rowSelected},
-		{label: "VPC", count: "(1)", state: rowAvailable},
-		{label: "Subnet", count: "(1)", state: rowAvailable},
-		{label: "Elastic IPs", count: "(1)", state: rowAvailable},
-		{label: "Network Interfaces", count: "(2)", state: rowAvailable},
-		{label: "Auto Scaling Groups", state: rowAvailable},
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupName", value: "web-sg", kind: fieldSubPlain},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "GroupName", value: "db-access-sg", kind: fieldSubPlain},
+		{key: "IamInstanceProfile", value: "", kind: fieldSection},
+		{key: "Arn", value: "arn:aws:iam::123456:role/web-role", kind: fieldSubNav},
+		{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		{key: "KeyName", value: "prod-keypair", kind: fieldPlain},
+		{key: "PrivateIpAddress", value: "10.0.48.175", kind: fieldPlain},
+		{key: "PublicIpAddress", value: "203.0.113.10", kind: fieldPlain},
+	}
+
+	related := []relatedRow{
+		{label: "Auto Scaling Groups", state: rowSelected},
 		{label: "Target Groups", state: rowAvailable},
 		{label: "CloudWatch Alarms", state: rowAvailable},
-		{label: "IAM Role", state: rowAvailable},
+		{label: "CloudFormation Stacks", state: rowAvailable},
+		{label: "EBS Snapshots", state: rowAvailable},
+		{label: "Elastic IPs", count: "(1)", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
 		{label: "EKS Node Groups", state: rowDim},
 		{label: "Elastic Beanstalk", state: rowDim},
+	}
+
+	// No cursor in left column (right is focused); separator is accent color
+	box := renderTwoColBox(fields, -1, related, "detail -- i-0abc123 (web-prod)", w, true)
+	return header + "\n" + box
+}
+
+// -- Mockup 3: Right column hidden (r toggled off) --
+
+func mockRightHidden() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupName", value: "web-sg", kind: fieldSubPlain},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "GroupName", value: "db-access-sg", kind: fieldSubPlain},
+		{key: "IamInstanceProfile", value: "", kind: fieldSection},
+		{key: "Arn", value: "arn:aws:iam::123456:role/web-role", kind: fieldSubNav},
+		{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		{key: "KeyName", value: "prod-keypair", kind: fieldPlain},
+		{key: "PrivateIpAddress", value: "10.0.48.175", kind: fieldPlain},
+		{key: "PublicIpAddress", value: "203.0.113.10", kind: fieldPlain},
+		{key: "LaunchTime", value: "2026-03-15 09:22:45", kind: fieldPlain},
+		{key: "Architecture", value: "x86_64", kind: fieldPlain},
+	}
+
+	box := renderSingleColBox(fields, 0, "detail -- i-0abc123 (web-prod)", w)
+	return header + "\n" + box
+}
+
+// -- Mockup 4: RDS detail --
+
+func mockRDSDetail() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	fields := []detailField{
+		{key: "DBInstanceIdentifier", value: "mydb-prod", kind: fieldPlain},
+		{key: "Engine", value: "postgres", kind: fieldPlain},
+		{key: "EngineVersion", value: "15.4", kind: fieldPlain},
+		{key: "DBInstanceStatus", value: "available", kind: fieldPlain},
+		{key: "DBInstanceClass", value: "db.t3.medium", kind: fieldPlain},
+		{key: "Endpoint", value: "", kind: fieldSection},
+		{key: "Address", value: "mydb-prod.abc123.rds.amazonaws.com", kind: fieldSubPlain},
+		{key: "Port", value: "5432", kind: fieldSubPlain},
+		{key: "MultiAZ", value: "true", kind: fieldPlain},
+		{key: "VpcSecurityGroups", value: "", kind: fieldSection},
+		{key: "VpcSecurityGroupId", value: "sg-0abc123def456", kind: fieldSubNav},
+		{key: "Status", value: "active", kind: fieldSubPlain},
+		{key: "DBSubnetGroup", value: "", kind: fieldSection},
+		{key: "DBSubnetGroupName", value: "prod-db-subnets", kind: fieldSubPlain},
+		{key: "Subnets", value: "", kind: fieldSection},
+		{key: "SubnetId", value: "subnet-0aaa111bbb222", kind: fieldSubNav},
+		{key: "SubnetId", value: "subnet-0ccc333ddd444", kind: fieldSubNav},
+		{key: "KmsKeyId", value: "arn:aws:kms:us-east-1:123:key/abc", kind: fieldNavigable},
+		{key: "StorageEncrypted", value: "true", kind: fieldPlain},
+	}
+
+	related := []relatedRow{
+		{label: "CloudWatch Alarms", state: rowAvailable},
+		{label: "RDS Snapshots", count: "(5)", state: rowAvailable},
+		{label: "Secrets Manager", state: rowAvailable},
+		{label: "CW Log Groups", count: "(2)", state: rowAvailable},
 		{label: "CloudTrail Events", state: rowAvailable},
+		{label: "CloudFormation Stacks", state: rowDim},
 	}
 
-	box := renderList(rows, "related -- i-0abc123 (web-prod)", w, nil)
+	box := renderTwoColBox(fields, 0, related, "detail -- mydb-prod", w, false)
 	return header + "\n" + box
 }
 
-// -- Mockup 5: Filter active --
+// -- Mockup 5: VPC detail -- heavy right column --
 
-func mockFilterActive() string {
+func mockVPCDetail() string {
 	w := 120
-	header := renderHeaderFilter("prod", "us-east-1", "3.26.0", w, "sec")
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
 
-	rows := []listRow{
-		{label: "Security Groups", count: "(3)", state: rowSelected},
+	fields := []detailField{
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldPlain},
+		{key: "CidrBlock", value: "10.0.0.0/16", kind: fieldPlain},
+		{key: "State", value: "available", kind: fieldPlain},
+		{key: "IsDefault", value: "false", kind: fieldPlain},
+		{key: "DhcpOptionsId", value: "dopt-0abc123def456", kind: fieldPlain},
+		{key: "InstanceTenancy", value: "default", kind: fieldPlain},
+		{key: "Tags", value: "", kind: fieldSection},
+		{key: "Key", value: "Name", kind: fieldSubPlain},
+		{key: "Value", value: "production-vpc", kind: fieldSubPlain},
+		{key: "Key", value: "Environment", kind: fieldSubPlain},
+		{key: "Value", value: "prod", kind: fieldSubPlain},
 	}
 
-	box := renderList(rows, "related -- i-0abc123 (web-prod)", w, []string{"", ""})
-	return header + "\n" + box
-}
-
-// -- Mockup 6: Filtered resource list (multiple SGs) --
-
-func mockFilteredList() string {
-	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
-
-	colHdr := lipgloss.NewStyle().Foreground(colAccent).Bold(true)
-	sel := cellSelected
-	rowGreen := lipgloss.NewStyle().Foreground(colGreen)
-
-	nameW := 24
-	gidW := 26
-	vpcW := 26
-	descW := 38
-
-	hdrLine := " " +
-		colHdr.Render(padOrTrunc("NAME", nameW)) +
-		colHdr.Render(padOrTrunc("GROUP ID", gidW)) +
-		colHdr.Render(padOrTrunc("VPC ID", vpcW)) +
-		colHdr.Render(padOrTrunc("DESCRIPTION", descW))
-
-	row1 := sel.Render(pad(
-		" "+padOrTrunc("web-sg", nameW)+
-			padOrTrunc("sg-0abc111222333444", gidW)+
-			padOrTrunc("vpc-0aaa111bbb222cc", vpcW)+
-			padOrTrunc("Web server security group", descW),
-		w-2))
-	row2 := " " +
-		rowGreen.Render(padOrTrunc("db-access-sg", nameW)) +
-		rowGreen.Render(padOrTrunc("sg-0def555666777888", gidW)) +
-		rowGreen.Render(padOrTrunc("vpc-0aaa111bbb222cc", vpcW)) +
-		rowGreen.Render(padOrTrunc("Database access from web tier", descW))
-	row3 := " " +
-		rowGreen.Render(padOrTrunc("monitoring-sg", nameW)) +
-		rowGreen.Render(padOrTrunc("sg-0ghi999000111222", gidW)) +
-		rowGreen.Render(padOrTrunc("vpc-0aaa111bbb222cc", vpcW)) +
-		rowGreen.Render(padOrTrunc("Monitoring agent inbound", descW))
-
-	countLine := dimStyle.Render(" 3 security groups")
-
-	lines := []string{hdrLine, row1, row2, row3, "", countLine, ""}
-
-	box := renderFramedBox(lines, "sg-instances(3) -- i-0abc123 (web-prod)", w)
-	return header + "\n" + box
-}
-
-// -- Mockup 7: Direct to detail (single VPC) --
-
-func mockDirectDetail() string {
-	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
-
-	keyColW := 22
-	kvLine := func(key, val string) string {
-		return " " + kStyle.Render(padOrTrunc(key+":", keyColW)) + vStyle.Render(val)
-	}
-
-	lines := []string{
-		kvLine("VpcId", "vpc-0aaa111bbb222cc"),
-		kvLine("CidrBlock", "10.0.0.0/16"),
-		kvLine("State", greenStyle.Render("available")),
-		kvLine("IsDefault", "false"),
-		kvLine("DhcpOptionsId", "dopt-0abc123def456"),
-		kvLine("InstanceTenancy", "default"),
-		" " + secStyle.Render("Tags:"),
-		"     " + dimStyle.Render("- Key: Name"),
-		"       " + dimStyle.Render("Value: production-vpc"),
-		"     " + dimStyle.Render("- Key: Environment"),
-		"       " + dimStyle.Render("Value: prod"),
-		"",
-	}
-
-	box := renderFramedBox(lines, "vpc-0aaa111bbb222cc", w)
-	return header + "\n" + box
-}
-
-// -- Mockup 8: Deep navigation with depth indicator (VPC, 18 types) --
-
-func mockDeepNavigation() string {
-	w := 120
-	header := renderHeaderDepth(7, "prod", "us-east-1", w)
-
-	rows := []listRow{
-		// P0 -- critical networking (forward, cheap, counts shown)
-		{label: "Subnets", count: "(6)", state: rowSelected},
+	related := []relatedRow{
+		{label: "EC2 Instances", state: rowAvailable},
+		{label: "Subnets", count: "(6)", state: rowAvailable},
 		{label: "Security Groups", count: "(12)", state: rowAvailable},
 		{label: "Route Tables", count: "(3)", state: rowAvailable},
-		// P1 -- forward networking (cheap, counts shown)
 		{label: "NAT Gateways", count: "(2)", state: rowAvailable},
 		{label: "Internet Gateways", count: "(1)", state: rowAvailable},
 		{label: "VPC Endpoints", count: "(4)", state: rowAvailable},
-		// P1 -- reverse lookups (expensive, no counts)
 		{label: "Transit Gateways", state: rowAvailable},
-		{label: "EC2 Instances", state: rowAvailable},
 		{label: "Load Balancers", state: rowAvailable},
 		{label: "Lambda Functions", state: rowAvailable},
 		{label: "EKS Clusters", state: rowAvailable},
 		{label: "DB Instances", state: rowAvailable},
 		{label: "ElastiCache", state: rowAvailable},
-		{label: "Target Groups", state: rowAvailable},
-		// P2 -- unavailable (dim, no text)
 		{label: "OpenSearch", state: rowDim},
 		{label: "Redshift", state: rowDim},
 		{label: "MSK Clusters", state: rowDim},
-		// Always last
 		{label: "CloudTrail Events", state: rowAvailable},
 	}
 
-	box := renderList(rows, "related -- vpc-0aaa111 (production-vpc)", w, nil)
+	// Right column is taller than left -- the box extends to fit both.
+	// In real TUI, the right column would scroll. For this preview, we show
+	// the full list to demonstrate the height.
+	box := renderTwoColBox(fields, 0, related, "detail -- vpc-0aaa111 (production-vpc)", w, false)
 	return header + "\n" + box
 }
 
-// -- Mockup 9: All unavailable --
+// -- Mockup 6: Stacked layout (80 cols) --
 
-func mockAllUnavailable() string {
+func mockStacked80() string {
+	w := 80
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "LaunchTime", value: "2026-03-15 09:22:45", kind: fieldPlain},
+	}
+
+	related := []relatedRow{
+		{label: "Auto Scaling Groups", state: rowAvailable},
+		{label: "CloudWatch Alarms", state: rowAvailable},
+		{label: "CloudFormation Stacks", state: rowAvailable},
+		{label: "EKS Node Groups", state: rowDim},
+		{label: "CloudTrail Events", state: rowAvailable},
+	}
+
+	box := renderStackedBox(fields, 0, related, "detail -- i-0abc123 (web-prod)", w)
+	return header + "\n" + box
+}
+
+// -- Mockup 7: Initial load (right column all dim) --
+
+func mockInitialLoad() string {
 	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
 
-	rows := []listRow{
-		{label: "EC2 Instances", state: rowDim},
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		{key: "LaunchTime", value: "2026-03-15 09:22:45", kind: fieldPlain},
+	}
+
+	// All right column rows dim (checks in progress)
+	related := []relatedRow{
+		{label: "Target Groups", state: rowDim},
 		{label: "Auto Scaling Groups", state: rowDim},
+		{label: "CloudWatch Alarms", state: rowDim},
+		{label: "EKS Node Groups", state: rowDim},
+		{label: "CloudFormation Stacks", state: rowDim},
+		{label: "Elastic Beanstalk", state: rowDim},
 		{label: "EBS Snapshots", state: rowDim},
+		{label: "Elastic IPs", state: rowDim},
 		{label: "CloudTrail Events", state: rowDim},
 	}
 
-	innerW := w - 2
-	msg := dimStyle.Render("No related resources found. Press ctrl+r to refresh or esc to go back.")
-	msgW := lipgloss.Width(msg)
-	leftPad := (innerW - msgW) / 2
-	if leftPad < 0 {
-		leftPad = 0
-	}
-	centeredMsg := strings.Repeat(" ", leftPad) + msg
-
-	box := renderList(rows, "related -- ami-0abc123 (my-custom-ami)", w, []string{"", centeredMsg})
+	box := renderTwoColBox(fields, 0, related, "detail -- i-0abc123 (web-prod)", w, false)
 	return header + "\n" + box
 }
 
-// -- Mockup 10: Long list with scroll indicator (VPC, 27 types, 80 cols) --
+// -- Mockup 8: Deep navigation with depth indicator --
 
-func mockLongListScroll() string {
-	w := 80
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
+func mockDeepNavigation() string {
+	w := 120
+	header := renderHeaderDepth(5, "prod", "us-east-1", w)
 
-	// Show only the first 10 visible rows + scroll indicator
-	rows := []listRow{
-		{label: "Subnets", count: "(6)", state: rowSelected},
+	fields := []detailField{
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "CidrBlock", value: "10.0.1.0/24", kind: fieldPlain},
+		{key: "AvailabilityZone", value: "us-east-1a", kind: fieldPlain},
+		{key: "AvailableIpAddressCount", value: "251", kind: fieldPlain},
+		{key: "MapPublicIpOnLaunch", value: "false", kind: fieldPlain},
+		{key: "State", value: "available", kind: fieldPlain},
+		{key: "Tags", value: "", kind: fieldSection},
+		{key: "Key", value: "Name", kind: fieldSubPlain},
+		{key: "Value", value: "private-us-east-1a", kind: fieldSubPlain},
+	}
+
+	related := []relatedRow{
+		{label: "EC2 Instances", state: rowAvailable},
+		{label: "NAT Gateways", state: rowAvailable},
+		{label: "Network Interfaces", state: rowAvailable},
+		{label: "Route Tables", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
+		{label: "Load Balancers", state: rowDim},
+	}
+
+	box := renderTwoColBox(fields, 0, related, "detail -- subnet-0bbb222 (private-us-east-1a)", w, false)
+	return header + "\n" + box
+}
+
+// -- Mockup 9: Lambda detail (algorithmic relationships) --
+
+func mockLambdaDetail() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	fields := []detailField{
+		{key: "FunctionName", value: "process-orders", kind: fieldPlain},
+		{key: "Runtime", value: "python3.11", kind: fieldPlain},
+		{key: "Handler", value: "handler.main", kind: fieldPlain},
+		{key: "MemorySize", value: "256", kind: fieldPlain},
+		{key: "Timeout", value: "30", kind: fieldPlain},
+		{key: "Role", value: "arn:aws:iam::123456:role/lambda-exec", kind: fieldNavigable},
+		{key: "VpcConfig", value: "", kind: fieldSection},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldSubNav},
+		{key: "SubnetIds", value: "", kind: fieldSection},
+		{key: "", value: "- subnet-0aaa111bbb222", kind: fieldSubNav},
+		{key: "", value: "- subnet-0ccc333ddd444", kind: fieldSubNav},
+		{key: "SecurityGroupIds", value: "", kind: fieldSection},
+		{key: "", value: "- sg-0abc123def456", kind: fieldSubNav},
+		{key: "CodeSize", value: "1048576", kind: fieldPlain},
+		{key: "LastModified", value: "2026-03-28 14:30:00", kind: fieldPlain},
+	}
+
+	related := []relatedRow{
+		{label: "CW Log Group", state: rowAvailable},
+		{label: "SQS Event Sources", count: "(2)", state: rowAvailable},
+		{label: "EventBridge Rules", state: rowAvailable},
+		{label: "SNS Subscriptions", state: rowAvailable},
+		{label: "CloudWatch Alarms", state: rowAvailable},
+		{label: "API Gateway", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
+		{label: "S3 Notifications", state: rowDim},
+		{label: "Step Functions", state: rowDim},
+		{label: "Target Groups", state: rowDim},
+	}
+
+	box := renderTwoColBox(fields, 0, related, "detail -- process-orders (process-orders)", w, false)
+	return header + "\n" + box
+}
+
+// -- Mockup 10: Smart Enter from right column -> filtered list --
+
+func mockFilteredList() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	colHdr := lipgloss.NewStyle().Foreground(colAccent).Bold(true)
+	sel := cellSelected
+	rowGreen := lipgloss.NewStyle().Foreground(colGreen)
+
+	nameW := 26
+	stateW := 14
+	metricW := 30
+	dimW := 24
+
+	hdrLine := " " +
+		colHdr.Render(padOrTrunc("NAME", nameW)) +
+		colHdr.Render(padOrTrunc("STATE", stateW)) +
+		colHdr.Render(padOrTrunc("METRIC", metricW)) +
+		colHdr.Render(padOrTrunc("DIMENSIONS", dimW))
+
+	row1 := sel.Render(pad(
+		" "+padOrTrunc("ec2-cpu-high-i-0abc", nameW)+
+			padOrTrunc("OK", stateW)+
+			padOrTrunc("CPUUtilization", metricW)+
+			padOrTrunc("InstanceId:i-0abc123", dimW),
+		w-2))
+	row2 := " " +
+		rowGreen.Render(padOrTrunc("ec2-status-i-0abc", nameW)) +
+		rowGreen.Render(padOrTrunc("OK", stateW)) +
+		rowGreen.Render(padOrTrunc("StatusCheckFailed", metricW)) +
+		rowGreen.Render(padOrTrunc("InstanceId:i-0abc123", dimW))
+	row3 := " " +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Render(padOrTrunc("ec2-mem-high-i-0abc", nameW)) +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Render(padOrTrunc("ALARM", stateW)) +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Render(padOrTrunc("MemoryUtilization", metricW)) +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Render(padOrTrunc("InstanceId:i-0abc123", dimW))
+
+	countLine := dimStyle.Render(" 3 alarms")
+
+	lines := []string{hdrLine, row1, row2, row3, "", countLine, ""}
+
+	box := renderFramedBox(lines, "alarms(3) -- i-0abc123 (web-prod)", w)
+	return header + "\n" + box
+}
+
+// -- Mockup 11: Smart Enter from left navigable field -> direct detail --
+
+func mockDirectDetail() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	fields := []detailField{
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldPlain},
+		{key: "CidrBlock", value: "10.0.0.0/16", kind: fieldPlain},
+		{key: "State", value: "available", kind: fieldPlain},
+		{key: "IsDefault", value: "false", kind: fieldPlain},
+		{key: "DhcpOptionsId", value: "dopt-0abc123def456", kind: fieldPlain},
+		{key: "InstanceTenancy", value: "default", kind: fieldPlain},
+		{key: "Tags", value: "", kind: fieldSection},
+		{key: "Key", value: "Name", kind: fieldSubPlain},
+		{key: "Value", value: "production-vpc", kind: fieldSubPlain},
+	}
+
+	related := []relatedRow{
+		{label: "EC2 Instances", state: rowAvailable},
+		{label: "Subnets", count: "(6)", state: rowAvailable},
 		{label: "Security Groups", count: "(12)", state: rowAvailable},
 		{label: "Route Tables", count: "(3)", state: rowAvailable},
 		{label: "NAT Gateways", count: "(2)", state: rowAvailable},
 		{label: "Internet Gateways", count: "(1)", state: rowAvailable},
-		{label: "VPC Endpoints", count: "(4)", state: rowAvailable},
-		{label: "Transit Gateways", state: rowAvailable},
-		{label: "EC2 Instances", state: rowAvailable},
-		{label: "Load Balancers", state: rowAvailable},
-		{label: "Lambda Functions", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
 	}
 
-	innerW := w - 2
-	var lines []string
-	for _, r := range rows {
-		lines = append(lines, renderListRow(r, innerW))
-	}
-
-	// Scroll indicator
-	scrollIndicator := dimStyle.Render(strings.Repeat(" ", innerW-20) + "v 17 more below")
-	lines = append(lines, scrollIndicator)
-
-	box := renderFramedBox(lines, "related -- vpc-0aaa111 (production-vpc)", w)
+	box := renderTwoColBox(fields, 0, related, "detail -- vpc-0aaa111 (production-vpc)", w, false)
 	return header + "\n" + box
 }
 
-// -- Mockup 11: Help screen --
+// -- Mockup 12: Help screen --
 
 func mockHelpScreen() string {
 	w := 120
-	header := renderHeaderNormal("prod", "us-east-1", "3.26.0", w)
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
 
 	colW := 27
 	hk := func(key, desc string) string {
-		return helpKeyStyle.Render(padOrTrunc(key, 10)) + lipgloss.NewStyle().Foreground(colHeaderFg).Render(padOrTrunc(desc, colW-10))
+		return helpKeyStyle.Render(padOrTrunc(key, 10)) +
+			lipgloss.NewStyle().Foreground(colHeaderFg).Render(padOrTrunc(desc, colW-10))
 	}
 
 	blank := strings.Repeat(" ", colW)
 
 	lines := []string{
-		" " + helpCatStyle.Render(padOrTrunc("RELATED", colW)) +
-			helpCatStyle.Render(padOrTrunc("GENERAL", colW)) +
+		" " + helpCatStyle.Render(padOrTrunc("DETAIL", colW)) +
+			helpCatStyle.Render(padOrTrunc("RELATED", colW)) +
 			helpCatStyle.Render(padOrTrunc("NAVIGATION", colW)) +
 			helpCatStyle.Render(padOrTrunc("HOTKEYS", colW)),
 		"",
-		" " + hk("<enter>", "Open type") +
-			hk("<ctrl-r>", "Refresh") +
+		" " + hk("<enter>", "Open link") +
+			hk("<tab>", "Switch col") +
 			hk("<j>", "Down") +
 			hk("<?>", "Help"),
 		" " + hk("<esc>", "Go back") +
-			hk("<q>", "Quit") +
+			hk("<r>", "Toggle col") +
 			hk("<k>", "Up") +
 			hk("<:>", "Command"),
-		" " + blank +
-			hk("</>", "Filter") +
+		" " + hk("<h/l>", "Switch col") +
+			blank +
 			hk("<g>", "Top") +
-			hk("<r>", "Related"),
-		" " + blank +
+			blank,
+		" " + hk("<c>", "Copy value") +
 			blank +
 			hk("<G>", "Bottom") +
 			blank,
-		" " + blank +
+		" " + hk("<y>", "YAML view") +
 			blank +
 			hk("<pgdn>", "Page down") +
 			blank,
@@ -621,48 +911,52 @@ func mockHelpScreen() string {
 func main() {
 	fmt.Println()
 
-	// 1. Initial Load -- all dim
-	fmt.Print(divider("1. List -- Initial load (all rows dim, checks in progress)"))
+	// 1. EC2 detail -- two-column, left focused, dim separator
+	fmt.Print(divider("1. EC2 detail -- left focused, dim separator (120 cols)"))
+	fmt.Println(mockEC2LeftFocused())
+
+	// 2. EC2 detail -- right column focused, accent separator
+	fmt.Print(divider("2. EC2 detail -- right focused, accent separator (120 cols)"))
+	fmt.Println(mockEC2RightFocused())
+
+	// 3. Right column hidden
+	fmt.Print(divider("3. EC2 detail -- right column hidden (r off, 120 cols)"))
+	fmt.Println(mockRightHidden())
+
+	// 4. RDS detail
+	fmt.Print(divider("4. RDS detail -- different resource type (120 cols)"))
+	fmt.Println(mockRDSDetail())
+
+	// 5. VPC detail -- heavy right column
+	fmt.Print(divider("5. VPC detail -- heavy right column, 17 types (120 cols)"))
+	fmt.Println(mockVPCDetail())
+
+	// 6. Stacked layout (80 cols)
+	fmt.Print(divider("6. Stacked layout -- narrow terminal (80 cols)"))
+	fmt.Println(mockStacked80())
+
+	// 7. Initial load -- right column all dim
+	fmt.Print(divider("7. Initial load -- right column all dim (120 cols)"))
 	fmt.Println(mockInitialLoad())
 
-	// 2. Partially Loaded -- some forward checks done
-	fmt.Print(divider("2. List -- Partially loaded (forward checks resolved)"))
-	fmt.Println(mockPartiallyLoaded())
-
-	// 3. Fully Loaded (120 cols)
-	fmt.Print(divider("3. List -- Fully loaded (120 cols)"))
-	fmt.Println(mockFullyLoaded120())
-
-	// 4. Fully Loaded (80 cols)
-	fmt.Print(divider("4. List -- Fully loaded (80 cols)"))
-	fmt.Println(mockFullyLoaded80())
-
-	// 5. Filter active
-	fmt.Print(divider("5. List -- Filter active (/sec)"))
-	fmt.Println(mockFilterActive())
-
-	// 6. Filtered resource list
-	fmt.Print(divider("6. Smart Enter -- Filtered resource list (SG, count > 1)"))
-	fmt.Println(mockFilteredList())
-
-	// 7. Direct to detail
-	fmt.Print(divider("7. Smart Enter -- Direct to detail (VPC, count = 1)"))
-	fmt.Println(mockDirectDetail())
-
-	// 8. Deep navigation (VPC, 18 types)
-	fmt.Print(divider("8. Deep navigation -- Depth [7], VPC 18 related types"))
+	// 8. Deep navigation with depth indicator
+	fmt.Print(divider("8. Deep navigation -- depth [5], subnet detail (120 cols)"))
 	fmt.Println(mockDeepNavigation())
 
-	// 9. All unavailable
-	fmt.Print(divider("9. All dim state (no related resources found)"))
-	fmt.Println(mockAllUnavailable())
+	// 9. Lambda detail (algorithmic relationships)
+	fmt.Print(divider("9. Lambda detail -- algorithmic relationships (120 cols)"))
+	fmt.Println(mockLambdaDetail())
 
-	// 10. Long list with scroll indicator
-	fmt.Print(divider("10. Long list with scroll indicator (VPC, 27 types, 80 cols)"))
-	fmt.Println(mockLongListScroll())
+	// 10. Smart Enter: filtered list from right column
+	fmt.Print(divider("10. Smart Enter -- filtered alarm list from right col"))
+	fmt.Println(mockFilteredList())
 
-	// 11. Help screen
-	fmt.Print(divider("11. Help screen for related list"))
+	// 11. Smart Enter: direct to detail from navigable field
+	fmt.Print(divider("11. Smart Enter -- direct to VPC detail from left col"))
+	fmt.Println(mockDirectDetail())
+
+	// 12. Help screen
+	fmt.Print(divider("12. Help screen for two-column detail view"))
 	fmt.Println(mockHelpScreen())
 
 	fmt.Println()
