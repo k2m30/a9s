@@ -265,7 +265,9 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 				Gen:          gen,
 			}
 		}
-		result, err := pf(ctx, clients, "")
+		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (resource.FetchResult, error) {
+			return pf(ctx, clients, "")
+		})
 		if err != nil {
 			return messages.AvailabilityCheckedMsg{
 				ResourceType: shortName,
