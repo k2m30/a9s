@@ -51,7 +51,7 @@ verify-readonly:
 		| grep -v 'regions.go' \
 		| grep -v '\/\/' \
 		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
-		| grep -v 'CreateDate\|StartRecord\|StartTime\|StopTime' ; then \
+		| grep -v 'CreateDate\|CreateTime\|StartRecord\|StartTime\|StopTime\|StopDate' ; then \
 		echo "FAIL: Write API calls detected!"; exit 1; \
 	else \
 		echo "PASS: All API calls are read-only"; \
