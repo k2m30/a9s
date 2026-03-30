@@ -20,3 +20,11 @@ type Filterable interface {
 	SetFilter(text string)
 	GetFilter() string
 }
+
+// Searchable is an optional interface for views that support text search.
+// Text-content views (detail, YAML) implement this.
+type Searchable interface {
+	IsSearchActive() bool
+	IsSearchInputMode() bool
+	SearchInfo() string
+}

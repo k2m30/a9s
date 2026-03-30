@@ -40,7 +40,7 @@ var (
 	colRowSelectedFg = lipgloss.Color("#1a1b26")
 
 	colGreen  = lipgloss.Color("#9ece6a")
-	colYellow = lipgloss.Color("#e0af68")
+	colYellow = lipgloss.Color("#e0af68") //nolint:unused // design palette — reserved for future use in preview
 
 	colDetailKey = lipgloss.Color("#7aa2f7")
 	colDetailSec = lipgloss.Color("#e0af68")
@@ -61,7 +61,7 @@ var (
 	kStyle       = lipgloss.NewStyle().Foreground(colDetailKey)
 	vStyle       = lipgloss.NewStyle().Foreground(colDetailVal)
 	navStyle     = lipgloss.NewStyle().Foreground(colAccent).Underline(true) // navigable value
-	greenStyle   = lipgloss.NewStyle().Foreground(colGreen)
+	greenStyle = lipgloss.NewStyle().Foreground(colGreen) //nolint:unused // design style — reserved for future use in preview
 	helpKeyStyle = lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
 	helpCatStyle = lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
 )

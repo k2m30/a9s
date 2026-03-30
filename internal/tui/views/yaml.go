@@ -11,6 +11,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -28,6 +30,7 @@ type YAMLModel struct {
 	width    int
 	height   int
 	keys     keys.Map
+	search   SearchModel
 }
 
 // NewYAML creates a YAMLModel for the given resource.
@@ -47,11 +50,38 @@ func (m YAMLModel) Init() (YAMLModel, tea.Cmd) {
 func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Search input mode captures all keys.
+		if m.search.IsInputMode() {
+			m.search, _ = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, nil
+		}
 		switch {
+		case key.Matches(msg, m.keys.Search):
+			m.search.Activate()
+			return m, nil
+		case key.Matches(msg, m.keys.SearchNext):
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.NextMatch()
+				m.refreshViewportContent()
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.SearchPrev):
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.PrevMatch()
+				m.refreshViewportContent()
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Escape):
+			if m.search.IsActive() {
+				m.search.Deactivate()
+				m.refreshViewportContent()
+				return m, nil
+			}
 		case key.Matches(msg, m.keys.ToggleWrap):
 			m.wrap = !m.wrap
 			m.viewport.SoftWrap = m.wrap
-			m.viewport.SetContent(m.renderContent())
+			m.refreshViewportContent()
 			return m, nil
 		}
 	}
@@ -83,7 +113,42 @@ func (m *YAMLModel) SetSize(w, h int) {
 		m.viewport.SetWidth(w)
 		m.viewport.SetHeight(h)
 	}
-	m.viewport.SetContent(m.renderContent())
+	m.refreshViewportContent()
+}
+
+// refreshViewportContent re-renders content and applies search highlights.
+func (m *YAMLModel) refreshViewportContent() {
+	content := m.renderContent()
+	if m.search.IsActive() && m.search.Query() != "" {
+		plain := ansi.Strip(content)
+		m.search.SetContent(plain)
+		var matchLine int
+		content, matchLine = m.search.Apply(content)
+		if matchLine >= 0 {
+			m.viewport.GotoTop()
+			m.viewport.SetYOffset(matchLine)
+		}
+	}
+	m.viewport.SetContent(content)
+}
+
+// IsSearchActive returns true when search is active (input mode or confirmed highlights).
+func (m YAMLModel) IsSearchActive() bool { return m.search.IsActive() }
+
+// IsSearchInputMode returns true when the search input is capturing keystrokes.
+func (m YAMLModel) IsSearchInputMode() bool { return m.search.IsInputMode() }
+
+// SearchInfo returns the search state string for the header.
+// Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
+func (m YAMLModel) SearchInfo() string {
+	if !m.search.IsActive() {
+		return ""
+	}
+	if m.search.IsInputMode() {
+		q := m.search.Query()
+		return "/" + q
+	}
+	return m.search.MatchInfo()
 }
 
 // FrameTitle returns e.g. "i-0abc123 yaml".

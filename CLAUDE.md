@@ -1,6 +1,6 @@
 # a9s Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-29
+Auto-generated from all feature plans. Last updated: 2026-03-30
 
 ## GitHub
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
@@ -66,6 +66,7 @@ Go 1.26+: Follow standard conventions
 | `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
 | `a9s-add-resource` | Coder (steps 1-7), QA (steps 8-12) | Split blueprint: coder=implementation, QA=tests |
 | `a9s-add-child-view` | Coder (phase 3), QA (phase 2) | Split blueprint: architect scopes, QA tests, coder implements |
+| `a9s-add-related-view` | Coder (steps 1-6), QA (steps 7-11) | Split blueprint: add related-resource views per resource type |
 | `a9s-implement-issue` | Architect (orchestrator) | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
 
 ## Agents
@@ -168,5 +169,6 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+- 004-related-views-blockers: RetryOnThrottle integration (#186), resource cache (#111), cross-view search (#89)
 - 003-cloudtrail-json-parsing: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, AWS SDK Go v2, yaml.v3
 - 002-paginated-fetcher-migration: Paginated fetcher migration (#107, #108, #109)

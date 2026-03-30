@@ -83,6 +83,40 @@ func NewChildResourceList(childType resource.ResourceTypeDef, parentCtx map[stri
 	}
 }
 
+// NewResourceListFromCache creates a ResourceListModel pre-populated with cached data.
+// No loading state, no spinner — the view is immediately ready to render.
+func NewResourceListFromCache(
+	typeDef resource.ResourceTypeDef,
+	viewConfig *config.ViewsConfig,
+	k keys.Map,
+	resources []resource.Resource,
+	pagination *resource.PaginationMeta,
+	filterText string,
+	sortField SortField,
+	sortAsc bool,
+	cursorPos int,
+	hScrollOffset int,
+) ResourceListModel {
+	m := ResourceListModel{
+		typeDef:       typeDef,
+		viewConfig:    viewConfig,
+		allResources:  resources,
+		pagination:    pagination,
+		filterText:    filterText,
+		sort:          sortField,
+		sortAsc:       sortAsc,
+		hScrollOffset: hScrollOffset,
+		loading:       false,
+		keys:          k,
+	}
+	m.applySortAndFilter()
+	// Restore cursor position after filter application resets scroll.
+	if cursorPos >= 0 && cursorPos < len(m.filteredResources) {
+		m.scroll.SetCursor(cursorPos)
+	}
+	return m
+}
+
 // Init starts the spinner tick cycle.
 func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 	return m, m.spinner.Tick
@@ -345,9 +379,14 @@ func (m *ResourceListModel) View() string {
 	// Append "load more" or "loading..." indicator when truncated.
 	if showLoadMore {
 		sb.WriteString("\n")
-		hint := "── M: load more ──"
-		if m.loadingMore {
+		var hint string
+		switch {
+		case m.loadingMore:
 			hint = "── loading... ──"
+		case m.filterText != "":
+			hint = "── M: load more (filter applies to loaded data only) ──"
+		default:
+			hint = "── M: load more ──"
 		}
 		sb.WriteString(styles.DimText.Render(hint))
 	}
@@ -435,6 +474,36 @@ func (m ResourceListModel) ResourceType() string {
 // ParentContext returns the parent context map, or nil for top-level lists.
 func (m ResourceListModel) ParentContext() map[string]string {
 	return m.parentContext
+}
+
+// AllResources returns all loaded resources (across all pages).
+func (m ResourceListModel) AllResources() []resource.Resource {
+	return m.allResources
+}
+
+// PaginationState returns the current pagination metadata, or nil if unpaginated.
+func (m ResourceListModel) PaginationState() *resource.PaginationMeta {
+	return m.pagination
+}
+
+// CursorPosition returns the current cursor index in the filtered list.
+func (m ResourceListModel) CursorPosition() int {
+	return m.scroll.Cursor()
+}
+
+// SortState returns the current sort field and direction.
+func (m ResourceListModel) SortState() (SortField, bool) {
+	return m.sort, m.sortAsc
+}
+
+// HScrollOffset returns the current horizontal scroll offset.
+func (m ResourceListModel) HScrollOffset() int {
+	return m.hScrollOffset
+}
+
+// FilterText returns the current filter text.
+func (m ResourceListModel) FilterText() string {
+	return m.filterText
 }
 
 // handleChildKey iterates through the typeDef's Children looking for a match

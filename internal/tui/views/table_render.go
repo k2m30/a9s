@@ -127,6 +127,10 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 
 // extractCellValue gets the cell value for a column from a resource.
 func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) string {
+	// Special key "@id" maps to the resource's canonical ID field.
+	if c.key == "@id" {
+		return r.ID
+	}
 	// Try config-driven path via ExtractScalar first (if path set and RawStruct available).
 	if c.path != "" && r.RawStruct != nil {
 		val := fieldpath.ExtractScalar(r.RawStruct, c.path)

@@ -161,6 +161,16 @@ a9s --no-cache            # disable resource availability cache
 | `w` | Toggle line wrap (in YAML, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) |
 
+### Search (Detail and YAML Views)
+
+| Key | Action |
+|-----|--------|
+| `/` | Start search |
+| `n` | Next match |
+| `N` | Previous match |
+| `Enter` | Confirm search (keep highlights) |
+| `Esc` | Clear search |
+
 ### Sorting
 
 | Key | Action |
