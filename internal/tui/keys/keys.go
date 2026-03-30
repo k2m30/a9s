@@ -52,6 +52,11 @@ type Map struct {
 
 	// Detail / YAML
 	ToggleWrap key.Binding
+
+	// Search (detail/YAML views)
+	Search     key.Binding
+	SearchNext key.Binding
+	SearchPrev key.Binding
 }
 
 // Default returns the canonical key bindings.
@@ -67,7 +72,7 @@ func Default() Map {
 		Quit:      key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 		ForceQuit: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "force quit")),
 		Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
-		Refresh:   key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "refresh")),
+		Refresh:   key.NewBinding(key.WithKeys("ctrl+r", "\x12"), key.WithHelp("ctrl+r", "refresh")),
 		Identity:  key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "identity")),
 
 		Colon:  key.NewBinding(key.WithKeys(":"), key.WithHelp(":", "command")),
@@ -96,5 +101,9 @@ func Default() Map {
 		LoadMore: key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "load more")),
 
 		ToggleWrap: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap")),
+
+		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+		SearchNext: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
+		SearchPrev: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match")),
 	}
 }

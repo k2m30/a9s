@@ -92,10 +92,7 @@ func (m HelpModel) View() string {
 		return ""
 	}
 
-	colW := (m.width - 6) / numCols
-	if colW < 12 {
-		colW = 12
-	}
+	colW := max((m.width-6)/numCols, 12)
 
 	// Build category header row
 	var catParts []string
@@ -280,6 +277,14 @@ func (m HelpModel) detailGroups() []helpGroup {
 			},
 		},
 		{
+			title: "SEARCH",
+			bindings: []helpBinding{
+				{"/", "search"},
+				{"n", "next match"},
+				{"N", "prev match"},
+			},
+		},
+		{
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"esc", "back"},
@@ -305,6 +310,14 @@ func (m HelpModel) yamlGroups() []helpGroup {
 			bindings: []helpBinding{
 				{"c", "copy yaml"},
 				{"w", "wrap toggle"},
+			},
+		},
+		{
+			title: "SEARCH",
+			bindings: []helpBinding{
+				{"/", "search"},
+				{"n", "next match"},
+				{"N", "prev match"},
 			},
 		},
 		{
