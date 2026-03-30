@@ -18,6 +18,8 @@
 // 10. Smart Enter: filtered list from right column (120 cols)
 // 11. Smart Enter: direct to detail from left column navigable field
 // 12. Help screen for two-column detail view (120 cols)
+// 13. Search active in left column -- "vpc" match 1/3 (120 cols)
+// 14. Filter active in right column -- "/cloud" filtering types (120 cols)
 package main
 
 import (
@@ -48,6 +50,11 @@ var (
 
 	colHelpKey = lipgloss.Color("#9ece6a")
 	colHelpCat = lipgloss.Color("#e0af68")
+
+	// Search match colors (QA-26)
+	colMatchBg    = lipgloss.Color("#e0af68") // amber background for non-current matches
+	colMatchCurBg = lipgloss.Color("#ff9e64") // orange background for current match
+	colMatchFg    = lipgloss.Color("#1a1b26") // dark foreground on match background
 )
 
 // -- Styles --
@@ -64,6 +71,11 @@ var (
 	greenStyle = lipgloss.NewStyle().Foreground(colGreen) //nolint:unused // design style — reserved for future use in preview
 	helpKeyStyle = lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
 	helpCatStyle = lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
+
+	// Search match styles
+	matchStyle    = lipgloss.NewStyle().Foreground(colMatchFg).Background(colMatchBg)
+	matchCurStyle = lipgloss.NewStyle().Foreground(colMatchFg).Background(colMatchCurBg).Bold(true)
+	matchIndStyle = lipgloss.NewStyle().Foreground(colDim) // match indicator "[1/3 matches]"
 )
 
 // -- Constants --
@@ -128,6 +140,11 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 
 func renderHeaderNormal(profile, region, version string, w int) string {
 	right := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
+	return renderHeader(profile, region, version, w, right)
+}
+
+func renderHeaderFilter(profile, region, version string, w int, filterText string) string {
+	right := lipgloss.NewStyle().Foreground(colYellow).Bold(true).Render("/" + filterText)
 	return renderHeader(profile, region, version, w, right)
 }
 
@@ -277,6 +294,56 @@ func renderDetailField(f detailField, leftW int, selected bool) string {
 	return pad(rendered, leftW)
 }
 
+// -- Detail field with search highlights --
+// Renders a field with specific substrings highlighted as search matches.
+// matchPositions: list of {offset, length, isCurrent} for the plain text.
+// For simplicity in this preview, we take a pre-built styled string approach:
+// the caller provides the rendered text with embedded match markers.
+
+// renderSearchField renders a detail field where certain value substrings
+// are highlighted as search matches. For the preview, this is done by
+// manually constructing the styled text with match highlights inline.
+func renderSearchField(key string, preMatch string, match string, postMatch string, isCurrent bool, leftW int, isSelected bool, isSub bool) string {
+	keyColW := 22
+	indent := " "
+	keyW := keyColW
+	if isSub {
+		indent = "     "
+		keyW = keyColW - 4
+	}
+
+	mStyle := matchStyle
+	if isCurrent {
+		mStyle = matchCurStyle
+	}
+
+	if isSelected {
+		// Selected row: build with match highlight inside selection
+		plainPre := indent + padOrTrunc(key+":", keyW) + preMatch
+		matchPart := mStyle.Render(match)
+		plainPost := postMatch
+
+		// We need to combine: selected prefix + match (with match bg) + selected suffix
+		// For the preview, render the selected row with the match highlight embedded
+		return cellSelected.Render(plainPre) + matchPart + cellSelected.Render(pad(plainPost, leftW-lipgloss.Width(plainPre)-lipgloss.Width(match)))
+	}
+
+	// Normal row with search highlight
+	keyPart := indent + kStyle.Render(padOrTrunc(key+":", keyW))
+	valuePart := vStyle.Render(preMatch) + mStyle.Render(match) + vStyle.Render(postMatch)
+	return pad(keyPart+valuePart, leftW)
+}
+
+// renderSearchSectionField renders a section header with a search match in the key.
+func renderSearchSectionField(key string, preMatch string, match string, postMatch string, isCurrent bool, leftW int) string {
+	mStyle := matchStyle
+	if isCurrent {
+		mStyle = matchCurStyle
+	}
+	rendered := " " + secStyle.Render(preMatch) + mStyle.Render(match) + secStyle.Render(postMatch+":")
+	return pad(rendered, leftW)
+}
+
 // -- Related row in right column --
 
 type rowState int
@@ -348,6 +415,55 @@ func renderTwoColBox(
 			leftPart = renderDetailField(leftFields[i], leftW, i == selectedIdx)
 		} else {
 			leftPart = strings.Repeat(" ", leftW)
+		}
+
+		var rightPart string
+		if i < len(rightRows) {
+			rightPart = renderRelatedRow(rightRows[i], rightW)
+		} else {
+			rightPart = strings.Repeat(" ", rightW)
+		}
+
+		contentLines = append(contentLines, leftPart+sepChar+rightPart)
+	}
+
+	return renderFramedBox(contentLines, title, w)
+}
+
+// -- Two-column framed box with pre-rendered left lines --
+// Used when left column has custom rendering (e.g., search highlights).
+
+func renderTwoColBoxCustomLeft(
+	leftLines []string, // pre-rendered, must be padded to leftW
+	rightRows []relatedRow,
+	title string,
+	w int,
+	rightFocused bool,
+) string {
+	sepColor := colSep
+	if rightFocused {
+		sepColor = colAccent
+	}
+	sepChar := lipgloss.NewStyle().Foreground(sepColor).Render("\u2502")
+	innerW := w - 2
+	rightW := rightColWidth
+	leftW := innerW - rightW - 1 //nolint:unused // needed for proportion reference
+
+	numLines := len(leftLines)
+	if len(rightRows) > numLines {
+		numLines = len(rightRows)
+	}
+	numLines++
+
+	_ = leftW // suppress unused warning
+
+	var contentLines []string
+	for i := 0; i < numLines; i++ {
+		var leftPart string
+		if i < len(leftLines) {
+			leftPart = leftLines[i]
+		} else {
+			leftPart = strings.Repeat(" ", innerW-rightW-1)
 		}
 
 		var rightPart string
@@ -854,6 +970,143 @@ func mockDirectDetail() string {
 	return header + "\n" + box
 }
 
+// -- Mockup 13: Search active in left column --
+// Search for "vpc" confirmed, 3 matches found. Left column focused.
+// Current match (1/3) is on the VpcId value row.
+
+func mockSearchLeftColumn() string {
+	w := 120
+	header := renderHeaderNormal("prod", "us-east-1", "3.28.0", w)
+
+	innerW := w - 2
+	rightW := rightColWidth
+	leftW := innerW - rightW - 1
+
+	// Build left lines manually to show search highlights
+	var leftLines []string
+
+	// Row 0: InstanceId (no match, no selection)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		leftW, false))
+
+	// Row 1: InstanceType (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		leftW, false))
+
+	// Row 2: State (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "State", value: "running", kind: fieldPlain},
+		leftW, false))
+
+	// Row 3: VpcId -- CURRENT MATCH (1/3), cursor on this row
+	// "vpc" in "vpc-0aaa111bbb222cc" is the match. Show with cursor + orange highlight.
+	leftLines = append(leftLines, renderSearchField(
+		"VpcId", "", "vpc", "-0aaa111bbb222cc", true, leftW, true, false))
+
+	// Row 4: SubnetId (no match, navigable but no search hit)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		leftW, false))
+
+	// Row 5: SecurityGroups section (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "SecurityGroups", value: "", kind: fieldSection},
+		leftW, false))
+
+	// Row 6: GroupId sub-field (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		leftW, false))
+
+	// Row 7: GroupId sub-field (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		leftW, false))
+
+	// Row 8: IamInstanceProfile section (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "IamInstanceProfile", value: "", kind: fieldSection},
+		leftW, false))
+
+	// Row 9: Arn sub-field (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "Arn", value: "arn:aws:iam::123456:role/web-role", kind: fieldSubNav},
+		leftW, false))
+
+	// Row 10: ImageId (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		leftW, false))
+
+	// Row 11: VpcConfig section -- MATCH 2/3, amber highlight on "Vpc" in the key
+	leftLines = append(leftLines, renderSearchSectionField(
+		"VpcConfig", "", "Vpc", "Config", false, leftW))
+
+	// Row 12: Sub-field VpcId -- MATCH 3/3, amber highlight
+	leftLines = append(leftLines, renderSearchField(
+		"VpcId", "", "vpc", "-0aaa111bbb222cc", false, leftW, false, true))
+
+	// Row 13: AvailabilityZone sub-field (no match)
+	leftLines = append(leftLines, renderDetailField(
+		detailField{key: "AvailabilityZone", value: "us-east-1a", kind: fieldSubPlain},
+		leftW, false))
+
+	// Match indicator at bottom
+	leftLines = append(leftLines, pad(matchIndStyle.Render(" [1/3 matches]"), leftW))
+
+	// Right column (unaffected by search)
+	related := []relatedRow{
+		{label: "Auto Scaling Groups", state: rowAvailable},
+		{label: "CloudWatch Alarms", state: rowAvailable},
+		{label: "CloudFormation Stacks", state: rowAvailable},
+		{label: "EBS Snapshots", state: rowAvailable},
+		{label: "Elastic IPs", count: "(1)", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
+		{label: "EKS Node Groups", state: rowDim},
+		{label: "Elastic Beanstalk", state: rowDim},
+	}
+
+	box := renderTwoColBoxCustomLeft(leftLines, related, "detail -- i-0abc123 (web-prod)", w, false)
+	return header + "\n" + box
+}
+
+// -- Mockup 14: Filter active in right column --
+// Right column focused, filter "/cloud" active. Only matching types shown.
+
+func mockFilterRightColumn() string {
+	w := 120
+	header := renderHeaderFilter("prod", "us-east-1", "3.28.0", w, "cloud")
+
+	fields := []detailField{
+		{key: "InstanceId", value: "i-0abc123def456789a", kind: fieldPlain},
+		{key: "InstanceType", value: "t3.large", kind: fieldPlain},
+		{key: "State", value: "running", kind: fieldPlain},
+		{key: "VpcId", value: "vpc-0aaa111bbb222cc", kind: fieldNavigable},
+		{key: "SubnetId", value: "subnet-0bbb222ccc333dd", kind: fieldNavigable},
+		{key: "SecurityGroups", value: "", kind: fieldSection},
+		{key: "GroupId", value: "sg-0ccc333ddd444ee", kind: fieldSubNav},
+		{key: "GroupName", value: "web-sg", kind: fieldSubPlain},
+		{key: "GroupId", value: "sg-0ddd444eee555ff", kind: fieldSubNav},
+		{key: "GroupName", value: "db-access-sg", kind: fieldSubPlain},
+		{key: "IamInstanceProfile", value: "", kind: fieldSection},
+		{key: "Arn", value: "arn:aws:iam::123456:role/web-role", kind: fieldSubNav},
+		{key: "ImageId", value: "ami-0aaa111222333", kind: fieldNavigable},
+		{key: "KeyName", value: "prod-keypair", kind: fieldPlain},
+	}
+
+	// Right column: filtered to only types containing "cloud"
+	related := []relatedRow{
+		{label: "CloudWatch Alarms", state: rowSelected}, // cursor on first match
+		{label: "CloudFormation Stacks", state: rowAvailable},
+		{label: "CloudTrail Events", state: rowAvailable},
+	}
+
+	box := renderTwoColBox(fields, -1, related, "detail -- i-0abc123 (web-prod)", w, true)
+	return header + "\n" + box
+}
+
 // -- Mockup 12: Help screen --
 
 func mockHelpScreen() string {
@@ -883,7 +1136,7 @@ func mockHelpScreen() string {
 			hk("<k>", "Up") +
 			hk("<:>", "Command"),
 		" " + hk("<h/l>", "Switch col") +
-			blank +
+			hk("</>", "Filter list") +
 			hk("<g>", "Top") +
 			blank,
 		" " + hk("<c>", "Copy value") +
@@ -894,9 +1147,17 @@ func mockHelpScreen() string {
 			blank +
 			hk("<pgdn>", "Page down") +
 			blank,
-		" " + blank +
+		" " + hk("</>", "Search") +
 			blank +
 			hk("<pgup>", "Page up") +
+			blank,
+		" " + hk("<n>", "Next match") +
+			blank +
+			blank +
+			blank,
+		" " + hk("<N>", "Prev match") +
+			blank +
+			blank +
 			blank,
 		"",
 		lipgloss.NewStyle().Foreground(colDim).Render(
@@ -958,6 +1219,14 @@ func main() {
 	// 12. Help screen
 	fmt.Print(divider("12. Help screen for two-column detail view"))
 	fmt.Println(mockHelpScreen())
+
+	// 13. Search active in left column
+	fmt.Print(divider("13. Search active -- left col, 'vpc', match 1/3 (120 cols)"))
+	fmt.Println(mockSearchLeftColumn())
+
+	// 14. Filter active in right column
+	fmt.Print(divider("14. Filter active -- right col, '/cloud', 3 types (120 cols)"))
+	fmt.Println(mockFilterRightColumn())
 
 	fmt.Println()
 }
