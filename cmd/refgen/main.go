@@ -57,6 +57,33 @@ type resourceDef struct {
 	typ     reflect.Type
 }
 
+// SQSQueueAttributes is a synthetic struct representing the fields returned by
+// SQS GetQueueAttributes (QueueAttributeNameAll). SQS returns a map[string]string
+// so there is no SDK struct to reflect on.
+type SQSQueueAttributes struct {
+	QueueArn                          string
+	ApproximateNumberOfMessages       string
+	ApproximateNumberOfMessagesNotVisible string
+	ApproximateNumberOfMessagesDelayed string
+	CreatedTimestamp                   string
+	LastModifiedTimestamp              string
+	VisibilityTimeout                 string
+	MaximumMessageSize                string
+	MessageRetentionPeriod            string
+	DelaySeconds                      string
+	Policy                            string
+	RedrivePolicy                     string
+	RedriveAllowPolicy                string
+	DeadLetterTargetArn               string
+	FifoQueue                         string
+	ContentBasedDeduplication         string
+	DeduplicationScope                string
+	FifoThroughputLimit               string
+	KmsMasterKeyId                    string
+	KmsDataKeyReusePeriodSeconds      string
+	SqsManagedSseEnabled              string
+}
+
 func main() {
 	resources := []resourceDef{
 		{"s3", "s3types.Bucket", reflect.TypeOf(s3types.Bucket{})},
@@ -98,6 +125,7 @@ func main() {
 		{"eni", "ec2types.NetworkInterface", reflect.TypeOf(ec2types.NetworkInterface{})},
 		{"sns-sub", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
 		{"sns_subscriptions", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
+		{"sqs", "SQSQueueAttributes (synthetic)", reflect.TypeOf(SQSQueueAttributes{})},
 		{"iam-user", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
 		{"iam-group", "iamtypes.Group", reflect.TypeOf(iamtypes.Group{})},
 		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeOf(docdbtypes.DBClusterSnapshot{})},

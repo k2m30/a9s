@@ -2,7 +2,7 @@
 
  ┌───────────────┬─────────────────────────────────────────────────────────────────────┐
  │ COMPUTE       │ EC2, ECS Services, ECS Clusters, ECS Tasks, Lambda, ASG, Elastic    │
- │               │ Beanstalk                                                           │
+ │               │ Beanstalk, EBS Volumes, EBS Snapshots, AMIs                         │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
  │ CONTAINERS    │ EKS Clusters, EKS Node Groups                                       │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
@@ -11,9 +11,10 @@
  │               │ Endpoints, Transit Gateways, Network Interfaces                     │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
  │ DATABASES &   │ DB Instances, S3 Buckets, ElastiCache Redis, DB Clusters, DynamoDB, │
- │ STORAGE       │  OpenSearch, Redshift, EFS, RDS Snapshots, DocDB Snapshots          │
+ │ STORAGE       │ OpenSearch, Redshift, EFS, RDS Snapshots, DocDB Snapshots           │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
- │ MONITORING    │ CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails         │
+ │ MONITORING    │ CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails,        │
+ │               │ CloudTrail Events                                                   │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
  │ MESSAGING     │ SQS Queues, SNS Topics, SNS Subscriptions, EventBridge Rules,       │
  │               │ Kinesis Streams, MSK Clusters, Step Functions                       │
