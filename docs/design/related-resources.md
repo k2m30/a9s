@@ -1,7 +1,7 @@
 # Related Resources: Two-Column Detail View
 
 Issue: #64
-Version: 4.0
+Version: 4.2
 Target: a9s v3.28+
 Status: Design
 
@@ -33,7 +33,34 @@ entering detail view). The toggle state persists across navigation -- if the
 user hides the column, it stays hidden when entering a related resource's
 detail.
 
-CFN Stack Resources key remap: `r` -> `R` (same as v3.0 spec, unchanged).
+**Key binding implementation:** The detail view uses a NEW `ToggleRelated`
+binding in `keys.Map`, separate from the existing `Resources` binding.
+Both use the physical key `r` but are distinct bindings dispatched in
+different view contexts:
+
+| Binding | Struct Field | Physical Key | Active Context |
+|---------|-------------|-------------|----------------|
+| `Resources` | `keys.Map.Resources` | `r` | Resource list views (child-view trigger) |
+| `ToggleRelated` | `keys.Map.ToggleRelated` | `r` | Detail view (two-column toggle) |
+
+There is no code conflict because the detail view and resource list view
+are mutually exclusive -- only one is active at a time. The detail view's
+`Update()` matches `ToggleRelated`, never `Resources`. The resource list
+view's `Update()` matches `Resources`, never `ToggleRelated`.
+
+**CFN Stack Resources remap:** The existing `Resources` child-view
+binding for CloudFormation stacks uses `Key: "r"` in its `ChildViewDef`.
+To avoid collision with `ToggleRelated` in the CFN stack detail view,
+the CFN stack resource type definition changes `Key: "r"` to `Key: "R"`
+(uppercase). A new `keys.Map.StackResources` binding is added:
+
+| Binding | Struct Field | Physical Key | Active Context |
+|---------|-------------|-------------|----------------|
+| `StackResources` | `keys.Map.StackResources` | `R` | CFN stack detail view (child-view trigger) |
+
+This is a concrete `ChildViewDef` change in the CFN stack resource type
+registration, not a behavioral change -- the same child view is triggered,
+just with a shifted key to free `r` for the related column toggle.
 
 ---
 
@@ -457,7 +484,9 @@ When Tab switches back to the left column:
 | `esc` | Go back (pop view stack) | Go back (pop view stack) |
 | `?` | Help | Help |
 | `ctrl+r` | Refresh detail + re-check related | Refresh detail + re-check related |
-| `/` | Not active (detail view) | Not active (detail view) |
+| `/` | Activate search (left column text) | Filter right column list |
+| `n` | Next search match | -- (not applicable) |
+| `N` | Previous search match | -- (not applicable) |
 | `pgup`/`ctrl+u` | Page up | Page up |
 | `pgdn`/`ctrl+d` | Page down | Page down |
 
@@ -818,6 +847,14 @@ Notes:
 | `KeyMsg(ctrl+r)` | DetailView | DetailView refreshed | Re-fetch detail + re-check related |
 | `KeyMsg(c)` | Left focused | Copied field value | Flash "Copied!" in header |
 | `KeyMsg(c)` | Right focused | Copied type name | Flash "Copied!" in header |
+| `KeyMsg(/)` | Left focused, normal | Left: search input active | Header shows "/..." input |
+| `KeyMsg(/)` | Right focused, normal | Right: filter input active | Header shows "/..." input; list filters |
+| `KeyMsg(Enter)` | Search input active | Left: search confirmed | Highlights shown, match counter visible |
+| `KeyMsg(Esc)` | Search input active | Search cancelled | Header reverts, no highlights |
+| `KeyMsg(Esc)` | Search results active | Search cleared | Highlights removed, normal mode |
+| `KeyMsg(n)` | Left, search results | Next match | Cursor jumps, counter updates |
+| `KeyMsg(N)` | Left, search results | Previous match | Cursor jumps, counter updates |
+| `KeyMsg(Esc)` | Right, filter active | Filter cleared | All rows restored |
 | `tea.WindowSizeMsg` | Two-column | Reflow | May switch to stacked below 100 cols |
 
 ### View Stack Examples
@@ -862,9 +899,12 @@ push(ec2-detail:i-abc) -> [Enter on sg-0ccc333] push(sg-detail:sg-0ccc333)
 | `y` | Switch to YAML view (full width) | Any |
 | `h`/`l` | Switch column focus (`h` = left, `l` = right) | Either column |
 | `c` | Copy field value / type name | Either column |
-| `esc` | Go back | Any |
+| `/` | Search left-col text / filter right-col list | Context-dependent (see section 17) |
+| `n` | Next search match | Left column, search active |
+| `N` | Previous search match | Left column, search active |
+| `esc` | Clear search / go back | See section 17.5 |
 | `?` | Help | Any |
-| `ctrl+r` | Refresh all | Any |
+| `ctrl+r` | Refresh all (clears search) | Any |
 | `pgup`/`ctrl+u` | Page up in focused column | Either column |
 | `pgdn`/`ctrl+d` | Page down in focused column | Either column |
 | `ctrl+c` | Force quit | Any |
@@ -873,10 +913,9 @@ push(ec2-detail:i-abc) -> [Enter on sg-0ccc333] push(sg-detail:sg-0ccc333)
 
 | Key | Why Not |
 |-----|---------|
-| `/` (filter) | Detail view has no filterable list of instances |
 | `:` (command) | Already available globally (unchanged) |
 | `d` (detail) | Already in detail view |
-| `N`/`S`/`A` (sort) | Not a sortable list |
+| `S`/`A` (sort) | Not a sortable list |
 
 ---
 
@@ -901,6 +940,10 @@ No new colors. Two new style combinations using existing palette values.
 | Frame title | `#c0caf5` | -- | Bold | Existing: Frame title |
 | Depth indicator `[N]` | `#565f89` | -- | -- | Existing: Header dim |
 | Scroll indicator | `#565f89` | -- | Dim | Existing: Dim text |
+| Search match (non-current) | `#1a1b26` | `#e0af68` | -- | Existing: amber bg from QA-26 |
+| Search match (current) | `#1a1b26` | `#ff9e64` | Bold | Existing: orange bg from QA-26 |
+| Match indicator text | `#565f89` | -- | Dim | "[3/17 matches]" at frame bottom |
+| Search/filter input (header) | `#e0af68` | -- | Bold | Existing: Header filter |
 
 ---
 
@@ -948,6 +991,16 @@ When the right column has more rows than visible height:
 - Right column scrolls independently when focused
 - Scroll indicator shows remaining rows
 
+### State Preservation on Layout Transition
+
+When `WindowSizeMsg` crosses the 100-col threshold (switching between
+stacked and two-column layouts), all state is preserved: cursor
+positions for both columns, search highlights and match index, filter
+query and narrowed list, focused column, scroll offsets. The focused
+column remains focused in both layouts. In stacked mode, Tab switches
+between the detail section (top) and related section (bottom) -- the
+same semantics, different visual arrangement.
+
 ---
 
 ## 14. Help Screen
@@ -961,10 +1014,12 @@ When `?` is pressed in the two-column detail view:
 |                                                                                                        |
 | <enter>  Open link         <tab>    Switch col  <j>       Down       <?>  Help                         |
 | <esc>    Go back           <r>      Toggle col  <k>       Up         <:>  Command                      |
-| <h/l>    Switch col                             <g>       Top                                           |
+| <h/l>    Switch col        </>      Filter list <g>       Top                                           |
 | <c>      Copy value                             <G>       Bottom                                       |
 | <y>      YAML view                              <pgdn>    Page down                                    |
-|                                                  <pgup>    Page up                                      |
+| </>      Search                                  <pgup>    Page up                                      |
+| <n>      Next match                                                                                    |
+| <N>      Prev match                                                                                    |
 |                                                                                                        |
 |                      Press any key to close                                                             |
 +--------------------------------------------------------------------------------------------------------+
@@ -1041,3 +1096,339 @@ Enter behavior.
 
 **Answer: No.** Fixed at 32 characters. The content is predetermined
 resource type names, so dynamic width adds complexity without benefit.
+
+---
+
+## 17. Search Interaction (Cross-View Search, #89)
+
+The cross-view search component (QA-26) was designed for viewport-based
+views (YAML, logs, policy documents). The two-column detail view
+introduces a field-list cursor model that requires careful integration.
+
+This section resolves all design questions about how search interacts
+with the two-column layout.
+
+### 17.1 Decision: `/` Behavior Depends on Focused Column
+
+`/` is context-sensitive based on which column has focus:
+
+| Focus | `/` behavior | Rationale |
+|-------|-------------|-----------|
+| Left column | **Text search** (QA-26 style) | The left column displays field keys and values -- the same content as the old viewport-based detail view. Search within field text is useful for finding specific values in large detail views (40+ fields). |
+| Right column | **List filter** (QA-11 style) | The right column is a navigable list of resource type names, identical in structure to the main menu. The main menu uses `/` as a filter. Consistency demands the right column follow the same pattern. |
+
+This is the "focused column only" model. The alternative of searching
+both columns simultaneously was rejected: it would require a merged
+match index across two independent scroll positions, and `n`/`N`
+jumping between columns would be disorienting. The focused-column-only
+model is simpler and maps to established patterns already in a9s.
+
+The alternative of disabling search entirely in the two-column view
+(YAML-view-only) was also considered, but rejected. Users with 40-60
+field detail views genuinely need `/` to locate specific values. The
+field-list cursor model (j/k one-row-at-a-time) makes scrolling through
+many fields tedious without a search shortcut.
+
+### 17.2 Left Column: Text Search
+
+When the left column is focused and the user presses `/`:
+
+1. The header right side changes to `/<cursor>` (amber `#e0af68`, bold)
+2. The user types a search query (e.g., "10.0", "vpc", "running")
+3. Enter confirms the search
+4. All matches in field keys AND values are highlighted:
+   - Non-current matches: amber background `#e0af68`, dark fg `#1a1b26`
+   - Current match: orange background `#ff9e64`, dark fg `#1a1b26`, bold
+5. The match indicator `[1/N matches]` appears at the bottom of the
+   left column content area (above the frame bottom border), dim `#565f89`
+6. The cursor jumps to the field row containing the first match
+7. `n`/`N` advances/retreats to the next/previous match, moving the
+   cursor to the field row containing that match
+
+**Adaptation from viewport search:** The key difference from the
+viewport-based search (QA-26) is that the cursor jumps to the matched
+row rather than scrolling a viewport offset. This is because the left
+column is a field list with per-row cursor, not a free-scrolling
+viewport. The visual result is the same: the user sees the matched text
+centered on screen.
+
+**Match scope:** Search matches span the full rendered text of each
+field row, including the key label and value. Searching for "Vpc" would
+match both the key "VpcId:" and any value containing "Vpc". This is
+case-insensitive, consistent with QA-26-I01.
+
+**Interaction with navigable fields:** Search highlighting coexists
+with navigable-field underline styling. When a match falls on a
+navigable field's value, the search highlight (amber/orange background)
+takes precedence over the underline. The underline reappears when the
+search is cleared. When the cursor lands on a row with a navigable
+field (via `n`/`N`), Enter still opens the target resource. Search mode
+does not change Enter's behavior -- Enter always means "open navigable
+field" in the left column. There is no "jump to match" Enter action;
+`n`/`N` handles match navigation.
+
+**Word wrap interaction:** Word wrap is always ON in the left column
+(section 4.4). Matches on wrapped continuation lines are highlighted
+normally. The cursor lands on the field's first line; the entire
+field (including wrapped lines) is highlighted with the cursor style.
+
+### 17.3 Right Column: List Filter
+
+When the right column is focused and the user presses `/`:
+
+1. The header right side changes to `/<cursor>` (amber `#e0af68`, bold)
+2. The user types a filter term (e.g., "cloud", "sg")
+3. Matching happens live as the user types (immediate filtering, no
+   Enter required) -- same as main menu filter behavior (QA-11)
+4. The right column list narrows to show only resource types whose names
+   contain the filter substring (case-insensitive)
+5. Dim (unavailable) rows that match the filter ARE shown (still dim)
+6. The frame title does NOT change (unlike the resource list which shows
+   `(matched/total)`, the right column is too small for that)
+7. Esc clears the filter and restores all rows
+
+This is identical to how `/` works in the main menu and resource list.
+No matched-text highlighting inside row cells. The filter simply hides
+non-matching rows.
+
+**Why filter instead of search?** The right column has at most ~18 rows
+(VPC has the most). Highlighting matches within 18 short labels adds
+no value -- the user can see all the labels at a glance. Filtering is
+more useful: it narrows the list when looking for a specific type.
+
+### 17.4 Switching Columns with Active Search/Filter
+
+When the user has an active search (left) or filter (right) and
+switches columns with Tab or h/l:
+
+| From | To | Behavior |
+|------|----|----------|
+| Left (search active) | Right | Search highlights persist in left column. Right column enters normal mode (no filter). `n`/`N` are inactive until user switches back to left column. |
+| Right (filter active) | Left | Filter persists in right column (filtered list stays narrowed). Left column enters normal mode. |
+| Left (search active) | Right, then back to left | Search highlights and match position are restored. `n`/`N` resume from where they left off. |
+| Right (filter active) | Left, then back to right | Filter is still active. The narrowed list is preserved. |
+
+The search/filter state is per-column and persists across focus switches.
+This avoids the confusing "matches disappear" problem when switching
+columns: they do not disappear, they simply become non-interactive
+while the other column is focused.
+
+**Header state on column switch:** When switching from a column with
+active search/filter to a column without, the header right side reverts
+to `? for help` (normal state). The search/filter query text is
+preserved internally but hidden from the header. When switching back to
+the column with active search/filter, the header does NOT re-show the
+input -- instead, the highlights/filter remain visible as a reminder
+that search/filter is active. To re-enter search input mode, the user
+presses `/` again.
+
+### 17.5 Esc Layering in Search/Filter Context
+
+Esc has three possible meanings in the two-column detail view. They are
+resolved by priority:
+
+| State | Esc action | Next state |
+|-------|-----------|------------|
+| Search input active (typing in header) | Cancel search input | Normal mode (no highlights) |
+| Search results active (highlights visible) | Clear search highlights | Normal mode |
+| Filter active (right column narrowed) | Clear filter, restore all rows | Normal mode |
+| Normal mode (no search, no filter) | Go back (pop view stack) | Previous view |
+
+This means:
+- If search input is showing: first Esc cancels the input.
+- If highlights are visible: first Esc clears them. Second Esc goes back.
+- If filter is active: first Esc clears it. Second Esc goes back.
+
+This matches the established pattern from QA-26-G04 (two Esc presses
+to exit view when search is active).
+
+### 17.6 `n`/`N` Key Conflict Analysis
+
+In the detail view (two-column), `n` and `N` have no prior bindings:
+
+| Key | Resource list binding | Detail view binding (before) | Detail view binding (now) |
+|-----|----------------------|-----------------------------|-----------------------------|
+| `n` | -- | -- | Next search match (left col, search active) |
+| `N` | Sort by name | -- | Previous search match (left col, search active) |
+
+`N` (uppercase) is bound to "Sort by name" in list views only. It has
+never been bound in the detail view. There is no conflict.
+
+When search is NOT active, `n`/`N` are no-ops in the detail view.
+They only activate when search results are visible in the left column.
+
+When the right column is focused, `n`/`N` are no-ops regardless of
+whether the left column has active search highlights. This prevents
+confusion: match navigation only works when the search column (left)
+has focus.
+
+### 17.7 `r` Key Conflict Analysis
+
+The physical key `r` is already bound to `keys.Map.Resources` (child-view
+trigger, active in resource list views). The detail view introduces a new
+`keys.Map.ToggleRelated` binding on the same physical key. There is no
+runtime conflict because the two bindings are dispatched in mutually
+exclusive view contexts:
+
+| Binding | Struct Field | Physical Key | View Context |
+|---------|-------------|-------------|--------------|
+| `Resources` | `keys.Map.Resources` | `r` | Resource list view |
+| `ToggleRelated` | `keys.Map.ToggleRelated` | `r` | Detail view |
+
+The detail view's `Update()` matches against `ToggleRelated`; the
+resource list view's `Update()` matches against `Resources`. Neither
+view imports the other's binding.
+
+**CFN Stack Resources special case:** The CFN stack resource type has a
+`ChildViewDef` with `Key: "r"` that triggers the stack resources child
+view. Because the CFN stack detail view now needs `r` for
+`ToggleRelated`, the `ChildViewDef` is changed to `Key: "R"` (uppercase
+shift). A new `keys.Map.StackResources` binding for `R` is added. This
+is the only resource type affected -- no other child-view trigger uses
+`r`.
+
+**`/` dual binding:** `/` is bound to both `Filter` and `Search` in
+`keys.Map`. Implementation must branch on the focused column before key
+matching: left column focused dispatches to `Search`, right column
+focused dispatches to `Filter`. This is the same pattern used for `c`
+(copy) which behaves differently per column.
+
+### 17.8 YAML View (No Change)
+
+YAML view does not show the right column (section 2.6). Search in YAML
+view works exactly as specified in QA-26: full-width viewport search
+with `/`, highlights, `n`/`N` navigation, match counter. No changes
+needed for the two-column feature.
+
+### 17.9 Stacked Layout (< 100 cols)
+
+In stacked mode (section 2.5), the detail fields and related list are
+in a single scrollable stream separated by `-- Related ---`.
+
+- When the detail section has focus (top): `/` activates text search
+  across the field rows, same as left-column search in two-column mode.
+- When the related section has focus (bottom): `/` activates list
+  filter, same as right-column filter in two-column mode.
+
+Tab switches between sections. The search/filter state is per-section
+and follows the same persistence rules as section 17.4.
+
+### 17.10 Right Column Hidden (`r` toggled off)
+
+When the right column is hidden, the view is a single-column detail
+display. `/` activates text search (same as left-column search).
+`n`/`N` navigate matches. This is identical to the old viewport-based
+detail view behavior from QA-26, except the cursor jumps to matched
+rows instead of scrolling a viewport offset.
+
+### 17.11 Wireframe: Search Active in Two-Column View
+
+Left column focused, search for "vpc" confirmed, 3 matches found.
+Current match on VpcId value (match 1/3).
+
+```
+ a9s v3.28.0  prod:us-east-1                                                                         ? for help
++----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
+| InstanceId:          i-0abc123def456789a                    |   Auto Scaling Groups                          |
+| InstanceType:        t3.large                               |   CloudWatch Alarms                            |
+|[SELECTED] VpcId:               [MATCHCUR]vpc[/]-0aaa111bbb222cc        [/]|   CloudFormation Stacks                        |
+| SubnetId:            subnet-0bbb222ccc333dd                 |   EBS Snapshots                                |
+| SecurityGroups:                                             |   Elastic IPs                                  |
+|     - GroupId:       sg-0ccc333ddd444ee                     | [DIM]EKS Node Groups[/]                          |
+|     - GroupId:       sg-0ddd444eee555ff                     |   CloudTrail Events                            |
+| IamInstanceProfile:                                         |                                                |
+|     Arn:             arn:aws:iam::role/web                   |                                                |
+| ImageId:             ami-0aaa111222333                       |                                                |
+| [MATCH]Vpc[/]Config:                                                |                                                |
+|     [MATCH]Vpc[/]Id:           vpc-0aaa111bbb222cc                  |                                                |
+| ...                                                         |                                                |
+| [DIM][1/3 matches][/]                                                   |                                                |
++-------------------------------------------------------------------------------------------------------------+
+```
+
+Notes:
+- `[MATCHCUR]` = orange bg `#ff9e64`, dark fg, bold (current match)
+- `[MATCH]` = amber bg `#e0af68`, dark fg (other matches)
+- The cursor (full-row highlight) is on the VpcId field row (match 1)
+- Match 2 is on "VpcConfig:" section header (key contains "Vpc")
+- Match 3 is on sub-field "VpcId:" under VpcConfig
+- `n` would move cursor to VpcConfig row, `N` would wrap to match 3
+- Right column is unaffected by left-column search
+- Navigable underlines on values are hidden while search highlights
+  are active (search bg takes precedence)
+- Match indicator `[1/3 matches]` at bottom-left of content area
+
+### 17.12 Wireframe: Filter Active in Right Column
+
+Right column focused, filter for "cloud" active, 3 of 9 types match.
+
+```
+ a9s v3.28.0  prod:us-east-1                                                                      /cloud
++----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
+| InstanceId:          i-0abc123def456789a                    |[SELECTED] CloudWatch Alarms          [/]       |
+| InstanceType:        t3.large                               |   CloudFormation Stacks                        |
+| State:               running                                |   CloudTrail Events                            |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |                                                |
+| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |                                                |
+| SecurityGroups:                                             |                                                |
+|     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       |                                                |
+|     - GroupId:       [UNDERLINE]sg-0ddd444eee555ff[/]       |                                                |
+| ...                                                         |                                                |
++-------------------------------------------------------------------------------------------------------------+
+```
+
+Notes:
+- Header right shows `/cloud` (amber bold) -- filter input active
+- Right column shows only types matching "cloud": CloudWatch Alarms,
+  CloudFormation Stacks, CloudTrail Events
+- Non-matching types (Target Groups, ASG, EKS, etc.) are hidden
+- Left column navigable underlines remain visible (no search active)
+- Separator color is accent `#7aa2f7` (right column focused)
+- Esc clears the filter and restores all 9 types
+
+---
+
+## 18. Summary of v4.0 to v4.1 Changes
+
+Changes from v4.0 to v4.1, prompted by cross-view search (#89):
+
+1. **`/` is now active in the detail view** -- previously explicitly
+   excluded. Behavior depends on focused column (text search vs. list
+   filter).
+2. **`n`/`N` added** to the detail view key bindings for search match
+   navigation. No conflict with existing bindings.
+3. **Esc layering** clarified: search input > search results > filter >
+   go back. Matches the QA-26-G04 pattern.
+4. **Search highlights in left column** coexist with navigable field
+   underlines and cursor highlighting. Search bg takes precedence.
+5. **Help screen wireframe** updated to include `/` Search, `n` Next,
+   `N` Prev in the DETAIL column and `/` Filter in the RELATED column.
+6. **State transition table** extended with search/filter messages.
+7. **Color table** extended with search match colors (amber/orange bg).
+8. **Two new wireframes** added: sections 17.11 (search active) and
+   17.12 (right-column filter active).
+
+---
+
+## 19. Summary of v4.1 to v4.2 Changes
+
+Changes from v4.1 to v4.2, prompted by TUI reviewer audit:
+
+1. **`r` key binding clarified** -- the detail view uses a NEW
+   `ToggleRelated` binding in `keys.Map`, separate from the existing
+   `Resources` binding. Both use physical key `r` but are dispatched in
+   mutually exclusive view contexts (section 1, "Key Binding: `r`").
+2. **CFN Stack Resources remap made concrete** -- `ChildViewDef` change
+   from `Key: "r"` to `Key: "R"`, with a new `keys.Map.StackResources`
+   binding (section 1, "Key Binding: `r`").
+3. **`r` key conflict analysis** added as section 17.7, parallel to the
+   existing `n`/`N` analysis in 17.6. Documents the `Resources` vs.
+   `ToggleRelated` dispatch model and the `/` dual-binding note.
+4. **Header state on column switch** specified in section 17.4 -- when
+   switching from a column with active search/filter to one without,
+   the header reverts to `? for help`. Query text preserved internally;
+   re-entering input mode requires pressing `/` again.
+5. **State preservation on layout transition** added to section 13 --
+   when `WindowSizeMsg` crosses the 100-col threshold, all state is
+   preserved: cursor positions, search/filter state, focused column,
+   scroll offsets.
