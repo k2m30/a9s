@@ -35,6 +35,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateCommandMode(msg)
 	}
 
+	// If the active view is in search input mode, delegate all keys to it.
+	// This prevents global keys (q, ?, i, etc.) from firing while typing a search query.
+	if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchInputMode() {
+		return m.updateActiveView(msg)
+	}
+
 	// Global keys in normal mode
 	if key.Matches(msg, m.keys.Help) {
 		// If already on help, let the help view handle it (closes help)
@@ -68,6 +74,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if key.Matches(msg, m.keys.Escape) {
+		// If active view has active search (confirmed highlights), delegate Esc to clear it.
+		if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
+			return m.updateActiveView(msg)
+		}
 		// If active view has a confirmed filter, clear it first
 		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
 			f.SetFilter("")
@@ -91,8 +101,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cmdInput.Focus()
 			return m, nil
 		}
-		// On static views (detail, yaml, help, reveal), ignore /
-		// (help handles it via its own Update which sends PopViewMsg)
+		// On help views, delegate / to the view (which sends PopViewMsg to close).
+		if _, ok := m.activeView().(*views.HelpModel); ok {
+			return m.updateActiveView(msg)
+		}
+		// On searchable views (detail, YAML), delegate / for search activation.
+		if _, ok := m.activeView().(views.Searchable); ok {
+			return m.updateActiveView(msg)
+		}
+		// On other static views (reveal), consume / without action.
+		return m, nil
 	}
 
 	// Copy (c) — context-dependent clipboard copy
@@ -185,6 +203,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
 	m.availabilityGen++ // cancel in-flight probes
+	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}
@@ -207,6 +226,7 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	m.region = msg.Region
 	m.identity = nil
 	m.availabilityGen++ // cancel in-flight probes
+	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}
@@ -293,6 +313,18 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				return messages.FlashMsg{Text: fmt.Sprintf("unknown resource type: %s", msg.ResourceType), IsError: true}
 			}
+		}
+		// Check resource cache before creating a new view and fetching.
+		if entry, ok := m.resourceCache[msg.ResourceType]; ok {
+			rl := views.NewResourceListFromCache(
+				*rt, m.viewConfig, m.keys,
+				entry.resources, entry.pagination,
+				entry.filterText, entry.sortField, entry.sortAsc,
+				entry.cursorPos, entry.hScrollOffset,
+			)
+			rl.SetSize(m.innerSize())
+			m.pushView(&rl)
+			return m, nil
 		}
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
 		rl.SetSize(m.innerSize())
@@ -402,6 +434,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	rt := rl.ResourceType()
+	delete(m.resourceCache, rt) // clear cache for refreshed type only
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 	// If the view has a parent context, it's a child view — use child fetch path.

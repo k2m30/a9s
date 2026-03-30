@@ -11,6 +11,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -36,6 +37,19 @@ type flashState struct {
 	isError bool
 	active  bool
 	gen     int // generation counter to avoid stale clears
+}
+
+// resourceCacheEntry stores the state of a previously-viewed resource list.
+// Used to restore the list when the user re-enters the same resource type
+// from the main menu, avoiding redundant API calls.
+type resourceCacheEntry struct {
+	resources     []resource.Resource
+	pagination    *resource.PaginationMeta
+	filterText    string
+	sortField     views.SortField
+	sortAsc       bool
+	cursorPos     int
+	hScrollOffset int
 }
 
 // Model is the root Bubble Tea model. It owns the view stack, header state,
@@ -74,6 +88,8 @@ type Model struct {
 	availQueue      []string // resource short names remaining to probe
 	availChecked    int      // number probed so far in current gen
 	availTotal      int      // total types to probe in current gen
+
+	resourceCache map[string]*resourceCacheEntry
 }
 
 // Option configures the root Model.
@@ -112,13 +128,14 @@ func New(profile, region string, opts ...Option) Model {
 	}
 
 	m := Model{
-		profile:    profile,
-		region:     region,
-		keys:       k,
-		stack:      []views.View{&menu},
-		cmdInput:   ti,
-		viewConfig: cfg,
-		configErr:  cfgErr,
+		profile:       profile,
+		region:        region,
+		keys:          k,
+		stack:         []views.View{&menu},
+		cmdInput:      ti,
+		viewConfig:    cfg,
+		configErr:     cfgErr,
+		resourceCache: make(map[string]*resourceCacheEntry),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -210,7 +227,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoadedMsg:
 		m.flash.active = false
-		return m.updateActiveView(msg)
+		updated, cmd := m.updateActiveView(msg)
+		// Write-through: update cache after view has processed the message.
+		if updatedModel, ok := updated.(Model); ok {
+			if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
+				// Only cache top-level resource lists, not child views.
+				if rl.ParentContext() == nil {
+					rt := rl.ResourceType()
+					sortField, sortAsc := rl.SortState()
+					updatedModel.resourceCache[rt] = &resourceCacheEntry{
+						resources:     rl.AllResources(),
+						pagination:    rl.PaginationState(),
+						filterText:    rl.FilterText(),
+						sortField:     sortField,
+						sortAsc:       sortAsc,
+						cursorPos:     rl.CursorPosition(),
+						hScrollOffset: rl.HScrollOffset(),
+					}
+					return updatedModel, cmd
+				}
+			}
+			return updatedModel, cmd
+		}
+		return updated, cmd
 	case messages.IdentityLoadedMsg:
 		return m.handleIdentityLoaded(msg)
 	case messages.IdentityErrorMsg:
@@ -370,6 +409,13 @@ func (m Model) headerRight() string {
 		return styles.FilterActive.Render("/" + m.cmdInput.Value())
 	case modeCommand:
 		return styles.FilterActive.Render(":" + m.cmdInput.Value())
+	}
+	// Show search state from active view.
+	if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
+		info := s.SearchInfo()
+		if info != "" {
+			return styles.FilterActive.Render(info)
+		}
 	}
 	if m.flash.active {
 		text := m.flash.text

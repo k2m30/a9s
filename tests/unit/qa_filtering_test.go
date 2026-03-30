@@ -409,9 +409,9 @@ func TestQA_Filter_11_16_RegionSelector_FilterWorks(t *testing.T) {
 	}
 }
 
-// ── 11-17: Detail view -- / key is ignored ──────────────────────────────────
+// ── 11-17: Detail view -- / key activates search ────────────────────────────
 
-func TestQA_Filter_11_17_DetailView_SlashIgnored(t *testing.T) {
+func TestQA_Filter_11_17_DetailView_SlashActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
@@ -427,26 +427,34 @@ func TestQA_Filter_11_17_DetailView_SlashIgnored(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should NOT enter filter mode -- header should still show ? for help
-	if strings.Contains(plain, "/") && !strings.Contains(plain, "? for help") {
-		// Check that we didn't enter filter mode
-		lines := strings.Split(plain, "\n")
-		if len(lines) > 0 {
-			headerLine := lines[0]
-			if strings.HasSuffix(strings.TrimSpace(headerLine), "/") {
-				t.Error("/ on detail view should NOT activate filter mode")
-			}
-		}
-	}
 	// Should still be on detail view
 	if !strings.Contains(plain, "test-instance") {
 		t.Error("should still be on detail view showing test-instance")
 	}
+	// Should NOT have entered filter mode -- filter mode renders a "/" prefix in the header
+	// followed by the filter input text, not a search prompt. The filter input is always on
+	// the header right side via modeFilter, never inside the view body.
+	lines := strings.Split(plain, "\n")
+	if len(lines) > 0 {
+		headerLine := lines[0]
+		// Filter mode makes the header right show "/"+input (e.g. just "/" when empty).
+		// If the header line ends with exactly "/" and nothing else, filter mode was activated.
+		trimmed := strings.TrimSpace(headerLine)
+		if strings.HasSuffix(trimmed, "/") && !strings.Contains(trimmed, "a9s") {
+			t.Error("/ on detail view should NOT activate filter mode (header shows filter input)")
+		}
+	}
+	// Search activation means "? for help" is replaced by search info in the header.
+	// We cannot assert exact search info text since the coder owns that format, but we
+	// can assert the header no longer shows "? for help" when search is active.
+	if strings.Contains(plain, "? for help") {
+		t.Error("header should NOT show '? for help' when detail view search is active")
+	}
 }
 
-// ── 11-18: YAML view -- / key is ignored ────────────────────────────────────
+// ── 11-18: YAML view -- / key activates search ──────────────────────────────
 
-func TestQA_Filter_11_18_YAMLView_SlashIgnored(t *testing.T) {
+func TestQA_Filter_11_18_YAMLView_SlashActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
@@ -462,13 +470,24 @@ func TestQA_Filter_11_18_YAMLView_SlashIgnored(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should still be on YAML view -- not in filter mode
+	// Should still be on YAML view -- not navigated away
 	if !strings.Contains(plain, "yaml") {
 		t.Error("should still be on yaml view")
 	}
-	// Header should show ? for help, not a filter indicator
-	if !strings.Contains(plain, "? for help") {
-		t.Error("header should show '? for help', not filter mode indicator")
+	// Should NOT have entered filter mode -- filter mode renders a "/" prefix in the header
+	lines := strings.Split(plain, "\n")
+	if len(lines) > 0 {
+		headerLine := lines[0]
+		trimmed := strings.TrimSpace(headerLine)
+		if strings.HasSuffix(trimmed, "/") && !strings.Contains(trimmed, "a9s") {
+			t.Error("/ on YAML view should NOT activate filter mode (header shows filter input)")
+		}
+	}
+	// Search activation means "? for help" is replaced by search info in the header.
+	// We cannot assert exact search info text since the coder owns that format, but we
+	// can assert the header no longer shows "? for help" when YAML view search is active.
+	if strings.Contains(plain, "? for help") {
+		t.Error("header should NOT show '? for help' when YAML view search is active")
 	}
 }
 

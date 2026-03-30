@@ -241,7 +241,6 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 // This test is SKIPPED until the resource cache is implemented.
 // Remove the t.Skip() call once the cache feature is in place.
 func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) {
-	t.Skip("TODO: requires resource cache implementation — Bug 2: re-entering a resource type should restore previously loaded resources without issuing new API calls")
 
 	tui.Version = "test"
 	m := newRootSizedModel()
@@ -324,7 +323,6 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 //
 // This test is SKIPPED until the resource cache is implemented.
 func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T) {
-	t.Skip("TODO: requires resource cache implementation — after re-entering cached list, M should continue from last pagination token, not start over")
 
 	tui.Version = "test"
 	m := newRootSizedModel()
@@ -385,7 +383,6 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 //
 // This test is SKIPPED until the resource cache is implemented.
 func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
-	t.Skip("TODO: requires resource cache implementation — each resource type must have an independent cache slot")
 
 	tui.Version = "test"
 	m := newRootSizedModel()

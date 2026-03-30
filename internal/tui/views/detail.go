@@ -9,6 +9,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -31,6 +33,7 @@ type DetailModel struct {
 	width        int
 	height       int
 	keys         keys.Map
+	search       SearchModel
 }
 
 // NewDetail creates a DetailModel for the given resource.
@@ -53,7 +56,34 @@ func (m DetailModel) Init() (DetailModel, tea.Cmd) {
 func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Search input mode captures all keys.
+		if m.search.IsInputMode() {
+			m.search, _ = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, nil
+		}
 		switch {
+		case key.Matches(msg, m.keys.Search):
+			m.search.Activate()
+			return m, nil
+		case key.Matches(msg, m.keys.SearchNext):
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.NextMatch()
+				m.refreshViewportContent()
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.SearchPrev):
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.PrevMatch()
+				m.refreshViewportContent()
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Escape):
+			if m.search.IsActive() {
+				m.search.Deactivate()
+				m.refreshViewportContent()
+				return m, nil
+			}
 		case key.Matches(msg, m.keys.YAML):
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
@@ -64,7 +94,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.ToggleWrap):
 			m.wrap = !m.wrap
 			m.viewport.SoftWrap = m.wrap
-			m.viewport.SetContent(m.renderContent())
+			m.refreshViewportContent()
 			return m, nil
 		}
 	}
@@ -97,7 +127,23 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.viewport.SetWidth(w)
 		m.viewport.SetHeight(h)
 	}
-	m.viewport.SetContent(m.renderContent())
+	m.refreshViewportContent()
+}
+
+// refreshViewportContent re-renders content and applies search highlights.
+func (m *DetailModel) refreshViewportContent() {
+	content := m.renderContent()
+	if m.search.IsActive() && m.search.Query() != "" {
+		plain := ansi.Strip(content)
+		m.search.SetContent(plain)
+		var matchLine int
+		content, matchLine = m.search.Apply(content)
+		if matchLine >= 0 {
+			m.viewport.GotoTop()
+			m.viewport.SetYOffset(matchLine)
+		}
+	}
+	m.viewport.SetContent(content)
 }
 
 // FrameTitle returns the resource identifier.
@@ -120,6 +166,29 @@ func (m DetailModel) CopyContent() (string, string) {
 // GetHelpContext returns HelpFromDetail.
 func (m DetailModel) GetHelpContext() HelpContext {
 	return HelpFromDetail
+}
+
+// IsSearchActive returns true when search is active (input mode or confirmed highlights).
+func (m DetailModel) IsSearchActive() bool {
+	return m.search.IsActive()
+}
+
+// IsSearchInputMode returns true when the search input is capturing keystrokes.
+func (m DetailModel) IsSearchInputMode() bool {
+	return m.search.IsInputMode()
+}
+
+// SearchInfo returns the search state string for the header.
+// Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
+func (m DetailModel) SearchInfo() string {
+	if !m.search.IsActive() {
+		return ""
+	}
+	if m.search.IsInputMode() {
+		q := m.search.Query()
+		return "/" + q
+	}
+	return m.search.MatchInfo()
 }
 
 // ResourceID returns the resource ID for clipboard copy.
@@ -259,7 +328,7 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 		}
 		if strings.Contains(val, "\n") {
 			lines = append(lines, " "+styles.DetailSection.Render(path+":"))
-			for _, subLine := range strings.Split(val, "\n") {
+			for subLine := range strings.SplitSeq(val, "\n") {
 				lines = append(lines, "     "+styles.DetailVal.Render(subLine))
 			}
 		} else {
