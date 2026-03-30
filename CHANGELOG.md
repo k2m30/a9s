@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.26.0] - 2026-03-30
+
+### Added
+- Resource cache — loaded resources preserved on Esc+re-enter, selective invalidation on profile/region switch (#111)
+- Cross-view search with `/` activation, `n`/`N` navigation, ANSI-aware highlighting across list, detail, and YAML views (#89)
+- Search bindings added to detail and YAML help screens (#89)
+- 68 QA story tests for search covering activation, navigation, highlighting, edge cases (#89)
+
+### Fixed
+- Availability probes retry up to 3x with exponential backoff on ThrottlingException instead of silently failing (#186)
+- `/` key routing delegates to Searchable views correctly (#89)
+- `recomputeMatches` no longer resets `currentIdx` on every call (#89)
+- Enter on empty search query deactivates instead of showing 0/0 (#89)
+
 ## [3.21.0] - 2026-03-28
 
 ### Added
