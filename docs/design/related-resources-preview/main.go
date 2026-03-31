@@ -352,6 +352,7 @@ const (
 	rowAvailable rowState = iota
 	rowDim
 	rowSelected
+	rowHeader // RELATED header -- dim, not selectable, cursor skips
 )
 
 type relatedRow struct {
@@ -371,6 +372,8 @@ func renderRelatedRow(r relatedRow, rightW int) string {
 	case rowSelected:
 		return cellSelected.Render(pad(text, rightW))
 	case rowDim:
+		return cellDim.Render(pad(text, rightW))
+	case rowHeader:
 		return cellDim.Render(pad(text, rightW))
 	default:
 		return cellNormal.Render(pad(text, rightW))
@@ -577,6 +580,7 @@ func mockEC2LeftFocused() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "Auto Scaling Groups", state: rowAvailable},
 		{label: "Target Groups", state: rowAvailable},
 		{label: "CloudWatch Alarms", state: rowAvailable},
@@ -618,6 +622,7 @@ func mockEC2RightFocused() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "Auto Scaling Groups", state: rowSelected},
 		{label: "Target Groups", state: rowAvailable},
 		{label: "CloudWatch Alarms", state: rowAvailable},
@@ -694,6 +699,7 @@ func mockRDSDetail() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "CloudWatch Alarms", state: rowAvailable},
 		{label: "RDS Snapshots", count: "(5)", state: rowAvailable},
 		{label: "Secrets Manager", state: rowAvailable},
@@ -727,6 +733,7 @@ func mockVPCDetail() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "EC2 Instances", state: rowAvailable},
 		{label: "Subnets", count: "(6)", state: rowAvailable},
 		{label: "Security Groups", count: "(12)", state: rowAvailable},
@@ -802,8 +809,9 @@ func mockInitialLoad() string {
 		{key: "LaunchTime", value: "2026-03-15 09:22:45", kind: fieldPlain},
 	}
 
-	// All right column rows dim (checks in progress)
+	// All right column rows dim (checks in progress); RELATED header always dim
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "Target Groups", state: rowDim},
 		{label: "Auto Scaling Groups", state: rowDim},
 		{label: "CloudWatch Alarms", state: rowDim},
@@ -839,6 +847,7 @@ func mockDeepNavigation() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "EC2 Instances", state: rowAvailable},
 		{label: "NAT Gateways", state: rowAvailable},
 		{label: "Network Interfaces", state: rowAvailable},
@@ -876,6 +885,7 @@ func mockLambdaDetail() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "CW Log Group", state: rowAvailable},
 		{label: "SQS Event Sources", count: "(2)", state: rowAvailable},
 		{label: "EventBridge Rules", state: rowAvailable},
@@ -957,6 +967,7 @@ func mockDirectDetail() string {
 	}
 
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "EC2 Instances", state: rowAvailable},
 		{label: "Subnets", count: "(6)", state: rowAvailable},
 		{label: "Security Groups", count: "(12)", state: rowAvailable},
@@ -1058,6 +1069,7 @@ func mockSearchLeftColumn() string {
 
 	// Right column (unaffected by search)
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "Auto Scaling Groups", state: rowAvailable},
 		{label: "CloudWatch Alarms", state: rowAvailable},
 		{label: "CloudFormation Stacks", state: rowAvailable},
@@ -1097,7 +1109,9 @@ func mockFilterRightColumn() string {
 	}
 
 	// Right column: filtered to only types containing "cloud"
+	// RELATED header persists during filtering (structural, not a filterable row)
 	related := []relatedRow{
+		{label: "RELATED", state: rowHeader},
 		{label: "CloudWatch Alarms", state: rowSelected}, // cursor on first match
 		{label: "CloudFormation Stacks", state: rowAvailable},
 		{label: "CloudTrail Events", state: rowAvailable},
