@@ -1,7 +1,7 @@
 # Related Resources: Two-Column Detail View
 
 Issue: #64
-Version: 4.2
+Version: 4.3
 Target: a9s v3.28+
 Status: Design
 
@@ -376,9 +376,10 @@ event search scoped to this resource).
 
 ### 5.2 Row Format
 
-Same pattern as the main menu:
+The first row of the right column is a `RELATED` header label:
 
 ```
+  RELATED                   -- header, dim #565f89, not selectable
   Security Groups (3)     -- available, cheap count known
   Target Groups           -- available, expensive (no count)
   CloudWatch Alarms       -- available, expensive (no count)
@@ -386,12 +387,24 @@ Same pattern as the main menu:
   CloudTrail Events       -- always available, no count
 ```
 
+The `RELATED` header uses dim color `#565f89`, no bold, no accent. It is
+a passive label, not a navigation target. The cursor skips it (same
+behavior as dim/unavailable rows). When Tab moves focus to the right
+column, the cursor lands on the first resource type row, not the header.
+
+No blank spacer line between the header and the first resource type row.
+
+The `RELATED` header appears only in the two-column (side-by-side)
+layout. In stacked mode (< 100 cols), the existing `-- Related ---`
+separator line serves as the header.
+
 Row indent: 2 spaces from the separator (left padding inside right column).
 
 ### 5.3 Row States
 
 | State | Visual | Cursor |
 |-------|--------|--------|
+| Header (`RELATED`) | Dim text `#565f89` | Cursor skips |
 | Available (count known) | Normal text `#c0caf5` with `(N)` | Selectable |
 | Available (no count) | Normal text `#c0caf5` | Selectable |
 | Unavailable | Dim text `#565f89` | Cursor skips |
@@ -556,16 +569,16 @@ EC2 instance, left column focused, cursor on InstanceId (non-navigable).
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
-|[SELECTED] InstanceId:          i-0abc123def456789a         [/]| [DIM]Target Groups               [/]        |
-| InstanceType:        t3.large                               |   Auto Scaling Groups                          |
-| State:               running                                |   CloudWatch Alarms                            |
-| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   EKS Node Groups                              |
-| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |   CloudFormation Stacks                        |
-| SecurityGroups:                                             | [DIM]Elastic Beanstalk[/]                        |
-|     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       |   EBS Snapshots                                |
-|     - GroupId:       [UNDERLINE]sg-0ddd444eee555ff[/]       |   Elastic IPs                                  |
-| IamInstanceProfile:                                         |   CloudTrail Events                            |
-|     Arn:             [UNDERLINE]arn:aws:iam::role/web[/]    |                                                |
+|[SELECTED] InstanceId:          i-0abc123def456789a         [/]| [DIM]RELATED[/]                                  |
+| InstanceType:        t3.large                               | [DIM]Target Groups[/]                            |
+| State:               running                                |   Auto Scaling Groups                          |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   CloudWatch Alarms                            |
+| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |   EKS Node Groups                              |
+| SecurityGroups:                                             |   CloudFormation Stacks                        |
+|     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       | [DIM]Elastic Beanstalk[/]                        |
+|     - GroupId:       [UNDERLINE]sg-0ddd444eee555ff[/]       |   EBS Snapshots                                |
+| IamInstanceProfile:                                         |   Elastic IPs                                  |
+|     Arn:             [UNDERLINE]arn:aws:iam::role/web[/]    |   CloudTrail Events                            |
 | ImageId:             [UNDERLINE]ami-0aaa111222333[/]        |                                                |
 | KeyName:             prod-keypair                           |                                                |
 | PrivateIpAddress:    10.0.48.175                            |                                                |
@@ -588,7 +601,8 @@ Notes:
 - Navigable values: VpcId, SubnetId, SecurityGroup GroupIds, IAM Arn, ImageId
   are rendered with underline in `#7aa2f7` (shown as `[UNDERLINE]` above)
 - Non-navigable values: InstanceType, State, KeyName, IPs, etc. in plain `#c0caf5`
-- Right column: related types with silent loading. Some available (normal text),
+- Right column: `RELATED` header (dim `#565f89`) as first row, not selectable.
+  Resource types below with silent loading. Some available (normal text),
   some dim (no results found). CloudTrail Events always last.
 - Separator: thin `│` in dim `#414868` (left column focused)
 
@@ -599,16 +613,16 @@ Same view, but Tab has moved focus to the right column.
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
-| InstanceId:          i-0abc123def456789a                    |[SELECTED] Auto Scaling Groups       [/]       |
-| InstanceType:        t3.large                               |   CloudWatch Alarms                            |
-| State:               running                                |   CloudFormation Stacks                        |
-| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   EBS Snapshots                                |
-| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |   Elastic IPs                                  |
-| SecurityGroups:                                             |   CloudTrail Events                            |
-|     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       | [DIM]Target Groups[/]                            |
-|     - GroupId:       [UNDERLINE]sg-0ddd444eee555ff[/]       | [DIM]EKS Node Groups[/]                          |
-| IamInstanceProfile:                                         | [DIM]Elastic Beanstalk[/]                        |
-|     Arn:             [UNDERLINE]arn:aws:iam::role/web[/]    |                                                |
+| InstanceId:          i-0abc123def456789a                    | [DIM]RELATED[/]                                  |
+| InstanceType:        t3.large                               |[SELECTED] Auto Scaling Groups       [/]       |
+| State:               running                                |   CloudWatch Alarms                            |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   CloudFormation Stacks                        |
+| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |   EBS Snapshots                                |
+| SecurityGroups:                                             |   Elastic IPs                                  |
+|     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       |   CloudTrail Events                            |
+|     - GroupId:       [UNDERLINE]sg-0ddd444eee555ff[/]       | [DIM]Target Groups[/]                            |
+| IamInstanceProfile:                                         | [DIM]EKS Node Groups[/]                          |
+|     Arn:             [UNDERLINE]arn:aws:iam::role/web[/]    | [DIM]Elastic Beanstalk[/]                        |
 | ImageId:             [UNDERLINE]ami-0aaa111222333[/]        |                                                |
 | ...                                                         |                                                |
 +-------------------------------------------------------------------------------------------------------------+
@@ -616,7 +630,8 @@ Same view, but Tab has moved focus to the right column.
 
 Notes:
 - Left column: no cursor highlight, navigable fields still underlined
-- Right column: cursor on "Auto Scaling Groups" (first available row)
+- Right column: `RELATED` header (dim) at top, cursor on "Auto Scaling Groups"
+  (first available row, skipping the header)
 - Separator: accent `#7aa2f7` (right column focused)
 - Dim rows at bottom: Target Groups (none found), EKS Node Groups, EB
 
@@ -651,13 +666,13 @@ type, and the right column shows RDS-specific reverse relationships.
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +-------------------------------- detail -- mydb-prod --------------------------------------------------------+
-| DBInstanceIdentifier: mydb-prod                             |   CloudWatch Alarms                            |
-| Engine:               postgres                              |   RDS Snapshots                                |
-| EngineVersion:        15.4                                  |   Secrets Manager                              |
-| DBInstanceStatus:     available                             |   CloudWatch Log Groups                        |
-| DBInstanceClass:      db.t3.medium                          |   CloudTrail Events                            |
-| Endpoint:                                                   | [DIM]CloudFormation Stacks[/]                    |
-|     Address:          mydb-prod.abc123.rds.amazonaws.com    |                                                |
+| DBInstanceIdentifier: mydb-prod                             | [DIM]RELATED[/]                                  |
+| Engine:               postgres                              |   CloudWatch Alarms                            |
+| EngineVersion:        15.4                                  |   RDS Snapshots                                |
+| DBInstanceStatus:     available                             |   Secrets Manager                              |
+| DBInstanceClass:      db.t3.medium                          |   CloudWatch Log Groups                        |
+| Endpoint:                                                   |   CloudTrail Events                            |
+|     Address:          mydb-prod.abc123.rds.amazonaws.com    | [DIM]CloudFormation Stacks[/]                    |
 |     Port:             5432                                  |                                                |
 | MultiAZ:             true                                   |                                                |
 | VpcSecurityGroups:                                          |                                                |
@@ -685,17 +700,18 @@ VPC has the most reverse relationships (~18 types). The right column scrolls.
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +---------------------------- detail -- vpc-0aaa111 (production-vpc) ------------------------------------------+
-|[SELECTED] VpcId:               vpc-0aaa111bbb222cc         [/]|   EC2 Instances                              |
-| CidrBlock:           10.0.0.0/16                            |   Subnets (6)                                  |
-| State:               available                              |   Security Groups (12)                         |
-| IsDefault:           false                                  |   Route Tables (3)                             |
-| DhcpOptionsId:       dopt-0abc123                           |   NAT Gateways (2)                             |
-| InstanceTenancy:     default                                |   Internet Gateways (1)                        |
-| Tags:                                                       |   VPC Endpoints (4)                            |
-|     - Key: Name                                             |   Transit Gateways                             |
-|       Value: production-vpc                                 |   Load Balancers                               |
-|     - Key: Environment                                      |   Lambda Functions                             |
-|       Value: prod                                           |   EKS Clusters                                 |
+|[SELECTED] VpcId:               vpc-0aaa111bbb222cc         [/]| [DIM]RELATED[/]                                  |
+| CidrBlock:           10.0.0.0/16                            |   EC2 Instances                                |
+| State:               available                              |   Subnets (6)                                  |
+| IsDefault:           false                                  |   Security Groups (12)                         |
+| DhcpOptionsId:       dopt-0abc123                           |   Route Tables (3)                             |
+| InstanceTenancy:     default                                |   NAT Gateways (2)                             |
+| Tags:                                                       |   Internet Gateways (1)                        |
+|     - Key: Name                                             |   VPC Endpoints (4)                            |
+|       Value: production-vpc                                 |   Transit Gateways                             |
+|     - Key: Environment                                      |   Load Balancers                               |
+|       Value: prod                                           |   Lambda Functions                             |
+|                                                             |   EKS Clusters                                 |
 |                                                             |   DB Instances                                 |
 |                                                             |   ElastiCache                                  |
 |                                                             | [DIM]OpenSearch[/]                               |
@@ -753,12 +769,13 @@ background availability checks run.
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
-| InstanceId:          i-0abc123def456789a                    | [DIM]Target Groups[/]                            |
-| InstanceType:        t3.large                               | [DIM]Auto Scaling Groups[/]                      |
-| State:               running                                | [DIM]CloudWatch Alarms[/]                        |
-| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      | [DIM]EKS Node Groups[/]                          |
-| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   | [DIM]CloudFormation Stacks[/]                    |
-| ...                                                         | [DIM]Elastic Beanstalk[/]                        |
+| InstanceId:          i-0abc123def456789a                    | [DIM]RELATED[/]                                  |
+| InstanceType:        t3.large                               | [DIM]Target Groups[/]                            |
+| State:               running                                | [DIM]Auto Scaling Groups[/]                      |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      | [DIM]CloudWatch Alarms[/]                        |
+| SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   | [DIM]EKS Node Groups[/]                          |
+| ...                                                         | [DIM]CloudFormation Stacks[/]                    |
+|                                                             | [DIM]Elastic Beanstalk[/]                        |
 |                                                             | [DIM]EBS Snapshots[/]                            |
 |                                                             | [DIM]Elastic IPs[/]                              |
 |                                                             | [DIM]CloudTrail Events[/]                        |
@@ -775,13 +792,13 @@ After navigating EC2 -> VpcId -> Subnets list -> Subnet detail (depth 5):
 ```
  a9s [5]  prod:us-east-1                                                                             ? for help
 +------------------------ detail -- subnet-0bbb222 (private-us-east-1a) --------------------------------------+
-| SubnetId:            subnet-0bbb222ccc333dd                 |   EC2 Instances                                |
-| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   NAT Gateways                                 |
-| CidrBlock:           10.0.1.0/24                            |   Network Interfaces                           |
-| AvailabilityZone:    us-east-1a                             |   Route Tables                                 |
-| AvailableIpAddressCount: 251                                |   CloudTrail Events                            |
-| MapPublicIpOnLaunch: false                                  | [DIM]Load Balancers[/]                           |
-| State:               available                              |                                                |
+| SubnetId:            subnet-0bbb222ccc333dd                 | [DIM]RELATED[/]                                  |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   EC2 Instances                                |
+| CidrBlock:           10.0.1.0/24                            |   NAT Gateways                                 |
+| AvailabilityZone:    us-east-1a                             |   Network Interfaces                           |
+| AvailableIpAddressCount: 251                                |   Route Tables                                 |
+| MapPublicIpOnLaunch: false                                  |   CloudTrail Events                            |
+| State:               available                              | [DIM]Load Balancers[/]                           |
 | Tags:                                                       |                                                |
 |     - Key: Name                                             |                                                |
 |       Value: private-us-east-1a                             |                                                |
@@ -796,17 +813,17 @@ Event Source Mappings) alongside reverse relationships.
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +----------------------- detail -- process-orders (process-orders) -------------------------------------------+
-| FunctionName:        process-orders                         |   CW Log Group                                 |
-| Runtime:             python3.11                             |   SQS Event Sources (2)                        |
-| Handler:             handler.main                           |   EventBridge Rules                            |
-| MemorySize:          256                                    |   SNS Subscriptions                            |
-| Timeout:             30                                     |   CloudWatch Alarms                            |
-| Role:                [UNDERLINE]arn:aws:iam::role/lambda[/] |   API Gateway                                  |
-| VpcConfig:                                                  |   CloudTrail Events                            |
-|     VpcId:           [UNDERLINE]vpc-0aaa111bbb222cc[/]      | [DIM]S3 Notifications[/]                         |
-|     SubnetIds:                                              | [DIM]Step Functions[/]                            |
-|       - [UNDERLINE]subnet-0aaa111[/]                        | [DIM]Target Groups[/]                            |
-|       - [UNDERLINE]subnet-0bbb222[/]                        |                                                |
+| FunctionName:        process-orders                         | [DIM]RELATED[/]                                  |
+| Runtime:             python3.11                             |   CW Log Group                                 |
+| Handler:             handler.main                           |   SQS Event Sources (2)                        |
+| MemorySize:          256                                    |   EventBridge Rules                            |
+| Timeout:             30                                     |   SNS Subscriptions                            |
+| Role:                [UNDERLINE]arn:aws:iam::role/lambda[/] |   CloudWatch Alarms                            |
+| VpcConfig:                                                  |   API Gateway                                  |
+|     VpcId:           [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   CloudTrail Events                            |
+|     SubnetIds:                                              | [DIM]S3 Notifications[/]                         |
+|       - [UNDERLINE]subnet-0aaa111[/]                        | [DIM]Step Functions[/]                            |
+|       - [UNDERLINE]subnet-0bbb222[/]                        | [DIM]Target Groups[/]                            |
 |     SecurityGroupIds:                                       |                                                |
 |       - [UNDERLINE]sg-0abc123[/]                            |                                                |
 | ...                                                         |                                                |
@@ -930,6 +947,7 @@ No new colors. Two new style combinations using existing palette values.
 | Detail value (navigable) | `#7aa2f7` | -- | Underline | NEW: accent + underline |
 | Detail section header | `#e0af68` | -- | Bold | Existing: Detail section |
 | Cursor row (either col) | `#1a1b26` | `#7aa2f7` | Bold | Existing: Table row selected |
+| Right col header (`RELATED`) | `#565f89` | -- | -- | Dim label, not selectable |
 | Right col row (available) | `#c0caf5` | -- | -- | Existing: Table row normal |
 | Right col row (dim) | `#565f89` | -- | Dim | Existing: Table row dim |
 | Right col row (selected) | `#1a1b26` | `#7aa2f7` | Bold | Existing: Table row selected |
@@ -1329,14 +1347,14 @@ Current match on VpcId value (match 1/3).
 ```
  a9s v3.28.0  prod:us-east-1                                                                         ? for help
 +----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
-| InstanceId:          i-0abc123def456789a                    |   Auto Scaling Groups                          |
-| InstanceType:        t3.large                               |   CloudWatch Alarms                            |
-|[SELECTED] VpcId:               [MATCHCUR]vpc[/]-0aaa111bbb222cc        [/]|   CloudFormation Stacks                        |
-| SubnetId:            subnet-0bbb222ccc333dd                 |   EBS Snapshots                                |
-| SecurityGroups:                                             |   Elastic IPs                                  |
-|     - GroupId:       sg-0ccc333ddd444ee                     | [DIM]EKS Node Groups[/]                          |
-|     - GroupId:       sg-0ddd444eee555ff                     |   CloudTrail Events                            |
-| IamInstanceProfile:                                         |                                                |
+| InstanceId:          i-0abc123def456789a                    | [DIM]RELATED[/]                                  |
+| InstanceType:        t3.large                               |   Auto Scaling Groups                          |
+|[SELECTED] VpcId:               [MATCHCUR]vpc[/]-0aaa111bbb222cc        [/]|   CloudWatch Alarms                            |
+| SubnetId:            subnet-0bbb222ccc333dd                 |   CloudFormation Stacks                        |
+| SecurityGroups:                                             |   EBS Snapshots                                |
+|     - GroupId:       sg-0ccc333ddd444ee                     |   Elastic IPs                                  |
+|     - GroupId:       sg-0ddd444eee555ff                     | [DIM]EKS Node Groups[/]                          |
+| IamInstanceProfile:                                         |   CloudTrail Events                            |
 |     Arn:             arn:aws:iam::role/web                   |                                                |
 | ImageId:             ami-0aaa111222333                       |                                                |
 | [MATCH]Vpc[/]Config:                                                |                                                |
@@ -1365,10 +1383,10 @@ Right column focused, filter for "cloud" active, 3 of 9 types match.
 ```
  a9s v3.28.0  prod:us-east-1                                                                      /cloud
 +----------------------------- detail -- i-0abc123 (web-prod) ------------------------------------------------+
-| InstanceId:          i-0abc123def456789a                    |[SELECTED] CloudWatch Alarms          [/]       |
-| InstanceType:        t3.large                               |   CloudFormation Stacks                        |
-| State:               running                                |   CloudTrail Events                            |
-| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |                                                |
+| InstanceId:          i-0abc123def456789a                    | [DIM]RELATED[/]                                  |
+| InstanceType:        t3.large                               |[SELECTED] CloudWatch Alarms          [/]       |
+| State:               running                                |   CloudFormation Stacks                        |
+| VpcId:               [UNDERLINE]vpc-0aaa111bbb222cc[/]      |   CloudTrail Events                            |
 | SubnetId:            [UNDERLINE]subnet-0bbb222ccc333dd[/]   |                                                |
 | SecurityGroups:                                             |                                                |
 |     - GroupId:       [UNDERLINE]sg-0ccc333ddd444ee[/]       |                                                |
@@ -1432,3 +1450,21 @@ Changes from v4.1 to v4.2, prompted by TUI reviewer audit:
    when `WindowSizeMsg` crosses the 100-col threshold, all state is
    preserved: cursor positions, search/filter state, focused column,
    scroll offsets.
+
+---
+
+## 20. Summary of v4.2 to v4.3 Changes
+
+Changes from v4.2 to v4.3:
+
+1. **`RELATED` header added to right column** -- dim `#565f89` label as
+   the first row of the right column in two-column layout. Not selectable
+   (cursor skips it). When Tab moves focus to the right column, cursor
+   lands on the first resource type row, not the header (section 5.2).
+2. **Row states table updated** -- header state added to section 5.3.
+3. **Color table updated** -- `RELATED` header entry added to section 11.
+4. **All two-column wireframes updated** -- sections 8.1, 8.2, 8.4, 8.5,
+   8.7, 8.8, 8.9, 17.11, 17.12 now show the `RELATED` header as the
+   first right-column row.
+5. **Stacked mode unchanged** -- the existing `-- Related ---` separator
+   already serves as the section header in stacked layout.
