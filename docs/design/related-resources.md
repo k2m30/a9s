@@ -50,13 +50,13 @@ view's `Update()` matches `Resources`, never `ToggleRelated`.
 
 **CFN Stack Resources remap:** The existing `Resources` child-view
 binding for CloudFormation stacks uses `Key: "r"` in its `ChildViewDef`.
-To avoid collision with `ToggleRelated` in the CFN stack detail view,
+To avoid collision with `ToggleRelated` in the detail view,
 the CFN stack resource type definition changes `Key: "r"` to `Key: "R"`
 (uppercase). A new `keys.Map.StackResources` binding is added:
 
 | Binding | Struct Field | Physical Key | Active Context |
 |---------|-------------|-------------|----------------|
-| `StackResources` | `keys.Map.StackResources` | `R` | CFN stack detail view (child-view trigger) |
+| `StackResources` | `keys.Map.StackResources` | `R` | CFN stack resource list (child-view trigger) |
 
 This is a concrete `ChildViewDef` change in the CFN stack resource type
 registration, not a behavioral change -- the same child view is triggered,
@@ -1059,7 +1059,7 @@ For an EC2 instance with the two-column layout:
 | ImageId | `ami-*` | AMI detail |
 | BlockDeviceMappings[].Ebs.VolumeId | `vol-*` | EBS Volume detail |
 | NetworkInterfaces[].NetworkInterfaceId | `eni-*` | ENI detail |
-| IamInstanceProfile.Arn | `arn:aws:iam::*` | IAM Role detail |
+| ~~IamInstanceProfile.Arn~~ | ~~`arn:aws:iam::*`~~ | ~~IAM Role detail~~ — **REMOVED**: instance profile ARNs are not role ARNs; this mapping requires `iam:GetInstanceProfile` and belongs in algorithmic relationships |
 
 ### Right Column (Reverse + Algorithmic)
 
@@ -1299,7 +1299,7 @@ view imports the other's binding.
 
 **CFN Stack Resources special case:** The CFN stack resource type has a
 `ChildViewDef` with `Key: "r"` that triggers the stack resources child
-view. Because the CFN stack detail view now needs `r` for
+view. Because the detail view now uses `r` for
 `ToggleRelated`, the `ChildViewDef` is changed to `Key: "R"` (uppercase
 shift). A new `keys.Map.StackResources` binding for `R` is added. This
 is the only resource type affected -- no other child-view trigger uses

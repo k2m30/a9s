@@ -1,7 +1,7 @@
 # Related Resources: QA User Stories
 
-Design spec: `docs/design/related-resources.md` v4.2
-Architecture: `docs/design/related-views-architecture.md` v2.0
+Design spec: `docs/design/related-resources.md` v4.3
+Architecture: `docs/design/related-views-architecture.md` v2.1
 Issue: #64
 
 ---
@@ -217,7 +217,8 @@ Long ARNs and policy documents in the output would exceed column width.
 
 **AWS comparison:**
 aws ec2 describe-instances --instance-ids i-0abc123
-Expected navigable fields: VpcId (vpc-*), SubnetId (subnet-*), SecurityGroups[].GroupId (sg-*), ImageId (ami-*), BlockDeviceMappings[].Ebs.VolumeId (vol-*), NetworkInterfaces[].NetworkInterfaceId (eni-*), IamInstanceProfile.Arn (arn:aws:iam::*)
+Expected navigable fields: VpcId (vpc-*), SubnetId (subnet-*), SecurityGroups[].GroupId (sg-*), ImageId (ami-*), BlockDeviceMappings[].Ebs.VolumeId (vol-*), NetworkInterfaces[].NetworkInterfaceId (eni-*)
+Note: IamInstanceProfile.Arn is NOT navigable — instance profile ARNs are not role ARNs, so direct navigation would route to the wrong resource. The EC2-to-Role relationship is algorithmic (requires iam:GetInstanceProfile API call).
 
 ---
 
@@ -319,23 +320,27 @@ No AWS CLI equivalent -- display ordering is a UI design choice.
 
 ---
 
-#### Story: Forward relationships show inline count
-**Given:** the user is viewing a resource where some right-column entries are forward relationships with known counts (e.g., an entry parsed from the resource's own fields)
-**When:** the check completes instantly (no API call needed)
-**Then:** the row displays the resource type name followed by the count in parentheses, e.g., "Security Groups (3)"
+#### Story: Relationships with known counts show inline count
+**Given:** the user is viewing a resource where some right-column entries have counts (i.e., the checker returned Count >= 0)
+**When:** the check completes (instantly for forward, asynchronously for reverse)
+**Then:** the row displays the resource type name followed by the count in parentheses, e.g., "Security Groups (3)", "Subnets (6)", "SQS Event Sources (2)"
+
+**Note:** Both forward and reverse relationships can show counts. Forward relationships always have counts (parsed from Fields, zero API calls). Reverse relationships show counts when the checker provides them (e.g., VPC -> Subnets via DescribeSubnets filter, Lambda -> SQS Event Sources via ListEventSourceMappings).
 
 **AWS comparison:**
-No AWS CLI equivalent -- counts are derived from parsing the resource's own API response.
+No AWS CLI equivalent -- counts are derived from parsing the resource's API response or from bounded reverse-lookup API calls.
 
 ---
 
-#### Story: Reverse/algorithmic relationships show no count
-**Given:** the user is viewing a resource with reverse relationships in the right column
-**When:** a reverse relationship check completes (background API call returns)
+#### Story: Relationships without counts show name only
+**Given:** the user is viewing a resource with right-column entries whose checkers returned Count = -1 (no count available)
+**When:** the check completes (background API call returns)
 **Then:** the row shows only the resource type name without any count, e.g., "CloudWatch Alarms" (not "CloudWatch Alarms (5)")
 
+**Note:** Whether a count is shown depends on the checker's return value, not the relationship category. A reverse checker that cannot cheaply enumerate results returns Count = -1 and the row shows no count. A reverse checker that can cheaply enumerate (e.g., filter by vpc-id) returns Count >= 0 and the row shows the count.
+
 **AWS comparison:**
-No AWS CLI equivalent -- expensive lookups intentionally omit counts.
+No AWS CLI equivalent -- checkers decide per-relationship whether to enumerate or just confirm existence.
 
 ---
 
