@@ -72,7 +72,7 @@ aws iam get-instance-profile --instance-profile-name PROFILE_NAME
 | B.1.2 | EC2 instance has SubnetId "subnet-0def456". I press `R` and select Subnet. | I navigate to Subnets list, filtered to "subnet-0def456". |
 | B.1.3 | EC2 instance has SecurityGroups ["sg-0111", "sg-0222"]. I press `R`. | The picker shows two separate Security Group entries: "sg-0111" and "sg-0222". Selecting either navigates to SG list, filtered to that group. |
 | B.1.4 | EC2 instance has a PublicIpAddress "54.123.45.67" associated with an Elastic IP. I press `R` and select EIP. | I navigate to EIP list, filtered to the Elastic IP with Public IP "54.123.45.67". EIP columns visible: Name (width 24), Allocation ID (width 26), Public IP (width 16), Association (width 26), Instance (width 20), Domain (width 8). |
-| B.1.5 | EC2 instance has IamInstanceProfile set. I press `R` and select IAM Role. | I navigate to IAM Roles list, filtered to the role extracted from the instance profile ARN. |
+| B.1.5 | EC2 instance has IamInstanceProfile set. I press `R`. | IAM Role does NOT appear in the related picker — instance profile ARNs are not role ARNs, so direct navigation is not possible. The EC2-to-Role relationship requires an algorithmic lookup (iam:GetInstanceProfile). |
 | B.1.6 | EC2 instance has associated ENIs. I press `R` and select ENI. | I navigate to ENI list, filtered to show ENIs attached to this instance. ENI columns visible: Name (width 24), ENI ID (width 26), Status (width 12), Type (width 14), VPC ID (width 24), Private IP (width 16). |
 
 **AWS comparison:**

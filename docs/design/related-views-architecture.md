@@ -1,10 +1,10 @@
 # Related Views Architecture
 
 Issue: #119
-Version: 2.0
+Version: 2.1
 Date: 2026-03-29
 Status: Design
-Aligns with: `docs/design/related-resources.md` v4.2
+Aligns with: `docs/design/related-resources.md` v4.3
 
 ---
 
@@ -172,7 +172,7 @@ they point to. This is pure data -- no per-resource code in the detail view.
 // be navigated to (Enter opens the target resource's detail).
 type NavigableFieldDef struct {
     // FieldPath is the dot-separated path in the detail view key labels.
-    // Examples: "VpcId", "SecurityGroups.GroupId", "IamInstanceProfile.Arn"
+    // Examples: "VpcId", "SecurityGroups.GroupId", "BlockDeviceMappings.Ebs.VolumeId"
     // For array items, the path matches the leaf field name.
     FieldPath string
     // TargetType is the ShortName of the resource this field points to.
@@ -356,12 +356,24 @@ pressed, the detail view emits a CloudTrail-specific navigation message.
 
 ### 1.6 Relationship Categories and Display Rules
 
-| Category | Check Method | Show Count? | Count Source |
-|----------|-------------|-------------|-------------|
-| `RelForward` | Parse Fields (no API) | Yes `(N)` | IDs in Fields |
-| `RelReverse` | API call | No | N/A |
-| `RelAlgorithmic` | API call / naming convention | No | N/A |
-| `RelCloudTrail` | Always available | No | N/A |
+| Category | Check Method | Sync/Async | Show Count? |
+|----------|-------------|------------|-------------|
+| `RelForward` | Parse Fields (no API) | Synchronous | If checker returns Count >= 0 |
+| `RelReverse` | API call | Async (background) | If checker returns Count >= 0 |
+| `RelAlgorithmic` | API call / naming convention | Async (background) | If checker returns Count >= 0 |
+| `RelCloudTrail` | Always available | Synchronous | No (Count = -1) |
+
+**Count display is determined by the checker's return value, not by the
+category.** If `RelatedCheckResult.Count >= 0`, the UI shows `(N)`. If
+`Count == -1`, no count is shown. This allows:
+
+- Forward checkers to always provide counts (they parse Fields, so the
+  count is always known instantly)
+- Reverse checkers to provide counts WHEN the API makes it cheap
+  (e.g., `DescribeSubnets` with vpc-id filter returns a bounded set;
+  `ListEventSourceMappings` for Lambda returns a small list)
+- Reverse checkers to omit counts when retrieval is expensive or the
+  result set is unbounded (return `Count = -1`)
 
 **Architect decides per relationship:**
 - Each `RelatedViewDef` in the per-resource research docs includes a
@@ -379,38 +391,48 @@ pressed, the detail view emits a CloudTrail-specific navigation message.
 
 The architect classifies each relationship at design time. The
 classification is encoded in `RelationshipCategory` and is immutable
-at runtime.
+at runtime. The category determines sync/async dispatch and whether
+RetryOnThrottle is required.
 
-**Cheap (RelForward) -- show inline count `(N)`:**
+**Category determines dispatch, not count display.**
+
+**Forward (RelForward) -- synchronous, always shows count:**
 - Source resource's API response contains the target's ID(s)
 - Checker parses `Resource.Fields` -- zero API calls
+- Always returns `Count >= 0` (the IDs are right there)
 - Example: EC2 -> Security Groups (IDs in `security_groups` field)
 - Example: EC2 -> VPC (ID in `vpc_id` field)
 
-**Expensive (RelReverse, RelAlgorithmic) -- no count shown:**
+**Reverse (RelReverse) -- async, count is checker-determined:**
 - Must query another AWS service to determine existence
 - Checker makes API call(s) -- latency varies
-- Example: EC2 -> Target Groups (must iterate TGs)
+- MAY return `Count >= 0` when the API is cheap and bounded
+  (e.g., VPC -> Subnets via `DescribeSubnets` with vpc-id filter;
+  Lambda -> SQS Event Sources via `ListEventSourceMappings`)
+- SHOULD return `Count = -1` when retrieval is expensive or unbounded
+  (e.g., scanning all instances across an account)
+- Example with count: VPC -> Subnets (6), Security Groups (12)
+- Example without count: EC2 -> Target Groups
+
+**Algorithmic (RelAlgorithmic) -- async, typically no count:**
+- Naming convention or multi-hop logic
+- Usually returns `Count = -1` (existence check, not enumeration)
 - Example: Lambda -> CloudWatch Log Group (naming convention lookup)
 
-**Why not show counts for expensive lookups?**
-- Reverse lookups may be slow (seconds per check)
-- The count for reverse lookups isn't meaningful for inline display
-  because it may change between check time and navigation time
-- Keeping expensive rows count-free sets user expectations correctly
+### Count Display Format
 
-### Cheap Count Display Format
-
-Inline count appears immediately after the display name with a space:
+Inline count appears when `RelatedCheckResult.Count >= 0`:
 
 ```
-Security Groups (3)
-VPC (1)
-Subnet (1)
+Security Groups (3)       -- forward: parsed from Fields
+Subnets (6)               -- reverse: DescribeSubnets with vpc-id filter
+SQS Event Sources (2)     -- reverse: ListEventSourceMappings
+CloudWatch Alarms         -- reverse: Count = -1 (checker chose not to enumerate)
+CloudTrail Events         -- always: Count = -1
 ```
 
-Count = -1 (from AlwaysAvailable) means the row shows no count but
-renders as available (normal text, cursor can land).
+`Count = -1` means the row shows no count but renders as available
+(normal text, cursor can land). `Count >= 0` always shows `(N)`.
 
 ---
 
@@ -795,6 +817,55 @@ func (m *DetailModel) buildFieldRows() {
 }
 ```
 
+### 4.3.1 Extraction Pipeline: Structured Output (Invasive Rewrite)
+
+**This is the most invasive single change in the related-views feature.**
+
+The current rendering pipeline is incompatible with per-field cursor
+navigation and navigable field detection:
+
+1. `renderFromConfig()` iterates `vd.Detail` paths
+2. For each path, `fieldpath.ExtractSubtree()` returns a YAML string
+3. Multi-line values (structs, arrays) are split by `\n` into anonymous
+   sub-lines with no structured metadata
+4. The output is `[]string` -- flat lines with no field path, no indent
+   level, no navigability flag
+
+The field-list model requires a **new extraction function** that produces
+structured output. This is NOT a modification to `ExtractSubtree` (which
+lives in the FROZEN `fieldpath/` package). It is a new function in the
+detail view (or a new `fieldpath` export if the freeze is lifted).
+
+**Required output structure:**
+
+```go
+// kvPair represents one row in the structured detail field list.
+type kvPair struct {
+    FieldPath  string // dot-separated path (e.g., "SecurityGroups.GroupId")
+    Key        string // display key label (e.g., "GroupId:")
+    Value      string // display value (e.g., "sg-0ccc333ddd444ee")
+    IsHeader   bool   // true for section headers ("Placement:", "Tags:")
+    IsSubField bool   // true for indented sub-fields under a header
+    IndentLevel int   // 0 = top-level, 1 = first nesting, 2 = second, etc.
+}
+```
+
+**Key difference from current pipeline:** Each array item like
+`SecurityGroups[0].GroupId` becomes its own `kvPair` with a
+`FieldPath` that the navigable-field matcher can compare against
+`NavigableFieldDef.FieldPath`. The current pipeline loses this
+information when it splits YAML text by newlines.
+
+**Implementation approach:** Walk `RawStruct` recursively (using the
+`vd.Detail` paths as roots), producing one `kvPair` per leaf field.
+For struct fields, produce a header `kvPair` followed by sub-field
+`kvPair`s. For array fields, produce one `kvPair` per array element's
+leaf fields. The walker preserves the dot-separated field path at
+every level.
+
+This is Phase 2 work and must be completed before navigable field
+detection (Phase 5) can function.
+
 ### 4.4 Cursor and Scroll
 
 The cursor moves over ALL rows (navigable and non-navigable alike).
@@ -954,7 +1025,7 @@ type relatedTypeItem struct {
     def       resource.RelatedViewDef
     available bool
     checked   bool
-    count     int // meaningful only when Category == RelForward
+    count     int // -1 = no count shown; >= 0 = show "(N)" regardless of category
 }
 
 type rightColumnModel struct {
@@ -1057,10 +1128,13 @@ Each resource type registers its navigable fields in the same
 // In internal/aws/ec2_related.go init():
 resource.RegisterNavigableFields("ec2", []resource.NavigableFieldDef{
     {FieldPath: "VpcId", TargetType: "vpc", IDExtract: "direct"},
-    {FieldPath: "SubnetId", TargetType: "subnets", IDExtract: "direct"},
+    {FieldPath: "SubnetId", TargetType: "subnet", IDExtract: "direct"},
     {FieldPath: "SecurityGroups.GroupId", TargetType: "sg", IDExtract: "direct"},
     {FieldPath: "ImageId", TargetType: "ami", IDExtract: "direct"},
-    {FieldPath: "IamInstanceProfile.Arn", TargetType: "iam_roles", IDExtract: "arn-resource"},
+    // NOTE: IamInstanceProfile.Arn is NOT navigable — instance profile ARNs
+    // are not role ARNs. The profile-to-role mapping requires an API call
+    // (iam:GetInstanceProfile), so this belongs in algorithmic relationships,
+    // not direct field navigation. See docs/design/related-resources/role.md.
     {FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs", IDExtract: "direct"},
     {FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni", IDExtract: "direct"},
 })
@@ -1121,24 +1195,32 @@ ToggleRelated:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "toggle rela
 StackResources: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resources")),
 ```
 
-### 8.2 Modified Bindings
+### 8.2 Unchanged Bindings
 
 ```go
-// Resources changes from "r" to "R":
-Resources: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resources")),
+// Resources stays at "r" -- NO CHANGE:
+Resources: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resources")),
 ```
+
+The `Resources` binding is NOT modified. It remains at physical key `r`
+in resource list views. There is no conflict with `ToggleRelated` because
+the detail view and resource list view are mutually exclusive -- only one
+is active at a time. The detail view's `Update()` matches `ToggleRelated`,
+never `Resources`. The resource list view's `Update()` matches
+`Resources`, never `ToggleRelated`.
 
 ### 8.3 Key Conflict Resolution
 
 | Physical Key | Binding | Active Context | Notes |
 |-------------|---------|---------------|-------|
 | `r` | `ToggleRelated` | Detail view | NEW: toggle right column |
-| `r` | `Resources` | Resource list view | REMOVED: was `r`, now `R` |
-| `R` | `Resources` | Resource list view | MOVED from `r` |
-| `R` | `StackResources` | CFN stack detail view | NEW: replaces old `r` |
+| `r` | `Resources` | Resource list view | UNCHANGED: child-view trigger |
+| `R` | `StackResources` | CFN stack resource list | NEW: replaces CFN's old `Key: "r"` |
 
-No code conflict because detail view and resource list view are mutually
-exclusive -- only one is active at a time.
+No code conflict because `ToggleRelated` and `Resources` are dispatched
+in mutually exclusive view contexts. Only CFN's `ChildViewDef` changes
+its `Key` field from `"r"` to `"R"` to avoid collision with
+`ToggleRelated` in the detail view (which would shadow `r` when viewing a CFN stack's detail).
 
 ### 8.4 CFN ChildViewDef Change
 
@@ -1263,12 +1345,12 @@ func (m Model) handleNavigateToRelated(msg messages.NavigateToRelatedMsg) (tea.M
     }
 
     if msg.TargetID != "" {
-        // Left-column navigable field: fetch single resource by ID
-        return m, m.fetchSingleRelatedByID(msg)
+        // Left-column navigable field: resolve single resource
+        return m.resolveRelatedByID(msg)
     }
 
     if msg.Count == 1 {
-        // Right-column single: fetch and go directly to detail
+        // Right-column single: use fetcher to get resource, push detail
         return m, m.fetchSingleRelatedResource(msg)
     }
 
@@ -1276,6 +1358,83 @@ func (m Model) handleNavigateToRelated(msg messages.NavigateToRelatedMsg) (tea.M
     return m.pushRelatedResourceList(msg)
 }
 ```
+
+### 9.4.1 resolveRelatedByID: Cache-First + Fetcher-Fallback
+
+When the user presses Enter on a navigable field (left column), the
+detail view knows the exact target resource ID (e.g., `vpc-0aaa111`).
+The handler resolves this to a full `Resource` using a two-step approach:
+
+**Step 1 -- Cache lookup (synchronous, zero API calls):**
+
+Check `m.resourceCache[msg.TargetType]` for a resource with matching ID.
+The resource cache is populated whenever the user visits a resource list.
+If the target type was previously visited, the full `Resource` is already
+in memory.
+
+```go
+func (m Model) resolveRelatedByID(msg messages.NavigateToRelatedMsg) (tea.Model, tea.Cmd) {
+    // Step 1: check resource list cache
+    if entry, ok := m.resourceCache[msg.TargetType]; ok {
+        for _, r := range entry.resources {
+            if r.ID == msg.TargetID {
+                d := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
+                d.SetSize(m.innerSize())
+                m.pushView(&d)
+                return m, nil
+            }
+        }
+    }
+
+    // Step 2: use RelatedFetcher to retrieve from AWS
+    return m, m.fetchRelatedByID(msg)
+}
+```
+
+**Step 2 -- Fetcher-fallback (async, API call):**
+
+If the target type is not cached (user never visited that resource list),
+use `resource.GetRelatedFetcher(sourceType, targetType)` to retrieve
+the resource. The `RelatedFetcher` already knows how to find resources
+for the specific source->target relationship and has the source resource
+context available (not just an opaque ID).
+
+```go
+func (m Model) fetchRelatedByID(msg messages.NavigateToRelatedMsg) tea.Cmd {
+    return func() tea.Msg {
+        ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+        defer cancel()
+
+        fetcher := resource.GetRelatedFetcher(msg.SourceType, msg.TargetType)
+        if fetcher == nil {
+            return messages.FlashMsg{Text: "Cannot navigate: no fetcher registered", IsError: true}
+        }
+        resources, err := fetcher(ctx, m.clients, msg.SourceResource)
+        if err != nil {
+            return messages.FlashMsg{Text: fmt.Sprintf("Fetch failed: %v", err), IsError: true}
+        }
+        // Find the specific resource by ID
+        for _, r := range resources {
+            if r.ID == msg.TargetID {
+                return messages.NavigateMsg{
+                    Target:       messages.TargetDetail,
+                    ResourceType: msg.TargetType,
+                    Resource:     &r,
+                }
+            }
+        }
+        return messages.FlashMsg{Text: "Related resource not found", IsError: true}
+    }
+}
+```
+
+**Why not a generic FetchByID interface?** Adding a `FetchByID(id string)`
+method to every resource type (~66 implementations) is high cost for a
+narrow use case. Each type uses different AWS describe operations with
+different ID parameter names and different context requirements (e.g.,
+ECS services need cluster ARN + service name, not just an ID). The
+`RelatedFetcher` already encapsulates per-relationship fetch logic and
+has the source resource context available, making it the natural path.
 
 ### 9.5 Message Flow Diagram
 
@@ -1304,8 +1463,9 @@ User presses Enter on navigable field (left column)
 detail.Update -> produces NavigateToRelatedMsg{TargetID: "vpc-xxx"}
     |
     v
-app.Update -> handleNavigateToRelated()
-    | fetches resource by ID -> pushes vpc-detail
+app.Update -> handleNavigateToRelated() -> resolveRelatedByID()
+    |-- cache hit: push vpc-detail immediately (no API call)
+    +-- cache miss: fetchRelatedByID() -> NavigateMsg -> push vpc-detail
 
 User presses Enter on related type (right column)
     |
@@ -1445,7 +1605,7 @@ infrastructure. No per-resource changes after this.
 |------|--------|
 | `internal/tui/views/detail.go` | **Major refactor**: viewport -> field-list model, two-column layout, embedded rightColumnModel, navigable field rendering, column focus |
 | `internal/tui/messages/messages.go` | Add `RelatedTypeCheckedMsg`, `NavigateToRelatedMsg` |
-| `internal/tui/keys/keys.go` | Add `ToggleRelated`, `StackResources`; change `Resources` to "R" |
+| `internal/tui/keys/keys.go` | Add `ToggleRelated`, `StackResources`; `Resources` stays at "r" (no change) |
 | `internal/tui/app.go` | Add cases in Update switch, add `relatedCache` and `relatedCheckGen` to Model |
 | `internal/tui/app_handlers.go` | Add related-check dispatch in detail-view entry, handle `RelatedTypeCheckedMsg`, handle `NavigateToRelatedMsg` |
 | `internal/tui/views/help.go` | Update help context for detail view two-column keys |
@@ -1481,11 +1641,13 @@ Each phase builds on the previous. The dependency chain is strict.
 2. `resource/related_helpers.go` -- ForwardSingleField, etc.
 3. Tests for registry and helpers
 
-### Phase 2: Detail View Refactor (foundation)
-1. Replace viewport with field-list model in `detail.go`
-2. Per-row cursor, j/k navigation, scroll-to-ensure-visible
-3. Variable-height word-wrapped rows (always ON, no wrap toggle)
-4. All existing tests must still pass (View() output changes)
+### Phase 2: Detail View Refactor (foundation -- most invasive phase)
+1. New structured extraction pipeline (section 4.3.1): walk RawStruct
+   producing `[]kvPair` with field paths, indent levels, headers
+2. Replace viewport with field-list model in `detail.go`
+3. Per-row cursor, j/k navigation, scroll-to-ensure-visible
+4. Variable-height word-wrapped rows (always ON, no wrap toggle)
+5. All existing tests must still pass (View() output changes)
 
 ### Phase 3: Two-Column Layout Infrastructure
 1. Fixed 32-char right column, left takes remaining space
@@ -1583,3 +1745,7 @@ before continuing the rollout.**
 | Throttle tests mandatory per reverse checker | QA must verify retry-then-success, retry-exhausted, and context-timeout for every expensive check |
 | Forward relationships in left column ONLY | Avoids duplication; left = "points to", right = "pointed to by" |
 | No separate relatedlist.go or app_related.go | Right column is embedded in detail view; handlers go in existing app_handlers.go |
+| Count display driven by checker, not category | Reverse checkers CAN return counts when cheap (VPC->Subnets, Lambda->SQS ESM); Count=-1 means no count shown |
+| `Resources` binding stays at `r` (not moved to `R`) | Only CFN's ChildViewDef.Key changes; `r`/`ToggleRelated` in detail view is context-separated, not key-separated |
+| Cache-first + fetcher-fallback for navigable field navigation | No generic FetchByID interface; reuses resourceCache when available, falls back to RelatedFetcher |
+| Structured extraction pipeline replaces ExtractSubtree for detail | Current YAML-string pipeline loses field paths; new pipeline produces kvPair with FieldPath, IndentLevel for navigability |
