@@ -262,6 +262,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityCacheLoaded(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.RelatedCheckStartedMsg:
+		return m.handleRelatedCheckStarted(msg)
+	case messages.RelatedCheckResultMsg:
+		return m.updateActiveView(msg)
+	case messages.RelatedNavigateMsg:
+		return m.handleRelatedNavigate(msg)
 	}
 	return m.updateActiveView(msg)
 }

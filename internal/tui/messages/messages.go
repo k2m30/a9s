@@ -123,6 +123,33 @@ type LoadResourcesMsg struct {
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
 
+// RelatedCheckStartedMsg requests that the root model dispatch related-resource checkers.
+// Emitted by DetailModel when user presses 'r'. The root model handles this because
+// it owns m.clients and m.resourceCache — views cannot dispatch AWS calls directly.
+type RelatedCheckStartedMsg struct {
+	ResourceType   string
+	SourceResource resource.Resource // the resource being viewed
+}
+
+// RelatedCheckResultMsg delivers one checker's async result back to the detail view.
+// The root model delegates this to the active view (detail model's rightColumnModel).
+type RelatedCheckResultMsg struct {
+	ResourceType string
+	Result       resource.RelatedCheckResult
+}
+
+// RelatedNavigateMsg requests navigation to a related resource type.
+// Emitted by: (a) detail view when Enter pressed on navigable field,
+//             (b) rightColumnModel when Enter pressed on selected row.
+// Handled by: root model in app_handlers.go (same pattern as NavigateMsg).
+type RelatedNavigateMsg struct {
+	TargetType     string            // resource short name to navigate to (e.g., "vpc")
+	SourceResource resource.Resource // the resource being viewed
+	SourceType     string            // source resource short name (e.g., "ec2")
+	TargetID       string            // specific ID for navigable field case (e.g., "vpc-0abc")
+	RelatedIDs     []string          // IDs from checker for right-column case
+}
+
 // AvailabilityCacheLoadedMsg delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
 // Only entries with a successful check (no error) are included.

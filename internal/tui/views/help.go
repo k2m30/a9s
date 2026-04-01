@@ -274,6 +274,8 @@ func (m HelpModel) detailGroups() []helpGroup {
 				{"y", "yaml"},
 				{"c", "copy yaml"},
 				{"w", "wrap toggle"},
+				{"r", "related"},
+				{"tab", "focus switch"},
 			},
 		},
 		{

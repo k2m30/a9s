@@ -29,6 +29,7 @@ type ResourceListModel struct {
 	sortAsc bool
 
 	filterText    string
+	pendingFilter string            // auto-applied after ResourcesLoadedMsg arrives
 	parentContext map[string]string // context from parent view for child fetchers
 	displayName   string           // custom display name for frame title
 
@@ -134,6 +135,10 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.allResources = msg.Resources
 		}
 		m.pagination = msg.Pagination
+		if m.pendingFilter != "" {
+			m.filterText = m.pendingFilter
+			m.pendingFilter = ""
+		}
 		m.applySortAndFilter()
 		m.rowTextCache = nil
 		m.styledRowCache = nil
@@ -409,6 +414,12 @@ func (m *ResourceListModel) SetFilter(text string) {
 	m.rowTextCache = nil
 	m.styledRowCache = nil
 	m.scroll.SetCursor(0)
+}
+
+// SetPendingFilter stores filter text to be applied when resources are loaded.
+// Used by related-resource navigation to pre-filter the list on first load.
+func (m *ResourceListModel) SetPendingFilter(text string) {
+	m.pendingFilter = text
 }
 
 // GetFilter returns the current filter text.

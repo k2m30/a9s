@@ -260,3 +260,124 @@ func tryParseJSON(s string) interface{} {
 	}
 	return parsed
 }
+
+// FieldItem is one rendered line from the structured detail extraction pipeline.
+type FieldItem struct {
+	Path        string // original path key (e.g., "VpcId", "SecurityGroups")
+	Key         string // display key (typically = Path for top-level)
+	Value       string // rendered value (empty for section headers)
+	IsHeader    bool   // true when value is multi-line (section header line)
+	IsSubField  bool   // true for lines indented under a section header
+	IndentLevel int    // 0 = top-level, 1 = sub-field
+	IsNavigable bool   // true when FieldPath matches a NavigableField
+	TargetType  string // non-empty when IsNavigable (e.g., "vpc")
+}
+
+// toSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
+func toSnakeCase(s string) string {
+	var result strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				result.WriteByte('_')
+			}
+			result.WriteRune(r + 32) // toLower
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// ExtractFieldList builds a structured []FieldItem for the given field paths.
+//
+// For each path in paths:
+//  1. Check fields map first (case-insensitive + snake_case fallback)
+//  2. If not found in map, call ExtractSubtree(obj, path)
+//  3. If still empty, set Value = "-"
+//
+// If the extracted value contains "\n" (multi-line — struct/slice/map from ExtractSubtree):
+//   - Emit one header FieldItem{Path: path, Key: path, IsHeader: true, Value: ""}
+//   - Then one sub-field FieldItem per line: {Path: path, Key: lineContent, IsSubField: true, IndentLevel: 1}
+//
+// For scalar values:
+//   - Emit one FieldItem{Path: path, Key: path, Value: value}
+//
+// Check navigable map for IsNavigable/TargetType annotation on top-level scalar items.
+//
+// Always returns a non-nil slice (empty []FieldItem{} for empty paths).
+func ExtractFieldList(obj interface{}, fields map[string]string, paths []string, navigable map[string]string) []FieldItem {
+	if len(paths) == 0 {
+		return []FieldItem{}
+	}
+	var items []FieldItem
+	for _, path := range paths {
+		val := ""
+		// 1. Check fields map first (case-insensitive match)
+		if len(fields) > 0 {
+			for k, v := range fields {
+				if strings.EqualFold(k, path) {
+					val = v
+					break
+				}
+			}
+			// Try snake_case if not found
+			if val == "" {
+				snakeKey := toSnakeCase(path)
+				if v, ok := fields[snakeKey]; ok {
+					val = v
+				}
+			}
+		}
+		// 2. Fall back to ExtractSubtree
+		if val == "" && obj != nil {
+			val = ExtractSubtree(obj, path)
+		}
+		// 3. Default to "-"
+		if val == "" {
+			val = "-"
+		}
+
+		// Check navigability for this path
+		targetType := ""
+		isNavigable := false
+		if navigable != nil {
+			if tt, ok := navigable[path]; ok {
+				targetType = tt
+				isNavigable = true
+			}
+		}
+
+		// Multi-line → header + sub-fields
+		if strings.Contains(val, "\n") {
+			items = append(items, FieldItem{
+				Path:     path,
+				Key:      path,
+				Value:    "",
+				IsHeader: true,
+			})
+			for _, line := range strings.Split(val, "\n") {
+				if line == "" {
+					continue
+				}
+				items = append(items, FieldItem{
+					Path:        path,
+					Key:         line,
+					Value:       line,
+					IsSubField:  true,
+					IndentLevel: 1,
+				})
+			}
+		} else {
+			// Scalar
+			items = append(items, FieldItem{
+				Path:        path,
+				Key:         path,
+				Value:       val,
+				IsNavigable: isNavigable,
+				TargetType:  targetType,
+			})
+		}
+	}
+	return items
+}

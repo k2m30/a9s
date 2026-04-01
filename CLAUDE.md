@@ -1,12 +1,13 @@
 # a9s Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-30
+Auto-generated from all feature plans. Last updated: 2026-04-01
 
 ## GitHub
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
+- N/A (session state only; no persistence) (006-related-views-infra)
 
 ## Project Structure
 
@@ -169,6 +170,6 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+- 006-related-views-infra: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2
+- 006-related-views-infra: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 - 004-related-views-blockers: RetryOnThrottle integration (#186), resource cache (#111), cross-view search (#89)
-- 003-cloudtrail-json-parsing: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, AWS SDK Go v2, yaml.v3
-- 002-paginated-fetcher-migration: Paginated fetcher migration (#107, #108, #109)

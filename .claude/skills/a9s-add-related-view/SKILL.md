@@ -15,11 +15,11 @@ can run in parallel (pattern is rigid).
 **Infrastructure must be in place first.** These must exist before any
 per-resource related views can be added:
 
-- `internal/resource/related.go` -- types, registries (`RelatedViewDef`, `NavigableFieldDef`), helper constructors
-- `RelatedTypeCheckedMsg` and `NavigateToRelatedMsg` in `internal/tui/messages/messages.go`
-- `ToggleRelated` and `StackResources` bindings in `internal/tui/keys/keys.go`
+- `internal/resource/related.go` -- types, registries (`RelatedDef`, `NavigableField`), helper constructors
+- `RelatedCheckResultMsg` and `RelatedNavigateMsg` in `internal/tui/messages/messages.go`
+- `ToggleRelated` and `ToggleRelated` bindings in `internal/tui/keys/keys.go`
 - Two-column detail view in `internal/tui/views/detail.go` (field-list model with embedded rightColumnModel)
-- Handler code in `internal/tui/app_handlers.go` for `RelatedTypeCheckedMsg` and `NavigateToRelatedMsg`
+- Handler code in `internal/tui/app_handlers.go` for `RelatedCheckResultMsg` and `RelatedNavigateMsg`
 
 If these don't exist, STOP. The infrastructure must land first.
 See `docs/design/related-views-architecture.md` Phases 1-8.
@@ -174,7 +174,7 @@ import (
 
 func init() {
     // --- Left column: navigable fields ---
-    resource.RegisterNavigableFields("{source}", []resource.NavigableFieldDef{
+    resource.RegisterNavigableFields("{source}", []resource.NavigableField{
         {FieldPath: "{FieldName}", TargetType: "{target}", IDExtract: "direct"},
         {FieldPath: "{Section.FieldName}", TargetType: "{target}", IDExtract: "arn-resource"},
         // ... one entry per navigable field in the detail view
@@ -185,14 +185,14 @@ func init() {
     // only as navigable fields in the left column.
 
     // Reverse relationships (expensive, no count)
-    resource.RegisterRelated("{source}", resource.RelatedViewDef{
+    resource.RegisterRelated("{source}", resource.RelatedDef{
         TargetType: "{target}",
         Category:   resource.RelReverse,
         Priority:   resource.PriorityP1,
     }, check{Source}{Target}, fetch{Source}{Target})
 
     // Algorithmic relationships
-    resource.RegisterRelated("{source}", resource.RelatedViewDef{
+    resource.RegisterRelated("{source}", resource.RelatedDef{
         TargetType:  "{target}",
         DisplayName: "{Optional Override}",
         Category:    resource.RelAlgorithmic,
@@ -299,9 +299,9 @@ func init() {
 
 **Critical for left-column navigable fields.** Verify that the source
 resource's regular fetcher populates the Fields keys that the
-`NavigableFieldDef` entries reference.
+`NavigableField` entries reference.
 
-For example, if a `NavigableFieldDef` has `FieldPath: "VpcId"`, verify
+For example, if a `NavigableField` has `FieldPath: "VpcId"`, verify
 that `internal/aws/ec2.go` populates a field with key "VpcId" or that
 the field appears in the detail view from RawStruct reflection.
 
@@ -309,7 +309,7 @@ If a required field is missing from Fields, add it to the regular fetcher.
 
 ### 6. Verify navigable field paths match detail view output
 
-The `FieldPath` in `NavigableFieldDef` must match the actual key labels
+The `FieldPath` in `NavigableField` must match the actual key labels
 rendered in the detail view. Run the detail view (or read `renderFromConfig`)
 to verify the paths are correct.
 

@@ -20,6 +20,19 @@ func init() {
 		}
 		return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
 	})
+
+	resource.RegisterRelated("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN},
+	})
+
+	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "SubnetId", TargetType: "subnet"},
+		{FieldPath: "ImageId", TargetType: "ami"},
+	})
 }
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
@@ -149,5 +162,36 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
+func checkEC2TargetGroups(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	// Check cache for "tg" resources — real matching logic comes in per-resource issues
+	if tgs, ok := cache["tg"]; ok {
+		_ = tgs // placeholder: iterate and match by instance ID
+	}
+	return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+}
+
+// checkEC2ASG checks the cache for ASGs containing this EC2 instance.
+func checkEC2ASG(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if asgs, ok := cache["asg"]; ok {
+		_ = asgs
+	}
+	return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+}
+
+// checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
+func checkEC2Alarms(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if alarms, ok := cache["alarm"]; ok {
+		_ = alarms
+	}
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+}
+
+// checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
+func checkEC2CFN(_ context.Context, _ interface{}, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	// Check for CFN tags on the instance
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 }
 

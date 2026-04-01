@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -392,6 +393,15 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
 		d.SetSize(m.innerSize())
 		m.pushView(&d)
+		// Dispatch related checkers if the right column was auto-shown
+		if d.NeedsRelatedCheck() {
+			return m, func() tea.Msg {
+				return messages.RelatedCheckStartedMsg{
+					ResourceType:   resType,
+					SourceResource: *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetYAML:
@@ -626,4 +636,115 @@ func copyToClipboard(content, successLabel string) tea.Cmd {
 		}
 		return messages.FlashMsg{Text: successLabel, IsError: false}
 	}
+}
+
+// handleRelatedCheckStarted dispatches one async tea.Cmd per registered RelatedDef
+// for the given resource type. In demo mode it calls the registered demo checker;
+// in live mode it calls def.Checker with a 10-second timeout.
+func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (tea.Model, tea.Cmd) {
+	defs := resource.GetRelated(msg.ResourceType)
+	if len(defs) == 0 {
+		return m, nil
+	}
+
+	cache := m.buildResourceCacheSnapshot()
+	cmds := make([]tea.Cmd, 0, len(defs))
+
+	for _, def := range defs {
+		def := def // capture for closure
+		cmds = append(cmds, func() tea.Msg {
+			if m.demoMode {
+				demoFn := resource.GetRelatedDemo(msg.ResourceType)
+				if demoFn != nil {
+					for _, r := range demoFn(msg.SourceResource) {
+						if r.TargetType == def.TargetType {
+							return messages.RelatedCheckResultMsg{
+								ResourceType: msg.ResourceType,
+								Result:       r,
+							}
+						}
+					}
+				}
+				return messages.RelatedCheckResultMsg{
+					ResourceType: msg.ResourceType,
+					Result:       resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+				}
+			}
+
+			if def.Checker == nil {
+				return messages.RelatedCheckResultMsg{
+					ResourceType: msg.ResourceType,
+					Result:       resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			result := def.Checker(ctx, m.clients, msg.SourceResource, cache)
+			result.TargetType = def.TargetType
+			return messages.RelatedCheckResultMsg{
+				ResourceType: msg.ResourceType,
+				Result:       result,
+			}
+		})
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// handleRelatedNavigate pushes a resource list view for the related target type.
+// Pre-filters the list when a specific target ID or related IDs are available.
+func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
+	rt := resource.FindResourceType(msg.TargetType)
+	if rt == nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
+				IsError: true,
+			}
+		}
+	}
+
+	// Determine filter text for pre-filtering
+	filterText := ""
+	if msg.TargetID != "" {
+		filterText = msg.TargetID // navigable field case: filter by specific ID
+	} else if len(msg.RelatedIDs) == 1 {
+		filterText = msg.RelatedIDs[0] // single related resource: filter by its ID
+	}
+	// Multiple RelatedIDs: no auto-filter (user filters manually)
+
+	// Check resource cache first
+	if entry, ok := m.resourceCache[msg.TargetType]; ok {
+		rl := views.NewResourceListFromCache(
+			*rt, m.viewConfig, m.keys,
+			entry.resources, entry.pagination,
+			filterText, // pre-filter applied here
+			entry.sortField, entry.sortAsc,
+			0, 0, // reset cursor and scroll for filtered view
+		)
+		rl.SetSize(m.innerSize())
+		m.pushView(&rl)
+		return m, nil
+	}
+
+	// Cache miss — create new list and fetch; apply filter after load
+	rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+	if filterText != "" {
+		rl.SetPendingFilter(filterText)
+	}
+	rl.SetSize(m.innerSize())
+	rl, initCmd := rl.Init()
+	m.pushView(&rl)
+	return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+}
+
+// buildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
+// resource lists, keyed by resource short name. Used by related checkers.
+func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
+	snap := make(resource.ResourceCache, len(m.resourceCache))
+	for shortName, entry := range m.resourceCache {
+		snap[shortName] = entry.resources
+	}
+	return snap
 }

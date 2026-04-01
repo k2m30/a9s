@@ -22,8 +22,9 @@ var (
 	FlashSuccess  lipgloss.Style
 	FlashError    lipgloss.Style
 	FilterActive  lipgloss.Style
-	DimText       lipgloss.Style
-	SpinnerStyle  lipgloss.Style
+	DimText        lipgloss.Style
+	SpinnerStyle   lipgloss.Style
+	NavigableField lipgloss.Style
 )
 
 // NoColorActive reports whether NO_COLOR is set in the environment.
@@ -85,6 +86,7 @@ func initStyles() {
 	FilterActive = lipgloss.Style{}
 	DimText = lipgloss.Style{}
 	SpinnerStyle = lipgloss.Style{}
+	NavigableField = lipgloss.Style{}
 	rowColorCache = nil
 
 	if NoColorActive() {
@@ -179,4 +181,5 @@ func initStyles() {
 	FilterActive = lipgloss.NewStyle().Foreground(ColFilter).Bold(true)
 	DimText = lipgloss.NewStyle().Foreground(ColDim)
 	SpinnerStyle = lipgloss.NewStyle().Foreground(ColSpinner)
+	NavigableField = lipgloss.NewStyle().Foreground(ColAccent).Underline(true)
 }
