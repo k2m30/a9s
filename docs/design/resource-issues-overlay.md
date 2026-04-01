@@ -1,11 +1,12 @@
 # Resource Issues Overlay Design Spec
 
-Issue: proposed
+Issue: [#196](https://github.com/k2m30/a9s/issues/196)
 Version: 1.0
 Target: a9s vNext
 Status: Design
 Source taxonomy: [`docs/design/resources-groupping.md`](/Users/k2m30/projects/a9s/docs/design/resources-groupping.md)
-Tracking issue draft: [`docs/issues/resource-issues-overlay-issue.md`](/Users/k2m30/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
+Tracking issue: [#196](https://github.com/k2m30/a9s/issues/196)
+Local issue draft: [`docs/issues/resource-issues-overlay-issue.md`](/Users/k2m30/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
 Signal catalog: [`docs/design/deterministic-issue-signals.md`](/Users/k2m30/projects/a9s/docs/design/deterministic-issue-signals.md)
 
 ---

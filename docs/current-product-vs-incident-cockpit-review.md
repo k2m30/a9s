@@ -1,5 +1,7 @@
 # Review: Current Product vs Incident Cockpit Requirements
 
+Related issue: [#196](https://github.com/k2m30/a9s/issues/196)
+
 ## Scope
 
 This review compares the current `a9s` product against

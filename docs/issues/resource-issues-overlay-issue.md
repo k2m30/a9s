@@ -1,5 +1,7 @@
 # GitHub Issue Draft: Resource Issues Overlay Across Resource Lists
 
+GitHub issue: [#196](https://github.com/k2m30/a9s/issues/196)
+
 Design spec: [`docs/design/resource-issues-overlay.md`](/Users/k2m30/projects/a9s/docs/design/resource-issues-overlay.md)
 Taxonomy source: [`docs/design/resources-groupping.md`](/Users/k2m30/projects/a9s/docs/design/resources-groupping.md)
 Signal catalog: [`docs/design/deterministic-issue-signals.md`](/Users/k2m30/projects/a9s/docs/design/deterministic-issue-signals.md)

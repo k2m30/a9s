@@ -1,5 +1,7 @@
 # AWS Incident Cockpit TUI
 
+Related issue: [#196](https://github.com/k2m30/a9s/issues/196)
+
 ## Purpose
 
 This document defines the ideal terminal-first AWS debugging, tracing, and
