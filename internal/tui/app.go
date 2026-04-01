@@ -70,8 +70,12 @@ type Model struct {
 
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
-	pendingRefresh bool  // set after profile/region switch to refresh on ClientsReadyMsg
-	configErr      error // non-nil if views config was found but corrupt
+	pendingRefresh bool   // set after profile/region switch to refresh on ClientsReadyMsg
+	connectGen     int    // incremented on profile/region switch; stale ClientsReadyMsg ignored
+	hasPrevState   bool   // true while prevProfile/prevRegion hold the rollback target
+	prevProfile    string // last stable profile before any in-flight switch, restored on failure
+	prevRegion     string // last stable region before any in-flight switch, restored on failure
+	configErr      error  // non-nil if views config was found but corrupt
 
 	identity         *awsclient.CallerIdentity
 	identityFetching bool
@@ -198,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
-		cmd := m.connectAWS(msg.Profile, msg.Region)
+		cmd := m.connectAWS(msg.Profile, msg.Region, m.connectGen)
 		return m, cmd
 	case messages.ClientsReadyMsg:
 		return m.handleClientsReady(msg)
@@ -306,10 +310,7 @@ func (m Model) View() tea.View {
 	if content != "" {
 		lines = strings.Split(content, "\n")
 	}
-	frameHeight := m.height - 1
-	if frameHeight < 3 {
-		frameHeight = 3
-	}
+	frameHeight := max(m.height-1, 3)
 	frame := layout.RenderFrame(lines, active.FrameTitle(), m.width, frameHeight)
 
 	v := tea.NewView(header + "\n" + frame)
@@ -421,10 +422,7 @@ func (m Model) headerRight() string {
 		text := m.flash.text
 		// Truncate to prevent header wrapping (fixes #84).
 		// Reserve ~40 chars for the left side (a9s + version + profile:region + padding).
-		maxFlash := m.width - 40
-		if maxFlash < 20 {
-			maxFlash = 20
-		}
+		maxFlash := max(m.width-40, 20)
 		if lipgloss.Width(text) > maxFlash {
 			// Truncate by runes to handle Unicode safely.
 			runes := []rune(text)
