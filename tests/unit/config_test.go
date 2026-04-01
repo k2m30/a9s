@@ -3,6 +3,7 @@ package unit_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -538,9 +539,11 @@ func TestEnsureConfigDir_CreatesDirectory(t *testing.T) {
 		t.Fatalf("%q is not a directory", target)
 	}
 
-	perm := info.Mode().Perm()
-	if perm != 0700 {
-		t.Errorf("directory permissions = %o, want %o", perm, 0700)
+	if runtime.GOOS != "windows" {
+		perm := info.Mode().Perm()
+		if perm != 0700 {
+			t.Errorf("directory permissions = %o, want %o", perm, 0700)
+		}
 	}
 }
 
@@ -587,16 +590,17 @@ func TestEnsureConfigDir_NoFilesCreated(t *testing.T) {
 // TestConfigFilePath verifies that ConfigFilePath joins the config directory
 // with the given filename correctly.
 func TestConfigFilePath(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", "/tmp/a9s-test")
+	base := filepath.Join(os.TempDir(), "a9s-test")
+	t.Setenv("A9S_CONFIG_FOLDER", base)
 
 	got := config.ConfigFilePath("views.yaml")
-	want := "/tmp/a9s-test/views.yaml"
+	want := filepath.Join(base, "views.yaml")
 	if got != want {
 		t.Errorf("ConfigFilePath(\"views.yaml\") = %q, want %q", got, want)
 	}
 
 	got = config.ConfigFilePath("keybindings.yaml")
-	want = "/tmp/a9s-test/keybindings.yaml"
+	want = filepath.Join(base, "keybindings.yaml")
 	if got != want {
 		t.Errorf("ConfigFilePath(\"keybindings.yaml\") = %q, want %q", got, want)
 	}

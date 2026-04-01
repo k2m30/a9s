@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -191,22 +192,41 @@ func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 	}
 }
 
-func (m *Model) connectAWS(profile, region string) tea.Cmd {
-	// Resolve region fallback BEFORE the async closure so that NewAWSSession
-	// always receives a non-empty region. Without this, the SDK fails with
-	// "Missing Region" when ~/.aws/config is absent (issue #82).
-	if region == "" {
-		configPath := awsclient.DefaultConfigPath()
-		region = awsclient.GetDefaultRegion(configPath, profile)
-	}
+func (m *Model) connectAWS(profile, region string, gen int) tea.Cmd {
 	return func() tea.Msg {
+		// First attempt: let SDK resolve region from env vars + config file.
 		cfg, err := awsclient.NewAWSSession(profile, region)
 		if err != nil {
-			return messages.ClientsReadyMsg{Err: err}
+			// If SDK fails due to missing region and we didn't provide one,
+			// fall back to config-file / us-east-1 (issue #82 safety net).
+			if region == "" && isMissingRegionError(err) {
+				configPath := awsclient.DefaultConfigPath()
+				fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
+				cfg, err = awsclient.NewAWSSession(profile, fallbackRegion)
+			}
+			if err != nil {
+				return messages.ClientsReadyMsg{Err: err, Gen: gen}
+			}
+		}
+		// SDK may succeed but leave Region empty (no env var, no config file).
+		// Retry with config-file / us-east-1 so API calls don't fail later.
+		if cfg.Region == "" && region == "" {
+			configPath := awsclient.DefaultConfigPath()
+			fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
+			cfg, err = awsclient.NewAWSSession(profile, fallbackRegion)
+			if err != nil {
+				return messages.ClientsReadyMsg{Err: err, Gen: gen}
+			}
 		}
 		clients := awsclient.CreateServiceClients(cfg)
-		return messages.ClientsReadyMsg{Clients: clients}
+		return messages.ClientsReadyMsg{Clients: clients, Region: cfg.Region, Gen: gen}
 	}
+}
+
+// isMissingRegionError checks if an AWS config error is due to missing region.
+func isMissingRegionError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "missing region") || strings.Contains(msg, "could not find region")
 }
 
 // loadAvailabilityCache returns a tea.Cmd that reads the availability cache from disk.

@@ -152,24 +152,57 @@ func (m Model) handleClearFlash(msg messages.ClearFlashMsg) (tea.Model, tea.Cmd)
 // handleClientsReady stores the new AWS clients and optionally triggers a
 // pending refresh (after profile/region switch).
 func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
+	// Ignore stale results from a superseded connect (rapid profile/region switch)
+	if msg.Gen != m.connectGen {
+		return m, nil
+	}
+
 	if msg.Err != nil {
+		// Rollback profile/region to previous stable values on connect failure
+		if m.hasPrevState {
+			m.profile = m.prevProfile
+			m.region = m.prevRegion
+		}
+		m.hasPrevState = false
+		m.prevProfile = ""
+		m.prevRegion = ""
+		m.pendingRefresh = false
 		newGen := m.flash.gen + 1
 		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true, gen: newGen}
-		m.pendingRefresh = false
 		gen := m.flash.gen
-		return m, tea.Tick(apiErrorFlashDuration, func(_ time.Time) tea.Msg {
+		clearFlash := tea.Tick(apiErrorFlashDuration, func(_ time.Time) tea.Msg {
 			return messages.ClearFlashMsg{Gen: gen}
 		})
+
+		// The switch attempt cleared identity, resource cache, and availability.
+		// Restore them using the still-valid old clients.
+		var cmds []tea.Cmd
+		cmds = append(cmds, clearFlash)
+		if m.clients != nil {
+			m.identityFetching = true
+			cmds = append(cmds, m.fetchIdentity())
+			if !m.noCache {
+				cmds = append(cmds, m.loadAvailabilityCache())
+			}
+		}
+		return m, tea.Batch(cmds...)
 	}
 	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
 	}
+	m.hasPrevState = false
+	m.prevProfile = ""
+	m.prevRegion = ""
 	if m.profile == "" && !m.demoMode {
 		m.profile = "default"
 	}
 	if m.region == "" && !m.demoMode {
-		configPath := awsclient.DefaultConfigPath()
-		m.region = awsclient.GetDefaultRegion(configPath, m.profile)
+		if msg.Region != "" {
+			m.region = msg.Region
+		} else {
+			configPath := awsclient.DefaultConfigPath()
+			m.region = awsclient.GetDefaultRegion(configPath, m.profile)
+		}
 	}
 	// Fetch identity on every clients-ready event
 	m.identityFetching = true
@@ -199,6 +232,13 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	if m.demoMode {
 		return m, nil
 	}
+	m.connectGen++
+	// Only save prev on first switch; rapid A→B→C keeps A as rollback target
+	if !m.hasPrevState {
+		m.hasPrevState = true
+		m.prevProfile = m.profile
+		m.prevRegion = m.region
+	}
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
@@ -214,7 +254,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	flashCmd := func() tea.Msg {
 		return messages.FlashMsg{Text: "Switching to " + msg.Profile + "..."}
 	}
-	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, ""))
+	return m, tea.Batch(flashCmd, m.connectAWS(msg.Profile, "", m.connectGen))
 }
 
 // handleRegionSelected switches the AWS region, pops the region selector,
@@ -222,6 +262,13 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
 	if m.demoMode {
 		return m, nil
+	}
+	m.connectGen++
+	// Only save prev on first switch; rapid switches keep original as rollback target
+	if !m.hasPrevState {
+		m.hasPrevState = true
+		m.prevProfile = m.profile
+		m.prevRegion = m.region
 	}
 	m.region = msg.Region
 	m.identity = nil
@@ -237,7 +284,7 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	flashCmd := func() tea.Msg {
 		return messages.FlashMsg{Text: "Switching to " + msg.Region + "..."}
 	}
-	return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region))
+	return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region, m.connectGen))
 }
 
 // handleProfilesLoaded pushes the profile selector view onto the stack.
@@ -552,6 +599,12 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		m.availQueue = m.availQueue[1:]
 		cmd := m.probeResourceAvailability(next, m.availabilityGen)
 		return m, cmd
+	}
+
+	// Queue is drained but other probes may still be in flight.
+	// Only finalize when ALL probes have returned.
+	if m.availChecked < m.availTotal {
+		return m, nil
 	}
 
 	// All checks done — clear progress indicator, flash, and save cache
