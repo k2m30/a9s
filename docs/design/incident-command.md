@@ -1,6 +1,6 @@
 # Incident Command / Cockpit Design Spec
 
-Issue: proposed
+Related issue: [#196](https://github.com/k2m30/a9s/issues/196)
 Version: 1.0
 Target: a9s vNext
 Status: Design
