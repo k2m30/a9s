@@ -94,11 +94,13 @@ type InitConnectMsg struct {
 }
 
 // ClientsReadyMsg is sent when AWS clients are initialized.
-// Clients is typed as interface{} to avoid importing aws/ from the messages package.
+// Clients is typed as any to avoid importing aws/ from the messages package.
 // The root model type-asserts it to *awsclient.ServiceClients.
 type ClientsReadyMsg struct {
-	Clients interface{}
+	Clients any
 	Err     error
+	Region  string // resolved region from AWS config (set on success)
+	Gen     int    // connect generation — ignore if != current connectGen
 }
 
 // EnterChildViewMsg signals that the user has triggered a child view navigation.
@@ -141,10 +143,10 @@ type AvailabilityCheckedMsg struct {
 }
 
 // IdentityLoadedMsg is sent when the caller identity has been fetched.
-// Identity is typed as interface{} to avoid importing aws/ from the messages package.
+// Identity is typed as any to avoid importing aws/ from the messages package.
 // The root model type-asserts it to *awsclient.CallerIdentity.
 type IdentityLoadedMsg struct {
-	Identity interface{}
+	Identity any
 }
 
 // IdentityErrorMsg is sent when the caller identity fetch fails.

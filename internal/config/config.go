@@ -137,7 +137,17 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 				return nil, fmt.Errorf("parsing %s: %w", filePath, err)
 			}
 
-			merged[resourceName] = *vd
+			if existing, ok := merged[resourceName]; ok {
+				if len(vd.List) > 0 {
+					existing.List = vd.List
+				}
+				if len(vd.Detail) > 0 {
+					existing.Detail = vd.Detail
+				}
+				merged[resourceName] = existing
+			} else {
+				merged[resourceName] = *vd
+			}
 		}
 	}
 
