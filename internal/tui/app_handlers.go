@@ -488,9 +488,16 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 
 	// Detail view: re-trigger related resource checks
-	if _, ok := m.activeView().(*views.DetailModel); ok {
+	if d, ok := m.activeView().(*views.DetailModel); ok {
+		rt := d.ResourceType()
+		srcRes := d.SourceResource()
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-		return m.updateActiveView(tea.KeyPressMsg{Code: -1, Text: "\x12"})
+		return m, func() tea.Msg {
+			return messages.RelatedCheckStartedMsg{
+				ResourceType:   rt,
+				SourceResource: srcRes,
+			}
+		}
 	}
 
 	rl, ok := m.activeView().(*views.ResourceListModel)
