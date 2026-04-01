@@ -473,6 +473,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 
 // handleRefresh re-fetches resources when on a resource list view,
 // or restarts availability checks when on the main menu.
+// For detail views, re-triggers related resource checks.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Main menu: restart availability checks
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
@@ -484,6 +485,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
+	}
+
+	// Detail view: re-trigger related resource checks
+	if _, ok := m.activeView().(*views.DetailModel); ok {
+		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+		return m.updateActiveView(tea.KeyPressMsg{Code: -1, Text: "\x12"})
 	}
 
 	rl, ok := m.activeView().(*views.ResourceListModel)
@@ -705,34 +712,78 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 	}
 
-	// Determine filter text for pre-filtering
-	filterText := ""
+	// Bug 1 fix: TargetID set → find resource in cache and push detail directly.
 	if msg.TargetID != "" {
-		filterText = msg.TargetID // navigable field case: filter by specific ID
-	} else if len(msg.RelatedIDs) == 1 {
-		filterText = msg.RelatedIDs[0] // single related resource: filter by its ID
+		if entry, ok := m.resourceCache[msg.TargetType]; ok {
+			for _, r := range entry.resources {
+				if r.ID == msg.TargetID {
+					detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
+					detail.SetSize(m.innerSize())
+					m.pushView(&detail)
+					return m, nil
+				}
+			}
+		}
+		// Resource not in cache — flash error
+		targetID := msg.TargetID
+		return m, func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("Resource %s not found in cache", targetID),
+				IsError: true,
+			}
+		}
 	}
-	// Multiple RelatedIDs: no auto-filter (user filters manually)
 
-	// Check resource cache first
-	if entry, ok := m.resourceCache[msg.TargetType]; ok {
-		rl := views.NewResourceListFromCache(
-			*rt, m.viewConfig, m.keys,
-			entry.resources, entry.pagination,
-			filterText, // pre-filter applied here
-			entry.sortField, entry.sortAsc,
-			0, 0, // reset cursor and scroll for filtered view
-		)
+	// Bug 2 fix: single RelatedID → push detail directly (same as TargetID).
+	if len(msg.RelatedIDs) == 1 {
+		targetID := msg.RelatedIDs[0]
+		if entry, ok := m.resourceCache[msg.TargetType]; ok {
+			for _, r := range entry.resources {
+				if r.ID == targetID {
+					detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
+					detail.SetSize(m.innerSize())
+					m.pushView(&detail)
+					return m, nil
+				}
+			}
+		}
+		// Not in cache — fall through to list with pending filter
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetPendingFilter(targetID)
 		rl.SetSize(m.innerSize())
+		rl, initCmd := rl.Init()
 		m.pushView(&rl)
-		return m, nil
+		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
-	// Cache miss — create new list and fetch; apply filter after load
-	rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-	if filterText != "" {
-		rl.SetPendingFilter(filterText)
+	// Bug 3 fix: multiple RelatedIDs → filter cache to only matching resources.
+	if len(msg.RelatedIDs) > 1 {
+		if entry, ok := m.resourceCache[msg.TargetType]; ok {
+			idSet := make(map[string]bool, len(msg.RelatedIDs))
+			for _, id := range msg.RelatedIDs {
+				idSet[id] = true
+			}
+			var filtered []resource.Resource
+			for _, r := range entry.resources {
+				if idSet[r.ID] {
+					filtered = append(filtered, r)
+				}
+			}
+			rl := views.NewResourceListFromCache(
+				*rt, m.viewConfig, m.keys,
+				filtered, entry.pagination,
+				"", // no text filter needed, already filtered by ID
+				entry.sortField, entry.sortAsc,
+				0, 0,
+			)
+			rl.SetSize(m.innerSize())
+			m.pushView(&rl)
+			return m, nil
+		}
 	}
+
+	// Fallback: no IDs specified or cache miss for multiple IDs — push unfiltered list.
+	rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
 	rl.SetSize(m.innerSize())
 	rl, initCmd := rl.Init()
 	m.pushView(&rl)

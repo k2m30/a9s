@@ -182,3 +182,12 @@ func (m rightColumnModel) SelectedRow() *rightColumnRow {
 	}
 	return nil
 }
+
+// SelectedTypeName returns the display name of the currently selected row, or "" if none.
+func (m rightColumnModel) SelectedTypeName() string {
+	row := m.SelectedRow()
+	if row == nil {
+		return ""
+	}
+	return row.displayName
+}

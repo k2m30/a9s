@@ -1,5 +1,3 @@
-//go:build spec008
-
 package integration
 
 // ec2_nav_chain_spec008_test.go — Spec-008: EC2 full navigation chain tests.

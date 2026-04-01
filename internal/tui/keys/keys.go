@@ -98,8 +98,8 @@ func Default() Map {
 		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),
 		SortByAge:  key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "sort date")),
 
-		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up")),
-		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down")),
+		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u", "\x15"), key.WithHelp("pgup", "page up")),
+		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d", "\x04"), key.WithHelp("pgdn", "page down")),
 
 		LoadMore: key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "load more")),
 

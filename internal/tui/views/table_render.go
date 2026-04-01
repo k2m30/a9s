@@ -151,5 +151,13 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 			return v
 		}
 	}
+	// Final fallback: use resource Name for name-style columns when Fields has no value.
+	// This handles test fixtures and resources where Fields is sparse but r.Name is set.
+	// Matches columns whose key or title contains "name" (e.g., "alarm_name", "Alarm Name").
+	if r.Name != "" &&
+		(strings.Contains(strings.ToLower(c.key), "name") ||
+			strings.Contains(strings.ToLower(c.title), "name")) {
+		return r.Name
+	}
 	return ""
 }

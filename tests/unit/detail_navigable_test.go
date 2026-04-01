@@ -89,9 +89,13 @@ func TestDetail_NavigableField_HighlightedInView(t *testing.T) {
 	defer resource.UnregisterNavigableFields("ec2")
 
 	d := makeNavDetail(140, 30)
+
+	// Move cursor off VpcId (row 0) → row 1, so VpcId is NOT under cursor.
+	// Per spec-007 Bug4, navigable underline is suppressed when cursor is on the row.
+	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 	view := d.View()
 
-	// VpcId is navigable → NavigableField style (underline + accent colour).
+	// VpcId is navigable and cursor is NOT on it → NavigableField style (underline + accent colour).
 	// Lipgloss v2 encodes underline as attribute "4" combined with other codes,
 	// so the escape looks like \x1b[4;... rather than a standalone \x1b[4m.
 	// We check for the two forms that indicate underline is active.

@@ -870,6 +870,13 @@ func TestEC2_051_CopyFromRightCol(t *testing.T) {
 // PASSES AFTER FIX: handleRefresh() handles the detail view by emitting
 // RelatedCheckStartedMsg to restart background checks.
 func TestEC2_052_CtrlR_Refresh(t *testing.T) {
+	// Ensure EC2 related defs are registered (prior tests may unregister them).
+	resource.RegisterRelated("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups"},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups"},
+	})
+	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 

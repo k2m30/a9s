@@ -5,10 +5,12 @@ import "github.com/k2m30/a9s/v3/internal/resource"
 func init() {
 	resource.RegisterRelatedDemo("ec2", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "tg", Count: 1, ResourceIDs: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/demo-web-tg/abc123"}},
-			{TargetType: "asg", Count: 1, ResourceIDs: []string{"demo-web-asg"}},
-			{TargetType: "alarm", Count: 2, ResourceIDs: []string{"demo-ec2-cpu-high", "demo-ec2-status-check"}},
+			{TargetType: "tg", Count: 1, ResourceIDs: []string{"acme-web-tg"}},
+			{TargetType: "asg", Count: 1, ResourceIDs: []string{"acme-web-prod-asg"}},
+			{TargetType: "alarm", Count: 2, ResourceIDs: []string{"api-high-error-rate", "rds-cpu-utilization"}},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "eip", Count: 1, ResourceIDs: []string{"eipalloc-0aaa111111111111a"}},
+			{TargetType: "ebs-snap", Count: 2, ResourceIDs: []string{"snap-0a1b2c3d4e5f60001", "snap-0a1b2c3d4e5f60002"}},
 		}
 	})
 }

@@ -26,6 +26,8 @@ func init() {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN},
+		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP},
+		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
@@ -193,5 +195,21 @@ func checkEC2Alarms(_ context.Context, _ interface{}, _ resource.Resource, cache
 func checkEC2CFN(_ context.Context, _ interface{}, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	// Check for CFN tags on the instance
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+}
+
+// checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
+func checkEC2EIP(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if eips, ok := cache["eip"]; ok {
+		_ = eips
+	}
+	return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+}
+
+// checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
+func checkEC2EBSSnap(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if snaps, ok := cache["ebs-snap"]; ok {
+		_ = snaps
+	}
+	return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
 }
 

@@ -250,6 +250,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return updatedModel, cmd
 				}
+			} else if msg.ResourceType != "" && !msg.Append {
+				// Active view is not a ResourceList for this type (e.g., detail or menu).
+				// Cache resources directly from the message so handleRelatedNavigate
+				// can find them when navigating to a related resource type.
+				if _, alreadyCached := updatedModel.resourceCache[msg.ResourceType]; !alreadyCached {
+					updatedModel.resourceCache[msg.ResourceType] = &resourceCacheEntry{
+						resources: msg.Resources,
+					}
+				}
 			}
 			return updatedModel, cmd
 		}
@@ -303,10 +312,15 @@ func (m Model) View() tea.View {
 	rightContent := m.headerRight()
 	badge := m.accountBadge()
 	role := m.identityRoleName()
-	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
+	// §7.4: when stack depth exceeds 4, show "[N]" in place of the version string.
+	displayVersion := Version
+	if len(m.stack) > 4 {
+		displayVersion = fmt.Sprintf("[%d]", len(m.stack))
+	}
+	cacheKey := headerProfile + ":" + headerRegion + ":" + displayVersion + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
 	header := m.headerCache
 	if cacheKey != m.headerCacheKey {
-		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent, badge, role)
+		header = layout.RenderHeader(headerProfile, headerRegion, displayVersion, m.width, rightContent, badge, role)
 		m.headerCache = header
 		m.headerCacheKey = cacheKey
 	}

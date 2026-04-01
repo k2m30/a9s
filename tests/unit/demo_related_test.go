@@ -20,8 +20,8 @@ func TestDemoRelatedChecker_EC2(t *testing.T) {
 
 	res := resource.Resource{ID: "i-demo001", Name: "demo-instance"}
 	results := checker(res)
-	if len(results) != 4 {
-		t.Fatalf("expected 4 results, got %d", len(results))
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results (tg, asg, alarm, cfn, eip, ebs-snap), got %d", len(results))
 	}
 
 	// Build map for easier per-type assertions.

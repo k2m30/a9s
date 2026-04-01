@@ -57,6 +57,9 @@ func NewDetail(res resource.Resource, resourceType string, viewConfig *config.Vi
 
 // buildFieldList computes m.fieldList from the view config and navigable field registry.
 // Sets m.fieldList to nil when no config or detail paths are available (falls through to renderFromConfig).
+// After calling ExtractFieldList, post-processes sub-fields to mark navigable ones:
+// a sub-field under path P whose key K matches navMap["P.K"] is marked IsNavigable
+// with TargetType from the navMap, and its Value is set to the extracted sub-value.
 func (m *DetailModel) buildFieldList() {
 	if m.viewConfig == nil {
 		m.fieldList = nil
@@ -72,11 +75,59 @@ func (m *DetailModel) buildFieldList() {
 	for _, nf := range navFields {
 		navMap[nf.FieldPath] = nf.TargetType
 	}
-	m.fieldList = fieldpath.ExtractFieldList(m.res.RawStruct, m.res.Fields, vd.Detail, navMap)
+	// When the resource has neither a Fields map nor a RawStruct, synthesize a minimal
+	// Fields map from the resource's own ID/Name/Status so that bare resources (e.g.,
+	// cached stubs navigated to directly) still render their key identifiers.
+	// Only apply when RawStruct is nil — if RawStruct is present, ExtractFieldList will
+	// extract the correct values from it directly.
+	fields := m.res.Fields
+	if len(fields) == 0 && m.res.RawStruct == nil && (m.res.ID != "" || m.res.Name != "" || m.res.Status != "") {
+		fieldKeys := resource.GetFieldKeys(m.resourceType)
+		synth := make(map[string]string, 3)
+		if m.res.ID != "" && len(fieldKeys) > 0 {
+			// First registered field key is the primary ID field (e.g., "subnet_id").
+			synth[fieldKeys[0]] = m.res.ID
+		}
+		if m.res.Name != "" && len(fieldKeys) > 1 {
+			synth[fieldKeys[1]] = m.res.Name
+		}
+		if m.res.Status != "" && len(fieldKeys) > 2 {
+			synth[fieldKeys[2]] = m.res.Status
+		}
+		if len(synth) > 0 {
+			fields = synth
+		}
+	}
+	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, vd.Detail, navMap)
+	// Post-process: annotate sub-fields that match a navigable path "Parent.SubKey".
+	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
+	// Sub-field Value is the raw YAML line (e.g., "- GroupId: sg-xxx" or "  GroupName: foo").
+	// Trim leading "- " and whitespace to extract the bare key for path composition.
+	for i, item := range items {
+		if !item.IsSubField {
+			continue
+		}
+		// Strip leading whitespace and list-item prefix ("- ").
+		rawLine := strings.TrimSpace(item.Value)
+		rawLine = strings.TrimPrefix(rawLine, "- ")
+		subKey, subVal, hasSep := strings.Cut(rawLine, ": ")
+		if !hasSep {
+			continue
+		}
+		composedPath := item.Path + "." + subKey
+		if tt, ok := navMap[composedPath]; ok {
+			items[i].IsNavigable = true
+			items[i].TargetType = tt
+			items[i].Value = subVal
+		}
+	}
+	m.fieldList = items
 }
 
 // renderFromFieldList renders the structured field list to a string.
 // Each FieldItem is rendered according to its type: header, sub-field, navigable, or normal.
+// Bug3 fix: applies styles.RowSelected to the cursor row when left column is focused.
+// Bug4 fix: suppresses NavigableField underline on the cursor row (RowSelected takes over).
 func (m DetailModel) renderFromFieldList() string {
 	if len(m.fieldList) == 0 {
 		return styles.DimText.Render("  No detail data available")
@@ -90,18 +141,40 @@ func (m DetailModel) renderFromFieldList() string {
 	}
 	keyW := computeKeyWidth(topPaths)
 
+	leftFocused := !m.rightCol.IsFocused()
+
 	var lines []string
-	for _, item := range m.fieldList {
+	for idx, item := range m.fieldList {
+		isCursorRow := leftFocused && idx == m.fieldCursor
 		var line string
 		switch {
 		case item.IsHeader:
 			line = " " + styles.DetailSection.Render(item.Key+":")
 		case item.IsSubField:
-			line = "     " + styles.DetailVal.Render(item.Value)
+			// Bug2 fix: render sub-fields as "     Key:  value" with separate key/value styles.
+			// Sub-field items have Key == Value (the raw combined line like "Name: web-prod").
+			// Split on ": " to extract the key and value parts.
+			subKey, subVal, hasSep := strings.Cut(item.Value, ": ")
+			if hasSep {
+				line = "     " + styles.DetailKey.Render(subKey+":") + "  " + styles.DetailVal.Render(subVal)
+			} else {
+				line = "     " + styles.DetailVal.Render(item.Value)
+			}
 		case item.IsNavigable:
-			line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
+			// Bug4 fix: suppress underline on the cursor row; RowSelected takes over.
+			if isCursorRow {
+				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
+			} else {
+				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
+			}
 		default:
 			line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
+		}
+		// Bug3 fix: apply background highlight to the cursor row (left focused only).
+		// Use a background-only style so the escape sequence starts with \x1b[48;
+		// (matching test expectations). The line's own text colors remain visible.
+		if isCursorRow {
+			line = lipgloss.NewStyle().Background(styles.ColRowSelectedBg).Render(line)
 		}
 		lines = append(lines, line)
 	}
@@ -140,15 +213,110 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				return m, cmd
 			case key.Matches(msg, m.keys.Tab):
 				m.rightCol.SetFocused(false)
+				m.refreshViewportContent() // update cursor highlight after focus change
 				return m, nil
 			case key.Matches(msg, m.keys.Escape):
 				// Esc from focused right column: unfocus (don't pop view)
 				m.rightCol.SetFocused(false)
+				m.refreshViewportContent() // update cursor highlight after focus change
 				return m, nil
 			}
 			// Other keys (like ToggleRelated, Search, etc.) still handled by detail
 		}
 		switch {
+		case key.Matches(msg, m.keys.ScrollRight):
+			// l: focus right column (if showing and not already focused)
+			if m.rightColShowing() && !m.rightCol.IsFocused() {
+				m.rightCol.SetFocused(true)
+				m.refreshViewportContent()
+				return m, nil
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.ScrollLeft):
+			// h: focus left column (if right is focused)
+			if m.rightCol.IsFocused() {
+				m.rightCol.SetFocused(false)
+				m.refreshViewportContent()
+				return m, nil
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.Copy):
+			if m.rightCol.IsFocused() {
+				name := m.rightCol.SelectedTypeName()
+				if name != "" {
+					return m, func() tea.Msg {
+						return messages.CopiedMsg{Content: name}
+					}
+				}
+				return m, nil
+			}
+			// Left column: copy the field value at cursor
+			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+				item := m.fieldList[m.fieldCursor]
+				val := item.Value
+				if val == "" {
+					val = item.Key
+				}
+				return m, func() tea.Msg {
+					return messages.CopiedMsg{Content: val}
+				}
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.Refresh):
+			// Ctrl+R: re-trigger related checks if right column is showing
+			if m.rightColShowing() {
+				defs := resource.GetRelated(m.resourceType)
+				m.rightCol = newRightColumn(defs, m.res)
+				m.rightCol.keys = m.keys
+				m.rightCol.SetSize(m.rightColWidth, m.height)
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStartedMsg{
+						ResourceType:   m.resourceType,
+						SourceResource: m.res,
+					}
+				}
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.PageDown):
+			if !m.rightCol.IsFocused() && m.fieldList != nil {
+				pageSize := m.height - 4
+				if pageSize < 1 {
+					pageSize = 1
+				}
+				m.fieldCursor += pageSize
+				if m.fieldCursor >= len(m.fieldList) {
+					m.fieldCursor = len(m.fieldList) - 1
+				}
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+				return m, nil
+			}
+			// No fieldList — scroll viewport directly
+			if m.ready {
+				m.viewport.HalfPageDown()
+				return m, nil
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.PageUp):
+			if !m.rightCol.IsFocused() && m.fieldList != nil {
+				pageSize := m.height - 4
+				if pageSize < 1 {
+					pageSize = 1
+				}
+				m.fieldCursor -= pageSize
+				if m.fieldCursor < 0 {
+					m.fieldCursor = 0
+				}
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+				return m, nil
+			}
+			// No fieldList — scroll viewport directly
+			if m.ready {
+				m.viewport.HalfPageUp()
+				return m, nil
+			}
+			return m, nil
 		case key.Matches(msg, m.keys.Search):
 			m.search.Activate()
 			return m, nil
@@ -177,6 +345,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				} else {
 					m.rightCol.SetFocused(true)
 				}
+				m.refreshViewportContent() // update cursor highlight after focus change
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.ToggleRelated):
@@ -249,18 +418,38 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			m.viewport.SoftWrap = m.wrap
 			m.refreshViewportContent()
 			return m, nil
+		case key.Matches(msg, m.keys.Top):
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
+				m.fieldCursor = 0
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+				return m, nil
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.Bottom):
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
+				m.fieldCursor = len(m.fieldList) - 1
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+				return m, nil
+			}
+			return m, nil
 		case key.Matches(msg, m.keys.Down):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
 				m.fieldCursor++
 				m.syncViewportToCursor()
+				m.refreshViewportContent()
 				return m, nil
 			}
+			return m, nil // Bug6 fix: clamp at boundary, don't fall through to viewport scroll
 		case key.Matches(msg, m.keys.Up):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
 				m.fieldCursor--
 				m.syncViewportToCursor()
+				m.refreshViewportContent()
 				return m, nil
 			}
+			return m, nil // Bug6 fix: clamp at boundary, don't fall through to viewport scroll
 		}
 	}
 
@@ -274,12 +463,18 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 }
 
 // View renders detail content via viewport.
-// When the right column is showing and width >= 100, renders left and right columns side by side.
+// When the right column is showing and width >= 100, renders left and right columns side by side
+// with a │ separator (Bug1 fix). When width is 80-99, renders stacked layout (Bug5 fix).
 func (m DetailModel) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
 	if m.rightColShowing() && m.width >= 100 {
+		// Side-by-side layout with │ separator (Bug1 fix).
+		sep := styles.ColSepDim.Render("│")
+		if m.rightCol.IsFocused() {
+			sep = styles.ColSepAccent.Render("│")
+		}
 		leftContent := m.viewport.View()
 		rightContent := m.rightCol.View()
 		leftLines := strings.Split(leftContent, "\n")
@@ -289,7 +484,7 @@ func (m DetailModel) View() string {
 		if len(rightLines) > maxLines {
 			maxLines = len(rightLines)
 		}
-		leftW := m.width - m.rightColWidth
+		leftW := m.width - m.rightColWidth - 1 // -1 for separator character
 		var sb strings.Builder
 		for i := range maxLines {
 			if i > 0 {
@@ -310,9 +505,17 @@ func (m DetailModel) View() string {
 				padded = left + strings.Repeat(" ", leftW-leftVisible)
 			}
 			sb.WriteString(padded)
+			sb.WriteString(sep)
 			sb.WriteString(right)
 		}
 		return sb.String()
+	}
+	if m.rightColShowing() && m.width >= 80 {
+		// Bug5 fix: stacked layout for width 80-99.
+		leftContent := m.viewport.View()
+		divider := styles.DimText.Render("-- Related " + strings.Repeat("-", m.width-13))
+		rightContent := m.rightCol.View()
+		return leftContent + "\n" + divider + "\n" + rightContent
 	}
 	return m.viewport.View()
 }
@@ -328,7 +531,8 @@ func (m *DetailModel) SetSize(w, h int) {
 
 	// Auto-show right column on first SetSize call when terminal is wide enough
 	// and there are registered related defs for this resource type.
-	if !m.ready && w >= 100 && len(resource.GetRelated(m.resourceType)) > 0 {
+	// Bug5 fix: also auto-show at width 80-99 (stacked layout, not side-by-side).
+	if !m.ready && w >= 80 && len(resource.GetRelated(m.resourceType)) > 0 {
 		m.rightColAutoShown = true
 		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
 		m.rightCol.keys = m.keys
@@ -336,8 +540,11 @@ func (m *DetailModel) SetSize(w, h int) {
 
 	viewportW := w
 	if m.rightColShowing() && w >= 100 {
-		viewportW = w - m.rightColWidth
+		viewportW = w - m.rightColWidth - 1 // -1 for separator character
 		m.rightCol.SetSize(m.rightColWidth, h)
+	} else if m.rightColShowing() && w >= 80 {
+		// Stacked mode: right column takes full width but shorter height.
+		m.rightCol.SetSize(w, h/2)
 	}
 
 	if !m.ready {
@@ -359,7 +566,7 @@ func (m DetailModel) rightColShowing() bool {
 // recalcViewportWidth adjusts the viewport width based on the right column visibility.
 func (m *DetailModel) recalcViewportWidth() {
 	if m.rightColShowing() && m.width >= 100 {
-		leftW := m.width - m.rightColWidth
+		leftW := m.width - m.rightColWidth - 1 // -1 for separator
 		if m.ready {
 			m.viewport.SetWidth(leftW)
 		}
@@ -381,6 +588,11 @@ func (m *DetailModel) syncViewportToCursor() {
 	} else if m.fieldCursor >= yOffset+visibleLines {
 		m.viewport.SetYOffset(m.fieldCursor - visibleLines + 1)
 	}
+}
+
+// FieldCursor returns the current field cursor index for testing.
+func (m DetailModel) FieldCursor() int {
+	return m.fieldCursor
 }
 
 // refreshViewportContent re-renders content and applies search highlights.

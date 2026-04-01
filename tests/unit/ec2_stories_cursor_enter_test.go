@@ -1,5 +1,3 @@
-//go:build spec008
-
 package unit_test
 
 // ec2_stories_cursor_enter_test.go — Spec-008 / EC2 stories EC2-006 through EC2-016.

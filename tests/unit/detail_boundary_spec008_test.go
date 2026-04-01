@@ -1,5 +1,3 @@
-//go:build spec008
-
 package unit_test
 
 // detail_boundary_spec008_test.go — Spec-008: j/k boundary clamping in DetailModel.

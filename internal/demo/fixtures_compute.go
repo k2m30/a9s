@@ -140,6 +140,138 @@ func ec2Instances() []resource.Resource {
 	return instances
 }
 
+// ec2InstanceExtras holds the per-instance fields that are not part of the
+// original makeEC2Instance signature but are required by navigable-field tests.
+type ec2InstanceExtras struct {
+	imageID        string
+	keyName        string
+	architecture   ec2types.ArchitectureValues
+	az             string
+	securityGroups []ec2types.GroupIdentifier
+}
+
+// ec2Extras maps instance IDs to their extra fixture data.
+var ec2Extras = map[string]ec2InstanceExtras{
+	"i-0a1b2c3d4e5f60001": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60002": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60003": {
+		imageID:      "ami-0a1b2c3d4e5f60002",
+		keyName:      "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60004": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60005": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60006": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1c",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ddd444444444444d"), GroupName: aws.String("acme-db-proxy-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60007": {
+		imageID:      "ami-0a1b2c3d4e5f60002",
+		keyName:      "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60008": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-api-internal-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60009": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60010": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+}
+
+// ec2DefaultExtras returns a fallback ec2InstanceExtras for generated instances.
+func ec2DefaultExtras(instanceID string) ec2InstanceExtras {
+	if ex, ok := ec2Extras[instanceID]; ok {
+		return ex
+	}
+	// Derive deterministic values from the instance ID suffix.
+	suffix := instanceID[len(instanceID)-4:]
+	amiIDs := []string{"ami-0a1b2c3d4e5f60001", "ami-0a1b2c3d4e5f60002", "ami-0a1b2c3d4e5f60003"}
+	keyNames := []string{"acme-prod-keypair", "acme-staging-keypair", "acme-dev-keypair"}
+	archs := []ec2types.ArchitectureValues{ec2types.ArchitectureValuesX8664, ec2types.ArchitectureValuesArm64}
+	azs := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
+	idx := 0
+	for _, ch := range suffix {
+		idx += int(ch)
+	}
+	return ec2InstanceExtras{
+		imageID:      amiIDs[idx%len(amiIDs)],
+		keyName:      keyNames[idx%len(keyNames)],
+		architecture: archs[idx%len(archs)],
+		az:           azs[idx%len(azs)],
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	}
+}
+
 // makeEC2Instance constructs a resource.Resource with a fully populated
 // ec2types.Instance as RawStruct. This enables both detail and YAML views
 // in demo mode.
@@ -153,6 +285,7 @@ func makeEC2Instance(
 ) resource.Resource {
 	stateName := ec2types.InstanceStateName(state)
 	stateCode := stateNameToCode(stateName)
+	extras := ec2DefaultExtras(instanceID)
 
 	inst := ec2types.Instance{
 		InstanceId:       aws.String(instanceID),
@@ -162,8 +295,13 @@ func makeEC2Instance(
 			Name: stateName,
 			Code: aws.Int32(stateCode),
 		},
-		VpcId:    aws.String(vpcID),
-		SubnetId: aws.String(subnetID),
+		VpcId:          aws.String(vpcID),
+		SubnetId:       aws.String(subnetID),
+		ImageId:        aws.String(extras.imageID),
+		KeyName:        aws.String(extras.keyName),
+		Architecture:   extras.architecture,
+		Placement:      &ec2types.Placement{AvailabilityZone: aws.String(extras.az)},
+		SecurityGroups: extras.securityGroups,
 		Tags: []ec2types.Tag{
 			{Key: aws.String("Name"), Value: aws.String(name)},
 			{Key: aws.String("Environment"), Value: aws.String(envFromName(name))},
