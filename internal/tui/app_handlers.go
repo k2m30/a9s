@@ -731,14 +731,19 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 		}
-		// Resource not in cache — flash error
-		targetID := msg.TargetID
-		return m, func() tea.Msg {
-			return messages.FlashMsg{
-				Text:    fmt.Sprintf("Resource %s not found in cache", targetID),
-				IsError: true,
-			}
+		// Resource not in cache — fetch target list and preserve exact-ID filtering.
+		m.flash = flashState{
+			text:    fmt.Sprintf("Resource %s not in cache; loading %s list", msg.TargetID, msg.TargetType),
+			isError: false,
+			active:  true,
 		}
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetPendingFilter(msg.TargetID)
+		rl.SetRelatedIDFilter([]string{msg.TargetID})
+		rl.SetSize(m.innerSize())
+		rl, initCmd := rl.Init()
+		m.pushView(&rl)
+		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
 	// Bug 2 fix: single RelatedID → push detail directly (same as TargetID).
@@ -757,6 +762,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		// Not in cache — fall through to list with pending filter
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
 		rl.SetPendingFilter(targetID)
+		rl.SetRelatedIDFilter([]string{targetID})
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -787,6 +793,13 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			m.pushView(&rl)
 			return m, nil
 		}
+		// Cache miss: fetch and preserve exact-ID filtering.
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetRelatedIDFilter(msg.RelatedIDs)
+		rl.SetSize(m.innerSize())
+		rl, initCmd := rl.Init()
+		m.pushView(&rl)
+		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
 	// Fallback: no IDs specified or cache miss for multiple IDs — push unfiltered list.

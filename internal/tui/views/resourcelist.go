@@ -30,6 +30,7 @@ type ResourceListModel struct {
 
 	filterText    string
 	pendingFilter string            // auto-applied after ResourcesLoadedMsg arrives
+	relatedIDSet  map[string]struct{} // optional exact-ID prefilter (used by related navigation)
 	parentContext map[string]string // context from parent view for child fetchers
 	displayName   string           // custom display name for frame title
 
@@ -422,6 +423,24 @@ func (m *ResourceListModel) SetPendingFilter(text string) {
 	m.pendingFilter = text
 }
 
+// SetRelatedIDFilter constrains the list to an exact set of resource IDs.
+// Used by related-resource navigation flows to preserve checker result IDs
+// even when the destination type must be fetched first.
+func (m *ResourceListModel) SetRelatedIDFilter(ids []string) {
+	if len(ids) == 0 {
+		m.relatedIDSet = nil
+		return
+	}
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+	m.relatedIDSet = set
+}
+
 // GetFilter returns the current filter text.
 func (m *ResourceListModel) GetFilter() string {
 	return m.filterText
@@ -620,7 +639,17 @@ func (m ResourceListModel) FrameTitle() string {
 
 // applyFilter filters allResources into filteredResources.
 func (m *ResourceListModel) applyFilter() {
-	m.filteredResources = FilterResources(m.filterText, m.allResources)
+	base := m.allResources
+	if len(m.relatedIDSet) > 0 {
+		subset := make([]resource.Resource, 0, len(base))
+		for _, r := range base {
+			if _, ok := m.relatedIDSet[r.ID]; ok {
+				subset = append(subset, r)
+			}
+		}
+		base = subset
+	}
+	m.filteredResources = FilterResources(m.filterText, base)
 	m.scroll.SetTotal(len(m.filteredResources))
 }
 
