@@ -10,14 +10,30 @@ package unit
 // to fix. PASSES NOW tests are regression guards.
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"  // trigger aws init() registrations
+	tea "charm.land/bubbletea/v2"
+
+	_ "github.com/k2m30/a9s/v3/internal/aws" // trigger aws init() registrations
+	"github.com/k2m30/a9s/v3/internal/config"
 	demo "github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
+
+var crossrefAnsiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+func crossrefStripAnsi(s string) string {
+	return crossrefAnsiRe.ReplaceAllString(s, "")
+}
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -291,6 +307,157 @@ func TestFixture_EC2_RelatedEBSSnap_IDsMatchFixtures(t *testing.T) {
 // Test 9 — ALL EC2 related ResourceIDs resolve (comprehensive catch-all)
 // FAILS NOW: tg, asg, alarm IDs do not match their fixtures.
 // ---------------------------------------------------------------------------
+
+// TestFixture_EC2_DetailView_ExtractSubtree_VpcId verifies that the detail view
+// code path — ExtractFieldList → ExtractSubtree(RawStruct, "VpcId") — returns a
+// non-empty value for the first EC2 demo fixture. This is the exact code path
+// that renders VpcId in the UI. If this fails, VpcId shows "–" in the app.
+func TestFixture_EC2_DetailView_ExtractSubtree_VpcId(t *testing.T) {
+	resources, ok := demo.GetResources("ec2")
+	if !ok || len(resources) == 0 {
+		t.Fatal("no EC2 demo fixtures")
+	}
+	res := resources[0] // i-0a1b2c3d4e5f60001 / web-prod-01
+	if res.RawStruct == nil {
+		t.Fatal("EC2 fixture RawStruct is nil")
+	}
+
+	// This is the exact code path detail.go uses: fieldpath.ExtractSubtree(m.res.RawStruct, path)
+	for _, tc := range []struct {
+		path   string
+		expect string
+	}{
+		{"VpcId", "vpc-0abc123def456789a"},
+		{"SubnetId", "subnet-0aaa111111111111a"},
+		{"ImageId", "ami-0a1b2c3d4e5f60001"},
+		{"KeyName", "acme-prod-keypair"},
+		{"InstanceId", "i-0a1b2c3d4e5f60001"},
+		{"Architecture", "x86_64"},
+	} {
+		val := fieldpath.ExtractSubtree(res.RawStruct, tc.path)
+		if val == "" {
+			t.Errorf("ExtractSubtree(RawStruct, %q) returned empty; expected %q", tc.path, tc.expect)
+		} else if val != tc.expect {
+			t.Errorf("ExtractSubtree(RawStruct, %q) = %q; expected %q", tc.path, val, tc.expect)
+		}
+	}
+
+	// Placement should produce YAML sub-tree, not empty
+	placement := fieldpath.ExtractSubtree(res.RawStruct, "Placement")
+	if placement == "" || placement == "-" {
+		t.Errorf("ExtractSubtree(RawStruct, \"Placement\") returned %q; expected YAML subtree with AvailabilityZone", placement)
+	}
+
+	// SecurityGroups should produce YAML sub-tree with GroupId
+	sgs := fieldpath.ExtractSubtree(res.RawStruct, "SecurityGroups")
+	if sgs == "" || sgs == "-" {
+		t.Errorf("ExtractSubtree(RawStruct, \"SecurityGroups\") returned %q; expected YAML subtree with GroupId entries", sgs)
+	}
+}
+
+// TestFixture_EC2_DetailView_AppModel_ShowsVpcId verifies that navigating to an
+// EC2 detail view through the full app model (demo mode) shows VpcId in the
+// rendered view — the same code path the real app takes.
+func TestFixture_EC2_DetailView_AppModel_ShowsVpcId(t *testing.T) {
+	resources, ok := demo.GetResources("ec2")
+	if !ok || len(resources) == 0 {
+		t.Fatal("no EC2 demo fixtures")
+	}
+	// Use the third instance (api-staging-01) — matches the failing screenshot
+	res := resources[2] // i-0a1b2c3d4e5f60003
+	if res.RawStruct == nil {
+		t.Fatalf("EC2 fixture [2] (ID=%s) RawStruct is nil", res.ID)
+	}
+	inst, ok := res.RawStruct.(ec2types.Instance)
+	if !ok {
+		t.Fatalf("EC2 fixture [2] RawStruct is %T, want ec2types.Instance", res.RawStruct)
+	}
+	if inst.VpcId == nil || *inst.VpcId == "" {
+		t.Fatalf("EC2 fixture [2] RawStruct.VpcId is nil/empty — expected vpc-0abc123def456789a")
+	}
+	t.Logf("Fixture VpcId = %s", *inst.VpcId)
+
+	// Build detail view the same way the app does
+	cfg := config.DefaultConfig()
+	k := keys.Default()
+	d := views.NewDetail(res, "ec2", cfg, k)
+	d.SetSize(120, 30)
+
+	view := d.View()
+	plain := crossrefStripAnsi(view)
+
+	// The VpcId value must appear in the rendered view, not "–"
+	if !strings.Contains(plain, *inst.VpcId) {
+		t.Errorf("Detail view for %s must show VpcId %q;\nplain view:\n%s", res.ID, *inst.VpcId, plain)
+	}
+	// SubnetId too
+	if inst.SubnetId != nil && *inst.SubnetId != "" {
+		if !strings.Contains(plain, *inst.SubnetId) {
+			t.Errorf("Detail view for %s must show SubnetId %q;\nplain view:\n%s", res.ID, *inst.SubnetId, plain)
+		}
+	}
+	// ImageId
+	if inst.ImageId != nil && *inst.ImageId != "" {
+		if !strings.Contains(plain, *inst.ImageId) {
+			t.Errorf("Detail view for %s must show ImageId %q;\nplain view:\n%s", res.ID, *inst.ImageId, plain)
+		}
+	}
+	// KeyName
+	if inst.KeyName != nil && *inst.KeyName != "" {
+		if !strings.Contains(plain, *inst.KeyName) {
+			t.Errorf("Detail view for %s must show KeyName %q;\nplain view:\n%s", res.ID, *inst.KeyName, plain)
+		}
+	}
+}
+
+// TestFixture_EC2_DetailView_FullAppFlow_ShowsVpcId tests the EXACT path the real
+// app takes: tui.New(demo) → navigate to EC2 list → resources loaded → navigate
+// to detail → check View() output. If VpcId shows "–" here, the app is broken.
+func TestFixture_EC2_DetailView_FullAppFlow_ShowsVpcId(t *testing.T) {
+	applyMsg := func(m tui.Model, msg tea.Msg) tui.Model {
+		newM, _ := m.Update(msg)
+		return newM.(tui.Model)
+	}
+
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	// Navigate to EC2 resource list
+	m = applyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+
+	view1 := crossrefStripAnsi(m.View().Content)
+	t.Logf("After NavigateMsg to EC2 list, view contains 'web-prod-01': %v", strings.Contains(view1, "web-prod-01"))
+
+	// Now navigate to detail for the first EC2 instance
+	resources, ok := demo.GetResources("ec2")
+	if !ok || len(resources) == 0 {
+		t.Fatal("no EC2 demo fixtures")
+	}
+	res := resources[0]
+	m = applyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &res,
+	})
+
+	view2 := crossrefStripAnsi(m.View().Content)
+
+	// Check that VpcId value appears (not "–")
+	inst := res.RawStruct.(ec2types.Instance)
+	if inst.VpcId != nil && *inst.VpcId != "" {
+		if !strings.Contains(view2, *inst.VpcId) {
+			t.Errorf("Full app flow: detail view must show VpcId %q;\nplain view:\n%s", *inst.VpcId, view2)
+		}
+	}
+	if inst.ImageId != nil && *inst.ImageId != "" {
+		if !strings.Contains(view2, *inst.ImageId) {
+			t.Errorf("Full app flow: detail view must show ImageId %q;\nplain view:\n%s", *inst.ImageId, view2)
+		}
+	}
+}
 
 // TestFixture_EC2_AllRelatedResourceIDs_ExistAsFixtures is a comprehensive check:
 // for every TargetType returned by the EC2 related-demo checker, every ResourceID
