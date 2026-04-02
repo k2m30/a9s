@@ -143,6 +143,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 ## Rules
 
 - ALWAYS rebuild binary (`go build -o a9s ./cmd/a9s/`) after ANY code change — version is resolved at build time via `internal/buildinfo`
+- Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
@@ -168,8 +169,3 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
-
-## Recent Changes
-- 006-related-views-infra: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2
-- 006-related-views-infra: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
-- 004-related-views-blockers: RetryOnThrottle integration (#186), resource cache (#111), cross-view search (#89)

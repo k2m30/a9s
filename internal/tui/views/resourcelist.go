@@ -28,14 +28,17 @@ type ResourceListModel struct {
 	sort    SortField
 	sortAsc bool
 
-	filterText    string
-	pendingFilter string            // auto-applied after ResourcesLoadedMsg arrives
-	relatedIDSet  map[string]struct{} // optional exact-ID prefilter (used by related navigation)
-	parentContext map[string]string // context from parent view for child fetchers
-	displayName   string           // custom display name for frame title
+	filterText           string
+	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
+	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
+	autoOpenSingleDetail bool                // when true, ResourcesLoaded auto-navigates to detail if exactly one row remains
+	parentContext        map[string]string   // context from parent view for child fetchers
+	displayName          string              // custom display name for frame title
+	titleSuffix          string              // optional suffix appended after count, e.g. " -- i-abc (web)"
+	escPops              bool                // when true, Esc pops view instead of clearing filter first
 
 	pagination  *resource.PaginationMeta // nil = unpaginated
-	loadingMore bool                      // true while fetching next page
+	loadingMore bool                     // true while fetching next page
 
 	loading bool
 	spinner spinner.Model
@@ -143,6 +146,39 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		m.applySortAndFilter()
 		m.rowTextCache = nil
 		m.styledRowCache = nil
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 1 {
+			r := m.filteredResources[0]
+			m.autoOpenSingleDetail = false
+			return m, func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:         messages.TargetDetail,
+					ResourceType:   m.typeDef.ShortName,
+					Resource:       &r,
+					ReplaceCurrent: true,
+				}
+			}
+		}
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.ShortName == "ami" {
+			if targetID, ok := m.exactRelatedTargetID(); ok {
+				m.autoOpenSingleDetail = false
+				stub := resource.Resource{
+					ID:   targetID,
+					Name: targetID,
+					Fields: map[string]string{
+						"ImageId": targetID,
+						"Name":    targetID,
+					},
+				}
+				return m, func() tea.Msg {
+					return messages.NavigateMsg{
+						Target:         messages.TargetDetail,
+						ResourceType:   m.typeDef.ShortName,
+						Resource:       &stub,
+						ReplaceCurrent: true,
+					}
+				}
+			}
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -408,6 +444,19 @@ func (m *ResourceListModel) applySortAndFilter() {
 	m.styledRowCache = nil
 }
 
+func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
+	if len(m.relatedIDSet) != 1 {
+		return "", false
+	}
+	for id := range m.relatedIDSet {
+		if id == "" {
+			return "", false
+		}
+		return id, true
+	}
+	return "", false
+}
+
 // SetFilter applies a filter; cursor resets to 0.
 func (m *ResourceListModel) SetFilter(text string) {
 	m.filterText = text
@@ -439,6 +488,12 @@ func (m *ResourceListModel) SetRelatedIDFilter(ids []string) {
 		set[id] = struct{}{}
 	}
 	m.relatedIDSet = set
+}
+
+// SetAutoOpenSingleDetail configures one-shot auto-navigation to detail when
+// a ResourcesLoaded update leaves exactly one filtered row.
+func (m *ResourceListModel) SetAutoOpenSingleDetail(v bool) {
+	m.autoOpenSingleDetail = v
 }
 
 // GetFilter returns the current filter text.
@@ -632,9 +687,38 @@ func (m ResourceListModel) FrameTitle() string {
 	}
 
 	if m.filterText != "" && filtered != total {
-		return name + "(" + itoa(filtered) + "/" + totalStr + ")"
+		title := name + "(" + itoa(filtered) + "/" + totalStr + ")"
+		if m.titleSuffix != "" {
+			title += m.titleSuffix
+		}
+		return title
 	}
-	return name + "(" + totalStr + ")"
+	title := name + "(" + totalStr + ")"
+	if m.titleSuffix != "" {
+		title += m.titleSuffix
+	}
+	return title
+}
+
+// SetTitleSuffix sets a suffix appended to the frame title after count rendering.
+func (m *ResourceListModel) SetTitleSuffix(s string) {
+	m.titleSuffix = s
+}
+
+// SetDisplayName overrides the base title name used in FrameTitle.
+func (m *ResourceListModel) SetDisplayName(name string) {
+	m.displayName = name
+}
+
+// SetEscPops configures Esc behavior for this list.
+// Related-navigation lists set this to true so Esc returns to source detail view.
+func (m *ResourceListModel) SetEscPops(v bool) {
+	m.escPops = v
+}
+
+// EscPops reports whether Esc should pop this view immediately.
+func (m ResourceListModel) EscPops() bool {
+	return m.escPops
 }
 
 // applyFilter filters allResources into filteredResources.

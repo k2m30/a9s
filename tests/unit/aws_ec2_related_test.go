@@ -111,3 +111,90 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 		}
 	}
 }
+
+func TestEC2NavigableFields_IncludeSecurityGroupsGroupID(t *testing.T) {
+	fields := resource.GetNavigableFields("ec2")
+	if len(fields) == 0 {
+		t.Fatal("resource.GetNavigableFields(\"ec2\") returned empty")
+	}
+
+	found := false
+	for _, f := range fields {
+		if f.FieldPath == "SecurityGroups.GroupId" && f.TargetType == "sg" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("ec2 navigable fields must include SecurityGroups.GroupId -> sg; got: %+v", fields)
+	}
+}
+
+// Bug reveal: real-profile EC2 detail counts currently depend on the destination
+// list already being present in cache. Related counts should be derivable without
+// pre-warming :asg/:eip first.
+func TestEC2RelatedCheckers_ASGDoesNotRequirePrewarmedCache(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-real-asg",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-real-asg"),
+			VpcId:      aws.String("vpc-123"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "asg")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count == -1 {
+		t.Fatalf("asg related count should not be unknown just because the asg list was not preloaded; got %+v", got)
+	}
+}
+
+// Bug reveal: EIP count is also cache-dependent today.
+func TestEC2RelatedCheckers_EIPDoesNotRequirePrewarmedCache(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-real-eip",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-real-eip"),
+			VpcId:      aws.String("vpc-123"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "eip")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count == -1 {
+		t.Fatalf("eip related count should not be unknown just because the eip list was not preloaded; got %+v", got)
+	}
+}
+
+// Bug reveal: live EC2 detail shows EKS node group rows but they are not backed
+// by a checker, so the row never becomes actionable.
+func TestEC2RelatedRegistry_NodeGroupsHasChecker(t *testing.T) {
+	for _, def := range resource.GetRelated("ec2") {
+		if def.TargetType != "ng" {
+			continue
+		}
+		if def.Checker == nil {
+			t.Fatal("ec2 related definition for ng must have a checker so EKS node group relationships can be counted and opened")
+		}
+		return
+	}
+	t.Fatal("ec2 related definition for ng not found")
+}
+
+// Bug reveal: live EC2 detail shows CloudTrail Events but the row is currently a
+// non-counted placeholder.
+func TestEC2RelatedRegistry_CloudTrailEventsHasChecker(t *testing.T) {
+	for _, def := range resource.GetRelated("ec2") {
+		if def.TargetType != "ct-events" {
+			continue
+		}
+		if def.Checker == nil {
+			t.Fatal("ec2 related definition for ct-events must have a checker so CloudTrail event relationships can be counted and opened")
+		}
+		return
+	}
+	t.Fatal("ec2 related definition for ct-events not found")
+}

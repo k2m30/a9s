@@ -2,7 +2,8 @@
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
-VERSION ?= dev
+BUILD_TS ?= $(shell date -u +%Y%m%d%H%M%S)
+VERSION ?= dev-$(BUILD_TS)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)

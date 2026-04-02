@@ -250,7 +250,7 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_NarrowTerminalIgnoresToggle
-// Given: width=80 (below the 100-column threshold for two-column layout)
+// Given: width=59 (below minimum width for related panel)
 // When:  ToggleRelated key pressed
 // Then:  View() is unchanged — toggle is a no-op below the width threshold
 // ---------------------------------------------------------------------------
@@ -262,13 +262,13 @@ func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 	})
 	defer resource.UnregisterRelated("ec2")
 
-	d := makeDetailForRelatedTest(t, 80)
+	d := makeDetailForRelatedTest(t, 59)
 	viewBefore := d.View()
 	d = sendToggleRelated(d)
 	viewAfter := d.View()
 
 	if viewBefore != viewAfter {
-		t.Errorf("at width=80 (below 100-column threshold), ToggleRelated should be a no-op; view changed:\nbefore:\n%s\nafter:\n%s", viewBefore, viewAfter)
+		t.Errorf("at width=59 (below related-panel threshold), ToggleRelated should be a no-op; view changed:\nbefore:\n%s\nafter:\n%s", viewBefore, viewAfter)
 	}
 }
 

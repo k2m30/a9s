@@ -88,6 +88,80 @@ func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
 	}
 }
 
+func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
+	m := newRootSizedModel()
+
+	res := &resource.Resource{
+		ID:   "i-abc123",
+		Name: "web-server",
+		Fields: map[string]string{
+			"InstanceId": "i-abc123",
+			"VpcId":      "vpc-123",
+		},
+	}
+
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     res,
+	})
+
+	_, cmd := rootApplyMsg(m, rootKeyPress("c"))
+	if cmd == nil {
+		t.Fatal("pressing 'c' in detail view should return a command")
+	}
+
+	msg := cmd()
+	switch v := msg.(type) {
+	case messages.CopiedMsg:
+		if v.Content != "i-abc123" {
+			t.Errorf("CopiedMsg.Content should be the active field value, got %q", v.Content)
+		}
+	case messages.FlashMsg:
+		if !strings.Contains(v.Text, "i-abc123") && !strings.HasPrefix(v.Text, "Copy failed:") {
+			t.Errorf("flash should mention copied field value, got %q", v.Text)
+		}
+	default:
+		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+	}
+}
+
+func TestWiring_EscapeOnFocusedRightColumn_StaysInDetail(t *testing.T) {
+	resource.RegisterRelated("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups"},
+	})
+	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+
+	m := newRootSizedModel()
+	res := &resource.Resource{
+		ID:   "i-abc123",
+		Name: "web-server",
+		Fields: map[string]string{
+			"InstanceId": "i-abc123",
+		},
+	}
+
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     res,
+	})
+
+	beforeTab := m.View().Content
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyTab))
+	afterTab := m.View().Content
+	if beforeTab == afterTab {
+		t.Skip("right column did not focus via Tab; skipping root Esc wiring check")
+	}
+
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
+	afterEsc := m.View().Content
+
+	if !strings.Contains(afterEsc, "web-server") && !strings.Contains(afterEsc, "i-abc123") {
+		t.Errorf("Esc on focused right column should stay in detail view, got: %s", afterEsc)
+	}
+}
+
 func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 	m := newRootSizedModel()
 

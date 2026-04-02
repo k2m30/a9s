@@ -107,6 +107,94 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDetail(t *testing.T) {
 	}
 }
 
+// TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail verifies that
+// when TargetID is known but target cache is empty, the intermediate related list
+// auto-opens detail as soon as ResourcesLoaded leaves exactly one filtered row.
+func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T) {
+	m := newRelatedDemoModel(t)
+
+	ec2Res := resource.Resource{
+		ID:     "i-0a1b2c3d4e5f60001",
+		Name:   "web-prod-01",
+		Status: "running",
+		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+	}
+	m = navigateToEC2DetailRelated(t, m, ec2Res)
+
+	// No preloaded ami cache: this exercises the fetch/list fallback path.
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+		TargetType:     "ami",
+		SourceResource: ec2Res,
+		TargetID:       "ami-single-1",
+	})
+
+	// Fetch result contains multiple AMIs; related ID filter leaves one.
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ami",
+		Resources: []resource.Resource{
+			{ID: "ami-single-1", Name: "ami-single", Status: "available"},
+			{ID: "ami-other-1", Name: "ami-other", Status: "available"},
+		},
+	})
+	m = m2
+	if cmd != nil {
+		if follow := cmd(); follow != nil {
+			m, _ = relatedApplyMsg(m, follow)
+		}
+	}
+
+	view := stripAnsi(relatedViewContent(m))
+	if !strings.Contains(view, "detail --") || !strings.Contains(view, "ami-single-1") {
+		t.Fatalf("single related TargetID cache-miss path must auto-open AMI detail; got:\n%s", view)
+	}
+	if strings.Contains(view, "ami(1/") || strings.Contains(view, "ami(1)") {
+		t.Fatalf("single related TargetID cache-miss path must not leave user in list view; got:\n%s", view)
+	}
+}
+
+// TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail verifies
+// the right-column path: RelatedIDs with one element must auto-open detail after load.
+func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail(t *testing.T) {
+	m := newRelatedDemoModel(t)
+
+	ec2Res := resource.Resource{
+		ID:     "i-0a1b2c3d4e5f60001",
+		Name:   "web-prod-01",
+		Status: "running",
+		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+	}
+	m = navigateToEC2DetailRelated(t, m, ec2Res)
+
+	// No preloaded asg cache: this exercises the right-column cache-miss flow.
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+		TargetType:     "asg",
+		SourceResource: ec2Res,
+		RelatedIDs:     []string{"asg-single-1"},
+	})
+
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "asg",
+		Resources: []resource.Resource{
+			{ID: "asg-single-1", Name: "asg-single", Status: "InService"},
+			{ID: "asg-other-1", Name: "asg-other", Status: "InService"},
+		},
+	})
+	m = m2
+	if cmd != nil {
+		if follow := cmd(); follow != nil {
+			m, _ = relatedApplyMsg(m, follow)
+		}
+	}
+
+	view := stripAnsi(relatedViewContent(m))
+	if !strings.Contains(view, "detail --") || !strings.Contains(view, "asg-single") {
+		t.Fatalf("single related right-column cache-miss path must auto-open ASG detail; got:\n%s", view)
+	}
+	if strings.Contains(view, "asg(1/") || strings.Contains(view, "asg(1)") {
+		t.Fatalf("single related right-column cache-miss path must not leave user in list view; got:\n%s", view)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Count>1: multiple related resources must be filtered to only those IDs
 // ---------------------------------------------------------------------------

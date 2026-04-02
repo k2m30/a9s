@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +109,11 @@ func ExtractScalar(obj interface{}, dotPath string) string {
 func ExtractSubtree(obj interface{}, dotPath string) string {
 	val, err := ExtractValue(obj, dotPath)
 	if err != nil {
+		// Fallback for paths that traverse slices without explicit indexes,
+		// e.g. "SecurityGroups.GroupId" on []GroupIdentifier.
+		if vals := extractMultiScalars(reflect.ValueOf(obj), strings.Split(dotPath, ".")); len(vals) > 0 {
+			return strings.Join(vals, "\n")
+		}
 		return ""
 	}
 
@@ -147,6 +154,65 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 	}
 
 	return FormatValue(val)
+}
+
+// extractMultiScalars walks a dot path and supports traversing slices/arrays
+// without explicit indices. It returns all scalar leaf values found.
+func extractMultiScalars(v reflect.Value, segments []string) []string {
+	for v.IsValid() && v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if !v.IsValid() {
+		return nil
+	}
+
+	if len(segments) == 0 {
+		if isScalar(v) {
+			return []string{FormatValue(v)}
+		}
+		if v.Kind() == reflect.Slice || v.Kind() == reflect.Array {
+			var out []string
+			for i := 0; i < v.Len(); i++ {
+				out = append(out, extractMultiScalars(v.Index(i), segments)...)
+			}
+			return out
+		}
+		return nil
+	}
+
+	seg := segments[0]
+	switch v.Kind() {
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			tag := f.Tag.Get("json")
+			if tag != "" {
+				jsonName := strings.Split(tag, ",")[0]
+				if jsonName == seg {
+					return extractMultiScalars(v.Field(i), segments[1:])
+				}
+			}
+		}
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if strings.EqualFold(f.Name, seg) {
+				return extractMultiScalars(v.Field(i), segments[1:])
+			}
+		}
+		return nil
+	case reflect.Slice, reflect.Array:
+		var out []string
+		for i := 0; i < v.Len(); i++ {
+			out = append(out, extractMultiScalars(v.Index(i), segments)...)
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 // ToSafeValue recursively converts a reflect.Value into a representation
@@ -313,6 +379,8 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 	var items []FieldItem
 	for _, path := range paths {
 		val := ""
+		nonScalarFromObj := false
+		nonScalarFromFields := false
 		// 1. Check fields map first (case-insensitive match)
 		if len(fields) > 0 {
 			for k, v := range fields {
@@ -328,10 +396,25 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 					val = v
 				}
 			}
+			if nested := extractNestedFieldLines(fields, path); len(nested) > 0 {
+				nonScalarFromFields = true
+				val = strings.Join(nested, "\n")
+			}
 		}
 		// 2. Fall back to ExtractSubtree
 		if val == "" && obj != nil {
 			val = ExtractSubtree(obj, path)
+			if val != "" {
+				if rv, err := ExtractValue(obj, path); err == nil {
+					for rv.Kind() == reflect.Ptr {
+						if rv.IsNil() {
+							break
+						}
+						rv = rv.Elem()
+					}
+					nonScalarFromObj = !isScalar(rv)
+				}
+			}
 		}
 		// 3. Default to "-"
 		if val == "" {
@@ -348,15 +431,20 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 			}
 		}
 
-		// Multi-line → header + sub-fields
-		if strings.Contains(val, "\n") {
+		// Multi-line (or non-scalar single-line YAML) → header + sub-fields.
+		if strings.Contains(val, "\n") || (nonScalarFromObj && val != "-") || (nonScalarFromFields && val != "-") {
 			items = append(items, FieldItem{
 				Path:     path,
 				Key:      path,
 				Value:    "",
 				IsHeader: true,
 			})
-			for _, line := range strings.Split(val, "\n") {
+			lines := strings.Split(val, "\n")
+			if len(lines) == 1 {
+				// Single-line YAML object, e.g. "Arn: arn:..."
+				lines = []string{val}
+			}
+			for _, line := range lines {
 				if line == "" {
 					continue
 				}
@@ -380,4 +468,61 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 		}
 	}
 	return items
+}
+
+type nestedFieldLine struct {
+	index int
+	key   string
+	value string
+}
+
+// extractNestedFieldLines expands dotted map keys under a section path.
+// Example:
+//
+//	path = "SecurityGroups"
+//	map keys = SecurityGroups.GroupId.0, SecurityGroups.GroupName.0
+//
+// Produces lines:
+//
+//	GroupId: <...>
+//	GroupName: <...>
+func extractNestedFieldLines(fields map[string]string, path string) []string {
+	prefix := path + "."
+	var lines []nestedFieldLine
+	for k, v := range fields {
+		if !strings.HasPrefix(k, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(k, prefix)
+		if rest == "" {
+			continue
+		}
+		parts := strings.Split(rest, ".")
+		key := parts[0]
+		if key == "" {
+			continue
+		}
+		idx := 0
+		for _, p := range parts[1:] {
+			if n, err := strconv.Atoi(p); err == nil {
+				idx = n
+				break
+			}
+		}
+		lines = append(lines, nestedFieldLine{index: idx, key: key, value: v})
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	sort.SliceStable(lines, func(i, j int) bool {
+		if lines[i].index != lines[j].index {
+			return lines[i].index < lines[j].index
+		}
+		return lines[i].key < lines[j].key
+	})
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		out = append(out, l.key+": "+l.value)
+	}
+	return out
 }

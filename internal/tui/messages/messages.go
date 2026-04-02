@@ -20,9 +20,10 @@ const (
 
 // NavigateMsg requests a view transition. The root model handles push/pop.
 type NavigateMsg struct {
-	Target       ViewTarget
-	ResourceType string
-	Resource     *resource.Resource
+	Target         ViewTarget
+	ResourceType   string
+	Resource       *resource.Resource
+	ReplaceCurrent bool // when true, pop current view before pushing target (used by auto-open flows)
 }
 
 // PopViewMsg requests popping the current view from the stack.
@@ -119,7 +120,6 @@ type LoadResourcesMsg struct {
 	ParentContext map[string]string
 }
 
-
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
 
@@ -140,7 +140,9 @@ type RelatedCheckResultMsg struct {
 
 // RelatedNavigateMsg requests navigation to a related resource type.
 // Emitted by: (a) detail view when Enter pressed on navigable field,
-//             (b) rightColumnModel when Enter pressed on selected row.
+//
+//	(b) rightColumnModel when Enter pressed on selected row.
+//
 // Handled by: root model in app_handlers.go (same pattern as NavigateMsg).
 type RelatedNavigateMsg struct {
 	TargetType     string            // resource short name to navigate to (e.g., "vpc")
@@ -180,4 +182,3 @@ type IdentityLoadedMsg struct {
 type IdentityErrorMsg struct {
 	Err string
 }
-

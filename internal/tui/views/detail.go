@@ -25,27 +25,31 @@ import (
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
 type DetailModel struct {
-	res               resource.Resource
-	resourceType      string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
-	viewConfig        *config.ViewsConfig
-	viewport          viewport.Model
-	ready             bool
-	wrap              bool
-	width             int
-	height            int
-	keys              keys.Map
-	search            SearchModel
-	rightCol          rightColumnModel
-	rightColVisible   bool                  // true when explicitly toggled on
-	rightColAutoShown bool                  // true when right column was auto-shown on SetSize (wide terminal + registered defs)
-	rightColWidth     int                   // width of right column panel (default 32)
-	fieldList         []fieldpath.FieldItem // structured field data; nil = not yet computed
-	fieldCursor       int                   // index into fieldList for navigable cursor
+	res                 resource.Resource
+	resourceType        string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
+	viewConfig          *config.ViewsConfig
+	viewport            viewport.Model
+	ready               bool
+	wrap                bool
+	width               int
+	height              int
+	keys                keys.Map
+	search              SearchModel
+	rightCol            rightColumnModel
+	rightColVisible     bool                  // true when explicitly toggled on
+	rightColAutoShown   bool                  // true when right column was auto-shown on SetSize (wide terminal + registered defs)
+	rightColUserToggled bool                  // true after user explicitly toggles related visibility
+	rightColWidth       int                   // width of right column panel (default 32)
+	fieldList           []fieldpath.FieldItem // structured field data; nil = not yet computed
+	fieldCursor         int                   // index into fieldList for navigable cursor
 }
 
 // NewDetail creates a DetailModel for the given resource.
 // resourceType identifies which ViewDef to use from the config (e.g. "ec2", "rds").
 func NewDetail(res resource.Resource, resourceType string, viewConfig *config.ViewsConfig, k keys.Map) DetailModel {
+	if resourceType == "" {
+		resourceType = inferDetailResourceType(res)
+	}
 	return DetailModel{
 		resourceType:  resourceType,
 		res:           res,
@@ -53,6 +57,33 @@ func NewDetail(res resource.Resource, resourceType string, viewConfig *config.Vi
 		keys:          k,
 		rightColWidth: 32,
 	}
+}
+
+// inferDetailResourceType provides a conservative fallback for routes that
+// navigate to detail without an explicit type. This prevents losing related
+// and navigable behavior for common top-level resources.
+func inferDetailResourceType(res resource.Resource) string {
+	has := func(k string) bool {
+		v, ok := res.Fields[k]
+		return ok && strings.TrimSpace(v) != ""
+	}
+	// EC2 signature: infer only from EC2-shaped key sets.
+	// Anchor on instance id key plus at least one EC2-specific companion field.
+	hasInstanceID := has("InstanceId") || has("instance_id")
+	hasEC2Companion := has("ImageId") || has("image_id") ||
+		has("VpcId") || has("vpc_id") ||
+		has("SubnetId") || has("subnet_id") ||
+		has("PrivateIpAddress") || has("private_ip") ||
+		has("PublicIpAddress") || has("public_ip") ||
+		has("KeyName") || has("key_name") ||
+		has("InstanceLifecycle") || has("lifecycle") ||
+		has("LaunchTime") || has("launch_time") ||
+		has("IamInstanceProfile") || has("iam_instance_profile") ||
+		has("SecurityGroups") || has("security_groups")
+	if hasInstanceID && hasEC2Companion {
+		return "ec2"
+	}
+	return ""
 }
 
 // buildFieldList computes m.fieldList from the view config and navigable field registry.
@@ -94,6 +125,9 @@ func (m *DetailModel) buildFieldList() {
 			fields = synth
 		}
 	}
+	// Bridge snake_case EC2 fixture/runtime maps to canonical EC2 view keys so
+	// detail paths and navigable fields continue to work when ResourceType is ec2.
+	fields = augmentEC2AliasFields(m.resourceType, fields)
 	if len(detailPaths) == 0 {
 		if len(fields) == 0 {
 			m.fieldList = nil
@@ -127,10 +161,58 @@ func (m *DetailModel) buildFieldList() {
 		if tt, ok := navMap[composedPath]; ok {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
+			items[i].Key = subKey
 			items[i].Value = subVal
 		}
 	}
 	m.fieldList = items
+}
+
+func augmentEC2AliasFields(resourceType string, fields map[string]string) map[string]string {
+	if resourceType != "ec2" || len(fields) == 0 {
+		return fields
+	}
+	aliases := map[string]string{
+		"instance_id":  "InstanceId",
+		"type":         "InstanceType",
+		"state":        "State",
+		"lifecycle":    "InstanceLifecycle",
+		"image_id":     "ImageId",
+		"key_name":     "KeyName",
+		"vpc_id":       "VpcId",
+		"subnet_id":    "SubnetId",
+		"private_ip":   "PrivateIpAddress",
+		"private_dns":  "PrivateDnsName",
+		"public_ip":    "PublicIpAddress",
+		"iam_profile":  "IamInstanceProfile",
+		"architecture": "Architecture",
+		"platform":     "Platform",
+		"launch_time":  "LaunchTime",
+	}
+	needCopy := false
+	for from, to := range aliases {
+		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
+			if _, exists := fields[to]; !exists {
+				needCopy = true
+				break
+			}
+		}
+	}
+	if !needCopy {
+		return fields
+	}
+	out := make(map[string]string, len(fields)+len(aliases))
+	for k, v := range fields {
+		out[k] = v
+	}
+	for from, to := range aliases {
+		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
+			if _, exists := out[to]; !exists {
+				out[to] = v
+			}
+		}
+	}
+	return out
 }
 
 // renderFromFieldList renders the structured field list to a string.
@@ -156,33 +238,65 @@ func (m DetailModel) renderFromFieldList() string {
 	for idx, item := range m.fieldList {
 		isCursorRow := leftFocused && idx == m.fieldCursor
 		var line string
-		switch {
-		case item.IsHeader:
-			line = " " + styles.DetailSection.Render(item.Key+":")
-		case item.IsSubField:
-			// Bug2 fix: render sub-fields as "     Key:  value" with separate key/value styles.
-			// Sub-field items have Key == Value (the raw combined line like "Name: web-prod").
-			// Split on ": " to extract the key and value parts.
-			subKey, subVal, hasSep := strings.Cut(item.Value, ": ")
-			if hasSep {
-				line = "     " + styles.DetailKey.Render(subKey+":") + "  " + styles.DetailVal.Render(subVal)
-			} else {
-				line = "     " + styles.DetailVal.Render(item.Value)
+		if isCursorRow {
+			// Render selected rows without nested foreground/underline styles so
+			// labels remain legible on selection background across themes.
+			switch {
+			case item.IsHeader:
+				line = " " + item.Key + ":"
+			case item.IsSubField:
+				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
+					line = "     " + item.Key + ":  " + item.Value
+					break
+				}
+				raw := strings.TrimSpace(item.Value)
+				raw = strings.TrimPrefix(raw, "- ")
+				subKey, subVal, hasSep := strings.Cut(raw, ": ")
+				if hasSep {
+					line = "     " + subKey + ":  " + subVal
+				} else {
+					line = "     " + raw
+				}
+			default:
+				line = " " + text.PadOrTrunc(item.Key+":", keyW) + item.Value
 			}
-		case item.IsNavigable:
-			// Bug4 fix: suppress underline on the cursor row; RowSelected takes over.
-			if isCursorRow {
-				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
-			} else {
+		} else {
+			switch {
+			case item.IsHeader:
+				line = " " + styles.DetailSection.Render(item.Key+":")
+			case item.IsSubField:
+				// Bug2 fix: render sub-fields as "     Key:  value" with separate key/value styles.
+				// Sub-field items have Key == Value (the raw combined line like "Name: web-prod").
+				// Split on ": " to extract the key and value parts.
+				// For navigable sub-fields, buildFieldList stores Key=subKey and Value=subValue.
+				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
+					line = "     " + styles.DetailKey.Render(item.Key+":") + "  " + styles.NavigableField.Render(item.Value)
+					break
+				}
+				raw := strings.TrimSpace(item.Value)
+				raw = strings.TrimPrefix(raw, "- ")
+				subKey, subVal, hasSep := strings.Cut(raw, ": ")
+				if hasSep {
+					line = "     " + styles.DetailKey.Render(subKey+":") + "  " + styles.DetailVal.Render(subVal)
+				} else {
+					line = "     " + styles.DetailVal.Render(raw)
+				}
+			case item.IsNavigable:
 				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
+			default:
+				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
 			}
-		default:
-			line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
 		}
 		// Bug3 fix: apply background highlight to the cursor row (left focused only).
-		// Use a background-only style so the escape sequence starts with \x1b[48;
-		// (matching test expectations). The line's own text colors remain visible.
+		// Keep this as background-only to preserve existing ANSI contract checks.
 		if isCursorRow {
+			// Ensure selection background spans full viewport width, not just text width.
+			if m.ready {
+				targetW := m.viewport.Width()
+				if w := lipgloss.Width(line); targetW > 0 && w < targetW {
+					line += strings.Repeat(" ", targetW-w)
+				}
+			}
 			line = lipgloss.NewStyle().Background(styles.ColRowSelectedBg).Render(line)
 		}
 		lines = append(lines, line)
@@ -214,17 +328,35 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		}
 		// When right column is focused, delegate navigation keys to it.
 		if m.rightColShowing() && m.rightCol.IsFocused() {
+			if m.rightCol.IsFiltering() {
+				var cmd tea.Cmd
+				m.rightCol, cmd = m.rightCol.Update(msg)
+				m.refreshViewportContent()
+				return m, cmd
+			}
 			switch {
 			case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down),
 				key.Matches(msg, m.keys.Enter):
 				var cmd tea.Cmd
 				m.rightCol, cmd = m.rightCol.Update(msg)
+				m.refreshViewportContent()
+				return m, cmd
+			case key.Matches(msg, m.keys.Search):
+				var cmd tea.Cmd
+				m.rightCol, cmd = m.rightCol.Update(msg)
+				m.refreshViewportContent()
 				return m, cmd
 			case key.Matches(msg, m.keys.Tab):
 				m.rightCol.SetFocused(false)
 				m.refreshViewportContent() // update cursor highlight after focus change
 				return m, nil
 			case key.Matches(msg, m.keys.Escape):
+				if m.rightCol.IsFiltering() {
+					var cmd tea.Cmd
+					m.rightCol, cmd = m.rightCol.Update(msg)
+					m.refreshViewportContent()
+					return m, cmd
+				}
 				// Esc from focused right column: unfocus (don't pop view)
 				m.rightCol.SetFocused(false)
 				m.refreshViewportContent() // update cursor highlight after focus change
@@ -358,8 +490,34 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.ToggleRelated):
-			if m.width < 100 {
+			m.rightColUserToggled = true
+			if m.width < 60 {
 				return m, nil // silently ignore on narrow terminals
+			}
+			if m.width < 100 {
+				// In stacked mode (80-99), first toggle after auto-show hides immediately.
+				if m.rightColAutoShown {
+					m.rightColAutoShown = false
+					m.rightColVisible = false
+					m.recalcViewportWidth()
+					return m, nil
+				}
+				m.rightColVisible = !m.rightColVisible
+				if m.rightColVisible {
+					defs := resource.GetRelated(m.resourceType)
+					m.rightCol = newRightColumn(defs, m.res)
+					m.rightCol.keys = m.keys
+					m.rightCol.SetSize(m.width, max(1, m.height/2))
+					m.recalcViewportWidth()
+					return m, func() tea.Msg {
+						return messages.RelatedCheckStartedMsg{
+							ResourceType:   m.resourceType,
+							SourceResource: m.res,
+						}
+					}
+				}
+				m.recalcViewportWidth()
+				return m, nil
 			}
 			if m.rightColAutoShown {
 				// Transition from auto-shown → explicitly on (still visible).
@@ -463,6 +621,114 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	case tea.KeyPressMsg:
 		// Bubble Tea v2 integration specs may emit KeyPressMsg directly.
 		// Handle the common navigation keys here.
+		if m.rightColShowing() && m.rightCol.IsFocused() {
+			if msg.Code == tea.KeyTab {
+				m.rightCol.SetFocused(false)
+				m.refreshViewportContent()
+				return m, nil
+			}
+			if msg.Code == tea.KeyEscape {
+				if m.rightCol.IsFiltering() {
+					var cmd tea.Cmd
+					m.rightCol, cmd = m.rightCol.Update(msg)
+					m.refreshViewportContent()
+					return m, cmd
+				}
+				m.rightCol.SetFocused(false)
+				m.refreshViewportContent()
+				return m, nil
+			}
+			if msg.Text == "/" || msg.Text == "j" || msg.Text == "k" || msg.Code == tea.KeyUp || msg.Code == tea.KeyDown || msg.Code == tea.KeyEnter || m.rightCol.IsFiltering() {
+				var cmd tea.Cmd
+				m.rightCol, cmd = m.rightCol.Update(msg)
+				m.refreshViewportContent()
+				return m, cmd
+			}
+		}
+		if msg.Text == "r" {
+			m.rightColUserToggled = true
+			if m.width < 60 {
+				return m, nil
+			}
+			if m.width < 100 {
+				if m.rightColAutoShown {
+					m.rightColAutoShown = false
+					m.rightColVisible = false
+					m.recalcViewportWidth()
+					return m, nil
+				}
+				m.rightColVisible = !m.rightColVisible
+				if m.rightColVisible {
+					defs := resource.GetRelated(m.resourceType)
+					m.rightCol = newRightColumn(defs, m.res)
+					m.rightCol.keys = m.keys
+					m.rightCol.SetSize(m.width, max(1, m.height/2))
+					m.recalcViewportWidth()
+					return m, func() tea.Msg {
+						return messages.RelatedCheckStartedMsg{
+							ResourceType:   m.resourceType,
+							SourceResource: m.res,
+						}
+					}
+				}
+				m.recalcViewportWidth()
+				return m, nil
+			}
+			if m.rightColAutoShown {
+				m.rightColAutoShown = false
+				m.rightColVisible = true
+				defs := resource.GetRelated(m.resourceType)
+				m.rightCol = newRightColumn(defs, m.res)
+				m.rightCol.keys = m.keys
+				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.recalcViewportWidth()
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStartedMsg{
+						ResourceType:   m.resourceType,
+						SourceResource: m.res,
+					}
+				}
+			}
+			m.rightColVisible = !m.rightColVisible
+			if m.rightColVisible {
+				defs := resource.GetRelated(m.resourceType)
+				m.rightCol = newRightColumn(defs, m.res)
+				m.rightCol.keys = m.keys
+				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.recalcViewportWidth()
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStartedMsg{
+						ResourceType:   m.resourceType,
+						SourceResource: m.res,
+					}
+				}
+			}
+			m.recalcViewportWidth()
+			return m, nil
+		}
+		if msg.Code == tea.KeyTab {
+			if m.rightColShowing() {
+				m.rightCol.SetFocused(!m.rightCol.IsFocused())
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
+		if msg.Code == tea.KeyEnter {
+			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+				item := m.fieldList[m.fieldCursor]
+				if item.IsNavigable {
+					return m, func() tea.Msg {
+						return messages.RelatedNavigateMsg{
+							TargetType:     item.TargetType,
+							SourceResource: m.res,
+							SourceType:     m.resourceType,
+							TargetID:       item.Value,
+						}
+					}
+				}
+			}
+			return m, nil
+		}
 		if msg.Text == "j" || msg.Code == tea.KeyDown {
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
 				m.fieldCursor++
@@ -486,6 +752,22 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if msg.Text == "g" {
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
+				m.fieldCursor = 0
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
+		if msg.Text == "G" {
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
+				m.fieldCursor = len(m.fieldList) - 1
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
 		return m, nil
 	}
 
@@ -500,13 +782,14 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 
 // View renders detail content via viewport.
 // When the right column is showing and width >= 100, renders left and right columns side by side
-// with a │ separator (Bug1 fix). When width is 80-99, renders stacked layout (Bug5 fix).
+// with a │ separator.
 func (m DetailModel) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
-	if m.rightColShowing() && m.width >= 100 {
-		// Side-by-side layout with │ separator (Bug1 fix).
+	if m.rightColShowing() && m.width >= 60 {
+		// Keep RELATED visible at medium widths by using side-by-side layout.
+		rightW := m.currentRightColWidth()
 		sep := styles.ColSepDim.Render("│")
 		if m.rightCol.IsFocused() {
 			sep = styles.ColSepAccent.Render("│")
@@ -520,7 +803,7 @@ func (m DetailModel) View() string {
 		if len(rightLines) > maxLines {
 			maxLines = len(rightLines)
 		}
-		leftW := m.width - m.rightColWidth - 1 // -1 for separator character
+		leftW := m.width - rightW - 1 // -1 for separator character
 		var sb strings.Builder
 		for i := range maxLines {
 			if i > 0 {
@@ -546,13 +829,6 @@ func (m DetailModel) View() string {
 		}
 		return sb.String()
 	}
-	if m.rightColShowing() && m.width >= 80 {
-		// Bug5 fix: stacked layout for width 80-99.
-		leftContent := m.viewport.View()
-		divider := styles.DimText.Render("-- Related " + strings.Repeat("-", m.width-13))
-		rightContent := m.rightCol.View()
-		return leftContent + "\n" + divider + "\n" + rightContent
-	}
 	return m.viewport.View()
 }
 
@@ -565,22 +841,21 @@ func (m *DetailModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
 
-	// Auto-show right column on first SetSize call when terminal is wide enough
-	// and there are registered related defs for this resource type.
-	// Bug5 fix: also auto-show at width 80-99 (stacked layout, not side-by-side).
-	if !m.ready && w >= 80 && len(resource.GetRelated(m.resourceType)) > 0 {
+	// Auto-show right column when wide enough and related defs exist:
+	// - on first SetSize call, and
+	// - on later resizes only if user hasn't explicitly toggled visibility.
+	if w >= 60 && len(resource.GetRelated(m.resourceType)) > 0 &&
+		(!m.ready || (!m.rightColShowing() && !m.rightColUserToggled)) {
 		m.rightColAutoShown = true
 		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
 		m.rightCol.keys = m.keys
 	}
 
 	viewportW := w
-	if m.rightColShowing() && w >= 100 {
-		viewportW = w - m.rightColWidth - 1 // -1 for separator character
-		m.rightCol.SetSize(m.rightColWidth, h)
-	} else if m.rightColShowing() && w >= 80 {
-		// Stacked mode: right column takes full width but shorter height.
-		m.rightCol.SetSize(w, h/2)
+	if m.rightColShowing() && w >= 60 {
+		rightW := m.currentRightColWidth()
+		viewportW = w - rightW - 1 // -1 for separator character
+		m.rightCol.SetSize(rightW, h)
 	}
 
 	if !m.ready {
@@ -601,8 +876,8 @@ func (m DetailModel) rightColShowing() bool {
 
 // recalcViewportWidth adjusts the viewport width based on the right column visibility.
 func (m *DetailModel) recalcViewportWidth() {
-	if m.rightColShowing() && m.width >= 100 {
-		leftW := m.width - m.rightColWidth - 1 // -1 for separator
+	if m.rightColShowing() && m.width >= 60 {
+		leftW := m.width - m.currentRightColWidth() - 1 // -1 for separator
 		if m.ready {
 			m.viewport.SetWidth(leftW)
 		}
@@ -610,6 +885,22 @@ func (m *DetailModel) recalcViewportWidth() {
 		m.viewport.SetWidth(m.width)
 	}
 	m.refreshViewportContent()
+}
+
+func (m DetailModel) currentRightColWidth() int {
+	// Keep right panel readable at medium widths while preserving left detail space.
+	if m.width <= 0 {
+		return m.rightColWidth
+	}
+	if m.width >= 100 {
+		return m.rightColWidth
+	}
+	w := max(24, m.width/3)
+	maxAllowed := max(16, m.width-40) // keep at least 40 cols for left pane
+	if w > maxAllowed {
+		w = maxAllowed
+	}
+	return w
 }
 
 // syncViewportToCursor adjusts the viewport scroll to keep fieldCursor visible.
@@ -658,13 +949,31 @@ func (m DetailModel) FrameTitle() string {
 	return m.res.ID
 }
 
-// CopyContent returns the resource as YAML for clipboard copy.
+// CopyContent returns column-aware clipboard content for the active selection.
 func (m DetailModel) CopyContent() (string, string) {
+	if m.rightCol.IsFocused() {
+		name := m.rightCol.SelectedTypeName()
+		if name == "" {
+			return "", ""
+		}
+		return name, "Copied: " + name
+	}
+	if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+		item := m.fieldList[m.fieldCursor]
+		content := item.Value
+		if content == "" {
+			content = item.Key
+		}
+		if content == "" {
+			return "", ""
+		}
+		return content, "Copied: " + content
+	}
 	content := m.RawYAML()
 	if content == "" {
 		return "", ""
 	}
-	return content, "Copied YAML to clipboard"
+	return content, "Copied detail to clipboard"
 }
 
 // GetHelpContext returns HelpFromDetail.
@@ -733,6 +1042,12 @@ func (m DetailModel) RawYAML() string {
 		return ""
 	}
 	return string(data)
+}
+
+// ConsumesEscapeLocally reports whether Escape should be handled inside the
+// detail view instead of by the root view-stack pop logic.
+func (m DetailModel) ConsumesEscapeLocally() bool {
+	return m.rightCol.IsFocused() || m.rightCol.IsFiltering()
 }
 
 // PlainContent returns the detail content as plain text (no ANSI) for clipboard copy.

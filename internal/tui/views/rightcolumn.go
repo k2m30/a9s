@@ -26,13 +26,16 @@ type rightColumnRow struct {
 }
 
 type rightColumnModel struct {
-	rows      []rightColumnRow
-	cursor    int
-	focused   bool
-	width     int
-	height    int
-	parentRes resource.Resource // stored for RelatedNavigateMsg construction
-	keys      keys.Map
+	rows         []rightColumnRow
+	cursor       int
+	focused      bool
+	width        int
+	height       int
+	scrollOffset int
+	filterQuery  string
+	filterActive bool
+	parentRes    resource.Resource // stored for RelatedNavigateMsg construction
+	keys         keys.Map
 }
 
 // newRightColumn constructs a rightColumnModel from related definitions and a parent resource.
@@ -62,30 +65,10 @@ func (m rightColumnModel) Init() (rightColumnModel, tea.Cmd) {
 // Update handles key navigation and result delivery.
 func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		return m.updateKeyPressMsg(msg)
 	case tea.KeyMsg:
-		if !m.focused {
-			return m, nil
-		}
-		switch {
-		case key.Matches(msg, m.keys.Down):
-			if m.cursor < len(m.rows)-1 {
-				m.cursor++
-			}
-		case key.Matches(msg, m.keys.Up):
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case key.Matches(msg, m.keys.Enter):
-			if row := m.SelectedRow(); row != nil && !row.loading && row.err == nil && row.count > 0 {
-				return m, func() tea.Msg {
-					return messages.RelatedNavigateMsg{
-						TargetType:     row.targetType,
-						SourceResource: m.parentRes,
-						RelatedIDs:     row.resourceIDs,
-					}
-				}
-			}
-		}
+		return m.updateKeyMsg(msg)
 
 	case messages.RelatedCheckResultMsg:
 		for i := range m.rows {
@@ -95,6 +78,120 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 				m.rows[i].count = msg.Result.Count
 				m.rows[i].resourceIDs = msg.Result.ResourceIDs
 				break
+			}
+		}
+		// Keep selection on an actionable row when possible.
+		m.ensureCursorValid()
+	}
+	return m, nil
+}
+
+func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+
+	if m.filterActive {
+		switch {
+		case key.Matches(msg, m.keys.Escape):
+			m.filterActive = false
+			m.filterQuery = ""
+			m.scrollOffset = 0
+			m.ensureCursorValid()
+			return m, nil
+		case key.Matches(msg, m.keys.Enter):
+			m.filterActive = false
+			return m, nil
+		default:
+			// In KeyMsg path, text updates are handled by KeyPressMsg.
+			return m, nil
+		}
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.Search):
+		m.filterActive = true
+		m.filterQuery = ""
+		m.scrollOffset = 0
+		return m, nil
+	case key.Matches(msg, m.keys.Down):
+		m.moveCursor(1)
+	case key.Matches(msg, m.keys.Up):
+		m.moveCursor(-1)
+	case key.Matches(msg, m.keys.Enter):
+		if row := m.SelectedRow(); row != nil && isActionableRow(*row) {
+			return m, func() tea.Msg {
+				return messages.RelatedNavigateMsg{
+					TargetType:     row.targetType,
+					SourceResource: m.parentRes,
+					RelatedIDs:     row.resourceIDs,
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m rightColumnModel) updateKeyPressMsg(msg tea.KeyPressMsg) (rightColumnModel, tea.Cmd) {
+	if !m.focused {
+		return m, nil
+	}
+
+	if m.filterActive {
+		switch msg.Code {
+		case tea.KeyEscape:
+			m.filterActive = false
+			m.filterQuery = ""
+			m.scrollOffset = 0
+			m.ensureCursorValid()
+			return m, nil
+		case tea.KeyEnter:
+			m.filterActive = false
+			return m, nil
+		case tea.KeyBackspace:
+			if len(m.filterQuery) > 0 {
+				m.filterQuery = m.filterQuery[:len(m.filterQuery)-1]
+				m.scrollOffset = 0
+				m.ensureCursorValid()
+			}
+			return m, nil
+		case tea.KeyUp:
+			m.moveCursor(-1)
+			return m, nil
+		case tea.KeyDown:
+			m.moveCursor(1)
+			return m, nil
+		}
+		if msg.Text != "" {
+			m.filterQuery += msg.Text
+			m.scrollOffset = 0
+			m.ensureCursorValid()
+		}
+		return m, nil
+	}
+
+	if msg.Text == "/" {
+		m.filterActive = true
+		m.filterQuery = ""
+		m.scrollOffset = 0
+		return m, nil
+	}
+	if msg.Text == "j" || msg.Code == tea.KeyDown {
+		m.moveCursor(1)
+		return m, nil
+	}
+	if msg.Text == "k" || msg.Code == tea.KeyUp {
+		m.moveCursor(-1)
+		return m, nil
+	}
+	if msg.Code == tea.KeyEnter {
+		if row := m.SelectedRow(); row != nil && isActionableRow(*row) {
+			return m, func() tea.Msg {
+				return messages.RelatedNavigateMsg{
+					TargetType:     row.targetType,
+					SourceResource: m.parentRes,
+					RelatedIDs:     row.resourceIDs,
+				}
 			}
 		}
 	}
@@ -118,10 +215,45 @@ func (m rightColumnModel) View() string {
 	centeredHeader := strings.Repeat(" ", padLeft) + header
 	lines = append(lines, styles.DimText.Render(centeredHeader))
 
+	visible := m.visibleIndexes()
 	if len(m.rows) == 0 {
 		lines = append(lines, styles.DimText.Render("  No related types registered"))
+	} else if len(visible) == 0 {
+		lines = append(lines, styles.DimText.Render("  No matches"))
 	} else {
-		for i, row := range m.rows {
+		usableHeight := m.height - 1 // after header
+		if usableHeight < 1 {
+			usableHeight = 1
+		}
+		// Keep selected row visible within the rendering window.
+		selectedPos := 0
+		for i, idx := range visible {
+			if idx == m.cursor {
+				selectedPos = i
+				break
+			}
+		}
+		if selectedPos < m.scrollOffset {
+			m.scrollOffset = selectedPos
+		}
+		if selectedPos >= m.scrollOffset+usableHeight {
+			m.scrollOffset = selectedPos - usableHeight + 1
+		}
+		if m.scrollOffset < 0 {
+			m.scrollOffset = 0
+		}
+		if m.scrollOffset > len(visible)-1 {
+			m.scrollOffset = len(visible) - 1
+		}
+
+		start := m.scrollOffset
+		end := start + usableHeight
+		if end > len(visible) {
+			end = len(visible)
+		}
+
+		for _, idx := range visible[start:end] {
+			row := m.rows[idx]
 			var rowText string
 			var rowStyle lipgloss.Style
 
@@ -143,7 +275,7 @@ func (m rightColumnModel) View() string {
 				rowStyle = styles.RowNormal
 			}
 
-			if m.focused && m.cursor == i {
+			if m.focused && m.cursor == idx {
 				lines = append(lines, styles.RowSelected.Width(m.width).Render(rowText))
 			} else {
 				lines = append(lines, rowStyle.Render(rowText))
@@ -168,6 +300,9 @@ func (m *rightColumnModel) SetSize(w, h int) {
 // SetFocused sets whether this column has keyboard focus.
 func (m *rightColumnModel) SetFocused(focused bool) {
 	m.focused = focused
+	if focused {
+		m.ensureCursorValid()
+	}
 }
 
 // IsFocused reports whether this column has keyboard focus.
@@ -190,4 +325,106 @@ func (m rightColumnModel) SelectedTypeName() string {
 		return ""
 	}
 	return row.displayName
+}
+
+func isActionableRow(row rightColumnRow) bool {
+	return !row.loading && row.err == nil && row.count > 0
+}
+
+func (m rightColumnModel) visibleIndexes() []int {
+	if len(m.rows) == 0 {
+		return nil
+	}
+	query := strings.TrimSpace(strings.ToLower(m.filterQuery))
+	if query == "" {
+		idx := make([]int, 0, len(m.rows))
+		for i := range m.rows {
+			idx = append(idx, i)
+		}
+		return idx
+	}
+	idx := make([]int, 0, len(m.rows))
+	for i, row := range m.rows {
+		if strings.Contains(strings.ToLower(row.displayName), query) {
+			idx = append(idx, i)
+		}
+	}
+	return idx
+}
+
+func (m *rightColumnModel) ensureCursorValid() {
+	visible := m.visibleIndexes()
+	if len(visible) == 0 {
+		m.cursor = 0
+		m.scrollOffset = 0
+		return
+	}
+	isVisible := false
+	for _, idx := range visible {
+		if idx == m.cursor {
+			isVisible = true
+			break
+		}
+	}
+	if !isVisible {
+		m.cursor = visible[0]
+	}
+	// Prefer first actionable visible row when actionable rows exist.
+	hasActionable := false
+	for _, idx := range visible {
+		if isActionableRow(m.rows[idx]) {
+			hasActionable = true
+			break
+		}
+	}
+	if hasActionable {
+		if row := m.SelectedRow(); row == nil || !isActionableRow(*row) {
+			for _, idx := range visible {
+				if isActionableRow(m.rows[idx]) {
+					m.cursor = idx
+					break
+				}
+			}
+		}
+	}
+}
+
+func (m *rightColumnModel) moveCursor(dir int) {
+	visible := m.visibleIndexes()
+	if len(visible) == 0 {
+		return
+	}
+	pos := -1
+	for i, idx := range visible {
+		if idx == m.cursor {
+			pos = i
+			break
+		}
+	}
+	if pos < 0 {
+		pos = 0
+	}
+	hasActionable := false
+	for _, idx := range visible {
+		if isActionableRow(m.rows[idx]) {
+			hasActionable = true
+			break
+		}
+	}
+	for {
+		next := pos + dir
+		if next < 0 || next >= len(visible) {
+			return
+		}
+		pos = next
+		idx := visible[pos]
+		if !hasActionable || isActionableRow(m.rows[idx]) {
+			m.cursor = idx
+			return
+		}
+	}
+}
+
+func (m rightColumnModel) IsFiltering() bool {
+	return m.filterActive
 }

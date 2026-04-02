@@ -162,7 +162,8 @@ func TestDetail_007_SeparatorAbsent_NoRightCol(t *testing.T) {
 // rendered with a distinct style from its VALUE portion.
 //
 // The current code applies only styles.DetailVal to the whole sub-field line:
-//   line = "     " + styles.DetailVal.Render(item.Value)
+//
+//	line = "     " + styles.DetailVal.Render(item.Value)
 //
 // After fix, the key part (text before ": ") is styled with styles.DetailKey
 // and the value part (text after ": ") with styles.DetailVal, producing two
@@ -450,37 +451,32 @@ func TestDetail_007_NavigableUnderline_OnWhenNotSelected(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Bug 5: Stacked layout missing for width 80-99
+// Bug 5: Related panel must stay visible for width 80-99
 // ---------------------------------------------------------------------------
 
-// TestDetail_007_StackedLayout_85Cols verifies that at width=85 with registered
-// related defs, View() output contains "Related" (the stacked-layout divider text).
-// FAILS NOW: width < 100 prevents rightCol from being auto-shown at all, so no
-// related content appears. The stacked layout for widths 80-99 is not implemented.
-// PASSES AFTER FIX: stacked layout shows right-column content below the left column.
-func TestDetail_007_StackedLayout_85Cols(t *testing.T) {
+// TestDetail_007_MediumLayout_85Cols_HasRelated verifies that at width=85 with
+// registered related defs, View() contains RELATED content.
+func TestDetail_007_MediumLayout_85Cols_HasRelated(t *testing.T) {
 	register007EC2Defs(t)
 
 	d := make007EC2Detail(85, 30, nil)
 	plain := stripAnsi(d.View())
 
-	if !strings.Contains(plain, "Related") {
-		t.Errorf("View() at width=85 with registered related defs must contain stacked \"Related\" section;\ngot:\n%s", plain)
+	if !strings.Contains(plain, "RELATED") {
+		t.Errorf("View() at width=85 with registered related defs must contain RELATED panel;\ngot:\n%s", plain)
 	}
 }
 
-// TestDetail_007_StackedLayout_85Cols_NoSeparator is a regression guard:
-// stacked layout (single column) must NOT contain │ (which is a side-by-side separator).
-// PASSES NOW (vacuously — no related content at all at width=85).
-// Must continue to pass after stacked layout is implemented.
-func TestDetail_007_StackedLayout_85Cols_NoSeparator(t *testing.T) {
+// TestDetail_007_MediumLayout_85Cols_HasSeparator verifies that medium widths
+// keep the related panel visible in two-column mode.
+func TestDetail_007_MediumLayout_85Cols_HasSeparator(t *testing.T) {
 	register007EC2Defs(t)
 
 	d := make007EC2Detail(85, 30, nil)
 	view := d.View()
 
-	if strings.Contains(view, "│") {
-		t.Errorf("stacked layout (width=85) must NOT contain │ column separator; got:\n%s", stripAnsi(view))
+	if !strings.Contains(view, "│") {
+		t.Errorf("medium layout (width=85) must contain │ column separator; got:\n%s", stripAnsi(view))
 	}
 }
 

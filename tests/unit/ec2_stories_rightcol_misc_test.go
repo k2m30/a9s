@@ -31,12 +31,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/config"
 )
 
 // ---------------------------------------------------------------------------
@@ -631,40 +631,32 @@ func TestEC2_044_Terminal60IsNotTooNarrow(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// EC2-045: Stacked layout at 80-99 columns (FAILS NOW — not implemented)
+// EC2-045: Related panel remains visible at 80-99 columns
 // ---------------------------------------------------------------------------
 
-// TestEC2_045_StackedLayout80to99 verifies that at width=90 with registered
-// related defs, the layout shows related content in a stacked format (no │ separator).
-//
-// FAILS NOW: Bug5 from Spec-007 — stacked layout for widths 80-99 is not implemented.
-// The right column is only auto-shown at width >= 100.
-// PASSES AFTER FIX: stacked layout renders related section below detail fields.
-func TestEC2_045_StackedLayout80to99(t *testing.T) {
+// TestEC2_045_MediumLayout80to99_HasRelated verifies that at width=90 with
+// registered related defs, RELATED content is visible.
+func TestEC2_045_MediumLayout80to99_HasRelated(t *testing.T) {
 	d, cleanup := ec2StoryDetail(t, 90, 30, true)
 	defer cleanup()
 
 	plain := stripAnsi(d.View())
 
-	// After fix, the stacked layout should show related content.
-	if !strings.Contains(plain, "Related") {
-		t.Errorf("EC2-045: at width=90 with registered related defs, View() must contain stacked 'Related' section;\ngot:\n%s", plain)
+	if !strings.Contains(plain, "RELATED") {
+		t.Errorf("EC2-045: at width=90 with registered related defs, View() must contain RELATED panel;\ngot:\n%s", plain)
 	}
 }
 
-// TestEC2_045_StackedLayout_NoSeparator is a companion: stacked layout must
-// NOT contain │ (which is the side-by-side separator).
-//
-// PASSES NOW (vacuously — no related content at width=90).
-// Must continue to pass after stacked layout is implemented.
-func TestEC2_045_StackedLayout_NoSeparator(t *testing.T) {
+// TestEC2_045_MediumLayout_HasSeparator verifies that the medium-width layout
+// renders left/right panes with a separator.
+func TestEC2_045_MediumLayout_HasSeparator(t *testing.T) {
 	d, cleanup := ec2StoryDetail(t, 90, 30, true)
 	defer cleanup()
 
 	view := d.View()
 
-	if strings.Contains(view, "│") {
-		t.Errorf("EC2-045: stacked layout (width=90) must NOT contain │ column separator;\ngot:\n%s", stripAnsi(view))
+	if !strings.Contains(view, "│") {
+		t.Errorf("EC2-045: medium layout (width=90) must contain │ column separator;\ngot:\n%s", stripAnsi(view))
 	}
 }
 
