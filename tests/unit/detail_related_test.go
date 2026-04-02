@@ -53,62 +53,67 @@ func pressToggleRelated(d views.DetailModel) (views.DetailModel, func() interfac
 }
 
 // ---------------------------------------------------------------------------
-// TestDetail_ToggleRelated_SetsVisible
+// TestDetail_ToggleRelated_FirstPressHidesAutoShown
 // Given: width=140, RelatedDefs registered for "ec2"
 // When:  ToggleRelated key pressed
-// Then:  returned cmd produces a RelatedCheckStartedMsg with ResourceType="ec2"
+// Then:  the auto-shown panel hides and no refresh cmd is dispatched
 // ---------------------------------------------------------------------------
 
-func TestDetail_ToggleRelated_SetsVisible(t *testing.T) {
+func TestDetail_ToggleRelated_FirstPressHidesAutoShown(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
 	})
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForToggleTest(t, 140)
-	_, rawCmd := pressToggleRelated(d)
+	before := d.View()
+	d, rawCmd := pressToggleRelated(d)
 
-	if rawCmd == nil {
-		t.Fatal("ToggleRelated at width=140 with registered defs should return a non-nil cmd")
+	if !strings.Contains(before, "RELATED") {
+		t.Fatal("precondition failed: related column should start auto-shown on wide EC2 detail")
+	}
+	if strings.Contains(d.View(), "RELATED") {
+		t.Fatal("first ToggleRelated press should hide the auto-shown panel")
+	}
+	if rawCmd != nil {
+		t.Fatal("first ToggleRelated press should not dispatch a refresh cmd")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestDetail_ToggleRelated_SecondPressShows
+// Given: width=140, RelatedDefs registered for "ec2", toggle pressed once
+// When:  toggle pressed a second time
+// Then:  returned cmd produces a RelatedCheckStartedMsg with ResourceType="ec2"
+// ---------------------------------------------------------------------------
+
+func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
+	resource.RegisterRelated("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+	})
+	defer resource.UnregisterRelated("ec2")
+
+	d := makeDetailForToggleTest(t, 140)
+
+	// First press hides the auto-shown column.
+	d, firstCmd := pressToggleRelated(d)
+	if firstCmd != nil {
+		t.Fatal("first ToggleRelated press should hide only; got unexpected cmd")
 	}
 
-	result := rawCmd()
+	// Second press: show the column and refresh related availability.
+	_, secondCmd := pressToggleRelated(d)
+	if secondCmd == nil {
+		t.Fatal("second ToggleRelated press should dispatch a cmd (checker); got nil")
+	}
+
+	result := secondCmd()
 	startMsg, ok := result.(messages.RelatedCheckStartedMsg)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedCheckStartedMsg; got %T", result)
 	}
 	if startMsg.ResourceType != "ec2" {
 		t.Errorf("RelatedCheckStartedMsg.ResourceType expected %q, got %q", "ec2", startMsg.ResourceType)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// TestDetail_ToggleRelated_SecondPressHides
-// Given: width=140, RelatedDefs registered for "ec2", toggle pressed once
-// When:  toggle pressed a second time
-// Then:  returned cmd is nil (no checker dispatch on close)
-// ---------------------------------------------------------------------------
-
-func TestDetail_ToggleRelated_SecondPressHides(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-	})
-	defer resource.UnregisterRelated("ec2")
-
-	d := makeDetailForToggleTest(t, 140)
-
-	// First press: auto-shown → explicitly on (or no-auto, explicitly on).
-	// Either way, a cmd is returned and the column is visible.
-	var firstCmd func() interface{}
-	d, firstCmd = pressToggleRelated(d)
-	if firstCmd == nil {
-		t.Fatal("first ToggleRelated press should dispatch a cmd (checker); got nil")
-	}
-
-	// Second press: hide the column — no checker dispatch expected.
-	_, secondCmd := pressToggleRelated(d)
-	if secondCmd != nil {
-		t.Errorf("second ToggleRelated press (hide) should return nil cmd; got non-nil")
 	}
 }
 

@@ -351,7 +351,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				m.refreshViewportContent() // update cursor highlight after focus change
 				return m, nil
 			case key.Matches(msg, m.keys.Escape):
-				if m.rightCol.IsFiltering() {
+				if m.rightCol.IsFiltering() || m.rightCol.HasFilter() {
 					var cmd tea.Cmd
 					m.rightCol, cmd = m.rightCol.Update(msg)
 					m.refreshViewportContent()
@@ -367,7 +367,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.ScrollRight):
 			// l: focus right column (if showing and not already focused)
-			if m.rightColShowing() && !m.rightCol.IsFocused() {
+			if m.rightColShowing() && !m.rightCol.IsFocused() && m.rightCol.HasActionableRows() {
 				m.rightCol.SetFocused(true)
 				m.refreshViewportContent()
 				return m, nil
@@ -480,7 +480,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.Tab):
-			if m.rightColShowing() {
+			if m.rightColShowing() && (m.rightCol.IsFocused() || m.rightCol.HasActionableRows()) {
 				if m.rightCol.IsFocused() {
 					m.rightCol.SetFocused(false)
 				} else {
@@ -520,21 +520,11 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				return m, nil
 			}
 			if m.rightColAutoShown {
-				// Transition from auto-shown → explicitly on (still visible).
-				// The first toggle after auto-show does NOT hide the column.
+				// First explicit toggle hides the auto-shown column.
 				m.rightColAutoShown = false
-				m.rightColVisible = true
-				defs := resource.GetRelated(m.resourceType)
-				m.rightCol = newRightColumn(defs, m.res)
-				m.rightCol.keys = m.keys
-				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.rightColVisible = false
 				m.recalcViewportWidth()
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{
-						ResourceType:   m.resourceType,
-						SourceResource: m.res,
-					}
-				}
+				return m, nil
 			}
 			// Normal toggle: flip visible state.
 			m.rightColVisible = !m.rightColVisible
@@ -628,7 +618,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				return m, nil
 			}
 			if msg.Code == tea.KeyEscape {
-				if m.rightCol.IsFiltering() {
+				if m.rightCol.IsFiltering() || m.rightCol.HasFilter() {
 					var cmd tea.Cmd
 					m.rightCol, cmd = m.rightCol.Update(msg)
 					m.refreshViewportContent()
@@ -676,18 +666,9 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			}
 			if m.rightColAutoShown {
 				m.rightColAutoShown = false
-				m.rightColVisible = true
-				defs := resource.GetRelated(m.resourceType)
-				m.rightCol = newRightColumn(defs, m.res)
-				m.rightCol.keys = m.keys
-				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.rightColVisible = false
 				m.recalcViewportWidth()
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{
-						ResourceType:   m.resourceType,
-						SourceResource: m.res,
-					}
-				}
+				return m, nil
 			}
 			m.rightColVisible = !m.rightColVisible
 			if m.rightColVisible {
@@ -707,7 +688,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			return m, nil
 		}
 		if msg.Code == tea.KeyTab {
-			if m.rightColShowing() {
+			if m.rightColShowing() && (m.rightCol.IsFocused() || m.rightCol.HasActionableRows()) {
 				m.rightCol.SetFocused(!m.rightCol.IsFocused())
 				m.refreshViewportContent()
 			}
@@ -983,17 +964,20 @@ func (m DetailModel) GetHelpContext() HelpContext {
 
 // IsSearchActive returns true when search is active (input mode or confirmed highlights).
 func (m DetailModel) IsSearchActive() bool {
-	return m.search.IsActive()
+	return m.search.IsActive() || m.rightCol.IsFiltering()
 }
 
 // IsSearchInputMode returns true when the search input is capturing keystrokes.
 func (m DetailModel) IsSearchInputMode() bool {
-	return m.search.IsInputMode()
+	return m.search.IsInputMode() || m.rightCol.IsFiltering()
 }
 
 // SearchInfo returns the search state string for the header.
 // Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
 func (m DetailModel) SearchInfo() string {
+	if m.rightCol.IsFiltering() {
+		return "/" + m.rightCol.FilterQuery()
+	}
 	if !m.search.IsActive() {
 		return ""
 	}

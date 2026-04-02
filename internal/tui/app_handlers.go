@@ -745,6 +745,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 		}
+		// Exact AMI navigation should fetch by image ID instead of falling back to
+		// the owned-AMI list, which misses public and third-party images.
+		if msg.TargetType == "ami" {
+			return m, m.fetchAMIDetail(msg.TargetID)
+		}
 		// Resource not in cache — fetch target list and preserve exact-ID filtering.
 		m.flash = flashState{
 			text:    fmt.Sprintf("Resource %s not in cache; loading %s list", msg.TargetID, msg.TargetType),

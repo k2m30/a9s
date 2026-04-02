@@ -37,6 +37,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN},
 		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: nil},
 		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP},
+		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents},
 	})
@@ -45,6 +46,7 @@ func init() {
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
+		{FieldPath: "BlockDeviceMappings.VolumeId", TargetType: "ebs"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
 	})
 }
@@ -354,6 +356,19 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 		}
 	}
 	return relatedResult("eip", ids)
+}
+
+func checkEC2EBS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ids := ec2VolumeIDs(res)
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
+	}
+	ordered := make([]string, 0, len(ids))
+	for id := range ids {
+		ordered = append(ordered, id)
+	}
+	sort.Strings(ordered)
+	return relatedResult("ebs", ordered)
 }
 
 // checkEC2NodeGroups checks for EKS node groups associated with this EC2 instance.

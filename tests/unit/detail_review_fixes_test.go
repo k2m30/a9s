@@ -397,7 +397,7 @@ func TestRightColumn_EnterBlockedOnLoadingRow(t *testing.T) {
 	}
 
 	// Transition auto-shown → explicitly visible so Tab works.
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
+	d = makeExplicitlyVisible(d)
 
 	// Tab: focus right column. No result delivered yet — row is loading.
 	d, _ = pressTabDetail(d)
@@ -428,7 +428,7 @@ func TestRightColumn_EnterBlockedOnZeroCountRow(t *testing.T) {
 	}
 
 	// Transition auto-shown → explicitly visible.
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
+	d = makeExplicitlyVisible(d)
 
 	// Deliver result with Count == 0 (no related resources found).
 	d = deliverResult(d, messages.RelatedCheckResultMsg{
@@ -470,7 +470,7 @@ func TestRightColumn_EnterAllowedOnPositiveCountRow(t *testing.T) {
 	}
 
 	// Transition auto-shown → explicitly visible (rebuilds rightCol).
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
+	d = makeExplicitlyVisible(d)
 
 	// Deliver result with Count == 2 (positive — navigation allowed).
 	d = deliverResult(d, messages.RelatedCheckResultMsg{

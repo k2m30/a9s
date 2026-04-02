@@ -80,11 +80,12 @@ func sendEnterWithCmd(d views.DetailModel) (views.DetailModel, tea.Cmd) {
 // makeExplicitlyVisible transitions a DetailModel's right column from auto-shown
 // (rightColAutoShown=true, rightColVisible=false) to explicitly visible
 // (rightColVisible=true). This is required before Tab can toggle focus.
-// Pressing r once at width >= 100 when the column is auto-shown triggers the
-// transition without hiding the column.
+// With the current UX, the first press of r hides the auto-shown column and the
+// second press re-opens it explicitly.
 // Precondition: width >= 100, related defs registered, SetSize called.
 func makeExplicitlyVisible(d views.DetailModel) views.DetailModel {
 	updated, _ := d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
+	updated, _ = updated.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
 	return updated
 }
 

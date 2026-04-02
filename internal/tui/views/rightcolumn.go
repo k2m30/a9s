@@ -91,6 +91,14 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 		return m, nil
 	}
 
+	if key.Matches(msg, m.keys.Escape) && strings.TrimSpace(m.filterQuery) != "" {
+		m.filterActive = false
+		m.filterQuery = ""
+		m.scrollOffset = 0
+		m.ensureCursorValid()
+		return m, nil
+	}
+
 	if m.filterActive {
 		switch {
 		case key.Matches(msg, m.keys.Escape):
@@ -134,6 +142,14 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 
 func (m rightColumnModel) updateKeyPressMsg(msg tea.KeyPressMsg) (rightColumnModel, tea.Cmd) {
 	if !m.focused {
+		return m, nil
+	}
+
+	if msg.Code == tea.KeyEscape && strings.TrimSpace(m.filterQuery) != "" {
+		m.filterActive = false
+		m.filterQuery = ""
+		m.scrollOffset = 0
+		m.ensureCursorValid()
 		return m, nil
 	}
 
@@ -427,4 +443,24 @@ func (m *rightColumnModel) moveCursor(dir int) {
 
 func (m rightColumnModel) IsFiltering() bool {
 	return m.filterActive
+}
+
+func (m rightColumnModel) FilterQuery() string {
+	return m.filterQuery
+}
+
+func (m rightColumnModel) HasFilter() bool {
+	return strings.TrimSpace(m.filterQuery) != ""
+}
+
+// HasActionableRows reports whether the right column is worth focusing.
+// Loading rows remain focusable so users can inspect and filter while checks run.
+// Fully-resolved all-zero rows are not focusable.
+func (m rightColumnModel) HasActionableRows() bool {
+	for _, idx := range m.visibleIndexes() {
+		if m.rows[idx].loading || isActionableRow(m.rows[idx]) {
+			return true
+		}
+	}
+	return false
 }

@@ -67,6 +67,17 @@ func sendToggleRelated(d views.DetailModel) views.DetailModel {
 	return updated
 }
 
+// showRelatedPanel ensures the related panel ends in the visible state.
+// On wide layouts the first press hides the auto-shown panel, so we may need
+// a second press to reopen it explicitly.
+func showRelatedPanel(d views.DetailModel) views.DetailModel {
+	updated := sendToggleRelated(d)
+	if strings.Contains(updated.View(), "RELATED") {
+		return updated
+	}
+	return sendToggleRelated(updated)
+}
+
 // sendRelatedResult delivers a RelatedCheckResultMsg to a DetailModel and
 // returns the updated model.
 func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) views.DetailModel {
@@ -89,7 +100,7 @@ func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 
 	view := d.View()
 	if !strings.Contains(view, "RELATED") {
@@ -112,7 +123,7 @@ func TestRightColumn_ShowsLoadingState(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 
 	view := d.View()
 	if !strings.Contains(view, "Target Groups") {
@@ -138,7 +149,7 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
@@ -169,7 +180,7 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
@@ -200,7 +211,7 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
@@ -234,7 +245,7 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 140)
 	// Toggle ON
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	viewOn := d.View()
 	if !strings.Contains(viewOn, "RELATED") {
 		t.Skip("right column not shown after first toggle; skipping off-toggle test")
@@ -264,7 +275,7 @@ func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 59)
 	viewBefore := d.View()
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	viewAfter := d.View()
 
 	if viewBefore != viewAfter {
@@ -284,7 +295,7 @@ func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 	resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 
 	view := d.View()
 	// When no RelatedDefs exist, the right column should show a hint that no
@@ -314,7 +325,7 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
@@ -411,7 +422,7 @@ func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
 	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
+	d = showRelatedPanel(d)
 	view := d.View()
 
 	// At 140 columns, both the resource field content (left col) and related
