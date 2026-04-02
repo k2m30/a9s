@@ -331,7 +331,18 @@ func (m Model) View() tea.View {
 		lines = strings.Split(content, "\n")
 	}
 	frameHeight := max(m.height-1, 3)
-	frame := layout.RenderFrame(lines, active.FrameTitle(), m.width, frameHeight)
+	frameTitle := active.FrameTitle()
+	if d, ok := active.(*views.DetailModel); ok {
+		src := d.SourceResource()
+		if src.ID != "" {
+			if src.Name != "" {
+				frameTitle = fmt.Sprintf("detail -- %s (%s)", src.ID, src.Name)
+			} else {
+				frameTitle = "detail -- " + src.ID
+			}
+		}
+	}
+	frame := layout.RenderFrame(lines, frameTitle, m.width, frameHeight)
 
 	v := tea.NewView(header + "\n" + frame)
 	v.AltScreen = true
@@ -389,6 +400,7 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *views.ResourceListModel:
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
+		m.cacheTopLevelResourceList(updated)
 		return m, cmd
 	case *views.DetailModel:
 		updated, cmd := v.Update(msg)
@@ -416,6 +428,23 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
+	if rl.ParentContext() != nil {
+		return
+	}
+	rt := rl.ResourceType()
+	sortField, sortAsc := rl.SortState()
+	m.resourceCache[rt] = &resourceCacheEntry{
+		resources:     rl.AllResources(),
+		pagination:    rl.PaginationState(),
+		filterText:    rl.FilterText(),
+		sortField:     sortField,
+		sortAsc:       sortAsc,
+		cursorPos:     rl.CursorPosition(),
+		hScrollOffset: rl.HScrollOffset(),
+	}
 }
 
 // helpContext determines the HelpContext from the current active view.

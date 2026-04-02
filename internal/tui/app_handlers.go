@@ -75,13 +75,24 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if key.Matches(msg, m.keys.Escape) {
+		if d, ok := m.activeView().(*views.DetailModel); ok && d.ConsumesEscapeLocally() {
+			return m.updateActiveView(msg)
+		}
 		// If active view has active search (confirmed highlights), delegate Esc to clear it.
 		if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
 			return m.updateActiveView(msg)
 		}
+		// Related-navigation resource lists should pop immediately on Esc.
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok && rl.EscPops() {
+			m.popView()
+			return m, nil
+		}
 		// If active view has a confirmed filter, clear it first
 		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
 			f.SetFilter("")
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				m.cacheTopLevelResourceList(*rl)
+			}
 			return m, nil
 		}
 		// Otherwise pop view; no-op on main menu (never quit from Esc)
@@ -243,7 +254,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
-	m.availabilityGen++ // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight probes
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
@@ -273,7 +284,7 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	}
 	m.region = msg.Region
 	m.identity = nil
-	m.availabilityGen++ // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight probes
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
@@ -383,6 +394,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	case messages.TargetDetail:
 		if msg.Resource == nil {
 			return m, nil
+		}
+		if msg.ReplaceCurrent {
+			m.popView()
 		}
 		resType := msg.ResourceType
 		if resType == "" {
@@ -738,8 +752,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			active:  true,
 		}
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetDisplayName(relatedListBaseName(*rt))
+		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 		rl.SetPendingFilter(msg.TargetID)
 		rl.SetRelatedIDFilter([]string{msg.TargetID})
+		rl.SetAutoOpenSingleDetail(true)
+		rl.SetEscPops(true)
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -761,8 +779,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 		// Not in cache — fall through to list with pending filter
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetDisplayName(relatedListBaseName(*rt))
+		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 		rl.SetPendingFilter(targetID)
 		rl.SetRelatedIDFilter([]string{targetID})
+		rl.SetAutoOpenSingleDetail(true)
+		rl.SetEscPops(true)
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -789,13 +811,19 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				entry.sortField, entry.sortAsc,
 				0, 0,
 			)
+			rl.SetDisplayName(relatedListBaseName(*rt))
+			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+			rl.SetEscPops(true)
 			rl.SetSize(m.innerSize())
 			m.pushView(&rl)
 			return m, nil
 		}
 		// Cache miss: fetch and preserve exact-ID filtering.
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetDisplayName(relatedListBaseName(*rt))
+		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 		rl.SetRelatedIDFilter(msg.RelatedIDs)
+		rl.SetEscPops(true)
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -804,10 +832,31 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 
 	// Fallback: no IDs specified or cache miss for multiple IDs — push unfiltered list.
 	rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+	rl.SetDisplayName(relatedListBaseName(*rt))
+	rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+	rl.SetEscPops(true)
 	rl.SetSize(m.innerSize())
 	rl, initCmd := rl.Init()
 	m.pushView(&rl)
 	return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+}
+
+func relatedTitleSuffix(src resource.Resource) string {
+	if src.ID == "" {
+		return ""
+	}
+	if src.Name != "" {
+		return fmt.Sprintf(" -- %s (%s)", src.ID, src.Name)
+	}
+	return " -- " + src.ID
+}
+
+func relatedListBaseName(rt resource.ResourceTypeDef) string {
+	// Match design/UI convention for alarms list title.
+	if rt.ShortName == "alarm" {
+		return "alarms"
+	}
+	return rt.ShortName
 }
 
 // buildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
