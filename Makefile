@@ -6,6 +6,7 @@ VERSION ?= dev
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+GOFILES  = $(shell find . -type f -name '*.go' -not -path './vendor/*')
 
 build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) $(CMD)
@@ -20,7 +21,7 @@ lint:
 	golangci-lint run ./...
 
 fmt:
-	gofmt -w .
+	gofmt -w $(GOFILES)
 
 run: build
 	./$(BINARY)
@@ -65,6 +66,8 @@ readme:
 	@echo "README.md regenerated from docs/shared/ snippets"
 
 check-readme:
-	@scripts/generate-readme.sh > /tmp/readme-check.md
-	@diff -q README.md /tmp/readme-check.md > /dev/null 2>&1 || (echo "FAIL: README.md is out of sync — run 'make readme'" && exit 1)
+	@tmpfile="$$(mktemp)"; \
+	scripts/generate-readme.sh > "$$tmpfile"; \
+	diff -q README.md "$$tmpfile" > /dev/null 2>&1 || (rm -f "$$tmpfile"; echo "FAIL: README.md is out of sync — run 'make readme'" && exit 1); \
+	rm -f "$$tmpfile"
 	@echo "PASS: README.md is in sync with docs/shared/"
