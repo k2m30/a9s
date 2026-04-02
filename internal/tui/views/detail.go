@@ -25,22 +25,22 @@ import (
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
 type DetailModel struct {
-	res          resource.Resource
-	resourceType string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
-	viewConfig   *config.ViewsConfig
-	viewport     viewport.Model
-	ready        bool
-	wrap         bool
-	width        int
-	height       int
-	keys         keys.Map
-	search       SearchModel
+	res               resource.Resource
+	resourceType      string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
+	viewConfig        *config.ViewsConfig
+	viewport          viewport.Model
+	ready             bool
+	wrap              bool
+	width             int
+	height            int
+	keys              keys.Map
+	search            SearchModel
 	rightCol          rightColumnModel
-	rightColVisible   bool // true when explicitly toggled on
-	rightColAutoShown bool // true when right column was auto-shown on SetSize (wide terminal + registered defs)
-	rightColWidth     int  // width of right column panel (default 32)
-	fieldList    []fieldpath.FieldItem // structured field data; nil = not yet computed
-	fieldCursor  int                   // index into fieldList for navigable cursor
+	rightColVisible   bool                  // true when explicitly toggled on
+	rightColAutoShown bool                  // true when right column was auto-shown on SetSize (wide terminal + registered defs)
+	rightColWidth     int                   // width of right column panel (default 32)
+	fieldList         []fieldpath.FieldItem // structured field data; nil = not yet computed
+	fieldCursor       int                   // index into fieldList for navigable cursor
 }
 
 // NewDetail creates a DetailModel for the given resource.
@@ -61,14 +61,10 @@ func NewDetail(res resource.Resource, resourceType string, viewConfig *config.Vi
 // a sub-field under path P whose key K matches navMap["P.K"] is marked IsNavigable
 // with TargetType from the navMap, and its Value is set to the extracted sub-value.
 func (m *DetailModel) buildFieldList() {
-	if m.viewConfig == nil {
-		m.fieldList = nil
-		return
-	}
-	vd := config.GetViewDef(m.viewConfig, m.resourceType)
-	if len(vd.Detail) == 0 {
-		m.fieldList = nil
-		return
+	var detailPaths []string
+	if m.viewConfig != nil {
+		vd := config.GetViewDef(m.viewConfig, m.resourceType)
+		detailPaths = vd.Detail
 	}
 	navFields := resource.GetNavigableFields(m.resourceType)
 	navMap := make(map[string]string, len(navFields))
@@ -98,7 +94,20 @@ func (m *DetailModel) buildFieldList() {
 			fields = synth
 		}
 	}
-	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, vd.Detail, navMap)
+	if len(detailPaths) == 0 {
+		if len(fields) == 0 {
+			m.fieldList = nil
+			return
+		}
+		keys := make([]string, 0, len(fields))
+		for k := range fields {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		m.fieldList = fieldpath.ExtractFieldList(nil, fields, keys, nil)
+		return
+	}
+	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)
 	// Post-process: annotate sub-fields that match a navigable path "Parent.SubKey".
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
 	// Sub-field Value is the raw YAML line (e.g., "- GroupId: sg-xxx" or "  GroupName: foo").
@@ -451,6 +460,33 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			}
 			return m, nil // Bug6 fix: clamp at boundary, don't fall through to viewport scroll
 		}
+	case tea.KeyPressMsg:
+		// Bubble Tea v2 integration specs may emit KeyPressMsg directly.
+		// Handle the common navigation keys here.
+		if msg.Text == "j" || msg.Code == tea.KeyDown {
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
+				m.fieldCursor++
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
+		if msg.Text == "k" || msg.Code == tea.KeyUp {
+			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
+				m.fieldCursor--
+				m.syncViewportToCursor()
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
+		if msg.Code == tea.KeyEscape || msg.Text == "esc" {
+			if m.search.IsActive() {
+				m.search.Deactivate()
+				m.refreshViewportContent()
+			}
+			return m, nil
+		}
+		return m, nil
 	}
 
 	// Delegate to viewport for scroll

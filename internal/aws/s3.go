@@ -11,14 +11,21 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("s3", []string{"name", "bucket_name", "creation_date"})
+	resource.RegisterFieldKeys("s3", []string{
+		"name",
+		"bucket_name",
+		"creation_date",
+		"notification_lambda",
+		"notification_sqs",
+		"notification_sns",
+	})
 
 	resource.RegisterPaginated("s3", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchS3BucketsPage(ctx, c.S3, continuationToken)
+		return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
 	})
 
 	// Register S3 objects as a child type with its own fetcher.
@@ -65,6 +72,17 @@ func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.R
 // FetchS3BucketsPage calls the S3 ListBuckets API and returns a single page
 // of buckets. Pass an empty continuationToken for the first page.
 func FetchS3BucketsPage(ctx context.Context, listAPI S3ListBucketsAPI, continuationToken string) (resource.FetchResult, error) {
+	return FetchS3BucketsPageWithNotifications(ctx, listAPI, nil, continuationToken)
+}
+
+// FetchS3BucketsPageWithNotifications returns one page of buckets and, when
+// available, enriches each bucket with notification targets.
+func FetchS3BucketsPageWithNotifications(
+	ctx context.Context,
+	listAPI S3ListBucketsAPI,
+	notificationAPI S3GetBucketNotificationConfigurationAPI,
+	continuationToken string,
+) (resource.FetchResult, error) {
 	input := &s3.ListBucketsInput{
 		MaxBuckets: aws.Int32(200),
 	}
@@ -88,15 +106,22 @@ func FetchS3BucketsPage(ctx context.Context, listAPI S3ListBucketsAPI, continuat
 		if bucket.CreationDate != nil {
 			creationDate = bucket.CreationDate.Format("2006-01-02 15:04")
 		}
+		lambdaArn, sqsArn, snsArn := "", "", ""
+		if notificationAPI != nil && bucketName != "" {
+			lambdaArn, sqsArn, snsArn, _ = firstS3NotificationTargets(ctx, notificationAPI, bucketName)
+		}
 
 		r := resource.Resource{
 			ID:     bucketName,
 			Name:   bucketName,
 			Status: "",
 			Fields: map[string]string{
-				"name":          bucketName,
-				"bucket_name":   bucketName,
-				"creation_date": creationDate,
+				"name":                bucketName,
+				"bucket_name":         bucketName,
+				"creation_date":       creationDate,
+				"notification_lambda": lambdaArn,
+				"notification_sqs":    sqsArn,
+				"notification_sns":    snsArn,
 			},
 			RawStruct: bucket,
 		}
@@ -126,6 +151,39 @@ func FetchS3BucketsPage(ctx context.Context, listAPI S3ListBucketsAPI, continuat
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func firstS3NotificationTargets(
+	ctx context.Context,
+	api S3GetBucketNotificationConfigurationAPI,
+	bucket string,
+) (lambdaArn, sqsArn, snsArn string, _ error) {
+	out, err := api.GetBucketNotificationConfiguration(ctx, &s3.GetBucketNotificationConfigurationInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		// Best effort enrichment: keep list results even if this lookup fails.
+		return "", "", "", nil
+	}
+	for _, c := range out.LambdaFunctionConfigurations {
+		if c.LambdaFunctionArn != nil && *c.LambdaFunctionArn != "" {
+			lambdaArn = *c.LambdaFunctionArn
+			break
+		}
+	}
+	for _, c := range out.QueueConfigurations {
+		if c.QueueArn != nil && *c.QueueArn != "" {
+			sqsArn = *c.QueueArn
+			break
+		}
+	}
+	for _, c := range out.TopicConfigurations {
+		if c.TopicArn != nil && *c.TopicArn != "" {
+			snsArn = *c.TopicArn
+			break
+		}
+	}
+	return lambdaArn, sqsArn, snsArn, nil
 }
 
 // FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.

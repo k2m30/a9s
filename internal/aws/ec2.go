@@ -3,9 +3,15 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -167,49 +173,280 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 }
 
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
-func checkEC2TargetGroups(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Check cache for "tg" resources — real matching logic comes in per-resource issues
-	if tgs, ok := cache["tg"]; ok {
-		_ = tgs // placeholder: iterate and match by instance ID
+func checkEC2TargetGroups(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, vpcID, _ := ec2Identity(res)
+	if instanceID == "" || vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+	tgList, ok := cache["tg"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+	}
+	var ids []string
+	for _, tgRes := range tgList {
+		raw, ok := tgRes.RawStruct.(elbv2types.TargetGroup)
+		if !ok {
+			if p, ok := tgRes.RawStruct.(*elbv2types.TargetGroup); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		targetType := tgRes.Fields["target_type"]
+		tgVpcID := tgRes.Fields["vpc_id"]
+		if ok {
+			targetType = string(raw.TargetType)
+			if raw.VpcId != nil {
+				tgVpcID = *raw.VpcId
+			}
+		}
+		if targetType != "instance" {
+			continue
+		}
+		// Without target-health rows in cache, best available approximation is
+		// VPC-level matching for instance target groups.
+		if tgVpcID == vpcID {
+			ids = append(ids, tgRes.ID)
+		}
+	}
+	return relatedResult("tg", ids)
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
-func checkEC2ASG(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if asgs, ok := cache["asg"]; ok {
-		_ = asgs
+func checkEC2ASG(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, _, _ := ec2Identity(res)
+	if instanceID == "" {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+	asgList, ok := cache["asg"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+	}
+	var ids []string
+	for _, asgRes := range asgList {
+		raw, ok := asgRes.RawStruct.(asgtypes.AutoScalingGroup)
+		if !ok {
+			if p, ok := asgRes.RawStruct.(*asgtypes.AutoScalingGroup); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		if !ok {
+			continue
+		}
+		for _, inst := range raw.Instances {
+			if inst.InstanceId != nil && *inst.InstanceId == instanceID {
+				ids = append(ids, asgRes.ID)
+				break
+			}
+		}
+	}
+	return relatedResult("asg", ids)
 }
 
 // checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
-func checkEC2Alarms(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if alarms, ok := cache["alarm"]; ok {
-		_ = alarms
+func checkEC2Alarms(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, _, _ := ec2Identity(res)
+	if instanceID == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	alarmList, ok := cache["alarm"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	var ids []string
+	for _, alarmRes := range alarmList {
+		raw, ok := alarmRes.RawStruct.(cwtypes.MetricAlarm)
+		if !ok {
+			if p, ok := alarmRes.RawStruct.(*cwtypes.MetricAlarm); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		if !ok {
+			continue
+		}
+		for _, d := range raw.Dimensions {
+			if d.Value != nil && *d.Value == instanceID {
+				ids = append(ids, alarmRes.ID)
+				break
+			}
+		}
+	}
+	return relatedResult("alarm", ids)
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
-func checkEC2CFN(_ context.Context, _ interface{}, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Check for CFN tags on the instance
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+func checkEC2CFN(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	_, _, stackName := ec2Identity(res)
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	cfnList, ok := cache["cfn"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	var ids []string
+	for _, cfnRes := range cfnList {
+		if cfnRes.ID == stackName || cfnRes.Name == stackName || cfnRes.Fields["stack_name"] == stackName {
+			ids = append(ids, cfnRes.ID)
+			continue
+		}
+		raw, ok := cfnRes.RawStruct.(cfntypes.Stack)
+		if !ok {
+			if p, ok := cfnRes.RawStruct.(*cfntypes.Stack); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		if ok && raw.StackName != nil && *raw.StackName == stackName {
+			ids = append(ids, cfnRes.ID)
+		}
+	}
+	return relatedResult("cfn", ids)
 }
 
 // checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
-func checkEC2EIP(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if eips, ok := cache["eip"]; ok {
-		_ = eips
+func checkEC2EIP(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, _, _ := ec2Identity(res)
+	if instanceID == "" {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+	eipList, ok := cache["eip"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+	}
+	var ids []string
+	for _, eipRes := range eipList {
+		raw, ok := eipRes.RawStruct.(ec2types.Address)
+		if !ok {
+			if p, ok := eipRes.RawStruct.(*ec2types.Address); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		if ok && raw.InstanceId != nil && *raw.InstanceId == instanceID {
+			ids = append(ids, eipRes.ID)
+			continue
+		}
+		if eipRes.Fields["instance_id"] == instanceID {
+			ids = append(ids, eipRes.ID)
+		}
+	}
+	return relatedResult("eip", ids)
 }
 
 // checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
-func checkEC2EBSSnap(_ context.Context, _ interface{}, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if snaps, ok := cache["ebs-snap"]; ok {
-		_ = snaps
+func checkEC2EBSSnap(_ context.Context, _ interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	volumeIDs := ec2VolumeIDs(res)
+	if len(volumeIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+	snapList, ok := cache["ebs-snap"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+	}
+	var ids []string
+	for _, snapRes := range snapList {
+		raw, ok := snapRes.RawStruct.(ec2types.Snapshot)
+		if !ok {
+			if p, ok := snapRes.RawStruct.(*ec2types.Snapshot); ok && p != nil {
+				raw = *p
+				ok = true
+			}
+		}
+		volumeID := snapRes.Fields["volume_id"]
+		if ok && raw.VolumeId != nil {
+			volumeID = *raw.VolumeId
+		}
+		if _, found := volumeIDs[volumeID]; found {
+			ids = append(ids, snapRes.ID)
+		}
+	}
+	return relatedResult("ebs-snap", ids)
 }
 
+func relatedResult(target string, ids []string) resource.RelatedCheckResult {
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: target, Count: 0}
+	}
+	set := make(map[string]struct{}, len(ids))
+	uniq := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, ok := set[id]; ok {
+			continue
+		}
+		set[id] = struct{}{}
+		uniq = append(uniq, id)
+	}
+	sort.Strings(uniq)
+	return resource.RelatedCheckResult{
+		TargetType:  target,
+		Count:       len(uniq),
+		ResourceIDs: uniq,
+	}
+}
+
+func ec2Identity(res resource.Resource) (instanceID, vpcID, stackName string) {
+	instanceID = res.ID
+	if raw, ok := res.RawStruct.(ec2types.Instance); ok {
+		if raw.InstanceId != nil {
+			instanceID = *raw.InstanceId
+		}
+		if raw.VpcId != nil {
+			vpcID = *raw.VpcId
+		}
+		for _, tag := range raw.Tags {
+			if tag.Key == nil || tag.Value == nil {
+				continue
+			}
+			if *tag.Key == "aws:cloudformation:stack-name" {
+				stackName = *tag.Value
+				break
+			}
+		}
+		return instanceID, vpcID, stackName
+	}
+	if raw, ok := res.RawStruct.(*ec2types.Instance); ok && raw != nil {
+		if raw.InstanceId != nil {
+			instanceID = *raw.InstanceId
+		}
+		if raw.VpcId != nil {
+			vpcID = *raw.VpcId
+		}
+		for _, tag := range raw.Tags {
+			if tag.Key == nil || tag.Value == nil {
+				continue
+			}
+			if *tag.Key == "aws:cloudformation:stack-name" {
+				stackName = *tag.Value
+				break
+			}
+		}
+		return instanceID, vpcID, stackName
+	}
+	return instanceID, res.Fields["vpc_id"], ""
+}
+
+func ec2VolumeIDs(res resource.Resource) map[string]struct{} {
+	ids := map[string]struct{}{}
+	raw, ok := res.RawStruct.(ec2types.Instance)
+	if !ok {
+		if p, ok := res.RawStruct.(*ec2types.Instance); ok && p != nil {
+			raw = *p
+			ok = true
+		}
+	}
+	if !ok {
+		return ids
+	}
+	for _, bdm := range raw.BlockDeviceMappings {
+		if bdm.Ebs == nil || bdm.Ebs.VolumeId == nil {
+			continue
+		}
+		ids[*bdm.Ebs.VolumeId] = struct{}{}
+	}
+	return ids
+}

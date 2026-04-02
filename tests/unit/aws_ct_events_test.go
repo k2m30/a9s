@@ -187,6 +187,45 @@ func TestFetchCloudTrailEvents_FieldExtraction(t *testing.T) {
 	}
 }
 
+func TestFetchCloudTrailEvents_FieldExtraction_MultipleResources(t *testing.T) {
+	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
+
+	mock := &mockCloudTrailLookupEventsClient{
+		output: &cloudtrail.LookupEventsOutput{
+			Events: []cloudtrailtypes.Event{
+				{
+					EventId:     aws.String("evt-multi-res"),
+					EventName:   aws.String("AttachVolume"),
+					EventTime:   &eventTime,
+					EventSource: aws.String("ec2.amazonaws.com"),
+					Username:    aws.String("admin"),
+					ReadOnly:    aws.String("false"),
+					Resources: []cloudtrailtypes.Resource{
+						{ResourceType: aws.String("AWS::EC2::Instance"), ResourceName: aws.String("i-0abc")},
+						{ResourceType: aws.String("AWS::EC2::Volume"), ResourceName: aws.String("vol-0def")},
+					},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	r := resources[0]
+	if r.Fields["resource_type"] != "AWS::EC2::Instance, AWS::EC2::Volume" {
+		t.Errorf("Fields[\"resource_type\"]: unexpected value %q", r.Fields["resource_type"])
+	}
+	if r.Fields["resource_name"] != "i-0abc, vol-0def" {
+		t.Errorf("Fields[\"resource_name\"]: unexpected value %q", r.Fields["resource_name"])
+	}
+}
+
 func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
 	// Event with empty Resources slice — resource_type and resource_name should be empty
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)

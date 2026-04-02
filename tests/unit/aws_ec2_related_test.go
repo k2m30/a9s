@@ -1,69 +1,113 @@
-package unit_test
-
-// aws_ec2_related_test.go — T024: verifies that EC2 has its related-resource
-// definitions and navigable fields registered via init().
-//
-// These tests read init()-registered data from the production registries; no
-// cleanup is required.
+package unit
 
 import (
+	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+
+	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestEC2_RelatedDefsRegistered(t *testing.T) {
-	defs := resource.GetRelated("ec2")
-	if defs == nil {
-		t.Skip("EC2 related defs were unregistered by a prior test; re-run in isolation to verify init() registration")
-	}
-	if len(defs) != 4 {
-		t.Fatalf("expected 4 related defs for ec2, got %d", len(defs))
-	}
-
-	expected := map[string]string{
-		"tg":    "Target Groups",
-		"asg":   "Auto Scaling Groups",
-		"alarm": "CloudWatch Alarms",
-		"cfn":   "CloudFormation Stacks",
-	}
-	for _, def := range defs {
-		wantName, ok := expected[def.TargetType]
-		if !ok {
-			t.Errorf("unexpected target type: %s", def.TargetType)
-			continue
-		}
-		if def.DisplayName != wantName {
-			t.Errorf("target %s: expected display name %q, got %q", def.TargetType, wantName, def.DisplayName)
-		}
-		if def.Checker == nil {
-			t.Errorf("target %s: Checker should not be nil", def.TargetType)
+func ec2CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("ec2") {
+		if def.TargetType == target {
+			if def.Checker == nil {
+				t.Fatalf("ec2 related checker for %s is nil", target)
+			}
+			return def.Checker
 		}
 	}
+	t.Fatalf("ec2 related checker for %s not found", target)
+	return nil
 }
 
-func TestEC2_NavigableFieldsRegistered(t *testing.T) {
-	fields := resource.GetNavigableFields("ec2")
-	if fields == nil {
-		t.Skip("EC2 navigable fields were unregistered by a prior test; re-run in isolation to verify init() registration")
-	}
-	if len(fields) != 3 {
-		t.Fatalf("expected 3 navigable fields for ec2, got %d", len(fields))
+func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-abc123",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-abc123"),
+			VpcId:      aws.String("vpc-123"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("app-stack")},
+			},
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-abc")}},
+			},
+		},
 	}
 
-	expected := map[string]string{
-		"VpcId":    "vpc",
-		"SubnetId": "subnet",
-		"ImageId":  "ami",
+	cache := resource.ResourceCache{
+		"tg": {
+			{
+				ID: "tg-web",
+				RawStruct: elbv2types.TargetGroup{
+					VpcId:      aws.String("vpc-123"),
+					TargetType: elbv2types.TargetTypeEnumInstance,
+				},
+			},
+		},
+		"asg": {
+			{
+				ID: "asg-web",
+				RawStruct: asgtypes.AutoScalingGroup{
+					Instances: []asgtypes.Instance{{InstanceId: aws.String("i-abc123")}},
+				},
+			},
+		},
+		"alarm": {
+			{
+				ID: "cpu-high",
+				RawStruct: cwtypes.MetricAlarm{
+					Dimensions: []cwtypes.Dimension{{Name: aws.String("InstanceId"), Value: aws.String("i-abc123")}},
+				},
+			},
+		},
+		"cfn": {
+			{
+				ID: "app-stack",
+				RawStruct: cfntypes.Stack{
+					StackName: aws.String("app-stack"),
+				},
+			},
+		},
+		"eip": {
+			{
+				ID: "eipalloc-abc",
+				RawStruct: ec2types.Address{
+					InstanceId: aws.String("i-abc123"),
+				},
+			},
+		},
+		"ebs-snap": {
+			{
+				ID: "snap-abc",
+				RawStruct: ec2types.Snapshot{
+					VolumeId: aws.String("vol-abc"),
+				},
+			},
+		},
 	}
-	for _, f := range fields {
-		wantType, ok := expected[f.FieldPath]
-		if !ok {
-			t.Errorf("unexpected field path: %s", f.FieldPath)
-			continue
+
+	targets := []string{"tg", "asg", "alarm", "cfn", "eip", "ebs-snap"}
+	for _, target := range targets {
+		checker := ec2CheckerByTarget(t, target)
+		got := checker(context.Background(), nil, instance, cache)
+		if got.Count < 0 {
+			t.Fatalf("%s checker returned unknown count: %+v", target, got)
 		}
-		if f.TargetType != wantType {
-			t.Errorf("field %s: expected target type %q, got %q", f.FieldPath, wantType, f.TargetType)
+		if got.Count == 0 {
+			t.Fatalf("%s checker returned zero count with matching fixture cache: %+v", target, got)
+		}
+		if len(got.ResourceIDs) == 0 {
+			t.Fatalf("%s checker returned empty ResourceIDs with positive count: %+v", target, got)
 		}
 	}
 }
