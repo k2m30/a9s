@@ -46,7 +46,7 @@ func init() {
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
-		{FieldPath: "BlockDeviceMappings.VolumeId", TargetType: "ebs"},
+		{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
 	})
 }

@@ -377,12 +377,8 @@ func TestEC2_022_TabReturnsFocusToLeft(t *testing.T) {
 // EC2-023: r key toggles right column off and on
 // ---------------------------------------------------------------------------
 
-// TestEC2_023_RToggle verifies that pressing r hides the right column, and
-// pressing r again restores it.
-//
-// NOTE: On auto-shown panels, the first r press transitions from auto-shown
-// to explicitly-on (still visible). The second press hides it.
-// This test accounts for that behavior.
+// TestEC2_023_RToggle verifies that pressing r hides the auto-shown right
+// column, and pressing r again restores it explicitly.
 func TestEC2_023_RToggle(t *testing.T) {
 	d, cleanup := ec2StoryDetail(t, 120, 30, true)
 	defer cleanup()
@@ -392,26 +388,20 @@ func TestEC2_023_RToggle(t *testing.T) {
 		t.Skip("right column not auto-shown at width=120; cannot test r toggle")
 	}
 
-	// First r: transitions auto-shown → explicitly-on (still visible).
+	// First r: hide the auto-shown column.
 	d, _ = pressDetailKey(d, "r")
 	plain1 := stripAnsi(d.View())
+	if strings.Contains(plain1, "RELATED") {
+		t.Errorf("EC2-023: after first r press, RELATED header must NOT appear;\ngot:\n%s", plain1)
+	}
 
-	// Second r: hides the column.
+	// Second r: restores the column.
 	d, _ = pressDetailKey(d, "r")
 	plain2 := stripAnsi(d.View())
 
-	if strings.Contains(plain2, "RELATED") {
-		t.Errorf("EC2-023: after second r press, RELATED header must NOT appear;\ngot:\n%s", plain2)
+	if !strings.Contains(plain2, "RELATED") {
+		t.Errorf("EC2-023: after second r press, RELATED header must reappear;\ngot:\n%s", plain2)
 	}
-
-	// Third r: restores the column.
-	d, _ = pressDetailKey(d, "r")
-	plain3 := stripAnsi(d.View())
-
-	if !strings.Contains(plain3, "RELATED") {
-		t.Errorf("EC2-023: after third r press, RELATED header must reappear;\ngot:\n%s", plain3)
-	}
-	_ = plain1
 }
 
 // TestEC2_023_RToggleHidesOnNarrowIsSilent verifies that pressing r on a
@@ -559,8 +549,8 @@ func TestEC2_043_AllCount0_NoCursorInRightCol(t *testing.T) {
 	}
 }
 
-// TestEC2_043_AllCount0_SecondTabReturnsFocus verifies that Tab again after
-// focusing an all-count=0 right column returns focus to the left column.
+// TestEC2_043_AllCount0_SecondTabReturnsFocus verifies that an all-count=0
+// right column cannot take focus, so Tab leaves the detail view unchanged.
 func TestEC2_043_AllCount0_SecondTabReturnsFocus(t *testing.T) {
 	d, cleanup := ec2StoryDetail(t, 120, 30, true)
 	defer cleanup()
@@ -575,17 +565,13 @@ func TestEC2_043_AllCount0_SecondTabReturnsFocus(t *testing.T) {
 	d = deliverRelatedResult(d, "alarm", 0)
 	d = deliverRelatedResult(d, "cfn", 0)
 
-	// Tab to right column.
-	d, _ = pressDetailTab(d)
-	viewFocused := d.View()
+	beforeTab := d.View()
 
-	// Tab again to return.
+	// Tab should not enter the right column.
 	d, _ = pressDetailTab(d)
-	viewUnfocused := d.View()
-
-	// The two views should differ (focus highlight removed).
-	if viewFocused == viewUnfocused {
-		t.Errorf("EC2-043: second Tab from all-count=0 right column must return focus to left (views must differ)")
+	afterTab := d.View()
+	if beforeTab != afterTab {
+		t.Errorf("EC2-043: Tab must not move focus into an all-count=0 right column")
 	}
 }
 
@@ -731,14 +717,12 @@ func TestEC2_049_NavigableFieldsWorkWithRightColHidden(t *testing.T) {
 		t.Skip("right column not auto-shown; skipping EC2-049")
 	}
 
-	// First r: transition auto-shown → explicitly-on.
-	d, _ = pressDetailKey(d, "r")
-	// Second r: hide the right column.
+	// First r hides the auto-shown column.
 	d, _ = pressDetailKey(d, "r")
 
 	// Verify right column is hidden.
 	if strings.Contains(stripAnsi(d.View()), "RELATED") {
-		t.Fatal("EC2-049: right column should be hidden after pressing r twice")
+		t.Fatal("EC2-049: right column should be hidden after pressing r once")
 	}
 
 	// Press j to move cursor to VpcId (index 1 in config: InstanceId=0, VpcId=1, SubnetId=2).

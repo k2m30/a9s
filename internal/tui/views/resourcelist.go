@@ -158,15 +158,33 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 		}
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.pagination != nil && m.pagination.IsTruncated && !m.loadingMore {
+			if _, ok := m.exactRelatedTargetID(); ok {
+				m.loadingMore = true
+				rt := m.typeDef.ShortName
+				token := m.pagination.NextToken
+				pc := m.parentContext
+				return m, func() tea.Msg {
+					return messages.LoadMoreMsg{
+						ResourceType:      rt,
+						ContinuationToken: token,
+						ParentContext:     pc,
+					}
+				}
+			}
+		}
 		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.ShortName == "ami" {
 			if targetID, ok := m.exactRelatedTargetID(); ok {
 				m.autoOpenSingleDetail = false
 				stub := resource.Resource{
-					ID:   targetID,
-					Name: targetID,
+					ID:     targetID,
+					Name:   targetID,
+					Status: "-",
 					Fields: map[string]string{
-						"ImageId": targetID,
-						"Name":    targetID,
+						"image_id": targetID,
+						"ImageId":  targetID,
+						"name":     targetID,
+						"Name":     targetID,
 					},
 				}
 				return m, func() tea.Msg {

@@ -195,6 +195,76 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail(t *t
 	}
 }
 
+// TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound verifies
+// that exact-ID related navigation does not dead-end on page 1 when the known
+// target lives on a later page.
+func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t *testing.T) {
+	m := newRelatedDemoModel(t)
+
+	ec2Res := resource.Resource{
+		ID:     "i-0a1b2c3d4e5f60001",
+		Name:   "web-prod-01",
+		Status: "running",
+		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+	}
+	m = navigateToEC2DetailRelated(t, m, ec2Res)
+
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+		TargetType:     "alarm",
+		SourceResource: ec2Res,
+		TargetID:       "alarm-page2-target",
+	})
+
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{ID: "alarm-page1-other", Name: "page1-other", Status: "ok"},
+		},
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "page-2",
+			PageSize:    1,
+			TotalHint:   -1,
+		},
+	})
+	m = m2
+	if cmd == nil {
+		t.Fatal("first page without the exact target should request LoadMore")
+	}
+	loadMore, ok := cmd().(messages.LoadMoreMsg)
+	if !ok {
+		t.Fatalf("expected LoadMoreMsg after page-1 miss, got %T", cmd())
+	}
+	if loadMore.ContinuationToken != "page-2" {
+		t.Fatalf("LoadMoreMsg continuation token = %q, want %q", loadMore.ContinuationToken, "page-2")
+	}
+
+	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{ID: "alarm-page2-target", Name: "page2-target", Status: "alarm"},
+			{ID: "alarm-page2-other", Name: "page2-other", Status: "ok"},
+		},
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			PageSize:    2,
+			TotalHint:   3,
+		},
+		Append: true,
+	})
+	m = m2
+	if cmd != nil {
+		if follow := cmd(); follow != nil {
+			m, _ = relatedApplyMsg(m, follow)
+		}
+	}
+
+	view := stripAnsi(relatedViewContent(m))
+	if !strings.Contains(view, "detail --") || !strings.Contains(view, "alarm-page2-target") {
+		t.Fatalf("exact-ID related navigation should auto-open detail once a later page contains the target; got:\n%s", view)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Count>1: multiple related resources must be filtered to only those IDs
 // ---------------------------------------------------------------------------
@@ -257,6 +327,73 @@ func TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount(t *testing.T) {
 	// Frame title should indicate count=2 for filtered alarm list
 	if !strings.Contains(view, "2") {
 		t.Errorf("frame/view should indicate count=2 for filtered alarm list; got:\n%s", view)
+	}
+}
+
+// TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained verifies that
+// when a cache-hit related list is paginated, loading more keeps the exact-ID
+// related subset instead of appending unrelated rows from later pages.
+func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing.T) {
+	m := newRelatedDemoModel(t)
+
+	// Prime cache via a real alarm list load so pagination metadata is retained.
+	m, _ = relatedApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "alarm",
+	})
+	m = applyRelatedResourcesLoaded(m, "alarm", []resource.Resource{
+		{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
+		{ID: "alarm-unrelated-1", Name: "unrelated-one", Status: "ok"},
+	})
+	m, _ = relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
+			{ID: "alarm-unrelated-1", Name: "unrelated-one", Status: "ok"},
+		},
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "page-2",
+			PageSize:    2,
+			TotalHint:   -1,
+		},
+	})
+
+	ec2Res := resource.Resource{
+		ID:     "i-0a1b2c3d4e5f60001",
+		Name:   "web-prod-01",
+		Status: "running",
+		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+	}
+	m = navigateToEC2DetailRelated(t, m, ec2Res)
+
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+		TargetType:     "alarm",
+		SourceResource: ec2Res,
+		RelatedIDs:     []string{"alarm-related-1", "alarm-related-2"},
+	})
+
+	m2, _ := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{ID: "alarm-related-2", Name: "related-two", Status: "alarm"},
+			{ID: "alarm-unrelated-2", Name: "unrelated-two", Status: "ok"},
+		},
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			PageSize:    2,
+			TotalHint:   4,
+		},
+		Append: true,
+	})
+	m = m2
+
+	view := stripAnsi(relatedViewContent(m))
+	if !strings.Contains(view, "related-one") || !strings.Contains(view, "related-two") {
+		t.Fatalf("related list should continue to show all matching related IDs after load more; got:\n%s", view)
+	}
+	if strings.Contains(view, "unrelated-one") || strings.Contains(view, "unrelated-two") {
+		t.Fatalf("related list must not leak unrelated rows after load more; got:\n%s", view)
 	}
 }
 

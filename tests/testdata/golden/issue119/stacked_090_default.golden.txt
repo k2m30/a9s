@@ -20,11 +20,11 @@
 │     GroupName:  acme-web-alb-sg                          │                             │
 │     GroupId:  sg-0bbb222222222222b                       │                             │
 │     GroupName:  acme-web-app-sg                          │                             │
+│ BlockDeviceMappings:                                     │                             │
+│     DeviceName:  /dev/xvda                               │                             │
+│     Ebs:                                                 │                             │
+│     Status:  attached                                    │                             │
+│     VolumeId:  vol-0a1b2c3d4e5f60002                     │                             │
 │ EbsOptimized:         -                                  │                             │
 │ MetadataOptions:      -                                  │                             │
-│ LaunchTime:           2025-11-15 08:30                   │                             │
-│ Architecture:         x86_64                             │                             │
-│ Platform:             -                                  │                             │
-│ Tags:                                                    │                             │
-│     Key:  Name                                           │                             │
 └────────────────────────────────────────────────────────────────────────────────────────┘

@@ -142,27 +142,64 @@ func (m *DetailModel) buildFieldList() {
 		return
 	}
 	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)
-	// Post-process: annotate sub-fields that match a navigable path "Parent.SubKey".
+	// Post-process: annotate sub-fields that match a navigable path.
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
-	// Sub-field Value is the raw YAML line (e.g., "- GroupId: sg-xxx" or "  GroupName: foo").
-	// Trim leading "- " and whitespace to extract the bare key for path composition.
+	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId
+	// remain navigable without being duplicated as top-level fields.
+	currentPath := ""
+	ancestorByLevel := map[int]string{}
 	for i, item := range items {
+		if item.IsHeader {
+			currentPath = item.Path
+			clear(ancestorByLevel)
+			continue
+		}
 		if !item.IsSubField {
 			continue
 		}
-		// Strip leading whitespace and list-item prefix ("- ").
-		rawLine := strings.TrimSpace(item.Value)
-		rawLine = strings.TrimPrefix(rawLine, "- ")
-		subKey, subVal, hasSep := strings.Cut(rawLine, ": ")
+		if item.Path != currentPath {
+			currentPath = item.Path
+			clear(ancestorByLevel)
+		}
+		rawLine := item.Value
+		trimmed := strings.TrimSpace(rawLine)
+		if trimmed == "" {
+			continue
+		}
+		level := 0
+		if leading := len(rawLine) - len(strings.TrimLeft(rawLine, " ")); leading > 0 {
+			level = leading / 2
+		}
+		if strings.HasPrefix(trimmed, "- ") {
+			trimmed = strings.TrimPrefix(trimmed, "- ")
+		}
+		subKey, subVal, hasSep := strings.Cut(trimmed, ":")
 		if !hasSep {
 			continue
 		}
-		composedPath := item.Path + "." + subKey
-		if tt, ok := navMap[composedPath]; ok {
+		subKey = strings.TrimSpace(subKey)
+		subVal = strings.TrimSpace(subVal)
+		for depth := range ancestorByLevel {
+			if depth >= level {
+				delete(ancestorByLevel, depth)
+			}
+		}
+		pathParts := []string{item.Path}
+		for depth := 0; depth < level; depth++ {
+			if ancestor, ok := ancestorByLevel[depth]; ok && ancestor != "" {
+				pathParts = append(pathParts, ancestor)
+			}
+		}
+		pathParts = append(pathParts, subKey)
+		composedPath := strings.Join(pathParts, ".")
+		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
 			items[i].Key = subKey
 			items[i].Value = subVal
+		}
+		if subVal == "" {
+			ancestorByLevel[level] = subKey
 		}
 	}
 	m.fieldList = items
@@ -523,6 +560,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				// First explicit toggle hides the auto-shown column.
 				m.rightColAutoShown = false
 				m.rightColVisible = false
+				m.rightCol.SetFocused(false)
 				m.recalcViewportWidth()
 				return m, nil
 			}
@@ -541,6 +579,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 					}
 				}
 			}
+			m.rightCol.SetFocused(false)
 			m.recalcViewportWidth()
 			return m, nil
 		case key.Matches(msg, m.keys.Enter):
@@ -667,6 +706,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			if m.rightColAutoShown {
 				m.rightColAutoShown = false
 				m.rightColVisible = false
+				m.rightCol.SetFocused(false)
 				m.recalcViewportWidth()
 				return m, nil
 			}
@@ -684,6 +724,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 					}
 				}
 			}
+			m.rightCol.SetFocused(false)
 			m.recalcViewportWidth()
 			return m, nil
 		}
@@ -822,6 +863,8 @@ func (m *DetailModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
 
+	wasShowing := m.rightColShowing()
+
 	// Auto-show right column when wide enough and related defs exist:
 	// - on first SetSize call, and
 	// - on later resizes only if user hasn't explicitly toggled visibility.
@@ -830,6 +873,10 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.rightColAutoShown = true
 		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
 		m.rightCol.keys = m.keys
+	} else if w < 60 && wasShowing {
+		m.rightColAutoShown = false
+		m.rightColVisible = false
+		m.rightCol.SetFocused(false)
 	}
 
 	viewportW := w

@@ -28,6 +28,21 @@ func (m *capturingCloudTrailClient) LookupEvents(ctx context.Context, input *clo
 	return m.output, m.err
 }
 
+type pagedCloudTrailClient struct {
+	outputs []*cloudtrail.LookupEventsOutput
+	inputs  []*cloudtrail.LookupEventsInput
+}
+
+func (m *pagedCloudTrailClient) LookupEvents(ctx context.Context, input *cloudtrail.LookupEventsInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+	m.inputs = append(m.inputs, input)
+	if len(m.outputs) == 0 {
+		return &cloudtrail.LookupEventsOutput{}, nil
+	}
+	out := m.outputs[0]
+	m.outputs = m.outputs[1:]
+	return out, nil
+}
+
 // ---------------------------------------------------------------------------
 // CloudTrail Events fetcher tests
 // ---------------------------------------------------------------------------
@@ -126,6 +141,42 @@ func TestFetchCloudTrailEvents_ErrorResponse(t *testing.T) {
 	}
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d resources", len(resources))
+	}
+}
+
+func TestFetchCloudTrailEvents_WalksAllPages(t *testing.T) {
+	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
+	mock := &pagedCloudTrailClient{
+		outputs: []*cloudtrail.LookupEventsOutput{
+			{
+				Events: []cloudtrailtypes.Event{
+					{EventId: aws.String("evt-page-1"), EventName: aws.String("First"), EventTime: &eventTime},
+				},
+				NextToken: aws.String("page-2"),
+			},
+			{
+				Events: []cloudtrailtypes.Event{
+					{EventId: aws.String("evt-page-2"), EventName: aws.String("Second"), EventTime: &eventTime},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 2 {
+		t.Fatalf("expected both pages to be collected, got %d resources", len(resources))
+	}
+	if len(mock.inputs) != 2 {
+		t.Fatalf("expected 2 LookupEvents calls, got %d", len(mock.inputs))
+	}
+	if mock.inputs[0].NextToken != nil {
+		t.Fatalf("first LookupEvents call should not set NextToken, got %q", aws.ToString(mock.inputs[0].NextToken))
+	}
+	if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page-2" {
+		t.Fatalf("second LookupEvents call should use page-2 token, got %v", mock.inputs[1].NextToken)
 	}
 }
 

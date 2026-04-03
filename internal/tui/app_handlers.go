@@ -745,9 +745,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 		}
-		// Exact AMI navigation should fetch by image ID instead of falling back to
-		// the owned-AMI list, which misses public and third-party images.
-		if msg.TargetType == "ami" {
+		// Exact AMI navigation should fetch by image ID in live mode instead of
+		// falling back to the owned-AMI list, which misses public and third-party images.
+		// In demo/tests, preserve the list-load flow so synthetic ResourcesLoadedMsg
+		// can still auto-open the exact target without requiring AWS clients.
+		if msg.TargetType == "ami" && m.clients != nil && !m.demoMode {
 			return m, m.fetchAMIDetail(msg.TargetID)
 		}
 		// Resource not in cache — fetch target list and preserve exact-ID filtering.
@@ -818,6 +820,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			)
 			rl.SetDisplayName(relatedListBaseName(*rt))
 			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+			rl.SetRelatedIDFilter(msg.RelatedIDs)
 			rl.SetEscPops(true)
 			rl.SetSize(m.innerSize())
 			m.pushView(&rl)

@@ -82,10 +82,7 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 		t.Fatalf("precondition failed: expected RELATED at wide width before explicit toggle; got:\n%s", before)
 	}
 
-	// First r transitions auto-shown -> explicitly on (still visible).
-	m2, _ = rootApplyMsg(m, rootKeyPress("r"))
-	m = m2
-	// Second r hides.
+	// First r hides the auto-shown column.
 	m2, _ = rootApplyMsg(m, rootKeyPress("r"))
 	m = m2
 	hidden := stripANSI(rootViewContent(m))

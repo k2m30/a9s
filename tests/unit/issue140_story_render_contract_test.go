@@ -148,12 +148,9 @@ func TestIssue140_Story_EC2_023_ToggleRightColumnRenderContract(t *testing.T) {
 	}
 
 	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-	// First press on auto-shown panel transitions auto->explicit while still visible.
-	_ = d
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
 	hidden := stripAnsi(d.View())
 	if strings.Contains(hidden, "RELATED") {
-		t.Fatalf("EC2-023: second r press should hide right column; got:\n%s", hidden)
+		t.Fatalf("EC2-023: first r press should hide right column; got:\n%s", hidden)
 	}
 
 	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
