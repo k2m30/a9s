@@ -105,7 +105,7 @@ jobs:
       - name: Run tests with coverage
         run: xvfb-run go test ./internal/... ./tests/... -coverpkg=./internal/... -coverprofile=coverage.out -covermode=atomic -timeout 120s -race
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.out
         env:
