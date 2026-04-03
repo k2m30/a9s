@@ -51,6 +51,19 @@ func init() {
 	})
 }
 
+// assertStruct extracts a value of type T from an interface that may hold
+// either T or *T. Used for RawStruct type assertions across related checkers.
+func assertStruct[T any](v any) (T, bool) {
+	if val, ok := v.(T); ok {
+		return val, true
+	}
+	if p, ok := v.(*T); ok && p != nil {
+		return *p, true
+	}
+	var zero T
+	return zero, false
+}
+
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
 // of instances. Used by existing tests and the legacy fetcher.
 func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]resource.Resource, error) {
@@ -195,13 +208,7 @@ func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource
 	}
 	var ids []string
 	for _, tgRes := range tgList {
-		raw, ok := tgRes.RawStruct.(elbv2types.TargetGroup)
-		if !ok {
-			if p, ok := tgRes.RawStruct.(*elbv2types.TargetGroup); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct)
 		targetType := tgRes.Fields["target_type"]
 		tgVpcID := tgRes.Fields["vpc_id"]
 		if ok {
@@ -237,13 +244,7 @@ func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource
 	}
 	var ids []string
 	for _, asgRes := range asgList {
-		raw, ok := asgRes.RawStruct.(asgtypes.AutoScalingGroup)
-		if !ok {
-			if p, ok := asgRes.RawStruct.(*asgtypes.AutoScalingGroup); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[asgtypes.AutoScalingGroup](asgRes.RawStruct)
 		if !ok {
 			continue
 		}
@@ -272,13 +273,7 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
-		raw, ok := alarmRes.RawStruct.(cwtypes.MetricAlarm)
-		if !ok {
-			if p, ok := alarmRes.RawStruct.(*cwtypes.MetricAlarm); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
 		if !ok {
 			continue
 		}
@@ -311,13 +306,7 @@ func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource
 			ids = append(ids, cfnRes.ID)
 			continue
 		}
-		raw, ok := cfnRes.RawStruct.(cfntypes.Stack)
-		if !ok {
-			if p, ok := cfnRes.RawStruct.(*cfntypes.Stack); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
 		if ok && raw.StackName != nil && *raw.StackName == stackName {
 			ids = append(ids, cfnRes.ID)
 		}
@@ -340,13 +329,7 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 	}
 	var ids []string
 	for _, eipRes := range eipList {
-		raw, ok := eipRes.RawStruct.(ec2types.Address)
-		if !ok {
-			if p, ok := eipRes.RawStruct.(*ec2types.Address); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[ec2types.Address](eipRes.RawStruct)
 		if ok && raw.InstanceId != nil && *raw.InstanceId == instanceID {
 			ids = append(ids, eipRes.ID)
 			continue
@@ -394,13 +377,7 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 	}
 	var ids []string
 	for _, ngRes := range ngList {
-		raw, ok := ngRes.RawStruct.(ekstypes.Nodegroup)
-		if !ok {
-			if p, ok := ngRes.RawStruct.(*ekstypes.Nodegroup); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[ekstypes.Nodegroup](ngRes.RawStruct)
 		rawClusterName := ngRes.Fields["cluster_name"]
 		rawNodegroupName := ngRes.Fields["nodegroup_name"]
 		if ok {
@@ -440,13 +417,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res reso
 	}
 	var ids []string
 	for _, eventRes := range eventList {
-		raw, ok := eventRes.RawStruct.(cloudtrailtypes.Event)
-		if !ok {
-			if p, ok := eventRes.RawStruct.(*cloudtrailtypes.Event); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct)
 		if ok {
 			if cloudTrailEventMentionsInstance(raw, instanceID) {
 				ids = append(ids, eventRes.ID)
@@ -475,13 +446,7 @@ func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Reso
 	}
 	var ids []string
 	for _, snapRes := range snapList {
-		raw, ok := snapRes.RawStruct.(ec2types.Snapshot)
-		if !ok {
-			if p, ok := snapRes.RawStruct.(*ec2types.Snapshot); ok && p != nil {
-				raw = *p
-				ok = true
-			}
-		}
+		raw, ok := assertStruct[ec2types.Snapshot](snapRes.RawStruct)
 		volumeID := snapRes.Fields["volume_id"]
 		if ok && raw.VolumeId != nil {
 			volumeID = *raw.VolumeId
@@ -623,13 +588,7 @@ func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID str
 
 func ec2VolumeIDs(res resource.Resource) map[string]struct{} {
 	ids := map[string]struct{}{}
-	raw, ok := res.RawStruct.(ec2types.Instance)
-	if !ok {
-		if p, ok := res.RawStruct.(*ec2types.Instance); ok && p != nil {
-			raw = *p
-			ok = true
-		}
-	}
+	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
 		return ids
 	}

@@ -750,7 +750,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		// In demo/tests, preserve the list-load flow so synthetic ResourcesLoadedMsg
 		// can still auto-open the exact target without requiring AWS clients.
 		if msg.TargetType == "ami" && m.clients != nil && !m.demoMode {
-			return m, m.fetchAMIDetail(msg.TargetID)
+			cmd := m.fetchAMIDetail(msg.TargetID)
+			return m, cmd
 		}
 		// Resource not in cache — fetch target list and preserve exact-ID filtering.
 		m.flash = flashState{

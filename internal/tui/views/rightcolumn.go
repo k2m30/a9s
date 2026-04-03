@@ -232,34 +232,15 @@ func (m rightColumnModel) View() string {
 	lines = append(lines, styles.DimText.Render(centeredHeader))
 
 	visible := m.visibleIndexes()
-	if len(m.rows) == 0 {
+	switch {
+	case len(m.rows) == 0:
 		lines = append(lines, styles.DimText.Render("  No related types registered"))
-	} else if len(visible) == 0 {
+	case len(visible) == 0:
 		lines = append(lines, styles.DimText.Render("  No matches"))
-	} else {
+	default:
 		usableHeight := m.height - 1 // after header
 		if usableHeight < 1 {
 			usableHeight = 1
-		}
-		// Keep selected row visible within the rendering window.
-		selectedPos := 0
-		for i, idx := range visible {
-			if idx == m.cursor {
-				selectedPos = i
-				break
-			}
-		}
-		if selectedPos < m.scrollOffset {
-			m.scrollOffset = selectedPos
-		}
-		if selectedPos >= m.scrollOffset+usableHeight {
-			m.scrollOffset = selectedPos - usableHeight + 1
-		}
-		if m.scrollOffset < 0 {
-			m.scrollOffset = 0
-		}
-		if m.scrollOffset > len(visible)-1 {
-			m.scrollOffset = len(visible) - 1
 		}
 
 		start := m.scrollOffset
@@ -403,6 +384,37 @@ func (m *rightColumnModel) ensureCursorValid() {
 			}
 		}
 	}
+	m.ensureScrollVisible()
+}
+
+func (m *rightColumnModel) ensureScrollVisible() {
+	visible := m.visibleIndexes()
+	if len(visible) == 0 {
+		return
+	}
+	usableHeight := m.height - 1
+	if usableHeight < 1 {
+		usableHeight = 1
+	}
+	selectedPos := 0
+	for i, idx := range visible {
+		if idx == m.cursor {
+			selectedPos = i
+			break
+		}
+	}
+	if selectedPos < m.scrollOffset {
+		m.scrollOffset = selectedPos
+	}
+	if selectedPos >= m.scrollOffset+usableHeight {
+		m.scrollOffset = selectedPos - usableHeight + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+	if m.scrollOffset > len(visible)-1 {
+		m.scrollOffset = len(visible) - 1
+	}
 }
 
 func (m *rightColumnModel) moveCursor(dir int) {
@@ -436,6 +448,7 @@ func (m *rightColumnModel) moveCursor(dir int) {
 		idx := visible[pos]
 		if !hasActionable || isActionableRow(m.rows[idx]) {
 			m.cursor = idx
+			m.ensureScrollVisible()
 			return
 		}
 	}

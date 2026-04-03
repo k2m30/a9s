@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,11 +73,15 @@ func TestIssue140ScenarioGoldens(t *testing.T) {
 			t.Fatalf("read %s: %v (generate with UPDATE_GOLDEN=1)", ansiPath, err)
 		}
 
-		if !bytes.Equal(expectedPlain, []byte(plain[name])) {
-			t.Fatalf("plain golden mismatch for scenario %s\n--- expected ---\n%s\n--- actual ---\n%s", name, string(expectedPlain), plain[name])
+		actualPlain := strings.ReplaceAll(plain[name], "\r\n", "\n")
+		goldenPlain := strings.ReplaceAll(string(expectedPlain), "\r\n", "\n")
+		if goldenPlain != actualPlain {
+			t.Fatalf("plain golden mismatch for scenario %s\n--- expected ---\n%s\n--- actual ---\n%s", name, goldenPlain, actualPlain)
 		}
-		if !bytes.Equal(expectedANSI, []byte(ansi[name])) {
-			t.Fatalf("ANSI golden mismatch for scenario %s\n--- expected ---\n%s\n--- actual ---\n%s", name, string(expectedANSI), ansi[name])
+		actualANSI := strings.ReplaceAll(ansi[name], "\r\n", "\n")
+		goldenANSI := strings.ReplaceAll(string(expectedANSI), "\r\n", "\n")
+		if goldenANSI != actualANSI {
+			t.Fatalf("ANSI golden mismatch for scenario %s\n--- expected ---\n%s\n--- actual ---\n%s", name, goldenANSI, actualANSI)
 		}
 	}
 }
