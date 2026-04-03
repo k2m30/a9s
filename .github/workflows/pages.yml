@@ -24,7 +24,7 @@ jobs:
         with:
           hugo-version: 'latest'
       - run: hugo -s website --minify
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: website/public
 
