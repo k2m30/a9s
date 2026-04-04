@@ -759,16 +759,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			isError: false,
 			active:  true,
 		}
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-		rl.SetDisplayName(relatedListBaseName(*rt))
-		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-		rl.SetPendingFilter(msg.TargetID)
-		rl.SetRelatedIDFilter([]string{msg.TargetID})
-		rl.SetAutoOpenSingleDetail(true)
-		rl.SetEscPops(true)
-		rl.SetSize(m.innerSize())
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
+			pendingFilter:        msg.TargetID,
+			relatedIDs:           []string{msg.TargetID},
+			autoOpenSingleDetail: true,
+		})
 		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
@@ -786,16 +781,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			}
 		}
 		// Not in cache — fall through to list with pending filter
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-		rl.SetDisplayName(relatedListBaseName(*rt))
-		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-		rl.SetPendingFilter(targetID)
-		rl.SetRelatedIDFilter([]string{targetID})
-		rl.SetAutoOpenSingleDetail(true)
-		rl.SetEscPops(true)
-		rl.SetSize(m.innerSize())
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
+			pendingFilter:        targetID,
+			relatedIDs:           []string{targetID},
+			autoOpenSingleDetail: true,
+		})
 		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
@@ -828,26 +818,45 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			return m, nil
 		}
 		// Cache miss: fetch and preserve exact-ID filtering.
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-		rl.SetDisplayName(relatedListBaseName(*rt))
-		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-		rl.SetRelatedIDFilter(msg.RelatedIDs)
-		rl.SetEscPops(true)
-		rl.SetSize(m.innerSize())
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
+			relatedIDs: msg.RelatedIDs,
+		})
 		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
-	// Fallback: no IDs specified or cache miss for multiple IDs — push unfiltered list.
-	rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-	rl.SetDisplayName(relatedListBaseName(*rt))
-	rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+	// Fallback: no IDs specified — push unfiltered list.
+	initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{})
+	return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+}
+
+// relatedListOpts configures a related-navigation resource list.
+type relatedListOpts struct {
+	pendingFilter        string
+	relatedIDs           []string
+	autoOpenSingleDetail bool
+}
+
+// newRelatedList creates a ResourceListModel configured for related-resource navigation,
+// pushes it onto the view stack, and returns the init command.
+// The caller decides whether to batch the fetch command (cache-hit branches skip it).
+func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resource, opts relatedListOpts) tea.Cmd {
+	rl := views.NewResourceList(rt, m.viewConfig, m.keys)
+	rl.SetDisplayName(relatedListBaseName(rt))
+	rl.SetTitleSuffix(relatedTitleSuffix(src))
+	if opts.pendingFilter != "" {
+		rl.SetPendingFilter(opts.pendingFilter)
+	}
+	if len(opts.relatedIDs) > 0 {
+		rl.SetRelatedIDFilter(opts.relatedIDs)
+	}
+	if opts.autoOpenSingleDetail {
+		rl.SetAutoOpenSingleDetail(true)
+	}
 	rl.SetEscPops(true)
 	rl.SetSize(m.innerSize())
 	rl, initCmd := rl.Init()
 	m.pushView(&rl)
-	return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+	return initCmd
 }
 
 func relatedTitleSuffix(src resource.Resource) string {
