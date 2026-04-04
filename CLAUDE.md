@@ -1,13 +1,14 @@
-# a9s Development Guidelines
+# CLAUDE.md
 
-Auto-generated from all feature plans. Last updated: 2026-04-01
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# a9s Development Guidelines
 
 ## GitHub
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
-- N/A (session state only; no persistence) (006-related-views-infra)
 
 ## Project Structure
 
@@ -41,19 +42,28 @@ specs/           # feature specifications
 ## Commands
 
 - `go build -o a9s ./cmd/a9s/` — build the binary
-- `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
+- `go test ./tests/unit/ -count=1 -timeout 120s` — run all unit tests
+- `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
 - `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
 - `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
+- `./a9s --demo` — run the app with synthetic fixture data (no AWS credentials needed)
 
 ## Prerequisites
 
 - Go 1.26+ (`brew install go`)
 - golangci-lint v2.11+ (`brew install golangci-lint`)
 - govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`)
+
+## Architecture Principles
+
+- **Read-only by design** — a9s never makes write calls to AWS
+- **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
+- **Message-driven** — views communicate via typed messages, never import each other
+- **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`
 
 ## Code Style
 
