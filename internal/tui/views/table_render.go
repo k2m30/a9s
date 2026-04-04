@@ -101,9 +101,7 @@ func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 	case SortID:
 		isActive = strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID")
 	case SortAge:
-		isActive = strings.Contains(strings.ToLower(c.key), "time") || strings.Contains(strings.ToLower(c.key), "date") ||
-			strings.Contains(strings.ToLower(c.key), "launch") || strings.Contains(strings.ToLower(c.key), "creation") ||
-			strings.Contains(strings.ToLower(c.title), "time") || strings.Contains(strings.ToLower(c.title), "date")
+		isActive = isAgeKey(c.key) || isAgeKey(c.title)
 	}
 	if isActive {
 		if m.sortAsc {
