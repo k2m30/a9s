@@ -653,6 +653,17 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 	return m.rightColAutoShown
 }
 
+// ApplyRelatedResults injects cached related check results into the right column,
+// avoiding re-dispatch of async checkers. Called by root model on detail re-entry.
+func (m *DetailModel) ApplyRelatedResults(results []resource.RelatedCheckResult) {
+	for _, r := range results {
+		m.rightCol, _ = m.rightCol.Update(messages.RelatedCheckResultMsg{
+			ResourceType: m.resourceType,
+			Result:       r,
+		})
+	}
+}
+
 // ConsumesEscapeLocally reports whether Escape should be handled inside the
 // detail view instead of by the root view-stack pop logic.
 func (m DetailModel) ConsumesEscapeLocally() bool {

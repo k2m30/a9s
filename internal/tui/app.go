@@ -94,6 +94,12 @@ type Model struct {
 	availTotal      int      // total types to probe in current gen
 
 	resourceCache map[string]*resourceCacheEntry
+	relatedCache  map[string][]resource.RelatedCheckResult
+}
+
+// relatedCacheKey builds the map key for relatedCache lookups.
+func relatedCacheKey(resourceType, resourceID string) string {
+	return resourceType + ":" + resourceID
 }
 
 // Option configures the root Model.
@@ -140,6 +146,7 @@ func New(profile, region string, opts ...Option) Model {
 		viewConfig:    cfg,
 		configErr:     cfgErr,
 		resourceCache: make(map[string]*resourceCacheEntry),
+		relatedCache:  make(map[string][]resource.RelatedCheckResult),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -274,6 +281,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResultMsg:
+		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
+		// Fall back to the active detail view's resource ID when SourceResourceID is unset
+		// (e.g., manually-injected test messages or legacy callers).
+		sourceID := msg.SourceResourceID
+		if sourceID == "" {
+			if d, ok := m.activeView().(*views.DetailModel); ok {
+				sourceID = d.SourceResource().ID
+			}
+		}
+		if sourceID != "" {
+			ck := relatedCacheKey(msg.ResourceType, sourceID)
+			m.relatedCache[ck] = append(m.relatedCache[ck], msg.Result)
+		}
 		return m.updateActiveView(msg)
 	case messages.RelatedNavigateMsg:
 		return m.handleRelatedNavigate(msg)

@@ -134,8 +134,9 @@ type RelatedCheckStartedMsg struct {
 // RelatedCheckResultMsg delivers one checker's async result back to the detail view.
 // The root model delegates this to the active view (detail model's rightColumnModel).
 type RelatedCheckResultMsg struct {
-	ResourceType string
-	Result       resource.RelatedCheckResult
+	ResourceType     string
+	SourceResourceID string // ID of the source resource (for cache keying)
+	Result           resource.RelatedCheckResult
 }
 
 // RelatedNavigateMsg requests navigation to a related resource type.
