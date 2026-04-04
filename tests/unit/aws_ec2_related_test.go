@@ -198,3 +198,151 @@ func TestEC2RelatedRegistry_CloudTrailEventsHasChecker(t *testing.T) {
 	}
 	t.Fatal("ec2 related definition for ct-events not found")
 }
+
+// ---------------------------------------------------------------------------
+// checkEC2EBS — direct checker coverage (0% before this test)
+// ---------------------------------------------------------------------------
+
+func TestEC2RelatedCheckers_EBS_MatchesVolumeIDs(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-ebs-multi",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-ebs-multi"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-abc")}},
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-def")}},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 2 {
+		t.Errorf("checkEC2EBS: expected count=2, got %d", got.Count)
+	}
+	if len(got.ResourceIDs) != 2 {
+		t.Errorf("checkEC2EBS: expected 2 ResourceIDs, got %v", got.ResourceIDs)
+	}
+	// ResourceIDs should be sorted
+	if got.ResourceIDs[0] != "vol-abc" || got.ResourceIDs[1] != "vol-def" {
+		t.Errorf("checkEC2EBS: expected sorted [vol-abc, vol-def], got %v", got.ResourceIDs)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_NoVolumes(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-ebs-none",
+		RawStruct: ec2types.Instance{
+			InstanceId:          aws.String("i-ebs-none"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected count=0, got %d", got.Count)
+	}
+	if len(got.ResourceIDs) != 0 {
+		t.Errorf("checkEC2EBS with empty BlockDeviceMappings: expected no ResourceIDs, got %v", got.ResourceIDs)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_NilEbs(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-ebs-nil",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-ebs-nil"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: nil}, // nil Ebs field — should not panic
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	// Must not panic
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("checkEC2EBS with nil Ebs: expected count=0, got %d", got.Count)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_NilVolumeId(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-ebs-nil-volid",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-ebs-nil-volid"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: nil}}, // Ebs present but VolumeId nil
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("checkEC2EBS with nil VolumeId: expected count=0, got %d", got.Count)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_SingleVolume(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-ebs-single",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-ebs-single"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-only")}},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 1 {
+		t.Errorf("checkEC2EBS single volume: expected count=1, got %d", got.Count)
+	}
+	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "vol-only" {
+		t.Errorf("checkEC2EBS single volume: expected ResourceIDs=[vol-only], got %v", got.ResourceIDs)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_DeduplicatesVolumeIDs(t *testing.T) {
+	// If somehow the same volume appears twice in BlockDeviceMappings, it should be counted once.
+	instance := resource.Resource{
+		ID: "i-ebs-dedup",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-ebs-dedup"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-dup")}},
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-dup")}},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 1 {
+		t.Errorf("checkEC2EBS should deduplicate volume IDs; expected count=1, got %d", got.Count)
+	}
+}
+
+func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
+	// When RawStruct is not an ec2types.Instance, should return count=0 without panic.
+	instance := resource.Resource{
+		ID:        "i-wrong-type",
+		RawStruct: "not-an-ec2-instance",
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs")
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("checkEC2EBS with wrong RawStruct type: expected count=0, got %d", got.Count)
+	}
+}
