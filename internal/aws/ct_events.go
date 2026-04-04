@@ -48,7 +48,7 @@ func FetchCloudTrailEvents(ctx context.Context, api CloudTrailLookupEventsAPI) (
 // a single page of events. Pass an empty continuationToken for the first page.
 func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &cloudtrail.LookupEventsInput{
-		MaxResults: aws.Int32(50),
+		MaxResults: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

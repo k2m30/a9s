@@ -235,26 +235,3 @@ func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 			"RelatedCheckStartedMsg (cache invalidated); got: %v", types)
 	}
 }
-
-// TestBug_RelatedCheckCache_RefreshForceRechecks verifies that pressing Ctrl+R
-// (refresh) from within the detail view forces fresh related checks even when
-// cached results exist.
-//
-// This test PASSES with current code (Ctrl+R already dispatches RelatedCheckStartedMsg
-// via the detail view's 'r' binding and the existing handleRelatedCheckStarted path).
-func TestBug_RelatedCheckCache_RefreshForceRechecks(t *testing.T) {
-	// Directly send RelatedCheckStartedMsg as Ctrl+R would produce via handleRefresh.
-	// This test validates the intent: explicit refresh must always re-dispatch checkers,
-	// bypassing any future cache.
-	m := setupEC2DetailWithResults(t)
-	_, recheckCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
-		ResourceType:   "ec2",
-		SourceResource: resource.Resource{ID: "any"},
-	})
-
-	// handleRelatedCheckStarted must return a non-nil cmd (batch of checker dispatches).
-	if recheckCmd == nil {
-		t.Fatal("handleRelatedCheckStarted must dispatch checkers even when results were " +
-			"previously delivered — explicit refresh must bypass any future cache")
-	}
-}

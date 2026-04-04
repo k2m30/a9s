@@ -192,21 +192,6 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				}
 			}
 			return m, nil
-		case key.Matches(msg, m.keys.Refresh):
-			// Ctrl+R: re-trigger related checks if right column is showing
-			if m.rightColShowing() {
-				defs := resource.GetRelated(m.resourceType)
-				m.rightCol = newRightColumn(defs, m.res)
-				m.rightCol.keys = m.keys
-				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{
-						ResourceType:   m.resourceType,
-						SourceResource: m.res,
-					}
-				}
-			}
-			return m, nil
 		case key.Matches(msg, m.keys.PageDown):
 			if !m.rightCol.IsFocused() && m.fieldList != nil {
 				pageSize := max(m.height-4, 1)

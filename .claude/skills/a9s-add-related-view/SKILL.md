@@ -19,7 +19,7 @@ per-resource related views can be added:
 - `RelatedCheckResultMsg` and `RelatedNavigateMsg` in `internal/tui/messages/messages.go`
 - `ToggleRelated` binding in `internal/tui/keys/keys.go`
 - Two-column detail view in `internal/tui/views/detail.go` (field-list model with embedded rightColumnModel)
-- Handler code in `internal/tui/app_handlers.go` for `RelatedCheckResultMsg` and `RelatedNavigateMsg`
+- Handler code in `internal/tui/app.go` (main Update switch) and `internal/tui/app_related.go` for `RelatedCheckResultMsg` and `RelatedNavigateMsg`
 
 If these don't exist, STOP. The infrastructure must land first.
 See `docs/design/related-views-architecture.md` Phases 1-8.
@@ -88,7 +88,7 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
     }
 
     // 2. Load target list from cache or live fetch
-    targetList, err := {source}RelatedResources(ctx, clients, cache, "{target}")
+    targetList, truncated, err := {source}RelatedResources(ctx, clients, cache, "{target}")
     if err != nil {
         return resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}
     }
@@ -103,6 +103,10 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
         if matchesSource(targetRes, sourceID) {
             ids = append(ids, targetRes.ID)
         }
+    }
+    // Truncation guard: partial page with 0 matches → unknown, not zero
+    if len(ids) == 0 && truncated {
+        return resource.RelatedCheckResult{TargetType: "{target}", Count: -1}
     }
     return relatedResult("{target}", ids)
 }
@@ -202,7 +206,7 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
         return resource.RelatedCheckResult{TargetType: "{target1}", Count: 0}
     }
 
-    targetList, err := {source}RelatedResources(ctx, clients, cache, "{target1}")
+    targetList, truncated, err := {source}RelatedResources(ctx, clients, cache, "{target1}")
     if err != nil {
         return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1, Err: err}
     }
@@ -216,6 +220,10 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
         if r.Fields["{source_id_field}"] == sourceID {
             ids = append(ids, r.ID)
         }
+    }
+    // Truncation guard: partial page with 0 matches → unknown, not zero
+    if len(ids) == 0 && truncated {
+        return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
     }
     return {source}RelatedResult("{target1}", ids)
 }

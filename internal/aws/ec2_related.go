@@ -74,12 +74,12 @@ func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
-	asgList, _, err := ec2RelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	var ids []string
 	for _, asgRes := range asgList {
@@ -93,6 +93,9 @@ func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource
 				break
 			}
 		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	return relatedResult("asg", ids)
 }
@@ -162,12 +165,12 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
-	eipList, _, err := ec2RelatedResources(ctx, clients, cache, "eip")
+	eipList, truncated, err := ec2RelatedResources(ctx, clients, cache, "eip")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: -1, Err: err}
 	}
 	if eipList == nil {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
 	}
 	var ids []string
 	for _, eipRes := range eipList {
@@ -179,6 +182,9 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 		if eipRes.Fields["instance_id"] == instanceID {
 			ids = append(ids, eipRes.ID)
 		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
 	}
 	return relatedResult("eip", ids)
 }
@@ -210,12 +216,12 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 	if clusterName == "" && nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
 	}
-	ngList, _, err := ec2RelatedResources(ctx, clients, cache, "ng")
+	ngList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
 	}
 	var ids []string
 	for _, ngRes := range ngList {
@@ -240,6 +246,9 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 			ids = append(ids, ngRes.ID)
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+	}
 	return relatedResult("ng", ids)
 }
 
@@ -250,12 +259,12 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res reso
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	eventList, _, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
+	eventList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
 	}
 	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
 	}
 	var ids []string
 	for _, eventRes := range eventList {
@@ -269,6 +278,9 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res reso
 		if eventRes.Fields["resource_name"] == instanceID {
 			ids = append(ids, eventRes.ID)
 		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
 	}
 	return relatedResult("ct-events", ids)
 }

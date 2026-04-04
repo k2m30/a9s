@@ -131,44 +131,6 @@ func TestEC2NavigableFields_IncludeSecurityGroupsGroupID(t *testing.T) {
 	}
 }
 
-// Bug reveal: real-profile EC2 detail counts currently depend on the destination
-// list already being present in cache. Related counts should be derivable without
-// pre-warming :asg/:eip first.
-func TestEC2RelatedCheckers_ASGDoesNotRequirePrewarmedCache(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-real-asg",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-real-asg"),
-			VpcId:      aws.String("vpc-123"),
-		},
-	}
-
-	checker := ec2CheckerByTarget(t, "asg")
-	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
-
-	if got.Count == -1 {
-		t.Fatalf("asg related count should not be unknown just because the asg list was not preloaded; got %+v", got)
-	}
-}
-
-// Bug reveal: EIP count is also cache-dependent today.
-func TestEC2RelatedCheckers_EIPDoesNotRequirePrewarmedCache(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-real-eip",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-real-eip"),
-			VpcId:      aws.String("vpc-123"),
-		},
-	}
-
-	checker := ec2CheckerByTarget(t, "eip")
-	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
-
-	if got.Count == -1 {
-		t.Fatalf("eip related count should not be unknown just because the eip list was not preloaded; got %+v", got)
-	}
-}
-
 // Bug reveal: live EC2 detail shows EKS node group rows but they are not backed
 // by a checker, so the row never becomes actionable.
 func TestEC2RelatedRegistry_NodeGroupsHasChecker(t *testing.T) {

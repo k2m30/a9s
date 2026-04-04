@@ -380,7 +380,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resourceCache[shortName] = &resourceCacheEntry{
 					resources: entry.Resources,
 				}
-				if entry.IsTruncated && len(entry.Resources) > 0 {
+				if entry.IsTruncated {
 					m.resourceCache[shortName].pagination = &resource.PaginationMeta{
 						IsTruncated: true,
 					}

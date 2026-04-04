@@ -7,6 +7,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// DefaultPageSize is the number of resources fetched per paginated API call.
+// Set to one screenful in a default 80×50 terminal (~40 visible rows after
+// frame chrome). All paginated fetchers should use this as their MaxResults /
+// Limit / PageSize parameter so the cost of a cold-cache probe or a
+// related-view first-page fetch is bounded and predictable.
+const DefaultPageSize = 50
+
 // FetchRelatedTarget returns the resource list for the given target type.
 // It checks the ResourceCache first (returning cached data immediately), then
 // falls back to calling the registered paginated fetcher for the first page only.
