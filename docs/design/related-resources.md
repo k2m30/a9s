@@ -166,34 +166,19 @@ only between the side borders.
 
 ### 2.5 Narrow Terminal Threshold
 
-**Threshold: 100 columns.**
-
 | Width | Layout |
 |-------|--------|
-| 100+ cols | Two columns side by side (left fills remaining, right = 32 fixed) |
-| 80-99 cols | Stacked: detail on top, related list below, one scrollable stream |
-| 60-79 cols | Stacked, no right column name truncation |
-| < 60 cols | "Terminal too narrow" |
+| 60+ cols | Two columns side by side (left fills remaining, right scales with width) |
+| < 60 cols | Right column hidden |
 
-At 100 columns: 2 border chars + 32 right column + 1 separator = 35 fixed.
-Left column gets 65 characters -- sufficient for key-value display (22-char
-key column + 43-char value = comfortable).
+At 100+ columns the right column is a fixed 32 chars wide. Between 60–99
+columns the right column width scales proportionally (`max(24, width/3)`,
+capped so at least 40 chars remain for the left pane). Side-by-side layout
+is used for all widths ≥ 60.
 
-Below 100 columns, the right column moves BELOW the detail fields in a
-stacked layout. A dim section separator divides them:
-
-```
-| PrivateIpAddress: 10.0.48.175                               |
-| ...                                                          |
-|                                                              |
-| -- Related ------------------------------------------------- |
-|                                                              |
-|   Security Groups (3)                                        |
-|   VPC (1)                                                    |
-```
-
-In stacked mode, Tab switches between the detail section and the related
-section. j/k moves within whichever section has focus.
+> **Note:** A stacked layout (detail on top, related list below) was
+> considered for 60–99 cols but not implemented. The side-by-side layout
+> works well at all supported widths.
 
 ### 2.6 YAML View
 
@@ -1318,20 +1303,7 @@ view works exactly as specified in QA-26: full-width viewport search
 with `/`, highlights, `n`/`N` navigation, match counter. No changes
 needed for the two-column feature.
 
-### 17.9 Stacked Layout (< 100 cols)
-
-In stacked mode (section 2.5), the detail fields and related list are
-in a single scrollable stream separated by `-- Related ---`.
-
-- When the detail section has focus (top): `/` activates text search
-  across the field rows, same as left-column search in two-column mode.
-- When the related section has focus (bottom): `/` activates list
-  filter, same as right-column filter in two-column mode.
-
-Tab switches between sections. The search/filter state is per-section
-and follows the same persistence rules as section 17.4.
-
-### 17.10 Right Column Hidden (`r` toggled off)
+### 17.9 Right Column Hidden (`r` toggled off)
 
 When the right column is hidden, the view is a single-column detail
 display. `/` activates text search (same as left-column search).
@@ -1339,7 +1311,7 @@ display. `/` activates text search (same as left-column search).
 detail view behavior from QA-26, except the cursor jumps to matched
 rows instead of scrolling a viewport offset.
 
-### 17.11 Wireframe: Search Active in Two-Column View
+### 17.10 Wireframe: Search Active in Two-Column View
 
 Left column focused, search for "vpc" confirmed, 3 matches found.
 Current match on VpcId value (match 1/3).

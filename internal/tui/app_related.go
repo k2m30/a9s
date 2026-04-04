@@ -26,7 +26,6 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 	cmds := make([]tea.Cmd, 0, len(defs))
 
 	for _, def := range defs {
-		def := def // capture for closure
 		cmds = append(cmds, func() tea.Msg {
 			if m.demoMode {
 				demoFn := resource.GetRelatedDemo(msg.ResourceType)
@@ -92,6 +91,20 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
 					detail.SetSize(m.innerSize())
 					m.pushView(&detail)
+					if detail.NeedsRelatedCheck() {
+						ck := relatedCacheKey(msg.TargetType, r.ID)
+						if cached, ok := m.relatedCache[ck]; ok && len(cached) > 0 {
+							detail.ApplyRelatedResults(cached)
+							return m, nil
+						}
+						srcRes := r
+						return m, func() tea.Msg {
+							return messages.RelatedCheckStartedMsg{
+								ResourceType:   msg.TargetType,
+								SourceResource: srcRes,
+							}
+						}
+					}
 					return m, nil
 				}
 			}
@@ -127,6 +140,20 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
 					detail.SetSize(m.innerSize())
 					m.pushView(&detail)
+					if detail.NeedsRelatedCheck() {
+						ck := relatedCacheKey(msg.TargetType, r.ID)
+						if cached, ok := m.relatedCache[ck]; ok && len(cached) > 0 {
+							detail.ApplyRelatedResults(cached)
+							return m, nil
+						}
+						srcRes := r
+						return m, func() tea.Msg {
+							return messages.RelatedCheckStartedMsg{
+								ResourceType:   msg.TargetType,
+								SourceResource: srcRes,
+							}
+						}
+					}
 					return m, nil
 				}
 			}
@@ -152,6 +179,25 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				if idSet[r.ID] {
 					filtered = append(filtered, r)
 				}
+			}
+			// If some IDs are missing and cache may have more pages, fetch the rest.
+			// Pre-populate the list with already-cached filtered rows so they remain
+			// visible when subsequent pages arrive via Append:true ResourcesLoadedMsg.
+			if len(filtered) < len(msg.RelatedIDs) && entry.pagination != nil && entry.pagination.IsTruncated {
+				rl := views.NewResourceListFromCache(
+					*rt, m.viewConfig, m.keys,
+					filtered, entry.pagination,
+					"",
+					entry.sortField, entry.sortAsc,
+					0, 0,
+				)
+				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+				rl.SetRelatedIDFilter(msg.RelatedIDs)
+				rl.SetEscPops(true)
+				rl.SetSize(m.innerSize())
+				m.pushView(&rl)
+				fetchCmd := m.fetchResources(msg.TargetType)
+				return m, fetchCmd
 			}
 			rl := views.NewResourceListFromCache(
 				*rt, m.viewConfig, m.keys,

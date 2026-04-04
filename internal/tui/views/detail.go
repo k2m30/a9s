@@ -90,8 +90,8 @@ func (m DetailModel) Init() (DetailModel, tea.Cmd) {
 func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.RelatedCheckResultMsg:
-		// Ignore results for a different resource type.
-		if msg.ResourceType != m.resourceType {
+		// Ignore results for a different resource type or source resource.
+		if msg.ResourceType != m.resourceType || (msg.SourceResourceID != "" && msg.SourceResourceID != m.res.ID) {
 			return m, nil
 		}
 		m.rightCol, _ = m.rightCol.Update(msg)
@@ -197,10 +197,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.PageDown):
 			if !m.rightCol.IsFocused() && m.fieldList != nil {
-				pageSize := m.height - 4
-				if pageSize < 1 {
-					pageSize = 1
-				}
+				pageSize := max(m.height-4, 1)
 				m.fieldCursor += pageSize
 				if m.fieldCursor >= len(m.fieldList) {
 					m.fieldCursor = len(m.fieldList) - 1
@@ -217,14 +214,8 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.PageUp):
 			if !m.rightCol.IsFocused() && m.fieldList != nil {
-				pageSize := m.height - 4
-				if pageSize < 1 {
-					pageSize = 1
-				}
-				m.fieldCursor -= pageSize
-				if m.fieldCursor < 0 {
-					m.fieldCursor = 0
-				}
+				pageSize := max(m.height-4, 1)
+				m.fieldCursor = max(m.fieldCursor-pageSize, 0)
 				m.syncViewportToCursor()
 				m.refreshViewportContent()
 				return m, nil
@@ -271,31 +262,6 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			if m.width < 60 {
 				return m, nil // silently ignore on narrow terminals
 			}
-			if m.width < 100 {
-				// In stacked mode (80-99), first toggle after auto-show hides immediately.
-				if m.rightColAutoShown {
-					m.rightColAutoShown = false
-					m.rightColVisible = false
-					m.recalcViewportWidth()
-					return m, nil
-				}
-				m.rightColVisible = !m.rightColVisible
-				if m.rightColVisible {
-					defs := resource.GetRelated(m.resourceType)
-					m.rightCol = newRightColumn(defs, m.res)
-					m.rightCol.keys = m.keys
-					m.rightCol.SetSize(m.width, max(1, m.height/2))
-					m.recalcViewportWidth()
-					return m, func() tea.Msg {
-						return messages.RelatedCheckStartedMsg{
-							ResourceType:   m.resourceType,
-							SourceResource: m.res,
-						}
-					}
-				}
-				m.recalcViewportWidth()
-				return m, nil
-			}
 			if m.rightColAutoShown {
 				// First explicit toggle hides the auto-shown column.
 				m.rightColAutoShown = false
@@ -310,7 +276,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				defs := resource.GetRelated(m.resourceType)
 				m.rightCol = newRightColumn(defs, m.res)
 				m.rightCol.keys = m.keys
-				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 				m.recalcViewportWidth()
 				return m, func() tea.Msg {
 					return messages.RelatedCheckStartedMsg{
@@ -399,7 +365,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 }
 
 // View renders detail content via viewport.
-// When the right column is showing and width >= 100, renders left and right columns side by side
+// When the right column is showing and width >= 60, renders left and right columns side by side
 // with a │ separator.
 func (m DetailModel) View() string {
 	if !m.ready {
@@ -417,10 +383,7 @@ func (m DetailModel) View() string {
 		leftLines := strings.Split(leftContent, "\n")
 		rightLines := strings.Split(rightContent, "\n")
 		// Normalise to same number of lines.
-		maxLines := len(leftLines)
-		if len(rightLines) > maxLines {
-			maxLines = len(rightLines)
-		}
+		maxLines := max(len(leftLines), len(rightLines))
 		leftW := m.width - rightW - 1 // -1 for separator character
 		var sb strings.Builder
 		for i := range maxLines {
@@ -451,10 +414,9 @@ func (m DetailModel) View() string {
 }
 
 // SetSize initializes or resizes the viewport. Must be called before View().
-// On first call, if width >= 100 and related defs are registered, the right
+// On first call, if width >= 60 and related defs are registered, the right
 // column is auto-shown (rightColAutoShown = true). The first explicit toggle
-// transitions from auto-shown to explicitly-on (still visible). A second toggle
-// hides the column.
+// hides the auto-shown column. A subsequent toggle re-shows it.
 func (m *DetailModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h

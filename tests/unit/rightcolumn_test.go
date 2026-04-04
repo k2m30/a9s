@@ -10,8 +10,8 @@ package unit
 // Key design facts:
 //   - `r` (ToggleRelated) toggles the right column ON/OFF
 //   - Right column shows display names for registered RelatedDefs
-//   - Right column fixed width: 32 chars; separator: 1 char; threshold: 100 cols
-//   - At width < 100, toggle has no effect (stacked layout managed separately)
+//   - Right column fixed width: 32 chars (adjusts proportionally below 100 cols); separator: 1 char
+//   - Side-by-side layout for all widths >= 60; below 60 the column is hidden
 //   - After toggle, before any RelatedCheckResultMsg: rows show display names (loading state)
 //   - RelatedCheckResultMsg delivers async check results (count, err)
 //   - Count ≥ 0 shown as "(N)"; err → "—" (em dash)
