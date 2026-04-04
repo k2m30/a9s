@@ -31,10 +31,11 @@ type DetailModel struct {
 	keys                keys.Map
 	search              SearchModel
 	rightCol            rightColumnModel
-	rightColVisible     bool                  // true when explicitly toggled on
-	rightColAutoShown   bool                  // true when right column was auto-shown on SetSize (wide terminal + registered defs)
-	rightColUserToggled bool                  // true after user explicitly toggles related visibility
-	rightColWidth       int                   // width of right column panel (default 32)
+	rightColVisible          bool // true when explicitly toggled on
+	rightColAutoShown        bool // true when right column was auto-shown on SetSize (wide terminal + registered defs)
+	rightColUserToggled      bool // true after user explicitly toggles related visibility
+	rightColWidth            int  // width of right column panel (default 32)
+	pendingRelatedDispatch   bool // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
 	fieldList           []fieldpath.FieldItem // structured field data; nil = not yet computed
 	fieldCursor         int                   // index into fieldList for navigable cursor
 }
@@ -84,6 +85,17 @@ func inferDetailResourceType(res resource.Resource) string {
 // Init implements tea.Model. No async work.
 func (m DetailModel) Init() (DetailModel, tea.Cmd) {
 	return m, nil
+}
+
+// TakePendingRelatedDispatch returns true and clears the resize-dispatch flag.
+// Called by the root model's tea.WindowSizeMsg handler (after propagateSize)
+// so RelatedCheckStartedMsg is emitted from the correct place.
+func (m *DetailModel) TakePendingRelatedDispatch() bool {
+	if m.pendingRelatedDispatch {
+		m.pendingRelatedDispatch = false
+		return true
+	}
+	return false
 }
 
 // Update delegates scroll to viewport; handles y (yaml), c (copy), esc (back).
@@ -431,6 +443,9 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.rightColAutoShown = true
 		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
 		m.rightCol.keys = m.keys
+		if m.ready { // resize case — first paint is handled via Init/first Update
+			m.pendingRelatedDispatch = true
+		}
 	} else if w < 60 && wasShowing {
 		m.rightColAutoShown = false
 		m.rightColVisible = false

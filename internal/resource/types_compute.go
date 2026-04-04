@@ -182,6 +182,19 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "public", Title: "Public", Width: 8, Sortable: true},
 			},
+			StubCreator: func(id string) Resource {
+				return Resource{
+					ID:     id,
+					Name:   id,
+					Status: "-",
+					Fields: map[string]string{
+						"image_id": id,
+						"ImageId":  id,
+						"name":     id,
+						"Name":     id,
+					},
+				}
+			},
 		},
 	}
 }

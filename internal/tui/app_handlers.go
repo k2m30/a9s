@@ -240,7 +240,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // handleProfileSelected switches the AWS profile, pops the profile selector,
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
-	m.relatedCache = make(map[string][]resource.RelatedCheckResult) // always clear on profile switch
+	m.relatedCache.clear() // always clear on profile switch
 	if m.demoMode {
 		return m, nil
 	}
@@ -272,7 +272,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // handleRegionSelected switches the AWS region, pops the region selector,
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
-	m.relatedCache = make(map[string][]resource.RelatedCheckResult) // always clear on region switch
+	m.relatedCache.clear() // always clear on region switch
 	if m.demoMode {
 		return m, nil
 	}
@@ -411,7 +411,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// Use cached related results when available; skip re-dispatch.
 		if d.NeedsRelatedCheck() {
 			ck := relatedCacheKey(resType, msg.Resource.ID)
-			if cached, ok := m.relatedCache[ck]; ok && len(cached) > 0 {
+			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
 				d.ApplyRelatedResults(cached)
 				return m, nil
 			}
@@ -512,7 +512,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
-		delete(m.relatedCache, relatedCacheKey(rt, srcRes.ID))
+		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 		return m, func() tea.Msg {
 			return messages.RelatedCheckStartedMsg{

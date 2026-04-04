@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"container/list"
 	"fmt"
 	"strings"
 
@@ -94,12 +95,79 @@ type Model struct {
 	availTotal      int      // total types to probe in current gen
 
 	resourceCache map[string]*resourceCacheEntry
-	relatedCache  map[string][]resource.RelatedCheckResult
+	relatedCache  *relatedCacheLRU
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.
 func relatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID
+}
+
+// relatedCacheLRU is a simple LRU cache for related-resource check results.
+// It caps at maxRelatedCacheEntries entries; the least-recently-used entry
+// is evicted when the cap is exceeded. Thread-safety is not required because
+// all Model updates run on the single Bubble Tea goroutine.
+const maxRelatedCacheEntries = 500
+
+type relatedCacheLRU struct {
+	cap   int
+	index map[string]*list.Element
+	order *list.List
+}
+
+type relatedCacheItem struct {
+	key     string
+	results []resource.RelatedCheckResult
+}
+
+func newRelatedCacheLRU(cap int) *relatedCacheLRU {
+	return &relatedCacheLRU{
+		cap:   cap,
+		index: make(map[string]*list.Element),
+		order: list.New(),
+	}
+}
+
+func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) {
+	el, ok := c.index[key]
+	if !ok {
+		return nil, false
+	}
+	c.order.MoveToFront(el)
+	return el.Value.(*relatedCacheItem).results, true
+}
+
+func (c *relatedCacheLRU) set(key string, results []resource.RelatedCheckResult) {
+	if el, ok := c.index[key]; ok {
+		c.order.MoveToFront(el)
+		el.Value.(*relatedCacheItem).results = results
+		return
+	}
+	el := c.order.PushFront(&relatedCacheItem{key: key, results: results})
+	c.index[key] = el
+	if c.order.Len() > c.cap {
+		back := c.order.Back()
+		if back != nil {
+			c.order.Remove(back)
+			delete(c.index, back.Value.(*relatedCacheItem).key)
+		}
+	}
+}
+
+func (c *relatedCacheLRU) delete(key string) {
+	if el, ok := c.index[key]; ok {
+		c.order.Remove(el)
+		delete(c.index, key)
+	}
+}
+
+func (c *relatedCacheLRU) clear() {
+	c.index = make(map[string]*list.Element)
+	c.order.Init()
+}
+
+func (c *relatedCacheLRU) len() int {
+	return c.order.Len()
 }
 
 // Option configures the root Model.
@@ -146,7 +214,7 @@ func New(profile, region string, opts ...Option) Model {
 		viewConfig:    cfg,
 		configErr:     cfgErr,
 		resourceCache: make(map[string]*resourceCacheEntry),
-		relatedCache:  make(map[string][]resource.RelatedCheckResult),
+		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -196,6 +264,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.propagateSize()
+		if d, ok := m.activeView().(*views.DetailModel); ok && d.TakePendingRelatedDispatch() {
+			src := d.SourceResource()
+			rtype := d.ResourceType()
+			return m, func() tea.Msg {
+				return messages.RelatedCheckStartedMsg{
+					ResourceType:   rtype,
+					SourceResource: src,
+				}
+			}
+		}
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -292,7 +370,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if sourceID != "" {
 			ck := relatedCacheKey(msg.ResourceType, sourceID)
-			m.relatedCache[ck] = append(m.relatedCache[ck], msg.Result)
+			existing, _ := m.relatedCache.get(ck)
+			m.relatedCache.set(ck, append(existing, msg.Result))
+		}
+		// Write-back: persist pages fetched on cold miss so the next detail view
+		// for any resource type gets a cache hit instead of re-fetching.
+		for shortName, entry := range msg.CachedPages {
+			if _, exists := m.resourceCache[shortName]; !exists {
+				m.resourceCache[shortName] = &resourceCacheEntry{
+					resources: entry.Resources,
+				}
+				if entry.IsTruncated && len(entry.Resources) > 0 {
+					m.resourceCache[shortName].pagination = &resource.PaginationMeta{
+						IsTruncated: true,
+					}
+				}
+			}
 		}
 		return m.updateActiveView(msg)
 	case messages.RelatedNavigateMsg:

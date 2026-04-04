@@ -117,6 +117,36 @@ Key registries: `resource.RegisterChildType()`, `resource.RegisterChildFetcher()
 
 ContextKeys resolution: `"ID"` → Resource.ID, `"Name"` → Resource.Name, `"@parent.x"` → inherited from parent context, else → Resource.Fields[key].
 
+## Related-View Architecture
+
+The right-column related panel is data-driven via `RelatedDef` and `NavigableField` on each resource type:
+
+```go
+type RelatedDef struct {
+    TargetType  string         // target resource short name (e.g., "vpc")
+    DisplayName string         // display label in the right column
+    Checker     RelatedChecker // async checker function
+}
+
+type NavigableField struct {
+    FieldPath  string // dot-path into resource fields (e.g., "VpcId")
+    TargetType string // resource type to navigate to
+}
+```
+
+Key registries:
+- `resource.RegisterRelated(shortName, []RelatedDef{...})` — registers related checkers
+- `resource.RegisterNavigableFields(shortName, []NavigableField{...})` — registers navigable fields
+- `resource.RegisterRelatedDemo(shortName, func)` — registers demo-mode checker override
+
+Adding a new related view requires **NO changes** to `app.go`, `detail.go`, `app_related.go`, or `messages.go`. All dispatch, rendering, and navigation are generic.
+
+ContextKeys resolution for related navigation (parallel to ChildView ContextKeys):
+- `"ID"` → `Resource.ID`
+- `"Name"` → `Resource.Name`
+- `"@parent.x"` → inherited from parent context key `x`
+- anything else → `Resource.Fields[key]`
+
 ## Agent File Access Rules
 
 Agents MUST use targeted file access — never broad globs on large directories.
