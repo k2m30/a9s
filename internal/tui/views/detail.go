@@ -664,6 +664,19 @@ func (m *DetailModel) ApplyRelatedResults(results []resource.RelatedCheckResult)
 	}
 }
 
+// ResetRightColumn resets the right column to its initial loading state,
+// discarding any loaded counts. Called by handleRefresh before re-dispatching
+// async checks so stale counts are not shown during reload.
+func (m *DetailModel) ResetRightColumn() {
+	if !m.rightColShowing() {
+		return
+	}
+	defs := resource.GetRelated(m.resourceType)
+	m.rightCol = newRightColumn(defs, m.res)
+	m.rightCol.keys = m.keys
+	m.rightCol.SetSize(m.rightColWidth, m.height)
+}
+
 // ConsumesEscapeLocally reports whether Escape should be handled inside the
 // detail view instead of by the root view-stack pop logic.
 func (m DetailModel) ConsumesEscapeLocally() bool {

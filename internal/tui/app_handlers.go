@@ -509,6 +509,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 
 	// Detail view: re-trigger related resource checks
 	if d, ok := m.activeView().(*views.DetailModel); ok {
+		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		delete(m.relatedCache, relatedCacheKey(rt, srcRes.ID))
