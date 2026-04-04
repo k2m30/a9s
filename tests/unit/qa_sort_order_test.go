@@ -707,3 +707,97 @@ func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
 		)
 	}
 }
+
+// ===========================================================================
+// Issue 208: Data-driven list title via ResourceTypeDef.ListTitle
+// ===========================================================================
+
+// TestQA_ListTitle_UsedInFrameTitle verifies that when ResourceTypeDef.ListTitle
+// is set, FrameTitle() uses it as the base name instead of ShortName.
+//
+// When ListTitle = "alarms" and ShortName = "alarm", the frame title should
+// start with "alarms(" after resources are loaded (format is "name(count)").
+func TestQA_ListTitle_UsedInFrameTitle(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		Name:      "CloudWatch Alarms",
+		ShortName: "alarm",
+		ListTitle: "alarms",
+		Columns: []resource.Column{
+			{Key: "alarm_name", Title: "Alarm Name", Width: 36},
+		},
+	}
+
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{
+				ID:     "a1",
+				Name:   "cpu-high",
+				Status: "OK",
+				Fields: map[string]string{"alarm_name": "cpu-high"},
+			},
+		},
+	})
+
+	title := m.FrameTitle()
+
+	if !strings.HasPrefix(title, "alarms(") {
+		t.Errorf(
+			"FrameTitle() should use ListTitle as base when set: got %q, expected prefix %q; "+
+				"ShortName=%q must NOT be used when ListTitle=%q is non-empty",
+			title, "alarms(", "alarm", "alarms",
+		)
+	}
+
+	if strings.HasPrefix(title, "alarm(") {
+		t.Errorf(
+			"FrameTitle() must NOT use ShortName %q when ListTitle %q is set: got %q",
+			"alarm", "alarms", title,
+		)
+	}
+}
+
+// TestQA_ListTitle_FallsBackToShortName verifies that when ResourceTypeDef.ListTitle
+// is empty (zero value), FrameTitle() falls back to ShortName as the base name.
+//
+// When ListTitle = "" and ShortName = "ec2", the frame title should start
+// with "ec2(" after resources are loaded.
+func TestQA_ListTitle_FallsBackToShortName(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		Name:      "EC2 Instances",
+		ShortName: "ec2",
+		// ListTitle intentionally omitted (zero value "")
+		Columns: []resource.Column{
+			{Key: "instance_id", Title: "Instance ID", Width: 14},
+		},
+	}
+
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources: []resource.Resource{
+			{
+				ID:     "i-abc123",
+				Name:   "my-server",
+				Status: "running",
+				Fields: map[string]string{"instance_id": "i-abc123"},
+			},
+		},
+	})
+
+	title := m.FrameTitle()
+
+	if !strings.HasPrefix(title, "ec2(") {
+		t.Errorf(
+			"FrameTitle() should fall back to ShortName when ListTitle is empty: got %q, expected prefix %q",
+			title, "ec2(",
+		)
+	}
+}

@@ -809,7 +809,6 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				entry.sortField, entry.sortAsc,
 				0, 0,
 			)
-			rl.SetDisplayName(relatedListBaseName(*rt))
 			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 			rl.SetRelatedIDFilter(msg.RelatedIDs)
 			rl.SetEscPops(true)
@@ -841,7 +840,6 @@ type relatedListOpts struct {
 // The caller decides whether to batch the fetch command (cache-hit branches skip it).
 func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resource, opts relatedListOpts) tea.Cmd {
 	rl := views.NewResourceList(rt, m.viewConfig, m.keys)
-	rl.SetDisplayName(relatedListBaseName(rt))
 	rl.SetTitleSuffix(relatedTitleSuffix(src))
 	if opts.pendingFilter != "" {
 		rl.SetPendingFilter(opts.pendingFilter)
@@ -867,14 +865,6 @@ func relatedTitleSuffix(src resource.Resource) string {
 		return fmt.Sprintf(" -- %s (%s)", src.ID, src.Name)
 	}
 	return " -- " + src.ID
-}
-
-func relatedListBaseName(rt resource.ResourceTypeDef) string {
-	// Match design/UI convention for alarms list title.
-	if rt.ShortName == "alarm" {
-		return "alarms"
-	}
-	return rt.ShortName
 }
 
 // buildResourceCacheSnapshot returns a read-only snapshot of currently-loaded

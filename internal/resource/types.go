@@ -46,6 +46,9 @@ type ResourceTypeDef struct {
 	Name string
 	// ShortName is the colon-command alias (e.g., "ec2").
 	ShortName string
+	// ListTitle overrides ShortName for list view frame titles (e.g., "alarms" instead of "alarm").
+	// When empty, ShortName is used.
+	ListTitle string
 	// Aliases are alternative command names for this resource type.
 	Aliases []string
 	// Category groups resource types in the main menu (e.g., "COMPUTE", "NETWORKING").

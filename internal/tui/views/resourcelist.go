@@ -684,6 +684,9 @@ func (m *ResourceListModel) ClearLoading() {
 //   - "ec2(15/200+)"          — truncated, filter active
 func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
+	if m.typeDef.ListTitle != "" {
+		name = m.typeDef.ListTitle
+	}
 	if m.displayName != "" {
 		name = m.displayName
 	}
