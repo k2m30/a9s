@@ -21,6 +21,24 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle"})
 
+	resource.RegisterFieldAliases("ec2", map[string]string{
+		"instance_id":  "InstanceId",
+		"type":         "InstanceType",
+		"state":        "State",
+		"lifecycle":    "InstanceLifecycle",
+		"image_id":     "ImageId",
+		"key_name":     "KeyName",
+		"vpc_id":       "VpcId",
+		"subnet_id":    "SubnetId",
+		"private_ip":   "PrivateIpAddress",
+		"private_dns":  "PrivateDnsName",
+		"public_ip":    "PublicIpAddress",
+		"iam_profile":  "IamInstanceProfile",
+		"architecture": "Architecture",
+		"platform":     "Platform",
+		"launch_time":  "LaunchTime",
+	})
+
 	resource.RegisterPaginated("ec2", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {

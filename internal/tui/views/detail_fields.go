@@ -1,5 +1,5 @@
 // detail_fields.go contains field list construction and field-list-based rendering for DetailModel.
-// Specifically: buildFieldList, augmentEC2AliasFields, and renderFromFieldList.
+// Specifically: buildFieldList and renderFromFieldList.
 package views
 
 import (
@@ -54,9 +54,9 @@ func (m *DetailModel) buildFieldList() {
 			fields = synth
 		}
 	}
-	// Bridge snake_case EC2 fixture/runtime maps to canonical EC2 view keys so
-	// detail paths and navigable fields continue to work when ResourceType is ec2.
-	fields = augmentEC2AliasFields(m.resourceType, fields)
+	// Bridge snake_case fetcher output to canonical PascalCase view keys so
+	// detail paths and navigable fields continue to work for registered resource types.
+	fields = resource.ApplyFieldAliases(m.resourceType, fields)
 	if len(detailPaths) == 0 {
 		if len(fields) == 0 {
 			m.fieldList = nil
@@ -130,53 +130,6 @@ func (m *DetailModel) buildFieldList() {
 		}
 	}
 	m.fieldList = items
-}
-
-func augmentEC2AliasFields(resourceType string, fields map[string]string) map[string]string {
-	if resourceType != "ec2" || len(fields) == 0 {
-		return fields
-	}
-	aliases := map[string]string{
-		"instance_id":  "InstanceId",
-		"type":         "InstanceType",
-		"state":        "State",
-		"lifecycle":    "InstanceLifecycle",
-		"image_id":     "ImageId",
-		"key_name":     "KeyName",
-		"vpc_id":       "VpcId",
-		"subnet_id":    "SubnetId",
-		"private_ip":   "PrivateIpAddress",
-		"private_dns":  "PrivateDnsName",
-		"public_ip":    "PublicIpAddress",
-		"iam_profile":  "IamInstanceProfile",
-		"architecture": "Architecture",
-		"platform":     "Platform",
-		"launch_time":  "LaunchTime",
-	}
-	needCopy := false
-	for from, to := range aliases {
-		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
-			if _, exists := fields[to]; !exists {
-				needCopy = true
-				break
-			}
-		}
-	}
-	if !needCopy {
-		return fields
-	}
-	out := make(map[string]string, len(fields)+len(aliases))
-	for k, v := range fields {
-		out[k] = v
-	}
-	for from, to := range aliases {
-		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
-			if _, exists := out[to]; !exists {
-				out[to] = v
-			}
-		}
-	}
-	return out
 }
 
 // renderFromFieldList renders the structured field list to a string.
