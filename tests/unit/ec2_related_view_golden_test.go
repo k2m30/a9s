@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,9 +47,10 @@ func TestGolden_EC2RelatedView_Text(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read golden file %s: %v (run with UPDATE_GOLDEN=1 to create it)", goldenPath, err)
 	}
+	expectedStr := strings.ReplaceAll(string(expected), "\r\n", "\n")
 
-	if !bytes.Equal(expected, []byte(actual)) {
-		t.Fatalf("golden mismatch for EC2 related view\n--- expected (golden) ---\n%s\n--- actual ---\n%s", string(expected), actual)
+	if expectedStr != actual {
+		t.Fatalf("golden mismatch for EC2 related view\n--- expected (golden) ---\n%s\n--- actual ---\n%s", expectedStr, actual)
 	}
 }
 
@@ -81,8 +81,9 @@ func TestGolden_EC2RelatedView_ANSI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read golden file %s: %v (run with UPDATE_GOLDEN=1 to create it)", goldenPath, err)
 	}
+	expectedStr := strings.ReplaceAll(string(expected), "\r\n", "\n")
 
-	if !bytes.Equal(expected, []byte(actual)) {
-		t.Fatalf("ANSI golden mismatch for EC2 related view\n--- expected (golden) ---\n%s\n--- actual ---\n%s", string(expected), actual)
+	if expectedStr != actual {
+		t.Fatalf("ANSI golden mismatch for EC2 related view\n--- expected (golden) ---\n%s\n--- actual ---\n%s", expectedStr, actual)
 	}
 }
