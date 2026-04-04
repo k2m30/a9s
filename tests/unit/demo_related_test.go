@@ -20,8 +20,8 @@ func TestDemoRelatedChecker_EC2(t *testing.T) {
 
 	res := resource.Resource{ID: "i-demo001", Name: "demo-instance"}
 	results := checker(res)
-	if len(results) != 6 {
-		t.Fatalf("expected 6 results (tg, asg, alarm, cfn, eip, ebs-snap), got %d", len(results))
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results (tg, asg, alarm, cfn, eip, ebs-snap, ebs, ng, ct-events), got %d", len(results))
 	}
 
 	// Build map for easier per-type assertions.
@@ -61,6 +61,37 @@ func TestDemoRelatedChecker_EC2(t *testing.T) {
 		t.Error("missing cfn result")
 	} else if cfn.Count != 0 {
 		t.Errorf("cfn count: expected 0, got %d", cfn.Count)
+	}
+
+	// EBS: count >= 1 with at least 1 resource ID.
+	if ebs, ok := byType["ebs"]; !ok {
+		t.Error("missing ebs result")
+	} else {
+		if ebs.Count < 1 {
+			t.Errorf("ebs count: expected >= 1, got %d", ebs.Count)
+		}
+		if len(ebs.ResourceIDs) < 1 {
+			t.Errorf("ebs resource IDs: expected >= 1, got %d", len(ebs.ResourceIDs))
+		}
+	}
+
+	// NG: count=0 (EC2 instances don't belong to node groups by default in demo).
+	if ng, ok := byType["ng"]; !ok {
+		t.Error("missing ng result")
+	} else if ng.Count != 0 {
+		t.Errorf("ng count: expected 0, got %d", ng.Count)
+	}
+
+	// CT-Events: count >= 1 with at least 1 resource ID.
+	if ct, ok := byType["ct-events"]; !ok {
+		t.Error("missing ct-events result")
+	} else {
+		if ct.Count < 1 {
+			t.Errorf("ct-events count: expected >= 1, got %d", ct.Count)
+		}
+		if len(ct.ResourceIDs) < 1 {
+			t.Errorf("ct-events resource IDs: expected >= 1, got %d", len(ct.ResourceIDs))
+		}
 	}
 }
 

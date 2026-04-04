@@ -196,7 +196,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				rl.SetEscPops(true)
 				rl.SetSize(m.innerSize())
 				m.pushView(&rl)
-				fetchCmd := m.fetchResources(msg.TargetType)
+				// Use fetchMoreResources with the stored token to resume from
+				// the correct page, not fetchResources which resets to page 1.
+				fetchCmd := m.fetchMoreResources(messages.LoadMoreMsg{
+					ResourceType:      msg.TargetType,
+					ContinuationToken: entry.pagination.NextToken,
+				})
 				return m, fetchCmd
 			}
 			rl := views.NewResourceListFromCache(
@@ -269,7 +274,10 @@ func relatedTitleSuffix(src resource.Resource) string {
 func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	snap := make(resource.ResourceCache, len(m.resourceCache))
 	for shortName, entry := range m.resourceCache {
-		snap[shortName] = entry.resources
+		snap[shortName] = resource.ResourceCacheEntry{
+			Resources:   entry.resources,
+			IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+		}
 	}
 	return snap
 }

@@ -45,7 +45,7 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 	}
 
 	cache := resource.ResourceCache{
-		"tg": {
+		"tg": {Resources: []resource.Resource{
 			{
 				ID: "tg-web",
 				RawStruct: elbv2types.TargetGroup{
@@ -53,47 +53,47 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 					TargetType: elbv2types.TargetTypeEnumInstance,
 				},
 			},
-		},
-		"asg": {
+		}},
+		"asg": {Resources: []resource.Resource{
 			{
 				ID: "asg-web",
 				RawStruct: asgtypes.AutoScalingGroup{
 					Instances: []asgtypes.Instance{{InstanceId: aws.String("i-abc123")}},
 				},
 			},
-		},
-		"alarm": {
+		}},
+		"alarm": {Resources: []resource.Resource{
 			{
 				ID: "cpu-high",
 				RawStruct: cwtypes.MetricAlarm{
 					Dimensions: []cwtypes.Dimension{{Name: aws.String("InstanceId"), Value: aws.String("i-abc123")}},
 				},
 			},
-		},
-		"cfn": {
+		}},
+		"cfn": {Resources: []resource.Resource{
 			{
 				ID: "app-stack",
 				RawStruct: cfntypes.Stack{
 					StackName: aws.String("app-stack"),
 				},
 			},
-		},
-		"eip": {
+		}},
+		"eip": {Resources: []resource.Resource{
 			{
 				ID: "eipalloc-abc",
 				RawStruct: ec2types.Address{
 					InstanceId: aws.String("i-abc123"),
 				},
 			},
-		},
-		"ebs-snap": {
+		}},
+		"ebs-snap": {Resources: []resource.Resource{
 			{
 				ID: "snap-abc",
 				RawStruct: ec2types.Snapshot{
 					VolumeId: aws.String("vol-abc"),
 				},
 			},
-		},
+		}},
 	}
 
 	targets := []string{"tg", "asg", "alarm", "cfn", "eip", "ebs-snap"}
@@ -344,5 +344,46 @@ func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
 
 	if got.Count != 0 {
 		t.Errorf("checkEC2EBS with wrong RawStruct type: expected count=0, got %d", got.Count)
+	}
+}
+
+// TestResourceCacheEntry_IsTruncated_Propagates verifies that when the cache
+// has IsTruncated=true for a target type and no matching resources are found,
+// the related checker returns Count=-1 ("?") rather than Count=0.
+//
+// Failing with current code because ResourceCacheEntry type doesn't exist yet
+// (Phase 1: #218 ResourceCache type change).
+func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-truncated-test",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-truncated-test"),
+			VpcId:      aws.String("vpc-999"),
+		},
+	}
+
+	// Cache has alarm data but it's truncated — and none of the alarms match
+	// this instance. The checker should return Count=-1 (unknown) not Count=0.
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID: "alarm-other-instance",
+					RawStruct: cwtypes.MetricAlarm{
+						Dimensions: []cwtypes.Dimension{
+							{Name: aws.String("InstanceId"), Value: aws.String("i-other")},
+						},
+					},
+				},
+			},
+			IsTruncated: true,
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "alarm")
+	got := checker(context.Background(), nil, instance, cache)
+
+	if got.Count != -1 {
+		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
 	}
 }

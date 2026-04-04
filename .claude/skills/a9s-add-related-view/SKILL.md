@@ -226,21 +226,24 @@ func check{Source}{Target2}(ctx context.Context, clients interface{}, res resour
 }
 
 // {source}RelatedResources returns the target list from cache or fetches it live.
-func {source}RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, error) {
-    if list, ok := cache[target]; ok {
-        return list, nil
+// Returns (resources, isTruncated, error).
+func {source}RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+    if entry, ok := cache[target]; ok {
+        return entry.Resources, entry.IsTruncated, nil
     }
     c, ok := clients.(*ServiceClients)
     if !ok || c == nil {
-        return nil, nil
+        return nil, false, nil
     }
     switch target {
     case "{target1}":
-        return Fetch{Target1}(ctx, c.{ServiceField1})
+        list, err := Fetch{Target1}(ctx, c.{ServiceField1})
+        return list, false, err
     case "{target2}":
-        return Fetch{Target2}(ctx, c.{ServiceField2})
+        list, err := Fetch{Target2}(ctx, c.{ServiceField2})
+        return list, false, err
     default:
-        return nil, nil
+        return nil, false, nil
     }
 }
 
@@ -419,11 +422,12 @@ func TestRelated_{Source}_{Target}_Found(t *testing.T) {
         },
     }
     cache := resource.ResourceCache{
-        "{target}": []resource.Resource{fakeTarget},
+        "{target}": resource.ResourceCacheEntry{Resources: []resource.Resource{fakeTarget}},
     }
     source := resource.Resource{ID: "source-id-1"}
 
-    result := check{Source}{Target}(context.Background(), nil, source, cache)
+    checker := {source}CheckerByTarget(t, "{target}")
+    result := checker(context.Background(), nil, source, cache)
 
     if result.Count != 1 {
         t.Errorf("Count = %d, want 1", result.Count)
@@ -444,11 +448,12 @@ func TestRelated_{Source}_{Target}_NotFound(t *testing.T) {
         },
     }
     cache := resource.ResourceCache{
-        "{target}": []resource.Resource{fakeTarget},
+        "{target}": resource.ResourceCacheEntry{Resources: []resource.Resource{fakeTarget}},
     }
     source := resource.Resource{ID: "source-id-1"}
 
-    result := check{Source}{Target}(context.Background(), nil, source, cache)
+    checker := {source}CheckerByTarget(t, "{target}")
+    result := checker(context.Background(), nil, source, cache)
 
     if result.Count != 0 {
         t.Errorf("Count = %d, want 0", result.Count)
@@ -461,7 +466,8 @@ func TestRelated_{Source}_{Target}_NotFound(t *testing.T) {
 func TestRelated_{Source}_{Target}_CacheMissNoClients(t *testing.T) {
     // Empty cache + nil clients -> unknown (-1), no error
     source := resource.Resource{ID: "source-id-1"}
-    result := check{Source}{Target}(context.Background(), nil, source, resource.ResourceCache{})
+    checker := {source}CheckerByTarget(t, "{target}")
+    result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
     if result.Count != -1 {
         t.Errorf("Count = %d, want -1 (unknown)", result.Count)
@@ -470,7 +476,8 @@ func TestRelated_{Source}_{Target}_CacheMissNoClients(t *testing.T) {
 
 func TestRelated_{Source}_{Target}_EmptySourceID(t *testing.T) {
     source := resource.Resource{ID: ""}
-    result := check{Source}{Target}(context.Background(), nil, source, resource.ResourceCache{})
+    checker := {source}CheckerByTarget(t, "{target}")
+    result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
     if result.Count != 0 {
         t.Errorf("Count = %d, want 0 for empty source ID", result.Count)
@@ -579,7 +586,7 @@ golangci-lint run ./...
 - `app.go` -- generic handlers dispatch to registry
 - `messages.go` -- generic message types carry strings
 - `keys.go` -- `r` toggle and `Tab` switching are generic
-- `app_handlers.go` -- `handleRelatedTypeChecked()` and `handleNavigateToRelated()` are generic
+- `app_related.go` -- `handleRelatedCheckStarted()` and `handleRelatedNavigate()` are generic
 
 ## Research Reference
 

@@ -23,8 +23,19 @@ type RelatedCheckResult struct {
 	Err         error    // non-nil = error
 }
 
-// ResourceCache is a read-only snapshot of already-loaded resource lists.
-type ResourceCache map[string][]Resource
+// ResourceCacheEntry holds a snapshot of one resource type's list plus
+// truncation state. IsTruncated=true means the snapshot is a partial page;
+// related checkers should return Count=-1 (unknown) when 0 local matches found.
+type ResourceCacheEntry struct {
+	Resources   []Resource
+	IsTruncated bool
+}
+
+// ResourceCache is a read-only snapshot of already-loaded resource lists,
+// keyed by resource short name. Each entry carries truncation state so that
+// related checkers can distinguish "0 matches in complete list" (Count=0)
+// from "0 matches in partial list" (Count=-1).
+type ResourceCache map[string]ResourceCacheEntry
 
 // RelatedChecker returns a count of related resources of a specific type.
 type RelatedChecker func(ctx context.Context, clients interface{}, res Resource, cache ResourceCache) RelatedCheckResult
@@ -69,6 +80,16 @@ func RegisterNavigableFields(shortName string, fields []NavigableField) {
 // or nil if none are registered.
 func GetNavigableFields(shortName string) []NavigableField {
 	return navigableFieldRegistry[shortName]
+}
+
+// IsFieldNavigable returns the NavigableField for the given field path, or nil if not registered.
+func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
+	for _, f := range navigableFieldRegistry[shortName] {
+		if f.FieldPath == fieldPath {
+			return &f
+		}
+	}
+	return nil
 }
 
 // UnregisterNavigableFields removes navigable field definitions for the given short name.

@@ -25,7 +25,7 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
+		return FetchS3BucketsPage(ctx, c.S3, continuationToken)
 	})
 
 	// Register S3 objects as a child type with its own fetcher.

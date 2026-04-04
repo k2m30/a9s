@@ -186,7 +186,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				defs := resource.GetRelated(m.resourceType)
 				m.rightCol = newRightColumn(defs, m.res)
 				m.rightCol.keys = m.keys
-				m.rightCol.SetSize(m.rightColWidth, m.height)
+				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 				return m, func() tea.Msg {
 					return messages.RelatedCheckStartedMsg{
 						ResourceType:   m.resourceType,
@@ -396,7 +396,7 @@ func (m DetailModel) View() string {
 			}
 			right := ""
 			if i < len(rightLines) {
-				right = rightLines[i]
+				right = ansi.Truncate(rightLines[i], rightW, "")
 			}
 			// Pad left column to its fixed width so right column aligns correctly.
 			padded := left
@@ -636,7 +636,7 @@ func (m *DetailModel) ResetRightColumn() {
 	defs := resource.GetRelated(m.resourceType)
 	m.rightCol = newRightColumn(defs, m.res)
 	m.rightCol.keys = m.keys
-	m.rightCol.SetSize(m.rightColWidth, m.height)
+	m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 }
 
 // ConsumesEscapeLocally reports whether Escape should be handled inside the

@@ -28,7 +28,7 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchLambdaFunctionsPageWithEventSources(ctx, c.Lambda, c.Lambda, continuationToken)
+		return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
 	})
 }
 

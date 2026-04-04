@@ -35,7 +35,7 @@ func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource
 	if instanceID == "" || vpcID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
-	tgList, err := ec2RelatedResources(ctx, clients, cache, "tg")
+	tgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: -1, Err: err}
 	}
@@ -62,6 +62,9 @@ func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource
 			ids = append(ids, tgRes.ID)
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+	}
 	return relatedResult("tg", ids)
 }
 
@@ -71,7 +74,7 @@ func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
-	asgList, err := ec2RelatedResources(ctx, clients, cache, "asg")
+	asgList, _, err := ec2RelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
 	}
@@ -100,7 +103,7 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
-	alarmList, err := ec2RelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := ec2RelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
 	}
@@ -120,6 +123,9 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 			}
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
 	return relatedResult("alarm", ids)
 }
 
@@ -129,7 +135,7 @@ func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, err := ec2RelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := ec2RelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
@@ -147,6 +153,9 @@ func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource
 			ids = append(ids, cfnRes.ID)
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
 	return relatedResult("cfn", ids)
 }
 
@@ -156,7 +165,7 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
-	eipList, err := ec2RelatedResources(ctx, clients, cache, "eip")
+	eipList, _, err := ec2RelatedResources(ctx, clients, cache, "eip")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: -1, Err: err}
 	}
@@ -204,7 +213,7 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 	if clusterName == "" && nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
 	}
-	ngList, err := ec2RelatedResources(ctx, clients, cache, "ng")
+	ngList, _, err := ec2RelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
 	}
@@ -244,7 +253,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res reso
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	eventList, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
+	eventList, _, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
 	}
@@ -273,7 +282,7 @@ func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Reso
 	if len(volumeIDs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
 	}
-	snapList, err := ec2RelatedResources(ctx, clients, cache, "ebs-snap")
+	snapList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs-snap")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1, Err: err}
 	}
@@ -291,36 +300,51 @@ func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Reso
 			ids = append(ids, snapRes.ID)
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+	}
 	return relatedResult("ebs-snap", ids)
 }
 
-func ec2RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, error) {
-	if list, ok := cache[target]; ok {
-		return list, nil
+// ec2RelatedResources returns the resource list for target from cache or by
+// fetching the first page. Returns (resources, isTruncated, error).
+// isTruncated=true means the list is partial; callers should return Count=-1
+// when 0 matches are found in a truncated list.
+func ec2RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	if entry, ok := cache[target]; ok {
+		return entry.Resources, entry.IsTruncated, nil
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 	switch target {
 	case "tg":
-		return FetchTargetGroups(ctx, c.ELBv2)
+		list, err := FetchTargetGroups(ctx, c.ELBv2)
+		return list, false, err
 	case "asg":
-		return FetchAutoScalingGroups(ctx, c.AutoScaling)
+		list, err := FetchAutoScalingGroups(ctx, c.AutoScaling)
+		return list, false, err
 	case "alarm":
-		return FetchCloudWatchAlarms(ctx, c.CloudWatch)
+		list, err := FetchCloudWatchAlarms(ctx, c.CloudWatch)
+		return list, false, err
 	case "ng":
-		return FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
+		list, err := FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
+		return list, false, err
 	case "cfn":
-		return FetchCloudFormationStacks(ctx, c.CloudFormation)
+		list, err := FetchCloudFormationStacks(ctx, c.CloudFormation)
+		return list, false, err
 	case "eip":
-		return FetchElasticIPs(ctx, c.EC2)
+		list, err := FetchElasticIPs(ctx, c.EC2)
+		return list, false, err
 	case "ebs-snap":
-		return FetchEBSSnapshots(ctx, c.EC2)
+		list, err := FetchEBSSnapshots(ctx, c.EC2)
+		return list, false, err
 	case "ct-events":
-		return FetchCloudTrailEvents(ctx, c.CloudTrail)
+		list, err := FetchCloudTrailEvents(ctx, c.CloudTrail)
+		return list, false, err
 	default:
-		return nil, nil
+		return nil, false, nil
 	}
 }
 
@@ -350,65 +374,39 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 
 func ec2Identity(res resource.Resource) (instanceID, vpcID, stackName string) {
 	instanceID = res.ID
-	if raw, ok := res.RawStruct.(ec2types.Instance); ok {
-		if raw.InstanceId != nil {
-			instanceID = *raw.InstanceId
-		}
-		if raw.VpcId != nil {
-			vpcID = *raw.VpcId
-		}
-		for _, tag := range raw.Tags {
-			if tag.Key == nil || tag.Value == nil {
-				continue
-			}
-			if *tag.Key == "aws:cloudformation:stack-name" {
-				stackName = *tag.Value
-				break
-			}
-		}
-		return instanceID, vpcID, stackName
+	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok {
+		return instanceID, res.Fields["vpc_id"], ""
 	}
-	if raw, ok := res.RawStruct.(*ec2types.Instance); ok && raw != nil {
-		if raw.InstanceId != nil {
-			instanceID = *raw.InstanceId
-		}
-		if raw.VpcId != nil {
-			vpcID = *raw.VpcId
-		}
-		for _, tag := range raw.Tags {
-			if tag.Key == nil || tag.Value == nil {
-				continue
-			}
-			if *tag.Key == "aws:cloudformation:stack-name" {
-				stackName = *tag.Value
-				break
-			}
-		}
-		return instanceID, vpcID, stackName
+	if raw.InstanceId != nil {
+		instanceID = *raw.InstanceId
 	}
-	return instanceID, res.Fields["vpc_id"], ""
+	if raw.VpcId != nil {
+		vpcID = *raw.VpcId
+	}
+	for _, tag := range raw.Tags {
+		if tag.Key == nil || tag.Value == nil {
+			continue
+		}
+		if *tag.Key == "aws:cloudformation:stack-name" {
+			stackName = *tag.Value
+			break
+		}
+	}
+	return instanceID, vpcID, stackName
 }
 
 func ec2Tags(res resource.Resource) map[string]string {
 	tags := map[string]string{}
-	switch raw := res.RawStruct.(type) {
-	case ec2types.Instance:
-		for _, tag := range raw.Tags {
-			if tag.Key == nil || tag.Value == nil {
-				continue
-			}
-			tags[*tag.Key] = *tag.Value
+	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok {
+		return tags
+	}
+	for _, tag := range raw.Tags {
+		if tag.Key == nil || tag.Value == nil {
+			continue
 		}
-	case *ec2types.Instance:
-		if raw == nil {
-			return tags
-		}
-		for _, tag := range raw.Tags {
-			if tag.Key == nil || tag.Value == nil {
-				continue
-			}
-			tags[*tag.Key] = *tag.Value
-		}
+		tags[*tag.Key] = *tag.Value
 	}
 	return tags
 }

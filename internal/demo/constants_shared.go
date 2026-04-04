@@ -23,4 +23,8 @@ const (
 	relatedEC2EIPID       = "eipalloc-0aaa111111111111a"
 	relatedEC2SnapshotID1 = "snap-0a1b2c3d4e5f60001"
 	relatedEC2SnapshotID2 = "snap-0a1b2c3d4e5f60002"
+
+	relatedEC2EBSVolID1   = "vol-0a1b2c3d4e5f60001"
+	relatedEC2EBSVolID2   = "vol-0a1b2c3d4e5f60002"
+	relatedEC2TrailEvent1 = "evt-0a1b2c3d4e5f60002"
 )

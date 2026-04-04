@@ -243,7 +243,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if updatedModel, ok := updated.(Model); ok {
 			if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
 				// Only cache top-level resource lists, not child views.
-				if rl.ParentContext() == nil {
+				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
 					sortField, sortAsc := rl.SortState()
 					updatedModel.resourceCache[rt] = &resourceCacheEntry{
@@ -451,7 +451,7 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
-	if rl.ParentContext() != nil {
+	if rl.ParentContext() != nil || rl.EscPops() {
 		return
 	}
 	rt := rl.ResourceType()

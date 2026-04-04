@@ -179,6 +179,45 @@ func TestDetail_NonNavigableField_EnterIsNoop(t *testing.T) {
 // Test 4 — nil viewConfig → Enter is a no-op (fieldList never built)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// IsFieldNavigable unit tests (resource.IsFieldNavigable)
+// ---------------------------------------------------------------------------
+
+func TestIsFieldNavigable_MatchFound(t *testing.T) {
+	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "SubnetId", TargetType: "subnet"},
+	})
+	defer resource.UnregisterNavigableFields("ec2")
+
+	f := resource.IsFieldNavigable("ec2", "VpcId")
+	if f == nil {
+		t.Fatal("IsFieldNavigable: expected non-nil for registered field VpcId")
+	}
+	if f.TargetType != "vpc" {
+		t.Errorf("IsFieldNavigable: TargetType: want %q, got %q", "vpc", f.TargetType)
+	}
+}
+
+func TestIsFieldNavigable_NoMatch(t *testing.T) {
+	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+	})
+	defer resource.UnregisterNavigableFields("ec2")
+
+	f := resource.IsFieldNavigable("ec2", "SubnetId")
+	if f != nil {
+		t.Errorf("IsFieldNavigable: expected nil for unregistered field SubnetId, got %+v", f)
+	}
+}
+
+func TestIsFieldNavigable_UnknownType(t *testing.T) {
+	f := resource.IsFieldNavigable("rds", "VpcId")
+	if f != nil {
+		t.Errorf("IsFieldNavigable: expected nil for unregistered type, got %+v", f)
+	}
+}
+
 func TestDetail_NoFieldList_EnterIsNoop(t *testing.T) {
 	res := makeNavEC2Resource()
 	k := keys.Default()
