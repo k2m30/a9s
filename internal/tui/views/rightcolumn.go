@@ -65,8 +65,6 @@ func (m rightColumnModel) Init() (rightColumnModel, tea.Cmd) {
 // Update handles key navigation and result delivery.
 func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		return m.updateKeyPressMsg(msg)
 	case tea.KeyMsg:
 		return m.updateKeyMsg(msg)
 
@@ -100,6 +98,7 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 	}
 
 	if m.filterActive {
+		k := msg.Key()
 		switch {
 		case key.Matches(msg, m.keys.Escape):
 			m.filterActive = false
@@ -110,10 +109,27 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 		case key.Matches(msg, m.keys.Enter):
 			m.filterActive = false
 			return m, nil
-		default:
-			// In KeyMsg path, text updates are handled by KeyPressMsg.
+		case key.Matches(msg, m.keys.Up):
+			m.moveCursor(-1)
+			return m, nil
+		case key.Matches(msg, m.keys.Down):
+			m.moveCursor(1)
 			return m, nil
 		}
+		if k.Code == tea.KeyBackspace {
+			if len(m.filterQuery) > 0 {
+				m.filterQuery = m.filterQuery[:len(m.filterQuery)-1]
+				m.scrollOffset = 0
+				m.ensureCursorValid()
+			}
+			return m, nil
+		}
+		if k.Text != "" {
+			m.filterQuery += k.Text
+			m.scrollOffset = 0
+			m.ensureCursorValid()
+		}
+		return m, nil
 	}
 
 	switch {
@@ -127,80 +143,6 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 	case key.Matches(msg, m.keys.Up):
 		m.moveCursor(-1)
 	case key.Matches(msg, m.keys.Enter):
-		if row := m.SelectedRow(); row != nil && isActionableRow(*row) {
-			return m, func() tea.Msg {
-				return messages.RelatedNavigateMsg{
-					TargetType:     row.targetType,
-					SourceResource: m.parentRes,
-					RelatedIDs:     row.resourceIDs,
-				}
-			}
-		}
-	}
-	return m, nil
-}
-
-func (m rightColumnModel) updateKeyPressMsg(msg tea.KeyPressMsg) (rightColumnModel, tea.Cmd) {
-	if !m.focused {
-		return m, nil
-	}
-
-	if msg.Code == tea.KeyEscape && strings.TrimSpace(m.filterQuery) != "" {
-		m.filterActive = false
-		m.filterQuery = ""
-		m.scrollOffset = 0
-		m.ensureCursorValid()
-		return m, nil
-	}
-
-	if m.filterActive {
-		switch msg.Code {
-		case tea.KeyEscape:
-			m.filterActive = false
-			m.filterQuery = ""
-			m.scrollOffset = 0
-			m.ensureCursorValid()
-			return m, nil
-		case tea.KeyEnter:
-			m.filterActive = false
-			return m, nil
-		case tea.KeyBackspace:
-			if len(m.filterQuery) > 0 {
-				m.filterQuery = m.filterQuery[:len(m.filterQuery)-1]
-				m.scrollOffset = 0
-				m.ensureCursorValid()
-			}
-			return m, nil
-		case tea.KeyUp:
-			m.moveCursor(-1)
-			return m, nil
-		case tea.KeyDown:
-			m.moveCursor(1)
-			return m, nil
-		}
-		if msg.Text != "" {
-			m.filterQuery += msg.Text
-			m.scrollOffset = 0
-			m.ensureCursorValid()
-		}
-		return m, nil
-	}
-
-	if msg.Text == "/" {
-		m.filterActive = true
-		m.filterQuery = ""
-		m.scrollOffset = 0
-		return m, nil
-	}
-	if msg.Text == "j" || msg.Code == tea.KeyDown {
-		m.moveCursor(1)
-		return m, nil
-	}
-	if msg.Text == "k" || msg.Code == tea.KeyUp {
-		m.moveCursor(-1)
-		return m, nil
-	}
-	if msg.Code == tea.KeyEnter {
 		if row := m.SelectedRow(); row != nil && isActionableRow(*row) {
 			return m, func() tea.Msg {
 				return messages.RelatedNavigateMsg{
