@@ -137,6 +137,13 @@ type RelatedCheckResultMsg struct {
 	ResourceType     string
 	SourceResourceID string // ID of the source resource (for cache keying)
 	Result           resource.RelatedCheckResult
+	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
+	// keyed by target resource short name. Non-nil only when FetchRelatedTarget
+	// executed a live fetch (i.e., target was absent from the ResourceCache snapshot
+	// passed to the checker). The app handler writes these entries into m.resourceCache
+	// so subsequent detail views for any resource type get a cache hit.
+	// Nil on cache hit or in demo mode — the app handler skips nil maps.
+	CachedPages map[string]resource.ResourceCacheEntry
 }
 
 // RelatedNavigateMsg requests navigation to a related resource type.

@@ -225,26 +225,16 @@ func check{Source}{Target2}(ctx context.Context, clients interface{}, res resour
     // ... similar pattern ...
 }
 
-// {source}RelatedResources returns the target list from cache or fetches it live.
+// {source}RelatedResources returns the resource list for target from cache or
+// fetches the first page via the registered paginated fetcher.
 // Returns (resources, isTruncated, error).
+// isTruncated=true means the list is partial; callers MUST return Count=-1
+// when 0 matches are found in a truncated list.
 func {source}RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
     if entry, ok := cache[target]; ok {
         return entry.Resources, entry.IsTruncated, nil
     }
-    c, ok := clients.(*ServiceClients)
-    if !ok || c == nil {
-        return nil, false, nil
-    }
-    switch target {
-    case "{target1}":
-        list, err := Fetch{Target1}(ctx, c.{ServiceField1})
-        return list, false, err
-    case "{target2}":
-        list, err := Fetch{Target2}(ctx, c.{ServiceField2})
-        return list, false, err
-    default:
-        return nil, false, nil
-    }
+    return FetchRelatedTarget(ctx, clients, cache, target)
 }
 
 // {source}RelatedResult deduplicates and sorts IDs into a RelatedCheckResult.
@@ -386,6 +376,20 @@ import (
 
     "github.com/k2m30/a9s/v3/internal/resource"
 )
+
+func {source}CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+    t.Helper()
+    for _, def := range resource.GetRelated("{source}") {
+        if def.TargetType == target {
+            if def.Checker == nil {
+                t.Fatalf("{source} related checker for %s is nil", target)
+            }
+            return def.Checker
+        }
+    }
+    t.Fatalf("{source} related checker for %s not found", target)
+    return nil
+}
 
 // --- Navigable Field Registration Tests ---
 
@@ -542,29 +546,6 @@ func TestRelated_{Source}_Registered(t *testing.T) {
             continue // stub entry, intentional
         }
         // Verify checker is callable (non-nil is sufficient for registration check)
-    }
-}
-
-func TestNavigableFields_{Source}_Registered(t *testing.T) {
-    fields := resource.GetNavigableFields("{source}")
-    if len(fields) == 0 {
-        t.Fatal("no navigable fields registered for {source}")
-    }
-
-    // Verify expected field paths and target types
-    expected := map[string]string{
-        "{FieldPath1}": "{target1}",
-        "{FieldPath2}": "{target2}",
-    }
-    for path, targetType := range expected {
-        nav := resource.IsFieldNavigable("{source}", path)
-        if nav == nil {
-            t.Errorf("expected navigable field %q not found", path)
-            continue
-        }
-        if nav.TargetType != targetType {
-            t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, targetType)
-        }
     }
 }
 ```

@@ -57,12 +57,37 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+
+			// If target type is absent from the snapshot, pre-fetch first page and
+			// include the result in CachedPages for write-back to m.resourceCache.
+			var cachedPages map[string]resource.ResourceCacheEntry
+			if _, inCache := cache[def.TargetType]; !inCache {
+				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
+					if fr, err := pf(ctx, m.clients, ""); err == nil {
+						isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+						entry := resource.ResourceCacheEntry{
+							Resources:   fr.Resources,
+							IsTruncated: isTrunc,
+						}
+						// Enrich the local cache snapshot so the checker gets a cache hit.
+						enriched := make(resource.ResourceCache, len(cache)+1)
+						for k, v := range cache {
+							enriched[k] = v
+						}
+						enriched[def.TargetType] = entry
+						cache = enriched
+						cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+					}
+				}
+			}
+
 			result := def.Checker(ctx, m.clients, msg.SourceResource, cache)
 			result.TargetType = def.TargetType
 			return messages.RelatedCheckResultMsg{
 				ResourceType:     msg.ResourceType,
 				SourceResourceID: msg.SourceResource.ID,
 				Result:           result,
+				CachedPages:      cachedPages,
 			}
 		})
 	}
@@ -93,7 +118,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					m.pushView(&detail)
 					if detail.NeedsRelatedCheck() {
 						ck := relatedCacheKey(msg.TargetType, r.ID)
-						if cached, ok := m.relatedCache[ck]; ok && len(cached) > 0 {
+						if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
 							detail.ApplyRelatedResults(cached)
 							return m, nil
 						}
@@ -142,7 +167,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					m.pushView(&detail)
 					if detail.NeedsRelatedCheck() {
 						ck := relatedCacheKey(msg.TargetType, r.ID)
-						if cached, ok := m.relatedCache[ck]; ok && len(cached) > 0 {
+						if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
 							detail.ApplyRelatedResults(cached)
 							return m, nil
 						}

@@ -32,7 +32,7 @@ func assertStruct[T any](v any) (T, bool) {
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
 func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, vpcID, _ := ec2Identity(res)
-	if instanceID == "" || vpcID == "" {
+	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
 	tgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "tg")
@@ -132,9 +132,6 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_, _, stackName := ec2Identity(res)
-	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-	}
 	cfnList, truncated, err := ec2RelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
@@ -314,38 +311,17 @@ func ec2RelatedResources(ctx context.Context, clients interface{}, cache resourc
 	if entry, ok := cache[target]; ok {
 		return entry.Resources, entry.IsTruncated, nil
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return nil, false, nil
+	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+	// When AWS clients are not initialized (nil or wrong type), the registered
+	// paginated fetchers return "AWS clients not initialized". Treat this as a
+	// graceful no-op (no resources available) rather than a hard error, preserving
+	// the same semantics as the old nil-client early-return.
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return nil, false, nil
+		}
 	}
-	switch target {
-	case "tg":
-		list, err := FetchTargetGroups(ctx, c.ELBv2)
-		return list, false, err
-	case "asg":
-		list, err := FetchAutoScalingGroups(ctx, c.AutoScaling)
-		return list, false, err
-	case "alarm":
-		list, err := FetchCloudWatchAlarms(ctx, c.CloudWatch)
-		return list, false, err
-	case "ng":
-		list, err := FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
-		return list, false, err
-	case "cfn":
-		list, err := FetchCloudFormationStacks(ctx, c.CloudFormation)
-		return list, false, err
-	case "eip":
-		list, err := FetchElasticIPs(ctx, c.EC2)
-		return list, false, err
-	case "ebs-snap":
-		list, err := FetchEBSSnapshots(ctx, c.EC2)
-		return list, false, err
-	case "ct-events":
-		list, err := FetchCloudTrailEvents(ctx, c.CloudTrail)
-		return list, false, err
-	default:
-		return nil, false, nil
-	}
+	return resources, isTruncated, err
 }
 
 func relatedResult(target string, ids []string) resource.RelatedCheckResult {

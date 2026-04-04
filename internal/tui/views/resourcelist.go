@@ -173,20 +173,10 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 		}
-		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.ShortName == "ami" {
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.StubCreator != nil {
 			if targetID, ok := m.exactRelatedTargetID(); ok {
 				m.autoOpenSingleDetail = false
-				stub := resource.Resource{
-					ID:     targetID,
-					Name:   targetID,
-					Status: "-",
-					Fields: map[string]string{
-						"image_id": targetID,
-						"ImageId":  targetID,
-						"name":     targetID,
-						"Name":     targetID,
-					},
-				}
+				stub := m.typeDef.StubCreator(targetID)
 				return m, func() tea.Msg {
 					return messages.NavigateMsg{
 						Target:         messages.TargetDetail,

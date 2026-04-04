@@ -61,6 +61,12 @@ type ResourceTypeDef struct {
 	// CopyField overrides which field CopyContent copies. When non-empty,
 	// the resource list copies Fields[CopyField] instead of the default ID.
 	CopyField string
+	// StubCreator optionally creates a minimal stub Resource for the given ID when
+	// the target resource is not yet in the resource cache. Used by ResourceListModel
+	// to auto-navigate to a detail view when the filtered list is empty but a specific
+	// target ID is known (e.g., AMI navigation from EC2 detail before AMIs are loaded).
+	// When nil, no stub navigation occurs — the list just shows empty with a spinner.
+	StubCreator func(id string) Resource
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.
