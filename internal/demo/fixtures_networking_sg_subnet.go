@@ -32,11 +32,12 @@ func sgFixtures() []resource.Resource {
 				"description": "Security group for production web ALB",
 			},
 			RawStruct: ec2types.SecurityGroup{
-				GroupId:     aws.String("sg-0aaa111111111111a"),
-				GroupName:   aws.String("acme-web-alb-sg"),
-				VpcId:       aws.String(prodVPCID),
-				Description: aws.String("Security group for production web ALB"),
-				OwnerId:     aws.String("123456789012"),
+				GroupId:          aws.String("sg-0aaa111111111111a"),
+				GroupName:        aws.String("acme-web-alb-sg"),
+				VpcId:            aws.String(prodVPCID),
+				Description:      aws.String("Security group for production web ALB"),
+				OwnerId:          aws.String("123456789012"),
+				SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/sg-0aaa111111111111a"),
 				IpPermissions: []ec2types.IpPermission{
 					{
 						IpProtocol: aws.String("tcp"),
