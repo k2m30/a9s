@@ -46,6 +46,9 @@ type ResourceTypeDef struct {
 	Name string
 	// ShortName is the colon-command alias (e.g., "ec2").
 	ShortName string
+	// ListTitle overrides ShortName for list view frame titles (e.g., "alarms" instead of "alarm").
+	// When empty, ShortName is used.
+	ListTitle string
 	// Aliases are alternative command names for this resource type.
 	Aliases []string
 	// Category groups resource types in the main menu (e.g., "COMPUTE", "NETWORKING").
@@ -58,6 +61,12 @@ type ResourceTypeDef struct {
 	// CopyField overrides which field CopyContent copies. When non-empty,
 	// the resource list copies Fields[CopyField] instead of the default ID.
 	CopyField string
+	// StubCreator optionally creates a minimal stub Resource for the given ID when
+	// the target resource is not yet in the resource cache. Used by ResourceListModel
+	// to auto-navigate to a detail view when the filtered list is empty but a specific
+	// target ID is known (e.g., AMI navigation from EC2 detail before AMIs are loaded).
+	// When nil, no stub navigation occurs — the list just shows empty with a spinner.
+	StubCreator func(id string) Resource
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.

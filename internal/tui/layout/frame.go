@@ -183,9 +183,3 @@ func RenderHeader(profile, region, version string, w int, rightContent, accountB
 		Foreground(styles.ColHeaderFg).
 		Width(w).Padding(0, 1).Render(content)
 }
-
-// RenderHeaderWithIdentity is an alias for RenderHeader for callers that
-// want an explicit name indicating identity parameters are being passed.
-func RenderHeaderWithIdentity(profile, region, version string, w int, rightContent, accountBadge, roleName string) string {
-	return RenderHeader(profile, region, version, w, rightContent, accountBadge, roleName)
-}

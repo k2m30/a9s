@@ -28,12 +28,17 @@ type ResourceListModel struct {
 	sort    SortField
 	sortAsc bool
 
-	filterText    string
-	parentContext map[string]string // context from parent view for child fetchers
-	displayName   string           // custom display name for frame title
+	filterText           string
+	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
+	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
+	autoOpenSingleDetail bool                // when true, ResourcesLoaded auto-navigates to detail if exactly one row remains
+	parentContext        map[string]string   // context from parent view for child fetchers
+	displayName          string              // custom display name for frame title
+	titleSuffix          string              // optional suffix appended after count, e.g. " -- i-abc (web)"
+	escPops              bool                // when true, Esc pops view instead of clearing filter first
 
 	pagination  *resource.PaginationMeta // nil = unpaginated
-	loadingMore bool                      // true while fetching next page
+	loadingMore bool                     // true while fetching next page
 
 	loading bool
 	spinner spinner.Model
@@ -134,9 +139,54 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.allResources = msg.Resources
 		}
 		m.pagination = msg.Pagination
+		if m.pendingFilter != "" {
+			m.filterText = m.pendingFilter
+			m.pendingFilter = ""
+		}
 		m.applySortAndFilter()
 		m.rowTextCache = nil
 		m.styledRowCache = nil
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 1 {
+			r := m.filteredResources[0]
+			m.autoOpenSingleDetail = false
+			return m, func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:         messages.TargetDetail,
+					ResourceType:   m.typeDef.ShortName,
+					Resource:       &r,
+					ReplaceCurrent: true,
+				}
+			}
+		}
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.pagination != nil && m.pagination.IsTruncated && !m.loadingMore {
+			if _, ok := m.exactRelatedTargetID(); ok {
+				m.loadingMore = true
+				rt := m.typeDef.ShortName
+				token := m.pagination.NextToken
+				pc := m.parentContext
+				return m, func() tea.Msg {
+					return messages.LoadMoreMsg{
+						ResourceType:      rt,
+						ContinuationToken: token,
+						ParentContext:     pc,
+					}
+				}
+			}
+		}
+		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.StubCreator != nil {
+			if targetID, ok := m.exactRelatedTargetID(); ok {
+				m.autoOpenSingleDetail = false
+				stub := m.typeDef.StubCreator(targetID)
+				return m, func() tea.Msg {
+					return messages.NavigateMsg{
+						Target:         messages.TargetDetail,
+						ResourceType:   m.typeDef.ShortName,
+						Resource:       &stub,
+						ReplaceCurrent: true,
+					}
+				}
+			}
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -402,6 +452,19 @@ func (m *ResourceListModel) applySortAndFilter() {
 	m.styledRowCache = nil
 }
 
+func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
+	if len(m.relatedIDSet) != 1 {
+		return "", false
+	}
+	for id := range m.relatedIDSet {
+		if id == "" {
+			return "", false
+		}
+		return id, true
+	}
+	return "", false
+}
+
 // SetFilter applies a filter; cursor resets to 0.
 func (m *ResourceListModel) SetFilter(text string) {
 	m.filterText = text
@@ -409,6 +472,36 @@ func (m *ResourceListModel) SetFilter(text string) {
 	m.rowTextCache = nil
 	m.styledRowCache = nil
 	m.scroll.SetCursor(0)
+}
+
+// SetPendingFilter stores filter text to be applied when resources are loaded.
+// Used by related-resource navigation to pre-filter the list on first load.
+func (m *ResourceListModel) SetPendingFilter(text string) {
+	m.pendingFilter = text
+}
+
+// SetRelatedIDFilter constrains the list to an exact set of resource IDs.
+// Used by related-resource navigation flows to preserve checker result IDs
+// even when the destination type must be fetched first.
+func (m *ResourceListModel) SetRelatedIDFilter(ids []string) {
+	if len(ids) == 0 {
+		m.relatedIDSet = nil
+		return
+	}
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+	m.relatedIDSet = set
+}
+
+// SetAutoOpenSingleDetail configures one-shot auto-navigation to detail when
+// a ResourcesLoaded update leaves exactly one filtered row.
+func (m *ResourceListModel) SetAutoOpenSingleDetail(v bool) {
+	m.autoOpenSingleDetail = v
 }
 
 // GetFilter returns the current filter text.
@@ -581,6 +674,9 @@ func (m *ResourceListModel) ClearLoading() {
 //   - "ec2(15/200+)"          — truncated, filter active
 func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
+	if m.typeDef.ListTitle != "" {
+		name = m.typeDef.ListTitle
+	}
 	if m.displayName != "" {
 		name = m.displayName
 	}
@@ -602,14 +698,53 @@ func (m ResourceListModel) FrameTitle() string {
 	}
 
 	if m.filterText != "" && filtered != total {
-		return name + "(" + itoa(filtered) + "/" + totalStr + ")"
+		title := name + "(" + itoa(filtered) + "/" + totalStr + ")"
+		if m.titleSuffix != "" {
+			title += m.titleSuffix
+		}
+		return title
 	}
-	return name + "(" + totalStr + ")"
+	title := name + "(" + totalStr + ")"
+	if m.titleSuffix != "" {
+		title += m.titleSuffix
+	}
+	return title
+}
+
+// SetTitleSuffix sets a suffix appended to the frame title after count rendering.
+func (m *ResourceListModel) SetTitleSuffix(s string) {
+	m.titleSuffix = s
+}
+
+// SetDisplayName overrides the base title name used in FrameTitle.
+func (m *ResourceListModel) SetDisplayName(name string) {
+	m.displayName = name
+}
+
+// SetEscPops configures Esc behavior for this list.
+// Related-navigation lists set this to true so Esc returns to source detail view.
+func (m *ResourceListModel) SetEscPops(v bool) {
+	m.escPops = v
+}
+
+// EscPops reports whether Esc should pop this view immediately.
+func (m ResourceListModel) EscPops() bool {
+	return m.escPops
 }
 
 // applyFilter filters allResources into filteredResources.
 func (m *ResourceListModel) applyFilter() {
-	m.filteredResources = FilterResources(m.filterText, m.allResources)
+	base := m.allResources
+	if len(m.relatedIDSet) > 0 {
+		subset := make([]resource.Resource, 0, len(base))
+		for _, r := range base {
+			if _, ok := m.relatedIDSet[r.ID]; ok {
+				subset = append(subset, r)
+			}
+		}
+		base = subset
+	}
+	m.filteredResources = FilterResources(m.filterText, base)
 	m.scroll.SetTotal(len(m.filteredResources))
 }
 

@@ -20,9 +20,10 @@ const (
 
 // NavigateMsg requests a view transition. The root model handles push/pop.
 type NavigateMsg struct {
-	Target       ViewTarget
-	ResourceType string
-	Resource     *resource.Resource
+	Target         ViewTarget
+	ResourceType   string
+	Resource       *resource.Resource
+	ReplaceCurrent bool // when true, pop current view before pushing target (used by auto-open flows)
 }
 
 // PopViewMsg requests popping the current view from the stack.
@@ -119,9 +120,46 @@ type LoadResourcesMsg struct {
 	ParentContext map[string]string
 }
 
-
 // RefreshMsg triggers a re-fetch of the current resource list.
 type RefreshMsg struct{}
+
+// RelatedCheckStartedMsg requests that the root model dispatch related-resource checkers.
+// Emitted by DetailModel when user presses 'r'. The root model handles this because
+// it owns m.clients and m.resourceCache — views cannot dispatch AWS calls directly.
+type RelatedCheckStartedMsg struct {
+	ResourceType   string
+	SourceResource resource.Resource // the resource being viewed
+}
+
+// RelatedCheckResultMsg delivers one checker's async result back to the detail view.
+// The root model delegates this to the active view (detail model's rightColumnModel).
+type RelatedCheckResultMsg struct {
+	ResourceType     string
+	SourceResourceID string // ID of the source resource (for cache keying)
+	Result           resource.RelatedCheckResult
+	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
+	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
+	// keyed by target resource short name. Non-nil only when FetchRelatedTarget
+	// executed a live fetch (i.e., target was absent from the ResourceCache snapshot
+	// passed to the checker). The app handler writes these entries into m.resourceCache
+	// so subsequent detail views for any resource type get a cache hit.
+	// Nil on cache hit or in demo mode — the app handler skips nil maps.
+	CachedPages map[string]resource.ResourceCacheEntry
+}
+
+// RelatedNavigateMsg requests navigation to a related resource type.
+// Emitted by: (a) detail view when Enter pressed on navigable field,
+//
+//	(b) rightColumnModel when Enter pressed on selected row.
+//
+// Handled by: root model in app_related.go (handleRelatedNavigate).
+type RelatedNavigateMsg struct {
+	TargetType     string            // resource short name to navigate to (e.g., "vpc")
+	SourceResource resource.Resource // the resource being viewed
+	SourceType     string            // source resource short name (e.g., "ec2")
+	TargetID       string            // specific ID for navigable field case (e.g., "vpc-0abc")
+	RelatedIDs     []string          // IDs from checker for right-column case
+}
 
 // AvailabilityCacheLoadedMsg delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
@@ -153,4 +191,3 @@ type IdentityLoadedMsg struct {
 type IdentityErrorMsg struct {
 	Err string
 }
-

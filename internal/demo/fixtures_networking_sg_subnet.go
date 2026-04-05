@@ -244,7 +244,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(prodPublicSubnetA),
 				VpcId:                   aws.String(prodVPCID),
-				CidrBlock:              aws.String("10.0.1.0/24"),
+				CidrBlock:               aws.String("10.0.1.0/24"),
 				AvailabilityZone:        aws.String("us-east-1a"),
 				AvailabilityZoneId:      aws.String("use1-az1"),
 				State:                   ec2types.SubnetStateAvailable,
@@ -276,7 +276,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(prodPublicSubnetB),
 				VpcId:                   aws.String(prodVPCID),
-				CidrBlock:              aws.String("10.0.2.0/24"),
+				CidrBlock:               aws.String("10.0.2.0/24"),
 				AvailabilityZone:        aws.String("us-east-1b"),
 				AvailabilityZoneId:      aws.String("use1-az2"),
 				State:                   ec2types.SubnetStateAvailable,
@@ -308,7 +308,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(prodPrivateSubnetA),
 				VpcId:                   aws.String(prodVPCID),
-				CidrBlock:              aws.String("10.0.3.0/24"),
+				CidrBlock:               aws.String("10.0.3.0/24"),
 				AvailabilityZone:        aws.String("us-east-1a"),
 				AvailabilityZoneId:      aws.String("use1-az1"),
 				State:                   ec2types.SubnetStateAvailable,
@@ -340,7 +340,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(prodPrivateSubnetB),
 				VpcId:                   aws.String(prodVPCID),
-				CidrBlock:              aws.String("10.0.4.0/24"),
+				CidrBlock:               aws.String("10.0.4.0/24"),
 				AvailabilityZone:        aws.String("us-east-1b"),
 				AvailabilityZoneId:      aws.String("use1-az2"),
 				State:                   ec2types.SubnetStateAvailable,
@@ -372,7 +372,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(stagingSubnetA),
 				VpcId:                   aws.String(stagingVPCID),
-				CidrBlock:              aws.String("10.1.1.0/24"),
+				CidrBlock:               aws.String("10.1.1.0/24"),
 				AvailabilityZone:        aws.String("us-east-1a"),
 				AvailabilityZoneId:      aws.String("use1-az1"),
 				State:                   ec2types.SubnetStateAvailable,
@@ -387,12 +387,43 @@ func subnetFixtures() []resource.Resource {
 				},
 			},
 		},
+		{
+			ID:     stagingSubnetB,
+			Name:   "staging-1b",
+			Status: "available",
+			Fields: map[string]string{
+				"subnet_id":         stagingSubnetB,
+				"name":              "staging-1b",
+				"vpc_id":            stagingVPCID,
+				"cidr_block":        "10.1.2.0/24",
+				"availability_zone": "us-east-1b",
+				"state":             "available",
+				"available_ips":     "246",
+			},
+			RawStruct: ec2types.Subnet{
+				SubnetId:                aws.String(stagingSubnetB),
+				VpcId:                   aws.String(stagingVPCID),
+				CidrBlock:               aws.String("10.1.2.0/24"),
+				AvailabilityZone:        aws.String("us-east-1b"),
+				AvailabilityZoneId:      aws.String("use1-az2"),
+				State:                   ec2types.SubnetStateAvailable,
+				AvailableIpAddressCount: aws.Int32(246),
+				MapPublicIpOnLaunch:     aws.Bool(true),
+				DefaultForAz:            aws.Bool(false),
+				SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + stagingSubnetB),
+				OwnerId:                 aws.String("123456789012"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("staging-1b")},
+					{Key: aws.String("Environment"), Value: aws.String("staging")},
+				},
+			},
+		},
 	}
 
-	// Generate 17 more subnets to reach 22 total
+	// Generate 16 more subnets to reach 22 total
 	azs := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
 	azIDs := []string{"use1-az1", "use1-az2", "use1-az4"}
-	for i := 0; i < 17; i++ {
+	for i := 0; i < 16; i++ {
 		subnetID := fmt.Sprintf("subnet-0gen%013x", i+100)
 		name := subnetNamePool[i%len(subnetNamePool)]
 		vpcID := prodVPCID
@@ -427,7 +458,7 @@ func subnetFixtures() []resource.Resource {
 			RawStruct: ec2types.Subnet{
 				SubnetId:                aws.String(subnetID),
 				VpcId:                   aws.String(vpcID),
-				CidrBlock:              aws.String(cidr),
+				CidrBlock:               aws.String(cidr),
 				AvailabilityZone:        aws.String(az),
 				AvailabilityZoneId:      aws.String(azID),
 				State:                   ec2types.SubnetStateAvailable,

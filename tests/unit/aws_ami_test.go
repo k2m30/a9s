@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -11,6 +12,17 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
+
+type capturingDescribeImagesClient struct {
+	output *ec2.DescribeImagesOutput
+	err    error
+	inputs []*ec2.DescribeImagesInput
+}
+
+func (m *capturingDescribeImagesClient) DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
+	m.inputs = append(m.inputs, params)
+	return m.output, m.err
+}
 
 // ---------------------------------------------------------------------------
 // AMI fetcher tests
@@ -21,24 +33,24 @@ func TestFetchAMIs_ParsesMultipleImages(t *testing.T) {
 		output: &ec2.DescribeImagesOutput{
 			Images: []ec2types.Image{
 				{
-					ImageId:        aws.String("ami-0abc111222333444a"),
-					Name:           aws.String("my-web-server-ami"),
-					State:          ec2types.ImageStateAvailable,
-					Architecture:   ec2types.ArchitectureValuesX8664,
+					ImageId:         aws.String("ami-0abc111222333444a"),
+					Name:            aws.String("my-web-server-ami"),
+					State:           ec2types.ImageStateAvailable,
+					Architecture:    ec2types.ArchitectureValuesX8664,
 					PlatformDetails: aws.String("Linux/UNIX"),
-					RootDeviceType: ec2types.DeviceTypeEbs,
-					CreationDate:   aws.String("2025-01-15T10:30:00.000Z"),
-					Public:         aws.Bool(false),
+					RootDeviceType:  ec2types.DeviceTypeEbs,
+					CreationDate:    aws.String("2025-01-15T10:30:00.000Z"),
+					Public:          aws.Bool(false),
 				},
 				{
-					ImageId:        aws.String("ami-0xyz999888777666b"),
-					Name:           aws.String("my-arm64-ami"),
-					State:          ec2types.ImageStateAvailable,
-					Architecture:   ec2types.ArchitectureValuesArm64,
+					ImageId:         aws.String("ami-0xyz999888777666b"),
+					Name:            aws.String("my-arm64-ami"),
+					State:           ec2types.ImageStateAvailable,
+					Architecture:    ec2types.ArchitectureValuesArm64,
 					PlatformDetails: aws.String("Linux/UNIX"),
-					RootDeviceType: ec2types.DeviceTypeEbs,
-					CreationDate:   aws.String("2025-02-01T08:00:00.000Z"),
-					Public:         aws.Bool(true),
+					RootDeviceType:  ec2types.DeviceTypeEbs,
+					CreationDate:    aws.String("2025-02-01T08:00:00.000Z"),
+					Public:          aws.Bool(true),
 				},
 			},
 		},
@@ -110,14 +122,14 @@ func TestFetchAMIs_FieldExtraction(t *testing.T) {
 		output: &ec2.DescribeImagesOutput{
 			Images: []ec2types.Image{
 				{
-					ImageId:        aws.String("ami-0abc111222333444a"),
-					Name:           aws.String("my-web-server-ami"),
-					State:          ec2types.ImageStateAvailable,
-					Architecture:   ec2types.ArchitectureValuesX8664,
+					ImageId:         aws.String("ami-0abc111222333444a"),
+					Name:            aws.String("my-web-server-ami"),
+					State:           ec2types.ImageStateAvailable,
+					Architecture:    ec2types.ArchitectureValuesX8664,
 					PlatformDetails: aws.String("Linux/UNIX"),
-					RootDeviceType: ec2types.DeviceTypeEbs,
-					CreationDate:   aws.String("2025-01-15T10:30:00.000Z"),
-					Public:         aws.Bool(false),
+					RootDeviceType:  ec2types.DeviceTypeEbs,
+					CreationDate:    aws.String("2025-01-15T10:30:00.000Z"),
+					Public:          aws.Bool(false),
 				},
 			},
 		},
@@ -249,5 +261,51 @@ func TestFetchAMIs_RawStructIsImage(t *testing.T) {
 	}
 	if img.ImageId == nil || *img.ImageId != "ami-rawstruct" {
 		t.Errorf("RawStruct.ImageId: expected %q, got %v", "ami-rawstruct", img.ImageId)
+	}
+}
+
+func TestFetchAMIByID_UsesExactImageIDWithoutOwnersFilter(t *testing.T) {
+	mock := &capturingDescribeImagesClient{
+		output: &ec2.DescribeImagesOutput{
+			Images: []ec2types.Image{
+				{
+					ImageId: aws.String("ami-public-exact"),
+					Name:    aws.String("public-exact-ami"),
+					State:   ec2types.ImageStateAvailable,
+				},
+			},
+		},
+	}
+
+	res, err := awsclient.FetchAMIByID(context.Background(), mock, "ami-public-exact")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(mock.inputs) != 1 {
+		t.Fatalf("expected exactly one DescribeImages call, got %d", len(mock.inputs))
+	}
+	in := mock.inputs[0]
+	if len(in.ImageIds) != 1 || in.ImageIds[0] != "ami-public-exact" {
+		t.Fatalf("FetchAMIByID should query the exact AMI id, got ImageIds=%v", in.ImageIds)
+	}
+	if len(in.Owners) != 0 {
+		t.Fatalf("FetchAMIByID must not set Owners filtering for exact-ID lookups, got %v", in.Owners)
+	}
+	if res.ID != "ami-public-exact" {
+		t.Fatalf("expected fetched resource ID %q, got %q", "ami-public-exact", res.ID)
+	}
+}
+
+func TestFetchAMIByID_NotFound(t *testing.T) {
+	mock := &capturingDescribeImagesClient{
+		output: &ec2.DescribeImagesOutput{Images: nil},
+	}
+
+	_, err := awsclient.FetchAMIByID(context.Background(), mock, "ami-missing")
+	if err == nil {
+		t.Fatal("expected not-found error, got nil")
+	}
+	if !strings.Contains(err.Error(), "ami-missing") {
+		t.Fatalf("expected error to mention missing ami id, got %v", err)
 	}
 }

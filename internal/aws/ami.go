@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -58,56 +60,7 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 
 	var resources []resource.Resource
 	for _, img := range output.Images {
-		imageID := ""
-		if img.ImageId != nil {
-			imageID = *img.ImageId
-		}
-
-		// Name comes directly from Image.Name, not from Tags
-		name := ""
-		if img.Name != nil {
-			name = *img.Name
-		}
-
-		state := string(img.State)
-
-		architecture := string(img.Architecture)
-
-		platform := ""
-		if img.PlatformDetails != nil {
-			platform = *img.PlatformDetails
-		}
-
-		rootDeviceType := string(img.RootDeviceType)
-
-		creationDate := ""
-		if img.CreationDate != nil {
-			creationDate = *img.CreationDate
-		}
-
-		public := "false"
-		if img.Public != nil && *img.Public {
-			public = "true"
-		}
-
-		r := resource.Resource{
-			ID:     imageID,
-			Name:   name,
-			Status: state,
-			Fields: map[string]string{
-				"image_id":         imageID,
-				"name":             name,
-				"state":            state,
-				"architecture":     architecture,
-				"platform":         platform,
-				"root_device_type": rootDeviceType,
-				"creation_date":    creationDate,
-				"public":           public,
-			},
-			RawStruct: img,
-		}
-
-		resources = append(resources, r)
+		resources = append(resources, imageResource(img))
 	}
 
 	// Build pagination metadata
@@ -132,4 +85,70 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// FetchAMIByID fetches one AMI by exact image ID. Unlike the generic AMI list
+// fetcher, this path does not restrict Owners so public and third-party images
+// referenced by EC2 instances can still open real detail views.
+func FetchAMIByID(ctx context.Context, api EC2DescribeImagesAPI, imageID string) (resource.Resource, error) {
+	output, err := api.DescribeImages(ctx, &ec2.DescribeImagesInput{
+		ImageIds:          []string{imageID},
+		IncludeDeprecated: aws.Bool(true),
+	})
+	if err != nil {
+		return resource.Resource{}, fmt.Errorf("fetching AMI %s: %w", imageID, err)
+	}
+	if len(output.Images) == 0 {
+		return resource.Resource{}, fmt.Errorf("AMI %s not found", imageID)
+	}
+	return imageResource(output.Images[0]), nil
+}
+
+func imageResource(img ec2types.Image) resource.Resource {
+	imageID := ""
+	if img.ImageId != nil {
+		imageID = *img.ImageId
+	}
+
+	name := ""
+	if img.Name != nil {
+		name = *img.Name
+	}
+
+	state := string(img.State)
+	architecture := string(img.Architecture)
+
+	platform := ""
+	if img.PlatformDetails != nil {
+		platform = *img.PlatformDetails
+	}
+
+	rootDeviceType := string(img.RootDeviceType)
+
+	creationDate := ""
+	if img.CreationDate != nil {
+		creationDate = *img.CreationDate
+	}
+
+	public := "false"
+	if img.Public != nil && *img.Public {
+		public = "true"
+	}
+
+	return resource.Resource{
+		ID:     imageID,
+		Name:   name,
+		Status: state,
+		Fields: map[string]string{
+			"image_id":         imageID,
+			"name":             name,
+			"state":            state,
+			"architecture":     architecture,
+			"platform":         platform,
+			"root_device_type": rootDeviceType,
+			"creation_date":    creationDate,
+			"public":           public,
+		},
+		RawStruct: img,
+	}
 }

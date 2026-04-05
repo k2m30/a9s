@@ -1,0 +1,30 @@
+ a9s v  demo:us-east-1                                                                                       ? for help 
+┌───────────────────────────────────────────────── resource-types(66) ─────────────────────────────────────────────────┐
+│  COMPUTE                                                                                                             │
+│    EC2 Instances                                                                                    :ec2             │
+│    ECS Services                                                                                     :ecs-svc         │
+│    ECS Clusters                                                                                     :ecs             │
+│    ECS Tasks                                                                                        :ecs-task        │
+│    Lambda Functions                                                                                 :lambda          │
+│    Auto Scaling Groups                                                                              :asg             │
+│    Elastic Beanstalk                                                                                :eb              │
+│    EBS Volumes                                                                                      :ebs             │
+│    EBS Snapshots                                                                                    :ebs-snap        │
+│    AMIs                                                                                             :ami             │
+│  CONTAINERS                                                                                                          │
+│    EKS Clusters                                                                                     :eks             │
+│    EKS Node Groups                                                                                  :ng              │
+│  NETWORKING                                                                                                          │
+│    Load Balancers                                                                                   :elb             │
+│    Target Groups                                                                                    :tg              │
+│    Security Groups                                                                                  :sg              │
+│    VPCs                                                                                             :vpc             │
+│    Subnets                                                                                          :subnet          │
+│    Route Tables                                                                                     :rtb             │
+│    NAT Gateways                                                                                     :nat             │
+│    Internet Gateways                                                                                :igw             │
+│    Elastic IPs                                                                                      :eip             │
+│    VPC Endpoints                                                                                    :vpce            │
+│    Transit Gateways                                                                                 :tgw             │
+│    Network Interfaces                                                                               :eni             │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

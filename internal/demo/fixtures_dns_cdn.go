@@ -168,13 +168,13 @@ func r53RecordsAcmeCorp() []resource.Resource {
 				"name":   "api.acme-corp.com.",
 				"type":   "A",
 				"ttl":    "",
-				"values": "ALIAS: acme-prod-alb-123456789.us-east-1.elb.amazonaws.com.",
+				"values": "ALIAS: acme-prod-web-1234567890.us-east-1.elb.amazonaws.com.",
 			},
 			RawStruct: r53types.ResourceRecordSet{
 				Name: aws.String("api.acme-corp.com."),
 				Type: r53types.RRTypeA,
 				AliasTarget: &r53types.AliasTarget{
-					DNSName:              aws.String("acme-prod-alb-123456789.us-east-1.elb.amazonaws.com."),
+					DNSName:              aws.String("acme-prod-web-1234567890.us-east-1.elb.amazonaws.com."),
 					HostedZoneId:         aws.String("Z35SXDOTRQ7X7K"),
 					EvaluateTargetHealth: true,
 				},
@@ -213,7 +213,7 @@ func r53RecordsInternal() []resource.Resource {
 
 func r53RecordsStaging() []resource.Resource {
 	return []resource.Resource{
-		{ID: "staging.acme-corp.com.|A", Name: "staging.acme-corp.com.", Status: "A", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "A", "ttl": "", "values": "ALIAS: acme-staging-alb-987654321.us-east-1.elb.amazonaws.com."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeA, AliasTarget: &r53types.AliasTarget{DNSName: aws.String("acme-staging-alb-987654321.us-east-1.elb.amazonaws.com."), HostedZoneId: aws.String("Z35SXDOTRQ7X7K"), EvaluateTargetHealth: true}}},
+		{ID: "staging.acme-corp.com.|A", Name: "staging.acme-corp.com.", Status: "A", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "A", "ttl": "", "values": "ALIAS: staging-web-alb-5555555555.us-east-1.elb.amazonaws.com."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeA, AliasTarget: &r53types.AliasTarget{DNSName: aws.String("staging-web-alb-5555555555.us-east-1.elb.amazonaws.com."), HostedZoneId: aws.String("Z35SXDOTRQ7X7K"), EvaluateTargetHealth: true}}},
 		{ID: "staging.acme-corp.com.|NS", Name: "staging.acme-corp.com.", Status: "NS", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "NS", "ttl": "172800", "values": "ns-777.awsdns-33.net., ns-888.awsdns-44.org."}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeNs, TTL: aws.Int64(172800), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("ns-777.awsdns-33.net.")}, {Value: aws.String("ns-888.awsdns-44.org.")}}}},
 		{ID: "staging.acme-corp.com.|SOA", Name: "staging.acme-corp.com.", Status: "SOA", Fields: map[string]string{"name": "staging.acme-corp.com.", "type": "SOA", "ttl": "900", "values": "ns-777.awsdns-33.net. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"}, RawStruct: r53types.ResourceRecordSet{Name: aws.String("staging.acme-corp.com."), Type: r53types.RRTypeSoa, TTL: aws.Int64(900), ResourceRecords: []r53types.ResourceRecord{{Value: aws.String("ns-777.awsdns-33.net. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400")}}}},
 	}

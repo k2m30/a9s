@@ -1,0 +1,30 @@
+ a9s v  demo:us-east-1                                                                                       ? for help 
+┌──────────────────────────────────────────────────────── help ────────────────────────────────────────────────────────┐
+│ NAVIGATION                           ACTIONS                              OTHER                                      │
+│                                                                                                                      │
+│ j/k      up/down                     enter    select                      i        identity                          │
+│ g        top                         /        filter                      ?        help                              │
+│ G        bottom                      :        command                     esc      back                              │
+│ pgup     page up                     q        quit                                                                   │
+│ pgdn     page down                   ctrl+c   force quit                                                             │
+│                                                                                                                      │
+│                                                Press any key to close                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

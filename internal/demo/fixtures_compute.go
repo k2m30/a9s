@@ -140,6 +140,138 @@ func ec2Instances() []resource.Resource {
 	return instances
 }
 
+// ec2InstanceExtras holds the per-instance fields that are not part of the
+// original makeEC2Instance signature but are required by navigable-field tests.
+type ec2InstanceExtras struct {
+	imageID        string
+	keyName        string
+	architecture   ec2types.ArchitectureValues
+	az             string
+	securityGroups []ec2types.GroupIdentifier
+}
+
+// ec2Extras maps instance IDs to their extra fixture data.
+var ec2Extras = map[string]ec2InstanceExtras{
+	"i-0a1b2c3d4e5f60001": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60002": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60003": {
+		imageID:      "ami-0a1b2c3d4e5f60002",
+		keyName:      "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60004": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60005": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60006": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1c",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ddd444444444444d"), GroupName: aws.String("acme-db-proxy-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60007": {
+		imageID:      "ami-0a1b2c3d4e5f60002",
+		keyName:      "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60008": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-api-internal-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60009": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60010": {
+		imageID:      "ami-0a1b2c3d4e5f60001",
+		keyName:      "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664,
+		az:           "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+}
+
+// ec2DefaultExtras returns a fallback ec2InstanceExtras for generated instances.
+func ec2DefaultExtras(instanceID string) ec2InstanceExtras {
+	if ex, ok := ec2Extras[instanceID]; ok {
+		return ex
+	}
+	// Derive deterministic values from the instance ID suffix.
+	suffix := instanceID[len(instanceID)-4:]
+	amiIDs := []string{"ami-0a1b2c3d4e5f60001", "ami-0a1b2c3d4e5f60002", "ami-0a1b2c3d4e5f60003"}
+	keyNames := []string{"acme-prod-keypair", "acme-staging-keypair", "acme-dev-keypair"}
+	archs := []ec2types.ArchitectureValues{ec2types.ArchitectureValuesX8664, ec2types.ArchitectureValuesArm64}
+	azs := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
+	idx := 0
+	for _, ch := range suffix {
+		idx += int(ch)
+	}
+	return ec2InstanceExtras{
+		imageID:      amiIDs[idx%len(amiIDs)],
+		keyName:      keyNames[idx%len(keyNames)],
+		architecture: archs[idx%len(archs)],
+		az:           azs[idx%len(azs)],
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	}
+}
+
 // makeEC2Instance constructs a resource.Resource with a fully populated
 // ec2types.Instance as RawStruct. This enables both detail and YAML views
 // in demo mode.
@@ -153,6 +285,7 @@ func makeEC2Instance(
 ) resource.Resource {
 	stateName := ec2types.InstanceStateName(state)
 	stateCode := stateNameToCode(stateName)
+	extras := ec2DefaultExtras(instanceID)
 
 	inst := ec2types.Instance{
 		InstanceId:       aws.String(instanceID),
@@ -162,14 +295,43 @@ func makeEC2Instance(
 			Name: stateName,
 			Code: aws.Int32(stateCode),
 		},
-		VpcId:    aws.String(vpcID),
-		SubnetId: aws.String(subnetID),
+		VpcId:          aws.String(vpcID),
+		SubnetId:       aws.String(subnetID),
+		ImageId:        aws.String(extras.imageID),
+		KeyName:        aws.String(extras.keyName),
+		Architecture:   extras.architecture,
+		Placement:      &ec2types.Placement{AvailabilityZone: aws.String(extras.az)},
+		SecurityGroups: extras.securityGroups,
+		IamInstanceProfile: &ec2types.IamInstanceProfile{
+			Arn: aws.String("arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring"),
+		},
+		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+			{
+				DeviceName: aws.String("/dev/xvda"),
+				Ebs: &ec2types.EbsInstanceBlockDevice{
+					VolumeId: aws.String(volumeIDForInstance(instanceID)),
+					Status:   ec2types.AttachmentStatusAttached,
+				},
+			},
+		},
 		Tags: []ec2types.Tag{
 			{Key: aws.String("Name"), Value: aws.String(name)},
 			{Key: aws.String("Environment"), Value: aws.String(envFromName(name))},
 		},
 		LaunchTime:        aws.Time(launchTime),
 		InstanceLifecycle: lifecycle,
+	}
+	if instanceID == "i-0a1b2c3d4e5f60001" {
+		inst.Tags = append(inst.Tags, ec2types.Tag{
+			Key:   aws.String("kubernetes.io/cluster/acme-prod"),
+			Value: aws.String("owned"),
+		})
+	}
+	if instanceID == "i-0a1b2c3d4e5f60003" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("eks:cluster-name"), Value: aws.String("acme-prod")},
+			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String("general-pool")},
+		)
 	}
 
 	if publicIP != "" {
@@ -233,6 +395,21 @@ func envFromName(name string) string {
 	return "prod"
 }
 
+func volumeIDForInstance(instanceID string) string {
+	// Keep volume references deterministic and aligned with snapshot fixtures.
+	// This powers EC2 -> EBS Snapshot demo dependencies.
+	volIDs := []string{
+		"vol-0a1b2c3d4e5f60001",
+		"vol-0a1b2c3d4e5f60002",
+		"vol-0a1b2c3d4e5f60003",
+		"vol-0a1b2c3d4e5f60005",
+	}
+	idx := 0
+	for _, ch := range instanceID {
+		idx += int(ch)
+	}
+	return volIDs[idx%len(volIDs)]
+}
 
 // lambdaFunctions returns demo Lambda function fixtures.
 func lambdaFunctions() []resource.Resource {
@@ -255,6 +432,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("api-gateway-authorizer"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimeNodejs20x,
 				MemorySize:   aws.Int32(256),
 				Timeout:      aws.Int32(10),
@@ -282,6 +460,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("data-pipeline-transform"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimePython312,
 				MemorySize:   aws.Int32(512),
 				Timeout:      aws.Int32(300),
@@ -292,23 +471,25 @@ func lambdaFunctions() []resource.Resource {
 			},
 		},
 		{
-			ID:     "order-processor",
-			Name:   "order-processor",
+			ID:     "process-orders",
+			Name:   "process-orders",
 			Status: "go1.x",
 			Fields: map[string]string{
-				"function_name": "order-processor",
-				"runtime":       "go1.x",
-				"memory":        "128",
-				"timeout":       "30",
-				"handler":       "main",
-				"last_modified": "2026-02-28T11:03:47+00:00",
-				"code_size":     "8388608",
-				"log_group":     "/aws/lambda/order-processor",
-				"package_type":  "Zip",
+				"function_name":    "process-orders",
+				"runtime":          "go1.x",
+				"memory":           "128",
+				"timeout":          "30",
+				"handler":          "main",
+				"last_modified":    "2026-02-28T11:03:47+00:00",
+				"code_size":        "8388608",
+				"log_group":        "/aws/lambda/process-orders",
+				"package_type":     "Zip",
+				"event_source_arn": "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
-				FunctionName: aws.String("order-processor"),
-				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:order-processor"),
+				FunctionName: aws.String("process-orders"),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimeGo1x,
 				MemorySize:   aws.Int32(128),
 				Timeout:      aws.Int32(30),
@@ -316,6 +497,9 @@ func lambdaFunctions() []resource.Resource {
 				LastModified: aws.String("2026-02-28T11:03:47+00:00"),
 				CodeSize:     8388608,
 				State:        lambdatypes.StateActive,
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup: aws.String("/acme/application/api"),
+				},
 			},
 		},
 		{
@@ -336,6 +520,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("image-thumbnail-gen"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimePython312,
 				MemorySize:   aws.Int32(1024),
 				Timeout:      aws.Int32(60),
@@ -363,6 +548,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("payment-webhook"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:payment-webhook"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimeJava21,
 				MemorySize:   aws.Int32(512),
 				Timeout:      aws.Int32(15),
@@ -390,6 +576,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("cloudwatch-slack-notifier"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier"),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      lambdatypes.RuntimeNodejs20x,
 				MemorySize:   aws.Int32(128),
 				Timeout:      aws.Int32(10),
@@ -437,6 +624,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String(name),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + name),
+				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
 				Runtime:      runtimeMap[runtime],
 				MemorySize:   aws.Int32(memorySizes[i]),
 				Timeout:      aws.Int32(timeouts[i]),
@@ -446,6 +634,12 @@ func lambdaFunctions() []resource.Resource {
 				State:        lambdatypes.StateActive,
 			},
 		})
+	}
+
+	for i := range fns {
+		if _, ok := fns[i].Fields["event_source_arn"]; !ok {
+			fns[i].Fields["event_source_arn"] = ""
+		}
 	}
 
 	return fns
@@ -882,4 +1076,3 @@ func amiFixtures() []resource.Resource {
 		},
 	}
 }
-

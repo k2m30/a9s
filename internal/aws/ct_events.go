@@ -3,9 +3,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -23,21 +25,30 @@ func init() {
 	})
 }
 
-// FetchCloudTrailEvents is a compatibility wrapper that fetches the first page
-// of CloudTrail events and returns the resources. Used by existing tests.
+// FetchCloudTrailEvents fetches all CloudTrail LookupEvents pages and returns
+// the combined resources. Used by related-resource cold-cache checks and tests.
 func FetchCloudTrailEvents(ctx context.Context, api CloudTrailLookupEventsAPI) ([]resource.Resource, error) {
-	result, err := FetchCloudTrailEventsPage(ctx, api, "")
-	if err != nil {
-		return nil, err
+	var all []resource.Resource
+	token := ""
+	for {
+		result, err := FetchCloudTrailEventsPage(ctx, api, token)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
 	}
-	return result.Resources, nil
+	return all, nil
 }
 
 // FetchCloudTrailEventsPage calls the CloudTrail LookupEvents API and returns
 // a single page of events. Pass an empty continuationToken for the first page.
 func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &cloudtrail.LookupEventsInput{
-		MaxResults: aws.Int32(50),
+		MaxResults: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
@@ -75,17 +86,7 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 			source = *event.EventSource
 		}
 
-		// Guard Resources slice: extract first resource if present
-		resourceType := ""
-		resourceName := ""
-		if len(event.Resources) > 0 {
-			if event.Resources[0].ResourceType != nil {
-				resourceType = *event.Resources[0].ResourceType
-			}
-			if event.Resources[0].ResourceName != nil {
-				resourceName = *event.Resources[0].ResourceName
-			}
-		}
+		resourceType, resourceName := cloudTrailResourceFields(event.Resources)
 
 		// ReadOnly is *string ("true" or "false")
 		readOnly := ""
@@ -129,4 +130,29 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 			TotalHint:   -1,
 		},
 	}, nil
+}
+
+func cloudTrailResourceFields(resources []cloudtrailtypes.Resource) (string, string) {
+	if len(resources) == 0 {
+		return "", ""
+	}
+	types := make([]string, 0, len(resources))
+	names := make([]string, 0, len(resources))
+	typeSeen := map[string]struct{}{}
+	nameSeen := map[string]struct{}{}
+	for _, rr := range resources {
+		if rr.ResourceType != nil && *rr.ResourceType != "" {
+			if _, ok := typeSeen[*rr.ResourceType]; !ok {
+				typeSeen[*rr.ResourceType] = struct{}{}
+				types = append(types, *rr.ResourceType)
+			}
+		}
+		if rr.ResourceName != nil && *rr.ResourceName != "" {
+			if _, ok := nameSeen[*rr.ResourceName]; !ok {
+				nameSeen[*rr.ResourceName] = struct{}{}
+				names = append(names, *rr.ResourceName)
+			}
+		}
+	}
+	return strings.Join(types, ", "), strings.Join(names, ", ")
 }

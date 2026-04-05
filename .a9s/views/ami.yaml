@@ -31,7 +31,12 @@ detail:
   - Description
   - Architecture
   - PlatformDetails
+  - UsageOperation
+  - Hypervisor
+  - ImageOwnerAlias
+  - RootDeviceName
   - RootDeviceType
+  - SriovNetSupport
   - VirtualizationType
   - EnaSupport
   - BootMode

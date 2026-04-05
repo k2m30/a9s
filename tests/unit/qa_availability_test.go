@@ -1089,12 +1089,12 @@ func TestQA_Availability_TruncatedZeroCount(t *testing.T) {
 	m.SetAvailability("ec2", 0)
 	m.SetTruncated("ec2", true)
 
-	// Must not panic — zero + truncated is illogical but should be safe.
 	output := m.View()
 
-	// Zero count should display as "(0)" — truncation is irrelevant for zero.
-	if !strings.Contains(output, "(0)") {
-		t.Errorf("View() should contain '(0)' for ec2 with count=0 even if truncated, output:\n%s", output)
+	// Truncated-zero must display as "(0+)" — the + signals the probe only saw
+	// page 1 and it happened to be empty, but more pages exist.
+	if !strings.Contains(output, "(0+)") {
+		t.Errorf("View() should contain '(0+)' for ec2 with count=0 and truncated=true, output:\n%s", output)
 	}
 }
 

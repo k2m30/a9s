@@ -16,7 +16,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 			},
 			Children: []ChildViewDef{
 				{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
-				{ChildType: "cfn_resources", Key: "r", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
+				{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 			},
 		},
 		{

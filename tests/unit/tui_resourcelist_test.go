@@ -640,3 +640,193 @@ func TestResourceList_NarrowScreen_ShowsAllColumns(t *testing.T) {
 		t.Errorf("Message content should be visible (truncated) on narrow screen:\n%s", view)
 	}
 }
+
+// ===========================================================================
+// SetDisplayName + FrameTitle coverage
+// ===========================================================================
+
+func TestResourceListView_SetDisplayName(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	k := keys.Default()
+	m := views.NewResourceList(rlTestTypeDef(), nil, k)
+	m.SetSize(80, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    rlTestResources(),
+	})
+
+	// Before SetDisplayName, FrameTitle uses typeDef.ShortName ("ec2")
+	title := m.FrameTitle()
+	if !strings.Contains(title, "ec2") {
+		t.Errorf("FrameTitle before SetDisplayName should contain 'ec2'; got: %q", title)
+	}
+
+	// After SetDisplayName, FrameTitle uses the custom name
+	m.SetDisplayName("Custom Name")
+	title = m.FrameTitle()
+	if !strings.Contains(title, "Custom Name") {
+		t.Errorf("FrameTitle after SetDisplayName should contain 'Custom Name'; got: %q", title)
+	}
+	// Should still include the count
+	if !strings.Contains(title, fmt.Sprintf("%d", len(rlTestResources()))) {
+		t.Errorf("FrameTitle should include resource count; got: %q", title)
+	}
+}
+
+func TestResourceListView_SetDisplayName_EmptyRestoresDefault(t *testing.T) {
+	k := keys.Default()
+	m := views.NewResourceList(rlTestTypeDef(), nil, k)
+	m.SetSize(80, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources:    rlTestResources(),
+	})
+
+	m.SetDisplayName("Temporary")
+	m.SetDisplayName("") // reset to default
+	title := m.FrameTitle()
+	if !strings.Contains(title, "ec2") {
+		t.Errorf("FrameTitle after clearing displayName should use ShortName; got: %q", title)
+	}
+}
+
+// ===========================================================================
+// exactRelatedTargetID — indirect coverage via ResourcesLoadedMsg with
+// pagination + autoOpenSingleDetail + relatedIDSet (single non-empty ID)
+// ===========================================================================
+
+func TestResourceListView_ExactRelatedTargetID_SingleID_TriggersLoadMore(t *testing.T) {
+	// When: ResourceListModel has relatedIDSet = {"vol-target-123"} (exactly one non-empty ID),
+	//       autoOpenSingleDetail = true, ResourcesLoadedMsg arrives with IsTruncated=true
+	//       and no resources match the filter.
+	// Then: exactRelatedTargetID returns ("vol-target-123", true) → LoadMoreMsg is emitted.
+	k := keys.Default()
+	td := resource.ResourceTypeDef{
+		Name:      "EBS Volumes",
+		ShortName: "ebs",
+		Columns: []resource.Column{
+			{Key: "volume_id", Title: "Volume ID", Width: 20},
+		},
+	}
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(80, 20)
+	m, _ = m.Init()
+
+	m.SetRelatedIDFilter([]string{"vol-target-123"})
+	m.SetAutoOpenSingleDetail(true)
+
+	// Resources that do NOT match the filter (non-matching IDs)
+	nonMatching := []resource.Resource{
+		{ID: "vol-other-1", Fields: map[string]string{"volume_id": "vol-other-1"}},
+		{ID: "vol-other-2", Fields: map[string]string{"volume_id": "vol-other-2"}},
+	}
+	var got tea.Cmd
+	m, got = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ebs",
+		Resources:    nonMatching,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "token-page-2",
+		},
+	})
+
+	if got == nil {
+		t.Fatal("exactRelatedTargetID with single non-empty ID + truncated page should emit LoadMoreMsg cmd")
+	}
+	msg := got()
+	loadMore, ok := msg.(messages.LoadMoreMsg)
+	if !ok {
+		t.Fatalf("expected LoadMoreMsg, got %T: %+v", msg, msg)
+	}
+	if loadMore.ResourceType != "ebs" {
+		t.Errorf("LoadMoreMsg.ResourceType should be 'ebs'; got %q", loadMore.ResourceType)
+	}
+	if loadMore.ContinuationToken != "token-page-2" {
+		t.Errorf("LoadMoreMsg.ContinuationToken should be 'token-page-2'; got %q", loadMore.ContinuationToken)
+	}
+}
+
+func TestResourceListView_ExactRelatedTargetID_MultipleIDs_NoLoadMore(t *testing.T) {
+	// When: relatedIDSet has 2 IDs, exactRelatedTargetID returns false → no LoadMoreMsg.
+	k := keys.Default()
+	td := resource.ResourceTypeDef{
+		Name:      "EBS Volumes",
+		ShortName: "ebs",
+		Columns: []resource.Column{
+			{Key: "volume_id", Title: "Volume ID", Width: 20},
+		},
+	}
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(80, 20)
+	m, _ = m.Init()
+
+	m.SetRelatedIDFilter([]string{"vol-id-1", "vol-id-2"}) // 2 IDs — exactRelatedTargetID returns false
+	m.SetAutoOpenSingleDetail(true)
+
+	nonMatching := []resource.Resource{
+		{ID: "vol-other-x", Fields: map[string]string{"volume_id": "vol-other-x"}},
+	}
+	var got tea.Cmd
+	m, got = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ebs",
+		Resources:    nonMatching,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "token-page-2",
+		},
+	})
+
+	if got != nil {
+		msg := got()
+		if _, isLoadMore := msg.(messages.LoadMoreMsg); isLoadMore {
+			t.Error("exactRelatedTargetID with 2 IDs should NOT emit LoadMoreMsg (ambiguous target)")
+		}
+	}
+	// The model should still exist and not panic
+	_ = m.FrameTitle()
+}
+
+func TestResourceListView_ExactRelatedTargetID_EmptyID_NoLoadMore(t *testing.T) {
+	// When: relatedIDSet = {""} (one empty-string ID),
+	//       exactRelatedTargetID returns ("", false) → no LoadMoreMsg.
+	k := keys.Default()
+	td := resource.ResourceTypeDef{
+		Name:      "EBS Volumes",
+		ShortName: "ebs",
+		Columns: []resource.Column{
+			{Key: "volume_id", Title: "Volume ID", Width: 20},
+		},
+	}
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(80, 20)
+	m, _ = m.Init()
+
+	// SetRelatedIDFilter skips empty strings when building the set,
+	// so the set ends up empty — exactRelatedTargetID returns false.
+	m.SetRelatedIDFilter([]string{""})
+	m.SetAutoOpenSingleDetail(true)
+
+	nonMatching := []resource.Resource{
+		{ID: "vol-other-y", Fields: map[string]string{"volume_id": "vol-other-y"}},
+	}
+	var got tea.Cmd
+	m, got = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ebs",
+		Resources:    nonMatching,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "token-page-3",
+		},
+	})
+
+	if got != nil {
+		msg := got()
+		if _, isLoadMore := msg.(messages.LoadMoreMsg); isLoadMore {
+			t.Error("empty-string relatedID should NOT trigger LoadMoreMsg")
+		}
+	}
+}

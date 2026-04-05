@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -18,15 +19,85 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		resources, err := FetchEKSClusters(ctx, c.EKS, c.EKS)
-		if err != nil {
-			return resource.FetchResult{}, err
+
+		input := &eks.ListClustersInput{
+			MaxResults: aws.Int32(DefaultPageSize),
 		}
+		if continuationToken != "" {
+			input.NextToken = aws.String(continuationToken)
+		}
+
+		listOutput, err := c.EKS.ListClusters(ctx, input)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
+		}
+
+		var resources []resource.Resource
+		for _, name := range listOutput.Clusters {
+			descOutput, err := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
+				Name: aws.String(name),
+			})
+			if err != nil || descOutput.Cluster == nil {
+				continue
+			}
+			resources = append(resources, buildEKSResource(name, descOutput.Cluster))
+		}
+
+		isTruncated := listOutput.NextToken != nil
+		var nextToken string
+		if listOutput.NextToken != nil {
+			nextToken = *listOutput.NextToken
+		}
+
 		return resource.FetchResult{
-			Resources:  resources,
-			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
 		}, nil
 	})
+}
+
+// buildEKSResource constructs a Resource from a cluster name and EKS Cluster struct.
+func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource {
+	clusterName := ""
+	if cluster.Name != nil {
+		clusterName = *cluster.Name
+	}
+
+	version := ""
+	if cluster.Version != nil {
+		version = *cluster.Version
+	}
+
+	status := string(cluster.Status)
+
+	endpoint := ""
+	if cluster.Endpoint != nil {
+		endpoint = *cluster.Endpoint
+	}
+
+	platformVersion := ""
+	if cluster.PlatformVersion != nil {
+		platformVersion = *cluster.PlatformVersion
+	}
+
+	return resource.Resource{
+		ID:     name,
+		Name:   clusterName,
+		Status: status,
+		Fields: map[string]string{
+			"cluster_name":     clusterName,
+			"version":          version,
+			"status":           status,
+			"endpoint":         endpoint,
+			"platform_version": platformVersion,
+		},
+		RawStruct: cluster,
+	}
 }
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names
@@ -63,45 +134,11 @@ func FetchEKSClusters(ctx context.Context, listAPI EKSListClustersAPI, describeA
 			return nil, fmt.Errorf("describing EKS cluster %s: %w", clusterName, err)
 		}
 
-		cluster := descOutput.Cluster
-
-		name := ""
-		if cluster.Name != nil {
-			name = *cluster.Name
+		if descOutput.Cluster == nil {
+			continue
 		}
 
-		version := ""
-		if cluster.Version != nil {
-			version = *cluster.Version
-		}
-
-		status := string(cluster.Status)
-
-		endpoint := ""
-		if cluster.Endpoint != nil {
-			endpoint = *cluster.Endpoint
-		}
-
-		platformVersion := ""
-		if cluster.PlatformVersion != nil {
-			platformVersion = *cluster.PlatformVersion
-		}
-
-		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: status,
-			Fields: map[string]string{
-				"cluster_name":     name,
-				"version":          version,
-				"status":           status,
-				"endpoint":         endpoint,
-				"platform_version": platformVersion,
-			},
-			RawStruct: cluster,
-		}
-
-		resources = append(resources, r)
+		resources = append(resources, buildEKSResource(clusterName, descOutput.Cluster))
 	}
 
 	return resources, nil

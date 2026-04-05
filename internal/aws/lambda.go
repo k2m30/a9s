@@ -10,7 +10,18 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("lambda", []string{"function_name", "runtime", "memory", "timeout", "handler", "last_modified", "code_size", "log_group", "package_type"})
+	resource.RegisterFieldKeys("lambda", []string{
+		"function_name",
+		"runtime",
+		"memory",
+		"timeout",
+		"handler",
+		"last_modified",
+		"code_size",
+		"log_group",
+		"package_type",
+		"event_source_arn",
+	})
 
 	resource.RegisterPaginated("lambda", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -43,6 +54,17 @@ func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]re
 // FetchLambdaFunctionsPage calls the Lambda ListFunctions API and returns
 // a single page of functions. Pass an empty continuationToken for the first page.
 func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, continuationToken string) (resource.FetchResult, error) {
+	return FetchLambdaFunctionsPageWithEventSources(ctx, api, nil, continuationToken)
+}
+
+// FetchLambdaFunctionsPageWithEventSources calls the Lambda ListFunctions API
+// and enriches each function with a first event source ARN when available.
+func FetchLambdaFunctionsPageWithEventSources(
+	ctx context.Context,
+	api LambdaListFunctionsAPI,
+	eventSourceAPI LambdaListEventSourceMappingsAPI,
+	continuationToken string,
+) (resource.FetchResult, error) {
 	input := &lambda.ListFunctionsInput{}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
@@ -93,21 +115,26 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 		}
 
 		packageType := string(fn.PackageType)
+		eventSourceARN := ""
+		if eventSourceAPI != nil {
+			eventSourceARN, _ = firstLambdaEventSourceARN(ctx, eventSourceAPI, functionName)
+		}
 
 		r := resource.Resource{
 			ID:     functionName,
 			Name:   functionName,
 			Status: runtime,
 			Fields: map[string]string{
-				"function_name": functionName,
-				"runtime":       runtime,
-				"memory":        memory,
-				"timeout":       timeout,
-				"handler":       handler,
-				"last_modified": lastModified,
-				"code_size":     codeSize,
-				"log_group":     logGroup,
-				"package_type":  packageType,
+				"function_name":    functionName,
+				"runtime":          runtime,
+				"memory":           memory,
+				"timeout":          timeout,
+				"handler":          handler,
+				"last_modified":    lastModified,
+				"code_size":        codeSize,
+				"log_group":        logGroup,
+				"package_type":     packageType,
+				"event_source_arn": eventSourceARN,
 			},
 			RawStruct: fn,
 		}
@@ -137,4 +164,29 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func firstLambdaEventSourceARN(ctx context.Context, api LambdaListEventSourceMappingsAPI, functionName string) (string, error) {
+	if functionName == "" {
+		return "", nil
+	}
+
+	input := &lambda.ListEventSourceMappingsInput{
+		FunctionName: &functionName,
+	}
+	for {
+		out, err := api.ListEventSourceMappings(ctx, input)
+		if err != nil {
+			return "", err
+		}
+		for _, m := range out.EventSourceMappings {
+			if m.EventSourceArn != nil && *m.EventSourceArn != "" {
+				return *m.EventSourceArn, nil
+			}
+		}
+		if out.NextMarker == nil || *out.NextMarker == "" {
+			return "", nil
+		}
+		input.Marker = out.NextMarker
+	}
 }

@@ -1,0 +1,5 @@
+# Normalize line endings to LF on commit; no conversion on checkout.
+* text=auto eol=lf
+
+# Golden files must stay LF-only — CRLF breaks byte-exact comparisons.
+tests/testdata/golden/* text eol=lf

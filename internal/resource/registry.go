@@ -1,6 +1,9 @@
 package resource
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // ParentContext holds key-value pairs passed from a parent view to a child
 // fetcher. For example, {"bucket": "my-bucket", "prefix": "data/"}.
@@ -23,6 +26,73 @@ func RegisterFieldKeys(shortName string, keys []string) {
 // or nil if none are registered.
 func GetFieldKeys(shortName string) []string {
 	return fieldKeyRegistry[shortName]
+}
+
+// fieldAliasBuiltins holds aliases registered by init() functions in aws/*.go.
+// These are permanent and never removed by UnregisterFieldAliases.
+var fieldAliasBuiltins = map[string]map[string]string{}
+
+// fieldAliasOverrides holds aliases registered outside of init() (e.g., in tests).
+// UnregisterFieldAliases removes entries from this map only.
+var fieldAliasOverrides = map[string]map[string]string{}
+
+// RegisterFieldAliases records field name aliases for a resource type.
+// Called from init() in aws/*.go alongside RegisterFieldKeys; registers as builtins
+// (permanent). When called outside of init() — e.g., in tests — entries are stored
+// as overrides that UnregisterFieldAliases can remove.
+func RegisterFieldAliases(shortName string, aliases map[string]string) {
+	// Detect init-time registration: if init has not yet registered a builtin for this
+	// short name we treat the call as a builtin. Subsequent calls (from tests) override.
+	if _, hasBuiltin := fieldAliasBuiltins[shortName]; !hasBuiltin {
+		fieldAliasBuiltins[shortName] = aliases
+	} else {
+		fieldAliasOverrides[shortName] = aliases
+	}
+}
+
+// ApplyFieldAliases returns a fields map augmented with alias keys.
+// For each alias (from→to), if fields[from] has a non-empty value and fields[to]
+// does not exist, it's copied. Returns the original map unchanged when no copies
+// are needed. Returns nil if fields is nil.
+// Overrides (registered after init) take precedence over builtins.
+func ApplyFieldAliases(shortName string, fields map[string]string) map[string]string {
+	aliases := fieldAliasOverrides[shortName]
+	if len(aliases) == 0 {
+		aliases = fieldAliasBuiltins[shortName]
+	}
+	if len(aliases) == 0 || len(fields) == 0 {
+		return fields
+	}
+	needCopy := false
+	for from, to := range aliases {
+		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
+			if _, exists := fields[to]; !exists {
+				needCopy = true
+				break
+			}
+		}
+	}
+	if !needCopy {
+		return fields
+	}
+	out := make(map[string]string, len(fields)+len(aliases))
+	for k, v := range fields {
+		out[k] = v
+	}
+	for from, to := range aliases {
+		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
+			if _, exists := out[to]; !exists {
+				out[to] = v
+			}
+		}
+	}
+	return out
+}
+
+// UnregisterFieldAliases removes field alias overrides. Used only in tests for cleanup.
+// Builtin aliases registered by init() are never removed.
+func UnregisterFieldAliases(shortName string) {
+	delete(fieldAliasOverrides, shortName)
 }
 
 // RegisterChildType stores a child type definition in the child types registry.

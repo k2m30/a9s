@@ -43,6 +43,7 @@ coverage.html
 # Internal tooling
 specs/
 .specify/
+.claude/skills/speckit*
 release-local.sh
 
 # Generated reference (dev-time only)

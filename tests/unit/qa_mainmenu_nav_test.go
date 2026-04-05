@@ -278,6 +278,54 @@ func TestQA_MainMenu_CommandNavigateEKS(t *testing.T) {
 	}
 }
 
+func TestQA_MainMenu_CommandTabAutocompleteCompletesUniquePrefix(t *testing.T) {
+	tui.Version = "1.0.2"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, rootKeyPress(":"))
+	for _, ch := range "he" {
+		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
+	}
+
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyTab))
+	plain := stripANSI(rootViewContent(m))
+	header := strings.SplitN(plain, "\n", 2)[0]
+	if !strings.Contains(header, ":help") {
+		t.Fatalf("tab autocomplete should complete ':he' to ':help', got header:\n%s", header)
+	}
+
+	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("after autocomplete, enter should return a NavigateMsg command")
+	}
+	msg := cmd()
+	nav, ok := msg.(messages.NavigateMsg)
+	if !ok {
+		t.Fatalf("expected NavigateMsg after autocomplete enter, got %T", msg)
+	}
+	if nav.Target != messages.TargetHelp {
+		t.Fatalf("expected autocomplete to navigate to help, got target %v", nav.Target)
+	}
+}
+
+func TestQA_MainMenu_CommandTabAutocompleteLeavesAmbiguousPrefixUnchanged(t *testing.T) {
+	tui.Version = "1.0.2"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, rootKeyPress(":"))
+	m, _ = rootApplyMsg(m, rootKeyPress("e"))
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyTab))
+
+	plain := stripANSI(rootViewContent(m))
+	header := strings.SplitN(plain, "\n", 2)[0]
+	if !strings.Contains(header, ":e") {
+		t.Fatalf("ambiguous prefix should remain ':e', got header:\n%s", header)
+	}
+	if strings.Contains(header, ":ec2") || strings.Contains(header, ":eks") || strings.Contains(header, ":ebs") {
+		t.Fatalf("ambiguous prefix should not autocomplete to a specific command, got header:\n%s", header)
+	}
+}
+
 func TestQA_MainMenu_CommandNavigateSecrets(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()

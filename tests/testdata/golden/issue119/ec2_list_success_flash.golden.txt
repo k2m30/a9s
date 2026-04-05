@@ -1,0 +1,30 @@
+ a9s v  demo:us-east-1                                                                                                        Copied ec2 id 
+┌──────────────────────────────────────────────────────────────── ec2(25) ─────────────────────────────────────────────────────────────────┐
+│ Name                      State         Lifecycle     Type            Private IP        Public IP         Instance ID                    │
+│ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
+│ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
+│ api-staging-01            running       spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d4e5f60003            │
+│ worker-batch-03           stopped       spot          c5.xlarge       10.0.3.100                          i-0a1b2c3d4e5f60004            │
+│ bastion-prod              running       on-demand     t3.micro        10.0.0.5          52.87.221.44      i-0a1b2c3d4e5f60005            │
+│ db-proxy-01               running       on-demand     r5.large        10.0.4.200                          i-0a1b2c3d4e5f60006            │
+│ web-staging-01            pending       spot          t3.medium       10.0.2.70                           i-0a1b2c3d4e5f60007            │
+│ ml-trainer-gpu            stopping      spot          g4dn.xlarge     10.0.5.30                           i-0a1b2c3d4e5f60008            │
+│ temp-load-test            shutting-do…  on-demand     c5.large        10.0.3.55                           i-0a1b2c3d4e5f60009            │
+│ old-migration-worker      terminated    on-demand     t3.small                                            i-0a1b2c3d4e5f60010            │
+│ cache-node-11             running       on-demand     t3.medium       10.0.2.21         54.210.34.100     i-0a1b2c3d4e5f60011            │
+│ queue-worker-12           running       on-demand     m5.large        10.0.2.22                           i-0a1b2c3d4e5f60012            │
+│ scheduler-13              running       on-demand     c5.large        10.0.2.23                           i-0a1b2c3d4e5f60013            │
+│ metrics-collector-14      running       on-demand     r5.large        10.0.2.24                           i-0a1b2c3d4e5f60014            │
+│ gateway-proxy-15          running       on-demand     t3.large        10.0.2.25                           i-0a1b2c3d4e5f60015            │
+│ auth-service-16           running       on-demand     m5.xlarge       10.0.2.26         54.210.39.105     i-0a1b2c3d4e5f60016            │
+│ search-indexer-17         running       on-demand     c5.xlarge       10.0.2.27                           i-0a1b2c3d4e5f60017            │
+│ notification-svc-18       stopped       on-demand     t3.small        10.0.2.28                           i-0a1b2c3d4e5f60018            │
+│ payment-processor-19      stopped       on-demand     r5.xlarge       10.0.2.29                           i-0a1b2c3d4e5f60019            │
+│ inventory-sync-20         running       on-demand     t3.micro        10.0.3.30                           i-0a1b2c3d4e5f60020            │
+│ report-generator-21       running       on-demand     m5.large        10.0.3.31         54.210.44.110     i-0a1b2c3d4e5f60021            │
+│ etl-worker-22             running       on-demand     c5.large        10.0.3.32                           i-0a1b2c3d4e5f60022            │
+│ log-shipper-23            running       on-demand     t3.medium       10.0.3.33                           i-0a1b2c3d4e5f60023            │
+│ config-server-24          stopped       on-demand     r5.large        10.0.3.34                           i-0a1b2c3d4e5f60024            │
+│ health-checker-25         running       on-demand     t3.large        10.0.3.35                           i-0a1b2c3d4e5f60025            │
+│                                                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

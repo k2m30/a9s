@@ -40,9 +40,9 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	}
 }
 
-// --- Detail view: c copies full detail content, not just ID ---
+// --- Detail view: c copies active field value ---
 
-func TestQA_Copy_Detail_CopiesYAML(t *testing.T) {
+func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -63,7 +63,7 @@ func TestQA_Copy_Detail_CopiesYAML(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Press c on detail view — should copy YAML, same as YAML view
+	// Press c on detail view — should copy the active field value.
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd == nil {
 		t.Fatal("c on detail view should return a copy command")
@@ -76,13 +76,8 @@ func TestQA_Copy_Detail_CopiesYAML(t *testing.T) {
 	if strings.HasPrefix(flash.Text, "Copy failed:") {
 		t.Skip("clipboard not available in this environment")
 	}
-	// Should NOT be just the resource ID
-	if flash.Text == "Copied: i-detail123" {
-		t.Error("detail copy should copy YAML content, not just resource ID")
-	}
-	// Flash should indicate YAML was copied
-	if !strings.Contains(flash.Text, "YAML") && !strings.Contains(flash.Text, "yaml") && !strings.Contains(flash.Text, "detail") {
-		t.Errorf("flash should mention YAML or detail, got: %s", flash.Text)
+	if !strings.Contains(flash.Text, "i-detail123") {
+		t.Errorf("detail copy should mention the active field value, got: %s", flash.Text)
 	}
 }
 

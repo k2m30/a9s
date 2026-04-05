@@ -468,7 +468,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 				Append:       false,
 			})
 			title := m.FrameTitle()
-			expected := rt.ShortName + "(100)"
+			expected := effectiveTitleName(rt) + "(100)"
 			if title != expected {
 				t.Errorf("non-truncated: expected %q, got %q", expected, title)
 			}
@@ -484,7 +484,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 				Append: false,
 			})
 			title = m.FrameTitle()
-			expected = rt.ShortName + "(100+)"
+			expected = effectiveTitleName(rt) + "(100+)"
 			if title != expected {
 				t.Errorf("truncated: expected %q, got %q", expected, title)
 			}

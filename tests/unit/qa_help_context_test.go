@@ -67,7 +67,7 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 		"wrap",    // w key description
 		"refresh", // ctrl+r description
 		// pgup/pgdn are now shown in main menu help
-		"sort",    // sort keys
+		"sort", // sort keys
 	}
 	for _, text := range mustNotContain {
 		if strings.Contains(strings.ToLower(plain), text) {
@@ -97,19 +97,19 @@ func TestQA_HelpContext_ResourceList_ShowsRelevantKeys(t *testing.T) {
 	plainLower := strings.ToLower(plain)
 
 	mustContain := []string{
-		"up/down",     // j/k description
-		"top",         // g/G description (top/bottom)
-		"pgup",        // page up key
-		"pgdn",        // page down key
-		"scroll c",    // h/l description (may truncate)
-		"enter",       // open
-		"detail",      // d key description
-		"yaml",        // y key description
-		"copy",        // c key description
-		"filter",      // / key description
-		"sort",        // sort keys description
-		"refresh",     // ctrl+r description
-		"esc",         // back
+		"up/down",  // j/k description
+		"top",      // g/G description (top/bottom)
+		"pgup",     // page up key
+		"pgdn",     // page down key
+		"scroll c", // h/l description (may truncate)
+		"enter",    // open
+		"detail",   // d key description
+		"yaml",     // y key description
+		"copy",     // c key description
+		"filter",   // / key description
+		"sort",     // sort keys description
+		"refresh",  // ctrl+r description
+		"esc",      // back
 	}
 	for _, text := range mustContain {
 		if !strings.Contains(plainLower, text) {
@@ -207,13 +207,13 @@ func TestQA_HelpContext_DetailView_ShowsRelevantKeys(t *testing.T) {
 	plainLower := strings.ToLower(plain)
 
 	mustContain := []string{
-		"up/down",  // j/k description
-		"top",      // g description
-		"bottom",   // G description
-		"yaml",     // y key description
-		"copy",     // c key description
-		"wrap",     // w key description
-		"esc",      // back
+		"up/down", // j/k description
+		"top",     // g description
+		"bottom",  // G description
+		"yaml",    // y key description
+		"copy",    // c key description
+		"wrap",    // w key description
+		"esc",     // back
 	}
 	for _, text := range mustContain {
 		if !strings.Contains(plainLower, text) {
@@ -238,7 +238,6 @@ func TestQA_HelpContext_DetailView_ExcludesIrrelevantKeys(t *testing.T) {
 	mustNotContain := []string{
 		"detail",  // d key - not in detail view
 		"reveal",  // x key
-		"filter",  // / key
 		"refresh", // ctrl+r
 		"pgup",    // pagination
 		"pgdn",    // pagination
@@ -270,12 +269,12 @@ func TestQA_HelpContext_YAMLView_ShowsRelevantKeys(t *testing.T) {
 	plainLower := strings.ToLower(plain)
 
 	mustContain := []string{
-		"up/down",  // j/k description
-		"top",      // g description
-		"bottom",   // G description
-		"copy",     // c key description
-		"wrap",     // w key description
-		"esc",      // back
+		"up/down", // j/k description
+		"top",     // g description
+		"bottom",  // G description
+		"copy",    // c key description
+		"wrap",    // w key description
+		"esc",     // back
 	}
 	for _, text := range mustContain {
 		if !strings.Contains(plainLower, text) {
@@ -329,12 +328,12 @@ func TestQA_HelpContext_RegionSelector_ShowsRelevantKeys(t *testing.T) {
 	plainLower := strings.ToLower(plain)
 
 	mustContain := []string{
-		"up/down",  // j/k description
-		"top",      // g description
-		"bottom",   // G description
-		"enter",    // select
-		"filter",   // / key description
-		"esc",      // cancel
+		"up/down", // j/k description
+		"top",     // g description
+		"bottom",  // G description
+		"enter",   // select
+		"filter",  // / key description
+		"esc",     // cancel
 	}
 	for _, text := range mustContain {
 		if !strings.Contains(plainLower, text) {
@@ -436,7 +435,7 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 // HC-09: HELP TEXT MATCHES ACTUAL BEHAVIOR
 // ═══════════════════════════════════════════════════════════════════════════
 
-func TestQA_HelpContext_DetailView_CopySaysYAML(t *testing.T) {
+func TestQA_HelpContext_DetailView_CopySaysValue(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
@@ -450,12 +449,12 @@ func TestQA_HelpContext_DetailView_CopySaysYAML(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
 
-	// Detail view c key copies YAML, not ID — help should say "copy yaml"
+	// Detail view c key copies the active field value — help should say "copy value"
 	if strings.Contains(plainLower, "copy id") {
-		t.Errorf("HC-09: detail help should say 'copy yaml' not 'copy id', got:\n%s", plain)
+		t.Errorf("HC-09: detail help should say 'copy value' not 'copy id', got:\n%s", plain)
 	}
-	if !strings.Contains(plainLower, "copy yaml") {
-		t.Errorf("HC-09: detail help should contain 'copy yaml', got:\n%s", plain)
+	if !strings.Contains(plainLower, "copy value") {
+		t.Errorf("HC-09: detail help should contain 'copy value', got:\n%s", plain)
 	}
 }
 

@@ -49,6 +49,30 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 	}
 }
 
+func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
+	clients := m.clients
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("AWS clients not initialized; cannot load AMI %s", imageID),
+				IsError: true,
+			}
+		}
+		res, err := awsclient.FetchAMIByID(context.Background(), clients.EC2, imageID)
+		if err != nil {
+			return messages.FlashMsg{
+				Text:    err.Error(),
+				IsError: true,
+			}
+		}
+		return messages.NavigateMsg{
+			Target:       messages.TargetDetail,
+			ResourceType: "ami",
+			Resource:     &res,
+		}
+	}
+}
+
 // fetchChildResources returns a tea.Cmd that calls the paginated child fetcher
 // for the given child type, passing an empty continuation token for the initial page.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
@@ -139,7 +163,6 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 		}
 	}
 }
-
 
 func (m *Model) fetchIdentity() tea.Cmd {
 	clients := m.clients
@@ -345,4 +368,3 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 		return nil
 	}
 }
-

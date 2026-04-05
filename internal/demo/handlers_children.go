@@ -9,23 +9,23 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
-	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
-	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	smithycbor "github.com/aws/smithy-go/encoding/cbor"
 
@@ -713,15 +713,16 @@ func registerEBChildHandlers(t *Transport) {
 func registerECSChildHandlers(t *Transport) {
 	// DescribeTaskDefinition — used by ecs_svc_logs to get log configuration
 	t.Handle("ecs", "DescribeTaskDefinition", func(_ *http.Request) (*http.Response, error) {
-		logGroup := "/ecs/demo-service"
-		streamPrefix := "ecs"
+		logGroup := "/aws/ecs/acme-services/api-gateway"
+		streamPrefix := "api-gateway"
 		out := &ecs.DescribeTaskDefinitionOutput{
 			TaskDefinition: &ecstypes.TaskDefinition{
-				Family:   aws.String("demo-service"),
-				Revision: 1,
+				Family:   aws.String("api-gateway"),
+				Revision: 12,
 				ContainerDefinitions: []ecstypes.ContainerDefinition{
 					{
-						Name: aws.String("app"),
+						Name:  aws.String("app"),
+						Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:latest"),
 						LogConfiguration: &ecstypes.LogConfiguration{
 							LogDriver: ecstypes.LogDriverAwslogs,
 							Options: map[string]string{
