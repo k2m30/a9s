@@ -95,4 +95,10 @@ func init() {
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCfnRoleID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("codeartifact", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "cb", Count: 1, ResourceIDs: []string{relatedCodeartifactCbID}},
+		}
+	})
 }
