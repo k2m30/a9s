@@ -61,4 +61,14 @@ func init() {
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedBackupRoleID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("asg", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2", Count: 4, ResourceIDs: []string{relatedASGEC2ID1, relatedASGEC2ID2, relatedASGEC2ID3, relatedASGEC2ID4}},
+			{TargetType: "tg", Count: 1, ResourceIDs: []string{relatedASGTGID}},
+			{TargetType: "subnet", Count: 3, ResourceIDs: []string{relatedASGSubnetID1, relatedASGSubnetID2, relatedASGSubnetID3}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "ng", Count: 0},
+		}
+	})
 }
