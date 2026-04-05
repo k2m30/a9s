@@ -19,6 +19,14 @@ func init() {
 		}
 		return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
 	})
+
+	resource.RegisterRelated("asg", []resource.RelatedDef{
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkASGEC2},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkASGTG},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
+		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: nil},
+	})
 }
 
 // FetchAutoScalingGroups calls the AutoScaling DescribeAutoScalingGroups API and converts the

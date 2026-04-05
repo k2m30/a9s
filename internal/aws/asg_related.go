@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // checkASGEC2 reads Instances[] from the ASG RawStruct and returns their IDs.
 // Pattern F — no cache needed.
-//
-//nolint:unused // ASG related-view scaffolding — wired up when ASG related views are implemented
 func checkASGEC2(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -31,9 +30,7 @@ func checkASGEC2(_ context.Context, _ interface{}, res resource.Resource, _ reso
 }
 
 // checkASGTG checks the cache for target groups referencing this ASG via TargetGroupARNs.
-// Pattern C: ASG RawStruct has TargetGroupARNs; match against tg cache by ID (ARN).
-//
-//nolint:unused // ASG related-view scaffolding — wired up when ASG related views are implemented
+// Pattern C: ASG RawStruct has TargetGroupARNs; match against tg cache by ARN from RawStruct.
 func checkASGTG(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -60,7 +57,8 @@ func checkASGTG(ctx context.Context, clients interface{}, res resource.Resource,
 
 	var ids []string
 	for _, tgRes := range tgList {
-		if arnSet[tgRes.ID] {
+		raw, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct)
+		if ok && raw.TargetGroupArn != nil && arnSet[*raw.TargetGroupArn] {
 			ids = append(ids, tgRes.ID)
 		}
 	}
@@ -72,8 +70,6 @@ func checkASGTG(ctx context.Context, clients interface{}, res resource.Resource,
 
 // checkASGSubnets parses VPCZoneIdentifier (comma-separated subnet IDs) from the ASG.
 // Pattern F — no cache needed.
-//
-//nolint:unused // ASG related-view scaffolding — wired up when ASG related views are implemented
 func checkASGSubnets(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -97,8 +93,6 @@ func checkASGSubnets(_ context.Context, _ interface{}, res resource.Resource, _ 
 }
 
 // asgRelatedResources returns the resource list for target from cache or fetches it.
-//
-//nolint:unused // ASG related-view scaffolding — wired up when ASG related views are implemented
 func asgRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {

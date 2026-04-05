@@ -61,7 +61,7 @@ func asgFixtures() []resource.Resource {
 				DefaultCooldown:      aws.Int32(300),
 				CreatedTime:          aws.Time(mustParseTime("2025-04-10T08:00:00Z")),
 				VPCZoneIdentifier:    aws.String("subnet-0aaa111111111111a,subnet-0bbb222222222222b,subnet-0ccc333333333333c"),
-				TargetGroupARNs:      []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-prod/1234567890abcdef"},
+				TargetGroupARNs:      []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
 				TerminationPolicies:  []string{"Default"},
 				LaunchConfigurationName: aws.String("acme-web-prod-lc-v3"),
 				LoadBalancerNames:       []string{"acme-prod-web"},
