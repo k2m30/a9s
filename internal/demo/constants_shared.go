@@ -2,6 +2,15 @@ package demo
 
 // Shared fixture identifiers used across multiple demo fixture files.
 // Keep cross-resource references centralized to avoid drift.
+//
+// Naming convention for related-resource constants:
+//
+//	related{SourceCamel}{TargetCamel}ID[N]
+//
+// {SourceCamel} and {TargetCamel} are the resource short names in PascalCase:
+// ec2→EC2, rds→RDS, s3→S3, tg→TG, ebs→EBS, asg→ASG, ng→NG, cfn→CFN, etc.
+// Add a numeric suffix (1, 2, …) only when a source has multiple IDs for the same target type.
+// Example: relatedEC2AlarmID1, relatedEC2AlarmID2, relatedEC2TGID (single — no suffix).
 const (
 	prodVPCID    = "vpc-0abc123def456789a"
 	stagingVPCID = "vpc-0def456789abc123d"

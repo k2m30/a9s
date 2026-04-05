@@ -339,8 +339,8 @@ type FieldItem struct {
 	TargetType  string // non-empty when IsNavigable (e.g., "vpc")
 }
 
-// toSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
-func toSnakeCase(s string) string {
+// ToSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
+func ToSnakeCase(s string) string {
 	var result strings.Builder
 	for i, r := range s {
 		if r >= 'A' && r <= 'Z' {
@@ -391,7 +391,7 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 			}
 			// Try snake_case if not found
 			if val == "" {
-				snakeKey := toSnakeCase(path)
+				snakeKey := ToSnakeCase(path)
 				if v, ok := fields[snakeKey]; ok {
 					val = v
 				}

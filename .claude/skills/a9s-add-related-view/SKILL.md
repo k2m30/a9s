@@ -293,8 +293,23 @@ func init() {
 }
 ```
 
-Add constant IDs to `internal/demo/constants_shared.go` (e.g., `relatedEC2TGID` is defined
-there) so the navigate-to flow works. **Do not** look for them in `fixtures_compute.go`.
+Add constant IDs to `internal/demo/constants_shared.go` so the navigate-to flow works.
+**Do not** look for them in `fixtures_compute.go`.
+
+**Naming convention for demo constants — MUST follow this pattern to avoid collisions:**
+
+```
+related{SourceCamel}{TargetCamel}ID[N]
+```
+
+Examples from the existing file:
+- `relatedEC2TGID` — EC2 → Target Group
+- `relatedEC2AlarmID1`, `relatedEC2AlarmID2` — EC2 → CloudWatch Alarm (multiple)
+- `relatedEC2EBSVolID1` — EC2 → EBS Volume
+
+Use the resource short name in PascalCase as `{SourceCamel}` and `{TargetCamel}`:
+`ec2` → `EC2`, `rds` → `RDS`, `s3` → `S3`, `tg` → `TG`, `ebs` → `EBS`, etc.
+Add a numeric suffix only when a source has multiple related IDs of the same target type.
 
 ### 5. Verify parent resource Fields
 
@@ -311,8 +326,20 @@ If a required field is missing from Fields, add it to the regular fetcher.
 ### 6. Verify navigable field paths match detail view output
 
 The `FieldPath` in `NavigableField` must match the actual key labels
-rendered in the detail view. Run the detail view (or read `renderFromConfig`)
-to verify the paths are correct.
+rendered in the detail view. A mismatch silently leaves the field non-highlighted
+across the entire resource type.
+
+**Automated check (required):** Run the test added in QA step 9
+(`TestNavigableFields_{Source}_FieldPathsResolve`) which verifies each registered
+`FieldPath` resolves to a non-empty value against the resource's demo fixture:
+
+```bash
+go test ./tests/unit/ -run "TestNavigableFields_{Source}_FieldPathsResolve" -v -count=1
+```
+
+**Manual fallback:** If no demo fixture exists yet, check `.a9s/views_reference.yaml`
+for the source resource — all field paths that appear in the detail view are
+listed there. Verify each `FieldPath` matches a key in that file (case-sensitive).
 
 For nested fields like `SecurityGroups.GroupId`, the detail view renders
 these as indented sub-fields. The FieldPath must match the leaf label
@@ -368,6 +395,8 @@ import (
 
     // ... SDK type imports as needed ...
 
+    "github.com/k2m30/a9s/v3/internal/demo"
+    "github.com/k2m30/a9s/v3/internal/fieldpath"
     "github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -405,6 +434,41 @@ func TestNavigableFields_{Source}_Registered(t *testing.T) {
         }
         if nav.TargetType != targetType {
             t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, targetType)
+        }
+    }
+}
+
+// TestNavigableFields_{Source}_FieldPathsResolve verifies that each registered
+// NavigableField.FieldPath resolves to a non-empty value against the demo fixture.
+// A mismatch here means the field will silently never be highlighted in the detail view.
+func TestNavigableFields_{Source}_FieldPathsResolve(t *testing.T) {
+    // Get demo resource for this source type (must be populated by the demo fixture)
+    demoFn := demo.GetDemoResources("{source}")
+    if demoFn == nil {
+        t.Skip("no demo fixture registered for {source}")
+    }
+    resources := demoFn()
+    if len(resources) == 0 {
+        t.Skip("demo fixture returned no resources for {source}")
+    }
+    r := resources[0]
+
+    fields := resource.GetNavigableFields("{source}")
+    if len(fields) == 0 {
+        t.Fatal("no navigable fields registered for {source}")
+    }
+
+    for _, nav := range fields {
+        items := fieldpath.ExtractFieldList(r.RawStruct, []string{nav.FieldPath}, r.Fields, nil)
+        found := false
+        for _, item := range items {
+            if item.Value != "" && item.Value != "-" {
+                found = true
+                break
+            }
+        }
+        if !found {
+            t.Errorf("NavigableField.FieldPath %q resolved to empty/missing value in demo fixture — check FieldPath spelling or add field to fetcher", nav.FieldPath)
         }
     }
 }

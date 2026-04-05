@@ -1,5 +1,5 @@
 // detail_render.go contains YAML/plain content generation and config-driven rendering for DetailModel.
-// Specifically: RawYAML, PlainContent, renderContent, computeKeyWidth, renderFromConfig, toSnakeCase.
+// Specifically: RawYAML, PlainContent, renderContent, computeKeyWidth, renderFromConfig.
 package views
 
 import (
@@ -137,7 +137,7 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 			}
 			// Try underscore-separated version: "InstanceId" → "instance_id"
 			if val == "" {
-				snakeKey := toSnakeCase(path)
+				snakeKey := fieldpath.ToSnakeCase(path)
 				if v, ok := m.res.Fields[snakeKey]; ok {
 					val = v
 				}
@@ -162,18 +162,3 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 	return lines
 }
 
-// toSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
-func toSnakeCase(s string) string {
-	var result strings.Builder
-	for i, r := range s {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 {
-				result.WriteByte('_')
-			}
-			result.WriteRune(r + 32) // toLower
-		} else {
-			result.WriteRune(r)
-		}
-	}
-	return result.String()
-}
