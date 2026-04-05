@@ -174,4 +174,20 @@ func init() {
 			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedEBSSnapKMSID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ecr", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "lambda", Count: 1, ResourceIDs: []string{relatedECRLambdaID}},
+			{TargetType: "cb", Count: 1, ResourceIDs: []string{relatedECRCbID}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
+
+	resource.RegisterRelatedDemo("ecs", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ecs-svc", Count: 3, ResourceIDs: []string{relatedECSSvcID1, relatedECSSvcID2, relatedECSSvcID3}},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedECSAlarmID}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
