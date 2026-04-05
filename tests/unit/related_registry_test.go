@@ -223,6 +223,41 @@ func TestRelated_ACM_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_Alarm_Registered(t *testing.T) {
+	defs := resource.GetRelated("alarm")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for alarm")
+	}
+
+	expected := []string{"sns", "asg"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+
+	// Verify sns has a non-nil checker, asg is a stub
+	for _, def := range defs {
+		switch def.TargetType {
+		case "sns":
+			if def.Checker == nil {
+				t.Error("alarm sns: Checker should not be nil")
+			}
+		case "asg":
+			if def.Checker != nil {
+				t.Error("alarm asg: Checker should be nil (stub)")
+			}
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

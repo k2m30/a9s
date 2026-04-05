@@ -25,4 +25,11 @@ func init() {
 			{TargetType: "ct-events", Count: 1, ResourceIDs: []string{relatedEC2TrailEvent1}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("alarm", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedAlarmSNSID}},
+			{TargetType: "asg", Count: 0},
+		}
+	})
 }

@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchCloudWatchAlarmsPage(ctx, c.CloudWatch, continuationToken)
 	})
+
+	resource.RegisterRelated("alarm", []resource.RelatedDef{
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+	})
 }
 
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and returns all
