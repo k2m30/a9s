@@ -880,7 +880,7 @@ func ebsVolumeFixtures() []resource.Resource {
 				"type":        "gp2",
 				"iops":        "300",
 				"encrypted":   "false",
-				"attached_to": "",
+				"attached_to": "i-0a1b2c3d4e5f60002",
 				"az":          "us-east-1a",
 				"created":     t3.Format("2006-01-02 15:04"),
 			},
@@ -893,7 +893,9 @@ func ebsVolumeFixtures() []resource.Resource {
 				Encrypted:        aws.Bool(false),
 				AvailabilityZone: aws.String("us-east-1a"),
 				CreateTime:       aws.Time(t3),
-				Attachments:      []ec2types.VolumeAttachment{},
+				Attachments: []ec2types.VolumeAttachment{
+					{InstanceId: aws.String("i-0a1b2c3d4e5f60002")},
+				},
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("orphaned-backup-vol")},
 				},
@@ -911,7 +913,7 @@ func ebsVolumeFixtures() []resource.Resource {
 				"type":        "gp3",
 				"iops":        "3000",
 				"encrypted":   "true",
-				"attached_to": "",
+				"attached_to": "i-0a1b2c3d4e5f60004",
 				"az":          "us-east-1c",
 				"created":     t4.Format("2006-01-02 15:04"),
 			},
@@ -924,8 +926,10 @@ func ebsVolumeFixtures() []resource.Resource {
 				Encrypted:        aws.Bool(true),
 				AvailabilityZone: aws.String("us-east-1c"),
 				CreateTime:       aws.Time(t4),
-				Attachments:      []ec2types.VolumeAttachment{},
-				Tags:             []ec2types.Tag{},
+				Attachments: []ec2types.VolumeAttachment{
+					{InstanceId: aws.String("i-0a1b2c3d4e5f60004")},
+				},
+				Tags: []ec2types.Tag{},
 			},
 		},
 		{
@@ -940,7 +944,7 @@ func ebsVolumeFixtures() []resource.Resource {
 				"type":        "io2",
 				"iops":        "16000",
 				"encrypted":   "true",
-				"attached_to": "",
+				"attached_to": "i-0a1b2c3d4e5f60006",
 				"az":          "us-east-1b",
 				"created":     t5.Format("2006-01-02 15:04"),
 			},
@@ -953,7 +957,9 @@ func ebsVolumeFixtures() []resource.Resource {
 				Encrypted:        aws.Bool(true),
 				AvailabilityZone: aws.String("us-east-1b"),
 				CreateTime:       aws.Time(t5),
-				Attachments:      []ec2types.VolumeAttachment{},
+				Attachments: []ec2types.VolumeAttachment{
+					{InstanceId: aws.String("i-0a1b2c3d4e5f60006")},
+				},
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("new-db-volume")},
 				},

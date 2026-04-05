@@ -28,6 +28,15 @@ func init() {
 		}
 		return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
 	})
+
+	resource.RegisterRelated("ebs", []resource.RelatedDef{
+		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSEC2, NeedsTargetCache: false},
+		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEBSSnap, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSKMS, NeedsTargetCache: false},
+	})
+	resource.RegisterNavigableFields("ebs", []resource.NavigableField{
+		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
+	})
 }
 
 // FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
