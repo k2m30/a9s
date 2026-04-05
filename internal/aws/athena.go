@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
 	})
+
+	resource.RegisterRelated("athena", []resource.RelatedDef{
+		{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: nil},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: nil},
+	})
 }
 
 // FetchAthenaWorkgroups calls the Athena ListWorkGroups API and converts the

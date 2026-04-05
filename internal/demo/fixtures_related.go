@@ -40,4 +40,25 @@ func init() {
 			{TargetType: "asg", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("apigw", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "lambda", Count: 1, ResourceIDs: []string{relatedApigwLambdaID}},
+			{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedApigwLogsID}},
+			{TargetType: "waf", Count: 1, ResourceIDs: []string{relatedApigwWAFID}},
+		}
+	})
+
+	resource.RegisterRelatedDemo("athena", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "s3", Count: 1, ResourceIDs: []string{relatedAthenaS3ID}},
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedAthenaKMSID}},
+		}
+	})
+
+	resource.RegisterRelatedDemo("backup", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedBackupRoleID}},
+		}
+	})
 }
