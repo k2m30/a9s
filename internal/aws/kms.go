@@ -19,13 +19,106 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		resources, err := FetchKMSKeys(ctx, c.KMS, c.KMS, c.KMS)
-		if err != nil {
-			return resource.FetchResult{}, err
+
+		input := &kms.ListKeysInput{
+			Limit: aws.Int32(DefaultPageSize),
 		}
+		if continuationToken != "" {
+			input.Marker = aws.String(continuationToken)
+		}
+
+		listOutput, err := c.KMS.ListKeys(ctx, input)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing KMS keys: %w", err)
+		}
+
+		if len(listOutput.Keys) == 0 {
+			return resource.FetchResult{
+				Resources: []resource.Resource{},
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: false,
+					NextToken:   "",
+					PageSize:    0,
+					TotalHint:   -1,
+				},
+			}, nil
+		}
+
+		// Build alias map — single page only to bound work.
+		// Aliases not found on this page will show as empty; subsequent
+		// pages (when the user scrolls) will fill them in.
+		aliasMap := make(map[string]string)
+		aliasOutput, aliasErr := c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
+			Limit: aws.Int32(DefaultPageSize),
+		})
+		if aliasErr == nil {
+			for _, alias := range aliasOutput.Aliases {
+				if alias.TargetKeyId != nil && alias.AliasName != nil {
+					aliasMap[*alias.TargetKeyId] = *alias.AliasName
+				}
+			}
+		}
+
+		var resources []resource.Resource
+		for _, key := range listOutput.Keys {
+			if key.KeyId == nil {
+				continue
+			}
+			descOutput, err := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
+				KeyId: aws.String(*key.KeyId),
+			})
+			if err != nil {
+				continue
+			}
+			meta := descOutput.KeyMetadata
+			if meta == nil {
+				continue
+			}
+			if meta.KeyManager != kmstypes.KeyManagerTypeCustomer {
+				continue
+			}
+
+			keyID := ""
+			if meta.KeyId != nil {
+				keyID = *meta.KeyId
+			}
+
+			description := ""
+			if meta.Description != nil {
+				description = *meta.Description
+			}
+
+			status := string(meta.KeyState)
+			alias := aliasMap[keyID]
+
+			resources = append(resources, resource.Resource{
+				ID:     keyID,
+				Name:   alias,
+				Status: status,
+				Fields: map[string]string{
+					"key_id":      keyID,
+					"alias":       alias,
+					"status":      status,
+					"description": description,
+				},
+				RawStruct: meta,
+			})
+		}
+
+		isTruncated := listOutput.Truncated
+		var nextToken string
+		if listOutput.NextMarker != nil {
+			nextToken = *listOutput.NextMarker
+		}
+
 		return resource.FetchResult{
-			Resources:  resources,
-			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
 		}, nil
 	})
 }

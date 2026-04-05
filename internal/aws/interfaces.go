@@ -70,6 +70,12 @@ type S3GetBucketLocationAPI interface {
 	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
 }
 
+// S3GetBucketNotificationConfigurationAPI defines the interface for
+// the S3 GetBucketNotificationConfiguration operation.
+type S3GetBucketNotificationConfigurationAPI interface {
+	GetBucketNotificationConfiguration(ctx context.Context, params *s3.GetBucketNotificationConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetBucketNotificationConfigurationOutput, error)
+}
+
 // RDSDescribeDBInstancesAPI defines the interface for the RDS DescribeDBInstances operation.
 type RDSDescribeDBInstancesAPI interface {
 	DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
@@ -148,6 +154,12 @@ type EC2DescribeInternetGatewaysAPI interface {
 // LambdaListFunctionsAPI defines the interface for the Lambda ListFunctions operation.
 type LambdaListFunctionsAPI interface {
 	ListFunctions(ctx context.Context, params *lambda.ListFunctionsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error)
+}
+
+// LambdaListEventSourceMappingsAPI defines the interface for the Lambda
+// ListEventSourceMappings operation.
+type LambdaListEventSourceMappingsAPI interface {
+	ListEventSourceMappings(ctx context.Context, params *lambda.ListEventSourceMappingsInput, optFns ...func(*lambda.Options)) (*lambda.ListEventSourceMappingsOutput, error)
 }
 
 // CloudWatchDescribeAlarmsAPI defines the interface for the CloudWatch DescribeAlarms operation.

@@ -39,7 +39,7 @@ The project's `CLAUDE.md` is the single source of truth for how Claude Code oper
 - **Project structure** — where everything lives
 - **Rules** — TDD, pre-push checks, docs sync, no CI debugging
 - **Agents** — specialized sub-agents for architecture, coding, QA, review, etc.
-- **Skills** — reusable workflows (a9s-common, a9s-bt-v2, a9s-add-resource, a9s-add-child-view)
+- **Skills** — reusable workflows (a9s-common, a9s-bt-v2, a9s-add-resource, a9s-add-child-view, a9s-add-related-view, a9s-implement-issue)
 
 You don't need to edit it to contribute. Just start Claude Code and it knows the rules.
 
@@ -66,6 +66,8 @@ Skills are reusable workflows loaded by Claude Code:
 - **`a9s-bt-v2`** — Bubble Tea v2 / Lipgloss v2 API patterns
 - **`a9s-add-resource`** — 12-step blueprint for adding new AWS resource types
 - **`a9s-add-child-view`** — step-by-step blueprint for adding child views (child fetcher + parent wiring + tests)
+- **`a9s-add-related-view`** — blueprint for adding related-resource views per resource type
+- **`a9s-implement-issue`** — end-to-end workflow: analyze → design → implement → verify → release
 
 ## Do's
 

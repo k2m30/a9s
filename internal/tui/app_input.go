@@ -37,6 +37,9 @@ func (m *Model) applyFilterToActiveView(text string) {
 	if f, ok := m.activeView().(views.Filterable); ok {
 		f.SetFilter(text)
 	}
+	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+		m.cacheTopLevelResourceList(*rl)
+	}
 }
 
 // updateCommandMode handles keys while in command input mode.
@@ -44,6 +47,10 @@ func (m Model) updateCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Escape) {
 		m.inputMode = modeNormal
 		m.cmdInput.Blur()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Tab) {
+		m.cmdInput.SetValue(m.autocompleteCommand(m.cmdInput.Value()))
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Enter) {
@@ -56,6 +63,42 @@ func (m Model) updateCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var teaCmd tea.Cmd
 	m.cmdInput, teaCmd = m.cmdInput.Update(msg)
 	return m, teaCmd
+}
+
+func (m Model) autocompleteCommand(input string) string {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return input
+	}
+
+	matches := make([]string, 0, 8)
+	seen := map[string]struct{}{}
+	add := func(candidate string) {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" || !strings.HasPrefix(candidate, input) {
+			return
+		}
+		if _, ok := seen[candidate]; ok {
+			return
+		}
+		seen[candidate] = struct{}{}
+		matches = append(matches, candidate)
+	}
+
+	for _, cmd := range []string{"q", "quit", "ctx", "profile", "region", "help"} {
+		add(cmd)
+	}
+	for _, rt := range resource.AllResourceTypes() {
+		add(rt.ShortName)
+		for _, alias := range rt.Aliases {
+			add(alias)
+		}
+	}
+
+	if len(matches) == 1 {
+		return matches[0]
+	}
+	return input
 }
 
 // executeCommand dispatches a colon-command string.

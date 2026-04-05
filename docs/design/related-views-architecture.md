@@ -1620,7 +1620,7 @@ These files were in the v1 architecture (separate pushed view) and are
 | File | Why not needed |
 |------|----------------|
 | `internal/tui/views/relatedlist.go` | No separate `RelatedTypesListModel` -- right column is embedded in DetailModel |
-| `internal/tui/app_related.go` | Handler logic moves to `app_handlers.go` additions |
+| `internal/tui/views/relatedlist.go` | No separate `RelatedTypesListModel` -- right column is embedded in DetailModel |
 
 ### Per-Resource Files (mechanical, per `a9s-add-related-view` skill)
 
@@ -1744,7 +1744,7 @@ before continuing the rollout.**
 | MaxResults on existence checks | Checkers need count, not full data; minimizes API data transfer and reduces throttle risk |
 | Throttle tests mandatory per reverse checker | QA must verify retry-then-success, retry-exhausted, and context-timeout for every expensive check |
 | Forward relationships in left column ONLY | Avoids duplication; left = "points to", right = "pointed to by" |
-| No separate relatedlist.go or app_related.go | Right column is embedded in detail view; handlers go in existing app_handlers.go |
+| No separate relatedlist.go | Right column is embedded in detail view; `app_related.go` holds related-specific handlers separated from the main handler file |
 | Count display driven by checker, not category | Reverse checkers CAN return counts when cheap (VPC->Subnets, Lambda->SQS ESM); Count=-1 means no count shown |
 | `Resources` binding stays at `r` (not moved to `R`) | Only CFN's ChildViewDef.Key changes; `r`/`ToggleRelated` in detail view is context-separated, not key-separated |
 | Cache-first + fetcher-fallback for navigable field navigation | No generic FetchByID interface; reuses resourceCache when available, falls back to RelatedFetcher |

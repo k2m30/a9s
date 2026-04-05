@@ -5,6 +5,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "CloudWatch Alarms",
 			ShortName: "alarm",
+			ListTitle: "alarms",
 			Aliases:   []string{"alarm", "alarms", "cloudwatch"},
 			Category:  "MONITORING",
 			Columns: []Column{

@@ -10,22 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// Consistent VPC IDs for cross-type references (Acme Corp Production scenario).
-const (
-	prodVPCID    = "vpc-0abc123def456789a"
-	stagingVPCID = "vpc-0def456789abc123d"
-)
-
-// Consistent subnet IDs referenced by other networking resources.
-const (
-	prodPublicSubnetA  = "subnet-0aaa111111111111a"
-	prodPublicSubnetB  = "subnet-0bbb222222222222b"
-	prodPrivateSubnetA = "subnet-0ccc333333333333c"
-	prodPrivateSubnetB = "subnet-0ddd444444444444d"
-	stagingSubnetA     = "subnet-0eee555555555555e"
-	stagingSubnetB     = "subnet-0fff666666666666f"
-)
-
 func init() {
 	demoData["elb"] = elbFixtures
 	demoData["tg"] = tgFixtures
@@ -646,8 +630,8 @@ func elbListenerRuleFixtures() []resource.Resource {
 				"is_default":         "false",
 			},
 			RawStruct: elbv2types.Rule{
-				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule1"),
-				Priority: aws.String("100"),
+				RuleArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule1"),
+				Priority:  aws.String("100"),
 				IsDefault: aws.Bool(false),
 			},
 		},
@@ -663,8 +647,8 @@ func elbListenerRuleFixtures() []resource.Resource {
 				"is_default":         "false",
 			},
 			RawStruct: elbv2types.Rule{
-				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule2"),
-				Priority: aws.String("200"),
+				RuleArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule2"),
+				Priority:  aws.String("200"),
 				IsDefault: aws.Bool(false),
 			},
 		},
@@ -680,8 +664,8 @@ func elbListenerRuleFixtures() []resource.Resource {
 				"is_default":         "false",
 			},
 			RawStruct: elbv2types.Rule{
-				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule3"),
-				Priority: aws.String("300"),
+				RuleArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule3"),
+				Priority:  aws.String("300"),
 				IsDefault: aws.Bool(false),
 			},
 		},
@@ -697,8 +681,8 @@ func elbListenerRuleFixtures() []resource.Resource {
 				"is_default":         "false",
 			},
 			RawStruct: elbv2types.Rule{
-				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule4"),
-				Priority: aws.String("400"),
+				RuleArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/rule4"),
+				Priority:  aws.String("400"),
 				IsDefault: aws.Bool(false),
 			},
 		},
@@ -714,8 +698,8 @@ func elbListenerRuleFixtures() []resource.Resource {
 				"is_default":         "true",
 			},
 			RawStruct: elbv2types.Rule{
-				RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/default"),
-				Priority: aws.String("default"),
+				RuleArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaa111/default"),
+				Priority:  aws.String("default"),
 				IsDefault: aws.Bool(true),
 			},
 		},

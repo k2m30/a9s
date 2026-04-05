@@ -122,13 +122,13 @@ func redisFixtures() []resource.Resource {
 				"endpoint":       "",
 			},
 			RawStruct: elasticachetypes.CacheCluster{
-				ARN:                aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:dev-feature-redis"),
-				CacheClusterId:     aws.String("dev-feature-redis"),
-				CacheClusterStatus: aws.String("creating"),
-				CacheNodeType:      aws.String("cache.t3.small"),
-				Engine:             aws.String("redis"),
-				EngineVersion:      aws.String("7.1"),
-				NumCacheNodes:      aws.Int32(1),
+				ARN:                    aws.String("arn:aws:elasticache:us-east-1:123456789012:cluster:dev-feature-redis"),
+				CacheClusterId:         aws.String("dev-feature-redis"),
+				CacheClusterStatus:     aws.String("creating"),
+				CacheNodeType:          aws.String("cache.t3.small"),
+				Engine:                 aws.String("redis"),
+				EngineVersion:          aws.String("7.1"),
+				NumCacheNodes:          aws.Int32(1),
 				CacheClusterCreateTime: aws.Time(mustParseTime("2026-03-21T08:00:00+00:00")),
 			},
 		},
@@ -162,8 +162,8 @@ func docdbClusterFixtures() []resource.Resource {
 					{DBInstanceIdentifier: aws.String("acme-docdb-prod-02"), IsClusterWriter: aws.Bool(false)},
 					{DBInstanceIdentifier: aws.String("acme-docdb-prod-03"), IsClusterWriter: aws.Bool(false)},
 				},
-				MasterUsername:  aws.String("docdbadmin"),
-				MultiAZ:         aws.Bool(true),
+				MasterUsername:    aws.String("docdbadmin"),
+				MultiAZ:           aws.Bool(true),
 				ClusterCreateTime: aws.Time(mustParseTime("2025-04-15T10:20:00+00:00")),
 			},
 		},
@@ -189,8 +189,8 @@ func docdbClusterFixtures() []resource.Resource {
 					{DBInstanceIdentifier: aws.String("analytics-docdb-01"), IsClusterWriter: aws.Bool(true)},
 					{DBInstanceIdentifier: aws.String("analytics-docdb-02"), IsClusterWriter: aws.Bool(false)},
 				},
-				MasterUsername:  aws.String("analytics"),
-				MultiAZ:         aws.Bool(false),
+				MasterUsername:    aws.String("analytics"),
+				MultiAZ:           aws.Bool(false),
 				ClusterCreateTime: aws.Time(mustParseTime("2025-08-20T16:45:00+00:00")),
 			},
 		},
@@ -215,8 +215,8 @@ func docdbClusterFixtures() []resource.Resource {
 				DBClusterMembers: []docdbtypes.DBClusterMember{
 					{DBInstanceIdentifier: aws.String("staging-docdb-01"), IsClusterWriter: aws.Bool(true)},
 				},
-				MasterUsername:  aws.String("stagingadmin"),
-				MultiAZ:         aws.Bool(false),
+				MasterUsername:    aws.String("stagingadmin"),
+				MultiAZ:           aws.Bool(false),
 				ClusterCreateTime: aws.Time(mustParseTime("2025-11-05T08:30:00+00:00")),
 			},
 		},
@@ -231,9 +231,12 @@ func s3Buckets() []resource.Resource {
 			Name:   "data-pipeline-logs",
 			Status: "",
 			Fields: map[string]string{
-				"name":          "data-pipeline-logs",
-				"bucket_name":   "data-pipeline-logs",
-				"creation_date": "2025-01-15T09:23:41+00:00",
+				"name":                "data-pipeline-logs",
+				"bucket_name":         "data-pipeline-logs",
+				"creation_date":       "2025-01-15T09:23:41+00:00",
+				"notification_lambda": "arn:aws:lambda:us-east-1:123456789012:function:process-orders",
+				"notification_sqs":    "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
+				"notification_sns":    "arn:aws:sns:us-east-1:123456789012:order-events",
 			},
 			RawStruct: s3types.Bucket{
 				Name:         aws.String("data-pipeline-logs"),
@@ -246,9 +249,12 @@ func s3Buckets() []resource.Resource {
 			Name:   "webapp-assets-prod",
 			Status: "",
 			Fields: map[string]string{
-				"name":          "webapp-assets-prod",
-				"bucket_name":   "webapp-assets-prod",
-				"creation_date": "2025-03-22T14:07:19+00:00",
+				"name":                "webapp-assets-prod",
+				"bucket_name":         "webapp-assets-prod",
+				"creation_date":       "2025-03-22T14:07:19+00:00",
+				"notification_lambda": "arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen",
+				"notification_sqs":    "arn:aws:sqs:us-east-1:123456789012:webhook-ingest-queue.fifo",
+				"notification_sns":    "arn:aws:sns:us-east-1:123456789012:deploy-notifications",
 			},
 			RawStruct: s3types.Bucket{
 				Name:         aws.String("webapp-assets-prod"),
@@ -337,6 +343,18 @@ func s3Buckets() []resource.Resource {
 				CreationDate: aws.Time(mustParseTime(createDate)),
 			},
 		})
+	}
+
+	for i := range buckets {
+		if _, ok := buckets[i].Fields["notification_lambda"]; !ok {
+			buckets[i].Fields["notification_lambda"] = ""
+		}
+		if _, ok := buckets[i].Fields["notification_sqs"]; !ok {
+			buckets[i].Fields["notification_sqs"] = ""
+		}
+		if _, ok := buckets[i].Fields["notification_sns"]; !ok {
+			buckets[i].Fields["notification_sns"] = ""
+		}
 	}
 
 	return buckets

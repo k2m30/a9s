@@ -3,8 +3,8 @@ package views
 import (
 	"strings"
 
-	lipgloss "charm.land/lipgloss/v2"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -81,7 +81,16 @@ func (m HelpModel) View() string {
 	descStyle := helpDescStyle
 
 	bind := func(k, d string) string {
+		// Keep descriptors intact; truncation of ANSI-styled cells can clip
+		// important help words in narrow layouts.
 		return hkStyle.Render(text.PadOrTrunc(k, 9)) + descStyle.Render(d)
+	}
+	padCell := func(s string, w int) string {
+		visible := lipgloss.Width(s)
+		if visible >= w {
+			return s
+		}
+		return s + strings.Repeat(" ", w-visible)
 	}
 
 	groups := m.buildGroups()
@@ -98,7 +107,7 @@ func (m HelpModel) View() string {
 	var catParts []string
 	for i, g := range groups {
 		if i < numCols-1 {
-			catParts = append(catParts, catStyle.Render(text.PadOrTrunc(g.title, colW)))
+			catParts = append(catParts, padCell(catStyle.Render(g.title), colW))
 		} else {
 			catParts = append(catParts, catStyle.Render(g.title))
 		}
@@ -126,7 +135,7 @@ func (m HelpModel) View() string {
 				cell = bind(g.bindings[row].key, g.bindings[row].desc)
 			}
 			if i < numCols-1 {
-				parts = append(parts, text.PadOrTrunc(cell, colW))
+				parts = append(parts, padCell(cell, colW))
 			} else {
 				parts = append(parts, cell)
 			}
@@ -272,8 +281,11 @@ func (m HelpModel) detailGroups() []helpGroup {
 			title: "ACTIONS",
 			bindings: []helpBinding{
 				{"y", "yaml"},
-				{"c", "copy yaml"},
+				{"c", "copy value"},
 				{"w", "wrap toggle"},
+				{"r", "related"},
+				{"tab", "focus switch"},
+				{"h/l", "focus cols"},
 			},
 		},
 		{
@@ -282,6 +294,16 @@ func (m HelpModel) detailGroups() []helpGroup {
 				{"/", "search"},
 				{"n", "next match"},
 				{"N", "prev match"},
+			},
+		},
+		{
+			title: "RELATED",
+			bindings: []helpBinding{
+				{"/", "filter list"},
+				{"c", "copy type"},
+				{"tab", "focus switch"},
+				{"r", "related"},
+				{"esc", "unfocus"},
 			},
 		},
 		{
