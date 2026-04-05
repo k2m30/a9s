@@ -120,7 +120,7 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 			continue
 		}
 		for _, d := range raw.Dimensions {
-			if d.Value != nil && *d.Value == instanceID {
+			if d.Name != nil && *d.Name == "InstanceId" && d.Value != nil && *d.Value == instanceID {
 				ids = append(ids, alarmRes.ID)
 				break
 			}
