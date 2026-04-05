@@ -157,4 +157,12 @@ func init() {
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedEbRuleRoleID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ebs", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2",      Count: 1, ResourceIDs: []string{relatedEBSEC2ID}},
+			{TargetType: "ebs-snap", Count: 1, ResourceIDs: []string{relatedEBSSnapID}},
+			{TargetType: "kms",      Count: 1, ResourceIDs: []string{relatedEBSKMSID}},
+		}
+	})
 }
