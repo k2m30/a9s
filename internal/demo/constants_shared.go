@@ -112,4 +112,7 @@ const (
 
 	relatedCbRoleID     = "acme-ci-deploy-role"
 	relatedCbPipelineID = "acme-api-deploy"
+
+	relatedCfS3ID  = "webapp-assets-prod"
+	relatedCfELBID = "acme-prod-web"
 )
