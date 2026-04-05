@@ -121,4 +121,6 @@ const (
 	relatedCodeartifactCbID = "acme-api-build"
 
 	relatedCtEventsRoleID = "deploy-bot"
+
+	relatedDbcSGID = "sg-0ccc333333333333c"
 )

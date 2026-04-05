@@ -394,8 +394,9 @@ func TestQA_DocDB_DetailView(t *testing.T) {
 	k := keys.Default()
 	res := fixtures[0]
 	// Use wide viewport to avoid truncation of long endpoint values
+	// (right panel auto-shows at width>=60 when related defs are registered, reducing left column)
 	m := views.NewDetail(res, "dbc", nil, k)
-	m.SetSize(120, 20)
+	m.SetSize(200, 20)
 	out := m.View()
 
 	if out == "" || out == "Initializing..." {

@@ -108,4 +108,13 @@ func init() {
 			{TargetType: "iam-user", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("dbc", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedDbcSGID}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "secrets", Count: 0},
+			{TargetType: "logs", Count: 0},
+		}
+	})
 }
