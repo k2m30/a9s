@@ -22,6 +22,32 @@ func init() {
 func secretsManagerSecrets() []resource.Resource {
 	secrets := []resource.Resource{
 		{
+			ID:     "prod/docdb/acme-docdb-prod",
+			Name:   "prod/docdb/acme-docdb-prod",
+			Status: "",
+			Fields: map[string]string{				"secret_name":      "prod/docdb/acme-docdb-prod",
+				"description":      "DocumentDB cluster credentials for acme-docdb-prod",
+				"last_accessed":    "2026-03-21",
+				"last_changed":     "2026-02-20",
+				"rotation_enabled": "Yes",
+			},
+			RawStruct: smtypes.SecretListEntry{
+				Name:             aws.String("prod/docdb/acme-docdb-prod"),
+				ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),
+				Description:      aws.String("DocumentDB cluster credentials for acme-docdb-prod"),
+				LastAccessedDate: aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
+				LastChangedDate:  aws.Time(time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC)),
+				RotationEnabled:  aws.Bool(true),
+				CreatedDate:      aws.Time(time.Date(2025, 2, 5, 9, 0, 0, 0, time.UTC)),
+				KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+				LastRotatedDate:   aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
+				RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"),
+				PrimaryRegion:     aws.String("us-east-1"),
+				RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
+				Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+			},
+		},
+		{
 			ID:     "prod/database/primary",
 			Name:   "prod/database/primary",
 			Status: "",
