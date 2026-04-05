@@ -7,11 +7,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -347,5 +351,816 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 
 	if got.Count != -1 {
 		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Navigable Field Registration
+// ---------------------------------------------------------------------------
+
+func TestNavigableFields_EC2_Registered(t *testing.T) {
+	expected := map[string]string{
+		"VpcId":                             "vpc",
+		"SubnetId":                          "subnet",
+		"ImageId":                           "ami",
+		"BlockDeviceMappings.Ebs.VolumeId":  "ebs",
+		"SecurityGroups.GroupId":            "sg",
+	}
+	for path, wantTarget := range expected {
+		nav := resource.IsFieldNavigable("ec2", path)
+		if nav == nil {
+			t.Errorf("expected navigable field %q not registered for ec2", path)
+			continue
+		}
+		if nav.TargetType != wantTarget {
+			t.Errorf("ec2 navigable field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
+		}
+	}
+}
+
+func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
+	resources, ok := demo.GetResources("ec2")
+	if !ok {
+		t.Skip("no demo fixture registered for ec2")
+	}
+	if len(resources) == 0 {
+		t.Skip("demo fixture returned no resources for ec2")
+	}
+	r := resources[0]
+
+	fields := resource.GetNavigableFields("ec2")
+	if len(fields) == 0 {
+		t.Fatal("no navigable fields registered for ec2")
+	}
+
+	for _, nav := range fields {
+		items := fieldpath.ExtractFieldList(r.RawStruct, r.Fields, []string{nav.FieldPath}, nil)
+		found := false
+		for _, item := range items {
+			if item.Value != "" && item.Value != "-" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("NavigableField.FieldPath %q resolved to empty/missing value in ec2 demo fixture", nav.FieldPath)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Demo Checker
+// ---------------------------------------------------------------------------
+
+func TestRelatedDemo_EC2_Registered(t *testing.T) {
+	checker := resource.GetRelatedDemo("ec2")
+	if checker == nil {
+		t.Fatal("no demo checker registered for ec2")
+	}
+
+	results := checker(resource.Resource{ID: "i-demo-test"})
+	if len(results) != 9 {
+		t.Fatalf("demo checker returned %d results, want 9", len(results))
+	}
+	for _, r := range results {
+		if r.TargetType == "" {
+			t.Error("demo result has empty TargetType")
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: tg
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_TG_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			VpcId:      aws.String("vpc-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "tg-1",
+				RawStruct: elbv2types.TargetGroup{
+					VpcId:      aws.String("vpc-match"),
+					TargetType: elbv2types.TargetTypeEnumInstance,
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_TG_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			VpcId:      aws.String("vpc-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "tg-2",
+				RawStruct: elbv2types.TargetGroup{
+					VpcId:      aws.String("vpc-other"),
+					TargetType: elbv2types.TargetTypeEnumInstance,
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_TG_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			VpcId:      aws.String("vpc-match"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_TG_EmptySourceID(t *testing.T) {
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: asg
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_ASG_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "asg-1",
+				RawStruct: asgtypes.AutoScalingGroup{
+					Instances: []asgtypes.Instance{{InstanceId: aws.String("i-match")}},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_ASG_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "asg-1",
+				RawStruct: asgtypes.AutoScalingGroup{
+					Instances: []asgtypes.Instance{{InstanceId: aws.String("i-other")}},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_ASG_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_ASG_EmptySourceID(t *testing.T) {
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: alarm
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_Alarm_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "alarm-1",
+				RawStruct: cwtypes.MetricAlarm{
+					Dimensions: []cwtypes.Dimension{
+						{Name: aws.String("InstanceId"), Value: aws.String("i-match")},
+					},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_Alarm_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "alarm-1",
+				RawStruct: cwtypes.MetricAlarm{
+					Dimensions: []cwtypes.Dimension{
+						{Name: aws.String("InstanceId"), Value: aws.String("i-other")},
+					},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_Alarm_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_Alarm_EmptySourceID(t *testing.T) {
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: cfn
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_CFN_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "my-stack",
+				RawStruct: cfntypes.Stack{
+					StackName: aws.String("my-stack"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_CFN_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "other-stack",
+				RawStruct: cfntypes.Stack{
+					StackName: aws.String("other-stack"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_CFN_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_CFN_EmptySourceID(t *testing.T) {
+	// An instance with no cloudformation tag returns Count=0 immediately.
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no CFN stack tag", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: eip
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_EIP_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"eip": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "eipalloc-abc",
+				RawStruct: ec2types.Address{
+					InstanceId: aws.String("i-match"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "eip")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_EIP_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"eip": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "eipalloc-abc",
+				RawStruct: ec2types.Address{
+					InstanceId: aws.String("i-other"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "eip")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_EIP_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "eip")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_EIP_EmptySourceID(t *testing.T) {
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "eip")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: ebs-snap
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_EBSSnap_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-match")}},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ebs-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "snap-1",
+				RawStruct: ec2types.Snapshot{
+					VolumeId: aws.String("vol-match"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_EBSSnap_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-match")}},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ebs-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "snap-1",
+				RawStruct: ec2types.Snapshot{
+					VolumeId: aws.String("vol-other"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_EBSSnap_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{Ebs: &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-match")}},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_EBSSnap_EmptySourceID(t *testing.T) {
+	// An instance with no block device mappings returns Count=0 immediately.
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no volumes", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: ng (EKS Node Groups)
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_NG_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:cluster-name"), Value: aws.String("my-cluster")},
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("my-ng")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ng": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "my-ng",
+				RawStruct: ekstypes.Nodegroup{
+					ClusterName:   aws.String("my-cluster"),
+					NodegroupName: aws.String("my-ng"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_NG_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:cluster-name"), Value: aws.String("my-cluster")},
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("my-ng")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ng": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "other-ng",
+				RawStruct: ekstypes.Nodegroup{
+					ClusterName:   aws.String("other-cluster"),
+					NodegroupName: aws.String("other-ng"),
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_NG_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:cluster-name"), Value: aws.String("my-cluster")},
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("my-ng")},
+			},
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_NG_EmptySourceID(t *testing.T) {
+	// An instance with no EKS tags returns Count=0 immediately.
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for instance with no EKS tags", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-checker: ct-events (CloudTrail Events)
+// ---------------------------------------------------------------------------
+
+func TestRelated_EC2_CTEvents_Found(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "evt-1",
+				RawStruct: cloudtrailtypes.Event{
+					Resources: []cloudtrailtypes.Resource{
+						{ResourceName: aws.String("i-match")},
+					},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ct-events")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count <= 0 {
+		t.Errorf("Count = %d, want > 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_CTEvents_NotFound(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID: "evt-1",
+				RawStruct: cloudtrailtypes.Event{
+					Resources: []cloudtrailtypes.Resource{
+						{ResourceName: aws.String("i-other")},
+					},
+				},
+			},
+		}},
+	}
+
+	checker := ec2CheckerByTarget(t, "ct-events")
+	result := checker(context.Background(), nil, instance, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_EC2_CTEvents_CacheMissNoClients(t *testing.T) {
+	instance := resource.Resource{
+		ID: "i-match",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-match"),
+		},
+	}
+
+	checker := ec2CheckerByTarget(t, "ct-events")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
+	}
+}
+
+func TestRelated_EC2_CTEvents_EmptySourceID(t *testing.T) {
+	instance := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+
+	checker := ec2CheckerByTarget(t, "ct-events")
+	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
 	}
 }
