@@ -540,6 +540,44 @@ func TestRelated_EbRule_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_EBS_Registered(t *testing.T) {
+	defs := resource.GetRelated("ebs")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for ebs")
+	}
+
+	type expectation struct {
+		displayName string
+		hasChecker  bool
+	}
+	expected := map[string]expectation{
+		"ec2":      {"EC2 Instance", true},
+		"ebs-snap": {"EBS Snapshots", true},
+		"kms":      {"KMS Key", true},
+	}
+	for target, want := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == target {
+				found = true
+				if want.hasChecker && def.Checker == nil {
+					t.Errorf("ebs %q: Checker should not be nil", target)
+				}
+				if !want.hasChecker && def.Checker != nil {
+					t.Errorf("ebs %q: Checker should be nil (stub)", target)
+				}
+				if def.DisplayName != want.displayName {
+					t.Errorf("ebs %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", target)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
