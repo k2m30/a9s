@@ -272,7 +272,7 @@ func TestIssue189_DemoDependencies_CoreCrossReferences(t *testing.T) {
 				if lb.TargetGroupArn == nil {
 					continue
 				}
-				tgName := arnLeaf(*lb.TargetGroupArn)
+				tgName := lbNameFromARN(*lb.TargetGroupArn)
 				if _, ok := tgByName[tgName]; !ok {
 					t.Errorf("ecs-svc %s target group %s missing", r.ID, tgName)
 				}

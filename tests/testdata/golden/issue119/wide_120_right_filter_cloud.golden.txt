@@ -11,7 +11,7 @@
 │ VpcId:                vpc-0abc123def456789a                                         │                                │
 │ SubnetId:             subnet-0aaa111111111111a                                      │                                │
 │ PrivateIpAddress:     10.0.1.10                                                     │                                │
-│ PrivateDnsName:       -                                                             │                                │
+│ PrivateDnsName:       ip-10-0-1-10.ec2.internal                                     │                                │
 │ PublicIpAddress:      54.210.33.112                                                 │                                │
 │ IamInstanceProfile:                                                                 │                                │
 │     Arn:  arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring            │                                │
@@ -25,6 +25,6 @@
 │     Ebs:                                                                            │                                │
 │     Status:  attached                                                               │                                │
 │     VolumeId:  vol-0a1b2c3d4e5f60002                                                │                                │
-│ EbsOptimized:         -                                                             │                                │
-│ MetadataOptions:      -                                                             │                                │
+│ EbsOptimized:         Yes                                                           │                                │
+│ MetadataOptions:                                                                    │                                │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
