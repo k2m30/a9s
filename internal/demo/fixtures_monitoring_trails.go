@@ -40,6 +40,7 @@ func cloudtrailFixtures() []resource.Resource {
 				HasCustomEventSelectors:    aws.Bool(true),
 				HasInsightSelectors:        aws.Bool(false),
 				CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+				KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			},
 		},
 		{

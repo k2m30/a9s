@@ -45,4 +45,4 @@ detail:
   - DeletionProtection
   - MasterUsername
   - PerformanceInsightsEnabled
-  - Tags
+  - TagList

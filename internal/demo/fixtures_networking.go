@@ -31,21 +31,21 @@ func init() {
 func elbFixtures() []resource.Resource {
 	elbs := []resource.Resource{
 		{
-			ID:     "acme-prod-web",
-			Name:   "acme-prod-web",
+			ID:     prodELBName,
+			Name:   prodELBName,
 			Status: "active",
 			Fields: map[string]string{
-				"name":              "acme-prod-web",
-				"dns_name":          "acme-prod-web-1234567890.us-east-1.elb.amazonaws.com",
+				"name":              prodELBName,
+				"dns_name":          prodELBDNS,
 				"type":              "application",
 				"scheme":            "internet-facing",
 				"state":             "active",
 				"vpc_id":            prodVPCID,
-				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef",
+				"load_balancer_arn": prodELBARN,
 			},
 			RawStruct: elbv2types.LoadBalancer{
-				LoadBalancerName: aws.String("acme-prod-web"),
-				LoadBalancerArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef"),
+				LoadBalancerName: aws.String(prodELBName),
+				LoadBalancerArn:  aws.String(prodELBARN),
 				DNSName:          aws.String("acme-prod-web-1234567890.us-east-1.elb.amazonaws.com"),
 				Type:             elbv2types.LoadBalancerTypeEnumApplication,
 				Scheme:           elbv2types.LoadBalancerSchemeEnumInternetFacing,
@@ -441,6 +441,24 @@ func vpcFixtures() []resource.Resource {
 				InstanceTenancy: ec2types.TenancyDefault,
 				DhcpOptionsId:   aws.String("dopt-0abc123def456789a"),
 				OwnerId:         aws.String("123456789012"),
+				CidrBlockAssociationSet: []ec2types.VpcCidrBlockAssociation{
+					{
+						AssociationId: aws.String("vpc-cidr-assoc-01"),
+						CidrBlock:     aws.String("10.0.0.0/16"),
+						CidrBlockState: &ec2types.VpcCidrBlockState{
+							State: ec2types.VpcCidrBlockStateCodeAssociated,
+						},
+					},
+				},
+				Ipv6CidrBlockAssociationSet: []ec2types.VpcIpv6CidrBlockAssociation{
+					{
+						AssociationId: aws.String("vpc-cidr-assoc-ipv6-01"),
+						Ipv6CidrBlock: aws.String("2600:1f18:1234:5678::/56"),
+						Ipv6CidrBlockState: &ec2types.VpcCidrBlockState{
+							State: ec2types.VpcCidrBlockStateCodeAssociated,
+						},
+					},
+				},
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("acme-prod")},
 					{Key: aws.String("Environment"), Value: aws.String("prod")},
