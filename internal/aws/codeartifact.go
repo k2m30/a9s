@@ -19,6 +19,10 @@ func init() {
 		}
 		return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
 	})
+
+	resource.RegisterRelated("codeartifact", []resource.RelatedDef{
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: nil},
+	})
 }
 
 // FetchCodeArtifactRepos calls the CodeArtifact ListRepositories API and converts the
