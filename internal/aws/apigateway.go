@@ -19,6 +19,12 @@ func init() {
 		}
 		return FetchAPIGatewaysPage(ctx, c.APIGatewayV2, continuationToken)
 	})
+
+	resource.RegisterRelated("apigw", []resource.RelatedDef{
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: nil},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: nil},
+	})
 }
 
 // FetchAPIGateways calls the API Gateway V2 GetApis API and converts

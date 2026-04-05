@@ -293,6 +293,69 @@ func TestRelated_AMI_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_APIGW_Registered(t *testing.T) {
+	defs := resource.GetRelated("apigw")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for apigw")
+	}
+
+	expected := []string{"lambda", "logs", "waf"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+}
+
+func TestRelated_Athena_Registered(t *testing.T) {
+	defs := resource.GetRelated("athena")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for athena")
+	}
+
+	expected := []string{"s3", "kms"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+}
+
+func TestRelated_Backup_Registered(t *testing.T) {
+	defs := resource.GetRelated("backup")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for backup")
+	}
+
+	expected := []string{"role"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
