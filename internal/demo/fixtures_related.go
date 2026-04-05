@@ -117,4 +117,15 @@ func init() {
 			{TargetType: "logs", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("dbi", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedDbiSGID}},
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedDbiKMSID}},
+			{TargetType: "subnet", Count: 0},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "rds-snap", Count: 0},
+			{TargetType: "secrets", Count: 0},
+		}
+	})
 }

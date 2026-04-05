@@ -12,6 +12,15 @@ import (
 func init() {
 	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"})
 
+	resource.RegisterRelated("dbi", []resource.RelatedDef{
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbiKMS},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbiSubnets},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
+		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: nil},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: nil},
+	})
+
 	resource.RegisterPaginated("dbi", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
