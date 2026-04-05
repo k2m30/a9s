@@ -71,4 +71,12 @@ func init() {
 			{TargetType: "ng", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("cb", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "logs", Count: 0},
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCbRoleID}},
+			{TargetType: "pipeline", Count: 1, ResourceIDs: []string{relatedCbPipelineID}},
+		}
+	})
 }

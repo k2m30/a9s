@@ -109,4 +109,7 @@ const (
 	relatedAthenaKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
 	relatedBackupRoleID = "acme-lambda-execution"
+
+	relatedCbRoleID     = "acme-ci-deploy-role"
+	relatedCbPipelineID = "acme-api-deploy"
 )
