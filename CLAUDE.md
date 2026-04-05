@@ -31,7 +31,7 @@ internal/
     styles/      # Tokyo Night Dark palette
     views/       # view models (menu, list, detail, yaml, help, etc.)
 tests/
-  unit/          # 3,100+ unit tests
+  unit/          # 3,800+ unit tests
   integration/   # integration tests
 docs/
   design/        # visual design spec (incl. child-views/ with 24 view levels)
@@ -180,6 +180,13 @@ Agents MUST use targeted file access — never broad globs on large directories.
 | `fixtures_data.go` | Glue, Athena, OpenSearch, Redshift |
 | `fixtures_containers.go` | EKS, Node Groups |
 | `fixtures_backup.go` | Backup, SES, EFS |
+
+## Bash Command Rules
+
+- **Never chain bash commands** with `&&`, `;`, `|`, or `cd`. Always use single, standalone commands with absolute paths.
+- **Never use `git -C <dir>`** flag. `cd` into the directory first as a standalone command, then run git commands separately.
+- **Never use `$()` or backticks** in bash commands. Resolve values first, write intermediates to `$TMPDIR` files, read them in subsequent commands.
+- **Commit messages**: write to `$TMPDIR/msg.txt` with the Write tool, then `git commit -F $TMPDIR/msg.txt` as a standalone command.
 
 ## Rules
 

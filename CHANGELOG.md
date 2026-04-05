@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.29.0] - 2026-04-06
+
+### Added
+- Related-resource views for 23 resource types — press `r` on any detail view to see cross-resource relationships with navigable fields and background availability checking:
+  - **Compute:** EC2 Instances, Auto Scaling Groups, Lambda (via ECR), Elastic Beanstalk
+  - **Containers:** ECS Clusters, ECR Repositories, EKS Node Groups (via EC2)
+  - **Databases:** RDS Instances, DocumentDB Clusters, DocumentDB Snapshots, DynamoDB Tables
+  - **Storage:** EBS Volumes, EBS Snapshots, AMIs
+  - **Networking:** CloudFront Distributions, API Gateways, ACM Certificates
+  - **Monitoring:** CloudWatch Alarms, CloudTrail Events
+  - **CI/CD:** CloudFormation Stacks, CodeBuild Projects, CodeArtifact Repositories
+  - **Messaging:** EventBridge Rules
+- Navigable fields in detail view left column — highlighted fields link directly to related resources (e.g., VpcId → VPC, SubnetId → Subnet, KmsKeyId → KMS)
+- Cache-based related checkers with truncation guards — partial-page cache returns "?" instead of false zero
+- Demo mode fixtures for all 23 related-view resource types with cross-linked IDs
+
+### Fixed
+- CloudWatch Alarm dimension filter now correctly matches InstanceId dimensions (#189)
+- Demo fixture RawStructs fully cross-linked for realistic related-view navigation (#189)
+- All navigable field paths resolve to non-empty values in demo fixtures (#189)
+
+## [3.28.0] - 2026-04-02
+
+### Added
+- Related-views infrastructure — two-column detail view with right panel showing related resource counts and navigation (#198)
+- `RelatedDef`, `NavigableField`, and `RelatedChecker` type system in `resource/related.go`
+- Generic message-driven dispatch for `RelatedCheckResultMsg` and `RelatedNavigateMsg`
+- `r` key to toggle related panel, `Tab` to switch columns, `Enter` to navigate
+- Resource cache integration — checkers read from already-loaded resource lists before falling back to live API
+- QA stories for related-resources feature (#119, #189)
+
 ## [3.26.0] - 2026-03-30
 
 ### Added
