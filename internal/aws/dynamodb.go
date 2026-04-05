@@ -20,6 +20,12 @@ func init() {
 		}
 		return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 	})
+
+	resource.RegisterRelated("ddb", []resource.RelatedDef{
+		{TargetType: "kms",    DisplayName: "KMS Key",           Checker: checkDdbKMS},
+		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: nil},
+		{TargetType: "alarm",  DisplayName: "CloudWatch Alarms", Checker: nil},
+	})
 }
 
 // FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and
