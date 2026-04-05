@@ -1006,7 +1006,7 @@ func ebsSnapshotFixtures() []resource.Resource {
 				StartTime:   aws.Time(t1),
 				Progress:    aws.String("100%"),
 				OwnerId:     aws.String("123456789012"),
-				KmsKeyId:    aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+				KmsKeyId:    aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")},
 				},
@@ -1037,6 +1037,7 @@ func ebsSnapshotFixtures() []resource.Resource {
 				StartTime:   aws.Time(t2),
 				Progress:    aws.String("100%"),
 				OwnerId:     aws.String("123456789012"),
+				KmsKeyId:    aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("api-data-snapshot-2026q1")},
 				},
@@ -1062,11 +1063,12 @@ func ebsSnapshotFixtures() []resource.Resource {
 				State:       ec2types.SnapshotStateCompleted,
 				VolumeId:    aws.String("vol-0a1b2c3d4e5f60003"),
 				VolumeSize:  aws.Int32(100),
-				Encrypted:   aws.Bool(false),
+				Encrypted:   aws.Bool(true),
 				Description: aws.String("Pre-deletion backup"),
 				StartTime:   aws.Time(t3),
 				Progress:    aws.String("100%"),
 				OwnerId:     aws.String("123456789012"),
+				KmsKeyId:    aws.String("c3d4e5f6-7890-12ab-cdef-333333333333"),
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("orphaned-vol-snapshot")},
 				},
@@ -1097,6 +1099,7 @@ func ebsSnapshotFixtures() []resource.Resource {
 				StartTime:   aws.Time(t4),
 				Progress:    aws.String("23%"),
 				OwnerId:     aws.String("123456789012"),
+				KmsKeyId:    aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				Tags:        []ec2types.Tag{},
 			},
 		},

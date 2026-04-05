@@ -37,6 +37,17 @@ func init() {
 	resource.RegisterNavigableFields("ebs", []resource.NavigableField{
 		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
 	})
+
+	resource.RegisterRelated("ebs-snap", []resource.RelatedDef{
+		{TargetType: "ami", DisplayName: "AMIs", Checker: checkEBSSnapAMI, NeedsTargetCache: true},
+		{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
+		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSSnapEC2, NeedsTargetCache: false},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
+	})
+	resource.RegisterNavigableFields("ebs-snap", []resource.NavigableField{
+		{FieldPath: "VolumeId", TargetType: "ebs"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
