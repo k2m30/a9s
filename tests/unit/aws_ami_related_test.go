@@ -1,0 +1,167 @@
+package unit_test
+
+import (
+	"context"
+	"testing"
+
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+func amiCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("ami") {
+		if def.TargetType == target {
+			if def.Checker == nil {
+				t.Fatalf("ami related checker for %s is nil", target)
+			}
+			return def.Checker
+		}
+	}
+	t.Fatalf("ami related checker for %s not found", target)
+	return nil
+}
+
+// --- EC2 Checker Tests (Pattern C) ---
+
+func TestRelated_AMI_EC2_Found(t *testing.T) {
+	amiID := "ami-0abc123"
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "i-0instance1", Fields: map[string]string{"image_id": amiID}},
+			{ID: "i-0instance2", Fields: map[string]string{"image_id": "ami-other"}},
+		}},
+	}
+	res := resource.Resource{ID: amiID}
+
+	checker := amiCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0instance1" {
+		t.Errorf("ResourceIDs = %v, want [i-0instance1]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_AMI_EC2_NotFound(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "i-0other", Fields: map[string]string{"image_id": "ami-other"}},
+		}},
+	}
+	res := resource.Resource{ID: "ami-0abc123"}
+
+	checker := amiCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_AMI_EC2_CacheMissNoClients(t *testing.T) {
+	res := resource.Resource{ID: "ami-0abc123"}
+	checker := amiCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	}
+}
+
+func TestRelated_AMI_EC2_EmptyAMIID(t *testing.T) {
+	res := resource.Resource{ID: ""}
+	checker := amiCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count)
+	}
+}
+
+// --- EBS Snapshot Checker Tests (Pattern F) ---
+
+func TestRelated_AMI_EBSSnaps_Found(t *testing.T) {
+	snapID := "snap-0abc123"
+	img := ec2types.Image{
+		ImageId: strPtr("ami-0abc123"),
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
+			{Ebs: &ec2types.EbsBlockDevice{SnapshotId: &snapID}},
+		},
+	}
+	res := resource.Resource{ID: "ami-0abc123", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != snapID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, snapID)
+	}
+}
+
+func TestRelated_AMI_EBSSnaps_NoSnapshots(t *testing.T) {
+	img := ec2types.Image{
+		ImageId:             strPtr("ami-0abc123"),
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{},
+	}
+	res := resource.Resource{ID: "ami-0abc123", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_AMI_EBSSnaps_InvalidRawStruct(t *testing.T) {
+	res := resource.Resource{ID: "ami-0abc123", RawStruct: "not-an-image"}
+
+	checker := amiCheckerByTarget(t, "ebs-snap")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	}
+}
+
+// --- ASG Stub Test ---
+
+func TestRelated_AMI_ASG_IsStub(t *testing.T) {
+	defs := resource.GetRelated("ami")
+	for _, def := range defs {
+		if def.TargetType == "asg" {
+			if def.Checker != nil {
+				t.Error("ami asg: expected nil Checker (stub)")
+			}
+			return
+		}
+	}
+	t.Error("ami asg related def not found")
+}
+
+// --- Demo Checker Test ---
+
+func TestRelatedDemo_AMI_Registered(t *testing.T) {
+	_ = demo.GetResources
+	checker := resource.GetRelatedDemo("ami")
+	if checker == nil {
+		t.Fatal("no demo checker registered for ami")
+	}
+	results := checker(resource.Resource{ID: "ami-demo"})
+	if len(results) == 0 {
+		t.Fatal("demo checker returned no results")
+	}
+	for _, r := range results {
+		if r.TargetType == "" {
+			t.Error("demo result has empty TargetType")
+		}
+	}
+}

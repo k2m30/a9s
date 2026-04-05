@@ -21,6 +21,12 @@ func init() {
 		}
 		return FetchAMIsPage(ctx, c.EC2, continuationToken)
 	})
+
+	resource.RegisterRelated("ami", []resource.RelatedDef{
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
+		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+	})
 }
 
 // FetchAMIs calls the EC2 DescribeImages API and returns all pages of AMIs.

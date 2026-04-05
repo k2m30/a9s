@@ -32,4 +32,12 @@ func init() {
 			{TargetType: "asg", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ami", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2", Count: 1, ResourceIDs: []string{relatedAMIEC2ID}},
+			{TargetType: "ebs-snap", Count: 1, ResourceIDs: []string{relatedAMISnapID1}},
+			{TargetType: "asg", Count: 0},
+		}
+	})
 }
