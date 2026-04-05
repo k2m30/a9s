@@ -258,6 +258,41 @@ func TestRelated_Alarm_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_AMI_Registered(t *testing.T) {
+	defs := resource.GetRelated("ami")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for ami")
+	}
+
+	expected := []string{"ec2", "ebs-snap", "asg"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+
+	// ec2 and ebs-snap should have non-nil checkers, asg is a stub
+	for _, def := range defs {
+		switch def.TargetType {
+		case "ec2", "ebs-snap":
+			if def.Checker == nil {
+				t.Errorf("ami %s: Checker should not be nil", def.TargetType)
+			}
+		case "asg":
+			if def.Checker != nil {
+				t.Error("ami asg: Checker should be nil (stub)")
+			}
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
