@@ -151,4 +151,10 @@ func init() {
 			{TargetType: "asg",  Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("eb-rule", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedEbRuleRoleID}},
+		}
+	})
 }
