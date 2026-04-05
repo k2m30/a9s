@@ -19,6 +19,14 @@ func init() {
 		}
 		return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
 	})
+
+	resource.RegisterRelated("acm", []resource.RelatedDef{
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: nil},
+		{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: nil},
+		{TargetType: "apigw", DisplayName: "API Gateways", Checker: nil},
+		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: nil},
+	})
+	// No NavigableFields — CertificateSummary has no forward refs to other resource types
 }
 
 // FetchACMCertificates calls the ACM ListCertificates API and converts the
