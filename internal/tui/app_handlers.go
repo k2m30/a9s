@@ -241,6 +241,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on profile switch
+	m.relatedGen++
 	if m.demoMode {
 		return m, nil
 	}
@@ -273,6 +274,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on region switch
+	m.relatedGen++
 	if m.demoMode {
 		return m, nil
 	}
@@ -513,6 +515,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
+		m.relatedGen++ // cancel in-flight results from previous batch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 		return m, func() tea.Msg {
 			return messages.RelatedCheckStartedMsg{

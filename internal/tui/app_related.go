@@ -14,6 +14,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
+// maxConcurrentProbes is the maximum number of related-resource checker goroutines
+// that may run concurrently for a single detail view. Matches the architecture spec.
+const maxConcurrentProbes = 4
+
 // handleRelatedCheckStarted dispatches one async tea.Cmd per registered RelatedDef
 // for the given resource type. In demo mode it calls the registered demo checker;
 // in live mode it calls def.Checker with a 10-second timeout.
@@ -24,13 +28,22 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 	}
 
 	cache := m.buildResourceCacheSnapshot()
+	gen := m.relatedGen
+	// Per-call semaphore: cap concurrent probes to maxConcurrentProbes so a
+	// resource type with many defs (e.g., EC2 with 10) doesn't saturate the
+	// goroutine pool. Created fresh per call so each detail-view open gets its
+	// own independent budget.
+	sem := make(chan struct{}, maxConcurrentProbes)
 	cmds := make([]tea.Cmd, 0, len(defs))
 
 	for _, def := range defs {
-		// Capture a per-closure snapshot so concurrent goroutines dispatched by
-		// tea.Batch cannot race on the shared outer cache variable.
+		// Capture per-closure copies so concurrent goroutines cannot race on the
+		// shared outer variables.
 		localCache := cache
 		cmds = append(cmds, func() tea.Msg {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			if m.demoMode {
 				demoFn := resource.GetRelatedDemo(msg.ResourceType)
 				if demoFn != nil {
@@ -40,6 +53,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 								ResourceType:     msg.ResourceType,
 								SourceResourceID: msg.SourceResource.ID,
 								Result:           r,
+								Generation:       gen,
 							}
 						}
 					}
@@ -48,6 +62,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 					ResourceType:     msg.ResourceType,
 					SourceResourceID: msg.SourceResource.ID,
 					Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+					Generation:       gen,
 				}
 			}
 
@@ -56,29 +71,34 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 					ResourceType:     msg.ResourceType,
 					SourceResourceID: msg.SourceResource.ID,
 					Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+					Generation:       gen,
 				}
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			// If target type is absent from the snapshot, pre-fetch first page and
-			// include the result in CachedPages for write-back to m.resourceCache.
+			// Only pre-fetch the target type if this checker actually reads it from
+			// the cache (NeedsTargetCache=true). Field-only checkers (e.g., checkEC2EBS)
+			// ignore the cache entirely, so fetching would be wasted AWS API calls.
 			var cachedPages map[string]resource.ResourceCacheEntry
-			if _, inCache := localCache[def.TargetType]; !inCache {
-				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-					if fr, err := pf(ctx, m.clients, ""); err == nil {
-						isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
-						entry := resource.ResourceCacheEntry{
-							Resources:   fr.Resources,
-							IsTruncated: isTrunc,
+			if def.NeedsTargetCache {
+				if _, inCache := localCache[def.TargetType]; !inCache {
+					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
+						if fr, err := pf(ctx, m.clients, ""); err == nil {
+							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+							entry := resource.ResourceCacheEntry{
+								Resources:   fr.Resources,
+								IsTruncated: isTrunc,
+								Pagination:  fr.Pagination,
+							}
+							// Enrich this closure's snapshot; never write back to the outer variable.
+							enriched := make(resource.ResourceCache, len(localCache)+1)
+							maps.Copy(enriched, localCache)
+							enriched[def.TargetType] = entry
+							localCache = enriched
+							cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
 						}
-						// Enrich this closure's snapshot; never write back to the outer variable.
-						enriched := make(resource.ResourceCache, len(localCache)+1)
-						maps.Copy(enriched, localCache)
-						enriched[def.TargetType] = entry
-						localCache = enriched
-						cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
 					}
 				}
 			}
@@ -89,6 +109,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 				ResourceType:     msg.ResourceType,
 				SourceResourceID: msg.SourceResource.ID,
 				Result:           result,
+				Generation:       gen,
 				CachedPages:      cachedPages,
 			}
 		})

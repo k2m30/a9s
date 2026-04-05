@@ -598,7 +598,7 @@ When the architect scopes related views for resource X, the handoff uses:
 
 ### CODER TASK:
 Files to create:
-  internal/aws/{source}_related.go -- checker functions + cache helper + relatedResult
+  internal/aws/{source}_related.go -- checker functions + cache helper (reuse shared relatedResult and assertStruct from ec2_related.go — do NOT redefine)
 Files to modify:
   internal/aws/{source}.go -- append RegisterRelated + RegisterNavigableFields in init()
   internal/demo/fixtures_related.go -- append RegisterRelatedDemo

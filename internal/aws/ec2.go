@@ -40,16 +40,16 @@ func init() {
 	})
 
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkEC2NodeGroups},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups, NeedsTargetCache: true},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms, NeedsTargetCache: true},
+		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkEC2NodeGroups, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN, NeedsTargetCache: true},
 		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: nil},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP},
+		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true},
 		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
-		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents},
+		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: true},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{

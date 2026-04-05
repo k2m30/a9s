@@ -71,8 +71,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	// incorrectly see another type's resource under its own key.
 	resource.RegisterRelated(srcType, []resource.RelatedDef{
 		{
-			TargetType:  typeX,
-			DisplayName: "Type X",
+			TargetType:       typeX,
+			DisplayName:      "Type X",
+			NeedsTargetCache: true, // reads target from cache; must be true to trigger cold-miss prefetch
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeX]
 				if !ok || len(entry.Resources) == 0 {
@@ -82,8 +83,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			},
 		},
 		{
-			TargetType:  typeY,
-			DisplayName: "Type Y",
+			TargetType:       typeY,
+			DisplayName:      "Type Y",
+			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeY]
 				if !ok || len(entry.Resources) == 0 {
@@ -93,8 +95,9 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 			},
 		},
 		{
-			TargetType:  typeZ,
-			DisplayName: "Type Z",
+			TargetType:       typeZ,
+			DisplayName:      "Type Z",
+			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[typeZ]
 				if !ok || len(entry.Resources) == 0 {

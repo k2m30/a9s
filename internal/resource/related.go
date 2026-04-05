@@ -4,9 +4,10 @@ import "context"
 
 // RelatedDef defines one related resource class for a given resource type.
 type RelatedDef struct {
-	TargetType  string         // target resource short name (e.g., "tg", "alarm")
-	DisplayName string         // right-column row label (e.g., "Target Groups")
-	Checker     RelatedChecker // async checker function (may be nil for stubs)
+	TargetType       string         // target resource short name (e.g., "tg", "alarm")
+	DisplayName      string         // right-column row label (e.g., "Target Groups")
+	Checker          RelatedChecker // async checker function (may be nil for stubs)
+	NeedsTargetCache bool           // true if checker reads target type from ResourceCache
 }
 
 // NavigableField associates a detail view field path with a target resource type.
@@ -29,6 +30,7 @@ type RelatedCheckResult struct {
 type ResourceCacheEntry struct {
 	Resources   []Resource
 	IsTruncated bool
+	Pagination  *PaginationMeta // full pagination from cold-miss fetch; nil when derived from snapshot
 }
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,

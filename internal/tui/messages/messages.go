@@ -137,6 +137,7 @@ type RelatedCheckResultMsg struct {
 	ResourceType     string
 	SourceResourceID string // ID of the source resource (for cache keying)
 	Result           resource.RelatedCheckResult
+	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
 	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
 	// keyed by target resource short name. Non-nil only when FetchRelatedTarget
 	// executed a live fetch (i.e., target was absent from the ResourceCache snapshot

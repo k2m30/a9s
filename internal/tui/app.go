@@ -96,6 +96,7 @@ type Model struct {
 
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
+	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.
@@ -359,6 +360,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResultMsg:
+		// Discard results from a previous check generation (e.g., after Ctrl+R or
+		// profile/region switch). Generation 0 is the initial state; unset means
+		// the message predates generation tracking and is always accepted.
+		if msg.Generation != 0 && msg.Generation != m.relatedGen {
+			return m, nil
+		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
 		// Fall back to the active detail view's resource ID when SourceResourceID is unset
 		// (e.g., manually-injected test messages or legacy callers).
@@ -377,13 +384,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// for any resource type gets a cache hit instead of re-fetching.
 		for shortName, entry := range msg.CachedPages {
 			if _, exists := m.resourceCache[shortName]; !exists {
-				m.resourceCache[shortName] = &resourceCacheEntry{
-					resources: entry.Resources,
+				pagination := entry.Pagination
+				// Backward compat: callers that set IsTruncated=true but leave Pagination nil
+				// (e.g., test fixtures, demo mode) must still have truncation preserved so
+				// that buildResourceCacheSnapshot can reconstruct IsTruncated correctly.
+				if pagination == nil && entry.IsTruncated {
+					pagination = &resource.PaginationMeta{IsTruncated: true}
 				}
-				if entry.IsTruncated {
-					m.resourceCache[shortName].pagination = &resource.PaginationMeta{
-						IsTruncated: true,
-					}
+				m.resourceCache[shortName] = &resourceCacheEntry{
+					resources:  entry.Resources,
+					pagination: pagination,
 				}
 			}
 		}
