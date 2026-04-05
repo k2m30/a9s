@@ -96,6 +96,15 @@ func realisticEC2Instance() ec2types.Instance {
 		SecurityGroups: []ec2types.GroupIdentifier{
 			{GroupId: ptrString("sg-0abc1234"), GroupName: ptrString("web-sg")},
 		},
+		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+			{
+				DeviceName: ptrString("/dev/sda1"),
+				Ebs: &ec2types.EbsInstanceBlockDevice{
+					VolumeId: ptrString("vol-0abc1234567890def"),
+					Status:   ec2types.AttachmentStatusAttached,
+				},
+			},
+		},
 		PlatformDetails:   ptrString("Linux/UNIX"),
 		Platform:          ec2types.PlatformValuesWindows,
 		InstanceLifecycle: ec2types.InstanceLifecycleTypeSpot,

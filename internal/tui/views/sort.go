@@ -3,8 +3,6 @@ package views
 import (
 	"sort"
 	"strings"
-
-	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // SortField identifies the active sort column.
@@ -17,11 +15,45 @@ const (
 	SortAge
 )
 
+// isAgeKey reports whether a field key represents a time-related field.
+func isAgeKey(key string) bool {
+	kl := strings.ToLower(key)
+	return strings.Contains(kl, "time") || strings.Contains(kl, "date") ||
+		strings.Contains(kl, "launch") || strings.Contains(kl, "creation") ||
+		strings.Contains(kl, "event") || strings.Contains(kl, "start") ||
+		strings.Contains(kl, "timestamp")
+}
+
+// ageFieldKey returns the deterministic field key for age sorting.
+// It scans the resolved columns in order and returns the first time-related key.
+// Config-driven columns may have empty keys, so it falls back to typeDef columns
+// which always carry canonical field keys.
+func (m ResourceListModel) ageFieldKey() string {
+	for _, c := range m.resolveColumns() {
+		if isAgeKey(c.key) {
+			return c.key
+		}
+	}
+	// Fallback: scan typeDef columns which always have canonical keys.
+	for _, c := range m.typeDef.Columns {
+		if isAgeKey(c.Key) {
+			return c.Key
+		}
+	}
+	return ""
+}
+
 // sortFiltered sorts filteredResources in place based on current sort settings.
 func (m *ResourceListModel) sortFiltered() {
 	if m.sort == SortNone {
 		return
 	}
+
+	var ageKey string
+	if m.sort == SortAge {
+		ageKey = m.ageFieldKey()
+	}
+
 	sort.SliceStable(m.filteredResources, func(i, j int) bool {
 		a := m.filteredResources[i]
 		b := m.filteredResources[j]
@@ -32,29 +64,11 @@ func (m *ResourceListModel) sortFiltered() {
 		case SortID:
 			va, vb = a.ID, b.ID
 		case SortAge:
-			// Use ID as fallback for age sorting (launch_time/creation_date fields)
-			va = m.getAgeField(a)
-			vb = m.getAgeField(b)
+			va, vb = a.Fields[ageKey], b.Fields[ageKey]
 		}
 		if m.sortAsc {
 			return va < vb
 		}
 		return va > vb
 	})
-}
-
-// getAgeField extracts the time-related field for age sorting.
-// Matches field keys containing common time-related substrings:
-// time, date, launch, creation, event, start, timestamp.
-func (m ResourceListModel) getAgeField(r resource.Resource) string {
-	for k, v := range r.Fields {
-		kl := strings.ToLower(k)
-		if strings.Contains(kl, "time") || strings.Contains(kl, "date") ||
-			strings.Contains(kl, "launch") || strings.Contains(kl, "creation") ||
-			strings.Contains(kl, "event") || strings.Contains(kl, "start") ||
-			strings.Contains(kl, "timestamp") {
-			return v
-		}
-	}
-	return ""
 }

@@ -517,3 +517,287 @@ func TestQA_SortOrder_LogStreams_AgeSortWorks(t *testing.T) {
 			idxA, idxB, idxC)
 	}
 }
+
+// ===========================================================================
+// Bug fix: Age sort must use the FIRST time-related column in column order,
+// not a random field from the Fields map (which has non-deterministic iteration).
+// ===========================================================================
+
+// multiTimeFieldTypeDef builds a type def with two time columns to expose
+// non-deterministic field selection in getAgeField.
+// Columns: name(20), creation_date(24), modified_date(24).
+// Both "creation_date" and "modified_date" match the "date" keyword in
+// getAgeField, so if the implementation iterates the Fields map (non-
+// deterministic), it may pick either column. The fix must use column
+// definition order instead.
+func multiTimeFieldTypeDef() resource.ResourceTypeDef {
+	return resource.ResourceTypeDef{
+		Name:      "Multi Time Fields",
+		ShortName: "multi_time",
+		Columns: []resource.Column{
+			{Key: "name", Title: "Name", Width: 20},
+			{Key: "creation_date", Title: "Creation Date", Width: 24},
+			{Key: "modified_date", Title: "Modified Date", Width: 24},
+		},
+	}
+}
+
+// multiTimeFieldResources returns 3 resources where creation_date and
+// modified_date produce different sort orders, so the test can detect
+// which column is actually used.
+//
+// By creation_date ascending: alpha, charlie, bravo
+// By modified_date ascending: bravo, charlie, alpha
+func multiTimeFieldResources() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID: "r-001", Name: "alpha", Status: "",
+			Fields: map[string]string{
+				"name":          "alpha",
+				"creation_date": "2026-01-01 00:00",
+				"modified_date": "2026-03-01 00:00",
+			},
+		},
+		{
+			ID: "r-002", Name: "bravo", Status: "",
+			Fields: map[string]string{
+				"name":          "bravo",
+				"creation_date": "2026-01-03 00:00",
+				"modified_date": "2026-02-01 00:00",
+			},
+		},
+		{
+			ID: "r-003", Name: "charlie", Status: "",
+			Fields: map[string]string{
+				"name":          "charlie",
+				"creation_date": "2026-01-02 00:00",
+				"modified_date": "2026-02-15 00:00",
+			},
+		},
+	}
+}
+
+// TestQA_SortOrder_AgeDeterministic_MultipleTimeFields verifies that when a
+// resource type has multiple time-related columns, age sort deterministically
+// uses the FIRST time column in column definition order (creation_date), not
+// an arbitrary one from the Fields map (which would non-deterministically
+// select modified_date on some Go map iterations).
+//
+// Both "creation_date" and "modified_date" contain the "date" keyword that
+// getAgeField matches, so a map-iterating implementation may pick either.
+//
+// Expected ascending order by creation_date: alpha, charlie, bravo.
+// If modified_date were used instead: bravo, charlie, alpha — a different order.
+func TestQA_SortOrder_AgeDeterministic_MultipleTimeFields(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.Reinit()
+	})
+
+	td := multiTimeFieldTypeDef()
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "multi_time",
+		Resources:    multiTimeFieldResources(),
+	})
+
+	// Press A to sort by age ascending — should use creation_date (first time column)
+	m, _ = m.Update(rlKeyPress("A"))
+
+	rendered := m.View()
+	plain := stripANSI(rendered)
+
+	idxAlpha := strings.Index(plain, "alpha")
+	idxBravo := strings.Index(plain, "bravo")
+	idxCharlie := strings.Index(plain, "charlie")
+
+	if idxAlpha < 0 || idxBravo < 0 || idxCharlie < 0 {
+		t.Fatalf("could not find all resource names in rendered output:\n%s", plain)
+	}
+
+	// creation_date ascending order: alpha (2026-01-01) < charlie (2026-01-02) < bravo (2026-01-03)
+	if idxAlpha > idxCharlie || idxCharlie > idxBravo {
+		t.Errorf(
+			"age sort must use first time column (creation_date), not modified_date: "+
+				"got alpha@%d charlie@%d bravo@%d — "+
+				"expected alpha before charlie before bravo (creation_date order); "+
+				"if modified_date were used, order would be bravo, charlie, alpha",
+			idxAlpha, idxCharlie, idxBravo,
+		)
+	}
+}
+
+// TestQA_SortOrder_AgeUsesFirstColumnMatch verifies deterministic column
+// selection when the first time-related column is named "started" and a
+// second time column is named "last_event". The sort must use "started".
+//
+// Expected ascending order by started: foo, bar.
+// If last_event were used: bar, foo — reversed.
+func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR")
+		styles.Reinit()
+	})
+
+	td := resource.ResourceTypeDef{
+		Name:      "Started First Type",
+		ShortName: "started_first",
+		Columns: []resource.Column{
+			{Key: "name", Title: "Name", Width: 20},
+			{Key: "started", Title: "Started", Width: 24},
+			{Key: "last_event", Title: "Last Event", Width: 24},
+		},
+	}
+
+	resources := []resource.Resource{
+		{
+			ID: "s-001", Name: "foo", Status: "",
+			Fields: map[string]string{
+				"name":       "foo",
+				"started":    "2026-01-01 00:00",
+				"last_event": "2026-03-01 00:00",
+			},
+		},
+		{
+			ID: "s-002", Name: "bar", Status: "",
+			Fields: map[string]string{
+				"name":       "bar",
+				"started":    "2026-01-02 00:00",
+				"last_event": "2026-02-01 00:00",
+			},
+		},
+	}
+
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "started_first",
+		Resources:    resources,
+	})
+
+	// Press A to sort by age ascending — should use "started" (first time column)
+	m, _ = m.Update(rlKeyPress("A"))
+
+	rendered := m.View()
+	plain := stripANSI(rendered)
+
+	idxFoo := strings.Index(plain, "foo")
+	idxBar := strings.Index(plain, "bar")
+
+	if idxFoo < 0 || idxBar < 0 {
+		t.Fatalf("could not find resource names in rendered output:\n%s", plain)
+	}
+
+	// started ascending order: foo (2026-01-01) before bar (2026-01-02)
+	if idxFoo > idxBar {
+		t.Errorf(
+			"age sort must use first time column (started), not last_event: "+
+				"got foo@%d bar@%d — expected foo before bar (started order); "+
+				"if last_event were used, bar would appear before foo",
+			idxFoo, idxBar,
+		)
+	}
+}
+
+// ===========================================================================
+// Issue 208: Data-driven list title via ResourceTypeDef.ListTitle
+// ===========================================================================
+
+// TestQA_ListTitle_UsedInFrameTitle verifies that when ResourceTypeDef.ListTitle
+// is set, FrameTitle() uses it as the base name instead of ShortName.
+//
+// When ListTitle = "alarms" and ShortName = "alarm", the frame title should
+// start with "alarms(" after resources are loaded (format is "name(count)").
+func TestQA_ListTitle_UsedInFrameTitle(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		Name:      "CloudWatch Alarms",
+		ShortName: "alarm",
+		ListTitle: "alarms",
+		Columns: []resource.Column{
+			{Key: "alarm_name", Title: "Alarm Name", Width: 36},
+		},
+	}
+
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "alarm",
+		Resources: []resource.Resource{
+			{
+				ID:     "a1",
+				Name:   "cpu-high",
+				Status: "OK",
+				Fields: map[string]string{"alarm_name": "cpu-high"},
+			},
+		},
+	})
+
+	title := m.FrameTitle()
+
+	if !strings.HasPrefix(title, "alarms(") {
+		t.Errorf(
+			"FrameTitle() should use ListTitle as base when set: got %q, expected prefix %q; "+
+				"ShortName=%q must NOT be used when ListTitle=%q is non-empty",
+			title, "alarms(", "alarm", "alarms",
+		)
+	}
+
+	if strings.HasPrefix(title, "alarm(") {
+		t.Errorf(
+			"FrameTitle() must NOT use ShortName %q when ListTitle %q is set: got %q",
+			"alarm", "alarms", title,
+		)
+	}
+}
+
+// TestQA_ListTitle_FallsBackToShortName verifies that when ResourceTypeDef.ListTitle
+// is empty (zero value), FrameTitle() falls back to ShortName as the base name.
+//
+// When ListTitle = "" and ShortName = "ec2", the frame title should start
+// with "ec2(" after resources are loaded.
+func TestQA_ListTitle_FallsBackToShortName(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		Name:      "EC2 Instances",
+		ShortName: "ec2",
+		// ListTitle intentionally omitted (zero value "")
+		Columns: []resource.Column{
+			{Key: "instance_id", Title: "Instance ID", Width: 14},
+		},
+	}
+
+	k := keys.Default()
+	m := views.NewResourceList(td, nil, k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources: []resource.Resource{
+			{
+				ID:     "i-abc123",
+				Name:   "my-server",
+				Status: "running",
+				Fields: map[string]string{"instance_id": "i-abc123"},
+			},
+		},
+	})
+
+	title := m.FrameTitle()
+
+	if !strings.HasPrefix(title, "ec2(") {
+		t.Errorf(
+			"FrameTitle() should fall back to ShortName when ListTitle is empty: got %q, expected prefix %q",
+			title, "ec2(",
+		)
+	}
+}

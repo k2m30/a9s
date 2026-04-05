@@ -137,3 +137,40 @@ func TestFetchSQSQueues_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+func TestFetchSQSQueues_RawStructIsStructuredAttributes(t *testing.T) {
+	listMock := &mockSQSListQueuesClient{
+		output: &sqs.ListQueuesOutput{
+			QueueUrls: []string{
+				"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue",
+			},
+		},
+	}
+	attrMock := &mockSQSGetQueueAttributesClient{
+		outputs: map[string]*sqs.GetQueueAttributesOutput{
+			"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue": {
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages": "42",
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+	raw, ok := resources[0].RawStruct.(awsclient.SQSQueueAttributesRow)
+	if !ok {
+		t.Fatalf("RawStruct should be awsclient.SQSQueueAttributesRow, got %T", resources[0].RawStruct)
+	}
+	if raw.QueueName != "my-orders-queue" {
+		t.Errorf("RawStruct.QueueName: expected %q, got %q", "my-orders-queue", raw.QueueName)
+	}
+	if raw.Attributes["ApproximateNumberOfMessages"] != "42" {
+		t.Errorf("RawStruct.Attributes[ApproximateNumberOfMessages]: expected %q, got %q", "42", raw.Attributes["ApproximateNumberOfMessages"])
+	}
+}

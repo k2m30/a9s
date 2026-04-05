@@ -101,9 +101,7 @@ func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 	case SortID:
 		isActive = strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID")
 	case SortAge:
-		isActive = strings.Contains(strings.ToLower(c.key), "time") || strings.Contains(strings.ToLower(c.key), "date") ||
-			strings.Contains(strings.ToLower(c.key), "launch") || strings.Contains(strings.ToLower(c.key), "creation") ||
-			strings.Contains(strings.ToLower(c.title), "time") || strings.Contains(strings.ToLower(c.title), "date")
+		isActive = isAgeKey(c.key) || isAgeKey(c.title)
 	}
 	if isActive {
 		if m.sortAsc {
@@ -150,6 +148,14 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 		if strings.ToLower(k) == titleLower {
 			return v
 		}
+	}
+	// Final fallback: use resource Name for name-style columns when Fields has no value.
+	// This handles test fixtures and resources where Fields is sparse but r.Name is set.
+	// Matches columns whose key or title contains "name" (e.g., "alarm_name", "Alarm Name").
+	if r.Name != "" &&
+		(strings.Contains(strings.ToLower(c.key), "name") ||
+			strings.Contains(strings.ToLower(c.title), "name")) {
+		return r.Name
 	}
 	return ""
 }

@@ -53,6 +53,9 @@ type Map struct {
 	// Detail / YAML
 	ToggleWrap key.Binding
 
+	// Related views
+	ToggleRelated key.Binding
+
 	// Search (detail/YAML views)
 	Search     key.Binding
 	SearchNext key.Binding
@@ -88,19 +91,21 @@ func Default() Map {
 
 		Events:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "events")),
 		Logs:      key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "logs")),
-		Resources: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resources")),
+		Resources: key.NewBinding(key.WithKeys("r", "R"), key.WithHelp("r/R", "resources")),
 		Source:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "source")),
 
 		SortByName: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
 		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),
 		SortByAge:  key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "sort date")),
 
-		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up")),
-		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down")),
+		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u", "\x15"), key.WithHelp("pgup", "page up")),
+		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d", "\x04"), key.WithHelp("pgdn", "page down")),
 
 		LoadMore: key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "load more")),
 
 		ToggleWrap: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap")),
+
+		ToggleRelated: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "related")),
 
 		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 		SearchNext: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),

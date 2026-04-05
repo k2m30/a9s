@@ -1,0 +1,30 @@
+ ImageId:              ami-0abc123def456789a                                           │            RELATED
+ InstanceId:           i-0a1b2c3d4e5f60001                                             │  Target Groups (1)             
+ InstanceType:         t3.large                                                        │  Auto Scaling Groups (2)
+ State:                running                                                         │  CloudWatch Alarms (0)
+ SubnetId:             subnet-0aaa111111111111a                                        │  CloudFormation Stacks (0)
+ VpcId:                vpc-0abc123def456789a                                           │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │
+                                                                                       │

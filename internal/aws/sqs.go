@@ -11,6 +11,14 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// SQSQueueAttributesRow preserves queue attributes in structured form for
+// detail/YAML views and tests.
+type SQSQueueAttributesRow struct {
+	QueueURL   string
+	QueueName  string
+	Attributes map[string]string
+}
+
 func init() {
 	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
 
@@ -91,7 +99,11 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 				"approx_not_visible": approxNotVisible,
 				"delay_seconds":      delaySeconds,
 			},
-			RawStruct: fmt.Sprintf("%v", attrs),
+			RawStruct: SQSQueueAttributesRow{
+				QueueURL:   queueURL,
+				QueueName:  queueName,
+				Attributes: attrs,
+			},
 		}
 
 		resources = append(resources, r)

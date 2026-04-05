@@ -74,13 +74,24 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if key.Matches(msg, m.keys.Escape) {
+		if d, ok := m.activeView().(*views.DetailModel); ok && d.ConsumesEscapeLocally() {
+			return m.updateActiveView(msg)
+		}
 		// If active view has active search (confirmed highlights), delegate Esc to clear it.
 		if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
 			return m.updateActiveView(msg)
 		}
+		// Related-navigation resource lists should pop immediately on Esc.
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok && rl.EscPops() {
+			m.popView()
+			return m, nil
+		}
 		// If active view has a confirmed filter, clear it first
 		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
 			f.SetFilter("")
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				m.cacheTopLevelResourceList(*rl)
+			}
 			return m, nil
 		}
 		// Otherwise pop view; no-op on main menu (never quit from Esc)
@@ -229,6 +240,8 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // handleProfileSelected switches the AWS profile, pops the profile selector,
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
+	m.relatedCache.clear() // always clear on profile switch
+	m.relatedGen++
 	if m.demoMode {
 		return m, nil
 	}
@@ -242,7 +255,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
-	m.availabilityGen++ // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight probes
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
@@ -260,6 +273,8 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // handleRegionSelected switches the AWS region, pops the region selector,
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
+	m.relatedCache.clear() // always clear on region switch
+	m.relatedGen++
 	if m.demoMode {
 		return m, nil
 	}
@@ -272,7 +287,7 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	}
 	m.region = msg.Region
 	m.identity = nil
-	m.availabilityGen++ // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight probes
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
@@ -383,6 +398,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if msg.Resource == nil {
 			return m, nil
 		}
+		if msg.ReplaceCurrent {
+			m.popView()
+		}
 		resType := msg.ResourceType
 		if resType == "" {
 			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
@@ -392,6 +410,20 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
 		d.SetSize(m.innerSize())
 		m.pushView(&d)
+		// Use cached related results when available; skip re-dispatch.
+		if d.NeedsRelatedCheck() {
+			ck := relatedCacheKey(resType, msg.Resource.ID)
+			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
+				d.ApplyRelatedResults(cached)
+				return m, nil
+			}
+			return m, func() tea.Msg {
+				return messages.RelatedCheckStartedMsg{
+					ResourceType:   resType,
+					SourceResource: *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetYAML:
@@ -463,6 +495,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 
 // handleRefresh re-fetches resources when on a resource list view,
 // or restarts availability checks when on the main menu.
+// For detail views, re-triggers related resource checks.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Main menu: restart availability checks
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
@@ -474,6 +507,22 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
+	}
+
+	// Detail view: re-trigger related resource checks
+	if d, ok := m.activeView().(*views.DetailModel); ok {
+		d.ResetRightColumn()
+		rt := d.ResourceType()
+		srcRes := d.SourceResource()
+		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
+		m.relatedGen++ // cancel in-flight results from previous batch
+		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+		return m, func() tea.Msg {
+			return messages.RelatedCheckStartedMsg{
+				ResourceType:   rt,
+				SourceResource: srcRes,
+			}
+		}
 	}
 
 	rl, ok := m.activeView().(*views.ResourceListModel)
@@ -560,9 +609,9 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		menu.SetCheckProgress(0, m.availTotal)
 	}
 
-	// Fire first batch of concurrent probes (up to 3)
+	// Fire first batch of concurrent probes (up to 4)
 	var cmds []tea.Cmd
-	for i := 0; i < 3 && len(m.availQueue) > 0; i++ {
+	for i := 0; i < 4 && len(m.availQueue) > 0; i++ {
 		shortName := m.availQueue[0]
 		m.availQueue = m.availQueue[1:]
 		cmds = append(cmds, m.probeResourceAvailability(shortName, m.availabilityGen))
@@ -627,3 +676,4 @@ func copyToClipboard(content, successLabel string) tea.Cmd {
 		return messages.FlashMsg{Text: successLabel, IsError: false}
 	}
 }
+
