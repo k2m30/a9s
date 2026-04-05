@@ -79,4 +79,14 @@ func init() {
 			{TargetType: "pipeline", Count: 1, ResourceIDs: []string{relatedCbPipelineID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("cf", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "s3", Count: 1, ResourceIDs: []string{relatedCfS3ID}},
+			{TargetType: "elb", Count: 1, ResourceIDs: []string{relatedCfELBID}},
+			{TargetType: "waf", Count: 0},
+			{TargetType: "acm", Count: 0},
+			{TargetType: "r53", Count: 0},
+		}
+	})
 }

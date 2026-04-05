@@ -20,6 +20,14 @@ func init() {
 		}
 		return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
 	})
+
+	resource.RegisterRelated("cf", []resource.RelatedDef{
+		{TargetType: "s3", DisplayName: "S3 Buckets (origin)", Checker: nil},
+		{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: nil},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: nil},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: nil},
+		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: nil},
+	})
 }
 
 // FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts
