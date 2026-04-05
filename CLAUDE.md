@@ -1,6 +1,8 @@
-# a9s Development Guidelines
+# CLAUDE.md
 
-Auto-generated from all feature plans. Last updated: 2026-03-30
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# a9s Development Guidelines
 
 ## GitHub
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
@@ -40,19 +42,28 @@ specs/           # feature specifications
 ## Commands
 
 - `go build -o a9s ./cmd/a9s/` — build the binary
-- `go test ./tests/unit/ -count=1 -timeout 120s` — run unit tests
+- `go test ./tests/unit/ -count=1 -timeout 120s` — run all unit tests
+- `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
 - `golangci-lint run ./...` — run linter (MUST pass locally before any push)
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
 - `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
+- `./a9s --demo` — run the app with synthetic fixture data (no AWS credentials needed)
 
 ## Prerequisites
 
 - Go 1.26+ (`brew install go`)
 - golangci-lint v2.11+ (`brew install golangci-lint`)
 - govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`)
+
+## Architecture Principles
+
+- **Read-only by design** — a9s never makes write calls to AWS
+- **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
+- **Message-driven** — views communicate via typed messages, never import each other
+- **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`
 
 ## Code Style
 
@@ -106,6 +117,36 @@ Key registries: `resource.RegisterChildType()`, `resource.RegisterChildFetcher()
 
 ContextKeys resolution: `"ID"` → Resource.ID, `"Name"` → Resource.Name, `"@parent.x"` → inherited from parent context, else → Resource.Fields[key].
 
+## Related-View Architecture
+
+The right-column related panel is data-driven via `RelatedDef` and `NavigableField` on each resource type:
+
+```go
+type RelatedDef struct {
+    TargetType  string         // target resource short name (e.g., "vpc")
+    DisplayName string         // display label in the right column
+    Checker     RelatedChecker // async checker function
+}
+
+type NavigableField struct {
+    FieldPath  string // dot-path into resource fields (e.g., "VpcId")
+    TargetType string // resource type to navigate to
+}
+```
+
+Key registries:
+- `resource.RegisterRelated(shortName, []RelatedDef{...})` — registers related checkers
+- `resource.RegisterNavigableFields(shortName, []NavigableField{...})` — registers navigable fields
+- `resource.RegisterRelatedDemo(shortName, func)` — registers demo-mode checker override
+
+Adding a new related view requires **NO changes** to `app.go`, `detail.go`, `app_related.go`, or `messages.go`. All dispatch, rendering, and navigation are generic.
+
+ContextKeys resolution for related navigation (parallel to ChildView ContextKeys):
+- `"ID"` → `Resource.ID`
+- `"Name"` → `Resource.Name`
+- `"@parent.x"` → inherited from parent context key `x`
+- anything else → `Resource.Fields[key]`
+
 ## Agent File Access Rules
 
 Agents MUST use targeted file access — never broad globs on large directories.
@@ -142,6 +183,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 ## Rules
 
 - ALWAYS rebuild binary (`go build -o a9s ./cmd/a9s/`) after ANY code change — version is resolved at build time via `internal/buildinfo`
+- Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
@@ -168,7 +210,3 @@ When code changes affect any of the following, update the shared source and rege
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
-## Recent Changes
-- 004-related-views-blockers: RetryOnThrottle integration (#186), resource cache (#111), cross-view search (#89)
-- 003-cloudtrail-json-parsing: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, AWS SDK Go v2, yaml.v3
-- 002-paginated-fetcher-migration: Paginated fetcher migration (#107, #108, #109)

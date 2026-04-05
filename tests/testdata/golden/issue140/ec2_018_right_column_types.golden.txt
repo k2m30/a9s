@@ -1,0 +1,35 @@
+ a9s v  demo:us-east-1                                                                                       ? for help 
+┌──────────────────────────────────── detail -- i-0a1b2c3d4e5f60001 (web-prod-01) ─────────────────────────────────────┐
+│ InstanceId:           i-0a1b2c3d4e5f60001                                           │            RELATED             │
+│ State:                running                                                       │  Target Groups                 │
+│ InstanceType:         t3.large                                                      │  Auto Scaling Groups           │
+│ InstanceLifecycle:    on-demand                                                     │  CloudWatch Alarms             │
+│ ImageId:              ami-0a1b2c3d4e5f60001                                         │  EKS Node Groups               │
+│ KeyName:              acme-prod-keypair                                             │  CloudFormation Stacks         │
+│ Placement:                                                                          │  Elastic Beanstalk             │
+│     AvailabilityZone:  us-east-1a                                                   │  Elastic IPs                   │
+│ VpcId:                vpc-0abc123def456789a                                         │  EBS Snapshots                 │
+│ SubnetId:             subnet-0aaa111111111111a                                      │  CloudTrail Events             │
+│ PrivateIpAddress:     10.0.1.10                                                     │                                │
+│ PrivateDnsName:       -                                                             │                                │
+│ PublicIpAddress:      54.210.33.112                                                 │                                │
+│ IamInstanceProfile:                                                                 │                                │
+│     Arn:  arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring            │                                │
+│ SecurityGroups:                                                                     │                                │
+│     GroupId:  sg-0aaa111111111111a                                                  │                                │
+│     GroupName:  acme-web-alb-sg                                                     │                                │
+│     GroupId:  sg-0bbb222222222222b                                                  │                                │
+│     GroupName:  acme-web-app-sg                                                     │                                │
+│ BlockDeviceMappings:                                                                │                                │
+│     DeviceName:  /dev/xvda                                                          │                                │
+│     Ebs:                                                                            │                                │
+│     Status:  attached                                                               │                                │
+│     VolumeId:  vol-0a1b2c3d4e5f60002                                                │                                │
+│ EbsOptimized:         -                                                             │                                │
+│ MetadataOptions:      -                                                             │                                │
+│ LaunchTime:           2025-11-15 08:30                                              │                                │
+│ Architecture:         x86_64                                                        │                                │
+│ Platform:             -                                                             │                                │
+│ Tags:                                                                               │                                │
+│     Key:  Name                                                                      │                                │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

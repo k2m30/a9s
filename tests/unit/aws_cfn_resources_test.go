@@ -488,7 +488,8 @@ func TestCfnResources_PaginatedChildFetcherRegistered(t *testing.T) {
 }
 
 // TestCfnResources_ParentHasChildDef verifies that the parent cfn resource
-// type has a child view definition for cfn_resources with key "r".
+// type has a child view definition for cfn_resources with key "R" (uppercase,
+// to avoid collision with the ToggleRelated binding on "r").
 func TestCfnResources_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("cfn")
 	if rt == nil {
@@ -499,8 +500,8 @@ func TestCfnResources_ParentHasChildDef(t *testing.T) {
 	for _, child := range rt.Children {
 		if child.ChildType == "cfn_resources" {
 			found = true
-			if child.Key != "r" {
-				t.Errorf("expected key %q, got %q", "r", child.Key)
+			if child.Key != "R" {
+				t.Errorf("expected key %q, got %q", "R", child.Key)
 			}
 			if child.ContextKeys["stack_name"] == "" {
 				t.Error("ContextKeys should include 'stack_name'")

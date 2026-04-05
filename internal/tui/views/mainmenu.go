@@ -95,9 +95,11 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 			c := m.scroll.Cursor()
 			if len(m.filteredItems) > 0 && c < len(m.filteredItems) {
 				selected := m.filteredItems[c]
-				// Block navigation to known-empty types (defensive — cursor should never land here)
+				// Block navigation only to confirmed-empty types.
+				// Truncated-zero is not confirmed empty — more pages may exist.
 				if m.availability != nil {
-					if count, known := m.availability[selected.ShortName]; known && count == 0 {
+					isTruncated := m.truncated != nil && m.truncated[selected.ShortName]
+					if count, known := m.availability[selected.ShortName]; known && count == 0 && !isTruncated {
 						return m, nil
 					}
 				}
@@ -158,8 +160,10 @@ func (m *MainMenuModel) skipUnavailable(direction int) {
 	cur := start
 	for cur >= 0 && cur < total {
 		item := m.filteredItems[cur]
-		if count, known := m.availability[item.ShortName]; !known || count > 0 {
-			// This item is navigable (unknown or has resources)
+		isTruncated := m.truncated != nil && m.truncated[item.ShortName]
+		if count, known := m.availability[item.ShortName]; !known || count > 0 || isTruncated {
+			// This item is navigable: unknown, has resources, or page was truncated
+			// (truncated-zero is not confirmed empty — more pages may exist).
 			m.scroll.SetCursor(cur)
 			return
 		}
@@ -255,7 +259,7 @@ func (m MainMenuModel) View() string {
 			if m.availability != nil {
 				if count, known := m.availability[item.ShortName]; known {
 					countSuffix := " (" + itoa(count) + ")"
-					if m.truncated != nil && m.truncated[item.ShortName] && count > 0 {
+					if m.truncated != nil && m.truncated[item.ShortName] {
 						countSuffix = " (" + itoa(count) + "+)"
 					}
 					nameStr += countSuffix
@@ -279,15 +283,17 @@ func (m MainMenuModel) View() string {
 			nameStr := item.Name
 			if known {
 				countSuffix := " (" + itoa(count) + ")"
-				if m.truncated != nil && m.truncated[item.ShortName] && count > 0 {
+				if m.truncated != nil && m.truncated[item.ShortName] {
 					countSuffix = " (" + itoa(count) + "+)"
 				}
 				nameStr += countSuffix
 			}
 			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
 
-			if known && count == 0 {
-				// Empty resource type — fully dimmed
+			isTruncated := m.truncated != nil && m.truncated[item.ShortName]
+			if known && count == 0 && !isTruncated {
+				// Confirmed-empty resource type — fully dimmed.
+				// Truncated-zero is not dimmed; more pages may exist.
 				dimAlias := styles.DimText.Render(aliasPadded)
 				dimName := styles.DimText.Render("    " + namePadded + " ")
 				sb.WriteString(dimName + dimAlias)

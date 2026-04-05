@@ -41,6 +41,14 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
+// effectiveTitleName returns the name FrameTitle() uses: ListTitle if set, else ShortName.
+func effectiveTitleName(rt resource.ResourceTypeDef) string {
+	if rt.ListTitle != "" {
+		return rt.ListTitle
+	}
+	return rt.ShortName
+}
+
 // ===========================================================================
 // Section D: Top-Level Pagination Correctness
 //
@@ -792,7 +800,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 
 			if total <= pageSize {
 				// Small type: all items returned, no truncation
-				expected := fmt.Sprintf("%s(%d)", rt.ShortName, pageCount)
+				expected := fmt.Sprintf("%s(%d)", effectiveTitleName(rt), pageCount)
 				if title != expected {
 					t.Errorf("demo %s (small): expected title %q, got %q", rt.ShortName, expected, title)
 				}
@@ -804,7 +812,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 				}
 			} else {
 				// Large type: first page returned with truncation
-				expected := fmt.Sprintf("%s(%d+)", rt.ShortName, pageCount)
+				expected := fmt.Sprintf("%s(%d+)", effectiveTitleName(rt), pageCount)
 				if title != expected {
 					t.Errorf("demo %s (large): expected title %q, got %q", rt.ShortName, expected, title)
 				}
@@ -1423,7 +1431,7 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 			})
 
 			// Should now have 150 items, no truncation
-			expected := rt.ShortName + "(150)"
+			expected := effectiveTitleName(rt) + "(150)"
 			if m.FrameTitle() != expected {
 				t.Errorf("J.1/%s: expected %q after append, got %q",
 					rt.ShortName, expected, m.FrameTitle())
@@ -1473,7 +1481,7 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 				Append:       true,
 			})
 
-			expectedTitle := rt.ShortName + "(400)"
+			expectedTitle := effectiveTitleName(rt) + "(400)"
 			if m.FrameTitle() != expectedTitle {
 				t.Fatalf("J.2/%s: precondition: expected %q, got %q",
 					rt.ShortName, expectedTitle, m.FrameTitle())
@@ -1688,7 +1696,7 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 
 			// After ClearLoading(), loadingMore must be cleared.
 			// Frame title should NOT contain "loading..." — it should be "rt(100+)".
-			expectedTitle := rt.ShortName + "(100+)"
+			expectedTitle := effectiveTitleName(rt) + "(100+)"
 			if title != expectedTitle {
 				t.Errorf("L.2/%s: after ClearLoading(), frame title should be %q, got %q",
 					rt.ShortName, expectedTitle, title)
@@ -2010,7 +2018,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 			})
 
 			// Total: 100 items
-			expected := rt.ShortName + "(100)"
+			expected := effectiveTitleName(rt) + "(100)"
 			if m.FrameTitle() != expected {
 				t.Fatalf("expected %q, got %q", expected, m.FrameTitle())
 			}
@@ -2225,9 +2233,9 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 			m.SetSize(120, 30)
 			m, _ = m.Init()
 
-			// 1. Loading state: FrameTitle returns just the short name
-			if m.FrameTitle() != rt.ShortName {
-				t.Errorf("loading: expected %q, got %q", rt.ShortName, m.FrameTitle())
+			// 1. Loading state: FrameTitle returns just the effective title name
+			if m.FrameTitle() != effectiveTitleName(rt) {
+				t.Errorf("loading: expected %q, got %q", effectiveTitleName(rt), m.FrameTitle())
 			}
 
 			// 2. Load truncated page
@@ -2251,8 +2259,8 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 					NextToken:   "tok",
 				},
 			})
-			if m.FrameTitle() != rt.ShortName+"(100+)" {
-				t.Errorf("truncated: expected %q, got %q", rt.ShortName+"(100+)", m.FrameTitle())
+			if m.FrameTitle() != effectiveTitleName(rt)+"(100+)" {
+				t.Errorf("truncated: expected %q, got %q", effectiveTitleName(rt)+"(100+)", m.FrameTitle())
 			}
 
 			// 3. Press M → loading more
@@ -2268,8 +2276,8 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
 				Append:       true,
 			})
-			if m.FrameTitle() != rt.ShortName+"(200)" {
-				t.Errorf("complete: expected %q, got %q", rt.ShortName+"(200)", m.FrameTitle())
+			if m.FrameTitle() != effectiveTitleName(rt)+"(200)" {
+				t.Errorf("complete: expected %q, got %q", effectiveTitleName(rt)+"(200)", m.FrameTitle())
 			}
 
 			// 5. M should be no-op now
@@ -2284,8 +2292,8 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				Resources:    resources[:50],
 				Pagination:   nil,
 			})
-			if m.FrameTitle() != rt.ShortName+"(50)" {
-				t.Errorf("refresh: expected %q, got %q", rt.ShortName+"(50)", m.FrameTitle())
+			if m.FrameTitle() != effectiveTitleName(rt)+"(50)" {
+				t.Errorf("refresh: expected %q, got %q", effectiveTitleName(rt)+"(50)", m.FrameTitle())
 			}
 		})
 	}

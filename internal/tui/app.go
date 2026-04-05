@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"container/list"
 	"fmt"
 	"strings"
 
@@ -94,6 +95,80 @@ type Model struct {
 	availTotal      int      // total types to probe in current gen
 
 	resourceCache map[string]*resourceCacheEntry
+	relatedCache  *relatedCacheLRU
+	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
+}
+
+// relatedCacheKey builds the map key for relatedCache lookups.
+func relatedCacheKey(resourceType, resourceID string) string {
+	return resourceType + ":" + resourceID
+}
+
+// relatedCacheLRU is a simple LRU cache for related-resource check results.
+// It caps at maxRelatedCacheEntries entries; the least-recently-used entry
+// is evicted when the cap is exceeded. Thread-safety is not required because
+// all Model updates run on the single Bubble Tea goroutine.
+const maxRelatedCacheEntries = 500
+
+type relatedCacheLRU struct {
+	cap   int
+	index map[string]*list.Element
+	order *list.List
+}
+
+type relatedCacheItem struct {
+	key     string
+	results []resource.RelatedCheckResult
+}
+
+func newRelatedCacheLRU(cap int) *relatedCacheLRU {
+	return &relatedCacheLRU{
+		cap:   cap,
+		index: make(map[string]*list.Element),
+		order: list.New(),
+	}
+}
+
+func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) {
+	el, ok := c.index[key]
+	if !ok {
+		return nil, false
+	}
+	c.order.MoveToFront(el)
+	return el.Value.(*relatedCacheItem).results, true
+}
+
+func (c *relatedCacheLRU) set(key string, results []resource.RelatedCheckResult) {
+	if el, ok := c.index[key]; ok {
+		c.order.MoveToFront(el)
+		el.Value.(*relatedCacheItem).results = results
+		return
+	}
+	el := c.order.PushFront(&relatedCacheItem{key: key, results: results})
+	c.index[key] = el
+	if c.order.Len() > c.cap {
+		back := c.order.Back()
+		if back != nil {
+			c.order.Remove(back)
+			delete(c.index, back.Value.(*relatedCacheItem).key)
+		}
+	}
+}
+
+func (c *relatedCacheLRU) delete(key string) {
+	if el, ok := c.index[key]; ok {
+		c.order.Remove(el)
+		delete(c.index, key)
+	}
+}
+
+func (c *relatedCacheLRU) clear() {
+	c.index = make(map[string]*list.Element)
+	c.order.Init()
+}
+
+func (c *relatedCacheLRU) len() int {
+	return c.order.Len()
 }
 
 // Option configures the root Model.
@@ -140,6 +215,8 @@ func New(profile, region string, opts ...Option) Model {
 		viewConfig:    cfg,
 		configErr:     cfgErr,
 		resourceCache: make(map[string]*resourceCacheEntry),
+		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
+		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -189,6 +266,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.propagateSize()
+		if d, ok := m.activeView().(*views.DetailModel); ok && d.TakePendingRelatedDispatch() {
+			src := d.SourceResource()
+			rtype := d.ResourceType()
+			return m, func() tea.Msg {
+				return messages.RelatedCheckStartedMsg{
+					ResourceType:   rtype,
+					SourceResource: src,
+				}
+			}
+		}
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -236,7 +323,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if updatedModel, ok := updated.(Model); ok {
 			if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
 				// Only cache top-level resource lists, not child views.
-				if rl.ParentContext() == nil {
+				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
 					sortField, sortAsc := rl.SortState()
 					updatedModel.resourceCache[rt] = &resourceCacheEntry{
@@ -250,6 +337,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return updatedModel, cmd
 				}
+			} else if msg.ResourceType != "" && !msg.Append {
+				// Active view is not a ResourceList for this type (e.g., detail or menu).
+				// Cache resources directly from the message so handleRelatedNavigate
+				// can find them when navigating to a related resource type.
+				if _, alreadyCached := updatedModel.resourceCache[msg.ResourceType]; !alreadyCached {
+					updatedModel.resourceCache[msg.ResourceType] = &resourceCacheEntry{
+						resources: msg.Resources,
+					}
+				}
 			}
 			return updatedModel, cmd
 		}
@@ -262,6 +358,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityCacheLoaded(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.RelatedCheckStartedMsg:
+		return m.handleRelatedCheckStarted(msg)
+	case messages.RelatedCheckResultMsg:
+		// Discard results from a previous check generation (e.g., after Ctrl+R or
+		// profile/region switch). relatedGen starts at 1 so the live path never
+		// stamps Generation=0 onto results. Generation=0 is therefore the safe
+		// sentinel for test/manual injection (always accepted). Any non-zero
+		// generation that doesn't match the current relatedGen is stale and dropped.
+		if msg.Generation != 0 && msg.Generation != m.relatedGen {
+			return m, nil
+		}
+		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
+		// Fall back to the active detail view's resource ID when SourceResourceID is unset
+		// (e.g., manually-injected test messages or legacy callers).
+		sourceID := msg.SourceResourceID
+		if sourceID == "" {
+			if d, ok := m.activeView().(*views.DetailModel); ok {
+				sourceID = d.SourceResource().ID
+			}
+		}
+		if sourceID != "" {
+			ck := relatedCacheKey(msg.ResourceType, sourceID)
+			existing, _ := m.relatedCache.get(ck)
+			m.relatedCache.set(ck, append(existing, msg.Result))
+		}
+		// Write-back: persist pages fetched on cold miss so the next detail view
+		// for any resource type gets a cache hit instead of re-fetching.
+		for shortName, entry := range msg.CachedPages {
+			if _, exists := m.resourceCache[shortName]; !exists {
+				pagination := entry.Pagination
+				// Backward compat: callers that set IsTruncated=true but leave Pagination nil
+				// (e.g., test fixtures, demo mode) must still have truncation preserved so
+				// that buildResourceCacheSnapshot can reconstruct IsTruncated correctly.
+				if pagination == nil && entry.IsTruncated {
+					pagination = &resource.PaginationMeta{IsTruncated: true}
+				}
+				m.resourceCache[shortName] = &resourceCacheEntry{
+					resources:  entry.Resources,
+					pagination: pagination,
+				}
+			}
+		}
+		return m.updateActiveView(msg)
+	case messages.RelatedNavigateMsg:
+		return m.handleRelatedNavigate(msg)
 	}
 	return m.updateActiveView(msg)
 }
@@ -297,10 +438,15 @@ func (m Model) View() tea.View {
 	rightContent := m.headerRight()
 	badge := m.accountBadge()
 	role := m.identityRoleName()
-	cacheKey := headerProfile + ":" + headerRegion + ":" + Version + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
+	// §7.4: when stack depth exceeds 4, show "[N]" in place of the version string.
+	displayVersion := Version
+	if len(m.stack) > 4 {
+		displayVersion = fmt.Sprintf("[%d]", len(m.stack))
+	}
+	cacheKey := headerProfile + ":" + headerRegion + ":" + displayVersion + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
 	header := m.headerCache
 	if cacheKey != m.headerCacheKey {
-		header = layout.RenderHeader(headerProfile, headerRegion, Version, m.width, rightContent, badge, role)
+		header = layout.RenderHeader(headerProfile, headerRegion, displayVersion, m.width, rightContent, badge, role)
 		m.headerCache = header
 		m.headerCacheKey = cacheKey
 	}
@@ -311,7 +457,18 @@ func (m Model) View() tea.View {
 		lines = strings.Split(content, "\n")
 	}
 	frameHeight := max(m.height-1, 3)
-	frame := layout.RenderFrame(lines, active.FrameTitle(), m.width, frameHeight)
+	frameTitle := active.FrameTitle()
+	if d, ok := active.(*views.DetailModel); ok {
+		src := d.SourceResource()
+		if src.ID != "" {
+			if src.Name != "" {
+				frameTitle = fmt.Sprintf("detail -- %s (%s)", src.ID, src.Name)
+			} else {
+				frameTitle = "detail -- " + src.ID
+			}
+		}
+	}
+	frame := layout.RenderFrame(lines, frameTitle, m.width, frameHeight)
 
 	v := tea.NewView(header + "\n" + frame)
 	v.AltScreen = true
@@ -369,6 +526,7 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *views.ResourceListModel:
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
+		m.cacheTopLevelResourceList(updated)
 		return m, cmd
 	case *views.DetailModel:
 		updated, cmd := v.Update(msg)
@@ -396,6 +554,23 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
+	if rl.ParentContext() != nil || rl.EscPops() {
+		return
+	}
+	rt := rl.ResourceType()
+	sortField, sortAsc := rl.SortState()
+	m.resourceCache[rt] = &resourceCacheEntry{
+		resources:     rl.AllResources(),
+		pagination:    rl.PaginationState(),
+		filterText:    rl.FilterText(),
+		sortField:     sortField,
+		sortAsc:       sortAsc,
+		cursorPos:     rl.CursorPosition(),
+		hScrollOffset: rl.HScrollOffset(),
+	}
 }
 
 // helpContext determines the HelpContext from the current active view.

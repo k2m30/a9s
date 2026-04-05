@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -19,13 +20,68 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		resources, err := FetchNodeGroups(ctx, c.EKS, c.EKS, c.EKS)
-		if err != nil {
-			return resource.FetchResult{}, err
+
+		clusterInput := &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize)}
+		if continuationToken != "" {
+			clusterInput.NextToken = aws.String(continuationToken)
 		}
+
+		clusterOutput, err := c.EKS.ListClusters(ctx, clusterInput)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
+		}
+
+		moreClusters := clusterOutput.NextToken != nil
+		moreNodegroups := false
+		hitCap := false
+		var resources []resource.Resource
+
+		for _, cluster := range clusterOutput.Clusters {
+			if hitCap {
+				moreNodegroups = true
+				break
+			}
+			ngOutput, err := c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+				ClusterName: aws.String(cluster),
+				MaxResults:  aws.Int32(DefaultPageSize),
+			})
+			if err != nil {
+				continue
+			}
+			if ngOutput.NextToken != nil {
+				moreNodegroups = true
+			}
+			for _, ngName := range ngOutput.Nodegroups {
+				if len(resources) >= DefaultPageSize {
+					hitCap = true
+					moreNodegroups = true
+					break
+				}
+				descOutput, err := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+					ClusterName:   aws.String(cluster),
+					NodegroupName: aws.String(ngName),
+				})
+				if err != nil || descOutput.Nodegroup == nil {
+					continue
+				}
+				resources = append(resources, buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup))
+			}
+		}
+
+		isTruncated := moreClusters || moreNodegroups
+		var nextToken string
+		if clusterOutput.NextToken != nil {
+			nextToken = *clusterOutput.NextToken
+		}
+
 		return resource.FetchResult{
-			Resources:  resources,
-			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
 		}, nil
 	})
 }
@@ -93,48 +149,47 @@ func FetchNodeGroups(
 			if err != nil {
 				return nil, fmt.Errorf("describing node group %s: %w", ngName, err)
 			}
-
-			ng := descOutput.Nodegroup
-
-			nodegroupName := ""
-			if ng.NodegroupName != nil {
-				nodegroupName = *ng.NodegroupName
+			if descOutput.Nodegroup == nil {
+				continue
 			}
-
-			ngClusterName := ""
-			if ng.ClusterName != nil {
-				ngClusterName = *ng.ClusterName
-			}
-
-			status := string(ng.Status)
-
-			instanceTypes := strings.Join(ng.InstanceTypes, ", ")
-
-			// Guard for nil ScalingConfig
-			desiredSize := ""
-			if ng.ScalingConfig != nil {
-				if ng.ScalingConfig.DesiredSize != nil {
-					desiredSize = fmt.Sprintf("%d", *ng.ScalingConfig.DesiredSize)
-				}
-			}
-
-			r := resource.Resource{
-				ID:     nodegroupName,
-				Name:   nodegroupName,
-				Status: status,
-				Fields: map[string]string{
-					"nodegroup_name": nodegroupName,
-					"cluster_name":   ngClusterName,
-					"status":         status,
-					"instance_types": instanceTypes,
-					"desired_size":   desiredSize,
-				},
-				RawStruct: ng,
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup))
 		}
 	}
 
 	return resources, nil
+}
+
+// buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.
+func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) resource.Resource {
+	nodegroupName := ngName
+	if ng.NodegroupName != nil {
+		nodegroupName = *ng.NodegroupName
+	}
+
+	ngClusterName := clusterName
+	if ng.ClusterName != nil {
+		ngClusterName = *ng.ClusterName
+	}
+
+	status := string(ng.Status)
+	instanceTypes := strings.Join(ng.InstanceTypes, ", ")
+
+	desiredSize := ""
+	if ng.ScalingConfig != nil && ng.ScalingConfig.DesiredSize != nil {
+		desiredSize = fmt.Sprintf("%d", *ng.ScalingConfig.DesiredSize)
+	}
+
+	return resource.Resource{
+		ID:     nodegroupName,
+		Name:   nodegroupName,
+		Status: status,
+		Fields: map[string]string{
+			"nodegroup_name": nodegroupName,
+			"cluster_name":   ngClusterName,
+			"status":         status,
+			"instance_types": instanceTypes,
+			"desired_size":   desiredSize,
+		},
+		RawStruct: ng,
+	}
 }
