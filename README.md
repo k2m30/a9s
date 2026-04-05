@@ -156,7 +156,7 @@ a9s --no-cache            # disable resource availability cache
 | `e` | Open Service Events (ECS Services) |
 | `L` | Open Container Logs (ECS Services) |
 | `M` | Load more (paginated lists, also in demo mode) |
-| `r` | Open Stack Resources (CFN Stacks) |
+| `R` | Open Stack Resources (CFN Stacks) |
 | `s` | Open source view (reserved for future child views) |
 | `w` | Toggle line wrap (in YAML, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
@@ -211,7 +211,7 @@ Press `Enter` on a resource to explore its nested children. Press `Esc` to go ba
 | ECS Services | Tasks | `Enter` | Running and stopped tasks with status, health, stopped reason |
 | ECS Services | Container Logs | `L` | Application logs from CloudWatch |
 | CFN Stacks | Stack Events | `Enter` | Event timeline showing stack operation progress and status |
-| CFN Stacks | Stack Resources | `r` | Logical and physical resources in the stack with status |
+| CFN Stacks | Stack Resources | `R` | Logical and physical resources in the stack with status |
 | Auto Scaling Groups | Scaling Activities | `Enter` | Scaling activity history with status, description, cause |
 | CloudWatch Alarms | Alarm History | `Enter` | State transitions, configuration updates, and action events |
 | Load Balancers | Listeners | `Enter` | Port, protocol, action, target, SSL policy, certificate |
