@@ -101,4 +101,11 @@ func init() {
 			{TargetType: "cb", Count: 1, ResourceIDs: []string{relatedCodeartifactCbID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ct-events", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCtEventsRoleID}},
+			{TargetType: "iam-user", Count: 0},
+		}
+	})
 }

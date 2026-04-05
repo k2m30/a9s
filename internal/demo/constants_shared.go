@@ -119,4 +119,6 @@ const (
 	relatedCfnRoleID = "acme-ci-deploy-role"
 
 	relatedCodeartifactCbID = "acme-api-build"
+
+	relatedCtEventsRoleID = "deploy-bot"
 )

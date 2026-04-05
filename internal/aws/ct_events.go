@@ -23,6 +23,11 @@ func init() {
 		}
 		return FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken)
 	})
+
+	resource.RegisterRelated("ct-events", []resource.RelatedDef{
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: nil},
+	})
 }
 
 // FetchCloudTrailEvents fetches all CloudTrail LookupEvents pages and returns
