@@ -233,6 +233,8 @@ func natFixtures() []resource.Resource {
 				State:            ec2types.NatGatewayStateAvailable,
 				ConnectivityType: ec2types.ConnectivityTypePublic,
 				CreateTime:       aws.Time(mustParseTime("2025-06-01T10:00:00+00:00")),
+				FailureCode:      aws.String("Gateway.NotAttached"),
+				FailureMessage:   aws.String("Network vpc-0abc123def456789a has no Internet gateway attached"),
 				NatGatewayAddresses: []ec2types.NatGatewayAddress{
 					{
 						AllocationId: aws.String("eipalloc-0aaa111111111111a"),
@@ -417,6 +419,8 @@ func eipFixtures() []resource.Resource {
 				AllocationId:       aws.String("eipalloc-0aaa111111111111a"),
 				PublicIp:           aws.String("54.210.33.200"),
 				AssociationId:      aws.String("eipassoc-0aaa111111111111a"),
+				InstanceId:         aws.String("i-0a1b2c3d4e5f60001"),
+				SubnetId:           aws.String("subnet-0aaa111111111111a"),
 				Domain:             ec2types.DomainTypeVpc,
 				NetworkBorderGroup: aws.String("us-east-1"),
 				NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),

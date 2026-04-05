@@ -47,6 +47,10 @@ func route53Zones() []resource.Resource {
 					Comment:     aws.String("Primary public domain for Acme Corp"),
 					PrivateZone: false,
 				},
+				LinkedService: &r53types.LinkedService{
+					ServicePrincipal: aws.String("servicediscovery.amazonaws.com"),
+					Description:      aws.String("Managed by AWS Service Discovery"),
+				},
 			},
 		},
 		{
@@ -107,13 +111,14 @@ func r53RecordsAcmeCorp() []resource.Resource {
 				"name":   "acme-corp.com.",
 				"type":   "A",
 				"ttl":    "",
-				"values": "ALIAS: d111111abcdef8.cloudfront.net.",
+				"values": "ALIAS: " + prodCFDomain + ".",
 			},
+			// R53 → CloudFront alias: satisfies cross-reference story.
 			RawStruct: r53types.ResourceRecordSet{
 				Name: aws.String("acme-corp.com."),
 				Type: r53types.RRTypeA,
 				AliasTarget: &r53types.AliasTarget{
-					DNSName:              aws.String("d111111abcdef8.cloudfront.net."),
+					DNSName:              aws.String(prodCFDomain + "."),
 					HostedZoneId:         aws.String("Z2FDTNDATAQYW2"),
 					EvaluateTargetHealth: false,
 				},
@@ -168,15 +173,37 @@ func r53RecordsAcmeCorp() []resource.Resource {
 				"name":   "api.acme-corp.com.",
 				"type":   "A",
 				"ttl":    "",
-				"values": "ALIAS: acme-prod-web-1234567890.us-east-1.elb.amazonaws.com.",
+				"values": "ALIAS: " + prodELBDNS + ".",
 			},
+			// R53 → ELB alias: satisfies cross-reference story.
 			RawStruct: r53types.ResourceRecordSet{
 				Name: aws.String("api.acme-corp.com."),
 				Type: r53types.RRTypeA,
 				AliasTarget: &r53types.AliasTarget{
-					DNSName:              aws.String("acme-prod-web-1234567890.us-east-1.elb.amazonaws.com."),
+					DNSName:              aws.String(prodELBDNS + "."),
 					HostedZoneId:         aws.String("Z35SXDOTRQ7X7K"),
 					EvaluateTargetHealth: true,
+				},
+			},
+		},
+		{
+			ID:     "assets.acme-corp.com.|A",
+			Name:   "assets.acme-corp.com.",
+			Status: "A",
+			Fields: map[string]string{
+				"name":   "assets.acme-corp.com.",
+				"type":   "A",
+				"ttl":    "",
+				"values": "ALIAS: " + prodStaticAssetsBucket + ".s3-website.us-east-1.amazonaws.com.",
+			},
+			// R53 → S3 website alias: satisfies cross-reference story.
+			RawStruct: r53types.ResourceRecordSet{
+				Name: aws.String("assets.acme-corp.com."),
+				Type: r53types.RRTypeA,
+				AliasTarget: &r53types.AliasTarget{
+					DNSName:              aws.String(prodStaticAssetsBucket + ".s3-website.us-east-1.amazonaws.com."),
+					HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
+					EvaluateTargetHealth: false,
 				},
 			},
 		},
@@ -228,7 +255,7 @@ func cloudFrontDistributions() []resource.Resource {
 			Status: "Deployed",
 			Fields: map[string]string{
 				"distribution_id": "E1A2B3C4D5E6F7",
-				"domain_name":     "d111111abcdef8.cloudfront.net",
+				"domain_name":     prodCFDomain,
 				"status":          "Deployed",
 				"enabled":         "true",
 				"aliases":         "acme-corp.com, www.acme-corp.com",
@@ -236,14 +263,34 @@ func cloudFrontDistributions() []resource.Resource {
 			},
 			RawStruct: cftypes.DistributionSummary{
 				Id:         aws.String("E1A2B3C4D5E6F7"),
-				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7"),
-				DomainName: aws.String("d111111abcdef8.cloudfront.net"),
+				ARN:        aws.String(prodCFARN),
+				DomainName: aws.String(prodCFDomain),
 				Status:     aws.String("Deployed"),
 				Enabled:    aws.Bool(true),
 				Aliases: &cftypes.Aliases{
 					Quantity: aws.Int32(2),
 					Items:    []string{"acme-corp.com", "www.acme-corp.com"},
 				},
+				// Origins: S3 website + ELB backend — satisfies "CloudFront → S3" and
+				// "CloudFront → ELB" cross-reference stories.
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(2),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-static-assets"),
+							DomainName: aws.String(prodStaticAssetsBucket + ".s3-website.us-east-1.amazonaws.com"),
+						},
+						{
+							Id:         aws.String("alb-api-backend"),
+							DomainName: aws.String(prodELBDNS),
+						},
+					},
+				},
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("s3-webapp-assets-prod"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+				},
+				HttpVersion:      cftypes.HttpVersionHttp2,
 				PriceClass:       cftypes.PriceClassPriceClassAll,
 				Comment:          aws.String("Production website distribution"),
 				LastModifiedTime: aws.Time(time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)),
@@ -270,6 +317,15 @@ func cloudFrontDistributions() []resource.Resource {
 				Aliases: &cftypes.Aliases{
 					Quantity: aws.Int32(1),
 					Items:    []string{"assets.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-webapp-assets"),
+							DomainName: aws.String(prodStaticAssetsBucket + ".s3.amazonaws.com"),
+						},
+					},
 				},
 				PriceClass:       cftypes.PriceClassPriceClass100,
 				Comment:          aws.String("Static assets CDN"),
@@ -309,7 +365,7 @@ func cloudFrontDistributions() []resource.Resource {
 func acmCertificates() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "acme-corp.com",
+			ID:     prodACMCertARN1,
 			Name:   "acme-corp.com",
 			Status: "ISSUED",
 			Fields: map[string]string{
@@ -321,16 +377,25 @@ func acmCertificates() []resource.Resource {
 			},
 			RawStruct: acmtypes.CertificateSummary{
 				DomainName:     aws.String("acme-corp.com"),
-				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111"),
+				CertificateArn: aws.String(prodACMCertARN1),
 				Status:         acmtypes.CertificateStatusIssued,
 				Type:           acmtypes.CertificateTypeAmazonIssued,
 				NotAfter:       aws.Time(mustParseTime("2027-04-15T23:59:59+00:00")),
+				NotBefore:      aws.Time(mustParseTime("2025-04-15T00:00:00+00:00")),
+				IssuedAt:       aws.Time(time.Date(2025, 4, 15, 10, 0, 0, 0, time.UTC)),
+				ImportedAt:     aws.Time(time.Date(2025, 4, 15, 10, 5, 0, 0, time.UTC)),
 				InUse:          aws.Bool(true),
 				CreatedAt:      aws.Time(time.Date(2025, 4, 15, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"acme-corp.com",
+					"www.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
 			},
 		},
 		{
-			ID:     "*.acme-corp.com",
+			ID:     prodACMCertARN2,
 			Name:   "*.acme-corp.com",
 			Status: "ISSUED",
 			Fields: map[string]string{
@@ -340,14 +405,25 @@ func acmCertificates() []resource.Resource {
 				"not_after":   "2027-06-20T23:59:59Z",
 				"in_use":      "true",
 			},
+			// This cert is associated with both ELB and CloudFront (InUse=true, ARN=prodACMCertARN2).
 			RawStruct: acmtypes.CertificateSummary{
 				DomainName:     aws.String("*.acme-corp.com"),
-				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/b2c3d4e5-6789-01ab-cdef-222222222222"),
+				CertificateArn: aws.String(prodACMCertARN2),
 				Status:         acmtypes.CertificateStatusIssued,
 				Type:           acmtypes.CertificateTypeAmazonIssued,
 				NotAfter:       aws.Time(mustParseTime("2027-06-20T23:59:59+00:00")),
+				NotBefore:      aws.Time(mustParseTime("2025-06-20T00:00:00+00:00")),
+				IssuedAt:       aws.Time(time.Date(2025, 6, 20, 14, 0, 0, 0, time.UTC)),
 				InUse:          aws.Bool(true),
 				CreatedAt:      aws.Time(time.Date(2025, 6, 20, 14, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"*.acme-corp.com",
+					"acme-corp.com",
+					"assets.acme-corp.com",
+					"api.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
 			},
 		},
 		{
@@ -368,6 +444,12 @@ func acmCertificates() []resource.Resource {
 				Type:           acmtypes.CertificateTypeAmazonIssued,
 				InUse:          aws.Bool(false),
 				CreatedAt:      aws.Time(time.Date(2026, 3, 20, 11, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"staging.acme-corp.com",
+					"*.staging.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
 		},
 		{
@@ -389,6 +471,11 @@ func acmCertificates() []resource.Resource {
 				NotAfter:       aws.Time(mustParseTime("2025-12-31T23:59:59+00:00")),
 				InUse:          aws.Bool(false),
 				ImportedAt:     aws.Time(time.Date(2024, 12, 31, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"legacy.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
 		},
 	}
@@ -409,13 +496,16 @@ func apiGateways() []resource.Resource {
 				"description": "Public REST API for Acme Corp mobile and web clients",
 			},
 			RawStruct: apigwtypes.Api{
-				ApiId:                    aws.String("abc123def4"),
-				Name:                     aws.String("acme-public-api"),
-				ProtocolType:             apigwtypes.ProtocolTypeHttp,
-				ApiEndpoint:              aws.String("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
-				Description:              aws.String("Public REST API for Acme Corp mobile and web clients"),
-				RouteSelectionExpression: aws.String("${request.method} ${request.path}"),
-				CreatedDate:              aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
+				ApiId:                        aws.String("abc123def4"),
+				Name:                         aws.String("acme-public-api"),
+				ProtocolType:                 apigwtypes.ProtocolTypeHttp,
+				ApiEndpoint:                  aws.String("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
+				Description:                  aws.String("Public REST API for Acme Corp mobile and web clients"),
+				RouteSelectionExpression:     aws.String("${request.method} ${request.path}"),
+				CreatedDate:                  aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
+				ApiKeySelectionExpression:    aws.String("$request.header.x-api-key"),
+				CorsConfiguration:            &apigwtypes.Cors{AllowMethods: []string{"GET", "POST", "PUT", "DELETE"}, AllowOrigins: []string{"https://app.acme-corp.com"}},
+				Tags:                         map[string]string{"Environment": "production"},
 			},
 		},
 		{
