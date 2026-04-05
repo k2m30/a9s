@@ -232,7 +232,8 @@ func ecrFixtures() []resource.Resource {
 					ScanOnPush: true,
 				},
 				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
-					EncryptionType: ecrtypes.EncryptionTypeAes256,
+					EncryptionType: ecrtypes.EncryptionTypeKms,
+					KmsKey:         aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-03-01T10:00:00+00:00")),
 			},
@@ -258,7 +259,8 @@ func ecrFixtures() []resource.Resource {
 					ScanOnPush: true,
 				},
 				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
-					EncryptionType: ecrtypes.EncryptionTypeAes256,
+					EncryptionType: ecrtypes.EncryptionTypeKms,
+					KmsKey:         aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-03-01T10:05:00+00:00")),
 			},
@@ -284,7 +286,8 @@ func ecrFixtures() []resource.Resource {
 					ScanOnPush: false,
 				},
 				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
-					EncryptionType: ecrtypes.EncryptionTypeAes256,
+					EncryptionType: ecrtypes.EncryptionTypeKms,
+					KmsKey:         aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-01-15T08:30:00+00:00")),
 			},
@@ -310,7 +313,8 @@ func ecrFixtures() []resource.Resource {
 					ScanOnPush: true,
 				},
 				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
-					EncryptionType: ecrtypes.EncryptionTypeAes256,
+					EncryptionType: ecrtypes.EncryptionTypeKms,
+					KmsKey:         aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-06-20T12:00:00+00:00")),
 			},

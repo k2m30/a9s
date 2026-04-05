@@ -19,6 +19,16 @@ func init() {
 		}
 		return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
 	})
+
+	resource.RegisterRelated("ecr", []resource.RelatedDef{
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true},
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
+	})
+
+	resource.RegisterNavigableFields("ecr", []resource.NavigableField{
+		{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
+	})
 }
 
 // FetchECRRepositories calls the ECR DescribeRepositories API and converts
