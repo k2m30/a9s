@@ -2,6 +2,7 @@ package demo
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -47,6 +48,44 @@ func ecsServiceFixtures() []resource.Resource {
 				TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
 				SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 				CreatedAt:          aws.Time(mustParseTime("2025-06-15T10:30:00Z")),
+				DeploymentConfiguration: &ecstypes.DeploymentConfiguration{
+					MaximumPercent:        aws.Int32(200),
+					MinimumHealthyPercent: aws.Int32(100),
+				},
+				Deployments: []ecstypes.Deployment{
+					{
+						Id:             aws.String("ecs-svc-deployment-01"),
+						Status:         aws.String("PRIMARY"),
+						DesiredCount:   2,
+						RunningCount:   2,
+						PendingCount:   0,
+						TaskDefinition: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-api:10"),
+						LaunchType:     ecstypes.LaunchTypeFargate,
+					},
+				},
+				Events: []ecstypes.ServiceEvent{
+					{
+						Id:        aws.String("evt-01"),
+						Message:   aws.String("service acme-api-service has reached a steady state"),
+						CreatedAt: aws.Time(time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC)),
+					},
+				},
+				LoadBalancers: []ecstypes.LoadBalancer{
+					{
+						TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"),
+						ContainerName:  aws.String("api"),
+						ContainerPort:  aws.Int32(8080),
+					},
+				},
+				NetworkConfiguration: &ecstypes.NetworkConfiguration{
+					AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{
+						Subnets:        []string{"subnet-0ccc333333333333c", "subnet-0ddd444444444444d"},
+						SecurityGroups: []string{"sg-0bbb222222222222b"},
+						AssignPublicIp: ecstypes.AssignPublicIpDisabled,
+					},
+				},
+				PlatformVersion: aws.String("LATEST"),
+				RoleArn:         aws.String("arn:aws:iam::123456789012:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"),
 				Tags: []ecstypes.Tag{
 					{Key: aws.String("Environment"), Value: aws.String("prod")},
 					{Key: aws.String("Team"), Value: aws.String("platform")},
@@ -254,6 +293,9 @@ func ecsClusterFixtures() []resource.Resource {
 				ActiveServicesCount:               3,
 				RegisteredContainerInstancesCount: 0,
 				CapacityProviders:                 []string{"FARGATE", "FARGATE_SPOT"},
+				DefaultCapacityProviderStrategy: []ecstypes.CapacityProviderStrategyItem{
+					{CapacityProvider: aws.String("FARGATE"), Weight: 1, Base: 0},
+				},
 				Settings: []ecstypes.ClusterSetting{
 					{Name: ecstypes.ClusterSettingNameContainerInsights, Value: aws.String("enabled")},
 				},
@@ -328,11 +370,11 @@ func ecsTaskFixtures() []resource.Resource {
 		{
 			ID:     "a1b2c3d4e5f6a1b2c3d4e5f6",
 			Name:   "a1b2c3d4e5f6a1b2c3d4e5f6",
-			Status: "RUNNING",
+			Status: "STOPPED",
 			Fields: map[string]string{
 				"task_id":         "a1b2c3d4e5f6a1b2c3d4e5f6",
 				"cluster":         ecsClusterArnServices,
-				"status":          "RUNNING",
+				"status":          "STOPPED",
 				"task_definition": "arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12",
 				"launch_type":     "FARGATE",
 				"cpu":             "512",
@@ -341,8 +383,8 @@ func ecsTaskFixtures() []resource.Resource {
 			RawStruct: ecstypes.Task{
 				TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/a1b2c3d4e5f6a1b2c3d4e5f6"),
 				ClusterArn:        aws.String(ecsClusterArnServices),
-				LastStatus:        aws.String("RUNNING"),
-				DesiredStatus:     aws.String("RUNNING"),
+				LastStatus:        aws.String("STOPPED"),
+				DesiredStatus:     aws.String("STOPPED"),
 				TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
 				LaunchType:        ecstypes.LaunchTypeFargate,
 				Cpu:               aws.String("512"),
@@ -354,6 +396,28 @@ func ecsTaskFixtures() []resource.Resource {
 				PlatformVersion:   aws.String("1.4.0"),
 				PlatformFamily:    aws.String("Linux"),
 				AvailabilityZone:  aws.String("us-east-1a"),
+				Attachments: []ecstypes.Attachment{
+					{
+						Id:     aws.String("att-01"),
+						Type:   aws.String("ElasticNetworkInterface"),
+						Status: aws.String("ATTACHED"),
+						Details: []ecstypes.KeyValuePair{
+							{Name: aws.String("networkInterfaceId"), Value: aws.String("eni-0aaa111111111111a")},
+						},
+					},
+				},
+				Containers: []ecstypes.Container{
+					{
+						Name:       aws.String("api"),
+						Image:      aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:latest"),
+						LastStatus: aws.String("RUNNING"),
+						TaskArn:    aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/task01"),
+					},
+				},
+				StartedBy:     aws.String("ecs-svc-01"),
+				StopCode:      ecstypes.TaskStopCodeEssentialContainerExited,
+				StoppedAt:     aws.Time(time.Date(2026, 3, 20, 10, 5, 0, 0, time.UTC)),
+				StoppedReason: aws.String("Essential container in task exited"),
 				Tags: []ecstypes.Tag{
 					{Key: aws.String("Environment"), Value: aws.String("prod")},
 				},

@@ -42,11 +42,12 @@ func pipelineFixtures() []resource.Resource {
 				"updated":       "2026-03-20 11:30:00",
 			},
 			RawStruct: cptypes.PipelineSummary{
-				Name:         aws.String("acme-api-deploy"),
-				PipelineType: cptypes.PipelineTypeV2,
-				Version:      aws.Int32(3),
-				Created:      aws.Time(mustParseTime("2025-04-10T09:00:00+00:00")),
-				Updated:      aws.Time(mustParseTime("2026-03-20T11:30:00+00:00")),
+				Name:          aws.String("acme-api-deploy"),
+				PipelineType:  cptypes.PipelineTypeV2,
+				ExecutionMode: cptypes.ExecutionModeQueued,
+				Version:       aws.Int32(3),
+				Created:       aws.Time(mustParseTime("2025-04-10T09:00:00+00:00")),
+				Updated:       aws.Time(mustParseTime("2026-03-20T11:30:00+00:00")),
 			},
 		},
 		{
@@ -371,11 +372,30 @@ func codebuildFixtures() []resource.Resource {
 				"last_modified": "2026-03-18T10:30:00+00:00",
 			},
 			RawStruct: cbtypes.Project{
-				Name:        aws.String("acme-api-build"),
-				Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-api-build"),
-				Description: aws.String("Build project for API microservice"),
+				Name:                 aws.String("acme-api-build"),
+				Arn:                  aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-api-build"),
+				Description:          aws.String("Build project for API microservice"),
+				ServiceRole:          aws.String(prodCIDeployRoleARN),
+				ConcurrentBuildLimit: aws.Int32(10),
 				Source: &cbtypes.ProjectSource{
 					Type: cbtypes.SourceTypeGithub,
+				},
+				Cache: &cbtypes.ProjectCache{
+					Type: cbtypes.CacheTypeLocal,
+				},
+				Environment: &cbtypes.ProjectEnvironment{
+					Type:        cbtypes.EnvironmentTypeLinuxContainer,
+					Image:       aws.String("aws/codebuild/standard:7.0"),
+					ComputeType: cbtypes.ComputeTypeBuildGeneral1Small,
+				},
+				LogsConfig: &cbtypes.LogsConfig{
+					CloudWatchLogs: &cbtypes.CloudWatchLogsConfig{
+						Status:    cbtypes.LogsConfigStatusTypeEnabled,
+						GroupName: aws.String("/aws/codebuild/acme-api-build"),
+					},
+				},
+				Tags: []cbtypes.Tag{
+					{Key: aws.String("Environment"), Value: aws.String("production")},
 				},
 				LastModified: aws.Time(mustParseTime("2026-03-18T10:30:00+00:00")),
 				Created:      aws.Time(mustParseTime("2025-06-01T09:00:00+00:00")),
@@ -395,6 +415,7 @@ func codebuildFixtures() []resource.Resource {
 				Name:        aws.String("acme-frontend-build"),
 				Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-frontend-build"),
 				Description: aws.String("Build project for React frontend"),
+				ServiceRole: aws.String(prodCIDeployRoleARN),
 				Source: &cbtypes.ProjectSource{
 					Type: cbtypes.SourceTypeCodecommit,
 				},
@@ -416,6 +437,7 @@ func codebuildFixtures() []resource.Resource {
 				Name:        aws.String("acme-docker-images"),
 				Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-docker-images"),
 				Description: aws.String("Base Docker image builder"),
+				ServiceRole: aws.String(prodCIDeployRoleARN),
 				Source: &cbtypes.ProjectSource{
 					Type: cbtypes.SourceTypeS3,
 				},
