@@ -143,4 +143,12 @@ func init() {
 			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedDocdbSnapKMSID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("eb", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "cfn",  Count: 1, ResourceIDs: []string{relatedEbCFNID}},
+			{TargetType: "logs", Count: 0},
+			{TargetType: "asg",  Count: 0},
+		}
+	})
 }
