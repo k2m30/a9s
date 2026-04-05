@@ -19,6 +19,12 @@ func init() {
 		}
 		return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 	})
+
+	resource.RegisterRelated("cb", []resource.RelatedDef{
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: nil},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
+		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: nil},
+	})
 }
 
 // FetchCodeBuildProjectsPage fetches one page of project names from ListProjects
