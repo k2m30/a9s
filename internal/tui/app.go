@@ -216,6 +216,7 @@ func New(profile, region string, opts ...Option) Model {
 		configErr:     cfgErr,
 		resourceCache: make(map[string]*resourceCacheEntry),
 		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
+		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -361,8 +362,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResultMsg:
 		// Discard results from a previous check generation (e.g., after Ctrl+R or
-		// profile/region switch). Generation 0 is the initial state; unset means
-		// the message predates generation tracking and is always accepted.
+		// profile/region switch). relatedGen starts at 1 so the live path never
+		// stamps Generation=0 onto results. Generation=0 is therefore the safe
+		// sentinel for test/manual injection (always accepted). Any non-zero
+		// generation that doesn't match the current relatedGen is stale and dropped.
 		if msg.Generation != 0 && msg.Generation != m.relatedGen {
 			return m, nil
 		}

@@ -149,15 +149,21 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestIssue239_StaleGenerationResult_IsDiscarded verifies that a RelatedCheckResultMsg
-// carrying an old (non-current) generation is silently dropped and does not update
-// the right column.
+// carrying a non-zero generation that doesn't match the current relatedGen is silently
+// dropped and does not update the right column.
 //
 // Business rule: the right column must not show counts from a previous check batch
 // after the user has triggered a refresh (Ctrl+R).
 //
-// Observable proxy: if a result with wrong generation is applied, the right column
-// shows its count "(N)"; if discarded, the row stays in loading/unknown state.
+// Mechanism: relatedGen starts at 1. The initial batch stamps gen=1. Ctrl+R
+// increments relatedGen to 2. Late results from the initial batch (gen=1) must
+// be discarded — they no longer match relatedGen=2.
+//
+// Observable proxy: if a gen=1 stale result is applied after relatedGen=2,
+// the right column shows the stale count; if discarded, no count appears.
 func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
+	const viewedResourceID = "i-0a1b2c3d4e5f60001"
+
 	// Set up EC2 detail view using demo fixtures so the right column is rendered.
 	m := setupEC2DetailWithResults(t)
 
@@ -167,69 +173,52 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 		t.Fatalf("precondition: expected '(2)' in view before test; got:\n%s", viewBefore)
 	}
 
-	// Trigger Ctrl+R from the detail view. This increments relatedGen (now=1) and
-	// clears the relatedCache entry — the right column returns to loading state.
+	// Trigger Ctrl+R: increments relatedGen from 1 to 2 and clears the relatedCache
+	// entry so the right column returns to loading state.
 	m, _ = rootApplyMsg(m, ctrlR())
 
-	// Drain the immediate cmd (RelatedCheckStartedMsg) but do NOT feed checker results
-	// back — we want the right column to remain in loading state.
-	// The loading state means no "(2)" should be present.
 	viewAfterRefresh := stripANSI(rootViewContent(m))
 	if strings.Contains(viewAfterRefresh, "(2)") {
-		t.Fatalf("precondition: after Ctrl+R, stale '(2)' is still visible — relatedCache was not cleared:\n%s", viewAfterRefresh)
+		t.Fatalf("precondition: after Ctrl+R stale '(2)' still visible — relatedCache not cleared:\n%s", viewAfterRefresh)
 	}
 
-	// Now inject a result with a stale generation (gen=0, relatedGen is now 1).
-	// This simulates a checker from the old batch arriving after the refresh.
+	// Inject a result with gen=1 (the initial batch's generation, now stale since
+	// relatedGen=2). This simulates a late arrival from the previous batch.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
 		ResourceType:     "ec2",
-		SourceResourceID: "i-stale",
-		Generation:       0, // Generation=0 is always accepted (backward-compat); use gen=2 for stale test
+		SourceResourceID: viewedResourceID,
+		Generation:       1, // initial batch generation — stale after Ctrl+R (relatedGen=2)
 		Result: resource.RelatedCheckResult{
 			TargetType: "tg",
 			Count:      99, // distinctive count — must NOT appear
 		},
 	})
 
-	// Generation=0 is accepted (backward compat). Use a clearly-wrong generation for
-	// the actual stale test.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
-		ResourceType:     "ec2",
-		SourceResourceID: "i-stale",
-		Generation:       999, // wrong generation — must be discarded
-		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      99, // should never appear
-		},
-	})
-
 	viewAfterStale := stripANSI(rootViewContent(m))
 	if strings.Contains(viewAfterStale, "99") {
-		t.Errorf("stale result with Generation=999 was applied — it should have been discarded.\n"+
+		t.Errorf("stale gen=1 result applied after relatedGen=2 — it must be discarded.\n"+
+			"Fix: the initial relatedGen must be >0 so gen=0 (unset) is always stale "+
+			"and gen=1 results are correctly rejected after the first Ctrl+R.\n"+
 			"View:\n%s", viewAfterStale)
 	}
 }
 
-// TestIssue239_CurrentGenerationResult_IsAccepted verifies the positive case:
-// a result carrying the correct current generation IS applied to the right column.
+// TestIssue239_CurrentGenerationResult_IsAccepted verifies that results stamped with
+// the current relatedGen ARE applied to the right column.
 //
-// Given: a detail view just opened (relatedGen=0), with Generation=0 result (backward compat)
-// When:  the result is delivered with Generation=0
-// Then:  it is always accepted regardless of relatedGen value
+// After Ctrl+R, relatedGen becomes 2. A result with gen=2 must be accepted;
+// a result with gen=0 (test injection sentinel) must also be accepted.
 func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
-	m := setupEC2DetailWithResults(t)
-
-	// After Ctrl+R the right column resets. Re-inject a result with Generation=0
-	// (backward compat path — always accepted).
-	m, _ = rootApplyMsg(m, ctrlR())
-
-	// Inject result for the actual resource being viewed. The first EC2 demo
-	// fixture has ID "i-0a1b2c3d4e5f60001" which setupEC2DetailWithResults opens.
 	const viewedResourceID = "i-0a1b2c3d4e5f60001"
+
+	m := setupEC2DetailWithResults(t)
+	m, _ = rootApplyMsg(m, ctrlR()) // relatedGen: 1 → 2
+
+	// gen=2 matches relatedGen=2 → accepted.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
-		Generation:       0, // backward compat: always accepted regardless of relatedGen
+		Generation:       2, // current generation after one Ctrl+R
 		Result: resource.RelatedCheckResult{
 			TargetType: "tg",
 			Count:      7,
@@ -238,7 +227,7 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 
 	view := stripANSI(rootViewContent(m))
 	if !strings.Contains(view, "(7)") {
-		t.Errorf("Generation=0 result should always be accepted; right column should show '(7)'.\nView:\n%s", view)
+		t.Errorf("gen=2 result should be accepted when relatedGen=2; right column should show '(7)'.\nView:\n%s", view)
 	}
 }
 
