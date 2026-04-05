@@ -151,15 +151,6 @@ a9s stores view configuration in `~/.a9s/views/` as per-resource YAML files (e.g
 
 ## AWS Permissions
 
-a9s uses **read-only** AWS API calls exclusively. The following managed policies provide sufficient access:
-
-- `ReadOnlyAccess` (broad read-only access to all services)
-- Or individual service policies like `AmazonEC2ReadOnlyAccess`, `AmazonS3ReadOnlyAccess`, etc.
-
-a9s will gracefully handle permission errors -- resources you don't have access to will show an error message instead of crashing.
-
-## Don't Trust My Read-Only Claims
-
 a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 66 resource types, CLI setup steps, and a Terraform module.
 
 ## Environment Variables
