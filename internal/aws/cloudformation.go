@@ -19,6 +19,10 @@ func init() {
 		}
 		return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
 	})
+
+	resource.RegisterRelated("cfn", []resource.RelatedDef{
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
+	})
 }
 
 // FetchCloudFormationStacks calls the CloudFormation DescribeStacks API and converts the

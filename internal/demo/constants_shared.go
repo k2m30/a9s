@@ -115,4 +115,6 @@ const (
 
 	relatedCfS3ID  = "webapp-assets-prod"
 	relatedCfELBID = "acme-prod-web"
+
+	relatedCfnRoleID = "acme-ci-deploy-role"
 )

@@ -89,4 +89,10 @@ func init() {
 			{TargetType: "r53", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("cfn", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCfnRoleID}},
+		}
+	})
 }
