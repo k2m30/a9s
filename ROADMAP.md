@@ -10,13 +10,12 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Customizable columns** -- `~/.a9s/views/` overrides which fields are displayed per resource type
 - **Multi-account** -- works out of the box via assume-role in `~/.aws/config`
 - **Demo mode** -- `--demo` flag runs the full UI with synthetic data, no AWS needed
+- **Child views** -- drill-down screens for resources that contain sub-entities (e.g., Lambda → invocations, CloudWatch Log Groups → log streams, ECS clusters → services/tasks, IAM groups → users). Design docs in `docs/design/child-views/`.
 
 ## Short-Term
-
-- **Child views** -- drill-down screens for resources that contain sub-entities (e.g., Lambda → invocations, CloudWatch Log Groups → log streams, ECS clusters → services/tasks, IAM groups → users). Design docs in `docs/design/child-views/`.
+- **Issues shown in UI** -- highlith potential issues to narrow down incident candidates
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
 - **Themes** -- additional color themes beyond Tokyo Night Dark
-- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). Gated on project maturity (10k+ stars). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
 
 ## Medium-Term
 
@@ -28,6 +27,8 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **More AWS resource types** -- Cognito, AppSync, Config Rules, GuardDuty, Neptune, SageMaker, and more
 - **Tag editor** -- view and edit resource tags inline
 - **Bookmarks** -- save frequently accessed resources for quick access
+- **Resource actions** -- start/stop/reboot instances, invoke lambdas (opt-in, off by default). Gated on project maturity (10k+ stars). a9s must prove itself as a safe, trusted read-only tool before introducing write operations.
+
 
 ## Non-Goals
 
