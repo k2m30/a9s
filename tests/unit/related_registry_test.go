@@ -503,6 +503,16 @@ func TestRelated_DBC_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_DBI_Registered(t *testing.T) {
+	defs := resource.GetRelated("dbi")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for dbi")
+	}
+	if len(defs) < 6 {
+		t.Errorf("expected at least 6 related defs for dbi, got %d", len(defs))
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
