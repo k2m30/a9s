@@ -44,12 +44,34 @@ func cfnFixtures() []resource.Resource {
 				"description":   "Core VPC networking stack for Acme Corp production",
 			},
 			RawStruct: cfntypes.Stack{
-				StackName:       aws.String("acme-vpc-stack"),
-				StackStatus:     cfntypes.StackStatusCreateComplete,
-				CreationTime:    aws.Time(mustParseTime("2024-10-15T09:00:00+00:00")),
-				LastUpdatedTime: aws.Time(mustParseTime("2025-06-20T14:30:00+00:00")),
-				Description:     aws.String("Core VPC networking stack for Acme Corp production"),
-				StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111"),
+				StackName:                   aws.String("acme-vpc-stack"),
+				StackStatus:                 cfntypes.StackStatusCreateComplete,
+				DetailedStatus:              cfntypes.DetailedStatusConfigurationComplete,
+				StackStatusReason:           aws.String("Stack CREATE_COMPLETE"),
+				CreationTime:                aws.Time(mustParseTime("2024-10-15T09:00:00+00:00")),
+				LastUpdatedTime:             aws.Time(mustParseTime("2025-06-20T14:30:00+00:00")),
+				DeletionTime:                aws.Time(mustParseTime("2099-01-01T00:00:00+00:00")),
+				Description:                 aws.String("Core VPC networking stack for Acme Corp production"),
+				StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111"),
+				RoleARN:                     aws.String(prodCIDeployRoleARN),
+				Capabilities:                []cfntypes.Capability{cfntypes.CapabilityCapabilityIam},
+				EnableTerminationProtection: aws.Bool(true),
+				DriftInformation: &cfntypes.StackDriftInformation{
+					StackDriftStatus:   cfntypes.StackDriftStatusInSync,
+					LastCheckTimestamp: aws.Time(mustParseTime("2026-03-20T10:00:00+00:00")),
+				},
+				Parameters: []cfntypes.Parameter{
+					{ParameterKey: aws.String("VpcCidr"), ParameterValue: aws.String("10.0.0.0/16")},
+					{ParameterKey: aws.String("Environment"), ParameterValue: aws.String("production")},
+				},
+				Outputs: []cfntypes.Output{
+					{OutputKey: aws.String("VpcId"), OutputValue: aws.String("vpc-0abc123def456789a"), Description: aws.String("Production VPC ID")},
+					{OutputKey: aws.String("PublicSubnets"), OutputValue: aws.String("subnet-0aaa111111111111a,subnet-0bbb222222222222b")},
+				},
+				Tags: []cfntypes.Tag{
+					{Key: aws.String("Environment"), Value: aws.String("production")},
+					{Key: aws.String("Team"), Value: aws.String("platform")},
+				},
 			},
 		},
 		{
@@ -70,6 +92,7 @@ func cfnFixtures() []resource.Resource {
 				LastUpdatedTime: aws.Time(mustParseTime("2026-03-15T08:45:00+00:00")),
 				Description:     aws.String("EKS cluster and managed node groups"),
 				StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-eks-cluster/22222222-2222-2222-2222-222222222222"),
+				RoleARN:         aws.String(prodCIDeployRoleARN),
 			},
 		},
 		{
@@ -89,6 +112,7 @@ func cfnFixtures() []resource.Resource {
 				CreationTime: aws.Time(mustParseTime("2025-03-05T16:20:00+00:00")),
 				Description:  aws.String("Aurora PostgreSQL cluster for API backend"),
 				StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-rds-aurora/33333333-3333-3333-3333-333333333333"),
+				RoleARN:      aws.String(prodCIDeployRoleARN),
 			},
 		},
 		{
@@ -109,6 +133,7 @@ func cfnFixtures() []resource.Resource {
 				LastUpdatedTime: aws.Time(mustParseTime("2026-03-18T22:15:00+00:00")),
 				Description:     aws.String("CloudWatch alarms and dashboards"),
 				StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-monitoring/44444444-4444-4444-4444-444444444444"),
+				RoleARN:         aws.String(prodCIDeployRoleARN),
 			},
 		},
 	}
@@ -139,6 +164,7 @@ func cfnFixtures() []resource.Resource {
 			CreationTime: aws.Time(mustParseTime(creationTime)),
 			Description:  aws.String(desc),
 			StackId:      aws.String(stackID),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
 		}
 		if lastUpdatedTime != nil {
 			s.LastUpdatedTime = lastUpdatedTime
@@ -171,19 +197,22 @@ func ecrFixtures() []resource.Resource {
 			Status: "",
 			Fields: map[string]string{
 				"repository_name": "acme/api-service",
-				"uri":             "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
+				"uri":             prodECRAPIImageURI,
 				"tag_mutability":  "IMMUTABLE",
 				"scan_on_push":    "true",
 				"created_at":      "2025-03-01 10:00:00",
 			},
 			RawStruct: ecrtypes.Repository{
 				RepositoryName: aws.String("acme/api-service"),
-				RepositoryUri:  aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service"),
+				RepositoryUri:  aws.String(prodECRAPIImageURI),
 				RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/acme/api-service"),
 				RegistryId:     aws.String("123456789012"),
 				ImageTagMutability: ecrtypes.ImageTagMutabilityImmutable,
 				ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 					ScanOnPush: true,
+				},
+				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+					EncryptionType: ecrtypes.EncryptionTypeAes256,
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-03-01T10:00:00+00:00")),
 			},
@@ -208,6 +237,9 @@ func ecrFixtures() []resource.Resource {
 				ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 					ScanOnPush: true,
 				},
+				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+					EncryptionType: ecrtypes.EncryptionTypeAes256,
+				},
 				CreatedAt: aws.Time(mustParseTime("2025-03-01T10:05:00+00:00")),
 			},
 		},
@@ -231,6 +263,9 @@ func ecrFixtures() []resource.Resource {
 				ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 					ScanOnPush: false,
 				},
+				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+					EncryptionType: ecrtypes.EncryptionTypeAes256,
+				},
 				CreatedAt: aws.Time(mustParseTime("2025-01-15T08:30:00+00:00")),
 			},
 		},
@@ -253,6 +288,9 @@ func ecrFixtures() []resource.Resource {
 				ImageTagMutability: ecrtypes.ImageTagMutabilityMutable,
 				ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 					ScanOnPush: true,
+				},
+				EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+					EncryptionType: ecrtypes.EncryptionTypeAes256,
 				},
 				CreatedAt: aws.Time(mustParseTime("2025-06-20T12:00:00+00:00")),
 			},

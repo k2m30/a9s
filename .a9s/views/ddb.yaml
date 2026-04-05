@@ -32,4 +32,3 @@ detail:
   - CreationDateTime
   - KeySchema
   - AttributeDefinitions
-  - Tags

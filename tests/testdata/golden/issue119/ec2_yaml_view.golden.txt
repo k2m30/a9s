@@ -6,6 +6,7 @@
 │      Ebs:                                                                                                            │
 │        Status: attached                                                                                              │
 │        VolumeId: vol-0a1b2c3d4e5f60002                                                                               │
+│EbsOptimized: "Yes"                                                                                                   │
 │IamInstanceProfile:                                                                                                   │
 │    Arn: arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring                                               │
 │ImageId: ami-0a1b2c3d4e5f60001                                                                                        │
@@ -13,18 +14,17 @@
 │InstanceType: t3.large                                                                                                │
 │KeyName: acme-prod-keypair                                                                                            │
 │LaunchTime: 2025-11-15 08:30                                                                                          │
+│MetadataOptions:                                                                                                      │
+│    HttpEndpoint: enabled                                                                                             │
+│    HttpPutResponseHopLimit: "2"                                                                                      │
+│    HttpTokens: required                                                                                              │
+│    State: applied                                                                                                    │
 │Placement:                                                                                                            │
 │    AvailabilityZone: us-east-1a                                                                                      │
+│Platform: Windows                                                                                                     │
+│PrivateDnsName: ip-10-0-1-10.ec2.internal                                                                             │
 │PrivateIpAddress: 10.0.1.10                                                                                           │
 │PublicIpAddress: 54.210.33.112                                                                                        │
 │SecurityGroups:                                                                                                       │
 │    - GroupId: sg-0aaa111111111111a                                                                                   │
-│      GroupName: acme-web-alb-sg                                                                                      │
-│    - GroupId: sg-0bbb222222222222b                                                                                   │
-│      GroupName: acme-web-app-sg                                                                                      │
-│State:                                                                                                                │
-│    Code: "16"                                                                                                        │
-│    Name: running                                                                                                     │
-│SubnetId: subnet-0aaa111111111111a                                                                                    │
-│Tags:                                                                                                                 │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
