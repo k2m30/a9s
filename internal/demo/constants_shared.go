@@ -178,4 +178,9 @@ const (
 	// eb related-view IDs
 	relatedEbLogsID = "/aws/elasticbeanstalk/acme-prod-api"
 	relatedEbASGID  = "awseb-e-acmeprodapi-asg"
+
+	// ebs related-view IDs
+	relatedEBSEC2ID  = "i-0a1b2c3d4e5f60001"
+	relatedEBSSnapID = "snap-0a1b2c3d4e5f60001"
+	relatedEBSKMSID  = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )
