@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, continuationToken)
 	})
+
+	resource.RegisterRelated("docdb-snap", []resource.RelatedDef{
+		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
+	})
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
