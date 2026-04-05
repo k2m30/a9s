@@ -123,9 +123,10 @@ The right-column related panel is data-driven via `RelatedDef` and `NavigableFie
 
 ```go
 type RelatedDef struct {
-    TargetType  string         // target resource short name (e.g., "vpc")
-    DisplayName string         // display label in the right column
-    Checker     RelatedChecker // async checker function
+    TargetType       string         // target resource short name (e.g., "vpc")
+    DisplayName      string         // display label in the right column
+    Checker          RelatedChecker // async checker function
+    NeedsTargetCache bool           // true if checker reads target type from ResourceCache (Pattern C)
 }
 
 type NavigableField struct {

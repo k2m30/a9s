@@ -153,8 +153,10 @@ func init() {
 
     // --- Right column: related resource definitions ---
     resource.RegisterRelated("{source}", []resource.RelatedDef{
-        {TargetType: "{target1}", DisplayName: "{Display Name 1}", Checker: check{Source}{Target1}},
-        {TargetType: "{target2}", DisplayName: "{Display Name 2}", Checker: check{Source}{Target2}},
+        // NeedsTargetCache: true for Pattern C (cache-based) checkers — triggers pre-fetch before checker runs.
+        // Omit (false) for Pattern A/B checkers that call AWS directly.
+        {TargetType: "{target1}", DisplayName: "{Display Name 1}", Checker: check{Source}{Target1}, NeedsTargetCache: true},
+        {TargetType: "{target2}", DisplayName: "{Display Name 2}", Checker: check{Source}{Target2}, NeedsTargetCache: true},
         // Checker may be nil for stubs (shows as unknown count):
         {TargetType: "{target3}", DisplayName: "{Display Name 3}", Checker: nil},
     })
@@ -172,6 +174,7 @@ func init() {
 - `TargetType string` -- target resource short name (e.g., "tg", "alarm")
 - `DisplayName string` -- right-column row label (e.g., "Target Groups")
 - `Checker RelatedChecker` -- async checker function (nil for stubs)
+- `NeedsTargetCache bool` -- set `true` for Pattern C (cache-based) checkers; triggers coordinated pre-fetch before the checker runs. Omitting this on a cache-based checker causes cold-cache misses to return `Count: -1` instead of the real count.
 
 `NavigableField` fields:
 - `FieldPath string` -- matches a label rendered in the detail view (e.g., "VpcId")
@@ -443,11 +446,10 @@ func TestNavigableFields_{Source}_Registered(t *testing.T) {
 // A mismatch here means the field will silently never be highlighted in the detail view.
 func TestNavigableFields_{Source}_FieldPathsResolve(t *testing.T) {
     // Get demo resource for this source type (must be populated by the demo fixture)
-    demoFn := demo.GetDemoResources("{source}")
-    if demoFn == nil {
+    resources, ok := demo.GetResources("{source}")
+    if !ok {
         t.Skip("no demo fixture registered for {source}")
     }
-    resources := demoFn()
     if len(resources) == 0 {
         t.Skip("demo fixture returned no resources for {source}")
     }
