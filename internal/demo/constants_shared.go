@@ -123,4 +123,7 @@ const (
 	relatedCtEventsRoleID = "deploy-bot"
 
 	relatedDbcSGID = "sg-0ccc333333333333c"
+
+	relatedDbiSGID  = "sg-0ccc333333333333c" // prodRDSSGID
+	relatedDbiKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )
