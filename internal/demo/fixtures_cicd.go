@@ -136,6 +136,26 @@ func cfnFixtures() []resource.Resource {
 				RoleARN:         aws.String(prodCIDeployRoleARN),
 			},
 		},
+		{
+			ID:     "awseb-e-acmeprodapi-stack",
+			Name:   "awseb-e-acmeprodapi-stack",
+			Status: "UPDATE_COMPLETE",
+			Fields: map[string]string{
+				"stack_name":    "awseb-e-acmeprodapi-stack",
+				"status":        "UPDATE_COMPLETE",
+				"creation_time": "2025-05-20T09:00:00+00:00",
+				"last_updated":  "2026-03-10T14:22:00+00:00",
+				"description":   "Elastic Beanstalk managed stack for acme-prod-api",
+			},
+			RawStruct: cfntypes.Stack{
+				StackName:       aws.String("awseb-e-acmeprodapi-stack"),
+				StackStatus:     cfntypes.StackStatusUpdateComplete,
+				CreationTime:    aws.Time(mustParseTime("2025-05-20T09:00:00+00:00")),
+				LastUpdatedTime: aws.Time(mustParseTime("2026-03-10T14:22:00+00:00")),
+				Description:     aws.String("Elastic Beanstalk managed stack for acme-prod-api"),
+				StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/55555555-5555-5555-5555-555555555555"),
+			},
+		},
 	}
 
 	// Generate 18 more stacks to reach 22 total
