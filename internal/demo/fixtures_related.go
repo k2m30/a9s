@@ -128,4 +128,12 @@ func init() {
 			{TargetType: "secrets", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ddb", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "kms",    Count: 1, ResourceIDs: []string{relatedDdbKMSID}},
+			{TargetType: "lambda", Count: 0},
+			{TargetType: "alarm",  Count: 0},
+		}
+	})
 }
