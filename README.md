@@ -125,74 +125,7 @@ a9s --no-cache            # disable resource availability cache
 
 ## Key Bindings
 
-### Navigation
-
-| Key | Action |
-|-----|--------|
-| `j` / `Down` | Move down |
-| `k` / `Up` | Move up |
-| `g` | Go to top |
-| `G` | Go to bottom |
-| `Enter` | Open / select |
-| `Esc` | Back / close |
-| `h` / `Left` | Scroll left |
-| `l` / `Right` | Scroll right |
-| `PgUp` / `Ctrl+U` | Page up |
-| `PgDn` / `Ctrl+D` | Page down |
-
-### Actions
-
-| Key | Action |
-|-----|--------|
-| `d` | Detail view |
-| `y` | YAML view |
-| `x` | Reveal (expand) |
-| `c` | Copy resource ID to clipboard |
-| `i` | IAM identity view |
-| `/` | Filter |
-| `:` | Command mode |
-| `?` | Help |
-| `Ctrl+R` | Refresh |
-| `e` | Open Service Events (ECS Services) |
-| `L` | Open Container Logs (ECS Services) |
-| `M` | Load more (paginated lists, also in demo mode) |
-| `R` | Open Stack Resources (CFN Stacks) |
-| `s` | Open source view (reserved for future child views) |
-| `w` | Toggle line wrap (in YAML, detail, and reveal views) |
-| `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
-
-### Related Resources (Detail View)
-
-| Key | Action |
-|-----|--------|
-| `r` | Toggle related resources panel |
-| `Tab` | Switch focus between detail content and related panel |
-| `Enter` | Navigate to related resource (on navigable field or panel row) |
-
-### Search (Detail and YAML Views)
-
-| Key | Action |
-|-----|--------|
-| `/` | Start search |
-| `n` | Next match |
-| `N` | Previous match |
-| `Enter` | Confirm search (keep highlights) |
-| `Esc` | Clear search |
-
-### Sorting
-
-| Key | Action |
-|-----|--------|
-| `N` | Sort by name |
-| `I` | Sort by ID |
-| `A` | Sort by date |
-
-### General
-
-| Key | Action |
-|-----|--------|
-| `q` | Quit |
-| `Ctrl+C` | Force quit |
+See the **[Key Bindings](https://github.com/k2m30/a9s/wiki/Key-Bindings)** wiki page for the full keyboard reference.
 
 ## Child Views (Drill-Downs)
 
@@ -255,6 +188,10 @@ a9s uses **read-only** AWS API calls exclusively. The following managed policies
 - Or individual service policies like `AmazonEC2ReadOnlyAccess`, `AmazonS3ReadOnlyAccess`, etc.
 
 a9s will gracefully handle permission errors -- resources you don't have access to will show an error message instead of crashing.
+
+## Don't Trust My Read-Only Claims
+
+a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 66 resource types, CLI setup steps, and a Terraform module.
 
 ## Environment Variables
 
