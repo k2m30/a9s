@@ -117,4 +117,6 @@ const (
 	relatedCfELBID = "acme-prod-web"
 
 	relatedCfnRoleID = "acme-ci-deploy-role"
+
+	relatedCodeartifactCbID = "acme-api-build"
 )
