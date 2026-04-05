@@ -5,10 +5,10 @@ import "github.com/k2m30/a9s/v3/internal/resource"
 func init() {
 	resource.RegisterRelatedDemo("acm", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "elb", Count: 0},
-			{TargetType: "cf", Count: 0},
-			{TargetType: "apigw", Count: 0},
-			{TargetType: "r53", Count: 0},
+			{TargetType: "elb", Count: 1, ResourceIDs: []string{relatedACMELBID}},
+			{TargetType: "cf", Count: 1, ResourceIDs: []string{relatedACMCFID}},
+			{TargetType: "apigw", Count: 1, ResourceIDs: []string{relatedACMApigwID}},
+			{TargetType: "r53", Count: 1, ResourceIDs: []string{relatedACMR53ID}},
 		}
 	})
 
@@ -29,7 +29,7 @@ func init() {
 	resource.RegisterRelatedDemo("alarm", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedAlarmSNSID}},
-			{TargetType: "asg", Count: 0},
+			{TargetType: "asg", Count: 1, ResourceIDs: []string{relatedAlarmASGID}},
 		}
 	})
 
@@ -37,7 +37,7 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "ec2", Count: 1, ResourceIDs: []string{relatedAMIEC2ID}},
 			{TargetType: "ebs-snap", Count: 1, ResourceIDs: []string{relatedAMISnapID1}},
-			{TargetType: "asg", Count: 0},
+			{TargetType: "asg", Count: 1, ResourceIDs: []string{relatedAMIASGID}},
 		}
 	})
 
@@ -67,14 +67,14 @@ func init() {
 			{TargetType: "ec2", Count: 4, ResourceIDs: []string{relatedASGEC2ID1, relatedASGEC2ID2, relatedASGEC2ID3, relatedASGEC2ID4}},
 			{TargetType: "tg", Count: 1, ResourceIDs: []string{relatedASGTGID}},
 			{TargetType: "subnet", Count: 3, ResourceIDs: []string{relatedASGSubnetID1, relatedASGSubnetID2, relatedASGSubnetID3}},
-			{TargetType: "alarm", Count: 0},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedASGAlarmID}},
 			{TargetType: "ng", Count: 0},
 		}
 	})
 
 	resource.RegisterRelatedDemo("cb", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "logs", Count: 0},
+			{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedCbLogsID}},
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCbRoleID}},
 			{TargetType: "pipeline", Count: 1, ResourceIDs: []string{relatedCbPipelineID}},
 		}
@@ -84,9 +84,9 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "s3", Count: 1, ResourceIDs: []string{relatedCfS3ID}},
 			{TargetType: "elb", Count: 1, ResourceIDs: []string{relatedCfELBID}},
-			{TargetType: "waf", Count: 0},
-			{TargetType: "acm", Count: 0},
-			{TargetType: "r53", Count: 0},
+			{TargetType: "waf", Count: 1, ResourceIDs: []string{relatedCfWAFID}},
+			{TargetType: "acm", Count: 1, ResourceIDs: []string{relatedCfACMID}},
+			{TargetType: "r53", Count: 1, ResourceIDs: []string{relatedCfR53ID}},
 		}
 	})
 
@@ -105,16 +105,16 @@ func init() {
 	resource.RegisterRelatedDemo("ct-events", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCtEventsRoleID}},
-			{TargetType: "iam-user", Count: 0},
+			{TargetType: "iam-user", Count: 1, ResourceIDs: []string{relatedCtEventsUserID}},
 		}
 	})
 
 	resource.RegisterRelatedDemo("dbc", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedDbcSGID}},
-			{TargetType: "alarm", Count: 0},
-			{TargetType: "secrets", Count: 0},
-			{TargetType: "logs", Count: 0},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedDbcAlarmID}},
+			{TargetType: "secrets", Count: 1, ResourceIDs: []string{relatedDbcSecretID}},
+			{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedDbcLogsID}},
 		}
 	})
 
@@ -122,18 +122,18 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedDbiSGID}},
 			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedDbiKMSID}},
-			{TargetType: "subnet", Count: 0},
-			{TargetType: "alarm", Count: 0},
-			{TargetType: "rds-snap", Count: 0},
-			{TargetType: "secrets", Count: 0},
+			{TargetType: "subnet", Count: 2, ResourceIDs: []string{relatedDbiSubnetID1, relatedDbiSubnetID2}},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedDbiAlarmID}},
+			{TargetType: "rds-snap", Count: 1, ResourceIDs: []string{relatedDbiRDSSnapID}},
+			{TargetType: "secrets", Count: 1, ResourceIDs: []string{relatedDbiSecretID}},
 		}
 	})
 
 	resource.RegisterRelatedDemo("ddb", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "kms",    Count: 1, ResourceIDs: []string{relatedDdbKMSID}},
-			{TargetType: "lambda", Count: 0},
-			{TargetType: "alarm",  Count: 0},
+			{TargetType: "lambda", Count: 1, ResourceIDs: []string{relatedDdbLambdaID}},
+			{TargetType: "alarm",  Count: 1, ResourceIDs: []string{relatedDdbAlarmID}},
 		}
 	})
 
@@ -147,8 +147,8 @@ func init() {
 	resource.RegisterRelatedDemo("eb", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "cfn",  Count: 1, ResourceIDs: []string{relatedEbCFNID}},
-			{TargetType: "logs", Count: 0},
-			{TargetType: "asg",  Count: 0},
+			{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedEbLogsID}},
+			{TargetType: "asg",  Count: 1, ResourceIDs: []string{relatedEbASGID}},
 		}
 	})
 
