@@ -398,6 +398,27 @@ func TestRelated_CB_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_CF_Registered(t *testing.T) {
+	defs := resource.GetRelated("cf")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for cf")
+	}
+
+	expected := []string{"s3", "elb", "waf", "acm", "r53"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
