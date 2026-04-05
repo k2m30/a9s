@@ -19,6 +19,16 @@ func init() {
 		}
 		return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
 	})
+
+	resource.RegisterRelated("ecs", []resource.RelatedDef{
+		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSServices, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSCFN, NeedsTargetCache: true},
+	})
+
+	resource.RegisterNavigableFields("ecs", []resource.NavigableField{
+		{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,

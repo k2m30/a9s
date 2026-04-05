@@ -299,6 +299,11 @@ func ecsClusterFixtures() []resource.Resource {
 				Settings: []ecstypes.ClusterSetting{
 					{Name: ecstypes.ClusterSettingNameContainerInsights, Value: aws.String("enabled")},
 				},
+				Configuration: &ecstypes.ClusterConfiguration{
+					ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
+						KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+					},
+				},
 				Tags: []ecstypes.Tag{
 					{Key: aws.String("Environment"), Value: aws.String("prod")},
 					{Key: aws.String("Team"), Value: aws.String("platform")},
@@ -325,6 +330,11 @@ func ecsClusterFixtures() []resource.Resource {
 				ActiveServicesCount:               2,
 				RegisteredContainerInstancesCount: 4,
 				CapacityProviders:                 []string{"FARGATE"},
+				Configuration: &ecstypes.ClusterConfiguration{
+					ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
+						KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+					},
+				},
 				Tags: []ecstypes.Tag{
 					{Key: aws.String("Environment"), Value: aws.String("prod")},
 					{Key: aws.String("Team"), Value: aws.String("data")},
@@ -351,6 +361,11 @@ func ecsClusterFixtures() []resource.Resource {
 				ActiveServicesCount:               1,
 				RegisteredContainerInstancesCount: 0,
 				CapacityProviders:                 []string{"FARGATE"},
+				Configuration: &ecstypes.ClusterConfiguration{
+					ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
+						KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+					},
+				},
 				Tags: []ecstypes.Tag{
 					{Key: aws.String("Environment"), Value: aws.String("staging")},
 				},

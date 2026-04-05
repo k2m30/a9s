@@ -188,4 +188,14 @@ const (
 	relatedEBSSnapAMIID = "ami-0a1b2c3d4e5f60001"
 	relatedEBSSnapEBSID = "vol-0a1b2c3d4e5f60001"
 	relatedEBSSnapKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	// ecr related-view IDs
+	relatedECRLambdaID = "api-gateway-authorizer"
+	relatedECRCbID     = "acme-api-build"
+
+	// ecs related-view IDs
+	relatedECSSvcID1  = "api-gateway"
+	relatedECSSvcID2  = "web-frontend"
+	relatedECSSvcID3  = "order-worker"
+	relatedECSAlarmID = "ecs-cpu-high"
 )
