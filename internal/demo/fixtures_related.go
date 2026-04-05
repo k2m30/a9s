@@ -3,6 +3,15 @@ package demo
 import "github.com/k2m30/a9s/v3/internal/resource"
 
 func init() {
+	resource.RegisterRelatedDemo("acm", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "elb", Count: 0},
+			{TargetType: "cf", Count: 0},
+			{TargetType: "apigw", Count: 0},
+			{TargetType: "r53", Count: 0},
+		}
+	})
+
 	resource.RegisterRelatedDemo("ec2", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "tg", Count: 1, ResourceIDs: []string{relatedEC2TGID}},
