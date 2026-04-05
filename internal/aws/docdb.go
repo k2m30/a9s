@@ -19,6 +19,13 @@ func init() {
 		}
 		return FetchDocDBClustersPage(ctx, c.DocDB, continuationToken)
 	})
+
+	resource.RegisterRelated("dbc", []resource.RelatedDef{
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbcSG},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: nil},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: nil},
+	})
 }
 
 // FetchDocDBClusters calls the DescribeDBClusters API and converts
