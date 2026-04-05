@@ -25,6 +25,55 @@ const (
 	ecsClusterArnServices = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"
 	ecsClusterArnBatch    = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"
 
+	// Security Group IDs — referenced by EC2, ELB, ENI, RDS, Redis, EKS, and SG fixtures.
+	prodWebALBSGID    = "sg-0aaa111111111111a" // acme-web-alb-sg
+	prodAPIInternalSGID = "sg-0bbb222222222222b" // acme-api-internal-sg
+	prodRDSSGID       = "sg-0ccc333333333333c" // acme-rds-sg / acme-worker-sg
+	prodDBProxySGID   = "sg-0ddd444444444444d" // acme-db-proxy-sg
+
+	// AMI IDs — referenced by EC2 fixtures (ImageId field) and AMI fixtures.
+	prodAMIID1 = "ami-0a1b2c3d4e5f60001" // Amazon Linux 2023 (x86_64)
+	prodAMIID2 = "ami-0a1b2c3d4e5f60002" // Amazon Linux 2023 (arm64)
+	prodAMIID3 = "ami-0a1b2c3d4e5f60003" // custom AMI
+
+	// IAM Role ARNs — referenced by CodeBuild, CodePipeline, CFN, Lambda, ECS, EKS, and RDS fixtures.
+	prodEKSNodeRoleARN    = "arn:aws:iam::123456789012:role/acme-eks-node-role"
+	prodLambdaRoleARN     = "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"
+	prodCIDeployRoleARN   = "arn:aws:iam::123456789012:role/acme-ci-deploy-role"
+	prodEKSClusterRoleARN = "arn:aws:iam::123456789012:role/eks-cluster-role"
+
+	// IAM Instance Profile ARN — referenced by EC2 IamInstanceProfile field.
+	prodInstanceProfileARN = "arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring"
+
+	// ELB name, ARN and DNS name — referenced by TG, R53, CloudFront, and ECS fixtures.
+	// ELB fixture ID = name (matches production fetcher which uses LoadBalancerName as ID).
+	prodELBName = "acme-prod-web"
+	prodELBARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef"
+	prodELBDNS  = "acme-prod-web-1234567890.us-east-1.elb.amazonaws.com"
+
+	// ECR image URI — referenced by ECS task definition and ECR fixtures.
+	prodECRAPIImageURI = "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service"
+
+	// S3 bucket names — referenced by CloudFront origins, R53 alias records, and
+	// notification config fixtures.
+	prodStaticAssetsBucket = "webapp-assets-prod"
+	prodLogsBucket         = "data-pipeline-logs"
+
+	// CloudFront distribution domain and ARN — referenced by R53 alias records.
+	prodCFDomain = "d111111abcdef8.cloudfront.net"
+	prodCFARN    = "arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7"
+
+	// ACM certificate ARN — referenced by ELB listeners, CloudFront, and API GW.
+	prodACMCertARN1 = "arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111"
+	prodACMCertARN2 = "arn:aws:acm:us-east-1:123456789012:certificate/b2c3d4e5-6789-01ab-cdef-222222222222"
+
+	// EKS cluster name — referenced by EKS, Node Group, CW Log Group, and EC2 tag fixtures.
+	prodEKSClusterName = "acme-prod"
+
+	// Lambda function names — referenced by CW Log Group naming conventions.
+	// Log group for a Lambda fn is /aws/lambda/{FunctionName}.
+	lambdaProcessOrdersFnName = "process-orders"
+
 	relatedEC2TGID        = "acme-web-tg"
 	relatedEC2ASGID       = "acme-web-prod-asg"
 	relatedEC2AlarmID1    = "api-high-error-rate"

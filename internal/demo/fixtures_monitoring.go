@@ -49,21 +49,30 @@ func cloudwatchAlarmFixtures() []resource.Resource {
 				"namespace":   "AWS/ApiGateway",
 				"threshold":   "5.00",
 			},
-			RawStruct: cwtypes.MetricAlarm{
-				AlarmName:          aws.String("api-high-error-rate"),
-				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-error-rate"),
-				AlarmDescription:   aws.String("Triggers when API 5XX error rate exceeds 5%"),
-				StateValue:         cwtypes.StateValueOk,
-				MetricName:         aws.String("5XXError"),
-				Namespace:          aws.String("AWS/ApiGateway"),
-				Threshold:          aws.Float64(5.0),
-				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
-				EvaluationPeriods:  aws.Int32(3),
-				Period:             aws.Int32(300),
-				Statistic:          cwtypes.StatisticAverage,
-				ActionsEnabled:     aws.Bool(true),
-				AlarmActions: []string{
-					"arn:aws:sns:us-east-1:123456789012:ops-alerts",
+RawStruct: cwtypes.MetricAlarm{
+				AlarmName:                  aws.String(relatedEC2AlarmID1),
+				AlarmArn:                   aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + relatedEC2AlarmID1),
+				AlarmDescription:           aws.String("Triggers when API 5XX error rate exceeds 5%"),
+				StateValue:                 cwtypes.StateValueOk,
+				StateReason:                aws.String("Threshold Crossed: 3 datapoints were less than or equal to the threshold (5.0)."),
+				StateUpdatedTimestamp:      aws.Time(time.Date(2026, 3, 22, 10, 5, 0, 0, time.UTC)),
+				StateTransitionedTimestamp: aws.Time(time.Date(2026, 3, 21, 10, 30, 0, 0, time.UTC)),
+				MetricName:                 aws.String("5XXError"),
+				Namespace:                  aws.String("AWS/ApiGateway"),
+				Threshold:                  aws.Float64(5.0),
+				ComparisonOperator:         cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:          aws.Int32(3),
+				DatapointsToAlarm:          aws.Int32(2),
+				Period:                     aws.Int32(300),
+				Statistic:                  cwtypes.StatisticAverage,
+				TreatMissingData:           aws.String("breaching"),
+				ActionsEnabled:             aws.Bool(true),
+				AlarmActions:               []string{relatedAlarmSNSID},
+				OKActions:                  []string{relatedAlarmSNSID},
+				InsufficientDataActions:    []string{relatedAlarmSNSID},
+				// Dimensions: EC2 instance — satisfies "CW Alarms → EC2 dimensions" story.
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d4e5f60001")},
 				},
 			},
 		},
@@ -78,19 +87,23 @@ func cloudwatchAlarmFixtures() []resource.Resource {
 				"namespace":   "AWS/RDS",
 				"threshold":   "80.00",
 			},
-			RawStruct: cwtypes.MetricAlarm{
-				AlarmName:          aws.String("rds-cpu-utilization"),
-				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:rds-cpu-utilization"),
-				AlarmDescription:   aws.String("Triggers when RDS CPU exceeds 80%"),
-				StateValue:         cwtypes.StateValueOk,
-				MetricName:         aws.String("CPUUtilization"),
-				Namespace:          aws.String("AWS/RDS"),
-				Threshold:          aws.Float64(80.0),
-				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
-				EvaluationPeriods:  aws.Int32(5),
-				Period:             aws.Int32(60),
-				Statistic:          cwtypes.StatisticAverage,
-				ActionsEnabled:     aws.Bool(true),
+RawStruct: cwtypes.MetricAlarm{
+				AlarmName:             aws.String(relatedEC2AlarmID2),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + relatedEC2AlarmID2),
+				AlarmDescription:      aws.String("Triggers when RDS CPU exceeds 80%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (80.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 3, 20, 8, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/RDS"),
+				Threshold:             aws.Float64(80.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSID},
+				// Dimensions: RDS instance — satisfies "CW Alarms → RDS dimensions" story.
 				Dimensions: []cwtypes.Dimension{
 					{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-api-primary")},
 				},
@@ -234,11 +247,17 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 				"creation_time":  "1704067200000",
 			},
 			RawStruct: cwlogstypes.LogGroup{
-				LogGroupName:    aws.String("/aws/lambda/api-gateway-authorizer"),
-				Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api-gateway-authorizer:*"),
-				StoredBytes:     aws.Int64(52428800),
-				RetentionInDays: aws.Int32(30),
-				CreationTime:    aws.Int64(1704067200000),
+				LogGroupName:              aws.String("/aws/lambda/api-gateway-authorizer"),
+				Arn:                       aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api-gateway-authorizer:*"),
+				LogGroupArn:               aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/api-gateway-authorizer:*"),
+				StoredBytes:               aws.Int64(52428800),
+				RetentionInDays:           aws.Int32(30),
+				CreationTime:              aws.Int64(1704067200000),
+				KmsKeyId:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+				LogGroupClass:             cwlogstypes.LogGroupClassStandard,
+				MetricFilterCount:         aws.Int32(2),
+				DataProtectionStatus:      cwlogstypes.DataProtectionStatusActivated,
+				DeletionProtectionEnabled: aws.Bool(false),
 			},
 		},
 		{
@@ -366,6 +385,46 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 				CreationTime: aws.Int64(1688169600000),
 			},
 		},
+	}
+
+	// Generate log group fixtures for every Lambda function that sets log_group in its Fields.
+	// This satisfies the TestDemoCrossReference/lambda-log-group constraint.
+	extraLambdaFns := []string{"image-thumbnail-gen", "cloudwatch-slack-notifier"}
+	allLambdaLogGroups := make([]string, len(extraLambdaFns), len(extraLambdaFns)+len(lambdaNamePool))
+	copy(allLambdaLogGroups, extraLambdaFns)
+	allLambdaLogGroups = append(allLambdaLogGroups, lambdaNamePool...)
+	for i, fn := range allLambdaLogGroups {
+		name := "/aws/lambda/" + fn
+		// Skip if already an explicit fixture above.
+		duplicate := false
+		for _, existing := range logGroups {
+			if existing.ID == name {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		ct := int64(1704067200000 + int64(i)*3600000)
+		logGroups = append(logGroups, resource.Resource{
+			ID:     name,
+			Name:   name,
+			Status: "",
+			Fields: map[string]string{
+				"log_group_name": name,
+				"stored_bytes":   "10485760",
+				"retention_days": "30",
+				"creation_time":  fmt.Sprintf("%d", ct),
+			},
+			RawStruct: cwlogstypes.LogGroup{
+				LogGroupName:    aws.String(name),
+				Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + name + ":*"),
+				StoredBytes:     aws.Int64(10485760),
+				RetentionInDays: aws.Int32(30),
+				CreationTime:    aws.Int64(ct),
+			},
+		})
 	}
 
 	// Generate 17 more log groups to reach 22 total

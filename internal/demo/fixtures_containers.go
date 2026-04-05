@@ -188,6 +188,27 @@ func nodegroupFixtures() []resource.Resource {
 					"Environment": "prod",
 					"Team":        "platform",
 				},
+				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+					Id:      aws.String("lt-0a1b2c3d4e5f60001"),
+					Name:    aws.String("eks-general-pool-lt"),
+					Version: aws.String("$Latest"),
+				},
+				Taints: []ekstypes.Taint{
+					{
+						Effect: ekstypes.TaintEffectNoSchedule,
+						Key:    aws.String("dedicated"),
+						Value:  aws.String("general"),
+					},
+				},
+				Health: &ekstypes.NodegroupHealth{
+					Issues: []ekstypes.Issue{
+						{
+							Code:        ekstypes.NodegroupIssueCodeNodeCreationFailure,
+							Message:     aws.String("0 out of 3 nodes are healthy"),
+							ResourceIds: []string{"i-0a1b2c3d4e5f60001"},
+						},
+					},
+				},
 			},
 		},
 		{

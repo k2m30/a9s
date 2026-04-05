@@ -11,6 +11,7 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -56,7 +57,17 @@ func sqsQueues() []resource.Resource {
 				"approx_not_visible": "8",
 				"delay_seconds":      "0",
 			},
-			RawStruct: "map[ApproximateNumberOfMessages:142 ApproximateNumberOfMessagesNotVisible:8 CreatedTimestamp:1700000000 DelaySeconds:0 MaximumMessageSize:262144 MessageRetentionPeriod:345600 QueueArn:arn:aws:sqs:us-east-1:123456789012:order-processing-queue ReceiveMessageWaitTimeSeconds:20 VisibilityTimeout:30]",
+			RawStruct: awsclient.SQSQueueAttributesRow{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/order-processing-queue",
+				QueueName: "order-processing-queue",
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "142",
+					"ApproximateNumberOfMessagesNotVisible": "8",
+					"VisibilityTimeout":                     "30",
+					"MessageRetentionPeriod":                "345600",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
+				},
+			},
 		},
 		{
 			ID:     "email-notification-queue",
@@ -287,6 +298,9 @@ func eventBridgeRules() []resource.Resource {
 				EventBusName:       aws.String("default"),
 				ScheduleExpression: aws.String("cron(0 2 * * ? *)"),
 				Description:        aws.String("Triggers nightly database backup at 2 AM UTC"),
+				EventPattern:       aws.String(`{"source":["aws.ec2"],"detail-type":["EC2 Instance State-change Notification"]}`),
+				ManagedBy:          aws.String("AWSManagedRule"),
+				RoleArn:            aws.String(prodCIDeployRoleARN),
 			},
 		},
 		{
@@ -441,6 +455,25 @@ func mskClusters() []resource.Resource {
 				State:          kafkatypes.ClusterStateActive,
 				CurrentVersion: aws.String("K3AEGXET"),
 				CreationTime:   aws.Time(mustParseTime("2025-04-10T14:00:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Serverless: &kafkatypes.Serverless{
+					VpcConfigs: []kafkatypes.VpcConfig{
+						{
+							SubnetIds:        []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+							SecurityGroupIds: []string{"sg-0abc123def456789a"},
+						},
+					},
+				},
+				Tags: map[string]string{
+					"Environment": "production",
+					"Team":        "platform",
+				},
 			},
 		},
 		{
