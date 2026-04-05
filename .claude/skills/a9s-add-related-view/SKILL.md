@@ -298,7 +298,7 @@ func init() {
 
 Add constant IDs to `internal/demo/constants_shared.go` so the navigate-to flow works.
 **Do not** look for them in `fixtures_compute.go`.
-
+**Never** amend tests if fixtures do not have related IDs/fields. Fix fixtures, not tests
 **Naming convention for demo constants — MUST follow this pattern to avoid collisions:**
 
 ```
