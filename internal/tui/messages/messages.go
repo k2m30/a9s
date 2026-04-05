@@ -151,7 +151,7 @@ type RelatedCheckResultMsg struct {
 //
 //	(b) rightColumnModel when Enter pressed on selected row.
 //
-// Handled by: root model in app_handlers.go (same pattern as NavigateMsg).
+// Handled by: root model in app_related.go (handleRelatedNavigate).
 type RelatedNavigateMsg struct {
 	TargetType     string            // resource short name to navigate to (e.g., "vpc")
 	SourceResource resource.Resource // the resource being viewed

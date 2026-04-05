@@ -4,6 +4,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -26,6 +27,9 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 	cmds := make([]tea.Cmd, 0, len(defs))
 
 	for _, def := range defs {
+		// Capture a per-closure snapshot so concurrent goroutines dispatched by
+		// tea.Batch cannot race on the shared outer cache variable.
+		localCache := cache
 		cmds = append(cmds, func() tea.Msg {
 			if m.demoMode {
 				demoFn := resource.GetRelatedDemo(msg.ResourceType)
@@ -61,7 +65,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 			// If target type is absent from the snapshot, pre-fetch first page and
 			// include the result in CachedPages for write-back to m.resourceCache.
 			var cachedPages map[string]resource.ResourceCacheEntry
-			if _, inCache := cache[def.TargetType]; !inCache {
+			if _, inCache := localCache[def.TargetType]; !inCache {
 				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
 					if fr, err := pf(ctx, m.clients, ""); err == nil {
 						isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
@@ -69,19 +73,17 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 							Resources:   fr.Resources,
 							IsTruncated: isTrunc,
 						}
-						// Enrich the local cache snapshot so the checker gets a cache hit.
-						enriched := make(resource.ResourceCache, len(cache)+1)
-						for k, v := range cache {
-							enriched[k] = v
-						}
+						// Enrich this closure's snapshot; never write back to the outer variable.
+						enriched := make(resource.ResourceCache, len(localCache)+1)
+						maps.Copy(enriched, localCache)
 						enriched[def.TargetType] = entry
-						cache = enriched
+						localCache = enriched
 						cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
 					}
 				}
 			}
 
-			result := def.Checker(ctx, m.clients, msg.SourceResource, cache)
+			result := def.Checker(ctx, m.clients, msg.SourceResource, localCache)
 			result.TargetType = def.TargetType
 			return messages.RelatedCheckResultMsg{
 				ResourceType:     msg.ResourceType,

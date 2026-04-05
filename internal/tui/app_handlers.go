@@ -606,9 +606,9 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		menu.SetCheckProgress(0, m.availTotal)
 	}
 
-	// Fire first batch of concurrent probes (up to 3)
+	// Fire first batch of concurrent probes (up to 4)
 	var cmds []tea.Cmd
-	for i := 0; i < 3 && len(m.availQueue) > 0; i++ {
+	for i := 0; i < 4 && len(m.availQueue) > 0; i++ {
 		shortName := m.availQueue[0]
 		m.availQueue = m.availQueue[1:]
 		cmds = append(cmds, m.probeResourceAvailability(shortName, m.availabilityGen))

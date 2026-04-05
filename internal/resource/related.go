@@ -109,3 +109,9 @@ func RegisterRelatedDemo(shortName string, f RelatedDemoChecker) {
 func GetRelatedDemo(shortName string) RelatedDemoChecker {
 	return relatedDemoRegistry[shortName]
 }
+
+// UnregisterRelatedDemo removes the demo checker for the given short name.
+// Used only in tests for cleanup.
+func UnregisterRelatedDemo(shortName string) {
+	delete(relatedDemoRegistry, shortName)
+}

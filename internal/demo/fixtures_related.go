@@ -12,7 +12,7 @@ func init() {
 			{TargetType: "eip", Count: 1, ResourceIDs: []string{relatedEC2EIPID}},
 			{TargetType: "ebs-snap", Count: 2, ResourceIDs: []string{relatedEC2SnapshotID1, relatedEC2SnapshotID2}},
 			{TargetType: "ebs", Count: 2, ResourceIDs: []string{relatedEC2EBSVolID1, relatedEC2EBSVolID2}},
-			{TargetType: "ng", Count: 0},
+			{TargetType: "ng", Count: 1, ResourceIDs: []string{relatedEC2NGNodeGroupID}},
 			{TargetType: "ct-events", Count: 1, ResourceIDs: []string{relatedEC2TrailEvent1}},
 		}
 	})

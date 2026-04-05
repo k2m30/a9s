@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -130,7 +132,8 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		mockCallCount++
 		return resource.FetchResult{
-			Resources:  []resource.Resource{{ID: "cfn-mock-stack"}},
+			// ID must match the aws:cloudformation:stack-name tag on the instance below.
+			Resources:  []resource.Resource{{ID: "my-cfn-stack", Name: "my-cfn-stack"}},
 			Pagination: &resource.PaginationMeta{IsTruncated: false},
 		}, nil
 	})
@@ -145,12 +148,28 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 		}
 	})
 
-	instance := resource.Resource{ID: "i-t004"}
+	instance := resource.Resource{
+		ID: "i-t004",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-t004"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-cfn-stack")},
+			},
+		},
+	}
 	checker := ec2CheckerByTarget(t, "cfn")
-	_ = checker(context.Background(), nil, instance, resource.ResourceCache{})
+	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
+	// Business logic: instance with a CFN stack tag must find the related stack on cold cache.
+	if got.Count != 1 {
+		t.Errorf("T004: expected Count=1 for instance with CFN tag, got %d", got.Count)
+	}
+	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "my-cfn-stack" {
+		t.Errorf("T004: expected ResourceIDs=[my-cfn-stack], got %v", got.ResourceIDs)
+	}
+	// Guard: fetcher must be called exactly once (N+1 prevention).
 	if mockCallCount != 1 {
-		t.Errorf("T004: expected mock paginated fetcher for 'cfn' to be called exactly once; got %d calls", mockCallCount)
+		t.Errorf("T004: expected paginated fetcher called once, got %d calls", mockCallCount)
 	}
 }
 

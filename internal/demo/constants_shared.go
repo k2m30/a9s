@@ -26,5 +26,6 @@ const (
 
 	relatedEC2EBSVolID1   = "vol-0a1b2c3d4e5f60001"
 	relatedEC2EBSVolID2   = "vol-0a1b2c3d4e5f60002"
-	relatedEC2TrailEvent1 = "evt-0a1b2c3d4e5f60002"
+	relatedEC2TrailEvent1    = "evt-0a1b2c3d4e5f60002"
+	relatedEC2NGNodeGroupID  = "general-pool"
 )

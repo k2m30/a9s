@@ -75,11 +75,13 @@ func TestDemoRelatedChecker_EC2(t *testing.T) {
 		}
 	}
 
-	// NG: count=0 (EC2 instances don't belong to node groups by default in demo).
+	// NG: count=1 with one resource ID (demo instance tagged to general-pool node group).
 	if ng, ok := byType["ng"]; !ok {
 		t.Error("missing ng result")
-	} else if ng.Count != 0 {
-		t.Errorf("ng count: expected 0, got %d", ng.Count)
+	} else if ng.Count != 1 {
+		t.Errorf("ng count: expected 1, got %d", ng.Count)
+	} else if len(ng.ResourceIDs) != 1 {
+		t.Errorf("ng resource IDs: expected 1, got %d", len(ng.ResourceIDs))
 	}
 
 	// CT-Events: count >= 1 with at least 1 resource ID.

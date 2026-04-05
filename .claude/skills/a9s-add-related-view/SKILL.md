@@ -225,7 +225,7 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
     if len(ids) == 0 && truncated {
         return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
     }
-    return {source}RelatedResult("{target1}", ids)
+    return relatedResult("{target1}", ids)
 }
 
 // check{Source}{Target2} checks the cache for {target2} resources related to this {source}.
@@ -239,36 +239,20 @@ func check{Source}{Target2}(ctx context.Context, clients interface{}, res resour
 // isTruncated=true means the list is partial; callers MUST return Count=-1
 // when 0 matches are found in a truncated list.
 func {source}RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-    if entry, ok := cache[target]; ok {
-        return entry.Resources, entry.IsTruncated, nil
+    resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+    // When AWS clients are not initialized (nil or wrong type), registered fetchers
+    // return "AWS clients not initialized". Treat as graceful no-op (Count=-1, no error).
+    if err != nil {
+        if _, ok := clients.(*ServiceClients); !ok {
+            return nil, false, nil
+        }
     }
-    return FetchRelatedTarget(ctx, clients, cache, target)
+    return resources, isTruncated, err
 }
 
-// {source}RelatedResult deduplicates and sorts IDs into a RelatedCheckResult.
-func {source}RelatedResult(target string, ids []string) resource.RelatedCheckResult {
-    if len(ids) == 0 {
-        return resource.RelatedCheckResult{TargetType: target, Count: 0}
-    }
-    set := make(map[string]struct{}, len(ids))
-    uniq := make([]string, 0, len(ids))
-    for _, id := range ids {
-        if id == "" {
-            continue
-        }
-        if _, ok := set[id]; ok {
-            continue
-        }
-        set[id] = struct{}{}
-        uniq = append(uniq, id)
-    }
-    sort.Strings(uniq)
-    return resource.RelatedCheckResult{
-        TargetType:  target,
-        Count:       len(uniq),
-        ResourceIDs: uniq,
-    }
-}
+// Do NOT define a {source}RelatedResult function. Call the shared package-level
+// relatedResult(target, ids) from ec2_related.go — it lives in the same package
+// and handles deduplication and sorting for all resource types.
 ```
 
 `RelatedCheckResult` fields:
@@ -298,17 +282,19 @@ Register a demo checker so the related panel shows realistic data in demo mode.
 The `RelatedDemoChecker` type is `func(res resource.Resource) []resource.RelatedCheckResult`.
 
 ```go
-resource.RegisterRelatedDemo("{source}", func(res resource.Resource) []resource.RelatedCheckResult {
-    return []resource.RelatedCheckResult{
-        {TargetType: "{target1}", Count: 2, ResourceIDs: []string{"related-id-1", "related-id-2"}},
-        {TargetType: "{target2}", Count: 1, ResourceIDs: []string{"related-id-3"}},
-        {TargetType: "{target3}", Count: 0},
-    }
-})
+func init() {
+    resource.RegisterRelatedDemo("{source}", func(res resource.Resource) []resource.RelatedCheckResult {
+        return []resource.RelatedCheckResult{
+            {TargetType: "{target1}", Count: 2, ResourceIDs: []string{"related-id-1", "related-id-2"}},
+            {TargetType: "{target2}", Count: 1, ResourceIDs: []string{"related-id-3"}},
+            {TargetType: "{target3}", Count: 0},
+        }
+    })
+}
 ```
 
-Use constant IDs from the demo fixtures file for `{source}` (e.g.,
-`relatedEC2TGID` from `fixtures_compute.go`) so the navigate-to flow works.
+Add constant IDs to `internal/demo/constants_shared.go` (e.g., `relatedEC2TGID` is defined
+there) so the navigate-to flow works. **Do not** look for them in `fixtures_compute.go`.
 
 ### 5. Verify parent resource Fields
 

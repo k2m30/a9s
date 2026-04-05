@@ -857,7 +857,7 @@ Notes:
 | `KeyMsg(n)` | Left, search results | Next match | Cursor jumps, counter updates |
 | `KeyMsg(N)` | Left, search results | Previous match | Cursor jumps, counter updates |
 | `KeyMsg(Esc)` | Right, filter active | Filter cleared | All rows restored |
-| `tea.WindowSizeMsg` | Two-column | Reflow | May switch to stacked below 100 cols |
+| `tea.WindowSizeMsg` | Two-column | Reflow | Right column hides below minimum width |
 
 ### View Stack Examples
 
@@ -1438,5 +1438,4 @@ Changes from v4.2 to v4.3:
 4. **All two-column wireframes updated** -- sections 8.1, 8.2, 8.4, 8.5,
    8.7, 8.8, 8.9, 17.11, 17.12 now show the `RELATED` header as the
    first right-column row.
-5. **Stacked mode unchanged** -- the existing `-- Related ---` separator
-   already serves as the section header in stacked layout.
+5. **Two-column layout only** -- stacked mode was dropped; the `RELATED` header applies only in two-column layout.

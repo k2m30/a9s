@@ -135,6 +135,9 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_, _, stackName := ec2Identity(res)
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
 	cfnList, truncated, err := ec2RelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
@@ -203,8 +206,8 @@ func checkEC2EBS(_ context.Context, _ interface{}, res resource.Resource, _ reso
 }
 
 // checkEC2NodeGroups checks for EKS node groups associated with this EC2 instance.
-// When the node group list is not loaded yet, we prefer a zero count over an
-// "unknown" placeholder so the detail view stays stable.
+// Returns Count=-1 (unknown) when the cache is truncated and no match was found
+// in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
@@ -253,7 +256,8 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 }
 
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
-// instance. When ct-events has not been loaded we degrade to zero, not unknown.
+// instance. Returns Count=-1 (unknown) when the cache is truncated and no match
+// was found in the partial list.
 func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
@@ -320,9 +324,6 @@ func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Reso
 // isTruncated=true means the list is partial; callers should return Count=-1
 // when 0 matches are found in a truncated list.
 func ec2RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	if entry, ok := cache[target]; ok {
-		return entry.Resources, entry.IsTruncated, nil
-	}
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	// When AWS clients are not initialized (nil or wrong type), the registered
 	// paginated fetchers return "AWS clients not initialized". Treat this as a
