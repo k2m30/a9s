@@ -20,7 +20,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				"DBSubnetGroup", "VpcSecurityGroups", "BackupRetentionPeriod",
 				"PreferredMaintenanceWindow", "PreferredBackupWindow",
 				"DeletionProtection", "MasterUsername",
-				"PerformanceInsightsEnabled", "Tags",
+				"PerformanceInsightsEnabled", "TagList",
 			},
 		},
 		"s3": {
@@ -80,7 +80,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				"GlobalSecondaryIndexes", "LocalSecondaryIndexes",
 				"ProvisionedThroughput", "DeletionProtectionEnabled",
 				"StreamSpecification", "SSEDescription",
-				"CreationDateTime", "KeySchema", "AttributeDefinitions", "Tags",
+				"CreationDateTime", "KeySchema", "AttributeDefinitions",
 			},
 		},
 		"opensearch": {

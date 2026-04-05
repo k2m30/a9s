@@ -153,95 +153,95 @@ type ec2InstanceExtras struct {
 // ec2Extras maps instance IDs to their extra fixture data.
 var ec2Extras = map[string]ec2InstanceExtras{
 	"i-0a1b2c3d4e5f60001": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+			{GroupId: aws.String(prodWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60002": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+			{GroupId: aws.String(prodWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60003": {
-		imageID:      "ami-0a1b2c3d4e5f60002",
+		imageID:      prodAMIID2,
 		keyName:      "acme-staging-keypair",
 		architecture: ec2types.ArchitectureValuesArm64,
 		az:           "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60004": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+			{GroupId: aws.String(prodRDSSGID), GroupName: aws.String("acme-worker-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60005": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String(prodWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60006": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1c",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0ddd444444444444d"), GroupName: aws.String("acme-db-proxy-sg")},
+			{GroupId: aws.String(prodDBProxySGID), GroupName: aws.String("acme-db-proxy-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60007": {
-		imageID:      "ami-0a1b2c3d4e5f60002",
+		imageID:      prodAMIID2,
 		keyName:      "acme-staging-keypair",
 		architecture: ec2types.ArchitectureValuesArm64,
 		az:           "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60008": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-api-internal-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-api-internal-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60009": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0ccc333333333333c"), GroupName: aws.String("acme-worker-sg")},
+			{GroupId: aws.String(prodRDSSGID), GroupName: aws.String("acme-worker-sg")},
 		},
 	},
 	"i-0a1b2c3d4e5f60010": {
-		imageID:      "ami-0a1b2c3d4e5f60001",
+		imageID:      prodAMIID1,
 		keyName:      "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664,
 		az:           "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-web-app-sg")},
+			{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
 		},
 	},
 }
@@ -253,7 +253,7 @@ func ec2DefaultExtras(instanceID string) ec2InstanceExtras {
 	}
 	// Derive deterministic values from the instance ID suffix.
 	suffix := instanceID[len(instanceID)-4:]
-	amiIDs := []string{"ami-0a1b2c3d4e5f60001", "ami-0a1b2c3d4e5f60002", "ami-0a1b2c3d4e5f60003"}
+	amiIDs := []string{prodAMIID1, prodAMIID2, prodAMIID3}
 	keyNames := []string{"acme-prod-keypair", "acme-staging-keypair", "acme-dev-keypair"}
 	archs := []ec2types.ArchitectureValues{ec2types.ArchitectureValuesX8664, ec2types.ArchitectureValuesArm64}
 	azs := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
@@ -267,7 +267,7 @@ func ec2DefaultExtras(instanceID string) ec2InstanceExtras {
 		architecture: archs[idx%len(archs)],
 		az:           azs[idx%len(azs)],
 		securityGroups: []ec2types.GroupIdentifier{
-			{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			{GroupId: aws.String(prodWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
 		},
 	}
 }
@@ -303,7 +303,7 @@ func makeEC2Instance(
 		Placement:      &ec2types.Placement{AvailabilityZone: aws.String(extras.az)},
 		SecurityGroups: extras.securityGroups,
 		IamInstanceProfile: &ec2types.IamInstanceProfile{
-			Arn: aws.String("arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring"),
+			Arn: aws.String(prodInstanceProfileARN),
 		},
 		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
 			{
@@ -320,17 +320,26 @@ func makeEC2Instance(
 		},
 		LaunchTime:        aws.Time(launchTime),
 		InstanceLifecycle: lifecycle,
+		EbsOptimized:      aws.Bool(true),
+		MetadataOptions: &ec2types.InstanceMetadataOptionsResponse{
+			State:                   ec2types.InstanceMetadataOptionsStateApplied,
+			HttpEndpoint:            ec2types.InstanceMetadataEndpointStateEnabled,
+			HttpTokens:              ec2types.HttpTokensStateRequired,
+			HttpPutResponseHopLimit: aws.Int32(2),
+		},
+		PrivateDnsName: aws.String(privateDNSFromIP(privateIP)),
 	}
 	if instanceID == "i-0a1b2c3d4e5f60001" {
+		inst.Platform = ec2types.PlatformValuesWindows
 		inst.Tags = append(inst.Tags, ec2types.Tag{
-			Key:   aws.String("kubernetes.io/cluster/acme-prod"),
+			Key:   aws.String("kubernetes.io/cluster/" + prodEKSClusterName),
 			Value: aws.String("owned"),
 		})
 	}
 	if instanceID == "i-0a1b2c3d4e5f60003" {
 		inst.Tags = append(inst.Tags,
-			ec2types.Tag{Key: aws.String("eks:cluster-name"), Value: aws.String("acme-prod")},
-			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String("general-pool")},
+			ec2types.Tag{Key: aws.String("eks:cluster-name"), Value: aws.String(prodEKSClusterName)},
+			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String(relatedEC2NGNodeGroupID)},
 		)
 	}
 
@@ -358,6 +367,8 @@ func makeEC2Instance(
 			"public_ip":   publicIP,
 			"launch_time": launchTimeStr,
 			"lifecycle":   lifecycleStr,
+			"image_id":    extras.imageID,
+			"vpc_id":      vpcID,
 		},
 		RawStruct: inst,
 	}
@@ -393,6 +404,20 @@ func envFromName(name string) string {
 		}
 	}
 	return "prod"
+}
+
+// privateDNSFromIP converts a private IP to EC2 internal DNS format.
+// e.g. "10.0.1.10" -> "ip-10-0-1-10.ec2.internal"
+func privateDNSFromIP(ip string) string {
+	dashed := ""
+	for _, ch := range ip {
+		if ch == '.' {
+			dashed += "-"
+		} else {
+			dashed += string(ch)
+		}
+	}
+	return "ip-" + dashed + ".ec2.internal"
 }
 
 func volumeIDForInstance(instanceID string) string {
@@ -432,14 +457,43 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("api-gateway-authorizer"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimeNodejs20x,
 				MemorySize:   aws.Int32(256),
 				Timeout:      aws.Int32(10),
 				Handler:      aws.String("index.handler"),
+				Description:  aws.String("API Gateway custom authorizer"),
 				LastModified: aws.String("2026-03-15T08:22:14+00:00"),
 				CodeSize:     1048576,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/api-gateway-authorizer"),
+					LogFormat: lambdatypes.LogFormatText,
+				},
+				DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+					TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+				},
+				Environment: &lambdatypes.EnvironmentResponse{
+					Variables: map[string]string{"ENV": "production", "LOG_LEVEL": "INFO"},
+				},
+				LastUpdateStatus:       lambdatypes.LastUpdateStatusSuccessful,
+				LastUpdateStatusReason: aws.String("Function update succeeded"),
+				Layers: []lambdatypes.Layer{
+					{Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:layer:acme-common:3"), CodeSize: 1048576},
+				},
+				VpcConfig: &lambdatypes.VpcConfigResponse{
+					VpcId:            aws.String(prodVPCID),
+					SubnetIds:        []string{prodPublicSubnetA},
+					SecurityGroupIds: []string{prodWebALBSGID},
+				},
 			},
 		},
 		{
@@ -460,45 +514,68 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("data-pipeline-transform"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimePython312,
 				MemorySize:   aws.Int32(512),
 				Timeout:      aws.Int32(300),
 				Handler:      aws.String("transform.lambda_handler"),
+				Description:  aws.String("ETL data pipeline transformation function"),
 				LastModified: aws.String("2026-03-10T16:45:33+00:00"),
 				CodeSize:     5242880,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/data-pipeline-transform"),
+					LogFormat: lambdatypes.LogFormatText,
+				},
 			},
 		},
 		{
-			ID:     "process-orders",
-			Name:   "process-orders",
+			ID:     lambdaProcessOrdersFnName,
+			Name:   lambdaProcessOrdersFnName,
 			Status: "go1.x",
 			Fields: map[string]string{
-				"function_name":    "process-orders",
+				"function_name":    lambdaProcessOrdersFnName,
 				"runtime":          "go1.x",
 				"memory":           "128",
 				"timeout":          "30",
 				"handler":          "main",
 				"last_modified":    "2026-02-28T11:03:47+00:00",
 				"code_size":        "8388608",
-				"log_group":        "/aws/lambda/process-orders",
+				"log_group":        "/aws/lambda/" + lambdaProcessOrdersFnName,
 				"package_type":     "Zip",
 				"event_source_arn": "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
 			},
 			RawStruct: lambdatypes.FunctionConfiguration{
-				FunctionName: aws.String("process-orders"),
-				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				FunctionName: aws.String(lambdaProcessOrdersFnName),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + lambdaProcessOrdersFnName),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimeGo1x,
 				MemorySize:   aws.Int32(128),
 				Timeout:      aws.Int32(30),
 				Handler:      aws.String("main"),
+				Description:  aws.String("Order processing Lambda triggered by SQS"),
 				LastModified: aws.String("2026-02-28T11:03:47+00:00"),
 				CodeSize:     8388608,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
 				LoggingConfig: &lambdatypes.LoggingConfig{
-					LogGroup: aws.String("/acme/application/api"),
+					LogGroup:  aws.String("/aws/lambda/" + lambdaProcessOrdersFnName),
+					LogFormat: lambdatypes.LogFormatText,
 				},
 			},
 		},
@@ -520,14 +597,27 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("image-thumbnail-gen"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimePython312,
 				MemorySize:   aws.Int32(1024),
 				Timeout:      aws.Int32(60),
 				Handler:      aws.String("thumbnail.handler"),
+				Description:  aws.String("S3-triggered image thumbnail generator"),
 				LastModified: aws.String("2026-03-01T09:18:55+00:00"),
 				CodeSize:     15728640,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/image-thumbnail-gen"),
+					LogFormat: lambdatypes.LogFormatText,
+				},
 			},
 		},
 		{
@@ -548,14 +638,27 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("payment-webhook"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:payment-webhook"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimeJava21,
 				MemorySize:   aws.Int32(512),
 				Timeout:      aws.Int32(15),
 				Handler:      aws.String("com.example.PaymentHandler::handleRequest"),
+				Description:  aws.String("Payment provider webhook handler"),
 				LastModified: aws.String("2026-03-12T20:11:09+00:00"),
 				CodeSize:     31457280,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/payment-webhook"),
+					LogFormat: lambdatypes.LogFormatText,
+				},
 			},
 		},
 		{
@@ -576,14 +679,27 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String("cloudwatch-slack-notifier"),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier"),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      lambdatypes.RuntimeNodejs20x,
 				MemorySize:   aws.Int32(128),
 				Timeout:      aws.Int32(10),
 				Handler:      aws.String("notify.handler"),
+				Description:  aws.String("CloudWatch alarm to Slack notification relay"),
 				LastModified: aws.String("2026-01-20T13:42:00+00:00"),
 				CodeSize:     524288,
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/cloudwatch-slack-notifier"),
+					LogFormat: lambdatypes.LogFormatText,
+				},
 			},
 		},
 	}
@@ -624,7 +740,7 @@ func lambdaFunctions() []resource.Resource {
 			RawStruct: lambdatypes.FunctionConfiguration{
 				FunctionName: aws.String(name),
 				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + name),
-				Role:         aws.String("arn:aws:iam::123456789012:role/acme-lambda-execution"),
+				Role:         aws.String(prodLambdaRoleARN),
 				Runtime:      runtimeMap[runtime],
 				MemorySize:   aws.Int32(memorySizes[i]),
 				Timeout:      aws.Int32(timeouts[i]),
@@ -632,6 +748,30 @@ func lambdaFunctions() []resource.Resource {
 				LastModified: aws.String(lastMod),
 				CodeSize:     codeSizes[i],
 				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+					TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+				},
+				Environment: &lambdatypes.EnvironmentResponse{
+					Variables: map[string]string{"ENV": "production", "LOG_LEVEL": "INFO"},
+				},
+				LastUpdateStatus:       lambdatypes.LastUpdateStatusSuccessful,
+				LastUpdateStatusReason: aws.String("Function update succeeded"),
+				Layers: []lambdatypes.Layer{
+					{Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:layer:acme-common:3"), CodeSize: 1048576},
+				},
+				VpcConfig: &lambdatypes.VpcConfigResponse{
+					VpcId:            aws.String(prodVPCID),
+					SubnetIds:        []string{prodPublicSubnetA},
+					SecurityGroupIds: []string{prodWebALBSGID},
+				},
 			},
 		})
 	}
@@ -676,15 +816,17 @@ func ebsVolumeFixtures() []resource.Resource {
 				"created":     t2.Format("2006-01-02 15:04"),
 			},
 			RawStruct: ec2types.Volume{
-				VolumeId:         aws.String("vol-0a1b2c3d4e5f60001"),
-				State:            ec2types.VolumeStateInUse,
-				Size:             aws.Int32(50),
-				VolumeType:       ec2types.VolumeTypeGp3,
-				Iops:             aws.Int32(3000),
-				Throughput:       aws.Int32(125),
-				Encrypted:        aws.Bool(true),
-				AvailabilityZone: aws.String("us-east-1a"),
-				CreateTime:       aws.Time(t2),
+				VolumeId:           aws.String("vol-0a1b2c3d4e5f60001"),
+				State:              ec2types.VolumeStateInUse,
+				Size:               aws.Int32(50),
+				VolumeType:         ec2types.VolumeTypeGp3,
+				Iops:               aws.Int32(3000),
+				Throughput:         aws.Int32(125),
+				Encrypted:          aws.Bool(true),
+				AvailabilityZone:   aws.String("us-east-1a"),
+				CreateTime:         aws.Time(t2),
+				KmsKeyId:           aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+				MultiAttachEnabled: aws.Bool(false),
 				Attachments: []ec2types.VolumeAttachment{
 					{InstanceId: aws.String("i-0a1b2c3d4e5f60001")},
 				},
@@ -858,6 +1000,7 @@ func ebsSnapshotFixtures() []resource.Resource {
 				StartTime:   aws.Time(t1),
 				Progress:    aws.String("100%"),
 				OwnerId:     aws.String("123456789012"),
+				KmsKeyId:    aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")},
 				},
@@ -963,11 +1106,11 @@ func ebsSnapshotFixtures() []resource.Resource {
 func amiFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "ami-0a1b2c3d4e5f60001",
+			ID:     prodAMIID1,
 			Name:   "acme-app-server-x86-v2.3.1",
 			Status: "available",
 			Fields: map[string]string{
-				"image_id":         "ami-0a1b2c3d4e5f60001",
+				"image_id":         prodAMIID1,
 				"name":             "acme-app-server-x86-v2.3.1",
 				"state":            "available",
 				"architecture":     "x86_64",
@@ -977,25 +1120,49 @@ func amiFixtures() []resource.Resource {
 				"public":           "false",
 			},
 			RawStruct: ec2types.Image{
-				ImageId:         aws.String("ami-0a1b2c3d4e5f60001"),
-				Name:            aws.String("acme-app-server-x86-v2.3.1"),
-				State:           ec2types.ImageStateAvailable,
-				Architecture:    ec2types.ArchitectureValuesX8664,
-				PlatformDetails: aws.String("Linux/UNIX"),
-				RootDeviceType:  ec2types.DeviceTypeEbs,
-				CreationDate:    aws.String("2026-02-15T10:30:00.000Z"),
-				Public:          aws.Bool(false),
-				OwnerId:         aws.String("123456789012"),
-				Description:     aws.String("Production app server image x86_64 v2.3.1"),
-				EnaSupport:      aws.Bool(true),
+				ImageId:            aws.String(prodAMIID1),
+				Name:               aws.String("acme-app-server-x86-v2.3.1"),
+				State:              ec2types.ImageStateAvailable,
+				Architecture:       ec2types.ArchitectureValuesX8664,
+				PlatformDetails:    aws.String("Linux/UNIX"),
+				RootDeviceType:     ec2types.DeviceTypeEbs,
+				RootDeviceName:     aws.String("/dev/xvda"),
+				Hypervisor:         ec2types.HypervisorTypeXen,
+				VirtualizationType: ec2types.VirtualizationTypeHvm,
+				ImageType:          ec2types.ImageTypeValuesMachine,
+				CreationDate:       aws.String("2026-02-15T10:30:00.000Z"),
+				Public:             aws.Bool(false),
+				OwnerId:            aws.String("123456789012"),
+				Description:        aws.String("Production app server image x86_64 v2.3.1"),
+				EnaSupport:         aws.Bool(true),
+				BlockDeviceMappings: []ec2types.BlockDeviceMapping{
+					{
+						DeviceName: aws.String("/dev/xvda"),
+						Ebs: &ec2types.EbsBlockDevice{
+							VolumeSize:          aws.Int32(20),
+							VolumeType:          ec2types.VolumeTypeGp3,
+							DeleteOnTermination: aws.Bool(true),
+						},
+					},
+				},
+				BootMode:        ec2types.BootModeValuesUefi,
+				DeprecationTime: aws.String("2028-01-01T00:00:00Z"),
+				ImageLocation:   aws.String("123456789012/amazon-linux-2023-x86_64"),
+				ImageOwnerAlias: aws.String("amazon"),
+				SriovNetSupport: aws.String("simple"),
+				UsageOperation:  aws.String("RunInstances"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("acme-app-server-x86-v2.3.1")},
+					{Key: aws.String("Environment"), Value: aws.String("prod")},
+				},
 			},
 		},
 		{
-			ID:     "ami-0a1b2c3d4e5f60002",
+			ID:     prodAMIID2,
 			Name:   "acme-app-server-arm64-v2.3.1",
 			Status: "available",
 			Fields: map[string]string{
-				"image_id":         "ami-0a1b2c3d4e5f60002",
+				"image_id":         prodAMIID2,
 				"name":             "acme-app-server-arm64-v2.3.1",
 				"state":            "available",
 				"architecture":     "arm64",
@@ -1005,25 +1172,33 @@ func amiFixtures() []resource.Resource {
 				"public":           "false",
 			},
 			RawStruct: ec2types.Image{
-				ImageId:         aws.String("ami-0a1b2c3d4e5f60002"),
-				Name:            aws.String("acme-app-server-arm64-v2.3.1"),
-				State:           ec2types.ImageStateAvailable,
-				Architecture:    ec2types.ArchitectureValuesArm64,
-				PlatformDetails: aws.String("Linux/UNIX"),
-				RootDeviceType:  ec2types.DeviceTypeEbs,
-				CreationDate:    aws.String("2026-02-15T10:35:00.000Z"),
-				Public:          aws.Bool(false),
-				OwnerId:         aws.String("123456789012"),
-				Description:     aws.String("Production app server image arm64 v2.3.1"),
-				EnaSupport:      aws.Bool(true),
+				ImageId:            aws.String(prodAMIID2),
+				Name:               aws.String("acme-app-server-arm64-v2.3.1"),
+				State:              ec2types.ImageStateAvailable,
+				Architecture:       ec2types.ArchitectureValuesArm64,
+				PlatformDetails:    aws.String("Linux/UNIX"),
+				RootDeviceType:     ec2types.DeviceTypeEbs,
+				RootDeviceName:     aws.String("/dev/xvda"),
+				Hypervisor:         ec2types.HypervisorTypeXen,
+				VirtualizationType: ec2types.VirtualizationTypeHvm,
+				ImageType:          ec2types.ImageTypeValuesMachine,
+				CreationDate:       aws.String("2026-02-15T10:35:00.000Z"),
+				Public:             aws.Bool(false),
+				OwnerId:            aws.String("123456789012"),
+				Description:        aws.String("Production app server image arm64 v2.3.1"),
+				EnaSupport:         aws.Bool(true),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("acme-app-server-arm64-v2.3.1")},
+					{Key: aws.String("Environment"), Value: aws.String("prod")},
+				},
 			},
 		},
 		{
-			ID:     "ami-0a1b2c3d4e5f60003",
+			ID:     prodAMIID3,
 			Name:   "acme-worker-x86-v1.8.0",
 			Status: "available",
 			Fields: map[string]string{
-				"image_id":         "ami-0a1b2c3d4e5f60003",
+				"image_id":         prodAMIID3,
 				"name":             "acme-worker-x86-v1.8.0",
 				"state":            "available",
 				"architecture":     "x86_64",
@@ -1033,17 +1208,25 @@ func amiFixtures() []resource.Resource {
 				"public":           "false",
 			},
 			RawStruct: ec2types.Image{
-				ImageId:         aws.String("ami-0a1b2c3d4e5f60003"),
-				Name:            aws.String("acme-worker-x86-v1.8.0"),
-				State:           ec2types.ImageStateAvailable,
-				Architecture:    ec2types.ArchitectureValuesX8664,
-				PlatformDetails: aws.String("Linux/UNIX"),
-				RootDeviceType:  ec2types.DeviceTypeEbs,
-				CreationDate:    aws.String("2025-09-10T08:00:00.000Z"),
-				Public:          aws.Bool(false),
-				OwnerId:         aws.String("123456789012"),
-				Description:     aws.String("Batch worker image x86_64 v1.8.0"),
-				EnaSupport:      aws.Bool(true),
+				ImageId:            aws.String(prodAMIID3),
+				Name:               aws.String("acme-worker-x86-v1.8.0"),
+				State:              ec2types.ImageStateAvailable,
+				Architecture:       ec2types.ArchitectureValuesX8664,
+				PlatformDetails:    aws.String("Linux/UNIX"),
+				RootDeviceType:     ec2types.DeviceTypeEbs,
+				RootDeviceName:     aws.String("/dev/xvda"),
+				Hypervisor:         ec2types.HypervisorTypeXen,
+				VirtualizationType: ec2types.VirtualizationTypeHvm,
+				ImageType:          ec2types.ImageTypeValuesMachine,
+				CreationDate:       aws.String("2025-09-10T08:00:00.000Z"),
+				Public:             aws.Bool(false),
+				OwnerId:            aws.String("123456789012"),
+				Description:        aws.String("Batch worker image x86_64 v1.8.0"),
+				EnaSupport:         aws.Bool(true),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("acme-worker-x86-v1.8.0")},
+					{Key: aws.String("Environment"), Value: aws.String("prod")},
+				},
 			},
 		},
 		{
@@ -1061,17 +1244,24 @@ func amiFixtures() []resource.Resource {
 				"public":           "false",
 			},
 			RawStruct: ec2types.Image{
-				ImageId:         aws.String("ami-0a1b2c3d4e5f60004"),
-				Name:            aws.String("acme-bastion-x86-v3.0.0-deprecated"),
-				State:           ec2types.ImageStateDeregistered,
-				Architecture:    ec2types.ArchitectureValuesX8664,
-				PlatformDetails: aws.String("Linux/UNIX"),
-				RootDeviceType:  ec2types.DeviceTypeEbs,
-				CreationDate:    aws.String("2024-06-01T12:00:00.000Z"),
-				Public:          aws.Bool(false),
-				OwnerId:         aws.String("123456789012"),
-				Description:     aws.String("Deprecated bastion host image"),
-				EnaSupport:      aws.Bool(true),
+				ImageId:            aws.String("ami-0a1b2c3d4e5f60004"),
+				Name:               aws.String("acme-bastion-x86-v3.0.0-deprecated"),
+				State:              ec2types.ImageStateDeregistered,
+				Architecture:       ec2types.ArchitectureValuesX8664,
+				PlatformDetails:    aws.String("Linux/UNIX"),
+				RootDeviceType:     ec2types.DeviceTypeEbs,
+				RootDeviceName:     aws.String("/dev/xvda"),
+				Hypervisor:         ec2types.HypervisorTypeXen,
+				VirtualizationType: ec2types.VirtualizationTypeHvm,
+				ImageType:          ec2types.ImageTypeValuesMachine,
+				CreationDate:       aws.String("2024-06-01T12:00:00.000Z"),
+				Public:             aws.Bool(false),
+				OwnerId:            aws.String("123456789012"),
+				Description:        aws.String("Deprecated bastion host image"),
+				EnaSupport:         aws.Bool(true),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("acme-bastion-x86-v3.0.0-deprecated")},
+				},
 			},
 		},
 	}

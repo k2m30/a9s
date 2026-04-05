@@ -2,6 +2,7 @@ package demo
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -48,6 +49,19 @@ func iamRoleFixtures() []resource.Resource {
 				CreateDate:               aws.Time(mustParseTime("2025-06-15T10:30:00+00:00")),
 				Description:              aws.String("Role for EKS managed node groups"),
 				AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+				MaxSessionDuration:       aws.Int32(3600),
+				PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
+					PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				},
+				RoleLastUsed: &iamtypes.RoleLastUsed{
+					LastUsedDate: aws.Time(time.Date(2026, 3, 21, 9, 0, 0, 0, time.UTC)),
+					Region:       aws.String("us-east-1"),
+				},
+				Tags: []iamtypes.Tag{
+					{Key: aws.String("Environment"), Value: aws.String("production")},
+					{Key: aws.String("Team"), Value: aws.String("platform")},
+				},
 			},
 		},
 		{
@@ -220,12 +234,17 @@ func iamPolicyFixtures() []resource.Resource {
 				"create_date":      "2025-02-10T09:00:00+00:00",
 			},
 			RawStruct: iamtypes.Policy{
-				PolicyName:      aws.String("acme-s3-read-only"),
-				PolicyId:        aws.String("ANPAEXAMPLE111111111"),
-				Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
-				AttachmentCount: aws.Int32(5),
-				Path:            aws.String("/"),
-				CreateDate:      aws.Time(mustParseTime("2025-02-10T09:00:00+00:00")),
+				PolicyName:                     aws.String("acme-s3-read-only"),
+				PolicyId:                       aws.String("ANPAEXAMPLE111111111"),
+				Arn:                            aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
+				AttachmentCount:                aws.Int32(5),
+				Path:                           aws.String("/"),
+				CreateDate:                     aws.Time(mustParseTime("2025-02-10T09:00:00+00:00")),
+				DefaultVersionId:               aws.String("v3"),
+				Description:                    aws.String("Allows EC2 and S3 read access"),
+				PermissionsBoundaryUsageCount:  aws.Int32(0),
+				Tags:                           []iamtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+				UpdateDate:                     aws.Time(time.Date(2026, 2, 10, 14, 30, 0, 0, time.UTC)),
 			},
 		},
 		{
@@ -342,6 +361,14 @@ func iamUserFixtures() []resource.Resource {
 				Path:             aws.String("/"),
 				CreateDate:       aws.Time(mustParseTime("2024-06-15T09:00:00+00:00")),
 				PasswordLastUsed: aws.Time(mustParseTime("2026-03-20T14:22:00+00:00")),
+				PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
+					PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentTypePolicy,
+				},
+				Tags: []iamtypes.Tag{
+					{Key: aws.String("Department"), Value: aws.String("Engineering")},
+					{Key: aws.String("CostCenter"), Value: aws.String("CC-1234")},
+				},
 			},
 		},
 		{

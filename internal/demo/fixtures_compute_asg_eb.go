@@ -63,6 +63,11 @@ func asgFixtures() []resource.Resource {
 				VPCZoneIdentifier:    aws.String("subnet-0aaa111111111111a,subnet-0bbb222222222222b,subnet-0ccc333333333333c"),
 				TargetGroupARNs:      []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-prod/1234567890abcdef"},
 				TerminationPolicies:  []string{"Default"},
+				LaunchConfigurationName: aws.String("acme-web-prod-lc-v3"),
+				LoadBalancerNames:       []string{"acme-prod-web"},
+				SuspendedProcesses: []asgtypes.SuspendedProcess{
+					{ProcessName: aws.String("Launch"), SuspensionReason: aws.String("User request")},
+				},
 				Instances: []asgtypes.Instance{
 					{InstanceId: aws.String("i-0a1b2c3d4e5f60001"), AvailabilityZone: aws.String("us-east-1a"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 					{InstanceId: aws.String("i-0a1b2c3d4e5f60002"), AvailabilityZone: aws.String("us-east-1b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},

@@ -5,7 +5,7 @@ list:
     path: State.Name
     width: 12
   Lifecycle:
-    path: InstanceLifecycle
+    key: lifecycle
     width: 12
   Type:
     path: InstanceType
