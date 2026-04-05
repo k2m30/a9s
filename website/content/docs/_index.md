@@ -30,4 +30,4 @@ title: "Documentation"
 
 ## AWS Permissions
 
-{{< include "permissions.md" >}}
+a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 66 resource types, CLI setup steps, and a Terraform module.
