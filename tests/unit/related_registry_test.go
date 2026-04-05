@@ -523,6 +523,16 @@ func TestRelated_DDB_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_DocdbSnap_Registered(t *testing.T) {
+	defs := resource.GetRelated("docdb-snap")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for docdb-snap")
+	}
+	if len(defs) < 2 {
+		t.Errorf("expected at least 2 related defs for docdb-snap, got %d", len(defs))
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
