@@ -134,4 +134,48 @@ const (
 
 	relatedEbCFNID      = "awseb-e-acmeprodapi-stack"
 	relatedEbRuleRoleID = "acme-ci-deploy-role"
+
+	// ACM related-view IDs
+	relatedACMELBID   = prodELBName
+	relatedACMCFID    = "E1A2B3C4D5E6F7"
+	relatedACMApigwID = "abc123def4"
+	relatedACMR53ID   = "/hostedzone/Z0123456789ABCDEFGHIJ"
+
+	// alarm→asg and asg→alarm — new alarm fixture targeting the web prod ASG
+	relatedAlarmASGID = "acme-web-prod-asg"
+	relatedASGAlarmID = "asg-web-scale-out-cpu"
+
+	// ami→asg
+	relatedAMIASGID = "acme-web-prod-asg"
+
+	// cb→logs
+	relatedCbLogsID = "/aws/codebuild/acme-api-build"
+
+	// cf related-view IDs
+	relatedCfWAFID = "a1b2c3d4-5678-90ab-cdef-222222222222"
+	relatedCfACMID = prodACMCertARN2
+	relatedCfR53ID = "/hostedzone/Z0123456789ABCDEFGHIJ"
+
+	// ct-events→iam-user
+	relatedCtEventsUserID = "alice.johnson"
+
+	// dbc related-view IDs
+	relatedDbcAlarmID  = "docdb-cpu-utilization"
+	relatedDbcSecretID = "prod/docdb/acme-docdb-prod"
+	relatedDbcLogsID   = "/aws/docdb/acme-docdb-prod/profiler"
+
+	// dbi related-view IDs
+	relatedDbiSubnetID1  = prodPrivateSubnetA
+	relatedDbiSubnetID2  = prodPrivateSubnetB
+	relatedDbiAlarmID    = "rds-cpu-utilization"
+	relatedDbiRDSSnapID  = "rds:prod-api-primary-2026-03-20"
+	relatedDbiSecretID   = "prod/database/primary"
+
+	// ddb related-view IDs
+	relatedDdbLambdaID = "data-pipeline-transform"
+	relatedDdbAlarmID  = "dynamodb-throttle"
+
+	// eb related-view IDs
+	relatedEbLogsID = "/aws/elasticbeanstalk/acme-prod-api"
+	relatedEbASGID  = "awseb-e-acmeprodapi-asg"
 )
