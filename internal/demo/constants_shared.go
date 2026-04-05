@@ -183,4 +183,9 @@ const (
 	relatedEBSEC2ID  = "i-0a1b2c3d4e5f60001"
 	relatedEBSSnapID = "snap-0a1b2c3d4e5f60001"
 	relatedEBSKMSID  = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	// ebs-snap related-view IDs
+	relatedEBSSnapAMIID = "ami-0a1b2c3d4e5f60001"
+	relatedEBSSnapEBSID = "vol-0a1b2c3d4e5f60001"
+	relatedEBSSnapKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )

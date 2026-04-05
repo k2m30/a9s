@@ -165,4 +165,13 @@ func init() {
 			{TargetType: "kms",      Count: 1, ResourceIDs: []string{relatedEBSKMSID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ebs-snap", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ami", Count: 1, ResourceIDs: []string{relatedEBSSnapAMIID}},
+			{TargetType: "ebs", Count: 1, ResourceIDs: []string{relatedEBSSnapEBSID}},
+			{TargetType: "ec2", Count: 0},
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedEBSSnapKMSID}},
+		}
+	})
 }
