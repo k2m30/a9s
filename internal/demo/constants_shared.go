@@ -128,4 +128,7 @@ const (
 	relatedDbiKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
 	relatedDdbKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	relatedDocdbSnapDbcID = "acme-docdb-prod"
+	relatedDocdbSnapKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )

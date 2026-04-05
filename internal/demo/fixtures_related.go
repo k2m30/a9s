@@ -136,4 +136,11 @@ func init() {
 			{TargetType: "alarm",  Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("docdb-snap", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "dbc", Count: 1, ResourceIDs: []string{relatedDocdbSnapDbcID}},
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedDocdbSnapKMSID}},
+		}
+	})
 }
