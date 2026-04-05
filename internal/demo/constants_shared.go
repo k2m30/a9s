@@ -39,4 +39,7 @@ const (
 	relatedEC2NGNodeGroupID  = "general-pool"
 
 	relatedAlarmSNSID = "arn:aws:sns:us-east-1:123456789012:alarm-notifications"
+
+	relatedAMIEC2ID   = "i-0a1b2c3d4e5f60001"
+	relatedAMISnapID1 = "snap-0a1b2c3d4e5f60001"
 )
