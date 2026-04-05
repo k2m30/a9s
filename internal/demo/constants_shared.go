@@ -91,4 +91,13 @@ const (
 
 	relatedAMIEC2ID   = "i-0a1b2c3d4e5f60001"
 	relatedAMISnapID1 = "snap-0a1b2c3d4e5f60001"
+
+	relatedApigwLambdaID = "api-gateway-authorizer"
+	relatedApigwLogsID   = "/aws/lambda/api-gateway-authorizer"
+	relatedApigwWAFID    = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	relatedAthenaS3ID  = "data-pipeline-logs"
+	relatedAthenaKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	relatedBackupRoleID = "acme-lambda-execution"
 )
