@@ -92,6 +92,15 @@ const (
 	relatedAMIEC2ID   = "i-0a1b2c3d4e5f60001"
 	relatedAMISnapID1 = "snap-0a1b2c3d4e5f60001"
 
+	relatedASGEC2ID1    = "i-0a1b2c3d4e5f60001"
+	relatedASGEC2ID2    = "i-0a1b2c3d4e5f60002"
+	relatedASGEC2ID3    = "i-0a1b2c3d4e5f60003"
+	relatedASGEC2ID4    = "i-0a1b2c3d4e5f60009"
+	relatedASGTGID      = "acme-web-tg"
+	relatedASGSubnetID1 = "subnet-0aaa111111111111a"
+	relatedASGSubnetID2 = "subnet-0bbb222222222222b"
+	relatedASGSubnetID3 = "subnet-0ccc333333333333c"
+
 	relatedApigwLambdaID = "api-gateway-authorizer"
 	relatedApigwLogsID   = "/aws/lambda/api-gateway-authorizer"
 	relatedApigwWAFID    = "a1b2c3d4-5678-90ab-cdef-111111111111"
