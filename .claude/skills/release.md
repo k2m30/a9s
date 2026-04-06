@@ -18,6 +18,19 @@ Run all of these and stop if any fail:
 
 **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require steps 4-6.
 
+## Counting Tests
+
+`go test -v` counts subtests (`t.Run`) as separate `=== RUN` lines, inflating the number. To get the real top-level test function count:
+
+```sh
+go test ./tests/unit/ -count=1 -timeout 120s -v 2>&1 | grep "^=== RUN   " | grep -v "/" | wc -l
+```
+
+- `grep "^=== RUN   "` — only RUN lines (not PAUSE/CONT)
+- `grep -v "/"` — exclude subtests (they contain `/` in the name)
+
+Use this count for README, website, changelog, and release notes. Round down to nearest hundred (e.g., 4,450 → "4,400+").
+
 ## Determine Version
 
 Ask the user: "What type of release is this?"
