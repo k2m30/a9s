@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.31.0] - 2026-04-06
+
+### Fixed
+- SNS Subscriptions no longer shows "(0+)" on accounts with zero subscriptions — known AWS API quirk where `ListSubscriptions` returns a `NextToken` with empty results
+- SNS Topics gets the same defensive guard for empty-page truncation
+- Secrets Manager now fetches up to 50 items per page instead of AWS default (~10)
+- SSM Parameters now fetches up to 50 items per page instead of AWS default (~10)
+- Lowercase `m` now triggers load-more in paginated lists (previously only `M` worked)
+
+### Changed
+- Replaced `interface{}` with `any` across 95 files in `internal/aws/`
+- Replaced manual contains-loops with `slices.Contains` in ELB, Target Group, and Security Group related checkers
+- Replaced `strings.Index` with `strings.Cut` in ELB and CloudTrail related checkers
+- Replaced `strP` helper with `aws.String` in Transit Gateway related checker
+
 ## [3.30.0] - 2026-04-06
 
 ### Added
