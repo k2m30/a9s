@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 	})
+
+	resource.RegisterRelated("logs", []resource.RelatedDef{
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
+	})
 }
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
