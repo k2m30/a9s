@@ -691,4 +691,32 @@ func init() {
 			{TargetType: "kms", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("vpc", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case prodVPCID:
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 4, ResourceIDs: []string{relatedVPCSubnetID1, relatedVPCSubnetID2, relatedVPCSubnetID3, relatedVPCSubnetID4}},
+				{TargetType: "sg", Count: 4, ResourceIDs: []string{relatedVPCSGID1, relatedVPCSGID2, relatedVPCSGID3, relatedVPCSGID4}},
+				{TargetType: "ec2", Count: 2, ResourceIDs: []string{relatedVPCEC2ID1, relatedVPCEC2ID2}},
+				{TargetType: "elb", Count: 1, ResourceIDs: []string{relatedVPCELBID1}},
+				{TargetType: "nat", Count: 2, ResourceIDs: []string{relatedVPCNATID1, relatedVPCNATID2}},
+				{TargetType: "igw", Count: 1, ResourceIDs: []string{relatedVPCIGWID}},
+				{TargetType: "rtb", Count: 3, ResourceIDs: []string{relatedVPCRTBID1, relatedVPCRTBID2, relatedVPCRTBID3}},
+				{TargetType: "vpce", Count: 1, ResourceIDs: []string{relatedVPCVPCEID1}},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "subnet", Count: 0},
+			{TargetType: "sg", Count: 0},
+			{TargetType: "ec2", Count: 0},
+			{TargetType: "elb", Count: 0},
+			{TargetType: "nat", Count: 0},
+			{TargetType: "igw", Count: 0},
+			{TargetType: "rtb", Count: 0},
+			{TargetType: "vpce", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
