@@ -252,4 +252,8 @@ const (
 
 	// redshift related-view IDs
 	relatedRedshiftAlarmID = "redshift-cluster-cpu-utilization"
+
+	// role related-view IDs
+	relatedRoleLambdaID1 = "api-gateway-authorizer"
+	relatedRoleGlueID1   = "acme-etl-orders"
 )

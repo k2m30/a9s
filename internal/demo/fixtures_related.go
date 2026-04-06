@@ -397,4 +397,37 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("role", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "acme-eks-node-role":
+			return []resource.RelatedCheckResult{
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "glue", Count: 0},
+				{TargetType: "ng", Count: 1, ResourceIDs: []string{relatedEC2NGNodeGroupID}},
+				{TargetType: "policy", Count: 0},
+			}
+		case "acme-lambda-execution":
+			return []resource.RelatedCheckResult{
+				{TargetType: "lambda", Count: 4, ResourceIDs: []string{relatedRoleLambdaID1}},
+				{TargetType: "glue", Count: 0},
+				{TargetType: "ng", Count: 0},
+				{TargetType: "policy", Count: 0},
+			}
+		case "acme-glue-role":
+			return []resource.RelatedCheckResult{
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "glue", Count: 3, ResourceIDs: []string{relatedRoleGlueID1}},
+				{TargetType: "ng", Count: 0},
+				{TargetType: "policy", Count: 0},
+			}
+		default:
+			return []resource.RelatedCheckResult{
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "glue", Count: 0},
+				{TargetType: "ng", Count: 0},
+				{TargetType: "policy", Count: 0},
+			}
+		}
+	})
 }
