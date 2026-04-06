@@ -134,6 +134,69 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 - `Count: -1` -- unknown (cache miss with no clients, or error)
 - `Count: N` (N > 0) -- confirmed N found, ResourceIDs populated
 
+### Pattern N: Naming-Convention (reverse lookup by name pattern)
+
+The target resource's ID or name follows a predictable naming convention
+that embeds the source resource's name. Search the target cache for matches.
+
+```go
+// Example: SFN → logs (log group name is /aws/vendedlogs/states/{sfn-name})
+func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+    sfnName := res.ID
+    if sfnName == "" {
+        return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+    }
+    expectedPrefix := "/aws/vendedlogs/states/" + sfnName
+
+    logsList, truncated, err := sfnRelatedResources(ctx, clients, cache, "logs")
+    // ... standard cache lookup, match by strings.HasPrefix(logRes.ID, expectedPrefix)
+}
+```
+
+Known naming conventions:
+- Lambda → logs: `/aws/lambda/{function-name}`
+- CodeBuild → logs: `/aws/codebuild/{project-name}`
+- SFN → logs: `/aws/vendedlogs/states/{state-machine-name}`
+- EKS → logs: `/aws/eks/{cluster-name}/...`
+
+### Pattern D: Dimension-Based (reverse lookup by alarm dimensions)
+
+Search the alarm cache for alarms whose `Dimensions[]` contain a matching
+dimension name/value. The source resource's ARN or name is the dimension value.
+
+```go
+// Example: SFN → alarm (alarm dimension StateMachineArn matches SFN ARN)
+func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+    sfnARN := res.Fields["arn"]
+    if sfnARN == "" {
+        return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+    }
+    alarmList, truncated, err := sfnRelatedResources(ctx, clients, cache, "alarm")
+    // ... iterate alarms, assert MetricAlarm, check Dimensions for StateMachineArn == sfnARN
+}
+```
+
+### When `Checker: nil` Is Acceptable
+
+A nil checker (unknown count, shows "?" in UI) is ONLY acceptable when ALL
+of the following are true:
+
+1. **No forward fields**: The source RawStruct has no fields referencing the target
+2. **No reverse fields**: No cached resource type has fields referencing this source
+3. **No naming convention**: The target doesn't follow a name pattern embedding the source name
+4. **No dimension match**: No alarm dimensions reference this source's ARN or name
+5. **The relationship requires a separate API call** not available from any cached data
+
+**Before marking a checker as nil, the architect MUST verify all five conditions.**
+Checking the research doc (`docs/design/related-resources/{shortname}.md`) is
+mandatory — it lists viable lookup strategies for each relationship.
+
+Common mistakes:
+- Marking alarm as nil when alarms have `Dimensions[]` referencing the source ARN
+- Marking logs as nil when a `/aws/{service}/{name}` log group convention exists
+- Marking a relationship as nil when OTHER cached resources have fields pointing back
+  (e.g., SNS→alarm: alarm cache has `AlarmActions[]` containing topic ARNs)
+
 ---
 
 # CODER STEPS (1-7) -- a9s-coder agent only
