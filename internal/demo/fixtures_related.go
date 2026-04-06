@@ -650,4 +650,20 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("tgw", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "tgw-0aaa111111111111a", "tgw-0a1b2c3d4e5f67890":
+			return []resource.RelatedCheckResult{
+				{TargetType: "vpc", Count: 0},
+				{TargetType: "rtb", Count: 1, ResourceIDs: []string{"rtb-0aaa111111111111a"}},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "vpc", Count: 0},
+			{TargetType: "rtb", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
