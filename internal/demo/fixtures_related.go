@@ -295,4 +295,13 @@ func init() {
 			{TargetType: "secrets", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("lambda", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedLambdaRoleID}},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedLambdaAlarmID}},
+			{TargetType: "sqs", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
