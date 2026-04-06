@@ -21,7 +21,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("ses", []resource.RelatedDef{
-		{TargetType: "r53", DisplayName: "Route 53 (DNS)", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "r53", DisplayName: "Route 53 (DNS)", Checker: checkSESR53, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
 }

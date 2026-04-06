@@ -271,6 +271,9 @@ const (
 	relatedSecretsKMSID    = "a1b2c3d4-5678-90ab-cdef-111111111111"
 	relatedSecretsLambdaID = "rotate-docdb-credentials"
 
+	// ses related-view IDs
+	relatedSESR53ID = "/hostedzone/Z0123456789ABCDEFGHIJ"
+
 	// sfn related-view IDs
 	relatedSFNAlarmID = "sfn-execution-failures"
 	relatedSFNLogsID  = "/aws/vendedlogs/states/order-fulfillment-workflow"

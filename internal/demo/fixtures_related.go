@@ -504,7 +504,7 @@ func init() {
 
 	resource.RegisterRelatedDemo("ses", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "r53", Count: 1},
+			{TargetType: "r53", Count: 1, ResourceIDs: []string{relatedSESR53ID}},
 			{TargetType: "cfn", Count: 0},
 		}
 	})
