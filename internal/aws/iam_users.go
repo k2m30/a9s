@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchIAMUsersPage(ctx, c.IAM, continuationToken)
 	})
+
+	resource.RegisterRelated("iam-user", []resource.RelatedDef{
+		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "policy", DisplayName: "IAM Policies", Checker: nil, NeedsTargetCache: false},
+	})
 }
 
 // FetchIAMUsers calls the IAM ListUsers API and returns all pages of users.
