@@ -302,6 +302,26 @@ const (
 	// ssm related-view IDs
 	relatedSSMKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
+	// vpc related-view IDs
+	relatedVPCSubnetID1 = prodPublicSubnetA
+	relatedVPCSubnetID2 = prodPublicSubnetB
+	relatedVPCSubnetID3 = prodPrivateSubnetA
+	relatedVPCSubnetID4 = prodPrivateSubnetB
+	relatedVPCSGID1     = "sg-0aaa111111111111a"
+	relatedVPCSGID2     = "sg-0bbb222222222222b"
+	relatedVPCSGID3     = "sg-0ccc333333333333c"
+	relatedVPCSGID4     = "sg-0ddd444444444444d"
+	relatedVPCEC2ID1    = "i-0a1b2c3d4e5f60001"
+	relatedVPCEC2ID2    = "i-0a1b2c3d4e5f60002"
+	relatedVPCELBID1    = prodELBName
+	relatedVPCNATID1    = "nat-0aaa111111111111a"
+	relatedVPCNATID2    = "nat-0bbb222222222222b"
+	relatedVPCIGWID     = "igw-0aaa111111111111a"
+	relatedVPCRTBID1    = "rtb-0aaa111111111111a"
+	relatedVPCRTBID2    = "rtb-0bbb222222222222b"
+	relatedVPCRTBID3    = "rtb-0ccc333333333333c"
+	relatedVPCVPCEID1   = "vpce-0aaa111111111111a"
+
 	// subnet related-view IDs (prodPublicSubnetA scenario)
 	relatedSubnetEC2ID1 = "i-0a1b2c3d4e5f60001"
 	relatedSubnetEC2ID2 = "i-0a1b2c3d4e5f60002"
