@@ -12,6 +12,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
@@ -887,6 +888,235 @@ func renderHeaderBadgeExpiry(profile, region, version, badge, expiryText string,
 
 // ── VIEW 8: Header with account badge (various states) ──────────────────────
 
+// ── VIEW 7e: EC2 Status Checks — Mixed (some failing) ─────────────────────
+
+func renderEC2StatusChecksMixed() string {
+	const w = 114
+
+	cols := []col{
+		{"NAME\u2191", 22},
+		{"STATE", 12},
+		{"LIFECYCLE", 10},
+		{"TYPE", 10},
+		{"PRIVATE IP", 16},
+		{"INSTANCE ID", 22},
+	}
+
+	type ec2row struct {
+		name, state, lifecycle, itype, ip, id string
+		checkStatus                            string // "ok", "impaired", "initializing", ""
+	}
+	rows := []ec2row{
+		{"api-prod-01", "running", "on-demand", "t3.medium", "10.0.1.42", "i-0abc123def456789a", "ok"},
+		{"api-prod-02", "running", "on-demand", "t3.medium", "10.0.1.43", "i-0abc123def456789b", "ok"},
+		{"worker-01", "running", "on-demand", "t3.large", "10.0.2.10", "i-0def456789abcdef0", "impaired"},
+		{"worker-02", "running", "on-demand", "t3.large", "10.0.2.11", "i-0def456789abcdef1", "initializing"},
+		{"bastion", "running", "on-demand", "t2.micro", "10.0.0.5", "i-0111222333aaabbb0", "ok"},
+		{"old-worker", "stopped", "on-demand", "t3.medium", "10.0.1.99", "i-0aaa111222bbbccc0", ""},
+		{"legacy-app", "terminated", "on-demand", "t2.small", "-", "i-0000111222cccddd0", ""},
+	}
+
+	innerW := w - 2
+
+	headerParts := make([]string, len(cols))
+	for i, c := range cols {
+		headerParts[i] = padOrTrunc(c.title, c.width)
+	}
+	headerLine := lipgloss.NewStyle().Foreground(colAccent).Bold(true).
+		Render(" " + strings.Join(headerParts, "  "))
+
+	warnStyle := lipgloss.NewStyle().Foreground(colStopped).Bold(true)
+	initStyle := lipgloss.NewStyle().Foreground(colPending)
+
+	var lines []string
+	lines = append(lines, headerLine)
+
+	for i, r := range rows {
+		// Build the STATE cell with optional prefix
+		stateCell := r.state
+		if r.state == "running" {
+			switch r.checkStatus {
+			case "impaired":
+				stateCell = warnStyle.Render("!") + " " + r.state
+			case "initializing":
+				stateCell = initStyle.Render("~") + " " + r.state
+			}
+		}
+
+		cells := []string{
+			padOrTrunc(r.name, cols[0].width),
+			padOrTrunc(stateCell, cols[1].width),
+			padOrTrunc(r.lifecycle, cols[2].width),
+			padOrTrunc(r.itype, cols[3].width),
+			padOrTrunc(r.ip, cols[4].width),
+			padOrTrunc(r.id, cols[5].width),
+		}
+		rowText := " " + strings.Join(cells, "  ")
+
+		if i == 0 {
+			line := lipgloss.NewStyle().
+				Background(colRowSelected).Foreground(colRowSelectedFg).Bold(true).
+				Width(innerW).Render(rowText)
+			lines = append(lines, line)
+		} else if i == 2 {
+			// worker-01: selected row with failed check — ! stays red on blue bg
+			// Compose: row bg is blue, but the ! glyph keeps its red fg
+			rowBase := rowColorStyle(r.state)
+			stateWithWarn := warnStyle.Render("!") + " " + rowBase.Render(r.state)
+			cellsCustom := []string{
+				padOrTrunc(rowBase.Render(r.name), cols[0].width),
+				padOrTrunc(stateWithWarn, cols[1].width),
+				padOrTrunc(rowBase.Render(r.lifecycle), cols[2].width),
+				padOrTrunc(rowBase.Render(r.itype), cols[3].width),
+				padOrTrunc(rowBase.Render(r.ip), cols[4].width),
+				padOrTrunc(rowBase.Render(r.id), cols[5].width),
+			}
+			rowTextCustom := " " + strings.Join(cellsCustom, "  ")
+			lines = append(lines, rowTextCustom)
+		} else {
+			style := rowColorStyle(r.state)
+			lines = append(lines, style.Render(rowText))
+		}
+	}
+
+	lines = append(lines,
+		lipgloss.NewStyle().Foreground(colDim).Render("  · · · (35 more rows)"))
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.8.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "ec2-instances(42)", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 7f: EC2 Status Checks — All Healthy ────────────────────────────────
+
+func renderEC2StatusChecksHealthy() string {
+	const w = 114
+
+	cols := []col{
+		{"NAME\u2191", 22},
+		{"STATE", 12},
+		{"LIFECYCLE", 10},
+		{"TYPE", 10},
+		{"PRIVATE IP", 16},
+		{"INSTANCE ID", 22},
+	}
+
+	type ec2row struct {
+		name, state, lifecycle, itype, ip, id string
+	}
+	rows := []ec2row{
+		{"api-prod-01", "running", "on-demand", "t3.medium", "10.0.1.42", "i-0abc123def456789a"},
+		{"api-prod-02", "running", "on-demand", "t3.medium", "10.0.1.43", "i-0abc123def456789b"},
+		{"worker-01", "running", "on-demand", "t3.large", "10.0.2.10", "i-0def456789abcdef0"},
+		{"worker-02", "running", "on-demand", "t3.large", "10.0.2.11", "i-0def456789abcdef1"},
+	}
+
+	innerW := w - 2
+
+	headerParts := make([]string, len(cols))
+	for i, c := range cols {
+		headerParts[i] = padOrTrunc(c.title, c.width)
+	}
+	headerLine := lipgloss.NewStyle().Foreground(colAccent).Bold(true).
+		Render(" " + strings.Join(headerParts, "  "))
+
+	var lines []string
+	lines = append(lines, headerLine)
+
+	for i, r := range rows {
+		cells := []string{
+			padOrTrunc(r.name, cols[0].width),
+			padOrTrunc(r.state, cols[1].width),
+			padOrTrunc(r.lifecycle, cols[2].width),
+			padOrTrunc(r.itype, cols[3].width),
+			padOrTrunc(r.ip, cols[4].width),
+			padOrTrunc(r.id, cols[5].width),
+		}
+		rowText := " " + strings.Join(cells, "  ")
+
+		if i == 0 {
+			line := lipgloss.NewStyle().
+				Background(colRowSelected).Foreground(colRowSelectedFg).Bold(true).
+				Width(innerW).Render(rowText)
+			lines = append(lines, line)
+		} else {
+			style := rowColorStyle(r.state)
+			lines = append(lines, style.Render(rowText))
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.8.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "ec2-instances(42)", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// ── VIEW 7g: EC2 Status Checks — Detail View (failed check) ─────────────────
+
+func renderEC2StatusChecksDetail() string {
+	const w = 84
+
+	secStyle := lipgloss.NewStyle().Foreground(colDetailSec).Bold(true)
+	kStyle := lipgloss.NewStyle().Foreground(colDetailKey)
+	vStyle := lipgloss.NewStyle().Foreground(colDetailVal)
+
+	kw := 24
+
+	kv := func(key, val string) string {
+		return " " + kStyle.Render(padOrTrunc(key+":", kw)) + vStyle.Render(val)
+	}
+	kvColor := func(key, val string, valColor color.Color) string {
+		return " " + kStyle.Render(padOrTrunc(key+":", kw)) +
+			lipgloss.NewStyle().Foreground(valColor).Render(val)
+	}
+	sec := func(s string) string {
+		return " " + secStyle.Render(s)
+	}
+	subKV := func(key, val string, valColor color.Color) string {
+		return "     " + kStyle.Render(padOrTrunc(key+":", 12)) +
+			lipgloss.NewStyle().Foreground(valColor).Render(val)
+	}
+
+	var lines []string
+	lines = append(lines, sec("Identity"))
+	lines = append(lines, kv("InstanceId", "i-0def456789abcdef0"))
+	lines = append(lines, kv("InstanceType", "t3.large"))
+	lines = append(lines, kv("ImageId", "ami-0abcdef01234567"))
+	lines = append(lines, "")
+	lines = append(lines, sec("State"))
+	lines = append(lines, kvColor("State.Name", "running", colRunning))
+	lines = append(lines, "")
+	lines = append(lines, sec("Status Checks"))
+	lines = append(lines, subKV("System", "ok", colRunning))
+	lines = append(lines, subKV("Instance", "impaired", colStopped))
+	lines = append(lines, "")
+	lines = append(lines, sec("Network"))
+	lines = append(lines, kv("VpcId", "vpc-0123456789abcdef0"))
+	lines = append(lines, kv("SubnetId", "subnet-0123456789abcde"))
+	lines = append(lines, kv("PrivateIpAddress", "10.0.2.10"))
+	lines = append(lines, "")
+	lines = append(lines, sec("Tags"))
+	lines = append(lines, kv("Name", "worker-01"))
+	lines = append(lines, kv("Environment", "production"))
+
+	_ = kvColor // used above
+
+	var sb strings.Builder
+	sb.WriteString(renderHeaderNormal("prod", "us-east-1", "0.8.0", w))
+	sb.WriteString("\n")
+	sb.WriteString(renderFramedBox(lines, "i-0def456789abcdef0", w))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
 func renderHeaderVariants() string {
 	const w = 110
 
@@ -1191,6 +1421,15 @@ func main() {
 
 	fmt.Println(divider("VIEW 7d: Lambda Code — Help Screen"))
 	fmt.Println(renderLambdaCodeHelp())
+
+	fmt.Println(divider("VIEW 7e: EC2 Status Checks — Mixed"))
+	fmt.Println(renderEC2StatusChecksMixed())
+
+	fmt.Println(divider("VIEW 7f: EC2 Status Checks — All Healthy"))
+	fmt.Println(renderEC2StatusChecksHealthy())
+
+	fmt.Println(divider("VIEW 7g: EC2 Status Checks — Detail (Failed)"))
+	fmt.Println(renderEC2StatusChecksDetail())
 
 	fmt.Println(divider("VIEW 8: Header Variants (Account Badge + Session Expiry)"))
 	fmt.Println(renderHeaderVariants())
