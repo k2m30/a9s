@@ -468,7 +468,11 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	frame := layout.RenderFrame(lines, frameTitle, m.width, frameHeight)
+	var hints []layout.KeyHint
+	if h, ok := active.(views.Hintable); ok {
+		hints = h.BottomHints()
+	}
+	frame := layout.RenderFrameWithHints(lines, frameTitle, hints, m.width, frameHeight)
 
 	v := tea.NewView(header + "\n" + frame)
 	v.AltScreen = true

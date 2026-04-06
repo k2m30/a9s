@@ -16,6 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 
 	"gopkg.in/yaml.v3"
@@ -158,6 +159,14 @@ func (m YAMLModel) FrameTitle() string {
 		id = m.res.Name
 	}
 	return id + " yaml"
+}
+
+// BottomHints implements Hintable for YAMLModel.
+func (m YAMLModel) BottomHints() []layout.KeyHint {
+	return []layout.KeyHint{
+		{Key: "w", Desc: "Wrap"},
+		{Key: "c", Desc: "Copy"},
+	}
 }
 
 // CopyContent returns the raw YAML text for clipboard copy.

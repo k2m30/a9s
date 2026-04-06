@@ -14,6 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
@@ -533,6 +534,59 @@ func (m DetailModel) FrameTitle() string {
 		return m.res.Name
 	}
 	return m.res.ID
+}
+
+// BottomHints implements Hintable for DetailModel.
+func (m DetailModel) BottomHints() []layout.KeyHint {
+	var hints []layout.KeyHint
+
+	// Right column focused state
+	if m.rightColShowing() && m.rightCol.IsFocused() {
+		name := m.rightCol.SelectedTypeName()
+		if name != "" {
+			// Resolve display name
+			displayName := name
+			if rt := resource.FindResourceType(name); rt != nil {
+				displayName = rt.Name
+			} else if ct := resource.GetChildType(name); ct != nil {
+				displayName = ct.Name
+			}
+			hints = append(hints, layout.KeyHint{Key: "enter", Desc: displayName})
+		}
+		hints = append(hints, layout.KeyHint{Key: "tab", Desc: "Fields"})
+		hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+		hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
+		return hints
+	}
+
+	// Left column — check navigable field under cursor
+	if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+		item := m.fieldList[m.fieldCursor]
+		if item.IsNavigable && item.TargetType != "" {
+			displayName := item.TargetType
+			if rt := resource.FindResourceType(item.TargetType); rt != nil {
+				displayName = rt.Name
+			} else if ct := resource.GetChildType(item.TargetType); ct != nil {
+				displayName = ct.Name
+			}
+			hints = append(hints, layout.KeyHint{Key: "enter", Desc: displayName})
+		}
+	}
+
+	hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+
+	// Related panel
+	if related := resource.GetRelated(m.resourceType); len(related) > 0 {
+		hints = append(hints, layout.KeyHint{Key: "r", Desc: "Related"})
+		if m.rightColVisible {
+			hints = append(hints, layout.KeyHint{Key: "tab", Desc: "Cols"})
+		}
+	}
+
+	hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
+	hints = append(hints, layout.KeyHint{Key: "w", Desc: "Wrap"})
+
+	return hints
 }
 
 // CopyContent returns column-aware clipboard content for the active selection.

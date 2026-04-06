@@ -8,6 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
@@ -322,6 +323,13 @@ func (m MainMenuModel) FrameTitle() string {
 		return "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
 	}
 	return "resource-types(" + itoa(total) + ")"
+}
+
+// BottomHints implements Hintable for MainMenuModel.
+func (m MainMenuModel) BottomHints() []layout.KeyHint {
+	return []layout.KeyHint{
+		{Key: "ctrl+r", Desc: "Refresh"},
+	}
 }
 
 // CopyContent returns empty — nothing to copy from the main menu.

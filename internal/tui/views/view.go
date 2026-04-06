@@ -1,5 +1,7 @@
 package views
 
+import "github.com/k2m30/a9s/v3/internal/tui/layout"
+
 // View is the interface all view models must implement.
 // It covers rendering, sizing, frame title, clipboard copy, and help context —
 // the methods that every view in the stack needs. Update is intentionally
@@ -27,4 +29,10 @@ type Searchable interface {
 	IsSearchActive() bool
 	IsSearchInputMode() bool
 	SearchInfo() string
+}
+
+// Hintable is an optional interface for views that provide bottom border key hints.
+// Views that don't implement it get a plain bottom border (backward compatible).
+type Hintable interface {
+	BottomHints() []layout.KeyHint
 }
