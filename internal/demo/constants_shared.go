@@ -202,4 +202,7 @@ const (
 	// ecs-svc related-view IDs
 	relatedECSSvcTGID    = "acme-api-tg"
 	relatedECSSvcAlarmID = "ecs-svc-cpu-high"
+
+	// efs related-view IDs
+	relatedEFSKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )

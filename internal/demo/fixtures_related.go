@@ -210,4 +210,12 @@ func init() {
 			{TargetType: "ecs", Count: 1, ResourceIDs: []string{"acme-services"}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("efs", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedEFSKMSID}},
+			{TargetType: "cfn", Count: 0},
+			{TargetType: "lambda", Count: 0},
+		}
+	})
 }
