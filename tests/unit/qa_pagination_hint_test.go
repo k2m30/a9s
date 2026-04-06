@@ -4,9 +4,9 @@ package unit
 // shown at the bottom of a paginated resource list.
 //
 // Tests verify three hint variants:
-//   1. Standard hint when no filter is active: "M: load more"
-//   2. Filter-aware hint when a filter is set: "M: load more (filter applies to loaded data only)"
-//   3. Loading state while fetching next page: "loading..." (not "M: load more")
+//   1. Standard hint when no filter is active: "m: load more"
+//   2. Filter-aware hint when a filter is set: "m: load more (filter applies to loaded data only)"
+//   3. Loading state while fetching next page: "loading..." (not "m: load more")
 //
 // Test 1 and 3 exercise existing behaviour and should PASS immediately.
 // Test 2 documents new behaviour (T012) and is EXPECTED TO FAIL until the
@@ -68,7 +68,7 @@ func newHintTestResourceList(n int) views.ResourceListModel {
 
 // TestQA_PaginationHint_NoFilter_ShowsStandard verifies that when a resource
 // list has a truncated pagination state and NO filter is active, the hint line
-// contains "M: load more" but does NOT contain the filter-warning suffix.
+// contains "m: load more" but does NOT contain the filter-warning suffix.
 //
 // This test exercises existing behaviour and should PASS immediately.
 func TestQA_PaginationHint_NoFilter_ShowsStandard(t *testing.T) {
@@ -76,8 +76,8 @@ func TestQA_PaginationHint_NoFilter_ShowsStandard(t *testing.T) {
 
 	output := stripANSI(rl.View())
 
-	if !strings.Contains(output, "M: load more") {
-		t.Errorf("expected hint to contain 'M: load more' with no active filter, got:\n%s", output)
+	if !strings.Contains(output, "m: load more") {
+		t.Errorf("expected hint to contain 'm: load more' with no active filter, got:\n%s", output)
 	}
 
 	if strings.Contains(output, "filter applies to loaded data only") {
@@ -104,8 +104,8 @@ func TestQA_PaginationHint_FilterActive_ShowsFilterWarning(t *testing.T) {
 
 	output := stripANSI(rl.View())
 
-	if !strings.Contains(output, "M: load more") {
-		t.Errorf("expected hint to contain 'M: load more' even with active filter, got:\n%s", output)
+	if !strings.Contains(output, "m: load more") {
+		t.Errorf("expected hint to contain 'm: load more' even with active filter, got:\n%s", output)
 	}
 
 	// KEY ASSERTION: the filter warning must be appended to the hint.
@@ -120,7 +120,7 @@ func TestQA_PaginationHint_FilterActive_ShowsFilterWarning(t *testing.T) {
 
 // TestQA_PaginationHint_Loading_ShowsLoadingText verifies that while the next
 // page is being fetched (after pressing M), the hint line shows "loading..."
-// and does NOT show "M: load more".
+// and does NOT show "m: load more".
 //
 // This test exercises existing behaviour and should PASS immediately.
 func TestQA_PaginationHint_Loading_ShowsLoadingText(t *testing.T) {
@@ -136,10 +136,10 @@ func TestQA_PaginationHint_Loading_ShowsLoadingText(t *testing.T) {
 		t.Errorf("expected hint to contain 'loading...' after pressing M, got:\n%s", output)
 	}
 
-	// The "M: load more" prompt must be hidden while loading is in progress.
+	// The "m: load more" prompt must be hidden while loading is in progress.
 	// Strip "loading..." occurrences first to avoid false substring matches.
 	withoutLoading := strings.ReplaceAll(output, "loading...", "")
-	if strings.Contains(withoutLoading, "M: load more") {
-		t.Errorf("expected 'M: load more' to be hidden while loading, but it was still present:\n%s", output)
+	if strings.Contains(withoutLoading, "m: load more") {
+		t.Errorf("expected 'm: load more' to be hidden while loading, but it was still present:\n%s", output)
 	}
 }
