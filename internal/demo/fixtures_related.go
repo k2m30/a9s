@@ -744,4 +744,12 @@ func init() {
 			{TargetType: "eni", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("waf", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "elb", Count: 1},
+			{TargetType: "apigw", Count: 0},
+			{TargetType: "cf", Count: 0},
+		}
+	})
 }
