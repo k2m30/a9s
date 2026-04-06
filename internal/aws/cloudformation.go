@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("cfn", []string{"stack_name", "status", "creation_time", "last_updated", "description"})
 
-	resource.RegisterPaginated("cfn", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("cfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -21,7 +21,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("cfn", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
 	})
 }
 

@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold"})
 
-	resource.RegisterPaginated("alarm", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("alarm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -22,7 +22,7 @@ func init() {
 
 	resource.RegisterRelated("alarm", []resource.RelatedDef{
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true},
 	})
 }
 

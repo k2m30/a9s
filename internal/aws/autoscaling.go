@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("asg", []string{"asg_name", "min_size", "max_size", "desired", "instances", "status"})
 
-	resource.RegisterPaginated("asg", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("asg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -24,8 +24,8 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkASGEC2},
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkASGTG},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: nil},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
+		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
 	})
 }
 

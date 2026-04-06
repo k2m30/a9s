@@ -243,7 +243,7 @@ func TestRelated_Alarm_Registered(t *testing.T) {
 		}
 	}
 
-	// Verify sns has a non-nil checker, asg is a stub
+	// Verify sns and asg both have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
 		case "sns":
@@ -251,8 +251,8 @@ func TestRelated_Alarm_Registered(t *testing.T) {
 				t.Error("alarm sns: Checker should not be nil")
 			}
 		case "asg":
-			if def.Checker != nil {
-				t.Error("alarm asg: Checker should be nil (stub)")
+			if def.Checker == nil {
+				t.Error("alarm asg: Checker should not be nil")
 			}
 		}
 	}

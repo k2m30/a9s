@@ -16,7 +16,7 @@ func init() {
 	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "user", "source", "resource_type", "resource_name", "read_only"})
 
 	// Paginated fetcher for resource list browsing (M key load-more).
-	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -25,8 +25,8 @@ func init() {
 	})
 
 	resource.RegisterRelated("ct-events", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: nil},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: true},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: true},
 	})
 }
 

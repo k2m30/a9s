@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo"
@@ -130,19 +131,107 @@ func TestRelated_Alarm_SNS_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- ASG Stub Test ---
+// --- ASG Checker Tests ---
 
-func TestRelated_Alarm_ASG_IsStub(t *testing.T) {
-	defs := resource.GetRelated("alarm")
-	for _, def := range defs {
-		if def.TargetType == "asg" {
-			if def.Checker != nil {
-				t.Error("alarm asg def: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
+	// Alarm has AutoScalingGroupName dimension pointing to "my-asg"
+	// ASG cache has a resource with ID "my-asg"
+	// → Count: 1
+	raw := cwtypes.MetricAlarm{
+		Dimensions: []cwtypes.Dimension{
+			{
+				Name:  aws.String("AutoScalingGroupName"),
+				Value: aws.String("my-asg"),
+			},
+		},
 	}
-	t.Error("alarm asg related def not found")
+	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-asg"},
+		}},
+	}
+
+	checker := alarmCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+}
+
+func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
+	// Alarm has dimension, but ASG cache has different name
+	// → Count: 0
+	raw := cwtypes.MetricAlarm{
+		Dimensions: []cwtypes.Dimension{
+			{
+				Name:  aws.String("AutoScalingGroupName"),
+				Value: aws.String("my-asg"),
+			},
+		},
+	}
+	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "other-asg"},
+		}},
+	}
+
+	checker := alarmCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
+	// Alarm has no AutoScalingGroupName dimension
+	// → Count: 0
+	raw := cwtypes.MetricAlarm{
+		Dimensions: []cwtypes.Dimension{
+			{
+				Name:  aws.String("FunctionName"),
+				Value: aws.String("my-lambda"),
+			},
+		},
+	}
+	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-asg"},
+		}},
+	}
+
+	checker := alarmCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no AutoScalingGroupName dimension)", result.Count)
+	}
+}
+
+func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
+	// Empty cache
+	// → Count: -1
+	raw := cwtypes.MetricAlarm{
+		Dimensions: []cwtypes.Dimension{
+			{
+				Name:  aws.String("AutoScalingGroupName"),
+				Value: aws.String("my-asg"),
+			},
+		},
+	}
+	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
+	cache := resource.ResourceCache{}
+
+	checker := alarmCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	}
 }
 
 // --- Demo Checker Test ---
