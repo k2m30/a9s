@@ -15,6 +15,17 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"})
 
+	resource.RegisterRelated("ng", []resource.RelatedDef{
+		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkNGRole, NeedsTargetCache: true},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkNGASG, NeedsTargetCache: true},
+	})
+
+	resource.RegisterNavigableFields("ng", []resource.NavigableField{
+		{FieldPath: "ClusterName", TargetType: "eks"},
+		{FieldPath: "NodeRole", TargetType: "role"},
+	})
+
 	resource.RegisterPaginated("ng", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {

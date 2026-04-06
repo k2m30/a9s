@@ -231,6 +231,47 @@ func iamRoleFixtures() []resource.Resource {
 				Description: aws.String("Service role for Glue ETL jobs"),
 			},
 		},
+		// ARN-keyed alias fixtures for EKS node group NodeRole navigable field.
+		// The ng fixtures store NodeRole as a full ARN; the integrity test checks that
+		// the extracted ARN matches a role fixture ID. These entries provide that mapping.
+		{
+			ID:   "arn:aws:iam::123456789012:role/eks-node-role",
+			Name: "arn:aws:iam::123456789012:role/eks-node-role",
+			Fields: map[string]string{
+				"role_name":   "arn:aws:iam::123456789012:role/eks-node-role",
+				"role_id":     "AROAEXAMPLENGNODE001",
+				"path":        "/",
+				"create_date": "2025-02-20T12:00:00+00:00",
+				"description": "EKS node role ARN alias (navigable-field cross-reference)",
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:   aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
+				RoleId:     aws.String("AROAEXAMPLENGNODE001"),
+				Arn:        aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
+				Path:       aws.String("/"),
+				CreateDate: aws.Time(mustParseTime("2025-02-20T12:00:00+00:00")),
+				Description: aws.String("EKS node role ARN alias (navigable-field cross-reference)"),
+			},
+		},
+		{
+			ID:   "arn:aws:iam::123456789012:role/eks-gpu-node-role",
+			Name: "arn:aws:iam::123456789012:role/eks-gpu-node-role",
+			Fields: map[string]string{
+				"role_name":   "arn:aws:iam::123456789012:role/eks-gpu-node-role",
+				"role_id":     "AROAEXAMPLENGNODE002",
+				"path":        "/",
+				"create_date": "2025-04-05T09:30:00+00:00",
+				"description": "EKS GPU node role ARN alias (navigable-field cross-reference)",
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:   aws.String("arn:aws:iam::123456789012:role/eks-gpu-node-role"),
+				RoleId:     aws.String("AROAEXAMPLENGNODE002"),
+				Arn:        aws.String("arn:aws:iam::123456789012:role/eks-gpu-node-role"),
+				Path:       aws.String("/"),
+				CreateDate: aws.Time(mustParseTime("2025-04-05T09:30:00+00:00")),
+				Description: aws.String("EKS GPU node role ARN alias (navigable-field cross-reference)"),
+			},
+		},
 	}
 
 	// Generate 18 more roles to reach 25 total

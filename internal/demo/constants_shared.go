@@ -237,4 +237,9 @@ const (
 	relatedNATVPCID    = prodVPCID
 	relatedNATSubnetID = prodPublicSubnetA
 	relatedNATRTBID    = "rtb-0aaa111111111111a"
+
+	// ng related-view IDs
+	relatedNGEKSID  = "acme-prod"
+	relatedNGRoleID = "acme-eks-node-role"
+	relatedNGASGID  = "eks-acme-prod-ng-general"
 )
