@@ -107,7 +107,7 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 		t.Fatalf("views dir not loadable: %v", err)
 	}
 	if cfg == nil {
-		t.Skip(".a9s/views/ directory does not exist yet")
+		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 	res := resource.Resource{
 		ID:        "i-test123",

@@ -55,10 +55,10 @@ func TestNavigableFields_ECS_Registered(t *testing.T) {
 func TestNavigableFields_ECS_FieldPathsResolve(t *testing.T) {
 	resources, ok := demo.GetResources("ecs")
 	if !ok {
-		t.Skip("no demo fixture registered for ecs")
+		t.Fatal("no demo fixture registered for ecs — fixtures_compute_ecs.go must register it")
 	}
 	if len(resources) == 0 {
-		t.Skip("demo fixture returned no resources for ecs")
+		t.Fatal("demo fixture returned no resources for ecs")
 	}
 
 	fields := resource.GetNavigableFields("ecs")

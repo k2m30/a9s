@@ -173,7 +173,7 @@ func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
 	// (or whatever is configured — we check that at least 3 fields show)
 	vd := config.GetViewDef(cfg, "s3_objects")
 	if len(vd.Detail) == 0 {
-		t.Skip("no s3_objects detail config")
+		t.Fatal("s3_objects detail config is empty — .a9s/views/s3_objects.yaml must have a detail section")
 	}
 
 	t.Logf("s3_objects detail paths: %v", vd.Detail)

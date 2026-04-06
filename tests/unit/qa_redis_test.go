@@ -103,10 +103,6 @@ func multiStatusRedisFixtures() []resource.Resource {
 // ===========================================================================
 
 func TestQA_Redis_ListColumns(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	m := loadedRedisModel(t)
 	out := m.View()
 
@@ -124,9 +120,6 @@ func TestQA_Redis_ListColumns(t *testing.T) {
 
 func TestQA_Redis_ListColumnData(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	m := loadedRedisModel(t)
 	out := m.View()
 
@@ -154,10 +147,6 @@ func TestQA_Redis_ListColumnData(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_FrameTitle(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	m := loadedRedisModel(t)
 	title := m.FrameTitle()
 
@@ -375,10 +364,6 @@ func TestQA_Redis_EmptyList(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_NullEndpoint(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	m := loadedRedisModel(t)
 	out := m.View()
 
@@ -394,9 +379,6 @@ func TestQA_Redis_NullEndpoint(t *testing.T) {
 
 func TestQA_Redis_DetailView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewDetail(res, "redis", nil, k)
@@ -420,9 +402,6 @@ func TestQA_Redis_DetailView(t *testing.T) {
 
 func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewDetail(res, "redis", nil, k)
@@ -469,9 +448,6 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 
 func TestQA_Redis_YAMLView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -500,9 +476,6 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 
 func TestQA_Redis_YAMLFrameTitle(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -523,9 +496,6 @@ func TestQA_Redis_YAMLFrameTitle(t *testing.T) {
 
 func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -567,9 +537,6 @@ func TestQA_Redis_NavigateFromMainMenu(t *testing.T) {
 
 func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -602,9 +569,6 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 
 func TestQA_Redis_NavigateToDetail(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -638,9 +602,6 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 
 func TestQA_Redis_NavigateToYAML(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -670,9 +631,6 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 
 func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -732,9 +690,6 @@ func TestQA_Redis_CommandNavigation(t *testing.T) {
 
 func TestQA_Redis_HorizontalScroll(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
@@ -790,10 +745,6 @@ func TestQA_Redis_LoadingSpinner(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_NoSeparatorBelowHeaders(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 	m := loadedRedisModel(t)
 	out := m.View()
 
@@ -822,9 +773,6 @@ func TestQA_Redis_NoSeparatorBelowHeaders(t *testing.T) {
 
 func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -864,9 +812,6 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 
 func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no Redis fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()

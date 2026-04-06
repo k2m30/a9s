@@ -159,7 +159,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-vpc", func(t *testing.T) {
 		ec2Fixtures, ok := demo.GetResources("ec2")
 		if !ok || len(ec2Fixtures) == 0 {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		vpcIDs := allIDs("vpc")
 		if vpcIDs == nil {
@@ -182,7 +182,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-subnet", func(t *testing.T) {
 		ec2Fixtures, ok := demo.GetResources("ec2")
 		if !ok || len(ec2Fixtures) == 0 {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		subnetIDs := allIDs("subnet")
 		if subnetIDs == nil {
@@ -205,7 +205,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-sg", func(t *testing.T) {
 		ec2Fixtures, ok := demo.GetResources("ec2")
 		if !ok || len(ec2Fixtures) == 0 {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		sgIDs := allIDs("sg")
 		if sgIDs == nil {
@@ -232,7 +232,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-ami", func(t *testing.T) {
 		ec2Fixtures, ok := demo.GetResources("ec2")
 		if !ok || len(ec2Fixtures) == 0 {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		amiIDs := allIDs("ami")
 		if amiIDs == nil {
@@ -256,7 +256,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-iam-instance-profile", func(t *testing.T) {
 		ec2Fixtures, ok := demo.GetResources("ec2")
 		if !ok || len(ec2Fixtures) == 0 {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		roleFixtures, ok := demo.GetResources("role")
 		if !ok || len(roleFixtures) == 0 {
@@ -293,7 +293,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("lambda-role", func(t *testing.T) {
 		lambdaFixtures, ok := demo.GetResources("lambda")
 		if !ok || len(lambdaFixtures) == 0 {
-			t.Skip("no lambda fixtures")
+			t.Fatal("no lambda fixtures — demo.GetResources(\"lambda\") should return data")
 		}
 		roleFixtures, ok := demo.GetResources("role")
 		if !ok || len(roleFixtures) == 0 {
@@ -332,7 +332,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("eks-nodegroup-cluster-name", func(t *testing.T) {
 		eksFixtures, ok := demo.GetResources("eks")
 		if !ok || len(eksFixtures) == 0 {
-			t.Skip("no eks fixtures")
+			t.Fatal("no eks fixtures — demo.GetResources(\"eks\") should return data")
 		}
 		ngFixtures, ok := demo.GetResources("ng")
 		if !ok || len(ngFixtures) == 0 {
@@ -365,7 +365,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("lambda-log-group", func(t *testing.T) {
 		lambdaFixtures, ok := demo.GetResources("lambda")
 		if !ok || len(lambdaFixtures) == 0 {
-			t.Skip("no lambda fixtures")
+			t.Fatal("no lambda fixtures — demo.GetResources(\"lambda\") should return data")
 		}
 		logFixtures, ok := demo.GetResources("logs")
 		if !ok || len(logFixtures) == 0 {
@@ -489,7 +489,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("elb-acm-cert", func(t *testing.T) {
 		elbFixtures, ok := demo.GetResources("elb")
 		if !ok || len(elbFixtures) == 0 {
-			t.Skip("no elb fixtures")
+			t.Fatal("no elb fixtures — demo.GetResources(\"elb\") should return data")
 		}
 		_, ok = demo.GetResources("acm")
 		if !ok {
@@ -515,7 +515,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("alarm-sns-topic", func(t *testing.T) {
 		alarmFixtures, ok := demo.GetResources("alarm")
 		if !ok || len(alarmFixtures) == 0 {
-			t.Skip("no alarm fixtures")
+			t.Fatal("no alarm fixtures — demo.GetResources(\"alarm\") should return data")
 		}
 		snsFixtures, ok := demo.GetResources("sns")
 		if !ok || len(snsFixtures) == 0 {
@@ -538,7 +538,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-ebs-volumes", func(t *testing.T) {
 		_, ok := demo.GetResources("ec2")
 		if !ok {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		_, ok = demo.GetResources("ebs")
 		if !ok {
@@ -563,7 +563,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ec2-ebs-snapshots", func(t *testing.T) {
 		_, ok := demo.GetResources("ec2")
 		if !ok {
-			t.Skip("no ec2 fixtures")
+			t.Fatal("no ec2 fixtures — demo.GetResources(\"ec2\") should return data")
 		}
 		_, ok = demo.GetResources("ebs-snap")
 		if !ok {
@@ -691,7 +691,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("lambda-sqs-event-source", func(t *testing.T) {
 		lambdaFixtures, ok := demo.GetResources("lambda")
 		if !ok || len(lambdaFixtures) == 0 {
-			t.Skip("no lambda fixtures")
+			t.Fatal("no lambda fixtures — demo.GetResources(\"lambda\") should return data")
 		}
 		sqsFixtures, ok := demo.GetResources("sqs")
 		if !ok || len(sqsFixtures) == 0 {
@@ -724,7 +724,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("ecs-svc-elb", func(t *testing.T) {
 		ecsSvcFixtures, ok := demo.GetResources("ecs-svc")
 		if !ok || len(ecsSvcFixtures) == 0 {
-			t.Skip("no ecs-svc fixtures")
+			t.Fatal("no ecs-svc fixtures — demo.GetResources(\"ecs-svc\") should return data")
 		}
 		elbFixtures, ok := demo.GetResources("elb")
 		if !ok || len(elbFixtures) == 0 {
@@ -745,7 +745,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("cf-s3-origin", func(t *testing.T) {
 		cfFixtures, ok := demo.GetResources("cf")
 		if !ok || len(cfFixtures) == 0 {
-			t.Skip("no cf fixtures")
+			t.Fatal("no cf fixtures — demo.GetResources(\"cf\") should return data")
 		}
 		s3Fixtures, ok := demo.GetResources("s3")
 		if !ok || len(s3Fixtures) == 0 {
@@ -766,7 +766,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("r53-elb-alias", func(t *testing.T) {
 		_, ok := demo.GetResources("r53")
 		if !ok {
-			t.Skip("no r53 fixtures")
+			t.Fatal("no r53 fixtures — demo.GetResources(\"r53\") should return data")
 		}
 		_, ok = demo.GetResources("elb")
 		if !ok {
@@ -787,7 +787,7 @@ func TestDemoCrossReference(t *testing.T) {
 	t.Run("eks-log-group", func(t *testing.T) {
 		eksFixtures, ok := demo.GetResources("eks")
 		if !ok || len(eksFixtures) == 0 {
-			t.Skip("no eks fixtures")
+			t.Fatal("no eks fixtures — demo.GetResources(\"eks\") should return data")
 		}
 		logFixtures, ok := demo.GetResources("logs")
 		if !ok || len(logFixtures) == 0 {

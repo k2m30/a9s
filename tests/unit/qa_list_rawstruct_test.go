@@ -721,7 +721,7 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 		t.Fatalf("failed to load production views dir: %v", err)
 	}
 	if cfg == nil {
-		t.Skip(".a9s/views/ directory does not exist yet")
+		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 
 	// Sub-test for each resource type using production config

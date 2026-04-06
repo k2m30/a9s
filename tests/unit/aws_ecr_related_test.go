@@ -56,10 +56,10 @@ func TestNavigableFields_ECR_Registered(t *testing.T) {
 func TestNavigableFields_ECR_FieldPathsResolve(t *testing.T) {
 	resources, ok := demo.GetResources("ecr")
 	if !ok {
-		t.Skip("no demo fixture registered for ecr")
+		t.Fatal("no demo fixture registered for ecr — fixtures_cicd.go must register it")
 	}
 	if len(resources) == 0 {
-		t.Skip("demo fixture returned no resources for ecr")
+		t.Fatal("demo fixture returned no resources for ecr")
 	}
 
 	fields := resource.GetNavigableFields("ecr")
