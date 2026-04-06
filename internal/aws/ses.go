@@ -12,12 +12,17 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ses", []string{"identity_name", "identity_type", "verification_status", "sending_enabled"})
 
-	resource.RegisterPaginated("ses", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ses", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
 		return FetchSESIdentitiesPage(ctx, c.SESv2, continuationToken)
+	})
+
+	resource.RegisterRelated("ses", []resource.RelatedDef{
+		{TargetType: "r53", DisplayName: "Route 53 (DNS)", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
 }
 

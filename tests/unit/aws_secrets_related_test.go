@@ -38,6 +38,20 @@ func secretsSource() resource.Resource {
 	}
 }
 
+// --- Navigable Fields ---
+
+// TestNavigableFields_Secrets_None verifies that secrets has no navigable fields.
+// KmsKeyId and RotationLambdaARN are full ARNs that do not match fixture resource IDs,
+// so they are intentionally not registered as navigable fields.
+func TestNavigableFields_Secrets_None(t *testing.T) {
+	for _, field := range []string{"KmsKeyId", "RotationLambdaARN"} {
+		nav := resource.IsFieldNavigable("secrets", field)
+		if nav != nil {
+			t.Errorf("expected no navigable field %q for secrets, but got target %q", field, nav.TargetType)
+		}
+	}
+}
+
 // --- KMS checker (forward: KmsKeyId ARN → kms cache by UUID) ---
 
 func TestRelated_Secrets_KMS_Found(t *testing.T) {
