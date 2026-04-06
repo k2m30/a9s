@@ -424,6 +424,32 @@ func init() {
 		}
 	})
 
+	resource.RegisterRelatedDemo("s3", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "data-pipeline-logs":
+			return []resource.RelatedCheckResult{
+				{TargetType: "trail", Count: 1, ResourceIDs: []string{relatedS3TrailID}},
+				{TargetType: "cf", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		case "webapp-assets-prod":
+			return []resource.RelatedCheckResult{
+				{TargetType: "trail", Count: 0},
+				{TargetType: "cf", Count: 1, ResourceIDs: []string{relatedS3CFID}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		default:
+			return []resource.RelatedCheckResult{
+				{TargetType: "trail", Count: 0},
+				{TargetType: "cf", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+	})
+
 	resource.RegisterRelatedDemo("role", func(res resource.Resource) []resource.RelatedCheckResult {
 		switch res.ID {
 		case "acme-eks-node-role":
