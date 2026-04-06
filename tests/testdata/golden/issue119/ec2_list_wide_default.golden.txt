@@ -3,10 +3,10 @@
 │ Name                      State         Lifecycle     Type            Private IP        Public IP         Instance ID                    │
 │ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
 │ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
-│ api-staging-01            running       spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d4e5f60003            │
+│ api-staging-01            ! running     spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d4e5f60003            │
 │ worker-batch-03           stopped       spot          c5.xlarge       10.0.3.100                          i-0a1b2c3d4e5f60004            │
 │ bastion-prod              running       on-demand     t3.micro        10.0.0.5          52.87.221.44      i-0a1b2c3d4e5f60005            │
-│ db-proxy-01               running       on-demand     r5.large        10.0.4.200                          i-0a1b2c3d4e5f60006            │
+│ db-proxy-01               ~ running     on-demand     r5.large        10.0.4.200                          i-0a1b2c3d4e5f60006            │
 │ web-staging-01            pending       spot          t3.medium       10.0.2.70                           i-0a1b2c3d4e5f60007            │
 │ ml-trainer-gpu            stopping      spot          g4dn.xlarge     10.0.5.30                           i-0a1b2c3d4e5f60008            │
 │ temp-load-test            shutting-do…  on-demand     c5.large        10.0.3.55                           i-0a1b2c3d4e5f60009            │
