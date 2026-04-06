@@ -583,12 +583,16 @@ func TestBottomBorderWithHints_Truncation(t *testing.T) {
 
 // TestBottomBorderWithHints_VeryNarrow verifies that when the hint doesn't fit
 // at a very narrow width, a plain border is returned.
+//
+// With right-aligned layout the overhead is 4 chars (1 for └, 3 for ──┘).
+// "y YAML" renders as 6 visible chars, so minimum fitting width is 10.
+// At w=9 the hint is dropped and only a plain border is produced.
 func TestBottomBorderWithHints_VeryNarrow(t *testing.T) {
 	hints := []layout.KeyHint{{Key: "y", Desc: "YAML"}}
-	got := layout.BottomBorderWithHints(hints, 10)
+	got := layout.BottomBorderWithHints(hints, 9)
 	vis := lipgloss.Width(got)
-	if vis != 10 {
-		t.Errorf("expected visual width 10, got %d", vis)
+	if vis != 9 {
+		t.Errorf("expected visual width 9, got %d", vis)
 	}
 	plain := stripANSI(got)
 	if !strings.HasPrefix(plain, "\u2514") {
@@ -597,10 +601,9 @@ func TestBottomBorderWithHints_VeryNarrow(t *testing.T) {
 	if !strings.HasSuffix(plain, "\u2518") {
 		t.Errorf("expected to end with '\u2518', got %q", plain[len(plain)-3:])
 	}
-	// At w=10, "YAML" (4 chars) + key "y" (1 char) + separators cannot fit —
-	// expect hint to be absent.
+	// At w=9, "y YAML" (6 chars) + overhead 4 (└ + ──┘) = 10 > 9 — hint must be dropped.
 	if strings.Contains(plain, "YAML") {
-		t.Errorf("expected hint 'YAML' to be dropped at w=10, but found it in %q", plain)
+		t.Errorf("expected hint 'YAML' to be dropped at w=9, but found it in %q", plain)
 	}
 }
 
