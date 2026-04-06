@@ -622,4 +622,32 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("tg", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "acme-web-tg":
+			return []resource.RelatedCheckResult{
+				{TargetType: "elb", Count: 1, ResourceIDs: []string{prodELBName}},
+				{TargetType: "ecs-svc", Count: 1, ResourceIDs: []string{"api-gateway"}},
+				{TargetType: "asg", Count: 0},
+				{TargetType: "alarm", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		case "acme-api-tg":
+			return []resource.RelatedCheckResult{
+				{TargetType: "elb", Count: 1, ResourceIDs: []string{"acme-internal-api"}},
+				{TargetType: "ecs-svc", Count: 0},
+				{TargetType: "asg", Count: 0},
+				{TargetType: "alarm", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "elb", Count: 0},
+			{TargetType: "ecs-svc", Count: 0},
+			{TargetType: "asg", Count: 0},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
