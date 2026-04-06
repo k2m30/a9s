@@ -1073,6 +1073,27 @@ func TestRelated_IGW_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_Kinesis_Registered(t *testing.T) {
+	defs := resource.GetRelated("kinesis")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for kinesis")
+	}
+
+	expected := []string{"lambda", "alarm", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for kinesis", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
