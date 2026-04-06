@@ -14,7 +14,7 @@ title: "Documentation"
 
 ## Child Views (Drill-Downs)
 
-{{< include "childviews.md" >}}
+See the **[Child Views](https://github.com/k2m30/a9s/wiki/Child-Views)** wiki page for the full drill-down reference.
 
 ## Commands
 
