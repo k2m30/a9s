@@ -466,6 +466,200 @@ func TestEC2StatusChecks_Detail_StoppedOmitsSection(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Detail View — dash substitution for empty status values
+// ---------------------------------------------------------------------------
+
+// TestEC2StatusChecks_Detail_EmptySystemShowsDash verifies that when
+// system_status is empty but instance_status is impaired, the System field
+// renders as an em-dash ("—") rather than a blank value.
+func TestEC2StatusChecks_Detail_EmptySystemShowsDash(t *testing.T) {
+	r := resource.Resource{
+		ID:     "i-test-empty-sys",
+		Name:   "dash-sys",
+		Status: "running",
+		Fields: map[string]string{
+			"instance_id":     "i-test-empty-sys",
+			"name":            "dash-sys",
+			"state":           "running",
+			"type":            "t3.medium",
+			"system_status":   "",
+			"instance_status": "impaired",
+		},
+	}
+
+	d := ec2DetailModel(t, r)
+	plain := stripANSI(d.View())
+
+	if !strings.Contains(plain, "Status Checks") {
+		t.Errorf("expected 'Status Checks' section when instance_status=impaired, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "—") {
+		t.Errorf("expected em-dash '—' substitution for empty system_status, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "impaired") {
+		t.Errorf("expected 'impaired' for instance_status, got:\n%s", plain)
+	}
+}
+
+// TestEC2StatusChecks_Detail_EmptyInstanceShowsDash verifies that when
+// instance_status is empty but system_status is impaired, the Instance field
+// renders as an em-dash ("—") rather than a blank value.
+func TestEC2StatusChecks_Detail_EmptyInstanceShowsDash(t *testing.T) {
+	r := resource.Resource{
+		ID:     "i-test-empty-inst",
+		Name:   "dash-inst",
+		Status: "running",
+		Fields: map[string]string{
+			"instance_id":     "i-test-empty-inst",
+			"name":            "dash-inst",
+			"state":           "running",
+			"type":            "t3.medium",
+			"system_status":   "impaired",
+			"instance_status": "",
+		},
+	}
+
+	d := ec2DetailModel(t, r)
+	plain := stripANSI(d.View())
+
+	if !strings.Contains(plain, "Status Checks") {
+		t.Errorf("expected 'Status Checks' section when system_status=impaired, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "—") {
+		t.Errorf("expected em-dash '—' substitution for empty instance_status, got:\n%s", plain)
+	}
+	if !strings.Contains(plain, "impaired") {
+		t.Errorf("expected 'impaired' for system_status, got:\n%s", plain)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Detail View — Status Checks section position
+// ---------------------------------------------------------------------------
+
+// TestEC2StatusChecks_Detail_SectionAppendsAfterState verifies that the
+// "Status Checks" section appears after the "State" content in the detail view
+// when the State section is the last in the field list (insertAt == -1 path).
+func TestEC2StatusChecks_Detail_SectionAppendsAfterState(t *testing.T) {
+	r := resource.Resource{
+		ID:     "i-test-order",
+		Name:   "order-test",
+		Status: "running",
+		Fields: map[string]string{
+			"instance_id":     "i-test-order",
+			"state":           "running",
+			"system_status":   "ok",
+			"instance_status": "impaired",
+		},
+	}
+
+	d := ec2DetailModel(t, r)
+	plain := stripANSI(d.View())
+
+	stateIdx := strings.Index(plain, "state")
+	statusIdx := strings.Index(plain, "Status Checks")
+
+	if statusIdx == -1 {
+		t.Fatalf("expected 'Status Checks' section in detail view, got:\n%s", plain)
+	}
+	if stateIdx == -1 {
+		t.Fatalf("expected 'state' field in detail view, got:\n%s", plain)
+	}
+	if statusIdx <= stateIdx {
+		t.Errorf("'Status Checks' section (at %d) should appear AFTER 'state' (at %d) in output", statusIdx, stateIdx)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Detail View — statusCheckStyle colors
+// ---------------------------------------------------------------------------
+
+// TestEC2StatusChecks_Detail_StatusStyleColors verifies that each status value
+// produces appropriate styling: ok=green, impaired=red/bold, initializing=yellow,
+// insufficient-data and unknown values use DimText styling.
+//
+// Lipgloss v2 renders hex colors as RGB decimal ANSI sequences (38;2;R;G;B).
+// Palette values: ColRunning=#9ece6a→158;206;106, ColStopped=#f7768e→247;118;142,
+// ColPending=#e0af68→224;175;104.
+func TestEC2StatusChecks_Detail_StatusStyleColors(t *testing.T) {
+	tests := []struct {
+		name          string
+		systemStatus  string
+		wantANSIColor string // RGB decimal substring expected in ANSI escape sequence
+		wantPlainText string // plain text to find after stripping ANSI
+	}{
+		{
+			name:          "ok uses green",
+			systemStatus:  "ok",
+			wantANSIColor: "38;2;158;206;106", // ColRunning #9ece6a
+			wantPlainText: "ok",
+		},
+		{
+			name:          "impaired uses red",
+			systemStatus:  "impaired",
+			wantANSIColor: "38;2;247;118;142", // ColStopped #f7768e
+			wantPlainText: "impaired",
+		},
+		{
+			name:          "initializing uses yellow",
+			systemStatus:  "initializing",
+			wantANSIColor: "38;2;224;175;104", // ColPending #e0af68
+			wantPlainText: "initializing",
+		},
+		{
+			name:          "insufficient-data renders",
+			systemStatus:  "insufficient-data",
+			wantANSIColor: "",
+			wantPlainText: "insufficient-data",
+		},
+		{
+			name:          "unknown value renders",
+			systemStatus:  "unknown-value",
+			wantANSIColor: "",
+			wantPlainText: "unknown-value",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := resource.Resource{
+				ID:     "i-test-style",
+				Name:   "style-test",
+				Status: "running",
+				Fields: map[string]string{
+					"instance_id":     "i-test-style",
+					"state":           "running",
+					"system_status":   tc.systemStatus,
+					"instance_status": "impaired",
+				},
+			}
+
+			d := ec2DetailModel(t, r)
+			output := d.View()
+			plain := stripANSI(output)
+
+			if !strings.Contains(plain, "Status Checks") {
+				t.Fatalf("expected 'Status Checks' section, got:\n%s", plain)
+			}
+
+			// Verify the plain text value renders.
+			if !strings.Contains(plain, tc.wantPlainText) {
+				t.Errorf("expected plain text %q in output, got:\n%s", tc.wantPlainText, plain)
+			}
+
+			// When a specific color is expected, verify the ANSI output contains
+			// the RGB decimal sequence. Lipgloss v2 renders hex colors as 38;2;R;G;B.
+			if tc.wantANSIColor != "" {
+				if !strings.Contains(output, tc.wantANSIColor) {
+					t.Errorf("expected ANSI sequence %q for status %q, raw output:\n%s",
+						tc.wantANSIColor, tc.systemStatus, output)
+				}
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Fetcher — DescribeInstanceStatus merges fields
 // ---------------------------------------------------------------------------
 
