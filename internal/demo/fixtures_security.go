@@ -184,6 +184,26 @@ func iamRoleFixtures() []resource.Resource {
 				Description: aws.String("Read-only role used by monitoring collectors"),
 			},
 		},
+		{
+			ID:     "acme-glue-role",
+			Name:   "acme-glue-role",
+			Status: "",
+			Fields: map[string]string{
+				"role_name":   "acme-glue-role",
+				"role_id":     "AROAEXAMPLE888888888",
+				"path":        "/",
+				"create_date": "2025-07-01T09:00:00+00:00",
+				"description": "Service role for Glue ETL jobs",
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:    aws.String("acme-glue-role"),
+				RoleId:      aws.String("AROAEXAMPLE888888888"),
+				Arn:         aws.String("arn:aws:iam::123456789012:role/acme-glue-role"),
+				Path:        aws.String("/"),
+				CreateDate:  aws.Time(mustParseTime("2025-07-01T09:00:00+00:00")),
+				Description: aws.String("Service role for Glue ETL jobs"),
+			},
+		},
 	}
 
 	// Generate 18 more roles to reach 25 total

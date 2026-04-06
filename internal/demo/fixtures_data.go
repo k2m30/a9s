@@ -37,7 +37,7 @@ func glueFixtures() []resource.Resource {
 			},
 			RawStruct: gluetypes.Job{
 				Name:            aws.String("acme-etl-orders"),
-				Role:            aws.String("arn:aws:iam::123456789012:role/acme-glue-role"),
+				Role:            aws.String("acme-glue-role"),
 				GlueVersion:    aws.String("4.0"),
 				WorkerType:     gluetypes.WorkerTypeG1x,
 				NumberOfWorkers: aws.Int32(10),
@@ -66,7 +66,7 @@ func glueFixtures() []resource.Resource {
 			},
 			RawStruct: gluetypes.Job{
 				Name:            aws.String("acme-etl-clickstream"),
-				Role:            aws.String("arn:aws:iam::123456789012:role/acme-glue-role"),
+				Role:            aws.String("acme-glue-role"),
 				GlueVersion:    aws.String("4.0"),
 				WorkerType:     gluetypes.WorkerTypeG2x,
 				NumberOfWorkers: aws.Int32(20),
@@ -95,7 +95,7 @@ func glueFixtures() []resource.Resource {
 			},
 			RawStruct: gluetypes.Job{
 				Name:            aws.String("acme-data-catalog-crawler"),
-				Role:            aws.String("arn:aws:iam::123456789012:role/acme-glue-crawler-role"),
+				Role:            aws.String("acme-glue-role"),
 				GlueVersion:    aws.String("3.0"),
 				WorkerType:     gluetypes.WorkerTypeStandard,
 				NumberOfWorkers: aws.Int32(5),
