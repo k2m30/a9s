@@ -12,7 +12,6 @@ import (
 func init() {
 	resource.RegisterRelated("ssm", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
 }
 
