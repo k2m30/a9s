@@ -719,4 +719,29 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("vpce", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "vpce-0aaa111111111111a": // S3 Gateway endpoint
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 2, ResourceIDs: []string{relatedVPCESubnetID1, relatedVPCESubnetID2}},
+				{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedVPCESGID1}},
+				{TargetType: "rtb", Count: 2, ResourceIDs: []string{relatedVPCERTBID1, relatedVPCERTBID2}},
+				{TargetType: "eni", Count: 0},
+			}
+		case "vpce-0ccc333333333333c": // Secrets Manager Interface endpoint
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 2, ResourceIDs: []string{relatedVPCESubnetID1, relatedVPCESubnetID2}},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "rtb", Count: 0},
+				{TargetType: "eni", Count: 1, ResourceIDs: []string{relatedVPCEENIID1}},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "subnet", Count: 0},
+			{TargetType: "sg", Count: 0},
+			{TargetType: "rtb", Count: 0},
+			{TargetType: "eni", Count: 0},
+		}
+	})
 }

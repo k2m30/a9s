@@ -322,6 +322,14 @@ const (
 	relatedVPCRTBID3    = "rtb-0ccc333333333333c"
 	relatedVPCVPCEID1   = "vpce-0aaa111111111111a"
 
+	// vpce related-view IDs
+	relatedVPCESubnetID1 = prodPrivateSubnetA
+	relatedVPCESubnetID2 = prodPrivateSubnetB
+	relatedVPCESGID1     = prodWebALBSGID
+	relatedVPCERTBID1    = "rtb-0aaa111111111111a"
+	relatedVPCERTBID2    = "rtb-0ccc333333333333c"
+	relatedVPCEENIID1    = "eni-0fff666666666666f"
+
 	// subnet related-view IDs (prodPublicSubnetA scenario)
 	relatedSubnetEC2ID1 = "i-0a1b2c3d4e5f60001"
 	relatedSubnetEC2ID2 = "i-0a1b2c3d4e5f60002"
