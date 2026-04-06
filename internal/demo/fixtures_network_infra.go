@@ -31,7 +31,7 @@ func rtbFixtures() []resource.Resource {
 				"name":               "prod-main",
 				"vpc_id":             prodVPCID,
 				"routes_count":       "2",
-				"associations_count": "1",
+				"associations_count": "2",
 			},
 			RawStruct: ec2types.RouteTable{
 				RouteTableId: aws.String("rtb-0aaa111111111111a"),
@@ -57,6 +57,12 @@ func rtbFixtures() []resource.Resource {
 						RouteTableAssociationId: aws.String("rtbassoc-0aaa111111111111a"),
 						RouteTableId:            aws.String("rtb-0aaa111111111111a"),
 					},
+					{
+						Main:                    aws.Bool(false),
+						RouteTableAssociationId: aws.String("rtbassoc-0aaa222222222222a"),
+						RouteTableId:            aws.String("rtb-0aaa111111111111a"),
+						SubnetId:                aws.String(prodPrivateSubnetA),
+					},
 				},
 				Tags: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("prod-main")},
@@ -72,7 +78,7 @@ func rtbFixtures() []resource.Resource {
 				"route_table_id":     "rtb-0bbb222222222222b",
 				"name":               "prod-public",
 				"vpc_id":             prodVPCID,
-				"routes_count":       "2",
+				"routes_count":       "3",
 				"associations_count": "2",
 			},
 			RawStruct: ec2types.RouteTable{
@@ -89,6 +95,12 @@ func rtbFixtures() []resource.Resource {
 					{
 						DestinationCidrBlock: aws.String("0.0.0.0/0"),
 						GatewayId:            aws.String("igw-0aaa111111111111a"),
+						State:                ec2types.RouteStateActive,
+						Origin:               ec2types.RouteOriginCreateRoute,
+					},
+					{
+						DestinationCidrBlock: aws.String("10.1.0.0/16"),
+						NatGatewayId:         aws.String("nat-0aaa111111111111a"),
 						State:                ec2types.RouteStateActive,
 						Origin:               ec2types.RouteOriginCreateRoute,
 					},
@@ -170,8 +182,8 @@ func rtbFixtures() []resource.Resource {
 				"route_table_id":     "rtb-0ddd444444444444d",
 				"name":               "staging-main",
 				"vpc_id":             stagingVPCID,
-				"routes_count":       "2",
-				"associations_count": "1",
+				"routes_count":       "3",
+				"associations_count": "2",
 			},
 			RawStruct: ec2types.RouteTable{
 				RouteTableId: aws.String("rtb-0ddd444444444444d"),
@@ -179,7 +191,7 @@ func rtbFixtures() []resource.Resource {
 				OwnerId:      aws.String("123456789012"),
 				Routes: []ec2types.Route{
 					{
-						DestinationCidrBlock: aws.String("10.1.0.0/16"),
+						DestinationCidrBlock: aws.String("10.2.0.0/16"),
 						GatewayId:            aws.String("local"),
 						State:                ec2types.RouteStateActive,
 						Origin:               ec2types.RouteOriginCreateRouteTable,
@@ -190,12 +202,24 @@ func rtbFixtures() []resource.Resource {
 						State:                ec2types.RouteStateActive,
 						Origin:               ec2types.RouteOriginCreateRoute,
 					},
+					{
+						DestinationCidrBlock: aws.String("10.2.0.0/16"),
+						NatGatewayId:         aws.String("nat-0ccc333333333333c"),
+						State:                ec2types.RouteStateActive,
+						Origin:               ec2types.RouteOriginCreateRoute,
+					},
 				},
 				Associations: []ec2types.RouteTableAssociation{
 					{
 						Main:                    aws.Bool(true),
 						RouteTableAssociationId: aws.String("rtbassoc-0fff666666666666f"),
 						RouteTableId:            aws.String("rtb-0ddd444444444444d"),
+					},
+					{
+						Main:                    aws.Bool(false),
+						RouteTableAssociationId: aws.String("rtbassoc-0ggg777777777777g"),
+						RouteTableId:            aws.String("rtb-0ddd444444444444d"),
+						SubnetId:                aws.String(stagingSubnetA),
 					},
 				},
 				Tags: []ec2types.Tag{
