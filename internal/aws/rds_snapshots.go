@@ -12,6 +12,15 @@ import (
 func init() {
 	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created"})
 
+	resource.RegisterRelated("rds-snap", []resource.RelatedDef{
+		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkRDSSnapDBI, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkRDSSnapKMS, NeedsTargetCache: true},
+	})
+
+	resource.RegisterNavigableFields("rds-snap", []resource.NavigableField{
+		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
+	})
+
 	resource.RegisterPaginated("rds-snap", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
