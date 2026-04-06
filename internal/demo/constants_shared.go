@@ -198,4 +198,8 @@ const (
 	relatedECSSvcID2  = "web-frontend"
 	relatedECSSvcID3  = "order-worker"
 	relatedECSAlarmID = "ecs-cpu-high"
+
+	// ecs-svc related-view IDs
+	relatedECSSvcTGID    = "acme-api-tg"
+	relatedECSSvcAlarmID = "ecs-svc-cpu-high"
 )

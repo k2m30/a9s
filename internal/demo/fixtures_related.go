@@ -190,4 +190,17 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ecs-svc", func(res resource.Resource) []resource.RelatedCheckResult {
+		clusterName := res.Fields["cluster"]
+		if clusterName == "" {
+			clusterName = "acme-services"
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "ecs", Count: 1, ResourceIDs: []string{clusterName}},
+			{TargetType: "tg", Count: 1, ResourceIDs: []string{relatedECSSvcTGID}},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedECSSvcAlarmID}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
