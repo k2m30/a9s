@@ -20,6 +20,16 @@ func init() {
 		}
 		return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
 	})
+
+	resource.RegisterNavigableFields("glue", []resource.NavigableField{
+		{FieldPath: "Role", TargetType: "role"},
+	})
+
+	resource.RegisterRelated("glue", []resource.RelatedDef{
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: nil, NeedsTargetCache: false},
+	})
 }
 
 // FetchGlueJobs calls the Glue GetJobs API and converts the response

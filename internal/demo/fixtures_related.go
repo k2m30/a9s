@@ -250,4 +250,12 @@ func init() {
 			{TargetType: "eip", Count: 1, ResourceIDs: []string{relatedENIEIPID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("glue", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedGlueRoleID1}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
