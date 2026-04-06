@@ -268,7 +268,8 @@ const (
 	relatedS3CFID    = "E1A2B3C4D5E6F7"   // CF distribution using webapp-assets-prod as origin
 
 	// secrets related-view IDs
-	relatedSecretsKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+	relatedSecretsKMSID    = "a1b2c3d4-5678-90ab-cdef-111111111111"
+	relatedSecretsLambdaID = "rotate-docdb-credentials"
 
 	// sfn related-view IDs
 	relatedSFNAlarmID = "sfn-execution-failures"

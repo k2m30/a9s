@@ -488,7 +488,7 @@ func init() {
 		case "prod/docdb/acme-docdb-prod":
 			return []resource.RelatedCheckResult{
 				{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedSecretsKMSID}},
-				{TargetType: "lambda", Count: 1},
+				{TargetType: "lambda", Count: 1, ResourceIDs: []string{relatedSecretsLambdaID}},
 				{TargetType: "dbi", Count: 0},
 				{TargetType: "cfn", Count: 0},
 			}
