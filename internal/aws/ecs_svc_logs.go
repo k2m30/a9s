@@ -15,7 +15,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ecs_svc_logs", []string{"timestamp", "stream_short", "message"})
 
-	resource.RegisterPaginatedChild("ecs_svc_logs", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("ecs_svc_logs", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

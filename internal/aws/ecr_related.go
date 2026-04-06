@@ -16,7 +16,7 @@ import (
 // (Pattern C — cache-based heuristic). Since FunctionConfiguration does not include
 // the image URI, any Lambda with PackageType=Image is considered potentially related
 // to this ECR repository.
-func checkECRLambda(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -51,7 +51,7 @@ func checkECRLambda(ctx context.Context, clients interface{}, res resource.Resou
 
 // checkECRCodeBuild checks the cache for CodeBuild projects whose environment image
 // contains this ECR repository URI (Pattern C — cache-based).
-func checkECRCodeBuild(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
 		return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
@@ -83,7 +83,7 @@ func checkECRCodeBuild(ctx context.Context, clients interface{}, res resource.Re
 
 // checkECRCFN checks the ECR repository's tags for aws:cloudformation:stack-name
 // and matches against the CFN stack cache (Pattern C — tag-based).
-func checkECRCFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := ecrCFNStackName(res)
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -125,7 +125,7 @@ func ecrCFNStackName(res resource.Resource) string {
 
 // ecrRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
-func ecrRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ecrRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

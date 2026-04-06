@@ -22,7 +22,7 @@ func init() {
 
 // checkSNSSubTopic checks the sns cache for the topic this subscription belongs to.
 // Pattern C: matches res.Fields["topic_arn"] against sns cache IDs (topic ARNs).
-func checkSNSSubTopic(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
@@ -51,7 +51,7 @@ func checkSNSSubTopic(ctx context.Context, clients interface{}, res resource.Res
 // checkSNSSubLambda checks the lambda cache for the function this subscription invokes.
 // Pattern C: only relevant when protocol=lambda. Parses the function name from the
 // endpoint ARN (last ":" segment) and matches against lambda cache IDs.
-func checkSNSSubLambda(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "lambda" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
@@ -90,7 +90,7 @@ func checkSNSSubLambda(ctx context.Context, clients interface{}, res resource.Re
 // checkSNSSubSQS checks the sqs cache for the queue this subscription delivers to.
 // Pattern C: only relevant when protocol=sqs. Parses the queue name from the
 // endpoint ARN (last ":" segment) and matches against sqs cache IDs.
-func checkSNSSubSQS(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "sqs" {
 		return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
 	}
@@ -128,7 +128,7 @@ func checkSNSSubSQS(ctx context.Context, clients interface{}, res resource.Resou
 
 // snsSubRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
-func snsSubRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func snsSubRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

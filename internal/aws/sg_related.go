@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -127,11 +128,8 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		if !ok {
 			continue
 		}
-		for _, sg := range lb.SecurityGroups {
-			if sg == sgID {
-				ids = append(ids, r.ID)
-				break
-			}
+		if slices.Contains(lb.SecurityGroups, sgID) {
+			ids = append(ids, r.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {

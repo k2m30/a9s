@@ -12,7 +12,7 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description"})
-	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
+	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients any, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return "", fmt.Errorf("AWS clients not initialized")
@@ -20,7 +20,7 @@ func init() {
 		return RevealSSMParameter(ctx, c.SSM, resourceID)
 	})
 
-	resource.RegisterPaginated("ssm", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ssm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

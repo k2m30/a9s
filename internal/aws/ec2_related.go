@@ -30,7 +30,7 @@ func assertStruct[T any](v any) (T, bool) {
 }
 
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
-func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
@@ -69,7 +69,7 @@ func checkEC2TargetGroups(ctx context.Context, clients interface{}, res resource
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
-func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -101,7 +101,7 @@ func checkEC2ASG(ctx context.Context, clients interface{}, res resource.Resource
 }
 
 // checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
-func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
@@ -133,7 +133,7 @@ func checkEC2Alarms(ctx context.Context, clients interface{}, res resource.Resou
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
-func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_, _, stackName := ec2Identity(res)
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -163,7 +163,7 @@ func checkEC2CFN(ctx context.Context, clients interface{}, res resource.Resource
 }
 
 // checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
-func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
@@ -192,7 +192,7 @@ func checkEC2EIP(ctx context.Context, clients interface{}, res resource.Resource
 	return relatedResult("eip", ids)
 }
 
-func checkEC2EBS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids := ec2VolumeIDs(res)
 	if len(ids) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
@@ -208,7 +208,7 @@ func checkEC2EBS(_ context.Context, _ interface{}, res resource.Resource, _ reso
 // checkEC2NodeGroups checks for EKS node groups associated with this EC2 instance.
 // Returns Count=-1 (unknown) when the cache is truncated and no match was found
 // in the partial list.
-func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
@@ -258,7 +258,7 @@ func checkEC2NodeGroups(ctx context.Context, clients interface{}, res resource.R
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
 // instance. Returns Count=-1 (unknown) when the cache is truncated and no match
 // was found in the partial list.
-func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
@@ -290,7 +290,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients interface{}, res reso
 }
 
 // checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
-func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volumeIDs := ec2VolumeIDs(res)
 	if len(volumeIDs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
@@ -323,7 +323,7 @@ func checkEC2EBSSnap(ctx context.Context, clients interface{}, res resource.Reso
 // fetching the first page. Returns (resources, isTruncated, error).
 // isTruncated=true means the list is partial; callers should return Count=-1
 // when 0 matches are found in a truncated list.
-func ec2RelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ec2RelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	// When AWS clients are not initialized (nil or wrong type), the registered
 	// paginated fetchers return "AWS clients not initialized". Treat this as a

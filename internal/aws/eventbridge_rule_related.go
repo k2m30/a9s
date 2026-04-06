@@ -17,7 +17,7 @@ func init() {
 
 // checkEbRuleRole reads RoleArn from the Rule RawStruct and extracts the role name.
 // Pattern F — no cache needed.
-func checkEbRuleRole(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rule, ok := assertStruct[eventbridgetypes.Rule](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1}

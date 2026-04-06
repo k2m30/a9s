@@ -22,7 +22,7 @@ type SQSQueueAttributesRow struct {
 func init() {
 	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
 
-	resource.RegisterPaginated("sqs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("sqs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

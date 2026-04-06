@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -139,11 +140,8 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		if !ok {
 			continue
 		}
-		for _, arn := range asg.TargetGroupARNs {
-			if arn == tgArn {
-				ids = append(ids, asgRes.ID)
-				break
-			}
+		if slices.Contains(asg.TargetGroupARNs, tgArn) {
+			ids = append(ids, asgRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {

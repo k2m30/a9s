@@ -12,7 +12,7 @@ import (
 
 // checkDbiSG reads VpcSecurityGroups from the DBInstance RawStruct and returns their IDs.
 // Pattern F — no cache needed.
-func checkDbiSG(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
@@ -31,7 +31,7 @@ func checkDbiSG(_ context.Context, _ interface{}, res resource.Resource, _ resou
 
 // checkDbiKMS reads the KmsKeyId ARN from the DBInstance RawStruct and extracts the UUID suffix.
 // Pattern F — no cache needed.
-func checkDbiKMS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -50,7 +50,7 @@ func checkDbiKMS(_ context.Context, _ interface{}, res resource.Resource, _ reso
 
 // checkDbiSubnets reads DBSubnetGroup.Subnets from the DBInstance RawStruct and returns their IDs.
 // Pattern F — no cache needed.
-func checkDbiSubnets(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}

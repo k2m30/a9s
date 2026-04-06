@@ -13,7 +13,7 @@ import (
 var ebsSnapCreateImageRe = regexp.MustCompile(`Created by CreateImage\((i-[a-zA-Z0-9]+)\)`)
 
 // checkEBSSnapAMI scans the AMI cache for AMIs whose block device mappings reference this snapshot (Pattern C).
-func checkEBSSnapAMI(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
 		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
@@ -47,7 +47,7 @@ func checkEBSSnapAMI(ctx context.Context, clients interface{}, res resource.Reso
 }
 
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
-func checkEBSSnapEBS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnapEBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	volumeID := res.Fields["volume_id"]
 	if volumeID == "" {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
@@ -56,7 +56,7 @@ func checkEBSSnapEBS(_ context.Context, _ interface{}, res resource.Resource, _ 
 }
 
 // checkEBSSnapEC2 parses the snapshot Description for "Created by CreateImage(i-xxx)" (Pattern F).
-func checkEBSSnapEC2(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	description := res.Fields["description"]
 	matches := ebsSnapCreateImageRe.FindStringSubmatch(description)
 	if len(matches) < 2 {
@@ -67,7 +67,7 @@ func checkEBSSnapEC2(_ context.Context, _ interface{}, res resource.Resource, _ 
 
 // checkEBSSnapKMS extracts the KMS key ID from RawStruct.KmsKeyId (Pattern F).
 // Handles both full ARN format (arn:aws:kms:…/key-id) and bare key ID.
-func checkEBSSnapKMS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -87,7 +87,7 @@ func checkEBSSnapKMS(_ context.Context, _ interface{}, res resource.Resource, _ 
 }
 
 // ebsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
-func ebsSnapRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ebsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

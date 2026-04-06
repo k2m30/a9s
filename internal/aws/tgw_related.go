@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -47,8 +48,8 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	resourceType := "vpc"
 	out, err := c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
 		Filters: []ec2types.Filter{
-			{Name: strP("transit-gateway-id"), Values: []string{tgwID}},
-			{Name: strP("resource-type"), Values: []string{resourceType}},
+			{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
+			{Name: aws.String("resource-type"), Values: []string{resourceType}},
 		},
 	})
 	if err != nil {
@@ -63,12 +64,9 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResult("vpc", ids)
 }
 
-// strP returns a pointer to the given string.
-func strP(s string) *string { return &s }
-
 // checkTGWCFN checks the transit gateway's tags for aws:cloudformation:stack-name.
 // No cache access needed — the tag carries the stack name directly.
-func checkTGWCFN(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkTGWCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
@@ -82,7 +80,7 @@ func checkTGWCFN(_ context.Context, _ interface{}, res resource.Resource, _ reso
 
 // checkTGWRTB checks the rtb cache for route tables that have routes
 // targeting this transit gateway (Pattern C).
-func checkTGWRTB(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
@@ -117,7 +115,7 @@ func checkTGWRTB(ctx context.Context, clients interface{}, res resource.Resource
 
 // tgwRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
-func tgwRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func tgwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

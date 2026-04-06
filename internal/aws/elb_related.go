@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -39,11 +40,8 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		if !ok {
 			continue
 		}
-		for _, lbARN := range raw.LoadBalancerArns {
-			if lbARN == elbARN {
-				ids = append(ids, tgRes.ID)
-				break
-			}
+		if slices.Contains(raw.LoadBalancerArns, elbARN) {
+			ids = append(ids, tgRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {
@@ -68,10 +66,9 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 
 	// Compute the ARN suffix: everything after "loadbalancer/"
 	const prefix = "loadbalancer/"
-	idx := strings.Index(elbARN, prefix)
 	arnSuffix := elbARN
-	if idx >= 0 {
-		arnSuffix = elbARN[idx+len(prefix):]
+	if _, after, found := strings.Cut(elbARN, prefix); found {
+		arnSuffix = after
 	}
 
 	alarmList, truncated, err := elbRelatedResources(ctx, clients, cache, "alarm")

@@ -10,7 +10,7 @@ import (
 )
 
 // checkEBSEC2 returns the EC2 instance this volume is attached to (Pattern F).
-func checkEBSEC2(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.Fields["attached_to"]
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -19,7 +19,7 @@ func checkEBSEC2(_ context.Context, _ interface{}, res resource.Resource, _ reso
 }
 
 // checkEBSSnap searches the ebs-snap cache for snapshots of this volume (Pattern C).
-func checkEBSSnap(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
@@ -46,7 +46,7 @@ func checkEBSSnap(ctx context.Context, clients interface{}, res resource.Resourc
 }
 
 // checkEBSKMS returns the KMS key used to encrypt this volume (Pattern F).
-func checkEBSKMS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -64,7 +64,7 @@ func checkEBSKMS(_ context.Context, _ interface{}, res resource.Resource, _ reso
 
 // ebsRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
-func ebsRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ebsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

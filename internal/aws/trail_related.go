@@ -165,14 +165,13 @@ func trailRelatedResources(ctx context.Context, clients any, cache resource.Reso
 // Returns the NAME portion, or empty string if parsing fails.
 func parseTrailLogGroupName(arn string) string {
 	const prefix = "log-group:"
-	idx := strings.Index(arn, prefix)
-	if idx == -1 {
+	_, rest, found := strings.Cut(arn, prefix)
+	if !found {
 		return ""
 	}
-	rest := arn[idx+len(prefix):]
 	// Strip trailing ":*" or ":log-stream:..." suffix
-	if colonIdx := strings.Index(rest, ":"); colonIdx != -1 {
-		rest = rest[:colonIdx]
+	if name, _, ok := strings.Cut(rest, ":"); ok {
+		return name
 	}
 	return rest
 }

@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("r53", []string{"zone_id", "name", "record_count", "private_zone", "comment"})
 
-	resource.RegisterPaginated("r53", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("r53", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

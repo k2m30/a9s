@@ -13,7 +13,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("redshift", []string{"cluster_id", "status", "node_type", "num_nodes", "db_name", "endpoint"})
 
-	resource.RegisterPaginated("redshift", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("redshift", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

@@ -17,7 +17,7 @@ func init() {
 
 // checkSSMKMS checks the KMS cache for the key used to encrypt this SecureString parameter.
 // Pattern C: extracts KeyId from RawStruct, then scans the kms cache for a match.
-func checkSSMKMS(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	param, ok := assertStruct[ssmtypes.ParameterMetadata](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -80,7 +80,7 @@ func matchesKMSKeyRef(kmsRes resource.Resource, keyRef string) bool {
 
 // ssmRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
-func ssmRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ssmRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

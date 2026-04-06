@@ -12,7 +12,7 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
-	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients interface{}, resourceID string) (string, error) {
+	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients any, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return "", fmt.Errorf("AWS clients not initialized")
@@ -20,7 +20,7 @@ func init() {
 		return RevealSecret(ctx, c.SecretsManager, resourceID)
 	})
 
-	resource.RegisterPaginated("secrets", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("secrets", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
