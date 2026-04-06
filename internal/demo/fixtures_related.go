@@ -360,4 +360,12 @@ func init() {
 			{TargetType: "role", Count: 1, ResourceIDs: []string{"acme-ci-deploy-role"}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("policy", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "role", Count: 5},
+			{TargetType: "iam-user", Count: 2},
+			{TargetType: "iam-group", Count: 1},
+		}
+	})
 }
