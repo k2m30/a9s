@@ -368,4 +368,19 @@ func init() {
 			{TargetType: "iam-group", Count: 1},
 		}
 	})
+
+	resource.RegisterRelatedDemo("r53", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "elb", Count: 1, ResourceIDs: []string{relatedCfELBID}},
+			{TargetType: "cf", Count: 1, ResourceIDs: []string{relatedACMCFID}},
+			{TargetType: "acm", Count: 0},
+		}
+	})
+
+	resource.RegisterRelatedDemo("rds-snap", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "dbi", Count: 1, ResourceIDs: []string{relatedRDSSnapDbiID}},
+			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedRDSSnapKMSID}},
+		}
+	})
 }

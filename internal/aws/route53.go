@@ -19,6 +19,12 @@ func init() {
 		}
 		return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
 	})
+
+	resource.RegisterRelated("r53", []resource.RelatedDef{
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: nil, NeedsTargetCache: false},
+	})
 }
 
 // FetchHostedZones calls the Route53 ListHostedZones API and converts

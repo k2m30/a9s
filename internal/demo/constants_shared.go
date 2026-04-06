@@ -242,4 +242,8 @@ const (
 	relatedNGEKSID  = "acme-prod"
 	relatedNGRoleID = "acme-eks-node-role"
 	relatedNGASGID  = "eks-acme-prod-ng-general"
+
+	// rds-snap related-view IDs
+	relatedRDSSnapDbiID = "prod-api-primary"
+	relatedRDSSnapKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )
