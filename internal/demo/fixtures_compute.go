@@ -137,6 +137,32 @@ func ec2Instances() []resource.Resource {
 		))
 	}
 
+	// Status check fields per design spec §11.
+	// Named instances (indices 0-9).
+	instances[0].Fields["system_status"] = "ok"
+	instances[0].Fields["instance_status"] = "ok"
+	instances[1].Fields["system_status"] = "ok"
+	instances[1].Fields["instance_status"] = "ok"
+	instances[2].Fields["system_status"] = "ok"
+	instances[2].Fields["instance_status"] = "impaired"
+	// instances[3]: stopped — no status fields
+	instances[4].Fields["system_status"] = "ok"
+	instances[4].Fields["instance_status"] = "ok"
+	instances[5].Fields["system_status"] = "initializing"
+	instances[5].Fields["instance_status"] = "initializing"
+	// instances[6]: pending — no status fields
+	// instances[7]: stopping — no status fields
+	// instances[8]: shutting-down — no status fields
+	// instances[9]: terminated — no status fields
+
+	// Generated instances (indices 10-24): running ones get ok/ok, others get nothing.
+	for i := 10; i < len(instances); i++ {
+		if instances[i].Fields["state"] == "running" {
+			instances[i].Fields["system_status"] = "ok"
+			instances[i].Fields["instance_status"] = "ok"
+		}
+	}
+
 	return instances
 }
 
@@ -359,16 +385,18 @@ func makeEC2Instance(
 		Name:   name,
 		Status: state,
 		Fields: map[string]string{
-			"instance_id": instanceID,
-			"name":        name,
-			"state":       state,
-			"type":        string(instanceType),
-			"private_ip":  privateIP,
-			"public_ip":   publicIP,
-			"launch_time": launchTimeStr,
-			"lifecycle":   lifecycleStr,
-			"image_id":    extras.imageID,
-			"vpc_id":      vpcID,
+			"instance_id":     instanceID,
+			"name":            name,
+			"state":           state,
+			"type":            string(instanceType),
+			"private_ip":      privateIP,
+			"public_ip":       publicIP,
+			"launch_time":     launchTimeStr,
+			"lifecycle":       lifecycleStr,
+			"image_id":        extras.imageID,
+			"vpc_id":          vpcID,
+			"system_status":   "",
+			"instance_status": "",
 		},
 		RawStruct: inst,
 	}

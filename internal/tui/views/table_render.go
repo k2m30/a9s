@@ -118,6 +118,16 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 	cells := make([]string, len(cols))
 	for i, c := range cols {
 		val := m.extractCellValue(c, r)
+		// Prepend status check indicator to the state cell for running instances.
+		if (c.key == "state" || c.path == "State.Name") && val == "running" {
+			sysStatus := r.Fields["system_status"]
+			instStatus := r.Fields["instance_status"]
+			if sysStatus == "impaired" || instStatus == "impaired" {
+				val = "! " + val
+			} else if sysStatus == "initializing" || instStatus == "initializing" {
+				val = "~ " + val
+			}
+		}
 		cells[i] = text.PadOrTrunc(val, c.width)
 	}
 	return " " + strings.Join(cells, "  ")

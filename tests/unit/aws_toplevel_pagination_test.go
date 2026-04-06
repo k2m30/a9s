@@ -53,6 +53,14 @@ func (m *mockEC2PaginatedClient) DescribeInstances(
 	return out, nil
 }
 
+func (m *mockEC2PaginatedClient) DescribeInstanceStatus(
+	_ context.Context,
+	_ *ec2.DescribeInstanceStatusInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeInstanceStatusOutput, error) {
+	return &ec2.DescribeInstanceStatusOutput{}, nil
+}
+
 func TestFetchEC2Instances_Pagination(t *testing.T) {
 	mock := &mockEC2PaginatedClient{
 		outputs: []*ec2.DescribeInstancesOutput{
@@ -1099,4 +1107,12 @@ func (m *mockEC2PaginatedErrorOnPage2Client) DescribeInstances(
 		return m.firstOutput, nil
 	}
 	return nil, m.secondErr
+}
+
+func (m *mockEC2PaginatedErrorOnPage2Client) DescribeInstanceStatus(
+	_ context.Context,
+	_ *ec2.DescribeInstanceStatusInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeInstanceStatusOutput, error) {
+	return &ec2.DescribeInstanceStatusOutput{}, nil
 }
