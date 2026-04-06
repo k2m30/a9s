@@ -26,7 +26,7 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 		t.Fatalf("failed to load views dir: %v", err)
 	}
 	if cfg == nil {
-		t.Skip(".a9s/views/ directory does not exist yet")
+		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 
 	k := keys.Default()

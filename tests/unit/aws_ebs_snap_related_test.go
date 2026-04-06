@@ -53,10 +53,10 @@ func TestNavigableFields_EBSSnap_Registered(t *testing.T) {
 func TestNavigableFields_EBSSnap_FieldPathsResolve(t *testing.T) {
 	resources, ok := demo.GetResources("ebs-snap")
 	if !ok {
-		t.Skip("no demo fixture registered for ebs-snap")
+		t.Fatal("no demo fixture registered for ebs-snap — fixtures_compute.go must register it")
 	}
 	if len(resources) == 0 {
-		t.Skip("demo fixture returned no resources for ebs-snap")
+		t.Fatal("demo fixture returned no resources for ebs-snap")
 	}
 	r := resources[0]
 

@@ -106,10 +106,6 @@ func multiStatusDocDBFixtures() []resource.Resource {
 // ===========================================================================
 
 func TestQA_DocDB_ListColumns(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	m := loadedDocDBModel(t)
 	out := m.View()
 
@@ -127,9 +123,6 @@ func TestQA_DocDB_ListColumns(t *testing.T) {
 
 func TestQA_DocDB_ListColumnData(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	m := loadedDocDBModel(t)
 	out := m.View()
 
@@ -158,10 +151,6 @@ func TestQA_DocDB_ListColumnData(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_FrameTitle(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	m := loadedDocDBModel(t)
 	title := m.FrameTitle()
 
@@ -176,10 +165,6 @@ func TestQA_DocDB_FrameTitle(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_InstancesCount(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	m := loadedDocDBModel(t)
 	out := m.View()
 
@@ -388,9 +373,6 @@ func TestQA_DocDB_EmptyList(t *testing.T) {
 
 func TestQA_DocDB_DetailView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	// Use wide viewport to avoid truncation of long endpoint values
@@ -415,9 +397,6 @@ func TestQA_DocDB_DetailView(t *testing.T) {
 
 func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewDetail(res, "dbc", nil, k)
@@ -463,9 +442,6 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 
 func TestQA_DocDB_YAMLView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -494,9 +470,6 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 
 func TestQA_DocDB_YAMLFrameTitle(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -517,9 +490,6 @@ func TestQA_DocDB_YAMLFrameTitle(t *testing.T) {
 
 func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	k := keys.Default()
 	res := fixtures[0]
 	m := views.NewYAML(res, k)
@@ -560,9 +530,6 @@ func TestQA_DocDB_NavigateFromMainMenu(t *testing.T) {
 
 func TestQA_DocDB_LoadAndDisplayList(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -588,9 +555,6 @@ func TestQA_DocDB_LoadAndDisplayList(t *testing.T) {
 
 func TestQA_DocDB_NavigateToDetail(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -622,9 +586,6 @@ func TestQA_DocDB_NavigateToDetail(t *testing.T) {
 
 func TestQA_DocDB_NavigateToYAML(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -652,9 +613,6 @@ func TestQA_DocDB_NavigateToYAML(t *testing.T) {
 
 func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -712,9 +670,6 @@ func TestQA_DocDB_CommandNavigation(t *testing.T) {
 
 func TestQA_DocDB_HorizontalScroll(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
@@ -870,10 +825,6 @@ func TestQA_DocDB_ZeroInstancesCount(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_NoSeparatorBelowHeaders(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 	m := loadedDocDBModel(t)
 	out := m.View()
 
@@ -902,9 +853,6 @@ func TestQA_DocDB_NoSeparatorBelowHeaders(t *testing.T) {
 
 func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -942,9 +890,6 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 
 func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	if len(fixtures) == 0 {
-		t.Skip("no DocumentDB fixtures available")
-	}
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
