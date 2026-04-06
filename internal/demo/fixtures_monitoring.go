@@ -371,6 +371,36 @@ RawStruct: cwtypes.MetricAlarm{
 				},
 			},
 		},
+		{
+			ID:     relatedSFNAlarmID,
+			Name:   relatedSFNAlarmID,
+			Status: "ALARM",
+			Fields: map[string]string{
+				"alarm_name":  relatedSFNAlarmID,
+				"state":       "ALARM",
+				"metric_name": "ExecutionsFailed",
+				"namespace":   "AWS/States",
+				"threshold":   "1.00",
+			},
+			RawStruct: cwtypes.MetricAlarm{
+				AlarmName:          aws.String(relatedSFNAlarmID),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + relatedSFNAlarmID),
+				AlarmDescription:   aws.String("Triggers when Step Functions executions fail"),
+				StateValue:         cwtypes.StateValueAlarm,
+				MetricName:         aws.String("ExecutionsFailed"),
+				Namespace:          aws.String("AWS/States"),
+				Threshold:          aws.Float64(1.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:  aws.Int32(1),
+				Period:             aws.Int32(60),
+				Statistic:          cwtypes.StatisticSum,
+				ActionsEnabled:     aws.Bool(true),
+				AlarmActions:       []string{relatedAlarmSNSID},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("StateMachineArn"), Value: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow")},
+				},
+			},
+		},
 	}
 
 	// Generate 17 more alarms to reach 22 total
@@ -600,6 +630,24 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 				StoredBytes:     aws.Int64(104857600),
 				RetentionInDays: aws.Int32(30),
 				CreationTime:    aws.Int64(1707350400000),
+			},
+		},
+		{
+			ID:     relatedSFNLogsID,
+			Name:   relatedSFNLogsID,
+			Status: "",
+			Fields: map[string]string{
+				"log_group_name": relatedSFNLogsID,
+				"stored_bytes":   "31457280",
+				"retention_days": "90",
+				"creation_time":  "1708000000000",
+			},
+			RawStruct: cwlogstypes.LogGroup{
+				LogGroupName:    aws.String(relatedSFNLogsID),
+				Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + relatedSFNLogsID + ":*"),
+				StoredBytes:     aws.Int64(31457280),
+				RetentionInDays: aws.Int32(90),
+				CreationTime:    aws.Int64(1708000000000),
 			},
 		},
 	}
