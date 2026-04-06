@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -118,6 +119,58 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	return relatedResult("asg", ids)
+}
+
+// checkNGEC2 scans the EC2 instance cache for instances tagged with this node
+// group's name via "eks:nodegroup-name" and optionally "eks:cluster-name".
+// Pattern C: tag-based cache scan.
+func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	nodegroupName := res.Fields["nodegroup_name"]
+	clusterName := res.Fields["cluster_name"]
+	if ng.NodegroupName != nil && *ng.NodegroupName != "" {
+		nodegroupName = *ng.NodegroupName
+	}
+	if ng.ClusterName != nil && *ng.ClusterName != "" {
+		clusterName = *ng.ClusterName
+	}
+	if nodegroupName == "" {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+
+	ec2List, truncated, err := ngRelatedResources(ctx, clients, cache, "ec2")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+	}
+	if ec2List == nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	var ids []string
+	for _, ec2Res := range ec2List {
+		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
+		if !ok {
+			continue
+		}
+		if tagValue(inst.Tags, "eks:nodegroup-name") != nodegroupName {
+			continue
+		}
+		if clusterName != "" {
+			instCluster := tagValue(inst.Tags, "eks:cluster-name")
+			if instCluster != "" && instCluster != clusterName {
+				continue
+			}
+		}
+		ids = append(ids, ec2Res.ID)
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+	return relatedResult("ec2", ids)
 }
 
 // ngRelatedResources returns the resource list for target from cache or by fetching the first page.

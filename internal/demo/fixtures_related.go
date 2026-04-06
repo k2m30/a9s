@@ -97,6 +97,7 @@ func init() {
 	resource.RegisterRelatedDemo("cfn", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCfnRoleID}},
+			{TargetType: "cfn", Count: 0},
 		}
 	})
 
@@ -130,6 +131,7 @@ func init() {
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedDbiAlarmID}},
 			{TargetType: "rds-snap", Count: 1, ResourceIDs: []string{relatedDbiRDSSnapID}},
 			{TargetType: "secrets", Count: 1, ResourceIDs: []string{relatedDbiSecretID}},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
@@ -153,6 +155,7 @@ func init() {
 			{TargetType: "cfn",  Count: 1, ResourceIDs: []string{relatedEbCFNID}},
 			{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedEbLogsID}},
 			{TargetType: "asg",  Count: 1, ResourceIDs: []string{relatedEbASGID}},
+			{TargetType: "ec2",  Count: 0},
 		}
 	})
 
@@ -205,6 +208,8 @@ func init() {
 			{TargetType: "tg", Count: 1, ResourceIDs: []string{relatedECSSvcTGID}},
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedECSSvcAlarmID}},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "elb", Count: 0},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
@@ -212,6 +217,7 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "ecs-svc", Count: 1, ResourceIDs: []string{"api-gateway"}},
 			{TargetType: "ecs", Count: 1, ResourceIDs: []string{"acme-services"}},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
@@ -220,6 +226,8 @@ func init() {
 			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedEFSKMSID}},
 			{TargetType: "cfn", Count: 0},
 			{TargetType: "lambda", Count: 0},
+			{TargetType: "sg", Count: 0},
+			{TargetType: "subnet", Count: 0},
 		}
 	})
 
@@ -236,14 +244,16 @@ func init() {
 			{TargetType: "ng", Count: 2, ResourceIDs: []string{"general-pool", "gpu-pool"}},
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
 	resource.RegisterRelatedDemo("elb", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "tg", Count: 2, ResourceIDs: []string{relatedELBTGID1, relatedELBTGID2}},
+			{TargetType: "tg",    Count: 2, ResourceIDs: []string{relatedELBTGID1, relatedELBTGID2}},
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedELBAlarmID1}},
-			{TargetType: "cfn", Count: 0},
+			{TargetType: "cfn",   Count: 0},
+			{TargetType: "r53",   Count: 0},
 		}
 	})
 
@@ -260,6 +270,7 @@ func init() {
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedGlueRoleID1}},
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
@@ -273,7 +284,8 @@ func init() {
 	resource.RegisterRelatedDemo("iam-user", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
 			{TargetType: "iam-group", Count: 2},
-			{TargetType: "policy", Count: 3},
+			{TargetType: "policy",    Count: 3},
+			{TargetType: "ct-events", Count: 0},
 		}
 	})
 
@@ -297,6 +309,7 @@ func init() {
 			{TargetType: "ebs", Count: 2, ResourceIDs: []string{relatedKMSEBSID1, relatedKMSEBSID2}},
 			{TargetType: "dbi", Count: 1, ResourceIDs: []string{relatedKMSDbiID}},
 			{TargetType: "secrets", Count: 0},
+			{TargetType: "s3", Count: 0},
 		}
 	})
 
@@ -306,6 +319,8 @@ func init() {
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedLambdaAlarmID}},
 			{TargetType: "sqs", Count: 0},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "logs", Count: 0},
+			{TargetType: "eb-rule", Count: 0},
 		}
 	})
 
@@ -328,6 +343,7 @@ func init() {
 			{TargetType: "lambda", Count: 1, ResourceIDs: []string{"data-pipeline-transform"}},
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "sg", Count: 0},
 		}
 	})
 
@@ -344,6 +360,7 @@ func init() {
 			{TargetType: "eks", Count: 1, ResourceIDs: []string{relatedNGEKSID}},
 			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedNGRoleID}},
 			{TargetType: "asg", Count: 1, ResourceIDs: []string{relatedNGASGID}},
+			{TargetType: "ec2", Count: 0},
 		}
 	})
 
@@ -351,6 +368,7 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{"acme-opensearch-cluster-health"}},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "logs", Count: 0},
 		}
 	})
 
@@ -388,6 +406,7 @@ func init() {
 		return []resource.RelatedCheckResult{
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedRedisAlarmID}},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "sg", Count: 0},
 		}
 	})
 
@@ -458,6 +477,7 @@ func init() {
 				{TargetType: "glue", Count: 0},
 				{TargetType: "ng", Count: 1, ResourceIDs: []string{relatedEC2NGNodeGroupID}},
 				{TargetType: "policy", Count: 0},
+				{TargetType: "ec2", Count: 0},
 			}
 		case "acme-lambda-execution":
 			return []resource.RelatedCheckResult{
@@ -465,6 +485,7 @@ func init() {
 				{TargetType: "glue", Count: 0},
 				{TargetType: "ng", Count: 0},
 				{TargetType: "policy", Count: 0},
+				{TargetType: "ec2", Count: 0},
 			}
 		case "acme-glue-role":
 			return []resource.RelatedCheckResult{
@@ -472,6 +493,7 @@ func init() {
 				{TargetType: "glue", Count: 3, ResourceIDs: []string{relatedRoleGlueID1}},
 				{TargetType: "ng", Count: 0},
 				{TargetType: "policy", Count: 0},
+				{TargetType: "ec2", Count: 0},
 			}
 		default:
 			return []resource.RelatedCheckResult{
@@ -479,6 +501,7 @@ func init() {
 				{TargetType: "glue", Count: 0},
 				{TargetType: "ng", Count: 0},
 				{TargetType: "policy", Count: 0},
+				{TargetType: "ec2", Count: 0},
 			}
 		}
 	})
@@ -512,17 +535,19 @@ func init() {
 	resource.RegisterRelatedDemo("sfn", func(res resource.Resource) []resource.RelatedCheckResult {
 		if res.ID == "order-fulfillment-workflow" {
 			return []resource.RelatedCheckResult{
-				{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedSFNAlarmID}},
-				{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedSFNLogsID}},
-				{TargetType: "role", Count: 0},
-				{TargetType: "cfn", Count: 0},
+				{TargetType: "alarm",   Count: 1, ResourceIDs: []string{relatedSFNAlarmID}},
+				{TargetType: "logs",    Count: 1, ResourceIDs: []string{relatedSFNLogsID}},
+				{TargetType: "role",    Count: 0},
+				{TargetType: "cfn",     Count: 0},
+				{TargetType: "eb-rule", Count: 0},
 			}
 		}
 		return []resource.RelatedCheckResult{
-			{TargetType: "alarm", Count: 0},
-			{TargetType: "logs", Count: 0},
-			{TargetType: "role", Count: 0},
-			{TargetType: "cfn", Count: 0},
+			{TargetType: "alarm",   Count: 0},
+			{TargetType: "logs",    Count: 0},
+			{TargetType: "role",    Count: 0},
+			{TargetType: "cfn",     Count: 0},
+			{TargetType: "eb-rule", Count: 0},
 		}
 	})
 
@@ -531,11 +556,13 @@ func init() {
 			return []resource.RelatedCheckResult{
 				{TargetType: "alarm", Count: 2, ResourceIDs: []string{relatedSNSAlarmID1, relatedSNSAlarmID2}},
 				{TargetType: "cfn", Count: 0},
+				{TargetType: "sns-sub", Count: 0},
 			}
 		}
 		return []resource.RelatedCheckResult{
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "cfn", Count: 0},
+			{TargetType: "sns-sub", Count: 0},
 		}
 	})
 
@@ -576,12 +603,14 @@ func init() {
 				{TargetType: "sns-sub", Count: 1, ResourceIDs: []string{relatedSQSSNSSubID}},
 				{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedSQSAlarmID}},
 				{TargetType: "lambda", Count: 1, ResourceIDs: []string{lambdaProcessOrdersFnName}},
+				{TargetType: "sqs", Count: 0},
 			}
 		}
 		return []resource.RelatedCheckResult{
 			{TargetType: "sns-sub", Count: 0},
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "lambda", Count: 0},
+			{TargetType: "sqs", Count: 0},
 		}
 	})
 
