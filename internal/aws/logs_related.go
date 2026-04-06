@@ -1,0 +1,95 @@
+// logs_related.go contains CloudWatch Log Group related-resource checker functions.
+package aws
+
+import (
+	"context"
+	"strings"
+
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// checkLogsLambda parses the log group name for the /aws/lambda/{name} pattern.
+// If matched, it searches the lambda cache for a function with that name.
+func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	logGroupName := res.ID
+	if logGroupName == "" {
+		logGroupName = res.Name
+	}
+
+	const prefix = "/aws/lambda/"
+	if !strings.HasPrefix(logGroupName, prefix) {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	functionName := strings.TrimPrefix(logGroupName, prefix)
+	if functionName == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	lambdaList, truncated, err := logsRelatedResources(ctx, clients, cache, "lambda")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if lambdaList == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	var ids []string
+	for _, lambdaRes := range lambdaList {
+		if lambdaRes.ID == functionName || lambdaRes.Name == functionName {
+			ids = append(ids, lambdaRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	return relatedResult("lambda", ids)
+}
+
+// checkLogsAlarms searches the alarm cache for alarms with a "LogGroupName" dimension
+// matching this log group's name (res.ID).
+func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	logGroupName := res.ID
+	if logGroupName == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
+
+	alarmList, truncated, err := logsRelatedResources(ctx, clients, cache, "alarm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+	}
+	if alarmList == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+
+	var ids []string
+	for _, alarmRes := range alarmList {
+		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, d := range rawAlarm.Dimensions {
+			if d.Name != nil && *d.Name == "LogGroupName" && d.Value != nil && *d.Value == logGroupName {
+				ids = append(ids, alarmRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	return relatedResult("alarm", ids)
+}
+
+// logsRelatedResources returns the resource list for target from cache or by fetching the first page.
+func logsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return nil, false, nil
+		}
+	}
+	return resources, isTruncated, err
+}
