@@ -274,4 +274,8 @@ const (
 	// sfn related-view IDs
 	relatedSFNAlarmID = "sfn-execution-failures"
 	relatedSFNLogsID  = "/aws/vendedlogs/states/order-fulfillment-workflow"
+
+	// sns related-view IDs
+	relatedSNSAlarmID1 = "api-high-error-rate"
+	relatedSNSAlarmID2 = "rds-cpu-utilization"
 )

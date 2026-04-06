@@ -525,4 +525,17 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("sns", func(res resource.Resource) []resource.RelatedCheckResult {
+		if res.ID == "arn:aws:sns:us-east-1:123456789012:alarm-notifications" {
+			return []resource.RelatedCheckResult{
+				{TargetType: "alarm", Count: 2, ResourceIDs: []string{relatedSNSAlarmID1, relatedSNSAlarmID2}},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
