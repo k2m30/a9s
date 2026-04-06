@@ -338,4 +338,12 @@ func init() {
 			{TargetType: "rtb", Count: 1, ResourceIDs: []string{relatedNATRTBID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ng", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "eks", Count: 1, ResourceIDs: []string{relatedNGEKSID}},
+			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedNGRoleID}},
+			{TargetType: "asg", Count: 1, ResourceIDs: []string{relatedNGASGID}},
+		}
+	})
 }
