@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.29.0] - 2026-04-06
+## [3.30.0] - 2026-04-06
+
+### Added
+- Related-resource views for **all 66 resource types** — press `r` on any detail view to see cross-resource relationships with navigable fields and background availability checking:
+  - **Compute:** EC2, ASG, Lambda, Elastic Beanstalk
+  - **Containers:** ECS Clusters, ECS Services, ECS Tasks, ECR, EKS, Node Groups
+  - **Databases:** RDS, RDS Snapshots, DocumentDB, DocDB Snapshots, DynamoDB, Redis, Redshift, OpenSearch
+  - **Storage:** S3, EBS Volumes, EBS Snapshots, AMIs, EFS, Backup
+  - **Networking:** VPC, Subnets, Security Groups, ELB, Target Groups, NAT, IGW, Route Tables, Transit Gateways, VPC Endpoints, Elastic IPs, ENI, CloudFront, API Gateway, ACM, Route 53, WAF
+  - **Security:** IAM Roles, IAM Users, IAM Groups, IAM Policies, KMS, Secrets Manager, SSM Parameters
+  - **Monitoring:** CloudWatch Alarms, Log Groups, CloudTrail, CloudTrail Events
+  - **CI/CD:** CloudFormation, CodeBuild, CodePipeline, CodeArtifact, Athena
+  - **Messaging:** SQS, SNS, SNS Subscriptions, EventBridge, Kinesis, Step Functions, MSK, SES, Glue
+- All 66 related-view checkers are real implementations — zero nil stubs remain
+- `TestGolden_LiveCheckerCompleteness` gate test fails the build if any nil checkers are introduced (#243)
+- EC2 inline status checks — instance status merged into resource fields during fetch, no background enrichment (#188)
+- Demo mode fixtures for all 66 resource types with cross-linked IDs for realistic related-view navigation
+
+### Changed
+- Consolidated 19 individual related smoke tests into a single table-driven test file
+- EC2 status check architecture simplified from background enrichment to per-page inline merge (#188)
+- EC2 DescribeInstanceStatus now respects 100-ID-per-call API limit (#188)
+
+### Fixed
+- All nil stub related-view checkers replaced with real cache-based or API-calling implementations (#243)
+
+## [3.29.0] - 2026-04-04
 
 ### Added
 - Related-resource views for 23 resource types — press `r` on any detail view to see cross-resource relationships with navigable fields and background availability checking:
@@ -348,7 +374,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clipboard support
 - Help overlay
 
-[Unreleased]: https://github.com/k2m30/a9s/compare/v3.16.0...HEAD
+[Unreleased]: https://github.com/k2m30/a9s/compare/v3.30.0...HEAD
+[3.30.0]: https://github.com/k2m30/a9s/compare/v3.29.0...v3.30.0
+[3.29.0]: https://github.com/k2m30/a9s/compare/v3.28.0...v3.29.0
+[3.28.0]: https://github.com/k2m30/a9s/compare/v3.26.0...v3.28.0
+[3.26.0]: https://github.com/k2m30/a9s/compare/v3.21.0...v3.26.0
+[3.21.0]: https://github.com/k2m30/a9s/compare/v3.20.0...v3.21.0
+[3.20.0]: https://github.com/k2m30/a9s/compare/v3.17.0...v3.20.0
+[3.17.0]: https://github.com/k2m30/a9s/compare/v3.16.0...v3.17.0
 [3.16.0]: https://github.com/k2m30/a9s/compare/v3.15.0...v3.16.0
 [3.15.0]: https://github.com/k2m30/a9s/compare/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/k2m30/a9s/compare/v3.13.0...v3.14.0
