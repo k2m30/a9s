@@ -889,6 +889,44 @@ func TestRelated_EIP_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_EKS_Registered(t *testing.T) {
+	defs := resource.GetRelated("eks")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for eks")
+	}
+
+	type expectation struct {
+		displayName string
+		hasChecker  bool
+	}
+	expected := map[string]expectation{
+		"ng":    {"Node Groups", true},
+		"alarm": {"CloudWatch Alarms", true},
+		"cfn":   {"CloudFormation Stacks", true},
+	}
+	for target, want := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == target {
+				found = true
+				if want.hasChecker && def.Checker == nil {
+					t.Errorf("eks %q: Checker should not be nil", target)
+				}
+				if !want.hasChecker && def.Checker != nil {
+					t.Errorf("eks %q: Checker should be nil (stub)", target)
+				}
+				if def.DisplayName != want.displayName {
+					t.Errorf("eks %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for eks", target)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
