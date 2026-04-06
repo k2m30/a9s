@@ -53,6 +53,7 @@ import (
 // EC2DescribeInstancesAPI defines the interface for the EC2 DescribeInstances operation.
 type EC2DescribeInstancesAPI interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+	DescribeInstanceStatus(ctx context.Context, params *ec2.DescribeInstanceStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error)
 }
 
 // S3ListBucketsAPI defines the interface for the S3 ListBuckets operation.

@@ -33,6 +33,14 @@ func (m *mockEC2DescribeInstancesAPIPaginated) DescribeInstances(_ context.Conte
 	return m.PageFunc(m.Calls)
 }
 
+func (m *mockEC2DescribeInstancesAPIPaginated) DescribeInstanceStatus(
+	_ context.Context,
+	_ *ec2.DescribeInstanceStatusInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeInstanceStatusOutput, error) {
+	return &ec2.DescribeInstanceStatusOutput{}, nil
+}
+
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchEC2InstancesPage
 // ---------------------------------------------------------------------------

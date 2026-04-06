@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -132,6 +133,12 @@ func registerEC2Handlers(t *Transport) {
 		return XMLResponse(xml), nil
 	})
 
+	t.Handle("ec2", "DescribeInstanceStatus", func(_ *http.Request) (*http.Response, error) {
+		resources := demoData["ec2"]()
+		xml := buildDescribeInstanceStatusXML(resources)
+		return XMLResponse(xml), nil
+	})
+
 	t.Handle("ec2", "DescribeVolumes", func(_ *http.Request) (*http.Response, error) {
 		resources := demoData["ebs"]()
 		volumes := ExtractSDK[ec2types.Volume](resources)
@@ -185,6 +192,31 @@ func buildDescribeInstancesXML(instances []ec2types.Instance) string {
 		sb.WriteString(`</item></instancesSet></item>`)
 	}
 	sb.WriteString(`</reservationSet></DescribeInstancesResponse>`)
+	return sb.String()
+}
+
+func buildDescribeInstanceStatusXML(resources []resource.Resource) string {
+	var sb strings.Builder
+	sb.WriteString(`<DescribeInstanceStatusResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">`)
+	sb.WriteString(`<requestId>demo-request-id</requestId><instanceStatusSet>`)
+	for _, r := range resources {
+		sysStatus := r.Fields["system_status"]
+		instStatus := r.Fields["instance_status"]
+		if sysStatus == "" && instStatus == "" {
+			continue
+		}
+		if sysStatus == "" {
+			sysStatus = "not-applicable"
+		}
+		if instStatus == "" {
+			instStatus = "not-applicable"
+		}
+		fmt.Fprintf(&sb, `<item><instanceId>%s</instanceId>`, xmlEscape(r.ID))
+		fmt.Fprintf(&sb, `<systemStatus><status>%s</status></systemStatus>`, xmlEscape(sysStatus))
+		fmt.Fprintf(&sb, `<instanceStatus><status>%s</status></instanceStatus>`, xmlEscape(instStatus))
+		sb.WriteString(`</item>`)
+	}
+	sb.WriteString(`</instanceStatusSet></DescribeInstanceStatusResponse>`)
 	return sb.String()
 }
 
