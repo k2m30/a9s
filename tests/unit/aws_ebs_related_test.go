@@ -52,10 +52,10 @@ func TestNavigableFields_EBS_Registered(t *testing.T) {
 func TestNavigableFields_EBS_FieldPathsResolve(t *testing.T) {
 	resources, ok := demo.GetResources("ebs")
 	if !ok {
-		t.Skip("no demo fixture registered for ebs")
+		t.Fatal("no demo fixture registered for ebs — fixtures_compute.go must register it")
 	}
 	if len(resources) == 0 {
-		t.Skip("demo fixture returned no resources for ebs")
+		t.Fatal("demo fixture returned no resources for ebs")
 	}
 	r := resources[0]
 

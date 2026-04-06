@@ -326,7 +326,7 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 		t.Fatalf("failed to load .a9s/views/: %v", err)
 	}
 	if cfg == nil {
-		t.Skip(".a9s/views/ directory does not exist yet — skipping round-trip test")
+		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 
 	defaults := config.DefaultConfig()

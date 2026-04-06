@@ -54,7 +54,7 @@ func makeEC2DetailForSourceIDTest(t *testing.T, resourceID string) views.DetailM
 func TestDetail_RelatedCheckResult_IgnoresWrongSourceID(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
-		t.Skip("no ec2 related defs registered — import internal/aws to register them")
+		t.Fatal("no ec2 related defs registered — internal/aws import should register them")
 	}
 
 	d := makeEC2DetailForSourceIDTest(t, "i-111")
@@ -98,7 +98,7 @@ func TestDetail_RelatedCheckResult_IgnoresWrongSourceID(t *testing.T) {
 func TestDetail_RelatedCheckResult_AcceptsCorrectSourceID(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
-		t.Skip("no ec2 related defs registered — import internal/aws to register them")
+		t.Fatal("no ec2 related defs registered — internal/aws import should register them")
 	}
 
 	d := makeEC2DetailForSourceIDTest(t, "i-111")
