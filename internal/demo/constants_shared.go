@@ -205,4 +205,9 @@ const (
 
 	// efs related-view IDs
 	relatedEFSKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	// elb related-view IDs
+	relatedELBTGID1    = "acme-web-tg"
+	relatedELBTGID2    = "acme-api-tg"
+	relatedELBAlarmID1 = "elb-unhealthy-hosts"
 )

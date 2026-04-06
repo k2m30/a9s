@@ -161,6 +161,7 @@ func TestDemoInfrastructureIntegrity(t *testing.T) {
 							hasValue := false
 							for _, val := range resolvedIDs {
 								val = strings.TrimSpace(val)
+								val = strings.TrimPrefix(val, "- ")
 								if val == "" || val == "-" || strings.EqualFold(val, "<nil>") {
 									continue
 								}
