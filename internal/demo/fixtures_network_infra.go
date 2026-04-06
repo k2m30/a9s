@@ -468,6 +468,33 @@ func eipFixtures() []resource.Resource {
 			},
 		},
 		{
+			ID:     "eipalloc-0ccc333333333333c",
+			Name:   "staging-nat-eip",
+			Status: "vpc",
+			Fields: map[string]string{
+				"allocation_id":  "eipalloc-0ccc333333333333c",
+				"name":           "staging-nat-eip",
+				"public_ip":      "52.87.100.10",
+				"association_id": "eipassoc-0ccc333333333333c",
+				"instance_id":    "i-0a1b2c3d4e5f60003",
+				"domain":         "vpc",
+			},
+			RawStruct: ec2types.Address{
+				AllocationId:       aws.String("eipalloc-0ccc333333333333c"),
+				PublicIp:           aws.String("52.87.100.10"),
+				AssociationId:      aws.String("eipassoc-0ccc333333333333c"),
+				InstanceId:         aws.String("i-0a1b2c3d4e5f60003"),
+				NetworkInterfaceId: aws.String("eni-0eee555555555555e"),
+				Domain:             ec2types.DomainTypeVpc,
+				NetworkBorderGroup: aws.String("us-east-1"),
+				PrivateIpAddress:   aws.String("10.1.1.50"),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("staging-nat-eip")},
+					{Key: aws.String("Environment"), Value: aws.String("staging")},
+				},
+			},
+		},
+		{
 			ID:     "eipalloc-0eee555555555555e",
 			Name:   "unassociated-eip",
 			Status: "vpc",
