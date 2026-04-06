@@ -666,4 +666,29 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("trail", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "acme-management-trail":
+			return []resource.RelatedCheckResult{
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{relatedTrailMgmtS3ID}},
+				{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedTrailLogsID}},
+				{TargetType: "sns", Count: 0},
+				{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedTrailKMSID}},
+			}
+		case "acme-audit-trail":
+			return []resource.RelatedCheckResult{
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{relatedTrailS3ID}},
+				{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedTrailLogsID}},
+				{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedTrailSNSID}},
+				{TargetType: "kms", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "s3", Count: 0},
+			{TargetType: "logs", Count: 0},
+			{TargetType: "sns", Count: 0},
+			{TargetType: "kms", Count: 0},
+		}
+	})
 }
