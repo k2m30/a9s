@@ -1432,6 +1432,27 @@ func TestRelated_Role_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_RTB_Registered(t *testing.T) {
+	defs := resource.GetRelated("rtb")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for rtb")
+	}
+
+	expected := []string{"subnet", "nat", "igw", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for rtb", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
