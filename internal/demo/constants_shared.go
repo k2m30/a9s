@@ -262,4 +262,8 @@ const (
 	relatedRTBSubnetID2 = prodPublicSubnetB
 	relatedRTBIGWID     = "igw-0aaa111111111111a"
 	relatedRTBNATID     = "nat-0aaa111111111111a"
+
+	// s3 related-view IDs
+	relatedS3TrailID = "acme-management-trail" // trail that logs to cloudtrail-audit-logs bucket
+	relatedS3CFID    = "E1A2B3C4D5E6F7"   // CF distribution using webapp-assets-prod as origin
 )
