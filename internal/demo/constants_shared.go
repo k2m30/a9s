@@ -246,4 +246,10 @@ const (
 	// rds-snap related-view IDs
 	relatedRDSSnapDbiID = "prod-api-primary"
 	relatedRDSSnapKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	// redis related-view IDs
+	relatedRedisAlarmID = "elasticache-cpu-utilization"
+
+	// redshift related-view IDs
+	relatedRedshiftAlarmID = "redshift-cluster-cpu-utilization"
 )

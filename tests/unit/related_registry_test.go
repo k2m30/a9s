@@ -1369,6 +1369,48 @@ func TestRelated_RDSSnap_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_Redis_Registered(t *testing.T) {
+	defs := resource.GetRelated("redis")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for redis")
+	}
+
+	expected := []string{"alarm", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for redis", exp)
+		}
+	}
+}
+
+func TestRelated_Redshift_Registered(t *testing.T) {
+	defs := resource.GetRelated("redshift")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for redshift")
+	}
+
+	expected := []string{"alarm", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for redshift", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

@@ -383,4 +383,18 @@ func init() {
 			{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedRDSSnapKMSID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("redis", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedRedisAlarmID}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
+
+	resource.RegisterRelatedDemo("redshift", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedRedshiftAlarmID}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
