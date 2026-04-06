@@ -18,21 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.31.0] - 2026-04-06
 
-### Fixed
-- SNS Subscriptions no longer shows "(0+)" on accounts with zero subscriptions — known AWS API quirk where `ListSubscriptions` returns a `NextToken` with empty results
-- SNS Topics gets the same defensive guard for empty-page truncation
-- Secrets Manager now fetches up to 50 items per page instead of AWS default (~10)
-- SSM Parameters now fetches up to 50 items per page instead of AWS default (~10)
-- Lowercase `m` now triggers load-more in paginated lists (previously only `M` worked)
-
-### Changed
-- Replaced `interface{}` with `any` across 95 files in `internal/aws/`
-- Replaced manual contains-loops with `slices.Contains` in ELB, Target Group, and Security Group related checkers
-- Replaced `strings.Index` with `strings.Cut` in ELB and CloudTrail related checkers
-- Replaced `strP` helper with `aws.String` in Transit Gateway related checker
-
-## [3.30.0] - 2026-04-06
-
 ### Added
 - Related-resource views for **all 66 resource types** — press `r` on any detail view to see cross-resource relationships with navigable fields and background availability checking:
   - **Compute:** EC2, ASG, Lambda, Elastic Beanstalk
@@ -46,16 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Messaging:** SQS, SNS, SNS Subscriptions, EventBridge, Kinesis, Step Functions, MSK, SES, Glue
 - All 66 related-view checkers are real implementations — zero nil stubs remain
 - `TestGolden_LiveCheckerCompleteness` gate test fails the build if any nil checkers are introduced (#243)
-- EC2 inline status checks — instance status merged into resource fields during fetch, no background enrichment (#188)
 - Demo mode fixtures for all 66 resource types with cross-linked IDs for realistic related-view navigation
 
 ### Changed
 - Consolidated 19 individual related smoke tests into a single table-driven test file
-- EC2 status check architecture simplified from background enrichment to per-page inline merge (#188)
-- EC2 DescribeInstanceStatus now respects 100-ID-per-call API limit (#188)
+- Replaced `interface{}` with `any` across 95 files in `internal/aws/`
+- Replaced manual contains-loops with `slices.Contains` (3 files)
+- Replaced `strings.Index` with `strings.Cut` (2 files)
+- Replaced `strP` helper with `aws.String` in Transit Gateway related checker
 
 ### Fixed
 - All nil stub related-view checkers replaced with real cache-based or API-calling implementations (#243)
+- SNS Subscriptions no longer shows "(0+)" on accounts with zero subscriptions — known AWS API quirk where `ListSubscriptions` returns a `NextToken` with empty results
+- SNS Topics gets the same defensive guard for empty-page truncation
+- Secrets Manager now fetches up to 50 items per page instead of AWS default (~10)
+- SSM Parameters now fetches up to 50 items per page instead of AWS default (~10)
+- Lowercase `m` now triggers load-more in paginated lists (previously only `M` worked)
 
 ## [3.29.0] - 2026-04-04
 
@@ -88,6 +79,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resource cache integration — checkers read from already-loaded resource lists before falling back to live API
 - QA stories for related-resources feature (#119, #189)
 
+## [3.27.0] - 2026-04-01
+
+### Fixed
+- Config overlay race condition during profile switch (#119)
+- Availability probe race condition on rapid view transitions
+- Profile rollback on failed AWS connection attempt
+- Region resolution edge case with multi-region config files
+- CI failures — clipboard tests skip on headless, verify-readonly path fix
+
 ## [3.26.0] - 2026-03-30
 
 ### Added
@@ -101,6 +101,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/` key routing delegates to Searchable views correctly (#89)
 - `recomputeMatches` no longer resets `currentIdx` on every call (#89)
 - Enter on empty search query deactivates instead of showing 0/0 (#89)
+
+## [3.25.0] - 2026-03-29
+
+### Added
+- CloudTrail Events structured field parsing — JSON `CloudTrailEvent` blob parsed into typed fields (EventName, EventSource, SourceIPAddress, UserAgent, ErrorCode) for detail and YAML views (#117, #118)
+
+## [3.24.0] - 2026-03-29
+
+### Changed
+- Migrated all fetchers from legacy `RegisterFetcher` to `RegisterPaginatedFetcher`, removed dual-registry system (#83)
+
+### Fixed
+- Demo mode overrides profile/region to "demo" values regardless of CLI flags or environment
+- Missing demo transport handlers for EBS Volumes, EBS Snapshots, CloudTrail Events
+
+## [3.23.0] - 2026-03-29
+
+### Added
+- EBS Volumes, EBS Snapshots, AMIs, and CloudTrail Events as new resource types with full pagination support
+
+## [3.22.0] - 2026-03-28
+
+### Added
+- Generalized secret reveal system — `x` key toggles masked values across any resource type, not just Secrets Manager
+- Horizontal scroll wrap toggle — `w` key switches between truncate and wrap modes in list view
+
+### Fixed
+- Horizontal scroll offset preserved when toggling wrap mode
 
 ## [3.21.0] - 2026-03-28
 
@@ -143,6 +171,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo probe counts match paginated page size (#68)
 - "Refreshing availability..." flash auto-clears when all checks complete (#68)
 - Cursor skips greyed-out empty resource types in main menu (#68)
+
+## [3.19.0] - 2026-03-27
+
+### Added
+- Human-readable timestamps across all views — dates shown as "2 hours ago", "3 days ago" instead of raw ISO 8601 (#57)
+
+### Fixed
+- Demo fixture timestamps aligned with production format (#57)
+
+## [3.18.0] - 2026-03-27
+
+### Changed
+- Split `views.yaml` into per-resource YAML files under `.a9s/views/` for cleaner config management
+- Added `cmd/viewsgen/` tool to auto-generate view config files from built-in defaults
+- Bumped GitHub Actions versions (#91, #92, #93, #94, #95)
 
 ## [3.17.0] - 2026-03-27
 
@@ -199,9 +242,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Respect `AWS_CONFIG_FILE` environment variable for profile discovery, enabling per-project AWS config via direnv (#88)
-
-### Fixed
-- Test count in README and website updated to reflect actual count (2,300+)
 
 ## [3.11.1] - 2026-03-25
 
@@ -374,39 +414,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Layout, navigation, and S3 bugs
 - Unicode separator, duplicate version constant
 
-## [0.3.0] - 2026-03-15
-
-### Added
-- Horizontal scroll for wide tables
-- Removed all skipped tests
-
-## [0.2.0] - 2026-03-15
-
-### Added
-- 517 QA tests covering layout, navigation, S3 bugs
-
-### Fixed
-- Layout and navigation bugs
-- S3 view issues
-
-## [0.1.0] - 2026-03-15
-
-### Added
-- Initial release
-- S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager resource types
-- YAML detail view
-- Multi-profile and multi-region support
-- Tokyo Night Dark theme
-- Clipboard support
-- Help overlay
-
-[Unreleased]: https://github.com/k2m30/a9s/compare/v3.30.0...HEAD
-[3.30.0]: https://github.com/k2m30/a9s/compare/v3.29.0...v3.30.0
+[Unreleased]: https://github.com/k2m30/a9s/compare/v3.32.0...HEAD
+[3.32.0]: https://github.com/k2m30/a9s/compare/v3.31.0...v3.32.0
+[3.31.0]: https://github.com/k2m30/a9s/compare/v3.29.0...v3.31.0
 [3.29.0]: https://github.com/k2m30/a9s/compare/v3.28.0...v3.29.0
-[3.28.0]: https://github.com/k2m30/a9s/compare/v3.26.0...v3.28.0
-[3.26.0]: https://github.com/k2m30/a9s/compare/v3.21.0...v3.26.0
+[3.28.0]: https://github.com/k2m30/a9s/compare/v3.27.0...v3.28.0
+[3.27.0]: https://github.com/k2m30/a9s/compare/v3.26.0...v3.27.0
+[3.26.0]: https://github.com/k2m30/a9s/compare/v3.25.0...v3.26.0
+[3.25.0]: https://github.com/k2m30/a9s/compare/v3.24.0...v3.25.0
+[3.24.0]: https://github.com/k2m30/a9s/compare/v3.23.0...v3.24.0
+[3.23.0]: https://github.com/k2m30/a9s/compare/v3.22.0...v3.23.0
+[3.22.0]: https://github.com/k2m30/a9s/compare/v3.21.0...v3.22.0
 [3.21.0]: https://github.com/k2m30/a9s/compare/v3.20.0...v3.21.0
-[3.20.0]: https://github.com/k2m30/a9s/compare/v3.17.0...v3.20.0
+[3.20.0]: https://github.com/k2m30/a9s/compare/v3.19.0...v3.20.0
+[3.19.0]: https://github.com/k2m30/a9s/compare/v3.18.0...v3.19.0
+[3.18.0]: https://github.com/k2m30/a9s/compare/v3.17.0...v3.18.0
 [3.17.0]: https://github.com/k2m30/a9s/compare/v3.16.0...v3.17.0
 [3.16.0]: https://github.com/k2m30/a9s/compare/v3.15.0...v3.16.0
 [3.15.0]: https://github.com/k2m30/a9s/compare/v3.14.0...v3.15.0
