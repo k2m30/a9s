@@ -226,4 +226,12 @@ func init() {
 			{TargetType: "nat", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("eks", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ng", Count: 2, ResourceIDs: []string{"general-pool", "gpu-pool"}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
