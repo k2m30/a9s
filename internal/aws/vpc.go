@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource
 
 // FetchVPCsPage fetches a single page of VPCs.
 func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeVpcsInput{}
+	input := &ec2.DescribeVpcsInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

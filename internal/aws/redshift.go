@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -43,7 +44,9 @@ func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI)
 
 // FetchRedshiftClustersPage fetches a single page of Redshift clusters.
 func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClustersAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &redshift.DescribeClustersInput{}
+	input := &redshift.DescribeClustersInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

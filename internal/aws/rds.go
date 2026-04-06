@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -52,7 +53,9 @@ func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]re
 
 // FetchRDSInstancesPage fetches a single page of RDS instances.
 func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &rds.DescribeDBInstancesInput{}
+	input := &rds.DescribeDBInstancesInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

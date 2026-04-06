@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -51,7 +52,9 @@ func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistrib
 
 // FetchCloudFrontDistributionsPage fetches a single page of CloudFront distributions.
 func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDistributionsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &cloudfront.ListDistributionsInput{}
+	input := &cloudfront.ListDistributionsInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

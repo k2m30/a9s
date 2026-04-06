@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -55,7 +56,9 @@ func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) 
 
 // FetchLoadBalancersPage fetches a single page of load balancers.
 func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &elbv2.DescribeLoadBalancersInput{}
+	input := &elbv2.DescribeLoadBalancersInput{
+		PageSize: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

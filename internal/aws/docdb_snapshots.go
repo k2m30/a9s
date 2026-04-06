@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -47,7 +48,9 @@ func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterS
 
 // FetchDocDBClusterSnapshotsPage fetches a single page of DocumentDB cluster snapshots.
 func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &docdb.DescribeDBClusterSnapshotsInput{}
+	input := &docdb.DescribeDBClusterSnapshotsInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

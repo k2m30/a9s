@@ -8,11 +8,10 @@ import (
 )
 
 // DefaultPageSize is the number of resources fetched per paginated API call.
-// Set to one screenful in a default 80×50 terminal (~40 visible rows after
-// frame chrome). All paginated fetchers should use this as their MaxResults /
-// Limit / PageSize parameter so the cost of a cold-cache probe or a
-// related-view first-page fetch is bounded and predictable.
-const DefaultPageSize = 50
+// Re-exported from the resource package so existing aws.DefaultPageSize call
+// sites keep working without churn. The single source of truth is
+// resource.DefaultPageSize.
+const DefaultPageSize = resource.DefaultPageSize
 
 // FetchRelatedTarget returns the resource list for the given target type.
 // It checks the ResourceCache first (returning cached data immediately), then

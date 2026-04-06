@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -48,7 +49,9 @@ func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]res
 
 // FetchHostedZonesPage fetches a single page of Route53 hosted zones.
 func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &route53.ListHostedZonesInput{}
+	input := &route53.ListHostedZonesInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

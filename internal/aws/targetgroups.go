@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([
 
 // FetchTargetGroupsPage fetches a single page of target groups.
 func FetchTargetGroupsPage(ctx context.Context, api ELBv2DescribeTargetGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &elbv2.DescribeTargetGroupsInput{}
+	input := &elbv2.DescribeTargetGroupsInput{
+		PageSize: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}
