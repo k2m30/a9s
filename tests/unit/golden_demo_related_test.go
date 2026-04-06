@@ -207,30 +207,24 @@ func TestGolden_DemoRelatedNoOrphans(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: Nil live checkers inventory.
+// Test 4: Every registered RelatedDef MUST have a live Checker.
 //
-// These are RelatedDefs where Checker==nil — demo mode works fine but live
-// mode silently returns Count=-1. This test documents the current state and
-// will catch regressions if someone accidentally nils a working checker.
+// If Checker is nil the right column shows "—" in live mode while demo
+// mode happily shows a count. That's a bug, not a TODO.
+// See: https://github.com/k2m30/a9s/issues/243
 // ---------------------------------------------------------------------------
 
 func TestGolden_LiveCheckerCompleteness(t *testing.T) {
-	var nilCount int
 	for _, shortName := range resource.AllShortNames() {
 		defs := resource.GetRelated(shortName)
 		for _, def := range defs {
-			if def.Checker == nil {
-				nilCount++
-				t.Logf("NIL CHECKER: %s→%s (%s) — works in demo, silent -1 in live",
-					shortName, def.TargetType, def.DisplayName)
-			}
+			t.Run(fmt.Sprintf("%s→%s", shortName, def.TargetType), func(t *testing.T) {
+				if def.Checker == nil {
+					t.Errorf("Checker is nil — shows dash in live mode, count in demo. Implement it. (#243)")
+				}
+			})
 		}
 	}
-	// This is informational for now. Uncomment to enforce:
-	// if nilCount > 0 {
-	//     t.Errorf("%d RelatedDef entries have nil Checker — demo-only, broken in live mode", nilCount)
-	// }
-	t.Logf("Total nil checkers: %d (demo-only, broken in live mode)", nilCount)
 }
 
 // ---------------------------------------------------------------------------
