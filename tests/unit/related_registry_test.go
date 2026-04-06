@@ -1191,6 +1191,27 @@ func TestRelated_Logs_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_MSK_Registered(t *testing.T) {
+	defs := resource.GetRelated("msk")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for msk")
+	}
+
+	expected := []string{"lambda", "alarm", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for msk", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

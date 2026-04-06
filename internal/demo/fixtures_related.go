@@ -322,4 +322,12 @@ func init() {
 			{TargetType: "alarm", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("msk", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "lambda", Count: 1, ResourceIDs: []string{"data-pipeline-transform"}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
