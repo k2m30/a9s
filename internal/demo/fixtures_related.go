@@ -745,4 +745,26 @@ func init() {
 			{TargetType: "cf", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("sg", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case prodWebALBSGID: // sg-0aaa111111111111a — acme-web-alb-sg; referenced by acme-api-internal-sg
+			return []resource.RelatedCheckResult{
+				{TargetType: "vpc", Count: 1, ResourceIDs: []string{prodVPCID}},
+				{TargetType: "ec2", Count: 1, ResourceIDs: []string{"i-0a1b2c3d4e5f60001"}},
+				{TargetType: "eni", Count: 1, ResourceIDs: []string{"eni-0aaa111111111111a"}},
+				{TargetType: "elb", Count: 1, ResourceIDs: []string{prodELBName}},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "sg", Count: 1, ResourceIDs: []string{"sg-0bbb222222222222b"}},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "vpc", Count: 1, ResourceIDs: []string{prodVPCID}},
+			{TargetType: "ec2", Count: 0},
+			{TargetType: "eni", Count: 0},
+			{TargetType: "elb", Count: 0},
+			{TargetType: "cfn", Count: 0},
+			{TargetType: "sg", Count: 0},
+		}
+	})
 }
