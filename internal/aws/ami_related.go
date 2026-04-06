@@ -10,7 +10,7 @@ import (
 
 // checkAMIEC2 checks the cache for EC2 instances launched from this AMI.
 // Pattern C: matches ec2.Fields["image_id"] against the AMI's ID.
-func checkAMIEC2(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -38,7 +38,7 @@ func checkAMIEC2(ctx context.Context, clients interface{}, res resource.Resource
 
 // checkAMIEBSSnaps reads the backing snapshot IDs from the AMI's block device mappings.
 // Pattern F: data is in RawStruct, no cache lookup needed.
-func checkAMIEBSSnaps(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
@@ -66,7 +66,7 @@ func checkAMIASG(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 
 // amiRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
-func amiRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func amiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

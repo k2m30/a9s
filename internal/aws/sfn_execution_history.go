@@ -20,7 +20,7 @@ func init() {
 		"state_name", "event_detail", "event_id", "previous_event_id",
 	})
 
-	resource.RegisterPaginatedChild("sfn_execution_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("sfn_execution_history", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

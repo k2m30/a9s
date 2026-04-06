@@ -21,7 +21,7 @@ func init() {
 		"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
 	})
 
-	resource.RegisterPaginatedChild("lambda_invocations", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("lambda_invocations", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

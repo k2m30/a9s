@@ -12,7 +12,7 @@ import (
 
 func init() {
 	resource.RegisterFieldKeys("ebs", []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"})
-	resource.RegisterPaginated("ebs", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ebs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -21,7 +21,7 @@ func init() {
 	})
 
 	resource.RegisterFieldKeys("ebs-snap", []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"})
-	resource.RegisterPaginated("ebs-snap", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ebs-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
