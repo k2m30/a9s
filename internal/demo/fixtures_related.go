@@ -203,4 +203,11 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ecs-task", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ecs-svc", Count: 1, ResourceIDs: []string{"api-gateway"}},
+			{TargetType: "ecs", Count: 1, ResourceIDs: []string{"acme-services"}},
+		}
+	})
 }
