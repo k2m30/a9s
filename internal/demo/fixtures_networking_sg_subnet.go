@@ -84,6 +84,14 @@ func sgFixtures() []resource.Resource {
 						ToPort:     aws.Int32(8080),
 						IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.0.0.0/16"), Description: aws.String("API traffic from VPC")}},
 					},
+					{
+						IpProtocol: aws.String("tcp"),
+						FromPort:   aws.Int32(8080),
+						ToPort:     aws.Int32(8080),
+						UserIdGroupPairs: []ec2types.UserIdGroupPair{
+							{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg"), UserId: aws.String("123456789012")},
+						},
+					},
 				},
 				IpPermissionsEgress: []ec2types.IpPermission{
 					{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
@@ -116,6 +124,14 @@ func sgFixtures() []resource.Resource {
 						FromPort:   aws.Int32(5432),
 						ToPort:     aws.Int32(5432),
 						IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.0.0.0/16"), Description: aws.String("PostgreSQL from VPC")}},
+					},
+					{
+						IpProtocol: aws.String("tcp"),
+						FromPort:   aws.Int32(5432),
+						ToPort:     aws.Int32(5432),
+						UserIdGroupPairs: []ec2types.UserIdGroupPair{
+							{GroupId: aws.String("sg-0bbb222222222222b"), GroupName: aws.String("acme-api-internal-sg"), UserId: aws.String("123456789012")},
+						},
 					},
 				},
 				IpPermissionsEgress: []ec2types.IpPermission{
