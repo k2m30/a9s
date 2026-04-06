@@ -143,7 +143,7 @@ type KeyHint struct {
 }
 
 // BottomBorderWithHints renders the bottom border line with embedded key hints.
-// Hints are placed left-to-right after └──. Hints that don't fit are dropped from the right.
+// Hints are right-aligned before ──┘. Hints that don't fit are dropped from the right.
 // Empty/nil hints produce a plain └───┘ border.
 // Total visual width of output equals w.
 func BottomBorderWithHints(hints []KeyHint, w int) string {
@@ -156,10 +156,9 @@ func BottomBorderWithHints(hints []KeyHint, w int) string {
 		return borderStyle.Render("\u2514" + strings.Repeat("\u2500", w-2) + "\u2518")
 	}
 
-	// Start with └── (corner + 2 dashes)
-	prefix := borderStyle.Render("\u2514\u2500\u2500")
-	// Reserve 1 for └, 2 for initial ──, 1 for ┘
-	usedWidth := 3 + 1 // corner(1) + 2 dashes + corner(1)
+	// Reserve: 1 for └, 1 minimum leading dash, 3 for ──┘ at the right end.
+	// The extra leading dash prevents hints from running directly against the corner.
+	usedWidth := 1 + 1 + 3 // corner(1) + min-dash(1) + ──┘(3)
 
 	var parts []string
 	for i, hint := range hints {
@@ -173,7 +172,7 @@ func BottomBorderWithHints(hints []KeyHint, w int) string {
 			sepVis = lipgloss.Width(dashSep)
 		}
 
-		if usedWidth+sepVis+hintVis > w-1 { // w-1 to leave room for ┘
+		if usedWidth+sepVis+hintVis > w {
 			break
 		}
 
@@ -185,21 +184,21 @@ func BottomBorderWithHints(hints []KeyHint, w int) string {
 		usedWidth += hintVis
 	}
 
-	// Fill remaining width with dashes, then ┘
-	// usedWidth = 3 (prefix) + 1 (reserved for ┘) + hints_width
-	// remaining = w - usedWidth = space for dashes only (┘ already accounted for)
-	remaining := w - usedWidth
-	if remaining < 0 {
-		remaining = 0
+	// Layout: └ + leading-dashes + hints + ──┘
+	// hintsWidth = usedWidth - 1(corner) - 1(min-dash) - 3(──┘)
+	// leadingDashes = w - 1(└) - hintsWidth - 3(──┘)
+	hintsWidth := usedWidth - 1 - 1 - 3
+	leadingDashes := w - 1 - hintsWidth - 3
+	if leadingDashes < 0 {
+		leadingDashes = 0
 	}
-	suffix := borderStyle.Render(strings.Repeat("\u2500", remaining) + "\u2518")
 
 	var sb strings.Builder
-	sb.WriteString(prefix)
+	sb.WriteString(borderStyle.Render("\u2514" + strings.Repeat("\u2500", leadingDashes)))
 	for _, p := range parts {
 		sb.WriteString(p)
 	}
-	sb.WriteString(suffix)
+	sb.WriteString(borderStyle.Render("\u2500\u2500\u2518"))
 	return sb.String()
 }
 
