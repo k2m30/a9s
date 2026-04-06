@@ -121,6 +121,7 @@ func elbFixtures() []resource.Resource {
 				VpcId:                 aws.String(prodVPCID),
 				CanonicalHostedZoneId: aws.String("Z26RNL4JYFTOTI"),
 				IpAddressType:         elbv2types.IpAddressTypeIpv4,
+				SecurityGroups:        []string{prodWebALBSGID},
 				CreatedTime:           aws.Time(mustParseTime("2025-09-10T09:00:00+00:00")),
 				AvailabilityZones: []elbv2types.AvailabilityZone{
 					{SubnetId: aws.String(prodPublicSubnetA), ZoneName: aws.String("us-east-1a")},
@@ -170,6 +171,11 @@ func elbFixtures() []resource.Resource {
 	elbSchemes := []elbv2types.LoadBalancerSchemeEnum{
 		elbv2types.LoadBalancerSchemeEnumInternetFacing, elbv2types.LoadBalancerSchemeEnumInternal,
 	}
+	// Subnet pool for generated ELBs — use known fixture IDs so navigable field
+	// integrity tests resolve to real subnet fixtures.
+	elbSubnetPool := []string{prodPublicSubnetA, prodPublicSubnetB, prodPrivateSubnetA, prodPrivateSubnetB}
+	// SG pool for generated ELBs — use known fixture IDs.
+	elbSGPool := []string{prodWebALBSGID, prodAPIInternalSGID}
 	for i := 0; i < 18; i++ {
 		name := elbNamePool[i]
 		lbType := elbTypes[i%len(elbTypes)]
@@ -193,6 +199,9 @@ func elbFixtures() []resource.Resource {
 			vpcID = stagingVPCID
 		}
 		createTime := fmt.Sprintf("2025-%02d-%02dT%02d:00:00+00:00", 1+(i%12), 1+i, 8+(i%12))
+		subnetA := elbSubnetPool[i%len(elbSubnetPool)]
+		subnetB := elbSubnetPool[(i+1)%len(elbSubnetPool)]
+		sgID := elbSGPool[i%len(elbSGPool)]
 		elbs = append(elbs, resource.Resource{
 			ID:     name,
 			Name:   name,
@@ -215,9 +224,14 @@ func elbFixtures() []resource.Resource {
 				State: &elbv2types.LoadBalancerState{
 					Code: elbv2types.LoadBalancerStateEnumActive,
 				},
-				VpcId:         aws.String(vpcID),
-				IpAddressType: elbv2types.IpAddressTypeIpv4,
-				CreatedTime:   aws.Time(mustParseTime(createTime)),
+				VpcId:          aws.String(vpcID),
+				IpAddressType:  elbv2types.IpAddressTypeIpv4,
+				SecurityGroups: []string{sgID},
+				CreatedTime:    aws.Time(mustParseTime(createTime)),
+				AvailabilityZones: []elbv2types.AvailabilityZone{
+					{SubnetId: aws.String(subnetA), ZoneName: aws.String("us-east-1a")},
+					{SubnetId: aws.String(subnetB), ZoneName: aws.String("us-east-1b")},
+				},
 			},
 		})
 	}

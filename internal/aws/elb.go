@@ -19,6 +19,18 @@ func init() {
 		}
 		return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 	})
+
+	resource.RegisterNavigableFields("elb", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "SecurityGroups", TargetType: "sg"},
+		{FieldPath: "AvailabilityZones.SubnetId", TargetType: "subnet"},
+	})
+
+	resource.RegisterRelated("elb", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+	})
 }
 
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the

@@ -234,4 +234,12 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("elb", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "tg", Count: 2, ResourceIDs: []string{relatedELBTGID1, relatedELBTGID2}},
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedELBAlarmID1}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
