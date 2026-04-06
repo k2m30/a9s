@@ -136,6 +136,112 @@ func RenderFramePrepadded(lines []string, title string, w, h int) string {
 	return sb.String()
 }
 
+// KeyHint is a single key+description hint for the bottom border.
+type KeyHint struct {
+	Key  string // e.g. "r", "d", "esc", "enter", "ctrl+r"
+	Desc string // e.g. "Related", "Detail", "Back"
+}
+
+// BottomBorderWithHints renders the bottom border line with embedded key hints.
+// Hints are placed left-to-right after └──. Hints that don't fit are dropped from the right.
+// Empty/nil hints produce a plain └───┘ border.
+// Total visual width of output equals w.
+func BottomBorderWithHints(hints []KeyHint, w int) string {
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ColBorder)
+	keyStyle := lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(styles.ColDim)
+	dashSep := borderStyle.Render("\u2500\u2500")
+
+	if w < 4 || len(hints) == 0 {
+		return borderStyle.Render("\u2514" + strings.Repeat("\u2500", w-2) + "\u2518")
+	}
+
+	// Start with └── (corner + 2 dashes)
+	prefix := borderStyle.Render("\u2514\u2500\u2500")
+	// Reserve 1 for └, 2 for initial ──, 1 for ┘
+	usedWidth := 3 + 1 // corner(1) + 2 dashes + corner(1)
+
+	var parts []string
+	for i, hint := range hints {
+		// Render the hint: "key desc"
+		rendered := keyStyle.Render(hint.Key) + " " + descStyle.Render(hint.Desc)
+		hintVis := lipgloss.Width(rendered)
+
+		// Between hints: ── separator
+		sepVis := 0
+		if i > 0 {
+			sepVis = lipgloss.Width(dashSep)
+		}
+
+		if usedWidth+sepVis+hintVis > w-1 { // w-1 to leave room for ┘
+			break
+		}
+
+		if i > 0 {
+			parts = append(parts, dashSep)
+			usedWidth += sepVis
+		}
+		parts = append(parts, rendered)
+		usedWidth += hintVis
+	}
+
+	// Fill remaining width with dashes, then ┘
+	// usedWidth = 3 (prefix) + 1 (reserved for ┘) + hints_width
+	// remaining = w - usedWidth = space for dashes only (┘ already accounted for)
+	remaining := w - usedWidth
+	if remaining < 0 {
+		remaining = 0
+	}
+	suffix := borderStyle.Render(strings.Repeat("\u2500", remaining) + "\u2518")
+
+	var sb strings.Builder
+	sb.WriteString(prefix)
+	for _, p := range parts {
+		sb.WriteString(p)
+	}
+	sb.WriteString(suffix)
+	return sb.String()
+}
+
+// RenderFrameWithHints is like RenderFrame but uses BottomBorderWithHints
+// for the bottom border. When hints is nil/empty, output is identical to RenderFrame.
+func RenderFrameWithHints(lines []string, title string, hints []KeyHint, w, h int) string {
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ColBorder)
+	borderV := borderStyle.Render("\u2502")
+	innerW := w - 2
+
+	topBorder := CenterTitle(title, w)
+
+	var sb strings.Builder
+	sb.WriteString(topBorder)
+
+	contentRows := h - 2
+	for i := 0; i < contentRows; i++ {
+		sb.WriteString("\n")
+		var content string
+		if i < len(lines) {
+			content = lines[i]
+		}
+
+		visW := lipgloss.Width(content)
+		var padded string
+		if visW < innerW {
+			padded = content + strings.Repeat(" ", innerW-visW)
+		} else {
+			padded = content
+		}
+
+		sb.WriteString(borderV)
+		sb.WriteString(padded)
+		sb.WriteString(borderV)
+	}
+
+	sb.WriteString("\n")
+	sb.WriteString(BottomBorderWithHints(hints, w))
+
+	return sb.String()
+}
+
 // RenderHeader produces the 1-line unframed header with optional identity info:
 //
 //	a9s v0.5.0  profile:region (alias) role          ? for help
@@ -175,7 +281,17 @@ func RenderHeader(profile, region, version string, w int, rightContent, accountB
 	leftW := lipgloss.Width(left)
 	gap := innerW - leftW - rightW
 	if gap < 1 {
-		gap = 1
+		// Content too wide — truncate left side to fit
+		maxLeftW := innerW - rightW - 1
+		if maxLeftW < 3 {
+			maxLeftW = 3
+		}
+		left = ansi.Truncate(left, maxLeftW, "\u2026")
+		leftW = lipgloss.Width(left)
+		gap = innerW - leftW - rightW
+		if gap < 1 {
+			gap = 1
+		}
 	}
 
 	content := left + strings.Repeat(" ", gap) + rightContent
