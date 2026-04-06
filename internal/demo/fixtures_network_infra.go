@@ -375,24 +375,6 @@ func igwFixtures() []resource.Resource {
 				},
 			},
 		},
-		{
-			ID:     "igw-0ccc333333333333c",
-			Name:   "detached-igw",
-			Status: "detached",
-			Fields: map[string]string{
-				"igw_id": "igw-0ccc333333333333c",
-				"name":   "detached-igw",
-				"vpc_id": "",
-				"state":  "detached",
-			},
-			RawStruct: ec2types.InternetGateway{
-				InternetGatewayId: aws.String("igw-0ccc333333333333c"),
-				OwnerId:           aws.String("123456789012"),
-				Tags: []ec2types.Tag{
-					{Key: aws.String("Name"), Value: aws.String("detached-igw")},
-				},
-			},
-		},
 	}
 }
 
