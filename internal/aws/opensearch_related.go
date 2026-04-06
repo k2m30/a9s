@@ -3,8 +3,10 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -13,6 +15,7 @@ func init() {
 	resource.RegisterRelated("opensearch", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN, NeedsTargetCache: false},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
 	})
 }
 
@@ -55,6 +58,45 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.
+// Pattern F — reads from RawStruct, no cache needed.
+func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	if len(domain.LogPublishingOptions) == 0 {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, opt := range domain.LogPublishingOptions {
+		if opt.CloudWatchLogsLogGroupArn == nil || *opt.CloudWatchLogsLogGroupArn == "" {
+			continue
+		}
+		arn := *opt.CloudWatchLogsLogGroupArn
+		// ARN format: arn:aws:logs:region:account:log-group:/name:*
+		// Extract log group name by splitting on ":log-group:" and stripping trailing ":*"
+		parts := strings.SplitN(arn, ":log-group:", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		logGroupName := strings.TrimSuffix(parts[1], ":*")
+		if logGroupName == "" {
+			continue
+		}
+		if _, exists := seen[logGroupName]; !exists {
+			seen[logGroupName] = struct{}{}
+			ids = append(ids, logGroupName)
+		}
+	}
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	return relatedResult("logs", ids)
 }
 
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.

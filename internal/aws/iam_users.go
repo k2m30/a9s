@@ -23,6 +23,7 @@ func init() {
 	resource.RegisterRelated("iam-user", []resource.RelatedDef{
 		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: true},
 	})
 }
 

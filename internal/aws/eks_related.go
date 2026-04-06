@@ -23,6 +23,7 @@ func init() {
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEKSAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEKSCFN, NeedsTargetCache: true},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEKSLogs, NeedsTargetCache: true},
 	})
 }
 
@@ -130,6 +131,36 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
 	return relatedResult("cfn", ids)
+}
+
+// checkEKSLogs searches the logs cache for the EKS control-plane log group.
+// Pattern N — naming convention: /aws/eks/{cluster-name}/cluster
+func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterName := res.ID
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	expectedLogGroup := "/aws/eks/" + clusterName + "/cluster"
+
+	logList, truncated, err := eksRelatedResources(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if logList == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+
+	var ids []string
+	for _, logRes := range logList {
+		if logRes.ID == expectedLogGroup {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	return relatedResult("logs", ids)
 }
 
 // eksRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -16,6 +17,7 @@ func init() {
 		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
+		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
 	})
 }
 
@@ -101,6 +103,88 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// sqsRedriveTarget extracts the deadLetterTargetArn from a RedrivePolicy JSON string.
+// Returns empty string if not present or invalid.
+func sqsRedriveTarget(redrivePolicy string) string {
+	if redrivePolicy == "" {
+		return ""
+	}
+	var policy struct {
+		DeadLetterTargetArn string `json:"deadLetterTargetArn"`
+	}
+	if err := json.Unmarshal([]byte(redrivePolicy), &policy); err != nil {
+		return ""
+	}
+	return policy.DeadLetterTargetArn
+}
+
+// checkSQSSQS finds DLQ relationships for this SQS queue in both directions:
+// - Forward: queues that this queue sends dead letters to (via RedrivePolicy)
+// - Reverse: queues that use this queue as their DLQ
+// Pattern C — scans the SQS cache.
+func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	thisARN := ""
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		thisARN = raw.Attributes["QueueArn"]
+	}
+	thisName := res.ID
+
+	sqsList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sqs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1, Err: err}
+	}
+	if sqsList == nil {
+		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+	}
+
+	// Forward: find the DLQ that this queue targets.
+	var forwardDLQARN string
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		forwardDLQARN = sqsRedriveTarget(raw.Attributes["RedrivePolicy"])
+	}
+
+	idSet := make(map[string]struct{})
+	for _, sqsRes := range sqsList {
+		if sqsRes.ID == thisName {
+			// Skip self.
+			continue
+		}
+		raw, ok := assertStruct[SQSQueueAttributesRow](sqsRes.RawStruct)
+		if !ok {
+			continue
+		}
+		candidateARN := raw.Attributes["QueueArn"]
+
+		// Forward: this queue's RedrivePolicy points to candidateARN.
+		if forwardDLQARN != "" && candidateARN != "" && forwardDLQARN == candidateARN {
+			idSet[sqsRes.ID] = struct{}{}
+		}
+
+		// Reverse: candidate queue's RedrivePolicy points to thisARN.
+		if thisARN != "" {
+			dlqTarget := sqsRedriveTarget(raw.Attributes["RedrivePolicy"])
+			if dlqTarget != "" && dlqTarget == thisARN {
+				idSet[sqsRes.ID] = struct{}{}
+			}
+		} else if thisName != "" {
+			// Fallback: match by queue name suffix.
+			dlqTarget := sqsRedriveTarget(raw.Attributes["RedrivePolicy"])
+			if dlqTarget != "" && strings.HasSuffix(dlqTarget, ":"+thisName) {
+				idSet[sqsRes.ID] = struct{}{}
+			}
+		}
+	}
+
+	var ids []string
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+	}
+	return relatedResult("sqs", ids)
 }
 
 // sqsRelatedResources returns the cached resource list for the given target type,
