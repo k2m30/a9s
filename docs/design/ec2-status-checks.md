@@ -1,7 +1,7 @@
 # EC2 Instance Status Checks — Design Spec
 
 Issue: [#188](https://github.com/k2m30/a9s/issues/188)
-Version: 1.1
+Version: 1.2
 Related: [#196](https://github.com/k2m30/a9s/issues/196) (resource issues overlay),
 [`deterministic-issue-signals.md`](deterministic-issue-signals.md)
 
@@ -88,73 +88,26 @@ Status values are color-coded:
 - `insufficient-data` — DIM `#565f89`
 - `not-applicable` — DIM `#565f89`
 
-### 3.3 Fetch Strategy — Filter-Based Background Enrichment
+### 3.3 Fetch Strategy — Per-Page Background Enrichment
 
-`DescribeInstanceStatus` supports **server-side filters** on status values.
-Instead of fetching checks for every instance, we ask AWS to return only
-instances with problems.
-
-**Two targeted calls, fired in parallel after the instance list loads:**
-
-```
-Call 1: DescribeInstanceStatus
-  Filters: [{ Name: "instance-status.status",  Values: ["impaired"] },
-            { Name: "system-status.status",     Values: ["impaired"] }]
-  → Returns only instances where at least one check is impaired
-
-Call 2: DescribeInstanceStatus
-  Filters: [{ Name: "instance-status.status",  Values: ["initializing"] },
-            { Name: "system-status.status",     Values: ["initializing"] }]
-  → Returns only instances where checks are still initializing
-```
-
-**Why this is better than fetching all instance IDs:**
-- **Common case is free**: healthy fleet → both calls return 0 results
-- **No instance ID list needed**: filters are account-wide, no dependency on
-  which page of instances is loaded
-- **Tiny response**: typically 0-5 instances, not hundreds
-- **No pagination headaches**: result set is almost always under the page limit
-- **Works with paginated instance list**: enrichment is independent of which
-  DescribeInstances page the user is viewing
-
-**Single call alternative (simpler):**
-
-Actually, a single call with `IncludeAllInstances: false` and **no filters**
-could also work — it returns all instances where status is NOT `ok`. But the
-filter approach is more explicit and avoids returning `insufficient-data`
-instances that we'd discard anyway.
-
-**Chosen approach: single call with exclusion filter.**
+After each page of `DescribeInstances` loads, fire a background
+`DescribeInstanceStatus` call with the current page's instance IDs.
+Merge results directly into `Resource.Fields`.
 
 ```
 DescribeInstanceStatus
-  IncludeAllInstances: false   (default — only running instances)
-  Filters: [{ Name: "instance-status.status", Values: ["impaired", "initializing"] }]
-
-  + second call:
-  Filters: [{ Name: "system-status.status", Values: ["impaired", "initializing"] }]
+  InstanceIds: [current page instance IDs]
+  IncludeAllInstances: true
 ```
 
-Wait — the filters are OR within a single filter name but AND across filter
-names. To catch "system OR instance is bad" we need either:
-- Two separate calls (one filtering system-status, one filtering instance-status)
-- One call with no filters, then client-side filtering
+`IncludeAllInstances: true` ensures we get results for all instances on the
+page, not just running ones. Stopped/terminated instances return
+`not-applicable` — we simply ignore those during rendering.
 
-**Final decision: one unfiltered call, client-side filter.**
-
-```
-DescribeInstanceStatus
-  IncludeAllInstances: false
-  (no filters — returns all running instances with ANY non-ok status)
-```
-
-This returns instances where system OR instance status is not `ok`. The
-response typically contains only instances with `impaired` or `initializing`
-status. In a healthy fleet, this returns an empty list. We filter out
-`insufficient-data` client-side (treated as healthy).
-
-This is the simplest approach: one API call, zero results for healthy fleets,
-a handful of results when something is wrong.
+Two API calls per page total: `DescribeInstances` (already exists) +
+`DescribeInstanceStatus` (new, background). At most 200 instance IDs per
+page — if that exceeds the 100-instance limit per `DescribeInstanceStatus`
+call, paginate with `NextToken`.
 
 ### 3.4 Fetch Flow
 
@@ -162,16 +115,15 @@ a handful of results when something is wrong.
 1. DescribeInstances returns page → list renders immediately, no indicators
 
 2. Background Cmd fires:
-     DescribeInstanceStatus(IncludeAllInstances: false)
-   This returns ONLY instances where system or instance status != ok.
+     DescribeInstanceStatus(InstanceIds: pageInstanceIDs, IncludeAllInstances: true)
 
-3. StatusChecksLoadedMsg arrives with map[instanceID]→{system, instance}
-   Only problematic instances are in the map.
+3. StatusChecksLoadedMsg arrives → merge system_status + instance_status
+   into Resource.Fields for each instance on the page
 
 4. List re-renders:
-   - Instance ID in the map with "impaired" → ! prefix
-   - Instance ID in the map with "initializing" → ~ prefix
-   - Instance ID NOT in the map → no indicator (healthy)
+   - Fields["system_status"] or Fields["instance_status"] == "impaired" → ! prefix
+   - Fields["system_status"] or Fields["instance_status"] == "initializing" → ~ prefix
+   - Otherwise → no indicator
 ```
 
 ### 3.5 Refresh Behavior
@@ -179,19 +131,9 @@ a handful of results when something is wrong.
 - `Ctrl+R`: re-fetches both `DescribeInstances` and `DescribeInstanceStatus`.
   Indicators disappear during refresh (correct — silence means healthy until
   proven otherwise).
+- Page navigation: new page triggers a new `DescribeInstanceStatus` call for
+  that page's instance IDs.
 - No auto-poll. Manual refresh only.
-
-### 3.6 Cost Analysis
-
-| Scenario                     | API Calls | Response Size |
-|------------------------------|-----------|---------------|
-| Healthy fleet (common)       | 1         | 0 instances   |
-| 2 instances with issues      | 1         | 2 instances   |
-| 50 instances initializing    | 1 (maybe paginated) | 50 instances |
-
-Compare with the "fetch all" approach: 1 call per page × N pages, returning
-all running instances regardless of health. The filter approach is strictly
-cheaper for the common case.
 
 ---
 
@@ -310,34 +252,22 @@ No new colors. Reuses existing Tokyo Night Dark palette:
 
 ---
 
-## 6. Data Model — Separate Problem Set (Not Merged Into Resources)
+## 6. Data Model — Merge Into Resource.Fields
 
-The status checks result is **not merged** into `Resource.Fields`. Instead,
-it is stored as a separate lookup map on the view model:
+Status check results are merged directly into `Resource.Fields` for each
+instance on the current page. No separate data structure.
 
-```
-statusChecks map[string]StatusCheckResult   // instance ID → problem info
-```
+| Field Key          | Source                            | Stored In          |
+|--------------------|-----------------------------------|--------------------|
+| `system_status`    | `SystemStatus.Status`             | `Resource.Fields`  |
+| `instance_status`  | `InstanceStatus.Status`           | `Resource.Fields`  |
 
-This map only contains entries for problematic instances (typically 0-50).
-The paginated resource list is untouched.
+These fields are populated by `StatusChecksLoadedMsg` and read by:
+- List view: to decide whether to prepend `!` or `~` to the STATE cell
+- Detail view: to render the `Status Checks` section
 
-**Why separate, not merged:**
-- The EC2 list is paginated. Merging into `Resource.Fields` would only
-  annotate instances on the current page. But status checks are account-wide
-  and cheap — the problem set applies across all pages.
-- On page navigation, merged fields would be lost and need re-merging.
-- Keeping the problem set separate means it survives page changes and only
-  needs re-fetching on `Ctrl+R`.
-- The detail view reads from the same map when rendering the Status Checks
-  section.
-
-**Lookup keys:**
-
-| Field               | Source                          | Stored In                          |
-|---------------------|---------------------------------|------------------------------------|
-| `SystemStatus`      | `SystemStatus.Status`           | `statusChecks[id].SystemStatus`    |
-| `InstanceStatus`    | `InstanceStatus.Status`         | `statusChecks[id].InstanceStatus`  |
+On page navigation, the new page's instances start without these fields
+(no indicators), then the background call populates them.
 
 ---
 
@@ -349,13 +279,12 @@ The paginated resource list is untouched.
 
 ```
 StatusCheckResult {
-    SystemStatus   string  // "impaired", "initializing"
-    InstanceStatus string  // "impaired", "initializing"
+    SystemStatus   string  // "ok", "impaired", "initializing", "not-applicable", ...
+    InstanceStatus string  // same enum
 }
 ```
 
-The map only contains entries for problematic instances. An empty map means
-the entire fleet is healthy.
+The map contains entries for all instances on the current page.
 
 ---
 
@@ -364,22 +293,19 @@ the entire fleet is healthy.
 ```
 ResourcesLoadedMsg (EC2 page)
   → List renders normally (no indicators)
-  → Background Cmd fires: fetchProblematicStatusChecks()
-      DescribeInstanceStatus(IncludeAllInstances: false)
-      Returns only instances where status != ok
+  → Background Cmd fires: fetchStatusChecks(pageInstanceIDs)
+      DescribeInstanceStatus(InstanceIds: [...], IncludeAllInstances: true)
 
 StatusChecksLoadedMsg
-  → Stores the problem map as a separate lookup: statusChecks map[id]→result
-  → List re-renders; renderer checks each row's instance ID against the map
-  → Rows found in the map gain ! or ~ prefix
+  → Merges system_status + instance_status into Resource.Fields
+  → List re-renders; rows with impaired/initializing gain ! or ~ prefix
 
 KeyMsg(ctrl+r)
-  → Clears the statusChecks map
-  → Re-fetches DescribeInstances AND re-fires status checks background Cmd
+  → Re-fetches DescribeInstances (clears Fields)
+  → Background Cmd re-fires for status checks on the new page
 
-Page navigation (next/prev page of EC2 instances)
-  → statusChecks map is RETAINED — it's account-wide, not page-specific
-  → New page rows are checked against the existing map immediately
+Page navigation
+  → New page loads → new background status check call for that page's IDs
 ```
 
 ---
@@ -389,34 +315,33 @@ Page navigation (next/prev page of EC2 instances)
 When rendering the STATE cell for an EC2 resource:
 
 ```
-state = resource.Fields["state"]
-id    = resource.ID
+state      = resource.Fields["state"]
+sysStatus  = resource.Fields["system_status"]
+instStatus = resource.Fields["instance_status"]
 
-// Look up in the separate problem set (not in Resource.Fields)
-check, hasProblem = statusChecks[id]
-
-if state == "running" && hasProblem {
-    if check.SystemStatus == "impaired" || check.InstanceStatus == "impaired" {
-        return RED_BOLD("!") + " " + state    // failed check
+if state == "running" {
+    if sysStatus == "impaired" || instStatus == "impaired" {
+        return RED_BOLD("!") + " " + state
     }
-    if check.SystemStatus == "initializing" || check.InstanceStatus == "initializing" {
-        return YELLOW("~") + " " + state       // still initializing
+    if sysStatus == "initializing" || instStatus == "initializing" {
+        return YELLOW("~") + " " + state
     }
 }
-return state  // healthy (not in map), non-running, or not yet enriched
+return state  // healthy, non-running, or not yet enriched
 ```
 
 The `!` / `~` glyph is rendered with its own `lipgloss.Style` foreground,
 separate from the row-level status color style.
 
-The detail view uses the same lookup:
+The detail view reads the same fields:
 
 ```
-check, hasProblem = statusChecks[resource.ID]
-if hasProblem {
-    // Render "Status Checks:" section with check.SystemStatus, check.InstanceStatus
+sysStatus  = resource.Fields["system_status"]
+instStatus = resource.Fields["instance_status"]
+if sysStatus != "" {
+    // Render "Status Checks:" section with sysStatus, instStatus
 }
-// Otherwise: omit the section entirely (silence means healthy)
+// Otherwise: omit the section entirely (not yet fetched or not applicable)
 ```
 
 ---
@@ -443,27 +368,17 @@ issues toggle key, reinforcing the visual language.
 
 ## 11. Demo Mode
 
-Demo mode provides a separate `statusChecks` map containing only problematic
-instances. Healthy instances are absent from the map.
+Demo fixtures set `system_status` and `instance_status` fields on EC2 instances:
 
-**Problem set map (2 entries):**
-
-| Instance ID              | System Status  | Instance Status |
-|--------------------------|----------------|-----------------|
-| i-0def456789abcdef0      | ok             | impaired        |
-| i-0def456789abcdef1      | initializing   | initializing    |
-
-**EC2 instance list (unchanged):**
-
-| Instance      | State       | Effect in List View             |
-|---------------|-------------|---------------------------------|
-| api-prod-01   | running     | No indicator (not in map)       |
-| api-prod-02   | running     | No indicator (not in map)       |
-| worker-01     | running     | `! running` (found in map: impaired) |
-| worker-02     | running     | `~ running` (found in map: initializing) |
-| bastion       | running     | No indicator (not in map)       |
-| old-worker    | stopped     | No indicator (not in map)       |
-| legacy-app    | terminated  | No indicator (not in map)       |
+| Instance      | State       | system_status  | instance_status | List View       |
+|---------------|-------------|----------------|-----------------|-----------------|
+| api-prod-01   | running     | ok             | ok              | `running`       |
+| api-prod-02   | running     | ok             | ok              | `running`       |
+| worker-01     | running     | ok             | impaired        | `! running`     |
+| worker-02     | running     | initializing   | initializing    | `~ running`     |
+| bastion       | running     | ok             | ok              | `running`       |
+| old-worker    | stopped     | (empty)        | (empty)         | `stopped`       |
+| legacy-app    | terminated  | (empty)        | (empty)         | `terminated`    |
 
 ---
 
