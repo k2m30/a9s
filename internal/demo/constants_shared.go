@@ -281,4 +281,10 @@ const (
 	// sns related-view IDs
 	relatedSNSAlarmID1 = "api-high-error-rate"
 	relatedSNSAlarmID2 = "rds-cpu-utilization"
+
+	// sns-sub related-view IDs
+	relatedSNSSubTopicID  = "arn:aws:sns:us-east-1:123456789012:alarm-notifications"
+	relatedSNSSubTopicID2 = "arn:aws:sns:us-east-1:123456789012:order-events"
+	relatedSNSSubLambdaID = "cloudwatch-slack-notifier"
+	relatedSNSSubSQSID    = "order-processing-queue"
 )

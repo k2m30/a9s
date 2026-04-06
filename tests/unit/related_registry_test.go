@@ -1555,6 +1555,26 @@ func TestRelated_SNS_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_SNSSub_Registered(t *testing.T) {
+	defs := resource.GetRelated("sns-sub")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for sns-sub")
+	}
+	expected := []string{"sns", "lambda", "sqs"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for sns-sub", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

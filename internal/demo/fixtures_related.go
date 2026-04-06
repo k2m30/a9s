@@ -538,4 +538,35 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("sns-sub", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "arn:aws:sns:us-east-1:123456789012:alarm-notifications:a1b2c3d4-e5f6-7890-abcd-ef1234567890":
+			// protocol=email: topic hit only
+			return []resource.RelatedCheckResult{
+				{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedSNSSubTopicID}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "sqs", Count: 0},
+			}
+		case "arn:aws:sns:us-east-1:123456789012:alarm-notifications:b2c3d4e5-f6a7-8901-bcde-f12345678901":
+			// protocol=lambda: topic + lambda hit
+			return []resource.RelatedCheckResult{
+				{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedSNSSubTopicID}},
+				{TargetType: "lambda", Count: 1, ResourceIDs: []string{relatedSNSSubLambdaID}},
+				{TargetType: "sqs", Count: 0},
+			}
+		case "arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012":
+			// protocol=sqs: topic + sqs hit
+			return []resource.RelatedCheckResult{
+				{TargetType: "sns", Count: 1, ResourceIDs: []string{relatedSNSSubTopicID2}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "sqs", Count: 1, ResourceIDs: []string{relatedSNSSubSQSID}},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "sns", Count: 0},
+			{TargetType: "lambda", Count: 0},
+			{TargetType: "sqs", Count: 0},
+		}
+	})
 }
