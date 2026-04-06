@@ -2058,7 +2058,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 // Load More Indicator in View()
 //
 // When a resource list is truncated (IsTruncated=true), the View() output
-// must show a "load more" indicator with the M key hint. This indicator
+// must show a "load more" indicator with the m key hint. This indicator
 // disappears when all pages are loaded, or changes to a loading indicator
 // while loadingMore is in progress.
 // ===========================================================================
@@ -2080,8 +2080,8 @@ func TestStory_LoadMoreIndicator_ShownWhenTruncated(t *testing.T) {
 	if !strings.Contains(outputLower, "load more") {
 		t.Errorf("View() for truncated list must contain 'load more', got:\n%s", output)
 	}
-	if !strings.Contains(output, "M") {
-		t.Errorf("View() for truncated list must contain 'M' key hint, got:\n%s", output)
+	if !strings.Contains(outputLower, "m: load more") {
+		t.Errorf("View() for truncated list must contain 'm' key hint, got:\n%s", output)
 	}
 }
 

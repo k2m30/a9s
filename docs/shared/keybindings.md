@@ -28,7 +28,7 @@
 | `Ctrl+R` | Refresh |
 | `e` | Open Service Events (ECS Services) |
 | `L` | Open Container Logs (ECS Services) |
-| `M` | Load more (paginated lists, also in demo mode) |
+| `m` | Load more (paginated lists, also in demo mode) |
 | `R` | Open Stack Resources (CFN Stacks) |
 | `s` | Open source view (reserved for future child views) |
 | `w` | Toggle line wrap (in YAML, detail, and reveal views) |

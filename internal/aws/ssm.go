@@ -51,7 +51,7 @@ func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]re
 // FetchSSMParametersPage calls the SSM DescribeParameters API and returns a single
 // page of parameters. Pass an empty continuationToken for the first page.
 func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ssm.DescribeParametersInput{}
+	input := &ssm.DescribeParametersInput{MaxResults: aws.Int32(DefaultPageSize)}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

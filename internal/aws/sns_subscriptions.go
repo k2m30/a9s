@@ -104,6 +104,11 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 		nextToken = *output.NextToken
 		isTruncated = true
 	}
+	// SNS ListSubscriptions may return a NextToken even with 0 results (known API quirk).
+	if len(resources) == 0 {
+		isTruncated = false
+		nextToken = ""
+	}
 
 	totalHint := len(resources)
 	if isTruncated {

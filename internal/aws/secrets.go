@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -50,7 +51,7 @@ func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]reso
 // FetchSecretsPage calls the SecretsManager ListSecrets API and returns a single
 // page of secrets. Pass an empty continuationToken for the first page.
 func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &secretsmanager.ListSecretsInput{}
+	input := &secretsmanager.ListSecretsInput{MaxResults: aws.Int32(DefaultPageSize)}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

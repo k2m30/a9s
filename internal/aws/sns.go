@@ -88,6 +88,11 @@ func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationT
 		nextToken = *output.NextToken
 		isTruncated = true
 	}
+	// Defensive: treat empty-result pages as non-truncated.
+	if len(resources) == 0 {
+		isTruncated = false
+		nextToken = ""
+	}
 
 	totalHint := len(resources)
 	if isTruncated {

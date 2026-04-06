@@ -101,7 +101,7 @@ func Default() Map {
 		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u", "\x15"), key.WithHelp("pgup", "page up")),
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d", "\x04"), key.WithHelp("pgdn", "page down")),
 
-		LoadMore: key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "load more")),
+		LoadMore: key.NewBinding(key.WithKeys("m", "M"), key.WithHelp("m", "load more")),
 
 		ToggleWrap: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap")),
 
