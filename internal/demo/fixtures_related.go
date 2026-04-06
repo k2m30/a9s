@@ -482,4 +482,23 @@ func init() {
 			}
 		}
 	})
+
+	resource.RegisterRelatedDemo("secrets", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "prod/docdb/acme-docdb-prod":
+			return []resource.RelatedCheckResult{
+				{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedSecretsKMSID}},
+				{TargetType: "lambda", Count: 1},
+				{TargetType: "dbi", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		default:
+			return []resource.RelatedCheckResult{
+				{TargetType: "kms", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "dbi", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+	})
 }
