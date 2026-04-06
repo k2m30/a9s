@@ -132,19 +132,21 @@ func TestRelated_AMI_EBSSnaps_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- ASG Stub Test ---
+// --- ami→asg: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_AMI_ASG_IsStub(t *testing.T) {
-	defs := resource.GetRelated("ami")
-	for _, def := range defs {
-		if def.TargetType == "asg" {
-			if def.Checker != nil {
-				t.Error("ami asg: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_AMI_ASG_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "ami-0abc1234def56789",
+		Name: "my-golden-image",
 	}
-	t.Error("ami asg related def not found")
+	checker := amiCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "asg" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "asg")
+	}
 }
 
 // --- Demo Checker Test ---

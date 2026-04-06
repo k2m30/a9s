@@ -1,12 +1,29 @@
 package unit_test
 
 import (
+	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// iamGroupCheckerByTarget returns the RelatedChecker for the given target type
+// registered under "iam-group". Fails immediately if the checker is nil or not found.
+func iamGroupCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("iam-group") {
+		if def.TargetType == target {
+			if def.Checker == nil {
+				t.Fatalf("iam-group related checker for %s is nil", target)
+			}
+			return def.Checker
+		}
+	}
+	t.Fatalf("iam-group related checker for %s not found", target)
+	return nil
+}
 
 // --- Navigable Fields ---
 
@@ -17,38 +34,60 @@ func TestNavigableFields_IAMGroup_None(t *testing.T) {
 	}
 }
 
-// --- Stub Checkers ---
+// --- iam-group→iam-user (IAM API: GetGroup) ---
 
-func TestRelated_IAMGroup_UserStub(t *testing.T) {
-	defs := resource.GetRelated("iam-group")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for iam-group")
-	}
-	for _, def := range defs {
-		if def.TargetType == "iam-user" {
-			if def.Checker != nil {
-				t.Errorf("iam-group iam-user Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
-	}
-	t.Error("expected related def for target iam-user not found for iam-group")
+func TestRelated_IAMGroup_User_NonNil(t *testing.T) {
+	checker := iamGroupCheckerByTarget(t, "iam-user")
+	_ = checker
 }
 
-func TestRelated_IAMGroup_PolicyStub(t *testing.T) {
-	defs := resource.GetRelated("iam-group")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for iam-group")
+func TestRelated_IAMGroup_User_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "dev-team",
+		Name: "dev-team",
 	}
-	for _, def := range defs {
-		if def.TargetType == "policy" {
-			if def.Checker != nil {
-				t.Errorf("iam-group policy Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := iamGroupCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
-	t.Error("expected related def for target policy not found for iam-group")
+	if result.TargetType != "iam-user" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-user")
+	}
+}
+
+func TestRelated_IAMGroup_User_EmptyID(t *testing.T) {
+	source := resource.Resource{
+		ID:   "",
+		Name: "",
+	}
+	checker := iamGroupCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+}
+
+// --- iam-group→policy (IAM API: ListAttachedGroupPolicies) ---
+
+func TestRelated_IAMGroup_Policy_NonNil(t *testing.T) {
+	checker := iamGroupCheckerByTarget(t, "policy")
+	_ = checker
+}
+
+func TestRelated_IAMGroup_Policy_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "dev-team",
+		Name: "dev-team",
+	}
+	checker := iamGroupCheckerByTarget(t, "policy")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+	if result.TargetType != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	}
 }
 
 // --- Demo Checker ---

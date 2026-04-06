@@ -21,7 +21,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("backup", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
 	})
 }
 

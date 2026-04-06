@@ -101,6 +101,13 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("alarm", ids)
 }
 
+// checkELBCFN returns Count: 0 because ELBv2 LoadBalancer tags are not included
+// in the DescribeLoadBalancers response — the CFN relationship cannot be
+// determined from cache alone.
+func checkELBCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // elbRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func elbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

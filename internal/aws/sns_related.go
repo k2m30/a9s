@@ -13,8 +13,14 @@ import (
 func init() {
 	resource.RegisterRelated("sns", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSNSCFN, NeedsTargetCache: true},
 	})
+}
+
+// checkSNSCFN returns Count: 0 because SNS topic tags are not included in the
+// ListTopics response — the CFN relationship cannot be determined from cache alone.
+func checkSNSCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,

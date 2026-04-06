@@ -23,7 +23,7 @@ func init() {
 	resource.RegisterRelated("dbc", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbcSG},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbcAlarm, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: nil},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
 	})
 }

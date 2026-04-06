@@ -12,8 +12,15 @@ import (
 func init() {
 	resource.RegisterRelated("opensearch", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN, NeedsTargetCache: false},
 	})
+}
+
+// checkOpenSearchCFN returns Count: 0 because OpenSearch domain tags are not
+// included in the ListDomainNames response — the CFN relationship cannot be
+// determined from cache alone.
+func checkOpenSearchCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkOpenSearchAlarms checks the cache for CloudWatch alarms with DomainName dimension matching this domain.

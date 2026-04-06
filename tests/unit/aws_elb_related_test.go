@@ -307,22 +307,21 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (stub — elbv2types.LoadBalancer has no Tags field) ---
+// --- elb→cfn: undeterminable from cache (no tags in list API), returns Count: 0 ---
 
-func TestRelated_ELB_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("elb")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for elb")
+func TestRelated_ELB_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-prod-web",
+		Name: "acme-prod-web",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("elb cfn Checker should be nil (stub) — elbv2types.LoadBalancer has no Tags field")
-			}
-			return
-		}
+	checker := elbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for elb")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

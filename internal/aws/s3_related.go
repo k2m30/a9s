@@ -103,11 +103,23 @@ func s3RelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	return resources, isTruncated, err
 }
 
+// checkS3Lambda returns Count: 0 because S3 notification configurations are not
+// available in the list API — the relationship cannot be determined from cache.
+func checkS3Lambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+// checkS3CFN returns Count: 0 because S3 bucket tags are not included in the
+// list API response — the relationship cannot be determined from cache.
+func checkS3CFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 func init() {
 	resource.RegisterRelated("s3", []resource.RelatedDef{
 		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkS3Trail, NeedsTargetCache: true},
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkS3CF, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda (notifications)", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda (notifications)", Checker: checkS3Lambda, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN, NeedsTargetCache: true},
 	})
 }

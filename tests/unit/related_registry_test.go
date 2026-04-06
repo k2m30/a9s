@@ -278,16 +278,12 @@ func TestRelated_AMI_Registered(t *testing.T) {
 		}
 	}
 
-	// ec2 and ebs-snap should have non-nil checkers, asg is a stub
+	// ec2, ebs-snap, and asg should all have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
-		case "ec2", "ebs-snap":
+		case "ec2", "ebs-snap", "asg":
 			if def.Checker == nil {
 				t.Errorf("ami %s: Checker should not be nil", def.TargetType)
-			}
-		case "asg":
-			if def.Checker != nil {
-				t.Error("ami asg: Checker should be nil (stub)")
 			}
 		}
 	}
@@ -826,7 +822,7 @@ func TestRelated_EFS_Registered(t *testing.T) {
 	expected := map[string]expectation{
 		"kms":    {"KMS Keys", true},
 		"cfn":    {"CloudFormation Stacks", true},
-		"lambda": {"Lambda Functions", false},
+		"lambda": {"Lambda Functions", true},
 	}
 	for target, want := range expected {
 		found := false
@@ -940,7 +936,7 @@ func TestRelated_ELB_Registered(t *testing.T) {
 	expected := map[string]expectation{
 		"tg":    {"Target Groups", true},
 		"alarm": {"CW Alarms", true},
-		"cfn":   {"CloudFormation", false},
+		"cfn":   {"CloudFormation", true},
 	}
 	for target, want := range expected {
 		found := false
@@ -1145,16 +1141,12 @@ func TestRelated_Lambda_Registered(t *testing.T) {
 		}
 	}
 
-	// role and alarm must have non-nil checkers; sqs and cfn are stubs (nil).
+	// role, alarm, sqs, and cfn must all have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
-		case "role", "alarm":
+		case "role", "alarm", "sqs", "cfn":
 			if def.Checker == nil {
 				t.Errorf("lambda %q: Checker should not be nil", def.TargetType)
-			}
-		case "sqs", "cfn":
-			if def.Checker != nil {
-				t.Errorf("lambda %q: Checker should be nil (stub)", def.TargetType)
 			}
 		}
 	}

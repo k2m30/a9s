@@ -179,19 +179,21 @@ func TestRelated_SNS_Alarm_EmptyCache(t *testing.T) {
 	}
 }
 
-// --- CFN stub test ---
+// --- sns→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_SNS_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("sns")
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Error("sns cfn def: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_SNS_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "arn:aws:sns:us-east-1:111122223333:alarm-notifications",
+		Name: "alarm-notifications",
 	}
-	t.Error("sns cfn related def not found")
+	checker := snsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- InsufficientDataActions coverage ---

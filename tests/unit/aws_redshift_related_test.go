@@ -122,17 +122,24 @@ func TestRelated_Redshift_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (stub) ---
+// --- redshift→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Redshift_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("redshift")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for redshift")
+func TestRelated_Redshift_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "analytics-prod",
+		Name: "analytics-prod",
 	}
-	for _, def := range defs {
+	for _, def := range resource.GetRelated("redshift") {
 		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("redshift cfn Checker should be nil (stub)")
+			if def.Checker == nil {
+				t.Fatal("redshift cfn Checker is nil")
+			}
+			result := def.Checker(context.Background(), nil, source, resource.ResourceCache{})
+			if result.Count != 0 {
+				t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+			}
+			if result.TargetType != "cfn" {
+				t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
 			}
 			return
 		}

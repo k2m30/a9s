@@ -48,6 +48,20 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("logs", ids)
 }
 
+// checkApigwLambda returns Count: 0 because API Gateway integration configuration
+// (Lambda targets) is not available in the GetApis list response — the
+// relationship cannot be determined from cache alone.
+func checkApigwLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+// checkApigwWAF returns Count: 0 because WAF Web ACL associations with API
+// Gateway are not available in the GetApis list response — the relationship
+// cannot be determined from cache alone.
+func checkApigwWAF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+}
+
 // apigwRelatedResources returns the resource list for target from cache or by fetching the first page.
 func apigwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

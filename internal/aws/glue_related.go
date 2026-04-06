@@ -84,6 +84,12 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("alarm", ids)
 }
 
+// checkGlueCFN returns Count: 0 because Glue job tags are not included in the
+// GetJobs list response — the CFN relationship cannot be determined from cache alone.
+func checkGlueCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // glueRelatedResources returns the resource list for target from cache or by fetching the first page.
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
