@@ -232,4 +232,9 @@ const (
 	// lambda related-view IDs
 	relatedLambdaRoleID  = "acme-lambda-execution"
 	relatedLambdaAlarmID = "lambda-errors-critical"
+
+	// nat related-view IDs
+	relatedNATVPCID    = prodVPCID
+	relatedNATSubnetID = prodPublicSubnetA
+	relatedNATRTBID    = "rtb-0aaa111111111111a"
 )
