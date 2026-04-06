@@ -12,12 +12,19 @@ import (
 func init() {
 	resource.RegisterFieldKeys("sfn", []string{"name", "type", "arn", "creation_date"})
 
-	resource.RegisterPaginated("sfn", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("sfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
 		return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
+	})
+
+	resource.RegisterRelated("sfn", []resource.RelatedDef{
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "logs", DisplayName: "CloudWatch Logs", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
 }
 
