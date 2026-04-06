@@ -294,4 +294,13 @@ const (
 
 	// ssm related-view IDs
 	relatedSSMKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+
+	// subnet related-view IDs (prodPublicSubnetA scenario)
+	relatedSubnetEC2ID1 = "i-0a1b2c3d4e5f60001"
+	relatedSubnetEC2ID2 = "i-0a1b2c3d4e5f60002"
+	relatedSubnetEC2ID3 = "i-0a1b2c3d4e5f60005"
+	relatedSubnetENIID1 = "eni-0aaa111111111111a"
+	relatedSubnetNATID1 = "nat-0aaa111111111111a"
+	relatedSubnetELBID1 = prodELBName    // acme-prod-web — uses prodPublicSubnetA
+	relatedSubnetELBID2 = "acme-prod-nlb" // uses prodPublicSubnetA
 )
