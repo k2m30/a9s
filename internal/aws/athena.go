@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -47,7 +48,9 @@ func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]
 
 // FetchAthenaWorkgroupsPage fetches a single page of Athena workgroups.
 func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &athena.ListWorkGroupsInput{}
+	input := &athena.ListWorkGroupsInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

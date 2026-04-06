@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]
 
 // FetchEBEnvironmentsPage fetches a single page of Elastic Beanstalk environments.
 func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &elasticbeanstalk.DescribeEnvironmentsInput{}
+	input := &elasticbeanstalk.DescribeEnvironmentsInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

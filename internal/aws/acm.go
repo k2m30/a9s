@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -50,7 +51,9 @@ func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]re
 
 // FetchACMCertificatesPage fetches a single page of ACM certificates.
 func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &acm.ListCertificatesInput{}
+	input := &acm.ListCertificatesInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

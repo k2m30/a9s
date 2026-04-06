@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -52,7 +53,9 @@ func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) (
 
 // FetchECRRepositoriesPage fetches a single page of ECR repositories.
 func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ecr.DescribeRepositoriesInput{}
+	input := &ecr.DescribeRepositoriesInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

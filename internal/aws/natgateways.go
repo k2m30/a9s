@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -54,7 +55,9 @@ func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]res
 
 // FetchNatGatewaysPage fetches a single page of NAT gateways.
 func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeNatGatewaysInput{}
+	input := &ec2.DescribeNatGatewaysInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

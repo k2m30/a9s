@@ -84,7 +84,7 @@ func FetchS3BucketsPageWithNotifications(
 	continuationToken string,
 ) (resource.FetchResult, error) {
 	input := &s3.ListBucketsInput{
-		MaxBuckets: aws.Int32(200),
+		MaxBuckets: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.ContinuationToken = &continuationToken

@@ -51,7 +51,9 @@ func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describe
 // names, then DescribeTable per table for full details.
 // Pass an empty continuationToken for the first page.
 func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &dynamodb.ListTablesInput{}
+	input := &dynamodb.ListTablesInput{
+		Limit: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.ExclusiveStartTableName = &continuationToken
 	}

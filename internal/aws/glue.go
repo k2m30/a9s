@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -54,7 +55,9 @@ func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource
 
 // FetchGlueJobsPage fetches a single page of Glue jobs.
 func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &glue.GetJobsInput{}
+	input := &glue.GetJobsInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}
