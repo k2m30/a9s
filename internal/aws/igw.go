@@ -12,6 +12,15 @@ import (
 func init() {
 	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state"})
 
+	resource.RegisterNavigableFields("igw", []resource.NavigableField{
+		{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
+	})
+
+	resource.RegisterRelated("igw", []resource.RelatedDef{
+		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkIGWVPC, NeedsTargetCache: true},
+		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkIGWRTB, NeedsTargetCache: true},
+	})
+
 	resource.RegisterPaginated("igw", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {

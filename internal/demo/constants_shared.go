@@ -218,4 +218,9 @@ const (
 
 	// glue related-view IDs
 	relatedGlueRoleID1 = "acme-glue-role"
+
+	// igw related-view IDs
+	relatedIGWVPCID  = prodVPCID
+	relatedIGWRTBID1 = "rtb-0aaa111111111111a"
+	relatedIGWRTBID2 = "rtb-0bbb222222222222b"
 )
