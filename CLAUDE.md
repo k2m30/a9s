@@ -209,6 +209,17 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - Website uses Hugo `{{< include >}}` shortcodes that resolve to `docs/shared/` via module mount
 - **Never edit README.md directly** — it will be overwritten by readmegen
 
+### Counting unit tests
+
+The test count in `docs/README.tmpl.md` and `website/themes/a9s-theme/layouts/index.html` must reflect top-level test functions, NOT subtests. `rtk go test -v` compresses output and hides `--- PASS` lines, so you must bypass it:
+
+```
+rtk proxy go test ./tests/unit/ -count=1 -timeout 120s -v > /tmp/a9s-verbose.txt 2>&1
+rtk grep -e "--- PASS" -c /tmp/a9s-verbose.txt
+```
+
+Round down to the nearest hundred for the public-facing number (e.g., 4,497 → "4,400+").
+
 When code changes affect any of the following, update the shared source and regenerate:
 - Key bindings added/removed/changed → `docs/shared/keybindings.md`
 - Child views added/removed → `docs/shared/childviews.md`
