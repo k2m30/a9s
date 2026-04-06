@@ -292,6 +292,13 @@ const (
 	relatedSQSSNSSubID = "arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012"
 	relatedSQSAlarmID  = "sqs-queue-depth-high"
 
+	// trail related-view IDs
+	relatedTrailMgmtS3ID = "cloudtrail-audit-logs"                                  // S3 bucket used by acme-management-trail
+	relatedTrailS3ID     = "data-pipeline-logs"                                     // S3 bucket used by acme-audit-trail
+	relatedTrailLogsID   = "/aws/cloudtrail"                                         // CW log group for CloudTrail
+	relatedTrailSNSID    = "arn:aws:sns:us-east-1:123456789012:alarm-notifications"  // SNS topic for CloudTrail
+	relatedTrailKMSID    = "a1b2c3d4-5678-90ab-cdef-111111111111"                    // KMS key for acme-management-trail
+
 	// ssm related-view IDs
 	relatedSSMKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
