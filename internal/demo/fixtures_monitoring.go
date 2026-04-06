@@ -654,7 +654,7 @@ func cloudwatchLogGroupFixtures() []resource.Resource {
 
 	// Generate log group fixtures for every Lambda function that sets log_group in its Fields.
 	// This satisfies the TestDemoCrossReference/lambda-log-group constraint.
-	extraLambdaFns := []string{"image-thumbnail-gen", "cloudwatch-slack-notifier"}
+	extraLambdaFns := []string{"image-thumbnail-gen", "cloudwatch-slack-notifier", relatedSecretsLambdaID}
 	allLambdaLogGroups := make([]string, len(extraLambdaFns), len(extraLambdaFns)+len(lambdaNamePool))
 	copy(allLambdaLogGroups, extraLambdaFns)
 	allLambdaLogGroups = append(allLambdaLogGroups, lambdaNamePool...)
