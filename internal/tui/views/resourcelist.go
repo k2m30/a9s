@@ -434,9 +434,9 @@ func (m *ResourceListModel) View() string {
 		case m.loadingMore:
 			hint = "── loading... ──"
 		case m.filterText != "":
-			hint = "── M: load more (filter applies to loaded data only) ──"
+			hint = "── m: load more (filter applies to loaded data only) ──"
 		default:
-			hint = "── M: load more ──"
+			hint = "── m: load more ──"
 		}
 		sb.WriteString(styles.DimText.Render(hint))
 	}
