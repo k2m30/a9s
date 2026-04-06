@@ -258,4 +258,11 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("iam-group", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "iam-user", Count: 3},
+			{TargetType: "policy", Count: 2},
+		}
+	})
 }
