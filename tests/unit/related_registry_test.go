@@ -965,6 +965,30 @@ func TestRelated_ELB_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_ENI_Registered(t *testing.T) {
+	defs := resource.GetRelated("eni")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for eni")
+	}
+
+	expected := []string{"ec2", "sg", "eip"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				if def.Checker == nil {
+					t.Errorf("eni %q: Checker should not be nil", exp)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for eni", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

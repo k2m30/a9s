@@ -210,4 +210,9 @@ const (
 	relatedELBTGID1    = "acme-web-tg"
 	relatedELBTGID2    = "acme-api-tg"
 	relatedELBAlarmID1 = "elb-unhealthy-hosts"
+
+	// eni related-view IDs
+	relatedENIEC2ID  = "i-0a1b2c3d4e5f60001"
+	relatedENISGID1  = "sg-0aaa111111111111a"
+	relatedENIEIPID  = "eipalloc-0aaa111111111111a"
 )
