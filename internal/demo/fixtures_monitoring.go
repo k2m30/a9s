@@ -281,6 +281,36 @@ RawStruct: cwtypes.MetricAlarm{
 				},
 			},
 		},
+		{
+			ID:     "acme-opensearch-cluster-health",
+			Name:   "acme-opensearch-cluster-health",
+			Status: "OK",
+			Fields: map[string]string{
+				"alarm_name":  "acme-opensearch-cluster-health",
+				"state":       "OK",
+				"metric_name": "ClusterStatus.yellow",
+				"namespace":   "AWS/ES",
+				"threshold":   "1.00",
+			},
+			RawStruct: cwtypes.MetricAlarm{
+				AlarmName:          aws.String("acme-opensearch-cluster-health"),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-opensearch-cluster-health"),
+				AlarmDescription:   aws.String("Triggers when OpenSearch cluster enters yellow health state"),
+				StateValue:         cwtypes.StateValueOk,
+				MetricName:         aws.String("ClusterStatus.yellow"),
+				Namespace:          aws.String("AWS/ES"),
+				Threshold:          aws.Float64(1.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:  aws.Int32(1),
+				Period:             aws.Int32(300),
+				Statistic:          cwtypes.StatisticMaximum,
+				ActionsEnabled:     aws.Bool(true),
+				AlarmActions:       []string{relatedAlarmSNSID},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DomainName"), Value: aws.String("acme-logs")},
+				},
+			},
+		},
 	}
 
 	// Generate 17 more alarms to reach 22 total
