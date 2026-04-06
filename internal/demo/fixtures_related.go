@@ -569,4 +569,21 @@ func init() {
 			{TargetType: "sqs", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("sqs", func(res resource.Resource) []resource.RelatedCheckResult {
+		if res.ID == "order-processing-queue" {
+			return []resource.RelatedCheckResult{
+				{TargetType: "sns-sub", Count: 1, ResourceIDs: []string{relatedSQSSNSSubID}},
+				{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedSQSAlarmID}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "sns-sub", Count: 0},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "lambda", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
