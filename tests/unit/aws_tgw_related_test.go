@@ -109,21 +109,17 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertions ---
+// --- VPC checker nil-clients test ---
 
-// TestRelated_TGW_VPCStub verifies that the vpc related def is registered but
-// has a nil Checker (stub, not yet implemented).
-func TestRelated_TGW_VPCStub(t *testing.T) {
-	defs := resource.GetRelated("tgw")
-	for _, def := range defs {
-		if def.TargetType == "vpc" {
-			if def.Checker != nil {
-				t.Error("tgw vpc: expected nil Checker (stub)")
-			}
-			return
-		}
+// TestRelated_TGW_VPC_NilClients verifies that the vpc checker returns Count:-1
+// when clients are nil (DescribeTransitGatewayAttachments cannot be called).
+func TestRelated_TGW_VPC_NilClients(t *testing.T) {
+	res := tgwSrcResource()
+	checker := tgwCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, nil)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
-	t.Error("tgw vpc related def not found")
 }
 
 // --- CFN checker tests (tag-based, no cache needed) ---

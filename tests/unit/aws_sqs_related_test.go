@@ -193,32 +193,17 @@ func TestRelated_SQS_EmptyCache(t *testing.T) {
 	}
 }
 
-// --- Stub Checker Assertions ---
+// --- Lambda checker nil-clients test ---
 
-func TestRelated_SQS_LambdaStub(t *testing.T) {
-	defs := resource.GetRelated("sqs")
-	for _, def := range defs {
-		if def.TargetType == "lambda" {
-			if def.Checker != nil {
-				t.Error("sqs lambda: expected nil Checker (stub)")
-			}
-			return
-		}
+// TestRelated_SQS_Lambda_NilClients verifies that the lambda checker returns
+// Count:-1 when clients are nil (API call cannot proceed).
+func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
+	res := sqsPaymentRes()
+	checker := sqsCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, res, nil)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
-	t.Error("sqs lambda related def not found")
-}
-
-func TestRelated_SQS_CfnStub(t *testing.T) {
-	defs := resource.GetRelated("sqs")
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Error("sqs cfn: expected nil Checker (stub)")
-			}
-			return
-		}
-	}
-	t.Error("sqs cfn related def not found")
 }
 
 // --- Demo Checker Test ---
