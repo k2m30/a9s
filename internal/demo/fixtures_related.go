@@ -398,6 +398,32 @@ func init() {
 		}
 	})
 
+	resource.RegisterRelatedDemo("rtb", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "rtb-0bbb222222222222b":
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 2, ResourceIDs: []string{relatedRTBSubnetID1, relatedRTBSubnetID2}},
+				{TargetType: "nat", Count: 0},
+				{TargetType: "igw", Count: 1, ResourceIDs: []string{relatedRTBIGWID}},
+				{TargetType: "cfn", Count: 0},
+			}
+		case "rtb-0aaa111111111111a":
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 0},
+				{TargetType: "nat", Count: 1, ResourceIDs: []string{relatedRTBNATID}},
+				{TargetType: "igw", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		default:
+			return []resource.RelatedCheckResult{
+				{TargetType: "subnet", Count: 0},
+				{TargetType: "nat", Count: 0},
+				{TargetType: "igw", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+	})
+
 	resource.RegisterRelatedDemo("role", func(res resource.Resource) []resource.RelatedCheckResult {
 		switch res.ID {
 		case "acme-eks-node-role":

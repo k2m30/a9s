@@ -1,0 +1,152 @@
+// routetables_related.go contains Route Table related-resource checker functions.
+package aws
+
+import (
+	"context"
+	"strings"
+
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+func init() {
+	resource.RegisterNavigableFields("rtb", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "Associations.SubnetId", TargetType: "subnet"},
+		{FieldPath: "Routes.NatGatewayId", TargetType: "nat"},
+	})
+
+	resource.RegisterRelated("rtb", []resource.RelatedDef{
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRTBSubnet, NeedsTargetCache: true},
+		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkRTBNAT, NeedsTargetCache: true},
+		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+	})
+}
+
+// checkRTBSubnet searches the subnet cache for subnets associated with this route table.
+// It extracts SubnetIds from ec2types.RouteTable.Associations[] (Pattern C — cache lookup).
+func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+
+	subnetIDs := make(map[string]bool)
+	for _, assoc := range rtb.Associations {
+		if assoc.SubnetId != nil && *assoc.SubnetId != "" {
+			subnetIDs[*assoc.SubnetId] = true
+		}
+	}
+	if len(subnetIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+	}
+
+	subnetList, truncated, err := rtbRelatedResources(ctx, clients, cache, "subnet")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+	}
+	if subnetList == nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+
+	var ids []string
+	for _, subnetRes := range subnetList {
+		if subnetIDs[subnetRes.ID] {
+			ids = append(ids, subnetRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+	return relatedResult("subnet", ids)
+}
+
+// checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.
+// It extracts NatGatewayIds from ec2types.RouteTable.Routes[] (Pattern C — cache lookup).
+func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+	}
+
+	natIDs := make(map[string]bool)
+	for _, route := range rtb.Routes {
+		if route.NatGatewayId != nil && *route.NatGatewayId != "" {
+			natIDs[*route.NatGatewayId] = true
+		}
+	}
+	if len(natIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
+	}
+
+	natList, truncated, err := rtbRelatedResources(ctx, clients, cache, "nat")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "nat", Count: -1, Err: err}
+	}
+	if natList == nil {
+		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+	}
+
+	var ids []string
+	for _, natRes := range natList {
+		if natIDs[natRes.ID] {
+			ids = append(ids, natRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+	}
+	return relatedResult("nat", ids)
+}
+
+// checkRTBIGW searches the igw cache for Internet Gateways referenced in this route table's routes.
+// It extracts GatewayIds from Routes[] that start with "igw-" (Pattern C — cache lookup).
+func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+	}
+
+	igwIDs := make(map[string]bool)
+	for _, route := range rtb.Routes {
+		if route.GatewayId != nil && strings.HasPrefix(*route.GatewayId, "igw-") {
+			igwIDs[*route.GatewayId] = true
+		}
+	}
+	if len(igwIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
+	}
+
+	igwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "igw")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "igw", Count: -1, Err: err}
+	}
+	if igwList == nil {
+		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+	}
+
+	var ids []string
+	for _, igwRes := range igwList {
+		if igwIDs[igwRes.ID] {
+			ids = append(ids, igwRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+	}
+	return relatedResult("igw", ids)
+}
+
+// rtbRelatedResources returns the resource list for target from cache or fetches
+// the first page via the registered paginated fetcher.
+func rtbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return nil, false, nil
+		}
+	}
+	return resources, isTruncated, err
+}

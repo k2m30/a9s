@@ -256,4 +256,10 @@ const (
 	// role related-view IDs
 	relatedRoleLambdaID1 = "api-gateway-authorizer"
 	relatedRoleGlueID1   = "acme-etl-orders"
+
+	// rtb related-view IDs
+	relatedRTBSubnetID1 = prodPublicSubnetA
+	relatedRTBSubnetID2 = prodPublicSubnetB
+	relatedRTBIGWID     = "igw-0aaa111111111111a"
+	relatedRTBNATID     = "nat-0aaa111111111111a"
 )
