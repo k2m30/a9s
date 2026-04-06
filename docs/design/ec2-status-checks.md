@@ -104,10 +104,11 @@ DescribeInstanceStatus
 page, not just running ones. Stopped/terminated instances return
 `not-applicable` — we simply ignore those during rendering.
 
-Two API calls per page total: `DescribeInstances` (already exists) +
-`DescribeInstanceStatus` (new, background). At most 200 instance IDs per
-page — if that exceeds the 100-instance limit per `DescribeInstanceStatus`
-call, paginate with `NextToken`.
+Two+ API calls per page total: `DescribeInstances` (already exists) +
+`DescribeInstanceStatus` (new, background). `DescribeInstanceStatus` has a
+hard limit of **100 instance IDs per call** (`InstanceIds` and `MaxResults`
+cannot be combined). A 200-instance page from `DescribeInstances` requires
+2 sequential `DescribeInstanceStatus` calls (100 IDs each).
 
 ### 3.4 Fetch Flow
 
