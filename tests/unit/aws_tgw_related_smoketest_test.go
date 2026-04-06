@@ -11,7 +11,7 @@ package unit_test
 //   - Enter on all count=0 rows does NOT emit RelatedNavigateMsg
 //
 // Demo fixture: tgw-0a1b2c3d4e5f67890
-// Demo results: rtb→1, vpc→0 (nil checker), cfn→0 (nil checker)
+// Demo results: rtb→1, vpc→0 (nil checker), cfn→0
 
 import (
 	"strings"
@@ -183,19 +183,19 @@ func TestTGW_Smoke_S05_EnterOnAllZeroRowsNoNav(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TGW-S06: vpc and cfn checkers nil; rtb non-nil; demo checker registered
+// TGW-S06: vpc checker nil; rtb and cfn non-nil; demo checker registered
 // ---------------------------------------------------------------------------
 
 func TestTGW_Smoke_S06_CheckerRegistration(t *testing.T) {
 	defs := resource.GetRelated("tgw")
 
 	type defCheck struct {
-		targetType  string
+		targetType     string
 		wantNilChecker bool
 	}
 	checks := []defCheck{
 		{"vpc", true},
-		{"cfn", true},
+		{"cfn", false},
 		{"rtb", false},
 	}
 
