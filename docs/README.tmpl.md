@@ -35,7 +35,7 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 - Tokyo Night Dark color theme
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
-- 3,800+ unit tests
+- 4,400+ unit tests
 
 ## Installation
 
