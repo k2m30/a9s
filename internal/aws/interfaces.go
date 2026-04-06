@@ -616,3 +616,15 @@ type EC2DescribeImagesAPI interface {
 type CloudTrailLookupEventsAPI interface {
 	LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error)
 }
+
+// EC2DescribeTransitGatewayAttachmentsAPI defines the interface for the EC2
+// DescribeTransitGatewayAttachments operation.
+type EC2DescribeTransitGatewayAttachmentsAPI interface {
+	DescribeTransitGatewayAttachments(ctx context.Context, params *ec2.DescribeTransitGatewayAttachmentsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error)
+}
+
+// WAFv2ListResourcesForWebACLAPI defines the interface for the WAFv2
+// ListResourcesForWebACL operation.
+type WAFv2ListResourcesForWebACLAPI interface {
+	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
+}

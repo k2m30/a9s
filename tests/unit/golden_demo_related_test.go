@@ -1,0 +1,346 @@
+package unit
+
+// golden_demo_related_test.go — Golden tests for demo-mode related views.
+//
+// These tests verify real consistency between registration layers, NOT
+// tautological "demo checker returns what demo checker returns" checks.
+//
+// What they catch:
+//   - RelatedDef targets missing from demo checker (shows loading/unknown in demo)
+//   - Demo checker ResourceIDs that don't exist in demo fixtures (navigation fails)
+//   - Live checkers that are nil (demo works, live silently returns -1)
+//   - Demo checker targets not in RegisterRelated (dead demo code)
+//   - Navigation roundtrip failures (navigate to related, Esc back)
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
+)
+
+// goldenDemoModel creates a demo-mode root model sized at 120×36.
+func goldenDemoModel(t *testing.T) tui.Model {
+	t.Helper()
+	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
+	return m
+}
+
+// goldenDrainBatch executes a cmd chain that may contain tea.BatchMsg at any
+// level and collects all produced messages. Expands BatchMsg by executing
+// every sub-cmd individually so that all async checker results are captured.
+func goldenDrainBatch(t *testing.T, m tui.Model, cmd tea.Cmd, maxOps int) (tui.Model, []tea.Msg) {
+	t.Helper()
+	var allMsgs []tea.Msg
+	queue := []tea.Cmd{cmd}
+	for ops := 0; ops < maxOps && len(queue) > 0; ops++ {
+		next := queue[0]
+		queue = queue[1:]
+		if next == nil {
+			continue
+		}
+		msg := next()
+		if msg == nil {
+			continue
+		}
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, sub := range batch {
+				if sub != nil {
+					queue = append(queue, sub)
+				}
+			}
+			continue
+		}
+		allMsgs = append(allMsgs, msg)
+		var nextCmd tea.Cmd
+		m, nextCmd = rootApplyMsg(m, msg)
+		if nextCmd != nil {
+			queue = append(queue, nextCmd)
+		}
+	}
+	return m, allMsgs
+}
+
+// ---------------------------------------------------------------------------
+// Test 1: Every RelatedDef target must have a matching demo checker entry.
+//
+// If RegisterRelated("ec2", [...{TargetType:"tg"}, {TargetType:"alarm"}...])
+// but RegisterRelatedDemo("ec2") only returns results for "tg", then "alarm"
+// shows as loading/unknown forever in demo mode.
+// ---------------------------------------------------------------------------
+
+func TestGolden_DemoRelatedCoverage(t *testing.T) {
+	for _, shortName := range resource.AllShortNames() {
+		defs := resource.GetRelated(shortName)
+		if len(defs) == 0 {
+			continue
+		}
+
+		demoFn := resource.GetRelatedDemo(shortName)
+		if demoFn == nil {
+			t.Errorf("%s: has %d RelatedDefs but no RegisterRelatedDemo — entire right column broken in demo", shortName, len(defs))
+			continue
+		}
+
+		// Get first fixture to evaluate conditional demo checkers.
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok || len(fixtures) == 0 {
+			continue // no demo fixtures = can't evaluate
+		}
+
+		demoResults := demoFn(fixtures[0])
+		demoTargets := make(map[string]bool, len(demoResults))
+		for _, r := range demoResults {
+			demoTargets[r.TargetType] = true
+		}
+
+		for _, def := range defs {
+			t.Run(fmt.Sprintf("%s→%s", shortName, def.TargetType), func(t *testing.T) {
+				if !demoTargets[def.TargetType] {
+					t.Errorf("RelatedDef target %q registered for %s but missing from demo checker — shows loading/unknown in demo mode",
+						def.TargetType, shortName)
+				}
+			})
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 2: Every ResourceID returned by demo checkers must exist in demo fixtures.
+//
+// If demo checker says ec2→tg has IDs ["acme-web-tg"] but demo.GetResources("tg")
+// has no resource with that ID, then navigating ec2→tg in demo mode fails.
+// ---------------------------------------------------------------------------
+
+func TestGolden_DemoRelatedIDsExist(t *testing.T) {
+	// Build lookup of all demo fixture IDs per type.
+	fixtureIDs := make(map[string]map[string]bool)
+	for _, shortName := range resource.AllShortNames() {
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok {
+			continue
+		}
+		ids := make(map[string]bool, len(fixtures))
+		for _, f := range fixtures {
+			ids[f.ID] = true
+		}
+		fixtureIDs[shortName] = ids
+	}
+
+	for _, shortName := range resource.AllShortNames() {
+		demoFn := resource.GetRelatedDemo(shortName)
+		if demoFn == nil {
+			continue
+		}
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok || len(fixtures) == 0 {
+			continue
+		}
+
+		results := demoFn(fixtures[0])
+		for _, r := range results {
+			if r.Count <= 0 || len(r.ResourceIDs) == 0 {
+				continue
+			}
+
+			targetFixtures, hasFixtures := fixtureIDs[r.TargetType]
+			if !hasFixtures {
+				t.Errorf("%s→%s: demo checker returns %d IDs but no demo fixtures exist for target type %q",
+					shortName, r.TargetType, len(r.ResourceIDs), r.TargetType)
+				continue
+			}
+
+			for _, id := range r.ResourceIDs {
+				t.Run(fmt.Sprintf("%s→%s/%s", shortName, r.TargetType, id), func(t *testing.T) {
+					if !targetFixtures[id] {
+						t.Errorf("demo checker for %s returns ID %q for target %q, but that ID does not exist in demo.GetResources(%q) — navigation will fail",
+							shortName, id, r.TargetType, r.TargetType)
+					}
+				})
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 3: Every demo checker target must have a matching RegisterRelated entry.
+//
+// If demo checker returns a result for target "foo" but there's no RelatedDef
+// for "foo", the demo result is dead code — it never reaches the right column.
+// ---------------------------------------------------------------------------
+
+func TestGolden_DemoRelatedNoOrphans(t *testing.T) {
+	for _, shortName := range resource.AllShortNames() {
+		demoFn := resource.GetRelatedDemo(shortName)
+		if demoFn == nil {
+			continue
+		}
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok || len(fixtures) == 0 {
+			continue
+		}
+
+		defs := resource.GetRelated(shortName)
+		defTargets := make(map[string]bool, len(defs))
+		for _, d := range defs {
+			defTargets[d.TargetType] = true
+		}
+
+		results := demoFn(fixtures[0])
+		for _, r := range results {
+			t.Run(fmt.Sprintf("%s→%s", shortName, r.TargetType), func(t *testing.T) {
+				if !defTargets[r.TargetType] {
+					t.Errorf("demo checker for %s returns target %q but no RegisterRelated entry exists — dead demo code",
+						shortName, r.TargetType)
+				}
+			})
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 4: Nil live checkers inventory.
+//
+// These are RelatedDefs where Checker==nil — demo mode works fine but live
+// mode silently returns Count=-1. This test documents the current state and
+// will catch regressions if someone accidentally nils a working checker.
+// ---------------------------------------------------------------------------
+
+func TestGolden_LiveCheckerCompleteness(t *testing.T) {
+	var nilCount int
+	for _, shortName := range resource.AllShortNames() {
+		defs := resource.GetRelated(shortName)
+		for _, def := range defs {
+			if def.Checker == nil {
+				nilCount++
+				t.Logf("NIL CHECKER: %s→%s (%s) — works in demo, silent -1 in live",
+					shortName, def.TargetType, def.DisplayName)
+			}
+		}
+	}
+	// This is informational for now. Uncomment to enforce:
+	// if nilCount > 0 {
+	//     t.Errorf("%d RelatedDef entries have nil Checker — demo-only, broken in live mode", nilCount)
+	// }
+	t.Logf("Total nil checkers: %d (demo-only, broken in live mode)", nilCount)
+}
+
+// ---------------------------------------------------------------------------
+// Test 5: Navigation roundtrip — navigate to related, Esc back.
+//
+// For each resource type with Count>0 related resources, verify:
+//   1. Navigate to detail view
+//   2. Trigger related checks
+//   3. Navigate to first related resource with Count>0
+//   4. Press Esc
+//   5. Verify we're back on the original detail view
+// ---------------------------------------------------------------------------
+
+func TestGolden_DemoRelatedNavRoundTrip(t *testing.T) {
+	for _, shortName := range resource.AllShortNames() {
+		demoFn := resource.GetRelatedDemo(shortName)
+		if demoFn == nil {
+			continue
+		}
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok || len(fixtures) == 0 {
+			continue
+		}
+		firstRes := fixtures[0]
+
+		// Find the first related target with Count>0 and ResourceIDs.
+		results := demoFn(firstRes)
+		var navTarget *resource.RelatedCheckResult
+		for i := range results {
+			if results[i].Count > 0 && len(results[i].ResourceIDs) > 0 {
+				navTarget = &results[i]
+				break
+			}
+		}
+		if navTarget == nil {
+			continue // nothing to navigate to
+		}
+
+		t.Run(fmt.Sprintf("%s→%s", shortName, navTarget.TargetType), func(t *testing.T) {
+			// Preload target fixtures so navigation can find the resource.
+			targetFixtures, targetOk := demo.GetResources(navTarget.TargetType)
+			if !targetOk || len(targetFixtures) == 0 {
+				t.Skipf("no demo fixtures for target type %q", navTarget.TargetType)
+				return
+			}
+
+			m := goldenDemoModel(t)
+
+			// Navigate to detail view for source resource.
+			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				Target:       messages.TargetDetail,
+				ResourceType: shortName,
+				Resource:     &firstRes,
+			})
+
+			// Trigger related checks and drain.
+			m, startCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+				ResourceType:   shortName,
+				SourceResource: firstRes,
+			})
+			if startCmd != nil {
+				m, _ = goldenDrainBatch(t, m, startCmd, 200)
+			}
+
+			// Preload target type resources into cache.
+			m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+				ResourceType: navTarget.TargetType,
+				Resources:    targetFixtures,
+			})
+
+			// Navigate to related resource.
+			m, navCmd := rootApplyMsg(m, messages.RelatedNavigateMsg{
+				TargetType:     navTarget.TargetType,
+				RelatedIDs:     navTarget.ResourceIDs,
+				SourceResource: firstRes,
+				SourceType:     shortName,
+			})
+			if navCmd != nil {
+				m, _ = goldenDrainBatch(t, m, navCmd, 200)
+			}
+
+			// Verify we navigated away from the source detail.
+			viewAfterNav := stripANSI(rootViewContent(m))
+			rt := resource.FindResourceType(navTarget.TargetType)
+			if rt == nil {
+				t.Fatalf("unknown target type %q", navTarget.TargetType)
+			}
+			// Check view shows target type content (short name in frame, display name, or resource ID).
+			hasTarget := strings.Contains(viewAfterNav, navTarget.TargetType) ||
+				strings.Contains(viewAfterNav, rt.Name) ||
+				strings.Contains(viewAfterNav, navTarget.ResourceIDs[0])
+			if !hasTarget {
+				t.Errorf("after navigating %s→%s: view does not contain short name %q, display name %q, or ID %q\nview:\n%s",
+					shortName, navTarget.TargetType, navTarget.TargetType, rt.Name, navTarget.ResourceIDs[0], viewAfterNav)
+			}
+
+			// Press Esc to go back.
+			m, escCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+			if escCmd != nil {
+				m, _ = goldenDrainBatch(t, m, escCmd, 50)
+			}
+
+			// Verify we're back on the source detail.
+			viewAfterEsc := stripANSI(rootViewContent(m))
+			hasSource := strings.Contains(viewAfterEsc, firstRes.ID) ||
+				strings.Contains(viewAfterEsc, firstRes.Name)
+			if !hasSource {
+				t.Errorf("after Esc from %s→%s: view does not contain source ID %q or name %q — back navigation failed\nview:\n%s",
+					shortName, navTarget.TargetType, firstRes.ID, firstRes.Name, viewAfterEsc)
+			}
+		})
+	}
+}

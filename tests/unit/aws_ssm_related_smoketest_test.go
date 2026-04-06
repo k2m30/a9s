@@ -4,14 +4,14 @@ package unit_test
 //
 // Equivalent to running ./a9s --demo, navigating to an SSM Parameter, and checking:
 //   - Right column visible with RELATED header
-//   - Correct labels (KMS Key, CloudFormation)
+//   - Correct labels (KMS Key)
 //   - Counts display correctly after results delivered
 //   - Tab focuses right column
 //   - Enter on count>0 row (kms, count=1) emits RelatedNavigateMsg with correct TargetType
 //   - Enter on all-count=0 right column does NOT emit RelatedNavigateMsg
 //
 // Demo fixture: /acme/prod/app/config
-// Demo results: kms→1, cfn→0
+// Demo results: kms→1
 
 import (
 	"strings"
@@ -88,7 +88,7 @@ func TestSSM_Smoke_S02_CorrectLabels(t *testing.T) {
 		t.Skip("SSM-S02: right column not visible; skipping label check")
 	}
 
-	for _, label := range []string{"KMS Key", "CloudFormation"} {
+	for _, label := range []string{"KMS Key"} {
 		if !strings.Contains(plain, label) {
 			t.Errorf("SSM-S02: expected label %q in right column; not found\nview:\n%s", label, plain)
 		}
@@ -106,18 +106,14 @@ func TestSSM_Smoke_S03_CountsAfterDeliver(t *testing.T) {
 		t.Skip("SSM-S03: right column not visible")
 	}
 
-	// Deliver demo-equivalent results: kms→1, cfn→0
+	// Deliver demo-equivalent results: kms→1
 	d = deliverSSMRelatedResult(d, "kms", 1, "arn:aws:kms:us-east-1:123456789012:key/demo-key-001")
-	d = deliverSSMRelatedResult(d, "cfn", 0)
 
 	plain := stripAnsi(d.View())
 
-	// kms should show (1); cfn should show (0)
+	// kms should show (1)
 	if !strings.Contains(plain, "(1)") {
 		t.Errorf("SSM-S03: expected '(1)' count in right column after delivering kms result; not found\nview:\n%s", plain)
-	}
-	if !strings.Contains(plain, "(0)") {
-		t.Errorf("SSM-S03: expected '(0)' for cfn row; not found\nview:\n%s", plain)
 	}
 }
 
@@ -133,7 +129,6 @@ func TestSSM_Smoke_S04_EnterOnKMSRowNavigates(t *testing.T) {
 	}
 
 	d = deliverSSMRelatedResult(d, "kms", 1, "arn:aws:kms:us-east-1:123456789012:key/demo-key-001")
-	d = deliverSSMRelatedResult(d, "cfn", 0)
 
 	// Tab to focus right column
 	d, _ = pressDetailTab(d)
@@ -166,7 +161,6 @@ func TestSSM_Smoke_S05_EnterOnAllZeroRowNoNav(t *testing.T) {
 
 	// All count=0 so cursor cannot land on any navigable row
 	d = deliverSSMRelatedResult(d, "kms", 0)
-	d = deliverSSMRelatedResult(d, "cfn", 0)
 
 	d, _ = pressDetailTab(d)
 
@@ -182,8 +176,8 @@ func TestSSM_Smoke_S05_EnterOnAllZeroRowNoNav(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SSM-S06: cfn checker is nil (stub); kms checker is non-nil.
-// Demo checker is registered and returns results for both targets.
+// SSM-S06: kms checker is non-nil. cfn def no longer exists.
+// Demo checker is registered and returns results for kms only.
 // ---------------------------------------------------------------------------
 
 func TestSSM_Smoke_S06_CheckersAndDemoChecker(t *testing.T) {
@@ -192,21 +186,17 @@ func TestSSM_Smoke_S06_CheckersAndDemoChecker(t *testing.T) {
 		t.Fatal("SSM-S06: no related defs registered for ssm")
 	}
 
-	// cfn must have nil checker; kms must have non-nil checker
-	nilCheckers := map[string]bool{"cfn": true}
-	nonNilCheckers := map[string]bool{"kms": true}
-
+	// kms must have non-nil checker
 	for i := range defs {
 		tt := defs[i].TargetType
-		if nilCheckers[tt] {
-			if defs[i].Checker != nil {
-				t.Errorf("SSM-S06: Checker for target %q must be nil (stub); got non-nil — implementation changed?", tt)
-			}
-		}
-		if nonNilCheckers[tt] {
+		if tt == "kms" {
 			if defs[i].Checker == nil {
 				t.Errorf("SSM-S06: Checker for target %q must be non-nil (real checker); got nil", tt)
 			}
+		}
+		// cfn must no longer be registered
+		if tt == "cfn" {
+			t.Errorf("SSM-S06: cfn related def must not be registered (removed); found unexpected def")
 		}
 	}
 
@@ -216,20 +206,17 @@ func TestSSM_Smoke_S06_CheckersAndDemoChecker(t *testing.T) {
 		t.Fatal("SSM-S06: no demo checker registered for ssm")
 	}
 
-	// Demo checker must return results for both target types
+	// Demo checker must return a result for kms
 	results := checker(resource.Resource{ID: "/acme/prod/app/config"})
 
-	targetTypes := []string{"kms", "cfn"}
-	for _, tt := range targetTypes {
-		found := false
-		for i := range results {
-			if results[i].TargetType == tt {
-				found = true
-				break
-			}
+	found := false
+	for i := range results {
+		if results[i].TargetType == "kms" {
+			found = true
+			break
 		}
-		if !found {
-			t.Errorf("SSM-S06: demo checker did not return a result for target type %q", tt)
-		}
+	}
+	if !found {
+		t.Errorf("SSM-S06: demo checker did not return a result for target type %q", "kms")
 	}
 }

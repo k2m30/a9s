@@ -1580,7 +1580,7 @@ func TestRelated_SQS_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sqs")
 	}
-	expected := []string{"sns-sub", "alarm", "lambda", "cfn"}
+	expected := []string{"sns-sub", "alarm", "lambda"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1600,7 +1600,7 @@ func TestRelated_SSM_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for ssm")
 	}
-	expected := []string{"kms", "cfn"}
+	expected := []string{"kms"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1640,7 +1640,7 @@ func TestRelated_TG_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for tg")
 	}
-	expected := []string{"elb", "ecs-svc", "asg", "alarm", "cfn"}
+	expected := []string{"elb", "ecs-svc", "asg", "alarm"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {

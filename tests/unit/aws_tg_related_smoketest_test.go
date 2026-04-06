@@ -4,14 +4,14 @@ package unit_test
 //
 // Equivalent to running ./a9s --demo, navigating to a Target Group, and checking:
 //   - Right column visible with RELATED header
-//   - Correct labels (Load Balancers, ECS Services, Auto Scaling Groups, CW Alarms, CloudFormation)
+//   - Correct labels (Load Balancers, ECS Services, Auto Scaling Groups, CW Alarms)
 //   - Counts display correctly after results delivered
 //   - Tab focuses right column
 //   - Enter on count>0 row emits RelatedNavigateMsg with correct TargetType
 //   - Enter on count=0 row does NOT emit RelatedNavigateMsg
 //
 // Demo fixture: my-tg
-// Demo results: elb→1, ecs-svc→1, asg→0, alarm→0, cfn→0
+// Demo results: elb→1, ecs-svc→1, asg→0, alarm→0
 
 import (
 	"strings"
@@ -87,7 +87,7 @@ func TestTG_Smoke_S02_CorrectLabels(t *testing.T) {
 		t.Skip("TG-S02: right column not visible; skipping label check")
 	}
 
-	for _, label := range []string{"Load Balancers", "ECS Services", "Auto Scaling Groups", "CW Alarms", "CloudFormation"} {
+	for _, label := range []string{"Load Balancers", "ECS Services", "Auto Scaling Groups", "CW Alarms"} {
 		if !strings.Contains(plain, label) {
 			t.Errorf("TG-S02: expected label %q in right column; not found\nview:\n%s", label, plain)
 		}
@@ -110,16 +110,15 @@ func TestTG_Smoke_S03_CountsAfterDeliver(t *testing.T) {
 	d = deliverTGRelatedResult(d, "ecs-svc", 1, "api-gateway")
 	d = deliverTGRelatedResult(d, "asg", 0)
 	d = deliverTGRelatedResult(d, "alarm", 0)
-	d = deliverTGRelatedResult(d, "cfn", 0)
 
 	plain := stripAnsi(d.View())
 
-	// elb and ecs-svc should show (1); asg, alarm, cfn should show (0)
+	// elb and ecs-svc should show (1); asg and alarm should show (0)
 	if !strings.Contains(plain, "(1)") {
 		t.Errorf("TG-S03: expected '(1)' count in right column after delivering elb/ecs-svc results; not found\nview:\n%s", plain)
 	}
 	if !strings.Contains(plain, "(0)") {
-		t.Errorf("TG-S03: expected '(0)' for stub rows; not found\nview:\n%s", plain)
+		t.Errorf("TG-S03: expected '(0)' for asg/alarm rows; not found\nview:\n%s", plain)
 	}
 }
 
@@ -138,7 +137,6 @@ func TestTG_Smoke_S04_EnterOnELBRowNavigates(t *testing.T) {
 	d = deliverTGRelatedResult(d, "ecs-svc", 1, "api-gateway")
 	d = deliverTGRelatedResult(d, "asg", 0)
 	d = deliverTGRelatedResult(d, "alarm", 0)
-	d = deliverTGRelatedResult(d, "cfn", 0)
 
 	// Tab to focus right column
 	d, _ = pressDetailTab(d)
@@ -174,7 +172,6 @@ func TestTG_Smoke_S05_EnterOnStubRowNoNav(t *testing.T) {
 	d = deliverTGRelatedResult(d, "ecs-svc", 0)
 	d = deliverTGRelatedResult(d, "asg", 0)
 	d = deliverTGRelatedResult(d, "alarm", 0)
-	d = deliverTGRelatedResult(d, "cfn", 0)
 
 	d, _ = pressDetailTab(d)
 
@@ -190,25 +187,12 @@ func TestTG_Smoke_S05_EnterOnStubRowNoNav(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TG-S06: alarm and cfn checkers nil; elb, ecs-svc, asg non-nil; demo checker registered
+// TG-S06: elb, ecs-svc, asg, alarm checkers are non-nil; cfn def no longer exists.
+// Demo checker is registered and returns results for all 4 remaining targets.
 // ---------------------------------------------------------------------------
 
 func TestTG_Smoke_S06_CheckerRegistration(t *testing.T) {
 	defs := resource.GetRelated("tg")
-
-	// Verify cfn checker is still nil (stub)
-	var cfnDef *resource.RelatedDef
-	for i := range defs {
-		if defs[i].TargetType == "cfn" {
-			cfnDef = &defs[i]
-			break
-		}
-	}
-	if cfnDef == nil {
-		t.Error("TG-S06: cfn related def not registered")
-	} else if cfnDef.Checker != nil {
-		t.Errorf("TG-S06: cfn Checker must be nil (stub); got non-nil — implementation changed?")
-	}
 
 	// Verify non-nil checkers for elb, ecs-svc, asg, alarm
 	nonNilCheckerTypes := []string{"elb", "ecs-svc", "asg", "alarm"}
@@ -229,13 +213,20 @@ func TestTG_Smoke_S06_CheckerRegistration(t *testing.T) {
 		}
 	}
 
-	// Demo checker must be registered and return results for all target types
+	// cfn must no longer be registered
+	for i := range defs {
+		if defs[i].TargetType == "cfn" {
+			t.Errorf("TG-S06: cfn related def must not be registered (removed); found unexpected def")
+		}
+	}
+
+	// Demo checker must be registered and return results for all 4 remaining target types
 	checker := resource.GetRelatedDemo("tg")
 	if checker == nil {
 		t.Fatal("TG-S06: no demo checker registered for tg")
 	}
 	results := checker(resource.Resource{ID: "tg-demo"})
-	expectedTypes := []string{"elb", "ecs-svc", "asg", "alarm", "cfn"}
+	expectedTypes := []string{"elb", "ecs-svc", "asg", "alarm"}
 	for _, targetType := range expectedTypes {
 		var found *resource.RelatedCheckResult
 		for i := range results {

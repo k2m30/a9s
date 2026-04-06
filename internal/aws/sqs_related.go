@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -14,8 +15,7 @@ func init() {
 	resource.RegisterRelated("sqs", []resource.RelatedDef{
 		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
 	})
 }
 
@@ -113,4 +113,36 @@ func sqsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
+// triggered by this SQS queue (Pattern A — direct API call).
+func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	row, ok := res.RawStruct.(SQSQueueAttributesRow)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	queueARN := row.Attributes["QueueArn"]
+	if queueARN == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Lambda == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
+		EventSourceArn: &queueARN,
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, m := range out.EventSourceMappings {
+		if m.FunctionArn != nil {
+			// Extract function name from ARN (last segment after ":")
+			parts := strings.Split(*m.FunctionArn, ":")
+			ids = append(ids, parts[len(parts)-1])
+		}
+	}
+	return relatedResult("lambda", ids)
 }

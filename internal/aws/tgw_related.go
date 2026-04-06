@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -14,8 +15,8 @@ func init() {
 		{
 			TargetType:       "vpc",
 			DisplayName:      "VPCs",
-			Checker:          nil,
-			NeedsTargetCache: true,
+			Checker:          checkTGWVPC,
+			NeedsTargetCache: false,
 		},
 		{
 			TargetType:       "rtb",
@@ -31,6 +32,39 @@ func init() {
 		},
 	})
 }
+
+// checkTGWVPC calls ec2:DescribeTransitGatewayAttachments to find VPCs attached to
+// this transit gateway (Pattern A — direct API call).
+func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	tgwID := res.ID
+	if tgwID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EC2 == nil {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	resourceType := "vpc"
+	out, err := c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
+		Filters: []ec2types.Filter{
+			{Name: strP("transit-gateway-id"), Values: []string{tgwID}},
+			{Name: strP("resource-type"), Values: []string{resourceType}},
+		},
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, att := range out.TransitGatewayAttachments {
+		if att.ResourceId != nil {
+			ids = append(ids, *att.ResourceId)
+		}
+	}
+	return relatedResult("vpc", ids)
+}
+
+// strP returns a pointer to the given string.
+func strP(s string) *string { return &s }
 
 // checkTGWCFN checks the transit gateway's tags for aws:cloudformation:stack-name.
 // No cache access needed — the tag carries the stack name directly.

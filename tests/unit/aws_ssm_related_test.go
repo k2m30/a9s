@@ -171,24 +171,6 @@ func TestRelated_SSM_EmptyCache(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertions ---
-
-func TestRelated_SSM_CfnStub(t *testing.T) {
-	defs := resource.GetRelated("ssm")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for ssm")
-	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("ssm cfn Checker should be nil (stub)")
-			}
-			return
-		}
-	}
-	t.Error("expected related def for target cfn not found for ssm")
-}
-
 // --- Demo checker test ---
 
 func TestRelatedDemo_SSM_Registered(t *testing.T) {

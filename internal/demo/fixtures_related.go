@@ -575,15 +575,13 @@ func init() {
 			return []resource.RelatedCheckResult{
 				{TargetType: "sns-sub", Count: 1, ResourceIDs: []string{relatedSQSSNSSubID}},
 				{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedSQSAlarmID}},
-				{TargetType: "lambda", Count: 0},
-				{TargetType: "cfn", Count: 0},
+				{TargetType: "lambda", Count: 1, ResourceIDs: []string{lambdaProcessOrdersFnName}},
 			}
 		}
 		return []resource.RelatedCheckResult{
 			{TargetType: "sns-sub", Count: 0},
 			{TargetType: "alarm", Count: 0},
 			{TargetType: "lambda", Count: 0},
-			{TargetType: "cfn", Count: 0},
 		}
 	})
 
@@ -592,12 +590,10 @@ func init() {
 		case "/acme/prod/app/config", "/acme/prod/db/connection-string":
 			return []resource.RelatedCheckResult{
 				{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedSSMKMSID}},
-				{TargetType: "cfn", Count: 0},
 			}
 		}
 		return []resource.RelatedCheckResult{
 			{TargetType: "kms", Count: 0},
-			{TargetType: "cfn", Count: 0},
 		}
 	})
 
@@ -631,7 +627,6 @@ func init() {
 				{TargetType: "ecs-svc", Count: 1, ResourceIDs: []string{"api-gateway"}},
 				{TargetType: "asg", Count: 0},
 				{TargetType: "alarm", Count: 0},
-				{TargetType: "cfn", Count: 0},
 			}
 		case "acme-api-tg":
 			return []resource.RelatedCheckResult{
@@ -639,7 +634,6 @@ func init() {
 				{TargetType: "ecs-svc", Count: 0},
 				{TargetType: "asg", Count: 0},
 				{TargetType: "alarm", Count: 0},
-				{TargetType: "cfn", Count: 0},
 			}
 		}
 		return []resource.RelatedCheckResult{
@@ -647,7 +641,6 @@ func init() {
 			{TargetType: "ecs-svc", Count: 0},
 			{TargetType: "asg", Count: 0},
 			{TargetType: "alarm", Count: 0},
-			{TargetType: "cfn", Count: 0},
 		}
 	})
 
@@ -655,7 +648,7 @@ func init() {
 		switch res.ID {
 		case "tgw-0aaa111111111111a", "tgw-0a1b2c3d4e5f67890":
 			return []resource.RelatedCheckResult{
-				{TargetType: "vpc", Count: 0},
+				{TargetType: "vpc", Count: 1, ResourceIDs: []string{prodVPCID}},
 				{TargetType: "rtb", Count: 1, ResourceIDs: []string{"rtb-0aaa111111111111a"}},
 				{TargetType: "cfn", Count: 0},
 			}
@@ -747,7 +740,7 @@ func init() {
 
 	resource.RegisterRelatedDemo("waf", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "elb", Count: 1},
+			{TargetType: "elb", Count: 1, ResourceIDs: []string{prodELBName}},
 			{TargetType: "apigw", Count: 0},
 			{TargetType: "cf", Count: 0},
 		}
