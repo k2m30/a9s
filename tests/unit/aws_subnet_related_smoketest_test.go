@@ -196,23 +196,17 @@ func TestSubnet_Smoke_S05_EnterOnZeroCountRowNoNav(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Subnet-S06: rtb and cfn checkers are nil; ec2, eni, nat, elb checkers are non-nil
+// Subnet-S06: all checkers (ec2, eni, nat, elb, rtb, cfn) are non-nil
 // Demo checker registered and returns results for all target types
 // ---------------------------------------------------------------------------
 
 func TestSubnet_Smoke_S06_CheckerNilAndDemoRegistered(t *testing.T) {
 	defs := resource.GetRelated("subnet")
 
-	nilCheckers := map[string]bool{"rtb": true, "cfn": true}
-	nonNilCheckers := map[string]bool{"ec2": true, "eni": true, "nat": true, "elb": true}
+	nonNilCheckers := map[string]bool{"ec2": true, "eni": true, "nat": true, "elb": true, "rtb": true, "cfn": true}
 
 	for i := range defs {
 		tt := defs[i].TargetType
-		if nilCheckers[tt] {
-			if defs[i].Checker != nil {
-				t.Errorf("Subnet-S06: %s Checker must be nil (stub); got non-nil — implementation changed?", tt)
-			}
-		}
 		if nonNilCheckers[tt] {
 			if defs[i].Checker == nil {
 				t.Errorf("Subnet-S06: %s Checker must be non-nil; got nil", tt)

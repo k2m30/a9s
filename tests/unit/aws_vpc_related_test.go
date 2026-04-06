@@ -280,21 +280,47 @@ func TestRelated_VPC_NilClients(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertion ---
+// --- CFN checker tests (tag-based, no cache needed) ---
 
-// TestRelated_VPC_CfnStub verifies that the cfn related def is registered but
-// has a nil Checker (stub, not yet implemented).
-func TestRelated_VPC_CfnStub(t *testing.T) {
-	defs := resource.GetRelated("vpc")
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Error("vpc cfn: expected nil Checker (stub)")
-			}
-			return
-		}
+// TestRelated_VPC_CFN_HasTag verifies that a VPC with the aws:cloudformation:stack-name
+// tag produces Count=1 with the stack name in ResourceIDs.
+func TestRelated_VPC_CFN_HasTag(t *testing.T) {
+	res := resource.Resource{
+		ID:   vpcTestID,
+		Fields: map[string]string{"vpc_id": vpcTestID},
+		RawStruct: ec2types.Vpc{
+			Tags: []ec2types.Tag{
+				{Key: strPtr("aws:cloudformation:stack-name"), Value: strPtr("vpc-stack")},
+			},
+		},
 	}
-	t.Error("vpc cfn related def not found")
+
+	checker := vpcCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (VPC has CFN tag)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-stack" {
+		t.Errorf("ResourceIDs = %v, want [\"vpc-stack\"]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_VPC_CFN_NoTag verifies that a VPC without the aws:cloudformation:stack-name
+// tag produces Count=0.
+func TestRelated_VPC_CFN_NoTag(t *testing.T) {
+	res := resource.Resource{
+		ID:        vpcTestID,
+		Fields:    map[string]string{"vpc_id": vpcTestID},
+		RawStruct: ec2types.Vpc{},
+	}
+
+	checker := vpcCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (VPC has no CFN tag)", result.Count)
+	}
 }
 
 // --- Demo checker ---

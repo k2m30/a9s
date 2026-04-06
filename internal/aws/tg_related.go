@@ -3,8 +3,10 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -16,7 +18,7 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkTGELB, NeedsTargetCache: false},
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkTGECSSvc, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkTGASG, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkTGAlarm, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
 
@@ -149,6 +151,49 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	return relatedResult("asg", ids)
+}
+
+// checkTGAlarm searches the alarm cache for CloudWatch alarms targeting this
+// target group via the TargetGroup dimension.
+func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	tgARNVal := tgARN(res)
+	if tgARNVal == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
+
+	alarmList, truncated, err := tgRelatedResources(ctx, clients, cache, "alarm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+	}
+	if alarmList == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+
+	// Extract the TG suffix for dimension matching: "targetgroup/name/hash"
+	tgSuffix := tgARNVal
+	if idx := strings.Index(tgARNVal, "targetgroup/"); idx >= 0 {
+		tgSuffix = tgARNVal[idx:]
+	}
+
+	var ids []string
+	for _, alarmRes := range alarmList {
+		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, d := range alarm.Dimensions {
+			if d.Name != nil && *d.Name == "TargetGroup" && d.Value != nil {
+				if strings.Contains(*d.Value, tgSuffix) || strings.Contains(tgARNVal, *d.Value) {
+					ids = append(ids, alarmRes.ID)
+					break
+				}
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	return relatedResult("alarm", ids)
 }
 
 // tgRelatedResources returns the resource list for target from cache or by

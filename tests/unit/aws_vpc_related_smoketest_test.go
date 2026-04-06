@@ -222,8 +222,8 @@ func TestVPC_Smoke_S05_EnterOnAllZeroRowsNoNav(t *testing.T) {
 func TestVPC_Smoke_S06_CheckerNilAndDemoRegistered(t *testing.T) {
 	defs := resource.GetRelated("vpc")
 
-	// Verify non-nil checkers for the 8 real implementations
-	realCheckers := []string{"subnet", "sg", "ec2", "elb", "nat", "igw", "rtb", "vpce"}
+	// Verify non-nil checkers for all 9 implementations (including cfn)
+	realCheckers := []string{"subnet", "sg", "ec2", "elb", "nat", "igw", "rtb", "vpce", "cfn"}
 	for _, targetType := range realCheckers {
 		var found *resource.RelatedDef
 		for i := range defs {
@@ -239,21 +239,6 @@ func TestVPC_Smoke_S06_CheckerNilAndDemoRegistered(t *testing.T) {
 		if found.Checker == nil {
 			t.Errorf("VPC-S06: Checker for %q must be non-nil; got nil", targetType)
 		}
-	}
-
-	// Verify cfn checker is nil (stub)
-	var cfnDef *resource.RelatedDef
-	for i := range defs {
-		if defs[i].TargetType == "cfn" {
-			cfnDef = &defs[i]
-			break
-		}
-	}
-	if cfnDef == nil {
-		t.Fatal("VPC-S06: cfn related def not registered")
-	}
-	if cfnDef.Checker != nil {
-		t.Fatal("VPC-S06: cfn Checker must be nil (stub); got non-nil — implementation changed?")
 	}
 
 	// Demo checker must return a result for cfn (Count:0 is valid)
