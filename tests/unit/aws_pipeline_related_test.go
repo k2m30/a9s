@@ -1,12 +1,28 @@
 package unit_test
 
 import (
+	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// pipelineCheckerByTarget returns the RelatedChecker for the given target registered under "pipeline".
+func pipelineCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("pipeline") {
+		if def.TargetType == target {
+			if def.Checker == nil {
+				t.Fatalf("pipeline related checker for %s is nil", target)
+			}
+			return def.Checker
+		}
+	}
+	t.Fatalf("pipeline related checker for %s not found", target)
+	return nil
+}
 
 // --- Navigable Fields ---
 
@@ -17,38 +33,38 @@ func TestNavigableFields_Pipeline_None(t *testing.T) {
 	}
 }
 
-// --- Stub Checkers ---
+// --- pipeline→cb: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Pipeline_CB_IsStub(t *testing.T) {
-	defs := resource.GetRelated("pipeline")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for pipeline")
+func TestRelated_Pipeline_CB_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-pipeline",
+		Name: "acme-pipeline",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cb" {
-			if def.Checker != nil {
-				t.Errorf("pipeline cb Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := pipelineCheckerByTarget(t, "cb")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cb not found for pipeline")
+	if result.TargetType != "cb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cb")
+	}
 }
 
-func TestRelated_Pipeline_Role_IsStub(t *testing.T) {
-	defs := resource.GetRelated("pipeline")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for pipeline")
+// --- pipeline→role: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_Pipeline_Role_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-pipeline",
+		Name: "acme-pipeline",
 	}
-	for _, def := range defs {
-		if def.TargetType == "role" {
-			if def.Checker != nil {
-				t.Errorf("pipeline role Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := pipelineCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target role not found for pipeline")
+	if result.TargetType != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	}
 }
 
 // --- Demo Checker ---

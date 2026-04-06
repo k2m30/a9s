@@ -396,22 +396,115 @@ func TestRelated_RTB_IGW_LocalGateway(t *testing.T) {
 	}
 }
 
-// --- CloudFormation stub ---
+// --- CloudFormation checker (tag-based: aws:cloudformation:stack-name → cfn cache) ---
 
-func TestRelated_RTB_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("rtb")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for rtb")
+func TestRelated_RTB_CFN_Found(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+				{Key: aws.String("Name"), Value: aws.String("my-rtb")},
+			},
+		},
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("rtb cfn Checker should be nil (stub) — ec2types.RouteTable has no Tags field accessible without fetching")
-			}
-			return
-		}
+	cfnRes := resource.Resource{
+		ID:     "my-stack",
+		Name:   "my-stack",
+		Fields: map[string]string{"stack_name": "my-stack"},
 	}
-	t.Error("expected related def for target cfn not found for rtb")
+	otherCfn := resource.Resource{
+		ID:     "other-stack",
+		Name:   "other-stack",
+		Fields: map[string]string{"stack_name": "other-stack"},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes, otherCfn}},
+	}
+
+	checker := rtbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [my-stack]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+func TestRelated_RTB_CFN_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+			},
+		},
+	}
+	otherCfn := resource.Resource{
+		ID:     "different-stack",
+		Name:   "different-stack",
+		Fields: map[string]string{"stack_name": "different-stack"},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{otherCfn}},
+	}
+
+	checker := rtbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_RTB_CFN_NoTag(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("my-rtb")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "any-stack", Name: "any-stack"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count)
+	}
+}
+
+func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("my-stack")},
+			},
+		},
+	}
+
+	checker := rtbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	}
 }
 
 // --- Demo Checker ---

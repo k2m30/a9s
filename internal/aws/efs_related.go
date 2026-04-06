@@ -19,7 +19,7 @@ func init() {
 	resource.RegisterRelated("efs", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda},
 	})
 }
 
@@ -94,6 +94,12 @@ func efsCFNStackName(res resource.Resource) string {
 		}
 	}
 	return ""
+}
+
+// checkEFSLambda returns Count: 0 because Lambda EFS mount point configurations
+// are not available in the list API — the relationship cannot be determined from cache.
+func checkEFSLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 }
 
 // efsRelatedResources returns the resource list for target from cache or fetches

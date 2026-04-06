@@ -28,7 +28,7 @@ func TestRelated_CF_Registered(t *testing.T) {
 		"elb": {"Load Balancers (origin)", true},
 		"waf": {"WAF Web ACLs", true},
 		"acm": {"ACM Certificates", true},
-		"r53": {"Route 53 Zones", false},
+		"r53": {"Route 53 Zones", true},
 	}
 	for target, want := range expected {
 		found := false

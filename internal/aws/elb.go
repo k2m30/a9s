@@ -29,7 +29,7 @@ func init() {
 	resource.RegisterRelated("elb", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN, NeedsTargetCache: true},
 	})
 }
 

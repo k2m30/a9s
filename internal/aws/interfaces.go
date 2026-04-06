@@ -597,6 +597,26 @@ type IAMListAccountAliasesAPI interface {
 	ListAccountAliases(ctx context.Context, params *iam.ListAccountAliasesInput, optFns ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error)
 }
 
+// IAMListAttachedUserPoliciesAPI defines the interface for the IAM ListAttachedUserPolicies operation.
+type IAMListAttachedUserPoliciesAPI interface {
+	ListAttachedUserPolicies(ctx context.Context, params *iam.ListAttachedUserPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error)
+}
+
+// IAMListAttachedGroupPoliciesAPI defines the interface for the IAM ListAttachedGroupPolicies operation.
+type IAMListAttachedGroupPoliciesAPI interface {
+	ListAttachedGroupPolicies(ctx context.Context, params *iam.ListAttachedGroupPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedGroupPoliciesOutput, error)
+}
+
+// IAMListGroupsForUserAPI defines the interface for the IAM ListGroupsForUser operation.
+type IAMListGroupsForUserAPI interface {
+	ListGroupsForUser(ctx context.Context, params *iam.ListGroupsForUserInput, optFns ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error)
+}
+
+// IAMListEntitiesForPolicyAPI defines the interface for the IAM ListEntitiesForPolicy operation.
+type IAMListEntitiesForPolicyAPI interface {
+	ListEntitiesForPolicy(ctx context.Context, params *iam.ListEntitiesForPolicyInput, optFns ...func(*iam.Options)) (*iam.ListEntitiesForPolicyOutput, error)
+}
+
 // EC2DescribeVolumesAPI defines the interface for the EC2 DescribeVolumes operation.
 type EC2DescribeVolumesAPI interface {
 	DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)

@@ -76,6 +76,19 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
+// checkSFNRole returns Count: 0 because StateMachineListItem does not expose the
+// execution role ARN — the relationship cannot be determined from cache.
+func checkSFNRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkSFNCFN returns Count: 0 because SFN state machine tags are not included
+// in the ListStateMachines response — the CFN relationship cannot be determined
+// from cache alone.
+func checkSFNCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // sfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
