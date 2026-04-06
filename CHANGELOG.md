@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.32.0] - 2026-04-06
+
+### Added
+- EC2 status check indicators in list view — `! running` for impaired, `~ running` for initializing (#188)
+- EC2 Status Checks section in detail view with color-coded System/Instance values (#188)
+- `DescribeInstanceStatus` API call integrated into EC2 fetcher with graceful degradation
+- Demo mode fixtures with impaired and initializing EC2 instances
+
+### Fixed
+- Pre-existing lint warning in `cmd/preview/main.go` (if-else chain → switch)
+
 ## [3.31.0] - 2026-04-06
 
 ### Fixed
