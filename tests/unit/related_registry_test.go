@@ -737,11 +737,50 @@ func TestRelated_ECS_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_ECSSvc_Registered(t *testing.T) {
+	defs := resource.GetRelated("ecs-svc")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for ecs-svc")
+	}
+
+	type expectation struct {
+		displayName string
+		hasChecker  bool
+	}
+	expected := map[string]expectation{
+		"ecs":   {"ECS Clusters", true},
+		"tg":    {"Target Groups", true},
+		"alarm": {"CloudWatch Alarms", true},
+		"cfn":   {"CloudFormation Stacks", true},
+	}
+	for target, want := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == target {
+				found = true
+				if want.hasChecker && def.Checker == nil {
+					t.Errorf("ecs-svc %q: Checker should not be nil", target)
+				}
+				if !want.hasChecker && def.Checker != nil {
+					t.Errorf("ecs-svc %q: Checker should be nil (stub)", target)
+				}
+				if def.DisplayName != want.displayName {
+					t.Errorf("ecs-svc %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for ecs-svc", target)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
 	_ context.Context,
-	_ interface{},
+	_ any,
 	_ resource.Resource,
 	_ resource.ResourceCache,
 ) resource.RelatedCheckResult {

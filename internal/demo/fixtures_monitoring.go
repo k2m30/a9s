@@ -250,6 +250,37 @@ RawStruct: cwtypes.MetricAlarm{
 				},
 			},
 		},
+		{
+			ID:     relatedECSSvcAlarmID,
+			Name:   relatedECSSvcAlarmID,
+			Status: "ALARM",
+			Fields: map[string]string{
+				"alarm_name":  relatedECSSvcAlarmID,
+				"state":       "ALARM",
+				"metric_name": "CPUUtilization",
+				"namespace":   "AWS/ECS",
+				"threshold":   "80.00",
+			},
+			RawStruct: cwtypes.MetricAlarm{
+				AlarmName:          aws.String(relatedECSSvcAlarmID),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + relatedECSSvcAlarmID),
+				AlarmDescription:   aws.String("Triggers when ECS service CPU exceeds 80%"),
+				StateValue:         cwtypes.StateValueAlarm,
+				MetricName:         aws.String("CPUUtilization"),
+				Namespace:          aws.String("AWS/ECS"),
+				Threshold:          aws.Float64(80.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:  aws.Int32(2),
+				Period:             aws.Int32(300),
+				Statistic:          cwtypes.StatisticAverage,
+				ActionsEnabled:     aws.Bool(true),
+				AlarmActions:       []string{relatedAlarmSNSID},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ServiceName"), Value: aws.String("api-gateway")},
+					{Name: aws.String("ClusterName"), Value: aws.String("acme-services")},
+				},
+			},
+		},
 	}
 
 	// Generate 17 more alarms to reach 22 total
