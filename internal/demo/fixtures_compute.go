@@ -702,9 +702,50 @@ func lambdaFunctions() []resource.Resource {
 				},
 			},
 		},
+		{
+			ID:     relatedSecretsLambdaID,
+			Name:   relatedSecretsLambdaID,
+			Status: "python3.12",
+			Fields: map[string]string{
+				"function_name": relatedSecretsLambdaID,
+				"runtime":       "python3.12",
+				"memory":        "128",
+				"timeout":       "30",
+				"handler":       "rotate.handler",
+				"last_modified": "2026-02-14T10:00:00+00:00",
+				"code_size":     "1048576",
+				"log_group":     "/aws/lambda/" + relatedSecretsLambdaID,
+				"package_type":  "Zip",
+			},
+			RawStruct: lambdatypes.FunctionConfiguration{
+				FunctionName: aws.String(relatedSecretsLambdaID),
+				FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + relatedSecretsLambdaID),
+				Role:         aws.String(prodLambdaRoleARN),
+				Runtime:      lambdatypes.RuntimePython312,
+				MemorySize:   aws.Int32(128),
+				Timeout:      aws.Int32(30),
+				Handler:      aws.String("rotate.handler"),
+				Description:  aws.String("Rotates DocDB credentials in Secrets Manager"),
+				LastModified: aws.String("2026-02-14T10:00:00+00:00"),
+				CodeSize:     1048576,
+				State:        lambdatypes.StateActive,
+				PackageType:  lambdatypes.PackageTypeZip,
+				Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+				EphemeralStorage: &lambdatypes.EphemeralStorage{
+					Size: aws.Int32(512),
+				},
+				TracingConfig: &lambdatypes.TracingConfigResponse{
+					Mode: lambdatypes.TracingModePassThrough,
+				},
+				LoggingConfig: &lambdatypes.LoggingConfig{
+					LogGroup:  aws.String("/aws/lambda/" + relatedSecretsLambdaID),
+					LogFormat: lambdatypes.LogFormatText,
+				},
+			},
+		},
 	}
 
-	// Generate 19 more functions to reach 25 total
+	// Generate 18 more functions to reach 25 total
 	runtimeMap := map[string]lambdatypes.Runtime{
 		"nodejs20.x": lambdatypes.RuntimeNodejs20x,
 		"python3.12": lambdatypes.RuntimePython312,
@@ -716,7 +757,7 @@ func lambdaFunctions() []resource.Resource {
 	codeSizes := []int64{524288, 1048576, 2097152, 5242880, 8388608, 1048576, 524288, 2097152, 15728640, 524288,
 		1048576, 31457280, 5242880, 524288, 1048576, 2097152, 8388608, 1048576, 524288}
 
-	for i := 0; i < 19; i++ {
+	for i := 0; i < 18; i++ {
 		name := lambdaNamePool[i]
 		runtime := lambdaRuntimePool[i]
 		handler := lambdaHandlerPool[i]
