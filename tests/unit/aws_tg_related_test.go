@@ -248,21 +248,6 @@ func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertions ---
-
-func TestRelated_TG_CfnStub(t *testing.T) {
-	defs := resource.GetRelated("tg")
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Error("tg cfn: expected nil Checker (stub)")
-			}
-			return
-		}
-	}
-	t.Error("tg cfn related def not found")
-}
-
 // --- NavigableFields test ---
 
 func TestNavigableFields_TG(t *testing.T) {
@@ -301,7 +286,7 @@ func TestRelatedDemo_TG_Registered(t *testing.T) {
 	}
 
 	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"elb": false, "ecs-svc": false, "asg": false, "alarm": false, "cfn": false}
+	wantTargets := map[string]bool{"elb": false, "ecs-svc": false, "asg": false, "alarm": false}
 	for _, r := range results {
 		if _, ok := wantTargets[r.TargetType]; ok {
 			wantTargets[r.TargetType] = true

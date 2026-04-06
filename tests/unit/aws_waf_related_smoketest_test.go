@@ -183,14 +183,16 @@ func TestWAF_Smoke_S05_EnterOnStubRowNoNav(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WAF-S06: All 3 checkers nil (stubs). Demo checker registered and returns all 3 targets.
+// WAF-S06: All 3 checkers are now non-nil (real implementations).
+// elb and apigw return Count:-1 with nil clients; cf returns Count:0 for REGIONAL scope.
+// Demo checker registered and returns all 3 targets.
 // ---------------------------------------------------------------------------
 
-func TestWAF_Smoke_S06_DemoCheckerOverridesNilChecker(t *testing.T) {
+func TestWAF_Smoke_S06_CheckersAndDemoChecker(t *testing.T) {
 	defs := resource.GetRelated("waf")
 
-	nilTargets := []string{"elb", "apigw", "cf"}
-	for _, targetType := range nilTargets {
+	allTargets := []string{"elb", "apigw", "cf"}
+	for _, targetType := range allTargets {
 		var def *resource.RelatedDef
 		for i := range defs {
 			if defs[i].TargetType == targetType {
@@ -201,8 +203,8 @@ func TestWAF_Smoke_S06_DemoCheckerOverridesNilChecker(t *testing.T) {
 		if def == nil {
 			t.Fatalf("WAF-S06: %s related def not registered", targetType)
 		}
-		if def.Checker != nil {
-			t.Fatalf("WAF-S06: %s Checker must be nil (stub); got non-nil — implementation changed?", targetType)
+		if def.Checker == nil {
+			t.Fatalf("WAF-S06: %s Checker must be non-nil (real checker); got nil", targetType)
 		}
 	}
 
@@ -213,7 +215,7 @@ func TestWAF_Smoke_S06_DemoCheckerOverridesNilChecker(t *testing.T) {
 	}
 	results := checker(resource.Resource{ID: "my-waf-id"})
 
-	for _, targetType := range nilTargets {
+	for _, targetType := range allTargets {
 		var result *resource.RelatedCheckResult
 		for i := range results {
 			if results[i].TargetType == targetType {
