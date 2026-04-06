@@ -122,6 +122,18 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("secrets", ids)
 }
 
+// checkKMSS3 searches the S3 cache for buckets that use this KMS key for encryption.
+// S3 bucket resources assembled by FetchS3BucketsPage do not store KMS key info in
+// Fields or RawStruct, so this checker returns Count: -1 (unknown).
+func checkKMSS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	}
+	// S3 resources do not expose KMS key IDs in Fields or RawStruct, so the
+	// relationship cannot be determined from cache alone.
+	return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+}
+
 // kmsIDMatches reports whether a KMS reference value (full ARN, bare key UUID,
 // or alias ARN) contains the given bare key UUID.
 // A full ARN has the form arn:aws:kms:region:account:key/{uuid}.

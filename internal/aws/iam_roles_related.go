@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -22,6 +23,7 @@ func init() {
 		{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true},
 	})
 }
 
@@ -166,6 +168,50 @@ func checkRolePolicy(_ context.Context, clients any, res resource.Resource, _ re
 		}
 	}
 	return relatedResult("policy", ids)
+}
+
+// checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile
+// ARN contains this role's name. Instance profiles often share the role name.
+// Pattern C: cache scan with ARN-contains approximation.
+func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	roleName := res.ID
+	if roleName == "" {
+		if raw, ok := assertStruct[iamtypes.Role](res.RawStruct); ok && raw.RoleName != nil {
+			roleName = *raw.RoleName
+		}
+	}
+	if roleName == "" {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+
+	ec2List, truncated, err := roleRelatedResources(ctx, clients, cache, "ec2")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+	}
+	if ec2List == nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	var ids []string
+	for _, ec2Res := range ec2List {
+		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
+		if !ok {
+			continue
+		}
+		if inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil {
+			continue
+		}
+		profileARN := *inst.IamInstanceProfile.Arn
+		// Instance profile ARN contains the profile name, which commonly matches
+		// the role name (e.g. arn:aws:iam::123:instance-profile/my-role).
+		if strings.Contains(profileARN, "/"+roleName) {
+			ids = append(ids, ec2Res.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+	return relatedResult("ec2", ids)
 }
 
 // roleRelatedResources returns the resource list for target from cache or by

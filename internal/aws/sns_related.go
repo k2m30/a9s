@@ -14,6 +14,7 @@ func init() {
 	resource.RegisterRelated("sns", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSNSCFN, NeedsTargetCache: true},
+		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
 	})
 }
 
@@ -57,6 +58,40 @@ func checkSNSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkSNSSub searches the sns-sub cache for subscriptions whose topic_arn
+// matches this SNS topic's ARN (Pattern C — reverse lookup in sns-sub cache).
+func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	topicARN := res.Fields["topic_arn"]
+	if topicARN == "" {
+		topicARN = res.ID
+	}
+	if topicARN == "" {
+		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+	}
+
+	subList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "sns-sub")
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1, Err: err}
+	}
+	if subList == nil {
+		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+	}
+
+	var ids []string
+	for _, subRes := range subList {
+		if subRes.Fields["topic_arn"] == topicARN {
+			ids = append(ids, subRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+	}
+	return relatedResult("sns-sub", ids)
 }
 
 // snsAlarmReferences reports whether any of the alarm's action lists contain

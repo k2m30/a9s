@@ -146,6 +146,36 @@ func checkDbiSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.R
 	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 }
 
+// checkDBILogs searches the logs cache for log groups matching the RDS naming convention.
+// Pattern N — naming convention: /aws/rds/instance/{db-instance-id}/{log-type}
+func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	dbID := res.ID
+	if dbID == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	prefix := "/aws/rds/instance/" + dbID + "/"
+
+	logList, truncated, err := dbiRelatedResources(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if logList == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+
+	var ids []string
+	for _, logRes := range logList {
+		if strings.HasPrefix(logRes.ID, prefix) {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	return relatedResult("logs", ids)
+}
+
 // dbiRelatedResources returns the resource list for target from cache or by fetching the first page.
 func dbiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

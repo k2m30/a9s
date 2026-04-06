@@ -22,6 +22,7 @@ func init() {
 
 	resource.RegisterRelated("cfn", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
 	})
 }
 

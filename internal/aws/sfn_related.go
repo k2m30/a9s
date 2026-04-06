@@ -89,6 +89,13 @@ func checkSFNCFN(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
+// checkSFNEbRule returns Count: -1 (unknown) because EventBridge rule targets
+// are not included in the ListRules response — the relationship cannot be
+// determined from cache alone without calling ListTargetsByRule per rule.
+func checkSFNEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+}
+
 // sfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

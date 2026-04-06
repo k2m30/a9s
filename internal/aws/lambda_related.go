@@ -95,6 +95,51 @@ func checkLambdaCFN(_ context.Context, _ any, _ resource.Resource, _ resource.Re
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
+// checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.
+// Pattern N — default: /aws/lambda/{function-name}, with custom override via LoggingConfig.
+func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	functionName := res.ID
+	if functionName == "" {
+		functionName = res.Name
+	}
+	if functionName == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	// Check for custom log group via LoggingConfig
+	expectedLogGroup := "/aws/lambda/" + functionName
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if ok && fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {
+		expectedLogGroup = *fn.LoggingConfig.LogGroup
+	}
+
+	logList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if logList == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+
+	var ids []string
+	for _, logRes := range logList {
+		if logRes.ID == expectedLogGroup {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	return relatedResult("logs", ids)
+}
+
+// checkLambdaEbRule returns Count: -1 (unknown) because EventBridge rule targets
+// are not included in the ListRules response — the relationship cannot be
+// determined from cache alone without calling ListTargetsByRule per rule.
+func checkLambdaEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+}
+
 // lambdaRelatedResources returns the resource list for target from cache or by fetching the first page.
 func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

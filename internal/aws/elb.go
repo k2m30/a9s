@@ -30,6 +30,7 @@ func init() {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN, NeedsTargetCache: true},
+		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkELBR53, NeedsTargetCache: true},
 	})
 }
 
