@@ -953,12 +953,13 @@ func renderEC2StatusChecksMixed() string {
 		}
 		rowText := " " + strings.Join(cells, "  ")
 
-		if i == 0 {
+		switch i {
+		case 0:
 			line := lipgloss.NewStyle().
 				Background(colRowSelected).Foreground(colRowSelectedFg).Bold(true).
 				Width(innerW).Render(rowText)
 			lines = append(lines, line)
-		} else if i == 2 {
+		case 2:
 			// worker-01: selected row with failed check — ! stays red on blue bg
 			// Compose: row bg is blue, but the ! glyph keeps its red fg
 			rowBase := rowColorStyle(r.state)
@@ -973,7 +974,7 @@ func renderEC2StatusChecksMixed() string {
 			}
 			rowTextCustom := " " + strings.Join(cellsCustom, "  ")
 			lines = append(lines, rowTextCustom)
-		} else {
+		default:
 			style := rowColorStyle(r.state)
 			lines = append(lines, style.Render(rowText))
 		}

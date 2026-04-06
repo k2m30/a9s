@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id"})
+	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status"})
 
 	resource.RegisterFieldAliases("ec2", map[string]string{
 		"instance_id":  "InstanceId",
@@ -165,6 +165,11 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 		}
 	}
 
+	// Enrich with status check data (graceful degradation on error).
+	if len(resources) > 0 {
+		enrichEC2StatusChecks(ctx, api, resources)
+	}
+
 	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
@@ -187,5 +192,73 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// enrichEC2StatusChecks calls DescribeInstanceStatus for the page's resources
+// and merges system_status/instance_status into each resource's Fields map.
+// Errors are silently ignored (graceful degradation per design spec).
+func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, resources []resource.Resource) {
+	// Collect instance IDs.
+	ids := make([]string, 0, len(resources))
+	for _, r := range resources {
+		if r.ID != "" {
+			ids = append(ids, r.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	// Build a map from instance ID to (systemStatus, instanceStatus).
+	statusMap := make(map[string][2]string, len(ids))
+
+	// DescribeInstanceStatus accepts max 100 IDs per call.
+	const batchSize = 100
+	for start := 0; start < len(ids); start += batchSize {
+		end := start + batchSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		batch := ids[start:end]
+
+		out, err := api.DescribeInstanceStatus(ctx, &ec2.DescribeInstanceStatusInput{
+			InstanceIds:         batch,
+			IncludeAllInstances: aws.Bool(true),
+		})
+		if err != nil {
+			// Non-fatal: skip enrichment for this batch.
+			continue
+		}
+
+		for _, s := range out.InstanceStatuses {
+			if s.InstanceId == nil {
+				continue
+			}
+			sysStatus := ""
+			instStatus := ""
+			if s.SystemStatus != nil {
+				sysStatus = string(s.SystemStatus.Status)
+			}
+			if s.InstanceStatus != nil {
+				instStatus = string(s.InstanceStatus.Status)
+			}
+			statusMap[*s.InstanceId] = [2]string{sysStatus, instStatus}
+		}
+	}
+
+	// Merge status fields into resources.
+	for i, r := range resources {
+		if pair, ok := statusMap[r.ID]; ok {
+			if resources[i].Fields == nil {
+				resources[i].Fields = make(map[string]string)
+			}
+			if pair[0] != "" {
+				resources[i].Fields["system_status"] = pair[0]
+			}
+			if pair[1] != "" {
+				resources[i].Fields["instance_status"] = pair[1]
+			}
+		}
+	}
 }
 

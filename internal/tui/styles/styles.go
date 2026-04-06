@@ -27,6 +27,10 @@ var (
 	NavigableField    lipgloss.Style
 	ColSepDim         lipgloss.Style // │ separator when left column is focused
 	ColSepAccent      lipgloss.Style // │ separator when right column is focused
+
+	StatusCheckFailed lipgloss.Style // "!" glyph — RED bold (impaired)
+	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
+	StatusCheckOk     lipgloss.Style // GREEN (ok values in detail view)
 )
 
 // NoColorActive reports whether NO_COLOR is set in the environment.
@@ -91,6 +95,9 @@ func initStyles() {
 	NavigableField = lipgloss.Style{}
 	ColSepDim = lipgloss.Style{}
 	ColSepAccent = lipgloss.Style{}
+	StatusCheckFailed = lipgloss.Style{}
+	StatusCheckWarn = lipgloss.Style{}
+	StatusCheckOk = lipgloss.Style{}
 	rowColorCache = nil
 
 	if NoColorActive() {
@@ -188,4 +195,7 @@ func initStyles() {
 	NavigableField = lipgloss.NewStyle().Foreground(ColAccent).Underline(true)
 	ColSepDim = lipgloss.NewStyle().Foreground(ColBorder)
 	ColSepAccent = lipgloss.NewStyle().Foreground(ColAccent)
+	StatusCheckFailed = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
+	StatusCheckWarn = lipgloss.NewStyle().Foreground(ColPending)
+	StatusCheckOk = lipgloss.NewStyle().Foreground(ColRunning)
 }

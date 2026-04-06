@@ -108,8 +108,10 @@ func strPtr(s string) *string {
 
 // mockEC2Client implements awsclient.EC2DescribeInstancesAPI for testing.
 type mockEC2Client struct {
-	output *ec2.DescribeInstancesOutput
-	err    error
+	output       *ec2.DescribeInstancesOutput
+	err          error
+	statusOutput *ec2.DescribeInstanceStatusOutput
+	statusErr    error
 }
 
 func (m *mockEC2Client) DescribeInstances(
@@ -118,6 +120,20 @@ func (m *mockEC2Client) DescribeInstances(
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeInstancesOutput, error) {
 	return m.output, m.err
+}
+
+func (m *mockEC2Client) DescribeInstanceStatus(
+	_ context.Context,
+	_ *ec2.DescribeInstanceStatusInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeInstanceStatusOutput, error) {
+	if m.statusErr != nil {
+		return nil, m.statusErr
+	}
+	if m.statusOutput != nil {
+		return m.statusOutput, nil
+	}
+	return &ec2.DescribeInstanceStatusOutput{}, nil
 }
 
 // ---------------------------------------------------------------------------

@@ -112,6 +112,14 @@ func (m *storyEC2PaginatedMock) DescribeInstances(
 	return out, nil
 }
 
+func (m *storyEC2PaginatedMock) DescribeInstanceStatus(
+	_ context.Context,
+	_ *ec2.DescribeInstanceStatusInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeInstanceStatusOutput, error) {
+	return &ec2.DescribeInstanceStatusOutput{}, nil
+}
+
 func TestStoryD1_EC2_1500Instances_AllReturned(t *testing.T) {
 	mock := newStoryEC2PaginatedMock(1500, 1000)
 	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)

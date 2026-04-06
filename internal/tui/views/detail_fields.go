@@ -68,6 +68,9 @@ func (m *DetailModel) buildFieldList() {
 		}
 		sort.Strings(keys)
 		m.fieldList = fieldpath.ExtractFieldList(nil, fields, keys, nil)
+		if m.resourceType == "ec2" {
+			m.injectEC2StatusChecks()
+		}
 		return
 	}
 	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)
@@ -130,6 +133,92 @@ func (m *DetailModel) buildFieldList() {
 		}
 	}
 	m.fieldList = items
+	if m.resourceType == "ec2" {
+		m.injectEC2StatusChecks()
+	}
+}
+
+// statusCheckStyle returns a lipgloss.Style appropriate for the given EC2 status check value.
+func statusCheckStyle(status string) lipgloss.Style {
+	switch status {
+	case "ok":
+		return styles.StatusCheckOk
+	case "impaired":
+		return styles.StatusCheckFailed
+	case "initializing":
+		return styles.StatusCheckWarn
+	default:
+		return styles.DimText
+	}
+}
+
+// injectEC2StatusChecks injects a "Status Checks" section into m.fieldList
+// after the "State" section when the instance is running and checks are non-trivial.
+func (m *DetailModel) injectEC2StatusChecks() {
+	if len(m.fieldList) == 0 {
+		return
+	}
+	// Only inject when instance is running.
+	state := m.res.Fields["state"]
+	if state != "running" {
+		return
+	}
+	sysStatus := m.res.Fields["system_status"]
+	instStatus := m.res.Fields["instance_status"]
+
+	// Omit when both fields are empty.
+	if sysStatus == "" && instStatus == "" {
+		return
+	}
+	// Omit when both are "ok" (healthy — no noise).
+	if sysStatus == "ok" && instStatus == "ok" {
+		return
+	}
+
+	// Build the items to inject.
+	sysVal := sysStatus
+	if sysVal == "" {
+		sysVal = "—"
+	}
+	instVal := instStatus
+	if instVal == "" {
+		instVal = "—"
+	}
+	inject := []fieldpath.FieldItem{
+		{Key: "Status Checks", IsHeader: true, Path: "StatusChecks"},
+		{Key: "System", Value: statusCheckStyle(sysStatus).Render(sysVal), IsSubField: true, Path: "StatusChecks"},
+		{Key: "Instance", Value: statusCheckStyle(instStatus).Render(instVal), IsSubField: true, Path: "StatusChecks"},
+	}
+
+	// Find the insertion point: after the "State" section header and its sub-fields.
+	insertAt := -1
+	inStateSection := false
+	for i, item := range m.fieldList {
+		if item.IsHeader && item.Key == "State" {
+			inStateSection = true
+			continue
+		}
+		if inStateSection {
+			if item.IsHeader {
+				// Found the next section header — insert before it.
+				insertAt = i
+				break
+			}
+			// Continue scanning sub-fields of State section.
+		}
+	}
+	if insertAt == -1 {
+		// State section was last, or not found — append at end.
+		m.fieldList = append(m.fieldList, inject...)
+		return
+	}
+
+	// Insert at the found position.
+	result := make([]fieldpath.FieldItem, 0, len(m.fieldList)+len(inject))
+	result = append(result, m.fieldList[:insertAt]...)
+	result = append(result, inject...)
+	result = append(result, m.fieldList[insertAt:]...)
+	m.fieldList = result
 }
 
 // renderFromFieldList renders the structured field list to a string.
@@ -166,6 +255,10 @@ func (m DetailModel) renderFromFieldList() string {
 					line = "     " + item.Key + ":  " + item.Value
 					break
 				}
+				if !item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
+					line = "     " + item.Key + ":  " + item.Value
+					break
+				}
 				raw := strings.TrimSpace(item.Value)
 				raw = strings.TrimPrefix(raw, "- ")
 				subKey, subVal, hasSep := strings.Cut(raw, ": ")
@@ -188,6 +281,12 @@ func (m DetailModel) renderFromFieldList() string {
 				// For navigable sub-fields, buildFieldList stores Key=subKey and Value=subValue.
 				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
 					line = "     " + styles.DetailKey.Render(item.Key+":") + "  " + styles.NavigableField.Render(item.Value)
+					break
+				}
+				// For injected sub-fields with separate Key/Value (e.g., EC2 status checks),
+				// render key label and pre-styled value directly without raw-string splitting.
+				if item.Key != "" && !strings.Contains(item.Key, ":") {
+					line = "     " + styles.DetailKey.Render(item.Key+":") + "  " + item.Value
 					break
 				}
 				raw := strings.TrimSpace(item.Value)
