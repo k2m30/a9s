@@ -600,4 +600,26 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("subnet", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case prodPublicSubnetA:
+			return []resource.RelatedCheckResult{
+				{TargetType: "ec2", Count: 3, ResourceIDs: []string{relatedSubnetEC2ID1, relatedSubnetEC2ID2, relatedSubnetEC2ID3}},
+				{TargetType: "eni", Count: 1, ResourceIDs: []string{relatedSubnetENIID1}},
+				{TargetType: "nat", Count: 1, ResourceIDs: []string{relatedSubnetNATID1}},
+				{TargetType: "elb", Count: 2, ResourceIDs: []string{relatedSubnetELBID1, relatedSubnetELBID2}},
+				{TargetType: "rtb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2", Count: 0},
+			{TargetType: "eni", Count: 0},
+			{TargetType: "nat", Count: 0},
+			{TargetType: "elb", Count: 0},
+			{TargetType: "rtb", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
