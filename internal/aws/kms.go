@@ -121,6 +121,12 @@ func init() {
 			},
 		}, nil
 	})
+
+	resource.RegisterRelated("kms", []resource.RelatedDef{
+		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true},
+		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
+	})
 }
 
 // FetchKMSKeys performs a multi-step fetch:

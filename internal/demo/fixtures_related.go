@@ -287,4 +287,12 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("kms", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ebs", Count: 2, ResourceIDs: []string{relatedKMSEBSID1, relatedKMSEBSID2}},
+			{TargetType: "dbi", Count: 1, ResourceIDs: []string{relatedKMSDbiID}},
+			{TargetType: "secrets", Count: 0},
+		}
+	})
 }
