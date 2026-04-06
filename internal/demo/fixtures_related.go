@@ -272,4 +272,11 @@ func init() {
 			{TargetType: "policy", Count: 3},
 		}
 	})
+
+	resource.RegisterRelatedDemo("igw", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "vpc", Count: 1, ResourceIDs: []string{relatedIGWVPCID}},
+			{TargetType: "rtb", Count: 2, ResourceIDs: []string{relatedIGWRTBID1, relatedIGWRTBID2}},
+		}
+	})
 }
