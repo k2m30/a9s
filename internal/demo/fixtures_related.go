@@ -330,4 +330,12 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("nat", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "vpc", Count: 1, ResourceIDs: []string{relatedNATVPCID}},
+			{TargetType: "subnet", Count: 1, ResourceIDs: []string{relatedNATSubnetID}},
+			{TargetType: "rtb", Count: 1, ResourceIDs: []string{relatedNATRTBID}},
+		}
+	})
 }

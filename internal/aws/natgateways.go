@@ -19,6 +19,18 @@ func init() {
 		}
 		return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
 	})
+
+	resource.RegisterNavigableFields("nat", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "SubnetId", TargetType: "subnet"},
+		{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},
+	})
+
+	resource.RegisterRelated("nat", []resource.RelatedDef{
+		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkNATVPC, NeedsTargetCache: true},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNATSubnet, NeedsTargetCache: true},
+		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkNATRTB, NeedsTargetCache: true},
+	})
 }
 
 // FetchNatGateways calls the EC2 DescribeNatGateways API and converts the
