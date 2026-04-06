@@ -228,4 +228,8 @@ const (
 	relatedKMSEBSID1 = "vol-0a1b2c3d4e5f60001"
 	relatedKMSEBSID2 = "vol-0a1b2c3d4e5f60002"
 	relatedKMSDbiID  = "prod-api-primary"
+
+	// lambda related-view IDs
+	relatedLambdaRoleID  = "acme-lambda-execution"
+	relatedLambdaAlarmID = "lambda-errors-critical"
 )
