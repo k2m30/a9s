@@ -16,7 +16,7 @@ func init() {
 		"timestamp", "history_item_type", "history_summary",
 	})
 
-	resource.RegisterPaginatedChild("alarm_history", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("alarm_history", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

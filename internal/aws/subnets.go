@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("subnet", []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"})
 
-	resource.RegisterPaginated("subnet", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("subnet", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

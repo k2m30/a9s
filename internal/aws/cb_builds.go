@@ -19,7 +19,7 @@ func init() {
 		"resolved_source_version", "log_group_name", "log_stream_name",
 	})
 
-	resource.RegisterPaginatedChild("cb_builds", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("cb_builds", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

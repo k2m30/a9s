@@ -14,7 +14,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ami", []string{"image_id", "name", "state", "architecture", "platform", "root_device_type", "creation_date", "public"})
 
-	resource.RegisterPaginated("ami", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ami", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

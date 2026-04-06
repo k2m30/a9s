@@ -25,7 +25,7 @@ const DefaultPageSize = 50
 //
 // Callers MUST return Count=-1 (unknown) when isTruncated==true and 0 matches
 // are found locally — never report a partial count as definitive.
-func FetchRelatedTarget(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func FetchRelatedTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
 		return entry.Resources, entry.IsTruncated, nil
 	}

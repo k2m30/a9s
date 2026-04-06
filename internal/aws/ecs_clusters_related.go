@@ -13,7 +13,7 @@ import (
 )
 
 // checkECSServices checks the cache for ECS services belonging to this cluster.
-func checkECSServices(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSServices(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
 		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
@@ -54,7 +54,7 @@ func checkECSServices(ctx context.Context, clients interface{}, res resource.Res
 }
 
 // checkECSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
-func checkECSAlarms(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
@@ -88,7 +88,7 @@ func checkECSAlarms(ctx context.Context, clients interface{}, res resource.Resou
 }
 
 // checkECSCFN checks the ECS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.
-func checkECSCFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := ""
 	raw, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
 	if ok {
@@ -129,7 +129,7 @@ func checkECSCFN(ctx context.Context, clients interface{}, res resource.Resource
 }
 
 // ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
-func ecsRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

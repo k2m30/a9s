@@ -16,7 +16,7 @@ func init() {
 		"priority", "conditions_summary", "action_type", "action_target", "is_default",
 	})
 
-	resource.RegisterPaginatedChild("elb_listener_rules", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("elb_listener_rules", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
