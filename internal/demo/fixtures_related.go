@@ -508,4 +508,21 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("sfn", func(res resource.Resource) []resource.RelatedCheckResult {
+		if res.ID == "order-fulfillment-workflow" {
+			return []resource.RelatedCheckResult{
+				{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedSFNAlarmID}},
+				{TargetType: "logs", Count: 1, ResourceIDs: []string{relatedSFNLogsID}},
+				{TargetType: "role", Count: 0},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "logs", Count: 0},
+			{TargetType: "role", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
