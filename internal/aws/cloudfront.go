@@ -13,7 +13,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("cf", []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class"})
 
-	resource.RegisterPaginated("cf", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("cf", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -22,10 +22,10 @@ func init() {
 	})
 
 	resource.RegisterRelated("cf", []resource.RelatedDef{
-		{TargetType: "s3", DisplayName: "S3 Buckets (origin)", Checker: nil},
-		{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: nil},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: nil},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: nil},
+		{TargetType: "s3", DisplayName: "S3 Buckets (origin)", Checker: checkCfS3, NeedsTargetCache: true},
+		{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true},
 		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: nil},
 	})
 }

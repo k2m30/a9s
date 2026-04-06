@@ -12,7 +12,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("apigw", []string{"api_id", "name", "protocol", "endpoint", "description"})
 
-	resource.RegisterPaginated("apigw", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("apigw", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -22,7 +22,7 @@ func init() {
 
 	resource.RegisterRelated("apigw", []resource.RelatedDef{
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: nil},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true},
 		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: nil},
 	})
 }
