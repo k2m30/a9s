@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -19,7 +20,7 @@ func init() {
 		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkVPCIGW, NeedsTargetCache: true},
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVPCRTB, NeedsTargetCache: true},
 		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkVPCVPCE, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkVPCCFN, NeedsTargetCache: false},
 	})
 }
 
@@ -250,6 +251,20 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
 	}
 	return relatedResult("vpce", ids)
+}
+
+// checkVPCCFN checks the VPC's tags for aws:cloudformation:stack-name.
+// No cache access needed — the tag carries the stack name directly.
+func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Vpc](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	return relatedResult("cfn", []string{stackName})
 }
 
 // vpcIDFromResource extracts the VPC ID from a VPC resource.

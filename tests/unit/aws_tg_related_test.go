@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -202,20 +203,52 @@ func TestRelated_TG_NilClients(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertions ---
+// --- Alarm checker tests (Pattern C — reverse cache lookup via TargetGroup dimension) ---
 
-func TestRelated_TG_AlarmStub(t *testing.T) {
-	defs := resource.GetRelated("tg")
-	for _, def := range defs {
-		if def.TargetType == "alarm" {
-			if def.Checker != nil {
-				t.Error("tg alarm: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_TG_Alarm_Match(t *testing.T) {
+	res := tgSrcResource()
+	tgARNSuffix := "targetgroup/my-tg/abc123"
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "tg-unhealthy-alarm",
+			RawStruct: cwtypes.MetricAlarm{
+				Dimensions: []cwtypes.Dimension{
+					{Name: strPtr("TargetGroup"), Value: strPtr(tgARNSuffix)},
+				},
+			},
+		}}},
 	}
-	t.Error("tg alarm related def not found")
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (alarm with matching TargetGroup dimension)", result.Count)
+	}
 }
+
+func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
+	res := tgSrcResource()
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "other-alarm",
+			RawStruct: cwtypes.MetricAlarm{
+				Dimensions: []cwtypes.Dimension{
+					{Name: strPtr("TargetGroup"), Value: strPtr("targetgroup/other-tg/xyz789")},
+				},
+			},
+		}}},
+	}
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (alarm with different TargetGroup dimension)", result.Count)
+	}
+}
+
+// --- Stub checker assertions ---
 
 func TestRelated_TG_CfnStub(t *testing.T) {
 	defs := resource.GetRelated("tg")

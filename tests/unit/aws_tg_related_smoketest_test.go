@@ -196,27 +196,22 @@ func TestTG_Smoke_S05_EnterOnStubRowNoNav(t *testing.T) {
 func TestTG_Smoke_S06_CheckerRegistration(t *testing.T) {
 	defs := resource.GetRelated("tg")
 
-	// Verify nil checkers for alarm and cfn
-	nilCheckerTypes := []string{"alarm", "cfn"}
-	for _, targetType := range nilCheckerTypes {
-		var found *resource.RelatedDef
-		for i := range defs {
-			if defs[i].TargetType == targetType {
-				found = &defs[i]
-				break
-			}
-		}
-		if found == nil {
-			t.Errorf("TG-S06: %s related def not registered", targetType)
-			continue
-		}
-		if found.Checker != nil {
-			t.Errorf("TG-S06: %s Checker must be nil (stub); got non-nil — implementation changed?", targetType)
+	// Verify cfn checker is still nil (stub)
+	var cfnDef *resource.RelatedDef
+	for i := range defs {
+		if defs[i].TargetType == "cfn" {
+			cfnDef = &defs[i]
+			break
 		}
 	}
+	if cfnDef == nil {
+		t.Error("TG-S06: cfn related def not registered")
+	} else if cfnDef.Checker != nil {
+		t.Errorf("TG-S06: cfn Checker must be nil (stub); got non-nil — implementation changed?")
+	}
 
-	// Verify non-nil checkers for elb, ecs-svc, asg
-	nonNilCheckerTypes := []string{"elb", "ecs-svc", "asg"}
+	// Verify non-nil checkers for elb, ecs-svc, asg, alarm
+	nonNilCheckerTypes := []string{"elb", "ecs-svc", "asg", "alarm"}
 	for _, targetType := range nonNilCheckerTypes {
 		var found *resource.RelatedDef
 		for i := range defs {

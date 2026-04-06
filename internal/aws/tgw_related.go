@@ -26,10 +26,24 @@ func init() {
 		{
 			TargetType:       "cfn",
 			DisplayName:      "CloudFormation",
-			Checker:          nil,
-			NeedsTargetCache: true,
+			Checker:          checkTGWCFN,
+			NeedsTargetCache: false,
 		},
 	})
+}
+
+// checkTGWCFN checks the transit gateway's tags for aws:cloudformation:stack-name.
+// No cache access needed — the tag carries the stack name directly.
+func checkTGWCFN(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	return relatedResult("cfn", []string{stackName})
 }
 
 // checkTGWRTB checks the rtb cache for route tables that have routes

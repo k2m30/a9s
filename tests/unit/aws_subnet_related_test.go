@@ -199,32 +199,113 @@ func TestRelated_Subnet_NilClients(t *testing.T) {
 	}
 }
 
-// --- Stub checker assertions ---
+// --- RTB checker tests ---
 
-func TestRelated_Subnet_RtbStub(t *testing.T) {
-	defs := resource.GetRelated("subnet")
-	for _, def := range defs {
-		if def.TargetType == "rtb" {
-			if def.Checker != nil {
-				t.Error("subnet rtb: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_Subnet_RTB_ExplicitAssoc(t *testing.T) {
+	res := subnetSrcResource()
+	subnetID := "subnet-abc123"
+	cache := resource.ResourceCache{
+		"rtb": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "rtb-explicit",
+			RawStruct: ec2types.RouteTable{
+				Associations: []ec2types.RouteTableAssociation{
+					{SubnetId: &subnetID},
+				},
+			},
+		}}},
 	}
-	t.Error("subnet rtb related def not found")
+
+	checker := subnetCheckerByTarget(t, "rtb")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (explicit association)", result.Count)
+	}
 }
 
-func TestRelated_Subnet_CfnStub(t *testing.T) {
-	defs := resource.GetRelated("subnet")
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Error("subnet cfn: expected nil Checker (stub)")
-			}
-			return
-		}
+func TestRelated_Subnet_RTB_MainRTB(t *testing.T) {
+	res := subnetSrcResource()
+	mainAssoc := true
+	vpcID := "vpc-11111111"
+	cache := resource.ResourceCache{
+		"rtb": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "rtb-main",
+			RawStruct: ec2types.RouteTable{
+				VpcId: &vpcID,
+				Associations: []ec2types.RouteTableAssociation{
+					{Main: &mainAssoc},
+				},
+			},
+		}}},
 	}
-	t.Error("subnet cfn related def not found")
+
+	checker := subnetCheckerByTarget(t, "rtb")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (main RTB fallback)", result.Count)
+	}
+}
+
+func TestRelated_Subnet_RTB_NoMatch(t *testing.T) {
+	res := subnetSrcResource()
+	otherSubnet := "subnet-other999"
+	cache := resource.ResourceCache{
+		"rtb": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "rtb-other",
+			RawStruct: ec2types.RouteTable{
+				Associations: []ec2types.RouteTableAssociation{
+					{SubnetId: &otherSubnet},
+				},
+			},
+		}}},
+	}
+
+	checker := subnetCheckerByTarget(t, "rtb")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (different subnet)", result.Count)
+	}
+}
+
+// --- CFN checker tests ---
+
+func TestRelated_Subnet_CFN_HasTag(t *testing.T) {
+	res := resource.Resource{
+		ID: "subnet-abc123",
+		Fields: map[string]string{"vpc_id": "vpc-11111111"},
+		RawStruct: ec2types.Subnet{
+			Tags: []ec2types.Tag{
+				{Key: strPtr("aws:cloudformation:stack-name"), Value: strPtr("my-stack")},
+			},
+		},
+	}
+
+	checker := subnetCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (has CFN tag)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-stack" {
+		t.Errorf("ResourceIDs = %v, want [\"my-stack\"]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_Subnet_CFN_NoTag(t *testing.T) {
+	res := resource.Resource{
+		ID:        "subnet-abc123",
+		Fields:    map[string]string{"vpc_id": "vpc-11111111"},
+		RawStruct: ec2types.Subnet{},
+	}
+
+	checker := subnetCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	}
 }
 
 // --- NavigableFields test ---

@@ -424,3 +424,14 @@ func ec2VolumeIDs(res resource.Resource) map[string]struct{} {
 	return ids
 }
 
+// tagValue extracts a tag value from a slice of EC2 tags.
+// Used by CFN checkers across multiple resource types.
+func tagValue(tags []ec2types.Tag, key string) string {
+	for _, t := range tags {
+		if t.Key != nil && *t.Key == key && t.Value != nil {
+			return *t.Value
+		}
+	}
+	return ""
+}
+
