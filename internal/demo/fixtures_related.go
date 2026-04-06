@@ -218,4 +218,12 @@ func init() {
 			{TargetType: "lambda", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("eip", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2", Count: 1, ResourceIDs: []string{"i-0a1b2c3d4e5f60001"}},
+			{TargetType: "eni", Count: 1, ResourceIDs: []string{"eni-0aaa111111111111a"}},
+			{TargetType: "nat", Count: 0},
+		}
+	})
 }
