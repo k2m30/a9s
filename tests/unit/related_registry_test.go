@@ -1635,6 +1635,26 @@ func TestRelated_Subnet_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_TG_Registered(t *testing.T) {
+	defs := resource.GetRelated("tg")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for tg")
+	}
+	expected := []string{"elb", "ecs-svc", "asg", "alarm", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for tg", exp)
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(
