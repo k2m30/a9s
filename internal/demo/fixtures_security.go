@@ -78,10 +78,37 @@ func iamRoleFixtures() []resource.Resource {
 			RawStruct: iamtypes.Role{
 				RoleName:    aws.String("acme-lambda-execution"),
 				RoleId:      aws.String("AROAEXAMPLE222222222"),
-				Arn:         aws.String("arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"),
+				Arn:         aws.String(prodLambdaRoleARN),
 				Path:        aws.String("/service-role/"),
 				CreateDate:  aws.Time(mustParseTime("2025-03-10T08:15:00+00:00")),
 				Description: aws.String("Execution role for Lambda functions"),
+			},
+		},
+		{
+			// Lambda navigable-field alias: lambdatypes.FunctionConfiguration.Role
+			// stores the full ARN. The infrastructure integrity test (Part 3) checks
+			// that the extracted field value matches a role fixture ID. This entry
+			// provides that ARN-keyed ID while the name-keyed entry above satisfies
+			// arnLeaf-based cross-reference checks.
+			// RoleName is set to the ARN so the IAM demo handler generates a unique
+			// resource entry distinct from the name-keyed fixture above.
+			ID:     prodLambdaRoleARN,
+			Name:   prodLambdaRoleARN,
+			Status: "",
+			Fields: map[string]string{
+				"role_name":   prodLambdaRoleARN,
+				"role_id":     "AROAEXAMPLE222222223",
+				"path":        "/service-role/",
+				"create_date": "2025-03-10T08:15:00+00:00",
+				"description": "Lambda execution role ARN alias (navigable-field cross-reference)",
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:    aws.String(prodLambdaRoleARN),
+				RoleId:      aws.String("AROAEXAMPLE222222223"),
+				Arn:         aws.String(prodLambdaRoleARN),
+				Path:        aws.String("/service-role/"),
+				CreateDate:  aws.Time(mustParseTime("2025-03-10T08:15:00+00:00")),
+				Description: aws.String("Lambda execution role ARN alias (navigable-field cross-reference)"),
 			},
 		},
 		{

@@ -1125,6 +1125,41 @@ func TestRelated_KMS_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_Lambda_Registered(t *testing.T) {
+	defs := resource.GetRelated("lambda")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for lambda")
+	}
+
+	expected := []string{"role", "alarm", "sqs", "cfn"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for lambda", exp)
+		}
+	}
+
+	// role and alarm must have non-nil checkers; sqs and cfn are stubs (nil).
+	for _, def := range defs {
+		switch def.TargetType {
+		case "role", "alarm":
+			if def.Checker == nil {
+				t.Errorf("lambda %q: Checker should not be nil", def.TargetType)
+			}
+		case "sqs", "cfn":
+			if def.Checker != nil {
+				t.Errorf("lambda %q: Checker should be nil (stub)", def.TargetType)
+			}
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

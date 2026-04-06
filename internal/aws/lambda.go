@@ -30,6 +30,20 @@ func init() {
 		}
 		return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
 	})
+
+	// Role is a full ARN on Lambda (arn:aws:iam::.../role/name); the navigable
+	// field uses the ARN path directly. The target role fixture must carry the ARN
+	// as its ID for the infrastructure integrity check to pass.
+	resource.RegisterNavigableFields("lambda", []resource.NavigableField{
+		{FieldPath: "Role", TargetType: "role"},
+	})
+
+	resource.RegisterRelated("lambda", []resource.RelatedDef{
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
+		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+	})
 }
 
 // FetchLambdaFunctions calls the Lambda ListFunctions API and returns all pages
