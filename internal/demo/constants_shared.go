@@ -215,4 +215,7 @@ const (
 	relatedENIEC2ID  = "i-0a1b2c3d4e5f60001"
 	relatedENISGID1  = "sg-0aaa111111111111a"
 	relatedENIEIPID  = "eipalloc-0aaa111111111111a"
+
+	// glue related-view IDs
+	relatedGlueRoleID1 = "acme-glue-role"
 )
