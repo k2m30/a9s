@@ -13,12 +13,18 @@ import (
 func init() {
 	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_id", "attachment_count", "path", "create_date"})
 
-	resource.RegisterPaginated("policy", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("policy", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
 		return FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
+	})
+
+	resource.RegisterRelated("policy", []resource.RelatedDef{
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: nil, NeedsTargetCache: false},
 	})
 }
 
