@@ -1,6 +1,10 @@
 package demo
 
-import "github.com/k2m30/a9s/v3/internal/resource"
+import (
+	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
 
 func init() {
 	resource.RegisterRelatedDemo("acm", func(res resource.Resource) []resource.RelatedCheckResult {
@@ -302,6 +306,20 @@ func init() {
 			{TargetType: "alarm", Count: 1, ResourceIDs: []string{relatedLambdaAlarmID}},
 			{TargetType: "sqs", Count: 0},
 			{TargetType: "cfn", Count: 0},
+		}
+	})
+
+	resource.RegisterRelatedDemo("logs", func(res resource.Resource) []resource.RelatedCheckResult {
+		lambdaCount := 0
+		var lambdaIDs []string
+		const lambdaPrefix = "/aws/lambda/"
+		if strings.HasPrefix(res.ID, lambdaPrefix) {
+			lambdaCount = 1
+			lambdaIDs = []string{relatedApigwLambdaID}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "lambda", Count: lambdaCount, ResourceIDs: lambdaIDs},
+			{TargetType: "alarm", Count: 0},
 		}
 	})
 }
