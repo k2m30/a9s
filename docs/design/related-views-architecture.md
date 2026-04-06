@@ -1746,6 +1746,8 @@ before continuing the rollout.**
 | Forward relationships in left column ONLY | Avoids duplication; left = "points to", right = "pointed to by" |
 | No separate relatedlist.go | Right column is embedded in detail view; `app_related.go` holds related-specific handlers separated from the main handler file |
 | Count display driven by checker, not category | Reverse checkers CAN return counts when cheap (VPC->Subnets, Lambda->SQS ESM); Count=-1 means no count shown |
+| Nil checker requires 5-point justification | Before marking Checker: nil, architect must verify: (1) no forward fields, (2) no reverse fields in cached types, (3) no naming convention, (4) no alarm dimension match, (5) requires uncached API. Lazy nil stubs are a defect. |
+| Pattern N (naming-convention) and Pattern D (dimension-based) are first-class | Log groups follow `/aws/{service}/{name}`, alarms have `Dimensions[]` — these are viable checkers, not stubs |
 | `Resources` binding stays at `r` (not moved to `R`) | Only CFN's ChildViewDef.Key changes; `r`/`ToggleRelated` in detail view is context-separated, not key-separated |
 | Cache-first + fetcher-fallback for navigable field navigation | No generic FetchByID interface; reuses resourceCache when available, falls back to RelatedFetcher |
 | Structured extraction pipeline replaces ExtractSubtree for detail | Current YAML-string pipeline loses field paths; new pipeline produces kvPair with FieldPath, IndentLevel for navigability |

@@ -21,8 +21,8 @@ func init() {
 	})
 
 	resource.RegisterRelated("sfn", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "logs", DisplayName: "CloudWatch Logs", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSFNAlarm, NeedsTargetCache: true},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: nil, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
 	})
