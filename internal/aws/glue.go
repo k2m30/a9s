@@ -28,7 +28,7 @@ func init() {
 	resource.RegisterRelated("glue", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN, NeedsTargetCache: false},
 	})
 }
 

@@ -162,18 +162,21 @@ func TestRelated_EFS_CFN_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Lambda stub checker (nil Checker) ---
+// --- efs→lambda: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_EFS_Lambda_StubNilChecker(t *testing.T) {
-	for _, def := range resource.GetRelated("efs") {
-		if def.TargetType == "lambda" {
-			if def.Checker != nil {
-				t.Error("efs lambda Checker should be nil (stub)")
-			}
-			return
-		}
+func TestRelated_EFS_Lambda_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "fs-0a1b2c3d4e5f60001",
+		Name: "prod-shared-efs",
 	}
-	t.Fatal("efs related def for lambda not found")
+	checker := efsCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
 }
 
 // --- Demo Checker ---

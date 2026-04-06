@@ -12,8 +12,15 @@ import (
 func init() {
 	resource.RegisterRelated("redis", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
 	})
+}
+
+// checkRedisCFN returns Count: 0 because ElastiCache replication group tags are
+// not included in the DescribeReplicationGroups list response — the CFN
+// relationship cannot be determined from cache alone.
+func checkRedisCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkRedisAlarms checks the cache for CloudWatch alarms with CacheClusterId dimension matching this cluster's ID.

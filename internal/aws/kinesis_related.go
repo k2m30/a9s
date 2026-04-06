@@ -11,10 +11,24 @@ import (
 
 func init() {
 	resource.RegisterRelated("kinesis", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, NeedsTargetCache: false},
 	})
+}
+
+// checkKinesisLambda returns Count: 0 because Kinesis stream event source
+// mappings are not available in the list API — the relationship cannot be
+// determined from cache alone.
+func checkKinesisLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+// checkKinesisCFN returns Count: 0 because Kinesis stream tags are not included
+// in the ListStreams response — the CFN relationship cannot be determined from
+// cache alone.
+func checkKinesisCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkKinesisAlarms checks the cache for CloudWatch alarms with StreamName dimension matching this stream.

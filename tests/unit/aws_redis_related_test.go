@@ -132,22 +132,21 @@ func TestRelated_Redis_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (stub) ---
+// --- redis→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Redis_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("redis")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for redis")
+func TestRelated_Redis_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-prod-sessions",
+		Name: "acme-prod-sessions",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("redis cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := redisCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for redis")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

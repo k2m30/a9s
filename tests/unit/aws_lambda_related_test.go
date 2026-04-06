@@ -253,8 +253,8 @@ func TestRelated_Lambda_SQS_IsStub(t *testing.T) {
 	}
 	for _, def := range defs {
 		if def.TargetType == "sqs" {
-			if def.Checker != nil {
-				t.Errorf("lambda sqs Checker should be nil (stub)")
+			if def.Checker == nil {
+				t.Errorf("lambda sqs Checker should not be nil")
 			}
 			return
 		}
@@ -269,8 +269,8 @@ func TestRelated_Lambda_CFN_IsStub(t *testing.T) {
 	}
 	for _, def := range defs {
 		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("lambda cfn Checker should be nil (stub)")
+			if def.Checker == nil {
+				t.Errorf("lambda cfn Checker should not be nil")
 			}
 			return
 		}

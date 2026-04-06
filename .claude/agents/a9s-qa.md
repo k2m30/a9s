@@ -26,6 +26,20 @@ Before doing ANY work, verify the task includes **exact scope**:
 
 Do NOT explore the codebase to fill in gaps. Do NOT guess what to test. The architect owns scoping.
 
+## VALUE GATE (mandatory)
+
+Before writing any test, ask: **"What bug would this catch that existing tests don't?"**
+
+REJECT tests that only verify:
+- A registered function is non-nil (already covered by registry/completeness tests)
+- Nil clients return -1 (trivial guard clause, not a real bug vector)
+- Empty ID returns -1 or 0 (same trivial guard)
+- A constant equals itself
+
+These catch zero bugs and add maintenance noise. If the entire task is nothing but these, reply:
+
+> REJECTED: All specified tests are trivial guards already covered by existing completeness tests. No real bug vectors identified. Please re-scope with tests that verify actual matching logic (correct field, correct ResourceIDs, correct edge cases).
+
 ## Your Scope
 
 **Writes to:** `tests/unit/` — test files only

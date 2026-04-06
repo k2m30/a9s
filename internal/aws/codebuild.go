@@ -23,7 +23,7 @@ func init() {
 	resource.RegisterRelated("cb", []resource.RelatedDef{
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
-		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: nil},
+		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline},
 	})
 }
 

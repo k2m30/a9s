@@ -25,7 +25,7 @@ func TestRelated_DBC_Registered(t *testing.T) {
 	expected := map[string]expectation{
 		"sg":      {"Security Groups", true},
 		"alarm":   {"CloudWatch Alarms", true},
-		"secrets": {"Secrets Manager", false},
+		"secrets": {"Secrets Manager", true},
 		"logs":    {"Log Groups", true},
 	}
 	for target, want := range expected {
@@ -285,6 +285,23 @@ func TestRelated_DBC_Logs_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	}
+}
+
+// --- dbc→secrets: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_DBC_Secrets_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-docdb-prod",
+		Name: "acme-docdb-prod",
+	}
+	checker := dbcCheckerByTarget(t, "secrets")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "secrets" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "secrets")
 	}
 }
 

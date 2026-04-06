@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -17,54 +18,48 @@ func TestNavigableFields_Policy_None(t *testing.T) {
 	}
 }
 
-// --- Stub Checkers ---
+// --- policy→iam-user (smoke: non-nil checker) ---
 
-func TestRelated_Policy_Role_IsStub(t *testing.T) {
-	defs := resource.GetRelated("policy")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for policy")
-	}
-	for _, def := range defs {
-		if def.TargetType == "role" {
-			if def.Checker != nil {
-				t.Errorf("policy role Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
-	}
-	t.Error("expected related def for target role not found for policy")
+func TestRelated_Policy_User_NonNil(t *testing.T) {
+	checker := checkerByTarget(t, "policy", "iam-user")
+	_ = checker
 }
 
-func TestRelated_Policy_User_IsStub(t *testing.T) {
-	defs := resource.GetRelated("policy")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for policy")
+func TestRelated_Policy_User_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "arn:aws:iam::111122223333:policy/test-policy",
+		Name: "test-policy",
 	}
-	for _, def := range defs {
-		if def.TargetType == "iam-user" {
-			if def.Checker != nil {
-				t.Errorf("policy iam-user Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := checkerByTarget(t, "policy", "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
-	t.Error("expected related def for target iam-user not found for policy")
+	if result.TargetType != "iam-user" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-user")
+	}
 }
 
-func TestRelated_Policy_Group_IsStub(t *testing.T) {
-	defs := resource.GetRelated("policy")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for policy")
+// --- policy→iam-group (smoke: non-nil checker) ---
+
+func TestRelated_Policy_Group_NonNil(t *testing.T) {
+	checker := checkerByTarget(t, "policy", "iam-group")
+	_ = checker
+}
+
+func TestRelated_Policy_Group_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "arn:aws:iam::111122223333:policy/test-policy",
+		Name: "test-policy",
 	}
-	for _, def := range defs {
-		if def.TargetType == "iam-group" {
-			if def.Checker != nil {
-				t.Errorf("policy iam-group Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := checkerByTarget(t, "policy", "iam-group")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
-	t.Error("expected related def for target iam-group not found for policy")
+	if result.TargetType != "iam-group" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
+	}
 }
 
 // --- Demo Checker ---

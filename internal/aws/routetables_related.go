@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -21,7 +22,7 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRTBSubnet, NeedsTargetCache: true},
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkRTBNAT, NeedsTargetCache: true},
 		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRTBCFN, NeedsTargetCache: true},
 	})
 }
 
@@ -137,6 +138,49 @@ func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
 	}
 	return relatedResult("igw", ids)
+}
+
+// checkRTBCFN checks EC2 RouteTable tags for aws:cloudformation:stack-name
+// and matches against the CFN stack cache (Pattern C — tag-based).
+func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stackName := rtbCFNStackName(res)
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+
+	cfnList, truncated, err := rtbRelatedResources(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
+	if cfnList == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+
+	var ids []string
+	for _, cfnRes := range cfnList {
+		if cfnRes.ID == stackName || cfnRes.Name == stackName || cfnRes.Fields["stack_name"] == stackName {
+			ids = append(ids, cfnRes.ID)
+			continue
+		}
+		raw, ok := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+		if ok && raw.StackName != nil && *raw.StackName == stackName {
+			ids = append(ids, cfnRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	return relatedResult("cfn", ids)
+}
+
+// rtbCFNStackName extracts the aws:cloudformation:stack-name tag value from the
+// route table's EC2 Tags slice.
+func rtbCFNStackName(res resource.Resource) string {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return ""
+	}
+	return tagValue(rtb.Tags, "aws:cloudformation:stack-name")
 }
 
 // rtbRelatedResources returns the resource list for target from cache or fetches

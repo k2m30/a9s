@@ -105,3 +105,10 @@ func dbcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+// checkDbcSecrets returns Count: 0 because the DocumentDB DescribeDBClusters API
+// does not include Secrets Manager ARNs in the list response — the relationship
+// cannot be determined from cache alone.
+func checkDbcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}

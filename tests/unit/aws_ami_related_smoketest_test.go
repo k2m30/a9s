@@ -200,8 +200,8 @@ func TestAMI_Smoke_S06_DemoCheckerOverridesNilChecker(t *testing.T) {
 	if asgDef == nil {
 		t.Fatal("AMI-S06: asg related def not registered")
 	}
-	if asgDef.Checker != nil {
-		t.Fatal("AMI-S06: asg Checker must be nil (stub); got non-nil — implementation changed?")
+	if asgDef.Checker == nil {
+		t.Fatal("AMI-S06: asg Checker must not be nil — implementation missing?")
 	}
 	// Demo checker must still return a result for asg (Count:0 is valid — it
 	// just means the demo account has no ASGs attached to this AMI)

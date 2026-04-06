@@ -21,8 +21,8 @@ func init() {
 	})
 
 	resource.RegisterRelated("athena", []resource.RelatedDef{
-		{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: nil},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: nil},
+		{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS},
 	})
 }
 

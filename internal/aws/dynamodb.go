@@ -23,7 +23,7 @@ func init() {
 
 	resource.RegisterRelated("ddb", []resource.RelatedDef{
 		{TargetType: "kms",    DisplayName: "KMS Key",           Checker: checkDdbKMS},
-		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: nil},
+		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: checkDdbLambda},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
 	})
 }

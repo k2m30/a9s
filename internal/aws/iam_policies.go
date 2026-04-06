@@ -22,9 +22,9 @@ func init() {
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkPolicyUser, NeedsTargetCache: false},
+		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkPolicyGroup, NeedsTargetCache: false},
 	})
 }
 

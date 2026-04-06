@@ -41,8 +41,8 @@ func init() {
 	resource.RegisterRelated("lambda", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
-		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkLambdaSQS, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
 	})
 }
 

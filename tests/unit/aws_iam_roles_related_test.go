@@ -322,18 +322,50 @@ func TestRelated_Role_NG_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Policy stub test ---
+// --- Policy checker (IAM API: ListAttachedRolePolicies) ---
 
-func TestRelated_Role_Policy_CheckerIsNil(t *testing.T) {
-	for _, def := range resource.GetRelated("role") {
-		if def.TargetType == "policy" {
-			if def.Checker != nil {
-				t.Errorf("role related checker for policy should be nil (stub), got non-nil")
-			}
-			return
-		}
+func TestRelated_Role_Policy_NonNil(t *testing.T) {
+	checker := roleCheckerByTarget(t, "policy")
+	// checkerByTarget fatals if checker is nil — reaching here means it's non-nil.
+	_ = checker
+}
+
+func TestRelated_Role_Policy_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "my-role",
+		Name: "my-role",
+		Fields: map[string]string{
+			"role_name": "my-role",
+		},
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String("my-role"),
+			Arn:      aws.String("arn:aws:iam::111122223333:role/my-role"),
+		},
 	}
-	t.Fatal("role related def for policy not found")
+
+	checker := roleCheckerByTarget(t, "policy")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+	if result.TargetType != "policy" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	}
+}
+
+func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
+	source := resource.Resource{
+		ID:   "",
+		Name: "",
+	}
+
+	checker := roleCheckerByTarget(t, "policy")
+	// With nil clients it must return -1, not panic.
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
 }
 
 // --- Demo checker ---

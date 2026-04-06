@@ -12,8 +12,15 @@ import (
 func init() {
 	resource.RegisterRelated("redshift", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: false},
 	})
+}
+
+// checkRedshiftCFN returns Count: 0 because Redshift cluster tags are not
+// reliably available from cache — the CFN relationship cannot be determined
+// from cache alone.
+func checkRedshiftCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkRedshiftAlarms checks the cache for CloudWatch alarms with ClusterIdentifier dimension matching this cluster.

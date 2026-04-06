@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -17,54 +18,70 @@ func TestNavigableFields_R53_None(t *testing.T) {
 	}
 }
 
-// --- Stub Checkers ---
-
-func TestRelated_R53_ELB_IsStub(t *testing.T) {
-	defs := resource.GetRelated("r53")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for r53")
-	}
-	for _, def := range defs {
-		if def.TargetType == "elb" {
-			if def.Checker != nil {
-				t.Errorf("r53 elb Checker should be nil (stub), got non-nil")
+// r53CheckerByTarget returns the RelatedChecker for the given target registered under "r53".
+func r53CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("r53") {
+		if def.TargetType == target {
+			if def.Checker == nil {
+				t.Fatalf("r53 related checker for %s is nil", target)
 			}
-			return
+			return def.Checker
 		}
 	}
-	t.Error("expected related def for target elb not found for r53")
+	t.Fatalf("r53 related checker for %s not found", target)
+	return nil
 }
 
-func TestRelated_R53_CF_IsStub(t *testing.T) {
-	defs := resource.GetRelated("r53")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for r53")
+// --- r53→elb: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_R53_ELB_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "/hostedzone/Z0123456789ABCDEFGHIJ",
+		Name: "example.com.",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cf" {
-			if def.Checker != nil {
-				t.Errorf("r53 cf Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := r53CheckerByTarget(t, "elb")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cf not found for r53")
+	if result.TargetType != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	}
 }
 
-func TestRelated_R53_ACM_IsStub(t *testing.T) {
-	defs := resource.GetRelated("r53")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for r53")
+// --- r53→cf: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_R53_CF_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "/hostedzone/Z0123456789ABCDEFGHIJ",
+		Name: "example.com.",
 	}
-	for _, def := range defs {
-		if def.TargetType == "acm" {
-			if def.Checker != nil {
-				t.Errorf("r53 acm Checker should be nil (stub), got non-nil")
-			}
-			return
-		}
+	checker := r53CheckerByTarget(t, "cf")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target acm not found for r53")
+	if result.TargetType != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	}
+}
+
+// --- r53→acm: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_R53_ACM_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "/hostedzone/Z0123456789ABCDEFGHIJ",
+		Name: "example.com.",
+	}
+	checker := r53CheckerByTarget(t, "acm")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "acm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
+	}
 }
 
 // --- Demo Checker ---

@@ -172,6 +172,13 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("acm", ids)
 }
 
+// checkCFR53 returns Count: 0 because Route 53 alias records pointing to
+// CloudFront distributions are not available in the ListHostedZones response —
+// the relationship cannot be determined from cache alone.
+func checkCFR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+}
+
 // cfRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func cfRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

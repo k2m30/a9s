@@ -29,7 +29,7 @@ func TestRelated_DBI_Registered(t *testing.T) {
 		"subnet":   {"Subnets", true},
 		"alarm":    {"CloudWatch Alarms", true},
 		"rds-snap": {"RDS Snapshots", true},
-		"secrets":  {"Secrets Manager", false},
+		"secrets":  {"Secrets Manager", true},
 	}
 	for target, want := range expected {
 		found := false
@@ -291,6 +291,23 @@ func TestRelated_DBI_RDSSnap_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	}
+}
+
+// --- dbi→secrets: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_DBI_Secrets_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "my-db-instance",
+		Name: "my-db-instance",
+	}
+	checker := dbiCheckerByTarget(t, "secrets")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "secrets" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "secrets")
 	}
 }
 

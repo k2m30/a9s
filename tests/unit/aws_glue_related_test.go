@@ -270,22 +270,21 @@ func TestRelated_Glue_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (stub — nil Checker) ---
+// --- glue→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Glue_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("glue")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for glue")
+func TestRelated_Glue_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-etl-orders",
+		Name: "acme-etl-orders",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("glue cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := glueCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for glue")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

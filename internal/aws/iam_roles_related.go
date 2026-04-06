@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -20,7 +21,7 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkRoleLambda, NeedsTargetCache: true},
 		{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true},
-		{TargetType: "policy", DisplayName: "IAM Policies", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
 	})
 }
 
@@ -133,6 +134,38 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
 	}
 	return relatedResult("ng", ids)
+}
+
+// checkRolePolicy uses the IAM ListAttachedRolePolicies API to return the
+// managed policies attached to this IAM role.
+func checkRolePolicy(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
+	}
+	roleName := res.ID
+	if roleName == "" {
+		raw, ok2 := assertStruct[iamtypes.Role](res.RawStruct)
+		if ok2 && raw.RoleName != nil {
+			roleName = *raw.RoleName
+		}
+	}
+	if roleName == "" {
+		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
+	}
+	out, err := c.IAM.ListAttachedRolePolicies(context.Background(), &iam.ListAttachedRolePoliciesInput{
+		RoleName: &roleName,
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, p := range out.AttachedPolicies {
+		if p.PolicyArn != nil {
+			ids = append(ids, *p.PolicyArn)
+		}
+	}
+	return relatedResult("policy", ids)
 }
 
 // roleRelatedResources returns the resource list for target from cache or by

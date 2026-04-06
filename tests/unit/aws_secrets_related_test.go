@@ -204,40 +204,129 @@ func TestRelated_Secrets_Lambda_NoRotation(t *testing.T) {
 	}
 }
 
-// --- DBI checker (stub — Checker==nil) ---
+// --- DBI checker: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Secrets_DBI_IsStub(t *testing.T) {
-	defs := resource.GetRelated("secrets")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for secrets")
+func TestRelated_Secrets_DBI_ReturnsZero(t *testing.T) {
+	source := secretsSource()
+	checker := secretsCheckerByTarget(t, "dbi")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	for _, def := range defs {
-		if def.TargetType == "dbi" {
-			if def.Checker != nil {
-				t.Errorf("secrets dbi Checker should be nil (stub)")
-			}
-			return
-		}
+	if result.TargetType != "dbi" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "dbi")
 	}
-	t.Error("expected related def for target dbi not found for secrets")
 }
 
-// --- CFN checker (stub — Checker==nil) ---
+// --- CFN checker (tag-based: aws:cloudformation:stack-name → cfn cache) ---
 
-func TestRelated_Secrets_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("secrets")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for secrets")
+func TestRelated_Secrets_CFN_Found(t *testing.T) {
+	source := resource.Resource{
+		ID:   "prod/myapp/db-password",
+		Name: "prod/myapp/db-password",
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/myapp/db-password"),
+			Tags: []smtypes.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("prod-stack")},
+			},
+		},
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("secrets cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	cfnRes := resource.Resource{
+		ID:     "prod-stack",
+		Name:   "prod-stack",
+		Fields: map[string]string{"stack_name": "prod-stack"},
 	}
-	t.Error("expected related def for target cfn not found for secrets")
+	otherCfn := resource.Resource{
+		ID:     "dev-stack",
+		Name:   "dev-stack",
+		Fields: map[string]string{"stack_name": "dev-stack"},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes, otherCfn}},
+	}
+
+	checker := secretsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prod-stack" {
+		t.Errorf("ResourceIDs = %v, want [prod-stack]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+func TestRelated_Secrets_CFN_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID:   "prod/myapp/db-password",
+		Name: "prod/myapp/db-password",
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/myapp/db-password"),
+			Tags: []smtypes.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("prod-stack")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "other-stack", Name: "other-stack", Fields: map[string]string{"stack_name": "other-stack"}},
+		}},
+	}
+
+	checker := secretsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+func TestRelated_Secrets_CFN_NoTag(t *testing.T) {
+	source := resource.Resource{
+		ID:   "prod/myapp/db-password",
+		Name: "prod/myapp/db-password",
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/myapp/db-password"),
+			Tags: []smtypes.Tag{
+				{Key: aws.String("Name"), Value: aws.String("some-tag")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "any-stack", Name: "any-stack"},
+		}},
+	}
+
+	checker := secretsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag)", result.Count)
+	}
+}
+
+func TestRelated_Secrets_CFN_CacheMiss(t *testing.T) {
+	source := resource.Resource{
+		ID:   "prod/myapp/db-password",
+		Name: "prod/myapp/db-password",
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/myapp/db-password"),
+			Tags: []smtypes.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("prod-stack")},
+			},
+		},
+	}
+
+	checker := secretsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
+	}
 }
 
 // --- Demo Checker ---

@@ -84,6 +84,13 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
+// checkCbPipeline returns Count: 0 because CodePipeline PipelineSummary does not
+// include stage details — the relationship between a CodeBuild project and its
+// containing pipeline cannot be determined from cache alone.
+func checkCbPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
+}
+
 // cbRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

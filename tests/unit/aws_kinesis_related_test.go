@@ -122,40 +122,38 @@ func TestRelated_Kinesis_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Lambda checker (stub) ---
+// --- kinesis→lambda: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Kinesis_Lambda_IsStub(t *testing.T) {
-	defs := resource.GetRelated("kinesis")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for kinesis")
+func TestRelated_Kinesis_Lambda_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "clickstream-ingest",
+		Name: "clickstream-ingest",
 	}
-	for _, def := range defs {
-		if def.TargetType == "lambda" {
-			if def.Checker != nil {
-				t.Errorf("kinesis lambda Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := kinesisCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target lambda not found for kinesis")
+	if result.TargetType != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
 }
 
-// --- CloudFormation checker (stub) ---
+// --- kinesis→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_Kinesis_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("kinesis")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for kinesis")
+func TestRelated_Kinesis_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "clickstream-ingest",
+		Name: "clickstream-ingest",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("kinesis cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := kinesisCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for kinesis")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

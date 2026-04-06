@@ -26,7 +26,7 @@ func TestRelated_CB_Registered(t *testing.T) {
 	expected := map[string]expectation{
 		"logs":     {"Log Groups", true},
 		"role":     {"IAM Roles", true},
-		"pipeline": {"CodePipelines", false},
+		"pipeline": {"CodePipelines", true},
 	}
 	for target, want := range expected {
 		found := false
@@ -275,6 +275,23 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	}
+}
+
+// --- cb→pipeline: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_CB_Pipeline_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-api-build",
+		Name: "acme-api-build",
+	}
+	checker := cbCheckerByTarget(t, "pipeline")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "pipeline" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "pipeline")
 	}
 }
 

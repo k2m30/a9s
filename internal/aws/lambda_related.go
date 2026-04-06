@@ -83,6 +83,18 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 	return relatedResult("alarm", ids)
 }
 
+// checkLambdaSQS returns Count: 0 because Lambda event source mappings are not
+// available in the list API — the relationship cannot be determined from cache.
+func checkLambdaSQS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+}
+
+// checkLambdaCFN returns Count: 0 because Lambda FunctionConfiguration (list API)
+// does not include Tags — the CFN relationship cannot be determined from cache alone.
+func checkLambdaCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // lambdaRelatedResources returns the resource list for target from cache or by fetching the first page.
 func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

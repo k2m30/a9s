@@ -224,38 +224,38 @@ func TestRelated_S3_CF_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Lambda & CFN stub tests ---
+// --- s3→lambda: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_S3_Lambda_IsStub(t *testing.T) {
-	defs := resource.GetRelated("s3")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for s3")
+func TestRelated_S3_Lambda_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "data-pipeline-logs",
+		Name: "data-pipeline-logs",
 	}
-	for _, def := range defs {
-		if def.TargetType == "lambda" {
-			if def.Checker != nil {
-				t.Errorf("s3 lambda Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := s3CheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target lambda not found for s3")
+	if result.TargetType != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
 }
 
-func TestRelated_S3_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("s3")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for s3")
+// --- s3→cfn: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_S3_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "data-pipeline-logs",
+		Name: "data-pipeline-logs",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("s3 cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := s3CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for s3")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

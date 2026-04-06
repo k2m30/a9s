@@ -21,9 +21,9 @@ func TestRelated_APIGW_Registered(t *testing.T) {
 		hasChecker  bool
 	}
 	expected := map[string]expectation{
-		"lambda": {"Lambda Functions", false},
+		"lambda": {"Lambda Functions", true},
 		"logs":   {"Log Groups", true},
-		"waf":    {"WAF Web ACLs", false},
+		"waf":    {"WAF Web ACLs", true},
 	}
 	for target, want := range expected {
 		found := false

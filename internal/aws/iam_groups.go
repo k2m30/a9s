@@ -21,8 +21,8 @@ func init() {
 	})
 
 	resource.RegisterRelated("iam-group", []resource.RelatedDef{
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "policy", DisplayName: "IAM Policies", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false},
+		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false},
 	})
 }
 

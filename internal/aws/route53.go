@@ -21,9 +21,9 @@ func init() {
 	})
 
 	resource.RegisterRelated("r53", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: false},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: false},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, NeedsTargetCache: false},
 	})
 }
 

@@ -11,10 +11,24 @@ import (
 
 func init() {
 	resource.RegisterRelated("msk", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkMSKLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
 	})
+}
+
+// checkMSKLambda returns Count: 0 because MSK cluster event source mappings are
+// not available in the list API — the relationship cannot be determined from
+// cache alone.
+func checkMSKLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+// checkMSKCFN returns Count: 0 because MSK cluster tags are not included in the
+// ListClusters response — the CFN relationship cannot be determined from cache
+// alone.
+func checkMSKCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
 // checkMSKAlarms checks the cache for CloudWatch alarms with "Cluster Name" dimension matching this cluster.

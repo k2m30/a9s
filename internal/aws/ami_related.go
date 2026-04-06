@@ -56,6 +56,14 @@ func checkAMIEBSSnaps(_ context.Context, _ interface{}, res resource.Resource, _
 	return relatedResult("ebs-snap", ids)
 }
 
+// checkAMIASG returns Count: 0 because Auto Scaling Groups referencing a specific
+// AMI via launch templates or launch configs cannot be determined from the cache
+// list alone — LaunchTemplate/MixedInstancesPolicy do not expose AMI IDs in the
+// DescribeAutoScalingGroups summary.
+func checkAMIASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+}
+
 // amiRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
 func amiRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
