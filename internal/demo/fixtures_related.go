@@ -265,4 +265,11 @@ func init() {
 			{TargetType: "policy", Count: 2},
 		}
 	})
+
+	resource.RegisterRelatedDemo("iam-user", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "iam-group", Count: 2},
+			{TargetType: "policy", Count: 3},
+		}
+	})
 }
