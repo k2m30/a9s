@@ -90,6 +90,30 @@ func checkGlueCFN(_ context.Context, _ any, _ resource.Resource, _ resource.Reso
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
+// checkGlueLogs searches the logs cache for the shared Glue job log groups.
+// Pattern N — Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
+// regardless of job name (shared log groups across all Glue jobs in the account).
+func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	logList, truncated, err := glueRelatedResources(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if logList == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+
+	var ids []string
+	for _, logRes := range logList {
+		if logRes.ID == "/aws-glue/jobs/output" || logRes.ID == "/aws-glue/jobs/error" {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	return relatedResult("logs", ids)
+}
+
 // glueRelatedResources returns the resource list for target from cache or by fetching the first page.
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

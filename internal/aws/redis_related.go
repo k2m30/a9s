@@ -5,6 +5,7 @@ import (
 	"context"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -13,6 +14,7 @@ func init() {
 	resource.RegisterRelated("redis", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
 	})
 }
 
@@ -55,6 +57,22 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkRedisSG returns the security groups associated with this Redis cache cluster (Pattern F).
+// It reads SecurityGroups[].SecurityGroupId from the CacheCluster RawStruct.
+func checkRedisSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	var ids []string
+	for _, sg := range cluster.SecurityGroups {
+		if sg.SecurityGroupId != nil && *sg.SecurityGroupId != "" {
+			ids = append(ids, *sg.SecurityGroupId)
+		}
+	}
+	return relatedResult("sg", ids)
 }
 
 // redisRelatedResources returns the resource list for target from cache or by fetching the first page.

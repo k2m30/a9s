@@ -29,6 +29,7 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN, NeedsTargetCache: false},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkGlueLogs, NeedsTargetCache: true},
 	})
 }
 

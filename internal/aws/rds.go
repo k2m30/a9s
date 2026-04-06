@@ -19,6 +19,7 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbiAlarm, NeedsTargetCache: true},
 		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkDbiRDSSnap, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 	})
 
 	resource.RegisterPaginated("dbi", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {

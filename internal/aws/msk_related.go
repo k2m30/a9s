@@ -5,6 +5,7 @@ import (
 	"context"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -14,6 +15,7 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkMSKLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
 	})
 }
 
@@ -63,6 +65,23 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkMSKSG returns the security groups associated with the MSK cluster's broker nodes.
+// It reads the SecurityGroups field from the Provisioned.BrokerNodeGroupInfo struct (Pattern F).
+func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	ids := cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	return relatedResult("sg", ids)
 }
 
 // mskRelatedResources returns the resource list for target from cache or by fetching the first page.

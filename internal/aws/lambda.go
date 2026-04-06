@@ -43,6 +43,8 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkLambdaSQS, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkLambdaLogs, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEbRule, NeedsTargetCache: true},
 	})
 }
 

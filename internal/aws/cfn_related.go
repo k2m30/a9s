@@ -45,6 +45,70 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("role", ids)
 }
 
+// checkCFNCFN finds related CloudFormation stacks — parent and child (nested) stacks.
+// Pattern F+C: forward lookup for ParentId (this is a nested stack) and reverse scan
+// for stacks whose ParentId matches this stack's StackId (children of this stack).
+func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+
+	cfnList, truncated, err := cfnRelatedResources(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
+	if cfnList == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+
+	// Collect this stack's StackId for reverse lookup.
+	thisStackID := ""
+	if stack.StackId != nil {
+		thisStackID = *stack.StackId
+	}
+
+	// Build a set so we don't emit duplicates.
+	seen := make(map[string]struct{})
+
+	// Forward: if this stack has a ParentId, it is a nested stack — add the parent.
+	if stack.ParentId != nil && *stack.ParentId != "" {
+		parentID := *stack.ParentId
+		for _, cfnRes := range cfnList {
+			rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+			if !cfnOk {
+				continue
+			}
+			if rawCFN.StackId != nil && *rawCFN.StackId == parentID {
+				seen[cfnRes.ID] = struct{}{}
+			}
+		}
+	}
+
+	// Reverse: scan for stacks whose ParentId matches this stack's StackId (child stacks).
+	if thisStackID != "" {
+		for _, cfnRes := range cfnList {
+			rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+			if !cfnOk {
+				continue
+			}
+			if rawCFN.ParentId != nil && *rawCFN.ParentId == thisStackID {
+				seen[cfnRes.ID] = struct{}{}
+			}
+		}
+	}
+
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	return relatedResult("cfn", ids)
+}
+
 // cfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

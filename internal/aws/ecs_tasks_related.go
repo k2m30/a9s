@@ -14,6 +14,7 @@ func init() {
 	resource.RegisterRelated("ecs-task", []resource.RelatedDef{
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
 	})
 }
 
@@ -62,4 +63,60 @@ func checkECSTaskCluster(_ context.Context, _ any, res resource.Resource, _ reso
 func arnLastSegment(arn string) string {
 	parts := strings.Split(arn, "/")
 	return parts[len(parts)-1]
+}
+
+// checkECSTaskLogs searches the logs cache for log groups matching the task's
+// task definition family name.
+// Pattern N — convention: scan cache for log groups containing the task def family name.
+func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	taskDefARN := ""
+	if raw.TaskDefinitionArn != nil {
+		taskDefARN = *raw.TaskDefinitionArn
+	}
+	if taskDefARN == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
+	family := arnLastSegment(taskDefARN)
+	// Remove revision suffix (e.g. "family:5" -> "family")
+	if idx := strings.LastIndex(family, ":"); idx >= 0 {
+		family = family[:idx]
+	}
+	if family == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	logList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if logList == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+
+	var ids []string
+	for _, logRes := range logList {
+		if strings.Contains(logRes.ID, family) {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	return relatedResult("logs", ids)
+}
+
+// ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.
+func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return nil, false, nil
+		}
+	}
+	return resources, isTruncated, err
 }

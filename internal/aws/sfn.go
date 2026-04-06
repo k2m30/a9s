@@ -25,6 +25,7 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSFNRole, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSFNCFN, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSFNEbRule, NeedsTargetCache: true},
 	})
 }
 

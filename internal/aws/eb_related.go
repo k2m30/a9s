@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -15,6 +16,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation Stack", Checker: checkEbCFN, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
 	})
 }
 
@@ -148,6 +150,50 @@ func checkEbASG(ctx context.Context, clients interface{}, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	return relatedResult("asg", ids)
+}
+
+// checkEbEC2 scans the EC2 instance cache for instances tagged with this EB
+// environment name via the "elasticbeanstalk:environment-name" tag.
+// Pattern C: tag-based cache scan.
+func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	envName := ""
+	if eb.EnvironmentName != nil {
+		envName = *eb.EnvironmentName
+	}
+	if envName == "" {
+		envName = res.Name
+	}
+	if envName == "" {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+
+	ec2List, truncated, err := ebRelatedResources(ctx, clients, cache, "ec2")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+	}
+	if ec2List == nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	var ids []string
+	for _, ec2Res := range ec2List {
+		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
+		if !ok {
+			continue
+		}
+		if tagValue(inst.Tags, "elasticbeanstalk:environment-name") == envName {
+			ids = append(ids, ec2Res.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+	return relatedResult("ec2", ids)
 }
 
 // ebRelatedResources returns the resource list for target from cache or fetches it.
