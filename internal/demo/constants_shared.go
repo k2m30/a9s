@@ -287,4 +287,8 @@ const (
 	relatedSNSSubTopicID2 = "arn:aws:sns:us-east-1:123456789012:order-events"
 	relatedSNSSubLambdaID = "cloudwatch-slack-notifier"
 	relatedSNSSubSQSID    = "order-processing-queue"
+
+	// sqs related-view IDs
+	relatedSQSSNSSubID = "arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012"
+	relatedSQSAlarmID  = "sqs-queue-depth-high"
 )
