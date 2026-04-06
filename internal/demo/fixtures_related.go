@@ -346,4 +346,11 @@ func init() {
 			{TargetType: "asg", Count: 1, ResourceIDs: []string{relatedNGASGID}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("opensearch", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "alarm", Count: 1, ResourceIDs: []string{"acme-opensearch-cluster-health"}},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
