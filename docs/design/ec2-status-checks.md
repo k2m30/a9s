@@ -1,7 +1,7 @@
 # EC2 Instance Status Checks — Design Spec
 
 Issue: [#188](https://github.com/k2m30/a9s/issues/188)
-Version: 1.2
+Version: 1.3
 Related: [#196](https://github.com/k2m30/a9s/issues/196) (resource issues overlay),
 [`deterministic-issue-signals.md`](deterministic-issue-signals.md)
 
@@ -45,7 +45,7 @@ when status checks are not fully passing on a `running` instance.
 | pending (any checks)               | `pending`             | YELLOW    |
 | stopped (checks not applicable)    | `stopped`             | RED       |
 | terminated                         | `terminated`          | DIM       |
-| checks not yet fetched             | `running`             | GREEN     |
+| status check API error (fallback)  | `running`             | GREEN     |
 
 Key decisions:
 - **`!`** prefix for failed checks — ASCII, visible in any terminal, no Unicode risk
@@ -78,8 +78,9 @@ after the `State` section:
 ```
 
 Section is omitted entirely when:
-- Status check data hasn't been fetched yet (keep detail clean, no placeholders)
+- `system_status` field is empty (API error fallback — degrade gracefully)
 - Instance is not running (stopped/terminated have no meaningful checks)
+- Both checks are `ok` (silence means healthy)
 
 Status values are color-coded:
 - `ok` — GREEN `#9ece6a`
@@ -88,52 +89,38 @@ Status values are color-coded:
 - `insufficient-data` — DIM `#565f89`
 - `not-applicable` — DIM `#565f89`
 
-### 3.3 Fetch Strategy — Per-Page Background Enrichment
+### 3.3 Fetch Strategy — Inline in the Same Fetch
 
-After each page of `DescribeInstances` loads, fire a background
-`DescribeInstanceStatus` call with the current page's instance IDs.
-Merge results directly into `Resource.Fields`.
+`DescribeInstanceStatus` is called **inside the same fetcher function** as
+`DescribeInstances`, not as a separate background enrichment. The flow is
+synchronous within the `tea.Cmd`:
 
 ```
-DescribeInstanceStatus
-  InstanceIds: [current page instance IDs]
-  IncludeAllInstances: true
+func FetchEC2InstancesPage(ctx, api, token):
+    1. DescribeInstances → get page of instances
+    2. Collect instance IDs from the page
+    3. DescribeInstanceStatus(InstanceIds: [...], IncludeAllInstances: true)
+       (chunk into batches of 100 if page > 100 instances)
+    4. Merge system_status + instance_status into Resource.Fields
+    5. Return resources with status check fields already populated
 ```
+
+No separate message type. No background call. No re-render. The data arrives
+together in one `ResourcesLoadedMsg`.
 
 `IncludeAllInstances: true` ensures we get results for all instances on the
 page, not just running ones. Stopped/terminated instances return
 `not-applicable` — we simply ignore those during rendering.
 
-Two+ API calls per page total: `DescribeInstances` (already exists) +
-`DescribeInstanceStatus` (new, background). `DescribeInstanceStatus` has a
-hard limit of **100 instance IDs per call** (`InstanceIds` and `MaxResults`
-cannot be combined). A 200-instance page from `DescribeInstances` requires
-2 sequential `DescribeInstanceStatus` calls (100 IDs each).
+`DescribeInstanceStatus` has a hard limit of **100 instance IDs per call**
+(`InstanceIds` and `MaxResults` cannot be combined). A 200-instance page
+from `DescribeInstances` requires 2 `DescribeInstanceStatus` calls
+(100 IDs each).
 
-### 3.4 Fetch Flow
+### 3.4 Refresh Behavior
 
-```
-1. DescribeInstances returns page → list renders immediately, no indicators
-
-2. Background Cmd fires:
-     DescribeInstanceStatus(InstanceIds: pageInstanceIDs, IncludeAllInstances: true)
-
-3. StatusChecksLoadedMsg arrives → merge system_status + instance_status
-   into Resource.Fields for each instance on the page
-
-4. List re-renders:
-   - Fields["system_status"] or Fields["instance_status"] == "impaired" → ! prefix
-   - Fields["system_status"] or Fields["instance_status"] == "initializing" → ~ prefix
-   - Otherwise → no indicator
-```
-
-### 3.5 Refresh Behavior
-
-- `Ctrl+R`: re-fetches both `DescribeInstances` and `DescribeInstanceStatus`.
-  Indicators disappear during refresh (correct — silence means healthy until
-  proven otherwise).
-- Page navigation: new page triggers a new `DescribeInstanceStatus` call for
-  that page's instance IDs.
+- `Ctrl+R`: re-fetches `DescribeInstances` + `DescribeInstanceStatus`
+  together in the same `tea.Cmd`. Same as initial load.
 - No auto-poll. Manual refresh only.
 
 ---
@@ -263,51 +250,14 @@ instance on the current page. No separate data structure.
 | `system_status`    | `SystemStatus.Status`             | `Resource.Fields`  |
 | `instance_status`  | `InstanceStatus.Status`           | `Resource.Fields`  |
 
-These fields are populated by `StatusChecksLoadedMsg` and read by:
+These fields are populated by the fetcher (same `tea.Cmd` as `DescribeInstances`)
+and read by:
 - List view: to decide whether to prepend `!` or `~` to the STATE cell
 - Detail view: to render the `Status Checks` section
 
-On page navigation, the new page's instances start without these fields
-(no indicators), then the background call populates them.
-
----
-
-## 7. New Message Type
-
-| Msg                       | Payload                          | Trigger                        |
-|---------------------------|----------------------------------|--------------------------------|
-| `StatusChecksLoadedMsg`   | `map[string]StatusCheckResult`   | Background fetch completes     |
-
-```
-StatusCheckResult {
-    SystemStatus   string  // "ok", "impaired", "initializing", "not-applicable", ...
-    InstanceStatus string  // same enum
-}
-```
-
-The map contains entries for all instances on the current page.
-
----
-
-## 8. State Transitions
-
-```
-ResourcesLoadedMsg (EC2 page)
-  → List renders normally (no indicators)
-  → Background Cmd fires: fetchStatusChecks(pageInstanceIDs)
-      DescribeInstanceStatus(InstanceIds: [...], IncludeAllInstances: true)
-
-StatusChecksLoadedMsg
-  → Merges system_status + instance_status into Resource.Fields
-  → List re-renders; rows with impaired/initializing gain ! or ~ prefix
-
-KeyMsg(ctrl+r)
-  → Re-fetches DescribeInstances (clears Fields)
-  → Background Cmd re-fires for status checks on the new page
-
-Page navigation
-  → New page loads → new background status check call for that page's IDs
-```
+No new message types. No separate data structures. The existing
+`ResourcesLoadedMsg` carries resources with status check fields
+already populated.
 
 ---
 
@@ -328,7 +278,7 @@ if state == "running" {
         return YELLOW("~") + " " + state
     }
 }
-return state  // healthy, non-running, or not yet enriched
+return state  // healthy, non-running, or API error fallback
 ```
 
 The `!` / `~` glyph is rendered with its own `lipgloss.Style` foreground,
@@ -339,10 +289,10 @@ The detail view reads the same fields:
 ```
 sysStatus  = resource.Fields["system_status"]
 instStatus = resource.Fields["instance_status"]
-if sysStatus != "" {
+if sysStatus != "" && sysStatus != "ok" || instStatus != "" && instStatus != "ok" {
     // Render "Status Checks:" section with sysStatus, instStatus
 }
-// Otherwise: omit the section entirely (not yet fetched or not applicable)
+// Otherwise: omit the section (healthy, not-applicable, or API error)
 ```
 
 ---
@@ -387,8 +337,9 @@ Demo fixtures set `system_status` and `instance_status` fields on EC2 instances:
 
 This design does NOT:
 - Add a new column (too expensive in horizontal space)
+- Add a new message type (status checks are part of the existing fetch)
+- Add background enrichment (fetched inline with DescribeInstances)
 - Auto-poll status checks (manual Ctrl+R only)
 - Show indicators for non-running instances
-- Show a loading state (`...`) — silence until data arrives
 - Require changes to `app.go`, message routing, or key bindings
 - Affect any resource type other than EC2
