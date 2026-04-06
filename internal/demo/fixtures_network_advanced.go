@@ -310,6 +310,21 @@ func eniFixtures() []resource.Resource {
 				OwnerId:            aws.String("123456789012"),
 				RequesterManaged:   aws.Bool(true),
 				SourceDestCheck:    aws.Bool(false),
+				Attachment: &ec2types.NetworkInterfaceAttachment{
+					AttachmentId:        aws.String("eni-attach-02"),
+					InstanceId:          aws.String("i-0a1b2c3d4e5f60002"),
+					DeviceIndex:         aws.Int32(0),
+					Status:              ec2types.AttachmentStatusAttached,
+					DeleteOnTermination: aws.Bool(true),
+				},
+				Groups: []ec2types.GroupIdentifier{
+					{GroupId: aws.String(prodWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+				},
+				Association: &ec2types.NetworkInterfaceAssociation{
+					PublicIp:     aws.String("54.210.33.113"),
+					IpOwnerId:    aws.String("amazon"),
+					AllocationId: aws.String("eipalloc-0bbb222222222222b"),
+				},
 				TagSet: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1b")},
 				},
@@ -342,8 +357,20 @@ func eniFixtures() []resource.Resource {
 				RequesterId:        aws.String("amazon-elb"),
 				RequesterManaged:   aws.Bool(false),
 				SourceDestCheck:    aws.Bool(true),
+				Attachment: &ec2types.NetworkInterfaceAttachment{
+					AttachmentId:        aws.String("eni-attach-05"),
+					InstanceId:          aws.String("i-0a1b2c3d4e5f60001"),
+					DeviceIndex:         aws.Int32(0),
+					Status:              ec2types.AttachmentStatusAttached,
+					DeleteOnTermination: aws.Bool(true),
+				},
 				Groups: []ec2types.GroupIdentifier{
 					{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+				},
+				Association: &ec2types.NetworkInterfaceAssociation{
+					PublicIp:     aws.String("54.210.33.115"),
+					IpOwnerId:    aws.String("amazon"),
+					AllocationId: aws.String("eipalloc-0aaa111111111111a"),
 				},
 				TagSet: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("web-prod-01-primary")},
@@ -377,6 +404,21 @@ func eniFixtures() []resource.Resource {
 				OwnerId:            aws.String("123456789012"),
 				RequesterManaged:   aws.Bool(true),
 				SourceDestCheck:    aws.Bool(true),
+				Attachment: &ec2types.NetworkInterfaceAttachment{
+					AttachmentId:        aws.String("eni-attach-06"),
+					InstanceId:          aws.String("i-0a1b2c3d4e5f60003"),
+					DeviceIndex:         aws.Int32(0),
+					Status:              ec2types.AttachmentStatusAttached,
+					DeleteOnTermination: aws.Bool(false),
+				},
+				Groups: []ec2types.GroupIdentifier{
+					{GroupId: aws.String(prodAPIInternalSGID), GroupName: aws.String("acme-api-internal-sg")},
+				},
+				Association: &ec2types.NetworkInterfaceAssociation{
+					PublicIp:     aws.String("54.210.33.116"),
+					IpOwnerId:    aws.String("amazon"),
+					AllocationId: aws.String("eipalloc-0ddd444444444444d"),
+				},
 				TagSet: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("vpce-secrets-eni-1a")},
 				},
@@ -408,6 +450,21 @@ func eniFixtures() []resource.Resource {
 				OwnerId:            aws.String("123456789012"),
 				RequesterManaged:   aws.Bool(false),
 				SourceDestCheck:    aws.Bool(true),
+				Attachment: &ec2types.NetworkInterfaceAttachment{
+					AttachmentId:        aws.String("eni-attach-07"),
+					InstanceId:          aws.String("i-0a1b2c3d4e5f60009"),
+					DeviceIndex:         aws.Int32(1),
+					Status:              ec2types.AttachmentStatusDetached,
+					DeleteOnTermination: aws.Bool(false),
+				},
+				Groups: []ec2types.GroupIdentifier{
+					{GroupId: aws.String(prodRDSSGID), GroupName: aws.String("acme-rds-sg")},
+				},
+				Association: &ec2types.NetworkInterfaceAssociation{
+					PublicIp:     aws.String("54.210.33.117"),
+					IpOwnerId:    aws.String("amazon"),
+					AllocationId: aws.String("eipalloc-0aaa111111111111a"),
+				},
 				TagSet: []ec2types.Tag{
 					{Key: aws.String("Name"), Value: aws.String("detached-eni")},
 				},

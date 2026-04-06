@@ -242,4 +242,12 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("eni", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "ec2", Count: 1, ResourceIDs: []string{relatedENIEC2ID}},
+			{TargetType: "sg", Count: 1, ResourceIDs: []string{relatedENISGID1}},
+			{TargetType: "eip", Count: 1, ResourceIDs: []string{relatedENIEIPID}},
+		}
+	})
 }
