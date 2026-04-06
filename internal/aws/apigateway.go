@@ -21,9 +21,9 @@ func init() {
 	})
 
 	resource.RegisterRelated("apigw", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: nil},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: nil},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkApigwWAF},
 	})
 }
 

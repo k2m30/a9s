@@ -139,6 +139,13 @@ func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("rds-snap", ids)
 }
 
+// checkDbiSecrets returns Count: 0 because the RDS DescribeDBInstances API does not
+// include Secrets Manager ARNs in the list response — the relationship cannot be
+// determined from cache alone.
+func checkDbiSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
 // dbiRelatedResources returns the resource list for target from cache or by fetching the first page.
 func dbiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

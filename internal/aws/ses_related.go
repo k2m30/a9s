@@ -58,6 +58,13 @@ func sesIdentityDomain(res resource.Resource) string {
 	return name
 }
 
+// checkSESCFN returns Count: 0 because SES identity tags are not included in
+// the ListEmailIdentities response — the CFN relationship cannot be determined
+// from cache alone.
+func checkSESCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // sesRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

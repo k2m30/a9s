@@ -233,38 +233,38 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Stub checker tests (kept) ---
+// --- sfn→role: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_SFN_Role_IsStub(t *testing.T) {
-	defs := resource.GetRelated("sfn")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for sfn")
+func TestRelated_SFN_Role_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "order-fulfillment-workflow",
+		Name: "order-fulfillment-workflow",
 	}
-	for _, def := range defs {
-		if def.TargetType == "role" {
-			if def.Checker != nil {
-				t.Errorf("sfn role Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := sfnCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target role not found for sfn")
+	if result.TargetType != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	}
 }
 
-func TestRelated_SFN_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("sfn")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for sfn")
+// --- sfn→cfn: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_SFN_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "order-fulfillment-workflow",
+		Name: "order-fulfillment-workflow",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("sfn cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := sfnCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for sfn")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---

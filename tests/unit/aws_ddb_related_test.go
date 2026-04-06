@@ -24,7 +24,7 @@ func TestRelated_DDB_Registered(t *testing.T) {
 	}
 	expected := map[string]expectation{
 		"kms":    {"KMS Key", true},
-		"lambda": {"Lambda Functions", false},
+		"lambda": {"Lambda Functions", true},
 		"alarm":  {"CloudWatch Alarms", true},
 	}
 	for target, want := range expected {
@@ -180,6 +180,23 @@ func TestRelated_DDB_Alarm_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	}
+}
+
+// --- ddb→lambda: undeterminable from cache, returns Count: 0 ---
+
+func TestRelated_DDB_Lambda_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-orders-table",
+		Name: "acme-orders-table",
+	}
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	}
+	if result.TargetType != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
 	}
 }
 

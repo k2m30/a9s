@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -14,8 +15,8 @@ func init() {
 	resource.RegisterRelated("secrets", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: nil, NeedsTargetCache: false},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: nil, NeedsTargetCache: true},
+		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
 	})
 }
 
@@ -100,6 +101,61 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}
 	return relatedResult("lambda", ids)
+}
+
+// checkSecretsDBI returns Count: 0 because the RDS instance associated with a
+// secret is not captured in the SecretListEntry — the relationship cannot be
+// determined from cache alone.
+func checkSecretsDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+}
+
+// checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name
+// and matches against the CFN stack cache.
+func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stackName := secretsCFNStackName(res)
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+
+	cfnList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
+	if cfnList == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+
+	var ids []string
+	for _, cfnRes := range cfnList {
+		if cfnRes.ID == stackName || cfnRes.Name == stackName || cfnRes.Fields["stack_name"] == stackName {
+			ids = append(ids, cfnRes.ID)
+			continue
+		}
+		raw, ok := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+		if ok && raw.StackName != nil && *raw.StackName == stackName {
+			ids = append(ids, cfnRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	return relatedResult("cfn", ids)
+}
+
+// secretsCFNStackName extracts the aws:cloudformation:stack-name tag value from
+// the secret's Tags slice.
+func secretsCFNStackName(res resource.Resource) string {
+	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
+	if !ok {
+		return ""
+	}
+	for _, tag := range secret.Tags {
+		if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil {
+			return *tag.Value
+		}
+	}
+	return ""
 }
 
 // secretsRelatedResources returns the resource list for target from cache or by

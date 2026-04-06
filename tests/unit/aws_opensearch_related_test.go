@@ -132,22 +132,21 @@ func TestRelated_OpenSearch_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (stub) ---
+// --- opensearch→cfn: undeterminable from cache, returns Count: 0 ---
 
-func TestRelated_OpenSearch_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("opensearch")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for opensearch")
+func TestRelated_OpenSearch_CFN_ReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-logs",
+		Name: "acme-logs",
 	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker != nil {
-				t.Errorf("opensearch cfn Checker should be nil (stub)")
-			}
-			return
-		}
+	checker := opensearchCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
 	}
-	t.Error("expected related def for target cfn not found for opensearch")
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }
 
 // --- Demo Checker ---
