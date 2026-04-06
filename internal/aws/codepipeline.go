@@ -19,6 +19,11 @@ func init() {
 		}
 		return FetchCodePipelinesPage(ctx, c.CodePipeline, continuationToken)
 	})
+
+	resource.RegisterRelated("pipeline", []resource.RelatedDef{
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: nil, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: nil, NeedsTargetCache: false},
+	})
 }
 
 // FetchCodePipelines calls the CodePipeline ListPipelines API and converts
