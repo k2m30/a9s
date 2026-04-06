@@ -447,6 +447,7 @@ func eipFixtures() []resource.Resource {
 				AllocationId:       aws.String("eipalloc-0bbb222222222222b"),
 				PublicIp:           aws.String("54.210.33.201"),
 				AssociationId:      aws.String("eipassoc-0bbb222222222222b"),
+				InstanceId:         aws.String("i-0a1b2c3d4e5f60002"),
 				Domain:             ec2types.DomainTypeVpc,
 				NetworkBorderGroup: aws.String("us-east-1"),
 				NetworkInterfaceId: aws.String("eni-0bbb222222222222b"),
@@ -474,6 +475,7 @@ func eipFixtures() []resource.Resource {
 				PublicIp:           aws.String("52.87.221.44"),
 				AssociationId:      aws.String("eipassoc-0ddd444444444444d"),
 				InstanceId:         aws.String("i-0a1b2c3d4e5f60005"),
+				NetworkInterfaceId: aws.String("eni-0eee555555555555e"),
 				Domain:             ec2types.DomainTypeVpc,
 				NetworkBorderGroup: aws.String("us-east-1"),
 				PrivateIpAddress:   aws.String("10.0.0.5"),
@@ -498,6 +500,8 @@ func eipFixtures() []resource.Resource {
 			RawStruct: ec2types.Address{
 				AllocationId:       aws.String("eipalloc-0eee555555555555e"),
 				PublicIp:           aws.String("34.201.55.100"),
+				InstanceId:         aws.String("i-0a1b2c3d4e5f60003"),
+				NetworkInterfaceId: aws.String("eni-0fff666666666666f"),
 				Domain:             ec2types.DomainTypeVpc,
 				NetworkBorderGroup: aws.String("us-east-1"),
 				Tags: []ec2types.Tag{
