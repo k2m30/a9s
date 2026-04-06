@@ -353,4 +353,11 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("pipeline", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "cb", Count: 2, ResourceIDs: []string{"acme-api-build", "acme-frontend-build"}},
+			{TargetType: "role", Count: 1, ResourceIDs: []string{"acme-ci-deploy-role"}},
+		}
+	})
 }
