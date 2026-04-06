@@ -83,7 +83,7 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 // a single page of instances. Pass an empty continuationToken for the first page.
 func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeInstancesInput{
-		MaxResults: aws.Int32(200),
+		MaxResults: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

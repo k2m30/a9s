@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
@@ -54,7 +55,9 @@ func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGe
 // URLs, then GetQueueAttributes per queue for details.
 // Pass an empty continuationToken for the first page.
 func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &sqs.ListQueuesInput{}
+	input := &sqs.ListQueuesInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

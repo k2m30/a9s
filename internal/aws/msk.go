@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource
 
 // FetchMSKClustersPage fetches a single page of MSK clusters.
 func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continuationToken string) (resource.FetchResult, error) {
-	input := &kafka.ListClustersV2Input{}
+	input := &kafka.ListClustersV2Input{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

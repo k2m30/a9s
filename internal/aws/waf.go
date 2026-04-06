@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
@@ -45,6 +46,7 @@ func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.R
 func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &wafv2.ListWebACLsInput{
 		Scope: wafv2types.ScopeRegional,
+		Limit: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextMarker = &continuationToken

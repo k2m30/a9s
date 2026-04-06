@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -51,7 +52,9 @@ func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysA
 
 // FetchInternetGatewaysPage fetches a single page of internet gateways.
 func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeInternetGatewaysInput{}
+	input := &ec2.DescribeInternetGatewaysInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

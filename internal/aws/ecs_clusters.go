@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -54,7 +55,9 @@ func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeA
 // It paginates ListClusters using continuationToken, then calls DescribeClusters
 // for the batch of ARNs returned on that page.
 func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ecs.ListClustersInput{}
+	input := &ecs.ListClustersInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

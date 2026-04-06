@@ -53,7 +53,8 @@ func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resour
 // Pass an empty continuationToken for the first page.
 func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeImagesInput{
-		Owners: []string{"self"},
+		Owners:     []string{"self"},
+		MaxResults: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

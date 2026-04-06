@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -48,7 +49,9 @@ func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resour
 
 // FetchAPIGatewaysPage fetches a single page of API Gateways.
 func FetchAPIGatewaysPage(ctx context.Context, api APIGatewayV2GetApisAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &apigatewayv2.GetApisInput{}
+	input := &apigatewayv2.GetApisInput{
+		MaxResults: aws.String(fmt.Sprintf("%d", DefaultPageSize)),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

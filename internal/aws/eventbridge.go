@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]
 
 // FetchEventBridgeRulesPage fetches a single page of EventBridge rules.
 func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &eventbridge.ListRulesInput{}
+	input := &eventbridge.ListRulesInput{
+		Limit: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

@@ -50,7 +50,9 @@ func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]res
 
 // FetchStepFunctionsPage fetches a single page of Step Functions state machines.
 func FetchStepFunctionsPage(ctx context.Context, api SFNListStateMachinesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &sfn.ListStateMachinesInput{}
+	input := &sfn.ListStateMachinesInput{
+		MaxResults: int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

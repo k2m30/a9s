@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -50,7 +51,9 @@ func FetchAutoScalingGroups(ctx context.Context, api ASGDescribeAutoScalingGroup
 
 // FetchAutoScalingGroupsPage fetches a single page of Auto Scaling groups.
 func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &autoscaling.DescribeAutoScalingGroupsInput{}
+	input := &autoscaling.DescribeAutoScalingGroupsInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

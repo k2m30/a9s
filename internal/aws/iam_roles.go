@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -43,7 +44,9 @@ func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resourc
 // FetchIAMRolesPage calls the IAM ListRoles API and returns a single page
 // of roles. Pass an empty continuationToken for the first page.
 func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &iam.ListRolesInput{}
+	input := &iam.ListRolesInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

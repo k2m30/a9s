@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -72,7 +73,9 @@ func FetchEBSVolumes(ctx context.Context, api EC2DescribeVolumesAPI) ([]resource
 // FetchEBSVolumesPage calls the EC2 DescribeVolumes API and returns a single
 // page of volumes. Pass an empty continuationToken for the first page.
 func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeVolumesInput{}
+	input := &ec2.DescribeVolumesInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}
@@ -204,7 +207,8 @@ func FetchEBSSnapshots(ctx context.Context, api EC2DescribeSnapshotsAPI) ([]reso
 // Pass an empty continuationToken for the first page.
 func FetchEBSSnapshotsPage(ctx context.Context, api EC2DescribeSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeSnapshotsInput{
-		OwnerIds: []string{"self"},
+		OwnerIds:   []string{"self"},
+		MaxResults: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

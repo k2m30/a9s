@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]
 
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems.
 func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &efs.DescribeFileSystemsInput{}
+	input := &efs.DescribeFileSystemsInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

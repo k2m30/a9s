@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -43,7 +44,9 @@ func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]reso
 
 // FetchKinesisStreamsPage fetches a single page of Kinesis streams.
 func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &kinesis.ListStreamsInput{}
+	input := &kinesis.ListStreamsInput{
+		Limit: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

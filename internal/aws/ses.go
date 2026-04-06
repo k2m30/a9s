@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -47,7 +48,9 @@ func FetchSESIdentities(ctx context.Context, api SESv2ListEmailIdentitiesAPI) ([
 
 // FetchSESIdentitiesPage fetches a single page of SES email identities.
 func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &sesv2.ListEmailIdentitiesInput{}
+	input := &sesv2.ListEmailIdentitiesInput{
+		PageSize: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

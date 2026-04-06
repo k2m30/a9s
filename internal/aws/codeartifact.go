@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -46,7 +47,9 @@ func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositorie
 
 // FetchCodeArtifactReposPage fetches a single page of CodeArtifact repositories.
 func FetchCodeArtifactReposPage(ctx context.Context, api CodeArtifactListRepositoriesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &codeartifact.ListRepositoriesInput{}
+	input := &codeartifact.ListRepositoriesInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

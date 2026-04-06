@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -51,7 +52,9 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 
 // FetchRDSSnapshotsPage fetches a single page of RDS snapshots.
 func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &rds.DescribeDBSnapshotsInput{}
+	input := &rds.DescribeDBSnapshotsInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

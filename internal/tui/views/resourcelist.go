@@ -510,6 +510,18 @@ func (m *ResourceListModel) GetFilter() string {
 	return m.filterText
 }
 
+// ShortName returns the resource type's short name (for cross-view state sync).
+func (m *ResourceListModel) ShortName() string { return m.typeDef.ShortName }
+
+// LoadedCount returns the total number of resources currently loaded into this view
+// (sum of all pages fetched so far).
+func (m *ResourceListModel) LoadedCount() int { return len(m.allResources) }
+
+// IsTruncated reports whether more pages remain unfetched on the AWS side.
+func (m *ResourceListModel) IsTruncated() bool {
+	return m.pagination != nil && m.pagination.IsTruncated
+}
+
 // SetSize updates dimensions.
 func (m *ResourceListModel) SetSize(w, h int) {
 	if m.width != w {

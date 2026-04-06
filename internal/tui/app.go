@@ -494,6 +494,23 @@ func (m *Model) popView() bool {
 	if len(m.stack) <= 1 {
 		return false
 	}
+	// Sync list count back to main menu when navigating directly from list → menu.
+	if len(m.stack) == 2 {
+		if rl, ok := m.stack[1].(*views.ResourceListModel); ok {
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				shortName := rl.ShortName()
+				if shortName != "" {
+					newCount := rl.LoadedCount()
+					newTrunc := rl.IsTruncated()
+					curCount, known := menu.GetAvailability()[shortName]
+					if !newTrunc || !known || newCount > curCount {
+						menu.SetAvailability(shortName, newCount)
+						menu.SetTruncated(shortName, newTrunc)
+					}
+				}
+			}
+		}
+	}
 	m.stack = m.stack[:len(m.stack)-1]
 	return true
 }

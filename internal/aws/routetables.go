@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -42,7 +43,9 @@ func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]res
 
 // FetchRouteTablesPage fetches a single page of route tables.
 func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeRouteTablesInput{}
+	input := &ec2.DescribeRouteTablesInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
@@ -52,7 +53,8 @@ func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.R
 // Pass an empty continuationToken for the first page.
 func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &iam.ListPoliciesInput{
-		Scope: iamtypes.PolicyScopeTypeLocal,
+		Scope:    iamtypes.PolicyScopeTypeLocal,
+		MaxItems: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken

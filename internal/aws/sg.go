@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -43,7 +44,9 @@ func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) 
 // FetchSecurityGroupsPage calls the EC2 DescribeSecurityGroups API and returns
 // a single page of security groups. Pass an empty continuationToken for the first page.
 func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &ec2.DescribeSecurityGroupsInput{}
+	input := &ec2.DescribeSecurityGroupsInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

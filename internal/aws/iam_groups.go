@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -48,7 +49,9 @@ func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resou
 // FetchIAMGroupsPage calls the IAM ListGroups API and returns a single page
 // of groups. Pass an empty continuationToken for the first page.
 func FetchIAMGroupsPage(ctx context.Context, api IAMListGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &iam.ListGroupsInput{}
+	input := &iam.ListGroupsInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}
