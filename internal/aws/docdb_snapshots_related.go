@@ -11,7 +11,7 @@ import (
 
 // checkDocdbSnapDBC reads DBClusterIdentifier from the DBClusterSnapshot RawStruct.
 // Pattern F — no cache needed.
-func checkDocdbSnapDBC(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDocdbSnapDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
@@ -25,7 +25,7 @@ func checkDocdbSnapDBC(_ context.Context, _ interface{}, res resource.Resource, 
 // checkDocdbSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
 // Extracts UUID after last '/' from the ARN.
 // Pattern F — no cache needed.
-func checkDocdbSnapKMS(_ context.Context, _ interface{}, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDocdbSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}

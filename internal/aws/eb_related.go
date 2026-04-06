@@ -22,7 +22,7 @@ func init() {
 
 // checkEbCFN checks the CFN cache for a stack associated with this EB environment.
 // Pattern C: match by stack name prefix "awseb-{envID}".
-func checkEbCFN(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
@@ -66,7 +66,7 @@ func checkEbCFN(ctx context.Context, clients interface{}, res resource.Resource,
 
 // checkEbLogs checks the log groups cache for groups associated with this EB environment.
 // Pattern C: match by log group prefix "/aws/elasticbeanstalk/{envName}/".
-func checkEbLogs(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
@@ -107,7 +107,7 @@ func checkEbLogs(ctx context.Context, clients interface{}, res resource.Resource
 
 // checkEbASG checks the ASG cache for groups tagged with this EB environment name.
 // Pattern C: match by "elasticbeanstalk:environment-name" tag on each ASG.
-func checkEbASG(ctx context.Context, clients interface{}, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
@@ -197,7 +197,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // ebRelatedResources returns the resource list for target from cache or fetches it.
-func ebRelatedResources(ctx context.Context, clients interface{}, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+func ebRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {

@@ -16,7 +16,7 @@ func init() {
 	resource.RegisterFieldKeys("r53_records", []string{"name", "type", "ttl", "values"})
 
 	// Register R53 records as a child type with its own fetcher.
-	resource.RegisterPaginatedChild("r53_records", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("r53_records", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

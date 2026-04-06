@@ -14,7 +14,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "status", "task_definition", "launch_type", "cpu", "memory"})
 
-	resource.RegisterPaginated("ecs-task", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ecs-task", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

@@ -16,7 +16,7 @@ func init() {
 		"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary",
 	})
 
-	resource.RegisterPaginatedChild("eb_rule_targets", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("eb_rule_targets", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
