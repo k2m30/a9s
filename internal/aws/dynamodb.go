@@ -13,7 +13,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
 
-	resource.RegisterPaginated("ddb", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("ddb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -24,7 +24,7 @@ func init() {
 	resource.RegisterRelated("ddb", []resource.RelatedDef{
 		{TargetType: "kms",    DisplayName: "KMS Key",           Checker: checkDdbKMS},
 		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: nil},
-		{TargetType: "alarm",  DisplayName: "CloudWatch Alarms", Checker: nil},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
 	})
 }
 
