@@ -279,4 +279,12 @@ func init() {
 			{TargetType: "rtb", Count: 2, ResourceIDs: []string{relatedIGWRTBID1, relatedIGWRTBID2}},
 		}
 	})
+
+	resource.RegisterRelatedDemo("kinesis", func(res resource.Resource) []resource.RelatedCheckResult {
+		return []resource.RelatedCheckResult{
+			{TargetType: "lambda", Count: 1, ResourceIDs: []string{"data-pipeline-transform"}},
+			{TargetType: "alarm", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }
