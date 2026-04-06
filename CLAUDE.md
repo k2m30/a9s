@@ -200,6 +200,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
 - BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
 - BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
+- BEFORE any release, update `CHANGELOG.md` with a new version entry (follow [Keep a Changelog](https://keepachangelog.com/) format) and create a matching `releases/vX.Y.Z.md` file with user-facing release notes. Every tagged version MUST have both a changelog entry and a release notes file.
 - **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require the pre-push checklist.
 
 ## Docs Sync Rule
