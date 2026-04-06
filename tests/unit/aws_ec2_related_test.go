@@ -381,10 +381,10 @@ func TestNavigableFields_EC2_Registered(t *testing.T) {
 func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
 	resources, ok := demo.GetResources("ec2")
 	if !ok {
-		t.Skip("no demo fixture registered for ec2")
+		t.Fatal("no demo fixture registered for ec2 — fixtures_compute.go must register it")
 	}
 	if len(resources) == 0 {
-		t.Skip("demo fixture returned no resources for ec2")
+		t.Fatal("demo fixture returned no resources for ec2")
 	}
 	r := resources[0]
 
