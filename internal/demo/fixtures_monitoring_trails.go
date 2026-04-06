@@ -98,5 +98,31 @@ func cloudtrailFixtures() []resource.Resource {
 				CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
 			},
 		},
+		{
+			ID:     "acme-audit-trail",
+			Name:   "acme-audit-trail",
+			Status: "",
+			Fields: map[string]string{
+				"trail_name":     "acme-audit-trail",
+				"trail_arn":      "arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-audit-trail",
+				"s3_bucket":      "data-pipeline-logs",
+				"home_region":    "us-east-1",
+				"multi_region":   "false",
+				"org_trail":      "false",
+				"log_validation": "true",
+			},
+			RawStruct: cloudtrailtypes.Trail{
+				Name:                       aws.String("acme-audit-trail"),
+				TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-audit-trail"),
+				S3BucketName:               aws.String("data-pipeline-logs"),
+				HomeRegion:                 aws.String("us-east-1"),
+				IsMultiRegionTrail:         aws.Bool(false),
+				IsOrganizationTrail:        aws.Bool(false),
+				LogFileValidationEnabled:   aws.Bool(true),
+				IncludeGlobalServiceEvents: aws.Bool(false),
+				HasCustomEventSelectors:    aws.Bool(true),
+				HasInsightSelectors:        aws.Bool(false),
+			},
+		},
 	}
 }
