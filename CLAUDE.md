@@ -44,7 +44,7 @@ specs/           # feature specifications
 - `go build -o a9s ./cmd/a9s/` — build the binary
 - `go test ./tests/unit/ -count=1 -timeout 120s` — run all unit tests
 - `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
-- `golangci-lint run ./...` — run linter (MUST pass locally before any push)
+- `golangci-lint ./...` — run linter (MUST pass locally before any push). Note: do NOT include the `run` subcommand — rtk treats it as a package path, causing a spurious `/run: directory not found` error.
 - `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
 - `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
@@ -194,7 +194,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
-- ALWAYS run `go test`, `golangci-lint run ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
+- ALWAYS run `go test`, `golangci-lint ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment

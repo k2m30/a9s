@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -48,7 +49,9 @@ func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI)
 // FetchCloudWatchAlarmsPage calls the CloudWatch DescribeAlarms API and returns
 // a single page of alarms. Pass an empty continuationToken for the first page.
 func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarmsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &cloudwatch.DescribeAlarmsInput{}
+	input := &cloudwatch.DescribeAlarmsInput{
+		MaxRecords: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

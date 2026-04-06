@@ -308,6 +308,7 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 				Gen:          gen,
 			}
 		}
+
 		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (resource.FetchResult, error) {
 			return pf(ctx, clients, "")
 		})

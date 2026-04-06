@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -49,7 +50,9 @@ func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resourc
 // FetchIAMUsersPage calls the IAM ListUsers API and returns a single page
 // of users. Pass an empty continuationToken for the first page.
 func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &iam.ListUsersInput{}
+	input := &iam.ListUsersInput{
+		MaxItems: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
 	}

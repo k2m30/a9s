@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -46,7 +47,9 @@ func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]reso
 
 // FetchBackupPlansPage fetches a single page of Backup plans.
 func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &backup.ListBackupPlansInput{}
+	input := &backup.ListBackupPlansInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}

@@ -46,6 +46,7 @@ func FetchRedisClusters(ctx context.Context, api ElastiCacheDescribeCacheCluster
 func FetchRedisClustersPage(ctx context.Context, api ElastiCacheDescribeCacheClustersAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &elasticache.DescribeCacheClustersInput{
 		ShowCacheNodeInfo: aws.Bool(true),
+		MaxRecords:        aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken

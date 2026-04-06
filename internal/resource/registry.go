@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+// DefaultPageSize is the number of resources fetched per paginated API call.
+// All paginated fetchers MUST pass this as their MaxResults / MaxItems /
+// MaxRecords / Limit / PageSize parameter, and all view-layer count displays
+// MUST floor truncated counts to a multiple of this value (e.g. "50+", "100+").
+const DefaultPageSize = 50
+
 // ParentContext holds key-value pairs passed from a parent view to a child
 // fetcher. For example, {"bucket": "my-bucket", "prefix": "data/"}.
 type ParentContext map[string]string

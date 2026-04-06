@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -48,7 +49,9 @@ func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAP
 // FetchCloudWatchLogGroupsPage calls the CloudWatchLogs DescribeLogGroups API and returns
 // a single page of log groups. Pass an empty continuationToken for the first page.
 func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGroupsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &cloudwatchlogs.DescribeLogGroupsInput{}
+	input := &cloudwatchlogs.DescribeLogGroupsInput{
+		Limit: aws.Int32(DefaultPageSize),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}
