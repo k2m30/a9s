@@ -1094,6 +1094,37 @@ func TestRelated_Kinesis_Registered(t *testing.T) {
 	}
 }
 
+func TestRelated_KMS_Registered(t *testing.T) {
+	defs := resource.GetRelated("kms")
+	if len(defs) == 0 {
+		t.Fatal("no related defs registered for kms")
+	}
+
+	expected := []string{"ebs", "dbi", "secrets"}
+	for _, exp := range expected {
+		found := false
+		for _, def := range defs {
+			if def.TargetType == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected related def for target %q not found for kms", exp)
+		}
+	}
+
+	// All three checkers must be non-nil (no stubs).
+	for _, def := range defs {
+		switch def.TargetType {
+		case "ebs", "dbi", "secrets":
+			if def.Checker == nil {
+				t.Errorf("kms %q: Checker should not be nil", def.TargetType)
+			}
+		}
+	}
+}
+
 // ─── compile-time reference to context so the import is used ────────────────
 // RelatedChecker requires context.Context; verify the type is usable.
 var _ resource.RelatedChecker = func(

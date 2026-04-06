@@ -223,4 +223,9 @@ const (
 	relatedIGWVPCID  = prodVPCID
 	relatedIGWRTBID1 = "rtb-0aaa111111111111a"
 	relatedIGWRTBID2 = "rtb-0bbb222222222222b"
+
+	// kms related-view IDs
+	relatedKMSEBSID1 = "vol-0a1b2c3d4e5f60001"
+	relatedKMSEBSID2 = "vol-0a1b2c3d4e5f60002"
+	relatedKMSDbiID  = "prod-api-primary"
 )
