@@ -10,6 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
@@ -315,7 +316,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.Resources):
 			if r := m.SelectedResource(); r != nil {
-				if updated, cmd := m.handleChildKey("r", r); cmd != nil {
+				if updated, cmd := m.handleChildKey("R", r); cmd != nil {
 					return updated, cmd
 				}
 			}
@@ -709,6 +710,70 @@ func (m ResourceListModel) FrameTitle() string {
 		title += m.titleSuffix
 	}
 	return title
+}
+
+// BottomHints implements Hintable for ResourceListModel.
+func (m ResourceListModel) BottomHints() []layout.KeyHint {
+	var hints []layout.KeyHint
+
+	// Child/related lists show esc Back first
+	if m.escPops {
+		hints = append(hints, layout.KeyHint{Key: "esc", Desc: "Back"})
+	}
+
+	// Enter-child awareness
+	var enterChild *resource.ChildViewDef
+	for i := range m.typeDef.Children {
+		if m.typeDef.Children[i].Key == "enter" {
+			enterChild = &m.typeDef.Children[i]
+			break
+		}
+	}
+	if enterChild != nil {
+		// Evaluate DrillCondition against selected resource — when the condition
+		// is false (e.g., S3 file, SFN Express), enter goes to detail, not child.
+		showEnterChild := true
+		if enterChild.DrillCondition != nil {
+			sel := m.SelectedResource()
+			showEnterChild = sel != nil && enterChild.DrillCondition(*sel)
+		}
+		if showEnterChild {
+			desc := enterChild.ChildType
+			if ct := resource.GetChildType(enterChild.ChildType); ct != nil {
+				desc = ct.Name
+			}
+			hints = append(hints, layout.KeyHint{Key: "enter", Desc: desc})
+			hints = append(hints, layout.KeyHint{Key: "d", Desc: "Detail"})
+		}
+	}
+
+	// Reveal key (Secrets Manager, etc.)
+	if resource.HasRevealFetcher(m.typeDef.ShortName) {
+		hints = append(hints, layout.KeyHint{Key: "x", Desc: "Reveal"})
+	}
+
+	hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+
+	// Non-enter child keys (e, L, R, etc.)
+	for _, child := range m.typeDef.Children {
+		if child.Key == "enter" {
+			continue
+		}
+		desc := child.ChildType
+		if ct := resource.GetChildType(child.ChildType); ct != nil {
+			desc = ct.Name
+		}
+		hints = append(hints, layout.KeyHint{Key: child.Key, Desc: desc})
+	}
+
+	hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
+
+	// Pagination "more" hint
+	if m.pagination != nil && m.pagination.IsTruncated {
+		hints = append(hints, layout.KeyHint{Key: "m", Desc: "More"})
+	}
+
+	return hints
 }
 
 // SetTitleSuffix sets a suffix appended to the frame title after count rendering.
