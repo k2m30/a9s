@@ -586,4 +586,18 @@ func init() {
 			{TargetType: "cfn", Count: 0},
 		}
 	})
+
+	resource.RegisterRelatedDemo("ssm", func(res resource.Resource) []resource.RelatedCheckResult {
+		switch res.ID {
+		case "/acme/prod/app/config", "/acme/prod/db/connection-string":
+			return []resource.RelatedCheckResult{
+				{TargetType: "kms", Count: 1, ResourceIDs: []string{relatedSSMKMSID}},
+				{TargetType: "cfn", Count: 0},
+			}
+		}
+		return []resource.RelatedCheckResult{
+			{TargetType: "kms", Count: 0},
+			{TargetType: "cfn", Count: 0},
+		}
+	})
 }

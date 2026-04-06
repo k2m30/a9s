@@ -291,4 +291,7 @@ const (
 	// sqs related-view IDs
 	relatedSQSSNSSubID = "arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012"
 	relatedSQSAlarmID  = "sqs-queue-depth-high"
+
+	// ssm related-view IDs
+	relatedSSMKMSID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 )
