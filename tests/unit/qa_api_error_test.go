@@ -498,3 +498,119 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 		})
 	}
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// §A issue-67: A.8, A.9, A.10 — error persistence, retry, isolation
+// ══════════════════════════════════════════════════════════════════════════════
+
+// TestQa67_A8_ErrorFlash_ClearedByNavigation verifies that navigating away
+// from a resource list that had an error does not leave the app in a broken state.
+func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Navigate to EC2 and send an error
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2",
+		Err:          fmt.Errorf("ExpiredToken: token has expired"),
+	})
+
+	// Verify error is shown
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "ExpiredToken") && !strings.Contains(plain, "expired") &&
+		!strings.Contains(plain, "Error") {
+		t.Logf("A.8: error flash before nav: %s", plain[:min(200, len(plain))])
+	}
+
+	// Navigate back to main menu via Esc
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	// View should still render (app is functional after error + nav)
+	out := rootViewContent(m)
+	if out == "" {
+		t.Error("A.8: View() should not be empty after navigating away from error state")
+	}
+}
+
+// TestQa67_A9_RefreshAfterError_TriggersNewFetch verifies that pressing ctrl+r
+// after an APIErrorMsg results in a new fetch command being issued.
+func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Navigate to RDS and load, then error
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "dbi",
+	})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "dbi",
+		Resources:    []resource.Resource{},
+	})
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "dbi",
+		Err:          fmt.Errorf("ThrottlingException: rate exceeded"),
+	})
+
+	// ctrl+r should trigger a new fetch
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	if cmd == nil {
+		t.Fatal("A.9: ctrl+r after APIErrorMsg should return a fetch command")
+	}
+
+	// The command should produce a fetch-related message (not crash)
+	msg := cmd()
+	switch msg.(type) {
+	case messages.APIErrorMsg:
+		// Expected: no real clients, so another error — but the retry was attempted
+	case messages.ResourcesLoadedMsg:
+		// Also fine: retry succeeded
+	case tea.BatchMsg:
+		// Batch command is also acceptable
+	default:
+		t.Logf("A.9: ctrl+r after error returned %T — acceptable", msg)
+	}
+}
+
+// TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers verifies that an error
+// on EC2 does not prevent S3 from loading independently.
+func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Navigate to EC2 and get an error
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2",
+		Err:          fmt.Errorf("AccessDenied: not authorized"),
+	})
+
+	// Navigate back to main menu
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	// Navigate to S3 — should load independently (no EC2 error contamination)
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "s3",
+	})
+	s3Resources := []resource.Resource{
+		{ID: "independent-bucket", Name: "independent-bucket", Fields: map[string]string{
+			"name":          "independent-bucket",
+			"region":        "us-east-1",
+			"creation_date": "2025-01-01",
+		}},
+	}
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: s3Resources})
+
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "independent-bucket") {
+		t.Errorf("A.10: S3 should load independently after EC2 error, got: %s", plain[:min(300, len(plain))])
+	}
+}

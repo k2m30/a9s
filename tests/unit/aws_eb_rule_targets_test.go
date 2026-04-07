@@ -502,3 +502,5 @@ func TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered(t *testing.T) {
 // Ensure imports are used.
 var _ = fmt.Sprintf
 var _ = strings.Contains
+
+// ============================================================================

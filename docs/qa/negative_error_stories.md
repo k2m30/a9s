@@ -350,6 +350,42 @@ Expected error: AccessDeniedException
 - EC2 Instances, S3 Buckets, RDS Instances, ElastiCache Redis, DocumentDB Clusters, EKS Clusters, Secrets Manager, Lambda Functions, ECS Clusters, ECS Services, ECS Tasks, CloudWatch Alarms, Log Groups, VPCs, Security Groups, Subnets, NAT Gateways, Internet Gateways, Elastic IPs, ENIs, Route Tables, Transit Gateways, VPC Endpoints, ELBs, Target Groups, ASGs, Elastic Beanstalk, CloudFront, Route 53, ACM Certificates, API Gateway, CloudFormation Stacks, CodeBuild Projects, CodePipelines, ECR Repositories, IAM Roles, IAM Policies, IAM Users, IAM Groups, WAF Web ACLs, DynamoDB Tables, OpenSearch Domains, Redshift Clusters, Kinesis Streams, SQS Queues, SNS Topics, SNS Subscriptions, EventBridge Rules, Step Functions, Glue Jobs, Athena Workgroups, MSK Clusters, CloudTrail Trails, KMS Keys, SSM Parameters, Backup Plans, SES Identities, EFS File Systems, Node Groups, RDS Snapshots, DocumentDB Snapshots, CodeArtifact Repositories
 **Then:** Each one shows a red error flash in the header. None of them crashes the application.
 
+### Story B.30: AccessDenied on SNS topic subscriptions child view
+**Given:** The user can list SNS topics but lacks `sns:ListSubscriptionsByTopic` permission.
+**When:** The user selects an SNS topic and presses `Enter` to view subscriptions.
+**Then:** The child view shows an error. The header right side displays a red error flash. The user can press `esc` to return to the SNS topics list.
+
+**AWS comparison:**
+aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:123456789012:my-topic
+Expected error: AuthorizationError
+
+### Story B.31: AccessDenied on EventBridge rule targets child view
+**Given:** The user can list EventBridge rules but lacks `events:ListTargetsByRule` permission.
+**When:** The user selects an EventBridge rule and presses `Enter` to view rule targets.
+**Then:** The child view shows an error. The header right side displays a red error flash. The user can press `esc` to return to the EventBridge rules list.
+
+**AWS comparison:**
+aws events list-targets-by-rule --rule my-rule --event-bus-name default
+Expected error: AccessDeniedException
+
+### Story B.32: AccessDenied on RDS instance events child view
+**Given:** The user can list RDS instances but lacks `rds:DescribeEvents` permission.
+**When:** The user selects an RDS instance and presses `Enter` to view events.
+**Then:** The child view shows an error. The header right side displays a red error flash. The user can press `esc` to return to the RDS instances list.
+
+**AWS comparison:**
+aws rds describe-events --source-identifier my-db --source-type db-instance
+Expected error: AccessDenied
+
+### Story B.33: AccessDenied on nested child views (Lambda invocations --> invocation logs)
+**Given:** The user can view Lambda invocations but lacks `logs:FilterLogEvents` permission for the per-invocation log line fetch.
+**When:** The user selects a Lambda invocation and presses `Enter` to view its log lines.
+**Then:** The nested child view shows an error flash in the header. The user can press `esc` to return to the invocations list.
+
+**AWS comparison:**
+aws logs filter-log-events --log-group-name /aws/lambda/my-function --filter-pattern "\"abc-123-request-id\""
+Expected error: AccessDeniedException
+
 ---
 
 ## C. Corrupted / Malformed Data
@@ -762,6 +798,42 @@ Expected fields visible: Timestamp, Event Type, State, Detail
 **Given:** The user has a `~/.a9s/views.yaml` file with invalid YAML syntax (e.g., unclosed quotes, bad indentation).
 **When:** The user launches a9s.
 **Then:** The application either shows a clear error about the malformed config or falls back to built-in defaults. The application does not crash with a YAML parse stack trace.
+
+### Story E.31: Empty SNS topic subscriptions child view
+**Given:** An SNS topic exists but has no subscriptions.
+**When:** The user selects the topic and presses `Enter` to view subscriptions.
+**Then:** The subscriptions child view shows an empty state message centered in the child frame. The frame title shows a `(0)` count. The user can press `esc` to return to the SNS topics list.
+
+**AWS comparison:**
+aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:123456789012:lonely-topic
+Expected fields visible: (none -- empty)
+
+### Story E.32: Empty EventBridge rule targets child view
+**Given:** An EventBridge rule exists but has no targets attached.
+**When:** The user selects the rule and presses `Enter` to view rule targets.
+**Then:** The targets child view shows an empty state message centered in the child frame. The frame title shows a `(0)` count. The user can press `esc` to return to the EventBridge rules list.
+
+**AWS comparison:**
+aws events list-targets-by-rule --rule no-targets-rule --event-bus-name default
+Expected fields visible: (none -- empty)
+
+### Story E.33: Empty RDS instance events child view
+**Given:** An RDS instance exists but has no events in the last 7 days.
+**When:** The user selects the instance and presses `Enter` to view events.
+**Then:** The events child view shows an empty state message centered in the child frame. The frame title shows a `(0)` count. The user can press `esc` to return to the RDS instances list.
+
+**AWS comparison:**
+aws rds describe-events --source-identifier quiet-db --source-type db-instance --duration 10080
+Expected fields visible: (none -- empty)
+
+### Story E.34: Empty nested child views (Lambda invocations --> invocation logs)
+**Given:** A Lambda invocation exists but the matching log lines have aged out of the CloudWatch retention window.
+**When:** The user selects the invocation and presses `Enter` to view its log lines.
+**Then:** The nested invocation logs child view shows an empty state message centered in the child frame. The frame title shows a `(0)` count. The user can press `esc` to return to the invocations list.
+
+**AWS comparison:**
+aws logs filter-log-events --log-group-name /aws/lambda/my-function --filter-pattern "\"abc-123-request-id\""
+Expected fields visible: (none -- empty)
 
 ---
 
