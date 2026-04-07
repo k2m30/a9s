@@ -322,7 +322,7 @@ func strFromMap(m map[string]any, key string) string {
 //  5. KMS use-key exact names → "R" (Decrypt, Encrypt, Sign, Verify, ReEncrypt, GenerateDataKey*)
 //  6. Destructive prefix table → "D"
 //  7. Read prefix table → "R"
-//  8. Write prefix table → "W" (includes Assume* e.g. AssumeRole, AssumeRoleWithWebIdentity)
+//  8. Write prefix table → "W" ("Assume" prefix catches non-STS Assume* events; all AssumeRole* are exact-match R above)
 //  9. "?" (no match)
 func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	// Category / type overrides (highest precedence).
@@ -345,12 +345,14 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	if strings.HasPrefix(eventName, "BatchDelete") {
 		return "D"
 	}
-	// KMS use-key ops and federation reads — exact matches (§2.1 row 2 additional).
-	// AssumeRoleWithWebIdentity is a read (OIDC token exchange), not a write.
+	// KMS use-key ops and STS role-vending — exact matches (§2.1 row 2 additional).
+	// All AssumeRole* operations are STS session vending (identity exchange, not state
+	// mutation). They are exact-matched here so the "Assume" W-prefix below only catches
+	// non-STS Assume* events from other services (if any).
 	switch eventName {
 	case "Decrypt", "Encrypt", "Sign", "Verify",
 		"ReEncrypt", "GenerateDataKey", "GenerateDataKeyWithoutPlaintext",
-		"AssumeRoleWithWebIdentity":
+		"AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
 		return "R"
 	}
 
