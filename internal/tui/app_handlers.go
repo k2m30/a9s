@@ -48,7 +48,11 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.updateActiveView(msg)
 		}
 		ctx := m.helpContext()
-		help := views.NewHelp(m.keys, ctx)
+		activeShortName := ""
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			activeShortName = rl.ShortName()
+		}
+		help := views.NewHelpWithResource(m.keys, ctx, activeShortName)
 		help.SetSize(m.innerSize())
 		m.pushView(&help)
 		return m, nil
@@ -437,7 +441,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 
 	case messages.TargetHelp:
 		ctx := m.helpContext()
-		h := views.NewHelp(m.keys, ctx)
+		activeShortName := ""
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			activeShortName = rl.ShortName()
+		}
+		h := views.NewHelpWithResource(m.keys, ctx, activeShortName)
 		h.SetSize(m.innerSize())
 		m.pushView(&h)
 		return m, nil
