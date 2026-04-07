@@ -101,8 +101,19 @@ func registerDynamoDBDescribeHandlers(t *Transport) {
 		}
 		if req.Body != nil {
 			bodyBytes, err := io.ReadAll(req.Body)
-			if err == nil {
-				json.Unmarshal(bodyBytes, &input) //nolint:errcheck
+			if err != nil {
+				return &http.Response{
+					StatusCode: 400,
+					Status:     "400 Bad Request",
+					Body:       io.NopCloser(strings.NewReader("failed to read request body: " + err.Error())),
+				}, nil
+			}
+			if unmarshalErr := json.Unmarshal(bodyBytes, &input); unmarshalErr != nil {
+				return &http.Response{
+					StatusCode: 400,
+					Status:     "400 Bad Request",
+					Body:       io.NopCloser(strings.NewReader("invalid request body: " + unmarshalErr.Error())),
+				}, nil
 			}
 		}
 

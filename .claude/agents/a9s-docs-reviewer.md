@@ -1,7 +1,19 @@
 ---
 name: a9s-docs-reviewer
 description: Reviews a9s documentation for accuracy — verifies README examples match code, services list matches fetchers, key bindings match definitions, and installation instructions are correct. Use after documentation changes or new resource types.
-tools: Read, Glob, Grep, Bash
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 model: sonnet
 ---
 

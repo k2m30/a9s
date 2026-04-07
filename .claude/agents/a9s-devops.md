@@ -4,6 +4,19 @@ description: "AWS DevOps practitioner who consults on which resources to add, fe
 model: opus
 color: blue
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 skills:
   - a9s-common
 ---

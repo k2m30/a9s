@@ -92,7 +92,7 @@ func TestBottomHints_ResourceList_NoEnterChild(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
-	wantKeys := []string{"y", "ctrl+r"}
+	wantKeys := []string{"y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -117,7 +117,7 @@ func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
-	wantKeys := []string{"enter", "d", "y", "ctrl+r"}
+	wantKeys := []string{"enter", "d", "y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -146,7 +146,7 @@ func TestBottomHints_ResourceList_WithReveal(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
-	wantKeys := []string{"x", "y", "ctrl+r"}
+	wantKeys := []string{"x", "y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -203,7 +203,7 @@ func TestBottomHints_ResourceList_MultipleChildKeys(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
-	wantKeys := []string{"enter", "d", "y", "e", "L", "ctrl+r"}
+	wantKeys := []string{"enter", "d", "y", "e", "L", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -231,7 +231,7 @@ func TestBottomHints_ResourceList_Pagination_WithMore(t *testing.T) {
 	}
 	k := keys.Default()
 	pagination := &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"}
-	m := views.NewResourceListFromCache(td, nil, k, nil, pagination, "", views.SortNone, true, 0, 0)
+	m := views.NewResourceListFromCache(td, nil, k, nil, pagination, "", views.SortNone, true, 0, 0, false)
 
 	hints := m.BottomHints()
 	if !hasHint(hints, "m") {
@@ -251,7 +251,7 @@ func TestBottomHints_ResourceList_Pagination_NoMore(t *testing.T) {
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	}
 	k := keys.Default()
-	m := views.NewResourceListFromCache(td, nil, k, nil, nil, "", views.SortNone, true, 0, 0)
+	m := views.NewResourceListFromCache(td, nil, k, nil, nil, "", views.SortNone, true, 0, 0, false)
 
 	hints := m.BottomHints()
 	if hasHint(hints, "m") {

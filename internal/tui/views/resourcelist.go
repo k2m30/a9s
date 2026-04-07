@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -26,10 +27,12 @@ type ResourceListModel struct {
 	scroll        ScrollState
 	hScrollOffset int
 
-	sort    SortField
-	sortAsc bool
+	sort       SortField
+	sortAsc    bool
+	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
 	filterText           string
+	attentionOnly        bool                // §7: ctrl+z toggle — when true, hide dim/neutral rows
 	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
 	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
 	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
@@ -49,12 +52,6 @@ type ResourceListModel struct {
 	height int
 	keys   keys.Map
 
-	// rowTextCache caches unstyled row text (renderDataRow output) per
-	// filteredResources index. Only the cursor highlight changes between
-	// renders during scrolling — the row text itself is identical.
-	// Invalidated when resources, filter, sort, hScroll, or width change.
-	rowTextCache map[int]string
-
 	// styledRowCache caches fully styled row strings (with cursor highlight
 	// or status color applied). On cursor move, only the old and new cursor
 	// positions are invalidated. Full invalidation happens when data, filter,
@@ -65,13 +62,22 @@ type ResourceListModel struct {
 // NewResourceList creates a ResourceListModel in loading state.
 func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
 	sp := spinner.New()
-	return ResourceListModel{
+	m := ResourceListModel{
 		typeDef:    typeDef,
 		viewConfig: viewConfig,
 		loading:    true,
 		spinner:    sp,
 		keys:       k,
 	}
+	// ct-events: default sort is by event_time DESC (newest first).
+	// Only apply when a viewConfig is present (full app mode); unit tests
+	// that pass nil viewConfig work with synthetic data and are not affected.
+	if typeDef.ShortName == "ct-events" && viewConfig != nil {
+		m.sort = SortAge
+		m.sortAsc = false
+		m.sortColKey = "time" // §6: TIME column is bound to SortAge for ct-events
+	}
+	return m
 }
 
 // NewChildResourceList creates a ResourceListModel for a child resource type.
@@ -103,6 +109,7 @@ func NewResourceListFromCache(
 	sortAsc bool,
 	cursorPos int,
 	hScrollOffset int,
+	attentionOnly bool,
 ) ResourceListModel {
 	m := ResourceListModel{
 		typeDef:       typeDef,
@@ -115,8 +122,10 @@ func NewResourceListFromCache(
 		hScrollOffset: hScrollOffset,
 		loading:       false,
 		keys:          k,
+		attentionOnly: attentionOnly,
 	}
 	m.applySortAndFilter()
+	m.updateSortColKey()
 	// Restore cursor position after filter application resets scroll.
 	if cursorPos >= 0 && cursorPos < len(m.filteredResources) {
 		m.scroll.SetCursor(cursorPos)
@@ -146,7 +155,6 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.pendingFilter = ""
 		}
 		m.applySortAndFilter()
-		m.rowTextCache = nil
 		m.styledRowCache = nil
 		if m.autoOpenSingleDetail && len(m.filteredResources) == 1 {
 			r := m.filteredResources[0]
@@ -224,7 +232,6 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.ScrollLeft):
 			if m.hScrollOffset > 0 {
 				m.hScrollOffset--
-				m.rowTextCache = nil
 				m.styledRowCache = nil
 			}
 		case key.Matches(msg, m.keys.ScrollRight):
@@ -243,7 +250,6 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			}
 			if canScroll {
 				m.hScrollOffset++
-				m.rowTextCache = nil
 				m.styledRowCache = nil
 			}
 		case key.Matches(msg, m.keys.Enter):
@@ -279,6 +285,12 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 					}
 				}
 			}
+		case key.Matches(msg, m.keys.ToggleAttentionOnly):
+			m.attentionOnly = !m.attentionOnly
+			m.applySortAndFilter()
+			m.scroll.SetCursor(0)
+			m.styledRowCache = nil
+			return m, nil
 		case key.Matches(msg, m.keys.SortByName):
 			if m.sort == SortName {
 				m.sortAsc = !m.sortAsc
@@ -286,6 +298,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortName
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.SortByID):
 			if m.sort == SortID {
@@ -294,6 +307,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortID
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.SortByAge):
 			if m.sort == SortAge {
@@ -302,6 +316,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortAge
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.Events):
 			if r := m.SelectedResource(); r != nil {
@@ -405,23 +420,16 @@ func (m *ResourceListModel) View() string {
 		sb.WriteString("\n")
 		r := m.filteredResources[i]
 
-		// Use cached row text when available (cursor movement doesn't invalidate).
-		rowText, ok := m.rowTextCache[i]
+		styled, ok := m.styledRowCache[i]
 		if !ok {
-			rowText = m.renderDataRow(cols, r)
-			if m.rowTextCache == nil {
-				m.rowTextCache = make(map[int]string)
-			}
-			m.rowTextCache[i] = rowText
-		}
-
-		styled, ok2 := m.styledRowCache[i]
-		if !ok2 {
-			if i == m.scroll.Cursor() {
-				styled = styles.RowSelected.Width(m.width).Render(rowText)
+			isSelected := i == m.scroll.Cursor()
+			var base lipgloss.Style
+			if isSelected {
+				base = styles.RowSelected
 			} else {
-				styled = styles.RowColorStyle(r.Status).Render(rowText)
+				base = styles.RowColorStyle(r.Status)
 			}
+			styled = m.renderDataRow(cols, r, base, m.width, isSelected)
 			if m.styledRowCache == nil {
 				m.styledRowCache = make(map[int]string)
 			}
@@ -452,8 +460,41 @@ func (m *ResourceListModel) View() string {
 func (m *ResourceListModel) applySortAndFilter() {
 	m.applyFilter()
 	m.sortFiltered()
-	m.rowTextCache = nil
 	m.styledRowCache = nil
+}
+
+// updateSortColKey sets m.sortColKey to the canonical column key for the current
+// sort mode on the current resource type. This is the single source of truth for
+// which column header receives the sort glyph (§6).
+//
+// Matching is exact against resolved column keys:
+//   - SortName → first column whose key/title is "name" or contains "Name"
+//   - SortID   → first column whose key contains "id" or title contains "ID"
+//   - SortAge  → first column whose key or path matches isAgeKey
+//
+// If no column matches, sortColKey is set to "" (no glyph rendered).
+func (m *ResourceListModel) updateSortColKey() {
+	cols := m.resolveColumns()
+	for _, c := range cols {
+		switch m.sort {
+		case SortName:
+			if strings.EqualFold(c.key, "name") || strings.Contains(strings.ToLower(c.title), "name") {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		case SortID:
+			if strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID") {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		case SortAge:
+			if isAgeKey(c.key) || isAgeKey(c.path) {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		}
+	}
+	m.sortColKey = ""
 }
 
 func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
@@ -473,7 +514,6 @@ func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
 func (m *ResourceListModel) SetFilter(text string) {
 	m.filterText = text
 	m.applyFilter()
-	m.rowTextCache = nil
 	m.styledRowCache = nil
 	m.scroll.SetCursor(0)
 }
@@ -534,7 +574,6 @@ func (m *ResourceListModel) IsTruncated() bool {
 // SetSize updates dimensions.
 func (m *ResourceListModel) SetSize(w, h int) {
 	if m.width != w {
-		m.rowTextCache = nil
 		m.styledRowCache = nil
 	}
 	m.width = w
@@ -619,6 +658,11 @@ func (m ResourceListModel) HScrollOffset() int {
 // FilterText returns the current filter text.
 func (m ResourceListModel) FilterText() string {
 	return m.filterText
+}
+
+// AttentionOnly returns the current state of the ctrl+z attention filter.
+func (m ResourceListModel) AttentionOnly() bool {
+	return m.attentionOnly
 }
 
 // handleChildKey iterates through the typeDef's Children looking for a match
@@ -724,11 +768,17 @@ func (m ResourceListModel) FrameTitle() string {
 		if m.titleSuffix != "" {
 			title += m.titleSuffix
 		}
+		if m.attentionOnly {
+			title += " [!]"
+		}
 		return title
 	}
 	title := name + "(" + totalStr + ")"
 	if m.titleSuffix != "" {
 		title += m.titleSuffix
+	}
+	if m.attentionOnly {
+		title += " [!]"
 	}
 	return title
 }
@@ -788,6 +838,7 @@ func (m ResourceListModel) BottomHints() []layout.KeyHint {
 	}
 
 	hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
+	hints = append(hints, layout.KeyHint{Key: "ctrl+z", Desc: "Only !"})
 
 	// Pagination "more" hint
 	if m.pagination != nil && m.pagination.IsTruncated {
@@ -830,7 +881,20 @@ func (m *ResourceListModel) applyFilter() {
 		}
 		base = subset
 	}
-	m.filteredResources = FilterResources(m.filterText, base)
+	result := FilterResources(m.filterText, base)
+
+	// §7 attention filter — hide dim rows when toggle is on.
+	if m.attentionOnly {
+		kept := make([]resource.Resource, 0, len(result))
+		for _, r := range result {
+			if !styles.IsDimRowColor(r.Status) {
+				kept = append(kept, r)
+			}
+		}
+		result = kept
+	}
+
+	m.filteredResources = result
 	m.scroll.SetTotal(len(m.filteredResources))
 }
 
@@ -858,3 +922,14 @@ func FilterResources(query string, resources []resource.Resource) []resource.Res
 	}
 	return result
 }
+
+
+
+
+
+
+
+
+
+
+

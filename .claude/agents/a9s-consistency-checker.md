@@ -1,7 +1,19 @@
 ---
 name: a9s-consistency-checker
 description: "Verifies consistency across code, tests, README, docs, and website. Catches drift between resource types in code vs docs, key bindings in code vs docs, Go version across all files, install commands, CLI flags, and feature claims. Use after any code change that touches resource types, keys, commands, or versions.\n\nExamples:\n\n- user: \"check everything is consistent\"\n  assistant: \"Let me use the a9s-consistency-checker agent to audit cross-file consistency.\"\n\n- user: \"I just added a new resource type\"\n  assistant: \"Let me use the a9s-consistency-checker agent to verify it's reflected everywhere.\"\n\n- user: \"verify the docs match the code\"\n  assistant: \"Let me use the a9s-consistency-checker agent to run a full consistency audit.\""
-tools: Read, Glob, Grep, Bash
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 model: sonnet
 ---
 
