@@ -41,19 +41,42 @@ Before doing ANY work, verify the task includes **exact scope**:
 
 Do NOT explore the codebase to fill in gaps. Do NOT guess what to test. The architect owns scoping.
 
-## VALUE GATE (mandatory)
+## VALUE SCORE GATE (mandatory)
 
-Before writing any test, ask: **"What bug would this catch that existing tests don't?"**
+Every architect dispatch MUST include a `Mode:` line — either `score` or `execute`.
 
-REJECT tests that only verify:
-- A registered function is non-nil (already covered by registry/completeness tests)
-- Nil clients return -1 (trivial guard clause, not a real bug vector)
-- Empty ID returns -1 or 0 (same trivial guard)
-- A constant equals itself
+### Mode: score (default for first dispatch)
 
-These catch zero bugs and add maintenance noise. If the entire task is nothing but these, reply:
+Do NOT write any test files. Evaluate the scoped task and assign a single integer 0–100 based on real bug-catching value:
 
-> REJECTED: All specified tests are trivial guards already covered by existing completeness tests. No real bug vectors identified. Please re-scope with tests that verify actual matching logic (correct field, correct ResourceIDs, correct edge cases).
+- **0–20** — pure busywork / trivial guards already covered by registry or completeness tests (nil client → -1, non-nil function, constants equal themselves).
+- **21–40** — low value, mostly redundant with existing coverage.
+- **41–60** — mixed; some real coverage, significant noise.
+- **61–80** — solid; catches realistic bugs in mapping, state transitions, edge cases.
+- **81–100** — high-value; catches bugs no existing test covers (new logic branches, regression-prone behavior).
+
+Reply with **exactly one line** in this form, then STOP:
+
+```
+SCORE: <N> — <at most 2 short sentences of rationale>
+```
+
+Do NOT write tests. Do NOT explore beyond the scope. Do NOT suggest rework — the architect decides what to do with the score.
+
+Example:
+```
+SCORE: 25 — Four of five specified tests are nil-client guards already covered by completeness tests. Only the field-mapping test catches a real bug.
+```
+
+### Mode: execute
+
+Refuse unless the dispatch includes a `Confirmed score: <N>` line referencing a prior score from this same task. If missing, reply:
+
+> REJECTED: Mode: execute requires a `Confirmed score: <N>` line from a prior score dispatch. Please re-dispatch with Mode: score first.
+
+With a valid confirmed score, write tests per the scope as described below.
+
+Both modes still run the SCOPE GATE above first — missing scope is an immediate rejection regardless of mode.
 
 ## Your Scope
 
