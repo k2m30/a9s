@@ -129,6 +129,9 @@ func registerCloudTrailHandlers(t *Transport) {
 			if ev.EventTime != nil {
 				m["EventTime"] = float64(ev.EventTime.Unix())
 			}
+			if ev.CloudTrailEvent != nil {
+				m["CloudTrailEvent"] = *ev.CloudTrailEvent
+			}
 			if len(ev.Resources) > 0 {
 				resList := make([]map[string]interface{}, 0, len(ev.Resources))
 				for _, r := range ev.Resources {
