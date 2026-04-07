@@ -283,10 +283,14 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Res
 			ids = append(ids, eventRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+	fetchFilter := map[string]string{"ResourceName": instanceID}
+	if truncated {
+		// Cache is partial — the filtered fetch will determine the real count.
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
 	}
-	return relatedResult("ct-events", ids)
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
 }
 
 // checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.

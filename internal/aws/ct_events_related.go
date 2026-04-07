@@ -94,6 +94,13 @@ func ctEventsExtractRoleName(res resource.Resource) string {
 		return username[strings.LastIndex(username, "/")+1:]
 	}
 
+	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON string.
+	if ok {
+		if name := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); name != "" {
+			return name
+		}
+	}
+
 	return ""
 }
 

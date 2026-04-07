@@ -163,8 +163,8 @@ func checkRolePolicy(_ context.Context, clients any, res resource.Resource, _ re
 	}
 	var ids []string
 	for _, p := range out.AttachedPolicies {
-		if p.PolicyArn != nil {
-			ids = append(ids, *p.PolicyArn)
+		if p.PolicyName != nil {
+			ids = append(ids, *p.PolicyName)
 		}
 	}
 	return relatedResult("policy", ids)

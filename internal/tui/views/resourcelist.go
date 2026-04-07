@@ -32,6 +32,7 @@ type ResourceListModel struct {
 	filterText           string
 	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
 	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
+	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
 	autoOpenSingleDetail bool                // when true, ResourcesLoaded auto-navigates to detail if exactly one row remains
 	parentContext        map[string]string   // context from parent view for child fetchers
 	displayName          string              // custom display name for frame title
@@ -332,11 +333,13 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				rt := m.typeDef.ShortName
 				token := m.pagination.NextToken
 				pc := m.parentContext
+				ff := m.fetchFilter
 				return m, func() tea.Msg {
 					return messages.LoadMoreMsg{
 						ResourceType:      rt,
 						ContinuationToken: token,
 						ParentContext:     pc,
+						FetchFilter:       ff,
 					}
 				}
 			}
@@ -479,6 +482,12 @@ func (m *ResourceListModel) SetFilter(text string) {
 // Used by related-resource navigation to pre-filter the list on first load.
 func (m *ResourceListModel) SetPendingFilter(text string) {
 	m.pendingFilter = text
+}
+
+// SetFetchFilter sets server-side filter parameters used for both initial fetch and load-more.
+// When non-nil, the list bypasses relatedIDSet and uses a registered FilteredPaginatedFetcher.
+func (m *ResourceListModel) SetFetchFilter(filter map[string]string) {
+	m.fetchFilter = filter
 }
 
 // SetRelatedIDFilter constrains the list to an exact set of resource IDs.

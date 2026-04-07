@@ -55,8 +55,8 @@ func checkUserPolicy(_ context.Context, clients any, res resource.Resource, _ re
 	}
 	var ids []string
 	for _, p := range out.AttachedPolicies {
-		if p.PolicyArn != nil {
-			ids = append(ids, *p.PolicyArn)
+		if p.PolicyName != nil {
+			ids = append(ids, *p.PolicyName)
 		}
 	}
 	return relatedResult("policy", ids)
@@ -92,10 +92,14 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 			ids = append(ids, eventRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+	fetchFilter := map[string]string{"Username": userName}
+	if truncated {
+		// Cache is partial — the filtered fetch will determine the real count.
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
 	}
-	return relatedResult("ct-events", ids)
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
 }
 
 // iamUserRelatedResources returns the resource list for target from cache or by
