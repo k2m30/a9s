@@ -16,6 +16,7 @@ type listCol struct {
 	width int
 	key   string // resource.Fields key (fallback)
 	path  string // config-driven path for ExtractScalar
+	color string // per-cell color classifier (e.g. "verb", "actor", "outcome", "origin")
 }
 
 // resolveColumns determines the column definitions to use.
@@ -31,6 +32,7 @@ func (m ResourceListModel) resolveColumns() []listCol {
 					width: lc.Width,
 					path:  lc.Path,
 					key:   lc.Key,
+					color: lc.Color,
 				}
 			}
 			return cols
@@ -128,7 +130,11 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 				val = "~ " + val
 			}
 		}
-		cells[i] = text.PadOrTrunc(val, c.width)
+		padded := text.PadOrTrunc(val, c.width)
+		if c.color != "" {
+			padded = ApplyCellColor(c.color, padded)
+		}
+		cells[i] = padded
 	}
 	return " " + strings.Join(cells, "  ")
 }
