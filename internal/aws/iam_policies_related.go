@@ -59,7 +59,7 @@ func resolveIAMAPI(c *ServiceClients) IAMListEntitiesForPolicyAPI {
 
 // checkPolicyRole uses the IAM ListEntitiesForPolicy API to return the IAM roles
 // attached to this policy.
-func checkPolicyRole(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
@@ -68,7 +68,7 @@ func checkPolicyRole(_ context.Context, clients any, res resource.Resource, _ re
 	if policyARN == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	out, err := listAllPolicyEntities(context.Background(), resolveIAMAPI(c), policyARN)
+	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
 	}
@@ -83,7 +83,7 @@ func checkPolicyRole(_ context.Context, clients any, res resource.Resource, _ re
 
 // checkPolicyUser uses the IAM ListEntitiesForPolicy API to return the IAM users
 // attached to this policy.
-func checkPolicyUser(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
@@ -92,7 +92,7 @@ func checkPolicyUser(_ context.Context, clients any, res resource.Resource, _ re
 	if policyARN == "" {
 		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
 	}
-	out, err := listAllPolicyEntities(context.Background(), resolveIAMAPI(c), policyARN)
+	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1, Err: err}
 	}
@@ -107,7 +107,7 @@ func checkPolicyUser(_ context.Context, clients any, res resource.Resource, _ re
 
 // checkPolicyGroup uses the IAM ListEntitiesForPolicy API to return the IAM groups
 // attached to this policy.
-func checkPolicyGroup(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1}
@@ -116,7 +116,7 @@ func checkPolicyGroup(_ context.Context, clients any, res resource.Resource, _ r
 	if policyARN == "" {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
 	}
-	out, err := listAllPolicyEntities(context.Background(), resolveIAMAPI(c), policyARN)
+	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1, Err: err}
 	}

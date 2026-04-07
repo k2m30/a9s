@@ -75,7 +75,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 				}
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
 			defer cancel()
 
 			// Only pre-fetch the target type if this checker actually reads it from
