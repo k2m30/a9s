@@ -74,6 +74,17 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"GenerateDataKeyWithoutPlaintext_R", "GenerateDataKeyWithoutPlaintext", "", "", "R"},
 
 		// ---------------------------------------------------------------
+		// §1.4 exact-match overrides — AssumeRoleWithWebIdentity is R, not W.
+		// AssumeRole and AssumeRoleWithSAML keep their Assume* → W classification.
+		// ---------------------------------------------------------------
+		// AssumeRoleWithWebIdentity: exact-match R (IRSA/OIDC — not a write op)
+		{"AssumeRoleWithWebIdentity_R", "AssumeRoleWithWebIdentity", "", "", "R"},
+		// AssumeRole: still W via "Assume" prefix (human/automation cross-role)
+		{"AssumeRole_W", "AssumeRole", "", "", "W"},
+		// AssumeRoleWithSAML: still W via "Assume" prefix (enterprise federation)
+		{"AssumeRoleWithSAML_W", "AssumeRoleWithSAML", "", "", "W"},
+
+		// ---------------------------------------------------------------
 		// Write prefixes — §2.1 W row
 		// ---------------------------------------------------------------
 		{"CreateBucket", "CreateBucket", "", "", "W"},

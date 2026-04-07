@@ -109,6 +109,7 @@ func NewResourceListFromCache(
 	sortAsc bool,
 	cursorPos int,
 	hScrollOffset int,
+	attentionOnly bool,
 ) ResourceListModel {
 	m := ResourceListModel{
 		typeDef:       typeDef,
@@ -121,6 +122,7 @@ func NewResourceListFromCache(
 		hScrollOffset: hScrollOffset,
 		loading:       false,
 		keys:          k,
+		attentionOnly: attentionOnly,
 	}
 	m.applySortAndFilter()
 	m.updateSortColKey()
@@ -658,6 +660,11 @@ func (m ResourceListModel) FilterText() string {
 	return m.filterText
 }
 
+// AttentionOnly returns the current state of the ctrl+z attention filter.
+func (m ResourceListModel) AttentionOnly() bool {
+	return m.attentionOnly
+}
+
 // handleChildKey iterates through the typeDef's Children looking for a match
 // on keyName. If found, checks DrillCondition, builds context, and returns
 // an EnterChildViewMsg command. Returns the model and nil cmd if no child matched.
@@ -831,6 +838,7 @@ func (m ResourceListModel) BottomHints() []layout.KeyHint {
 	}
 
 	hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
+	hints = append(hints, layout.KeyHint{Key: "ctrl+z", Desc: "Only !"})
 
 	// Pagination "more" hint
 	if m.pagination != nil && m.pagination.IsTruncated {

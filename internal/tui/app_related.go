@@ -250,6 +250,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					"",
 					entry.sortField, entry.sortAsc,
 					0, 0,
+					false,
 				)
 				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 				rl.SetRelatedIDFilter(msg.RelatedIDs)
@@ -270,6 +271,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				"", // no text filter needed, already filtered by ID
 				entry.sortField, entry.sortAsc,
 				0, 0,
+				false,
 			)
 			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 			rl.SetRelatedIDFilter(msg.RelatedIDs)

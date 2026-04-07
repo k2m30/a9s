@@ -248,6 +248,88 @@ func TestCtrlZ_PerViewState_DoesNotBleed(t *testing.T) {
 }
 
 // ===========================================================================
+// TestCtrlZ_PersistsAcrossCacheRoundTrip (§7.3 persistent state)
+//
+// attentionOnly must survive a cache eviction+restore cycle via
+// NewResourceListFromCache. The coder adds attentionOnly bool as the 11th
+// trailing parameter and adds an AttentionOnly() accessor.
+// This test WILL COMPILE-ERROR until those two additions land.
+// ===========================================================================
+
+func TestCtrlZ_PersistsAcrossCacheRoundTrip(t *testing.T) {
+	t.Helper()
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+
+	td := resource.FindResourceType("ct-events")
+	if td == nil {
+		t.Fatal("ct-events resource type not found")
+	}
+	k := keys.Default()
+	m := views.NewResourceList(*td, config.DefaultConfig(), k)
+	m.SetSize(200, 20)
+	m, _ = m.Init()
+
+	// Load 4 seed resources: 2 ct-info (dim), 1 ct-attention, 1 ct-danger.
+	m, _ = m.Update(messages.ResourcesLoadedMsg{
+		ResourceType: "ct-events",
+		Resources:    ctEvents4(),
+	})
+
+	// Toggle attentionOnly ON.
+	m, _ = m.Update(ctrlZ())
+	if !m.AttentionOnly() {
+		t.Fatal("attentionOnly should be true after ctrl+z")
+	}
+
+	// Capture non-attention row count before cache round-trip.
+	visibleBefore := len(m.AllResources()) // underlying 4 rows preserved
+
+	// Simulate cache eviction: rebuild via NewResourceListFromCache with the
+	// attentionOnly flag forwarded as the 11th arg (added by coder).
+	sortField, sortAsc := m.SortState()
+	m2 := views.NewResourceListFromCache(
+		*td, config.DefaultConfig(), k,
+		m.AllResources(),
+		m.PaginationState(),
+		m.FilterText(),
+		sortField,
+		sortAsc,
+		m.CursorPosition(),
+		m.HScrollOffset(),
+		m.AttentionOnly(), // 11th arg — NEW; coder adds this
+	)
+	m2.SetSize(200, 20)
+
+	// attentionOnly must be restored.
+	if !m2.AttentionOnly() {
+		t.Fatal("attentionOnly should persist across cache round-trip via NewResourceListFromCache")
+	}
+
+	// Underlying AllResources() count must be unchanged.
+	if got := len(m2.AllResources()); got != visibleBefore {
+		t.Errorf("AllResources after cache round-trip: got %d, want %d (underlying data must be preserved)", got, visibleBefore)
+	}
+
+	// Dim rows must still be filtered from View().
+	view2 := stripANSI(m2.View())
+	if strings.Contains(view2, "read-1") {
+		t.Errorf("ct-info row 'read-1' should be hidden after cache round-trip with attentionOnly=true\n  view:\n%s", view2)
+	}
+	if strings.Contains(view2, "read-2") {
+		t.Errorf("ct-info row 'read-2' should be hidden after cache round-trip with attentionOnly=true\n  view:\n%s", view2)
+	}
+
+	// Attention/danger rows must be visible.
+	if !strings.Contains(view2, "write-1") {
+		t.Errorf("ct-attention row 'write-1' must be visible after cache round-trip\n  view:\n%s", view2)
+	}
+	if !strings.Contains(view2, "delete-1") {
+		t.Errorf("ct-danger row 'delete-1' must be visible after cache round-trip\n  view:\n%s", view2)
+	}
+}
+
+// ===========================================================================
 // TestCtrlZ_StatusLineIndicator (§7.3)
 //
 // When attentionOnly is active, [!] must appear somewhere in the rendered
