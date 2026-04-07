@@ -632,3 +632,5 @@ func (m *tokenCapturingSNSSubsMock) ListSubscriptionsByTopic(ctx context.Context
 	m.capturedNextToken = params.NextToken
 	return m.inner.ListSubscriptionsByTopic(ctx, params, optFns...)
 }
+
+// ============================================================================
