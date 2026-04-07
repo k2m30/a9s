@@ -3,6 +3,8 @@ package views
 import (
 	"strings"
 
+	lipgloss "charm.land/lipgloss/v2"
+
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -16,6 +18,18 @@ type listCol struct {
 	width int
 	key   string // resource.Fields key (fallback)
 	path  string // config-driven path for ExtractScalar
+}
+
+// colSortKey returns the stable identifier for a column used to match against
+// ResourceListModel.sortColKey. Key is preferred, path fallback, title last resort.
+func colSortKey(c listCol) string {
+	if c.key != "" {
+		return c.key
+	}
+	if c.path != "" {
+		return c.path
+	}
+	return c.title
 }
 
 // resolveColumns determines the column definitions to use.
@@ -88,22 +102,14 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 	return styles.TableHeader.Render(headerText)
 }
 
-// colHeaderTitle returns the column title with sort indicator if applicable.
+// colHeaderTitle returns the column title with a sort indicator if this column
+// is the active sort column. Per §6, the indicator is bound to exactly one
+// column via ResourceListModel.sortColKey — set when the sort mode changes.
+// Substring matching is intentionally removed to prevent double-glyph bugs
+// (e.g. ct-events: both TIME and EVENT previously matched SortAge via isAgeKey).
 func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 	title := c.title
-	// Add sort indicator based on active sort field.
-	// Match by common patterns: first column is often "name-ish", etc.
-	var isActive bool
-	switch m.sort {
-	case SortName:
-		// Name sort applies to column with key "name" or title containing "Name"
-		isActive = strings.EqualFold(c.key, "name") || strings.Contains(strings.ToLower(c.title), "name")
-	case SortID:
-		isActive = strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID")
-	case SortAge:
-		isActive = isAgeKey(c.key) || isAgeKey(c.title)
-	}
-	if isActive {
+	if m.sortColKey != "" && colSortKey(c) == m.sortColKey {
 		if m.sortAsc {
 			title += "\u2191"
 		} else {
@@ -114,11 +120,17 @@ func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 }
 
 // renderDataRow renders a single data row.
-func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) string {
-	cells := make([]string, len(cols))
+func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, base lipgloss.Style, totalWidth int, isSelected bool) string {
+	var b strings.Builder
+	// Leading single space carries base style.
+	b.WriteString(base.Render(" "))
+	used := 1
 	for i, c := range cols {
+		if i > 0 {
+			b.WriteString(base.Render("  "))
+			used += 2
+		}
 		val := m.extractCellValue(c, r)
-		// Prepend status check indicator to the state cell for running instances.
 		if (c.key == "state" || c.path == "State.Name") && val == "running" {
 			sysStatus := r.Fields["system_status"]
 			instStatus := r.Fields["instance_status"]
@@ -128,9 +140,17 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 				val = "~ " + val
 			}
 		}
-		cells[i] = text.PadOrTrunc(val, c.width)
+		padded := text.PadOrTrunc(val, c.width)
+		used += c.width
+		b.WriteString(base.Render(padded))
 	}
-	return " " + strings.Join(cells, "  ")
+	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
+	// Non-cursor rows are not padded (preserving the same plain-text length as the
+	// pre-fix RowColorStyle.Render approach, which did not add Width padding).
+	if isSelected && totalWidth > used {
+		b.WriteString(base.Render(strings.Repeat(" ", totalWidth-used)))
+	}
+	return b.String()
 }
 
 // extractCellValue gets the cell value for a column from a resource.
@@ -161,10 +181,12 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	}
 	// Final fallback: use resource Name for name-style columns when Fields has no value.
 	// This handles test fixtures and resources where Fields is sparse but r.Name is set.
-	// Matches columns whose key or title contains "name" (e.g., "alarm_name", "Alarm Name").
+	// Matches columns whose key, title, or path contains "name"
+	// (e.g., "alarm_name", "Alarm Name", "EventName").
 	if r.Name != "" &&
 		(strings.Contains(strings.ToLower(c.key), "name") ||
-			strings.Contains(strings.ToLower(c.title), "name")) {
+			strings.Contains(strings.ToLower(c.title), "name") ||
+			strings.Contains(strings.ToLower(c.path), "name")) {
 		return r.Name
 	}
 	return ""

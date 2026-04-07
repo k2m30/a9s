@@ -4,6 +4,21 @@ description: "Wires app.go: message flow, command dispatch, entrypoint. Does NOT
 model: opus
 color: cyan
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - Write
+  - Edit
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 skills:
   - a9s-common
   - a9s-bt-v2

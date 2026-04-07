@@ -379,7 +379,7 @@ func TestQA_HelpContext_RevealView_ShowsRelevantKeys(t *testing.T) {
 
 	// Push reveal view via SecretRevealedMsg
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "my-secret",
+		ResourceID: "my-secret",
 		Value:      "super-secret-value",
 	})
 
@@ -402,7 +402,7 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "my-secret",
+		ResourceID: "my-secret",
 		Value:      "super-secret-value",
 	})
 

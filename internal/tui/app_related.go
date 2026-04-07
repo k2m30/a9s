@@ -75,7 +75,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 				}
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
 			defer cancel()
 
 			// Only pre-fetch the target type if this checker actually reads it from
@@ -250,6 +250,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					"",
 					entry.sortField, entry.sortAsc,
 					0, 0,
+					false,
 				)
 				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 				rl.SetRelatedIDFilter(msg.RelatedIDs)
@@ -270,6 +271,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				"", // no text filter needed, already filtered by ID
 				entry.sortField, entry.sortAsc,
 				0, 0,
+				false,
 			)
 			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 			rl.SetRelatedIDFilter(msg.RelatedIDs)

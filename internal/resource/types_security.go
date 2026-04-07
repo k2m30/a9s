@@ -5,7 +5,7 @@ func securityResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "IAM Roles",
 			ShortName: "role",
-			Aliases:   []string{"role", "roles", "iam-roles"},
+			Aliases:   []string{"role", "roles", "iam-roles", "iam_roles"},
 			Category:  "SECURITY & IAM",
 			Columns: []Column{
 				{Key: "role_name", Title: "Role Name", Width: 36, Sortable: true},
@@ -26,7 +26,7 @@ func securityResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "IAM Policies",
 			ShortName: "policy",
-			Aliases:   []string{"policy", "policies", "iam-policies"},
+			Aliases:   []string{"policy", "policies", "iam-policies", "iam_policies"},
 			Category:  "SECURITY & IAM",
 			Columns: []Column{
 				{Key: "policy_name", Title: "Policy Name", Width: 36, Sortable: true},
@@ -39,7 +39,7 @@ func securityResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "IAM Users",
 			ShortName: "iam-user",
-			Aliases:   []string{"iam-user", "iam-users", "users"},
+			Aliases:   []string{"iam-user", "iam-users", "users", "iam_users"},
 			Category:  "SECURITY & IAM",
 			Columns: []Column{
 				{Key: "user_name", Title: "User Name", Width: 32, Sortable: true},
@@ -52,7 +52,7 @@ func securityResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "IAM Groups",
 			ShortName: "iam-group",
-			Aliases:   []string{"iam-group", "iam-groups", "groups"},
+			Aliases:   []string{"iam-group", "iam-groups", "groups", "iam_groups"},
 			Category:  "SECURITY & IAM",
 			Columns: []Column{
 				{Key: "group_name", Title: "Group Name", Width: 32, Sortable: true},

@@ -99,24 +99,22 @@ Pick **(a)**, with one targeted concession on the renderer side:
 
    | CT condition | `Resource.Status` value | Cache key provenance |
    |---|---|---|
-   | `errorCode != ""` | `"error"` | existing (`styles.go:116`, red / `ColStopped`) |
-   | `recipientAccountId != userIdentity.accountId` | `"pending"` | existing (`styles.go:119`, yellow / `ColPending`) |
-   | `eventType == AwsServiceEvent` | `"terminated"` | existing (`styles.go:123`, dim / `ColTerminated`) |
-   | default (successful read or write) | `"running"` | existing (`styles.go:110`, green / `ColRunning`) |
-   | Root user event (taxonomy §4.1) | `"ct-root"` | **NEW** — see below |
+   | Verb is `W` or `D` (write / destructive) | `"ct-write"` | **NEW** — foreground-only red |
+   | Verb is `R`, `S`, `I`, or `N` (read / observation) | `"ct-read"` | **NEW** — foreground-only yellow |
 
-   Only **one new key** is added to the `rowColorCache` init:
-   `"ct-root"` → `lipgloss.NewStyle().Foreground(ColHeaderFg).Background(ColStopped)`.
-   This is the single genuinely new state CT introduces (EC2 has no
-   "highlighted critical actor" equivalent). Every other condition
-   maps onto an EC2 state string already in the cache.
+   Two new keys are added to the `rowColorCache` init:
+   - `"ct-write"` → `lipgloss.NewStyle().Foreground(ColStopped)` (red fg)
+   - `"ct-read"`  → `lipgloss.NewStyle().Foreground(ColPending)` (yellow fg)
+
+   **No background colors anywhere.** Backgrounds are unreadable
+   on root accounts and small personal terminals — every cue is
+   foreground-only. Errors, root identity, cross-account, and
+   service events are signaled through **cell-level** color
+   classifiers (ACTOR / OUTCOME), never through the row tint.
 
    Precedence (resolved at fetch time, highest first):
-   1. Root (`ct-root`)
-   2. Error (`error`)
-   3. Cross-account (`pending`)
-   4. Service event (`terminated`)
-   5. Default (`running`)
+   1. Write (`ct-write`) — verb in {W, D}
+   2. Read  (`ct-read`)  — verb in {R, S, I, N}
 
 5. **No new key bindings.** Sort, filter, horizontal scroll, `tab`
    cycle stay as today. The filter is the generic substring matcher
@@ -295,30 +293,34 @@ order** (newest at top), matching the default fetch order (§6.1).
 
 Color guide for the rows above (left-to-right reading order):
 
-| Row | Verb glyph | Event name color | Outcome color | Row tint | Why |
+| Row | Verb glyph | Event name color | Outcome color | Row tint (fg only) | Why |
 |---|---|---|---|---|---|
-| 1 | `D` red bold | red bold | green dim | none | destructive write, success |
-| 2 | `W` orange bold | orange | red bold | red bg-tint | write failure |
-| 3 | `D` red bold | red bold | green dim | **red bg-tint** | ROOT user → row tinted red regardless of outcome |
-| 4 | `R` dim | dim | green dim | none | read, success |
-| 5 | `S` accent bold | accent | green dim | dim fg | service-emitted event |
-| 6 | `W` orange | orange | green dim | none | mutating write |
-| 7 | `R` dim | dim | green dim | none | read |
-| 8 | `D` red bold | red bold | green dim | none | destructive |
-| 9 | `I` purple bold | purple | warning yellow | none | insight start |
-| 10 | `W` orange | orange | green dim | none | federated SAML |
-| 11 | `R` dim | dim | green dim | none | read |
-| 12 | `N` accent (network) | dim | red bold | yellow bg-tint | NetworkActivity, cross-account, denied |
-| 13 | `W` orange | orange | red bold | red bg-tint | write failure |
-| 14 | `R` dim | dim | green dim | none | read |
-| 15 | `R` dim | dim | green dim | none | read |
+| 1 | `D` red bold | red bold | green dim | red fg (`ct-write`) | destructive |
+| 2 | `W` orange bold | orange | red bold | red fg (`ct-write`) | write — outcome cell shows the failure |
+| 3 | `D` red bold | red bold | green dim | red fg (`ct-write`) | destructive — `ROOT` in ACTOR cell (bold red) is the root signal |
+| 4 | `R` dim | dim | green dim | yellow fg (`ct-read`) | read |
+| 5 | `S` accent bold | accent | green dim | yellow fg (`ct-read`) | service-emitted observation |
+| 6 | `W` orange | orange | green dim | red fg (`ct-write`) | mutating write |
+| 7 | `R` dim | dim | green dim | yellow fg (`ct-read`) | read |
+| 8 | `D` red bold | red bold | green dim | red fg (`ct-write`) | destructive |
+| 9 | `I` purple bold | purple | warning yellow | yellow fg (`ct-read`) | insight start |
+| 10 | `W` orange | orange | green dim | red fg (`ct-write`) | federated SAML write |
+| 11 | `R` dim | dim | green dim | yellow fg (`ct-read`) | read |
+| 12 | `N` accent (network) | dim | red bold | yellow fg (`ct-read`) | NetworkActivity — outcome cell shows the deny |
+| 13 | `W` orange | orange | red bold | red fg (`ct-write`) | write — outcome cell shows the failure |
+| 14 | `R` dim | dim | green dim | yellow fg (`ct-read`) | read |
+| 15 | `R` dim | dim | green dim | yellow fg (`ct-read`) | read |
 
 Notes:
 
+- **Row tint is binary: yellow for reads, red for writes.** No
+  backgrounds. Errors, root identity, cross-account, and service
+  events are conveyed by cell-level classifiers (ACTOR, OUTCOME,
+  EVENT) layered on top of the binary row tint.
 - The actor column applies its `actor` classifier independently of
-  the row tint. So row 3 has both `ROOT` rendered bright red bold
-  *and* the row background tinted red — two redundant signals
-  because root actions are the most critical pattern in a CT log.
+  the row tint. Row 3's `ROOT` is rendered bright red bold inside
+  an otherwise red-fg row — root actions remain unmissable through
+  the bold ACTOR cell, with no background needed.
 - The verb-glyph column header is intentionally blank.
 - `N` is added as a sixth glyph for `NetworkActivity` events
   (taxonomy §1.4). It uses `ColAccent` to distinguish from `S`.
@@ -405,31 +407,38 @@ OUTCOME are preserved at all widths above 60.
 The row tint is derived once in the fetcher and stored in
 `Resource.Status`. The list renderer's existing
 `styles.RowColorStyle` lookup (`internal/tui/styles/styles.go:47`)
-paints the row. **We reuse the EC2 status cache keys wherever the
-semantic already exists** and add exactly one new key for the Root
-state, which has no EC2 equivalent.
+paints the row. The redesign uses a **binary, foreground-only**
+row tint based on the verb classifier — yellow for reads, red for
+writes — and adds two new ct-specific keys to the cache.
+
+**No background colors anywhere in the row tint.** Backgrounds
+made the list unmanageable on root accounts and small personal
+terminals. Every other dimension (errors, root identity,
+cross-account, service events) is conveyed by **cell-level**
+classifiers (ACTOR / OUTCOME / EVENT), not by the row tint.
 
 | Condition | `Resource.Status` | Cache key source | Color | Precedence |
 |---|---|---|---|---|
-| Root user (taxonomy §4.1) | `ct-root` | **NEW** in `rowColorCache` init | `ColHeaderFg` fg on `ColStopped` bg | 1 (highest) |
-| `errorCode != ""` | `error` | existing `styles.go:116` | `ColStopped` red fg | 2 |
-| `recipientAccountId != userIdentity.accountId` | `pending` | existing `styles.go:119` | `ColPending` yellow fg | 3 |
-| `eventType == AwsServiceEvent` | `terminated` | existing `styles.go:123` | `ColTerminated` dim fg | 4 |
-| default success (read/write) | `running` | existing `styles.go:110` | `ColRunning` green fg | 5 (lowest) |
+| Verb in {W, D} | `ct-write` | **NEW** in `rowColorCache` init | `ColStopped` red fg | 1 (higher) |
+| Verb in {R, S, I, N} | `ct-read` | **NEW** in `rowColorCache` init | `ColPending` yellow fg | 2 (lower) |
 
-Precedence is resolved **at fetch time** before `Resource.Status`
-is set: a Root error event gets `ct-root` (red bg) which dominates
-`error` (red fg). A service-emitted cross-account event gets
-`pending` (cross-account wins over service).
+Precedence is trivial: the verb classifier runs once at fetch
+time, and the result is mapped to either `ct-write` or `ct-read`.
+Errors, root, cross-account, and service identity are layered on
+top via the cell-level classifiers in §8a (ACTOR, OUTCOME,
+EVENT), so no precedence stack is needed for the row tint itself.
 
-The single new cache entry to add:
+The two new cache entries to add:
 
 ```go
-"ct-root": lipgloss.NewStyle().Foreground(ColHeaderFg).Background(ColStopped).Bold(true),
+"ct-write": lipgloss.NewStyle().Foreground(ColStopped),  // red fg, no bg
+"ct-read":  lipgloss.NewStyle().Foreground(ColPending),  // yellow fg, no bg
 ```
 
-All other statuses are existing keys already used by EC2, RDS, EKS,
-ASG, and other list views. No new color tokens introduced.
+Both are foreground-only. No background, no bold — bold is
+reserved for cell-level classifiers (the ROOT actor, destructive
+verb glyph, failed outcome) so they remain visible on top of the
+binary row tint. No other new color tokens introduced.
 
 ---
 
@@ -545,11 +554,13 @@ All six questions from the prior revision are closed:
    canonical a9s timestamp format. See §2 and §3.1.
 2. **`N` glyph for NetworkActivity.** RESOLVED — kept on the list
    view. Documented in §3.1 and in the Help additions below.
-3. **Row tint vs. cell color collision.** RESOLVED — EC2-style
-   foreground-only tint for `error`, `pending`, `terminated`,
-   `running`. The single new `ct-root` key is the only one that
-   uses a background, to make root actions visually unmissable.
-   See §5.
+3. **Row tint vs. cell color collision.** RESOLVED — binary
+   foreground-only row tint: `ct-write` (red) for verbs W/D,
+   `ct-read` (yellow) for verbs R/S/I/N. **No background colors
+   anywhere** — backgrounds were unmanageable on root accounts and
+   small terminals. Errors, root, cross-account, and service
+   events are signaled exclusively through cell-level classifiers
+   on ACTOR / OUTCOME / EVENT. See §5.
 4. **Target for Insight / NetworkActivity.** RESOLVED — targets
    are never blank. Insight renders `<eventName> ×<ratio>`;
    NetworkActivity renders `<vpce-id> → <service>`;
@@ -590,13 +601,14 @@ grouped into two subsections. Colors are named using the same
 
 ### Row status colors (via `Resource.Status` → `RowColorStyle`)
 
+Binary, foreground-only. **No backgrounds.** Errors, root,
+cross-account, and service events are signaled by the cell-level
+classifiers below, not by the row tint.
+
 | Row appearance | Meaning | `Resource.Status` value |
 |---|---|---|
-| Red bg, light fg, bold | Root user action | `ct-root` |
-| Red fg | Any event with `errorCode != ""` | `error` |
-| Yellow fg | Cross-account — `recipientAccountId != userIdentity.accountId` | `pending` |
-| Dim fg | Service-emitted event (`AwsServiceEvent`) | `terminated` |
-| Green fg | Default successful event | `running` |
+| Red fg | Verb is `W` (write) or `D` (destructive) | `ct-write` |
+| Yellow fg | Verb is `R` (read), `S` (service), `I` (insight), or `N` (network) | `ct-read` |
 
 ### Actor and outcome cell colors
 
@@ -622,10 +634,10 @@ already used for `HelpFromSecretsList` as the pattern to mirror.
 
 | File | Change |
 |---|---|
-| `internal/aws/ct_events.go` | Parse `CloudTrailEvent` JSON once per event; write `_ct.*` keys to `Resource.Fields`; set `Resource.Status` to one of `ct-root`, `error`, `pending`, `terminated`, `running` (precedence per §5). Preserve LookupEvents newest-first order. Compute TARGET fallbacks per §2.1. Share the parser with the detail-view branch from `ct-event-detail.md`. |
+| `internal/aws/ct_events.go` | Parse `CloudTrailEvent` JSON once per event; write `_ct.*` keys to `Resource.Fields`; set `Resource.Status` to one of `ct-write` (verb W/D) or `ct-read` (verb R/S/I/N) per §5. Preserve LookupEvents newest-first order. Compute TARGET fallbacks per §2.1. Share the parser with the detail-view branch from `ct-event-detail.md`. |
 | `internal/config/types.go` | Add `Color string` field to `ListColumn`. Backwards-compatible (zero value = no classifier). |
 | `internal/tui/views/resourcelist.go` | In the cell formatter, switch on `col.Color` and apply one of the four classifiers. ~30 lines, generic, not ct-events-specific. Default sort override: when resource short name is `ct-events`, initial sort is TIME desc. |
-| `internal/tui/styles/styles.go` | Add **one** new key to `rowColorCache`: `ct-root` (fg `ColHeaderFg`, bg `ColStopped`, bold). All other ct statuses reuse existing EC2-style keys. |
+| `internal/tui/styles/styles.go` | Add **two** new foreground-only keys to `rowColorCache`: `ct-write` (`ColStopped` red fg) and `ct-read` (`ColPending` yellow fg). No backgrounds, no bold. |
 | `internal/tui/views/help.go` | Add CloudTrail Events legend block per §8a when context is `HelpFromResourceList*` and the calling resource type is `ct-events`. |
 | `.a9s/views/ct-events.yaml` | Rewrite `list:` block per §3. |
 | `internal/config/defaults.go` | Mirror the YAML rewrite for users without a custom config. |

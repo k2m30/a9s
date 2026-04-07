@@ -28,7 +28,16 @@ func isAgeKey(key string) bool {
 // It scans the resolved columns in order and returns the first time-related key.
 // Config-driven columns may have empty keys, so it falls back to typeDef columns
 // which always carry canonical field keys.
+//
+// Special-case: ct-events stores a display-formatted "time" field for rendering
+// and a raw RFC3339 "event_time" field for sorting — return "event_time" so
+// the comparator gets a sortable value. The display column (TIME) still shows
+// the sort glyph because sortColKey="time" (set in NewResourceList) is matched
+// by the TIME column key independently of the comparator field.
 func (m ResourceListModel) ageFieldKey() string {
+	if m.typeDef.ShortName == "ct-events" {
+		return "event_time"
+	}
 	for _, c := range m.resolveColumns() {
 		if isAgeKey(c.key) {
 			return c.key

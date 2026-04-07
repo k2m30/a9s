@@ -66,6 +66,35 @@ func RowColorStyle(status string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(ColHeaderFg)
 }
 
+// IsDimRowColor reports whether RowColorStyle for the given status produces
+// a dim or neutral foreground (i.e., the row has no severity signal worth
+// the user's attention). Used by the global ctrl+z "show interesting only"
+// filter. See docs/design/ct-event-list-v2.md §7.1.
+func IsDimRowColor(status string) bool {
+	// NO_COLOR disables the filter entirely — treat everything as non-dim
+	// so attentionOnly mode does not blank the screen.
+	if NoColorActive() {
+		return false
+	}
+	lower := strings.ToLower(status)
+	s, ok := rowColorCache[lower]
+	if !ok {
+		// Suffix branches mirror RowColorStyle.
+		switch {
+		case strings.HasSuffix(lower, "_in_progress"),
+			strings.HasSuffix(lower, "_failed"),
+			strings.HasSuffix(lower, "_complete"):
+			return false
+		}
+		return true // default ColHeaderFg → dim
+	}
+	// Compare by constructing reference styles.
+	dimRef := lipgloss.NewStyle().Foreground(ColTerminated)
+	neutralRef := lipgloss.NewStyle().Foreground(ColHeaderFg)
+	fg := s.GetForeground()
+	return fg == dimRef.GetForeground() || fg == neutralRef.GetForeground()
+}
+
 func init() {
 	initStyles()
 }
@@ -117,6 +146,7 @@ func initStyles() {
 		"deleting":     lipgloss.NewStyle().Foreground(ColStopped),
 		"deleted":      lipgloss.NewStyle().Foreground(ColStopped),
 		"pending":      lipgloss.NewStyle().Foreground(ColPending),
+		"stopping":     lipgloss.NewStyle().Foreground(ColPending), // ec2 lifecycle — transitioning
 		"creating":     lipgloss.NewStyle().Foreground(ColPending),
 		"modifying":    lipgloss.NewStyle().Foreground(ColPending),
 		"updating":     lipgloss.NewStyle().Foreground(ColPending),
@@ -175,6 +205,11 @@ func initStyles() {
 		"grey":        lipgloss.NewStyle().Foreground(ColTerminated), // EB Health
 		"not_started": lipgloss.NewStyle().Foreground(ColTerminated), // SES
 		"paused":      lipgloss.NewStyle().Foreground(ColTerminated), // Redshift
+
+		// --- CloudTrail severity ladder (§1.1 of ct-event-list-v2.md) ---
+		"ct-info":      lipgloss.NewStyle().Foreground(ColTerminated), // routine reads — dim
+		"ct-attention": lipgloss.NewStyle().Foreground(ColPending),    // writes / ROOT / sensitive / cross-account — yellow
+		"ct-danger":    lipgloss.NewStyle().Foreground(ColStopped),    // destructive / failed — red
 	}
 
 	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)

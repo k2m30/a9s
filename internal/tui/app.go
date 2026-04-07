@@ -2,6 +2,7 @@ package tui
 
 import (
 	"container/list"
+	"context"
 	"fmt"
 	"strings"
 
@@ -47,6 +48,7 @@ type resourceCacheEntry struct {
 	resources     []resource.Resource
 	pagination    *resource.PaginationMeta
 	filterText    string
+	attentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
 	sortField     views.SortField
 	sortAsc       bool
 	cursorPos     int
@@ -62,6 +64,9 @@ type Model struct {
 	profile string
 	region  string
 	clients *awsclient.ServiceClients
+
+	appCtx    context.Context
+	appCancel context.CancelFunc
 
 	stack []views.View
 
@@ -206,6 +211,10 @@ func New(profile, region string, opts ...Option) Model {
 		cfg = config.DefaultConfig()
 	}
 
+	// Create the app-wide context first so it can be passed to AWS client
+	// construction and threaded through all fetchers.
+	ctx, cancel := context.WithCancel(context.Background())
+
 	m := Model{
 		profile:       profile,
 		region:        region,
@@ -217,11 +226,18 @@ func New(profile, region string, opts ...Option) Model {
 		resourceCache: make(map[string]*resourceCacheEntry),
 		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
+		appCtx:        ctx,
+		appCancel:     cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)
 	}
 	return m
+}
+
+// AppContext returns the app-wide context. It is cancelled when the app quits.
+func (m Model) AppContext() context.Context {
+	return m.appCtx
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
@@ -262,6 +278,11 @@ func (m Model) Init() tea.Cmd {
 // Update implements tea.Model. Routes messages to global handlers or active view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.QuitMsg:
+		if m.appCancel != nil {
+			m.appCancel()
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -340,6 +361,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						resources:     rl.AllResources(),
 						pagination:    rl.PaginationState(),
 						filterText:    rl.FilterText(),
+						attentionOnly: rl.AttentionOnly(),
 						sortField:     sortField,
 						sortAsc:       sortAsc,
 						cursorPos:     rl.CursorPosition(),
@@ -608,6 +630,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 		resources:     rl.AllResources(),
 		pagination:    rl.PaginationState(),
 		filterText:    rl.FilterText(),
+		attentionOnly: rl.AttentionOnly(),
 		sortField:     sortField,
 		sortAsc:       sortAsc,
 		cursorPos:     rl.CursorPosition(),

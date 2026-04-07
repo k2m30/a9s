@@ -48,20 +48,23 @@ func XMLResponse(body string) *http.Response {
 // Paginate returns a page of items using offset-based demo tokens.
 // Token format: "demo:OFFSET" (e.g., "demo:20"). Empty token = start from 0.
 // Returns the page slice and a nextToken (*string, nil if last page).
-func Paginate[T any](items []T, pageSize int, token string) (page []T, nextToken *string) {
+// Returns a non-nil error when the token cannot be parsed.
+func Paginate[T any](items []T, pageSize int, token string) (page []T, nextToken *string, err error) {
 	offset := 0
 	if token != "" {
-		fmt.Sscanf(token, "demo:%d", &offset) //nolint:errcheck
+		if _, scanErr := fmt.Sscanf(token, "demo:%d", &offset); scanErr != nil {
+			return nil, nil, fmt.Errorf("invalid pagination token %q: %w", token, scanErr)
+		}
 	}
 
 	end := offset + pageSize
 	if end >= len(items) {
 		end = len(items)
-		return items[offset:end], nil
+		return items[offset:end], nil, nil
 	}
 
 	next := fmt.Sprintf("demo:%d", end)
-	return items[offset:end], &next
+	return items[offset:end], &next, nil
 }
 
 // ExtractSDK extracts RawStruct values of type T from resource.Resource slices.

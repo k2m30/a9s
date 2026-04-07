@@ -140,7 +140,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkRolePolicy uses the IAM ListAttachedRolePolicies API to return the
 // managed policies attached to this IAM role.
-func checkRolePolicy(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
@@ -155,7 +155,7 @@ func checkRolePolicy(_ context.Context, clients any, res resource.Resource, _ re
 	if roleName == "" {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
 	}
-	out, err := c.IAM.ListAttachedRolePolicies(context.Background(), &iam.ListAttachedRolePoliciesInput{
+	out, err := c.IAM.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
 		RoleName: &roleName,
 	})
 	if err != nil {
