@@ -554,3 +554,201 @@ func TestQA_MainMenu_NonTruncatedAvailabilityNoPlus(t *testing.T) {
 		t.Errorf("expected no '(50+)' when Truncated=false for ct-events, got:\n%s", plain)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests 8–10: loadingMore error transitions (CONCERNS.md #16)
+//
+// EXPECTED FAILURE STATUS (as of 2026-04-07):
+//
+// TestPagination_ErrorClearsLoadingMore — EXPECTED TO PASS on current main.
+//   handleAPIError calls ClearLoading() which sets loadingMore=false. This test
+//   documents the contract and will FAIL if someone removes the ClearLoading call.
+//   NOTE: If the active view is NOT a *ResourceListModel at the time of the error
+//   (e.g., a spinner-only view before resources arrive), loadingMore is never
+//   cleared — that race is the deadlock described in CONCERNS.md #16.
+//
+// TestPagination_DoubleLoadIgnored — EXPECTED TO PASS on current main.
+//   The guard `!m.loadingMore` on line 346 of resourcelist.go already prevents a
+//   second fetch. This test documents that contract.
+//
+// TestPagination_PopViewClearsLoadingMore — EXPECTED TO PASS on current main.
+//   When the user presses Esc and re-enters the resource list, a new
+//   ResourceListModel is created via NewResourceList (loadingMore defaults to
+//   false). This test documents that re-entry produces a clean state.
+// ---------------------------------------------------------------------------
+
+// TestPagination_ErrorClearsLoadingMore verifies that delivering an APIErrorMsg
+// while loadingMore=true clears the loadingMore flag AND retains the pagination
+// meta (so the user can retry with M after the error is resolved).
+//
+// Documents CONCERNS.md #16: if APIErrorMsg did not clear loadingMore, the view
+// would be permanently stuck showing "ct-events(50+ loading...)" with no way to
+// retry the next page.
+func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
+	tui.Version = "test"
+
+	m := newRootSizedModel()
+
+	// Navigate to ct-events.
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ct-events",
+	})
+
+	// Load page 1 — truncated.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ct-events",
+		Resources:    ctEventsResources(50),
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "page2-token",
+			PageSize:    50,
+			TotalHint:   -1,
+		},
+		Append: false,
+	})
+
+	// Press M — this sets loadingMore=true on the resource list.
+	m, cmd := rootApplyMsg(m, rootKeyPress("M"))
+	if cmd == nil {
+		t.Fatal("pressing M on a truncated list must return a non-nil command")
+	}
+
+	// Confirm we are now in the "loading..." state before the error arrives.
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "loading...") {
+		t.Fatalf("precondition: expected frame title to contain 'loading...' after pressing M, got:\n%s", plain)
+	}
+
+	// Deliver an APIErrorMsg for ct-events (simulating a network failure on page 2).
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ct-events",
+		Err:          fmt.Errorf("RequestTimeout: connection timed out"),
+	})
+
+	plain = stripANSI(rootViewContent(m))
+
+	// ASSERTION 1: loadingMore must be cleared — frame title must NOT contain "loading...".
+	// Failure here means the deadlock from CONCERNS.md #16 is present: the user
+	// cannot retry M and is stuck on "ct-events(50+ loading...)".
+	if strings.Contains(plain, "loading...") {
+		t.Errorf("APIErrorMsg should clear loadingMore — frame title must not contain 'loading...' after error, got:\n%s", plain)
+	}
+
+	// ASSERTION 2: pagination must be retained (IsTruncated still true) so the "+"
+	// indicator remains and the user knows they can retry M.
+	if !strings.Contains(plain, "50+") {
+		t.Errorf("APIErrorMsg must not clear pagination — frame title must still contain '50+' after error, got:\n%s", plain)
+	}
+}
+
+// TestPagination_DoubleLoadIgnored verifies that pressing M a second time while
+// loadingMore=true produces no command (the duplicate fetch is suppressed).
+//
+// This prevents issuing two concurrent page-2 fetches when the user double-taps M.
+func TestPagination_DoubleLoadIgnored(t *testing.T) {
+	tui.Version = "test"
+
+	m := newRootSizedModel()
+
+	// Navigate to ct-events.
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ct-events",
+	})
+
+	// Load page 1 — truncated.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ct-events",
+		Resources:    ctEventsResources(50),
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "page2-token",
+			PageSize:    50,
+			TotalHint:   -1,
+		},
+		Append: false,
+	})
+
+	// First M press — must produce a command (LoadMoreMsg) and set loadingMore=true.
+	m, firstCmd := rootApplyMsg(m, rootKeyPress("M"))
+	if firstCmd == nil {
+		t.Fatal("first M press on truncated list must return a non-nil command")
+	}
+
+	// Precondition: view must show "loading..." to confirm loadingMore=true.
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "loading...") {
+		t.Fatalf("precondition: expected 'loading...' in frame title after first M press, got:\n%s", plain)
+	}
+
+	// Second M press while loadingMore=true — must produce NO command.
+	// The guard `!m.loadingMore` in the LoadMore key handler suppresses the duplicate.
+	_, secondCmd := rootApplyMsg(m, rootKeyPress("M"))
+
+	// ASSERTION: the second M press must be a no-op at the root command level.
+	// A non-nil command here means a second page-2 fetch would be dispatched,
+	// which could cause duplicate rows or token confusion on arrival.
+	if secondCmd != nil {
+		t.Errorf("second M press while loadingMore=true should produce no command (duplicate fetch suppressed), but got a non-nil command")
+	}
+}
+
+// TestPagination_PopViewClearsLoadingMore verifies that pressing Esc to leave a
+// resource list that was mid-load (loadingMore=true), then re-entering it,
+// produces a view with loadingMore=false (fresh state, no leftover spinner).
+//
+// Without this property, re-entering a resource type would show
+// "ct-events(0+ loading...)" permanently even though no fetch is in flight.
+func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
+	tui.Version = "test"
+
+	m := newRootSizedModel()
+
+	// Navigate to ct-events.
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ct-events",
+	})
+
+	// Load page 1 — truncated.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ct-events",
+		Resources:    ctEventsResources(50),
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: true,
+			NextToken:   "page2-token",
+			PageSize:    50,
+			TotalHint:   -1,
+		},
+		Append: false,
+	})
+
+	// Press M — sets loadingMore=true and dispatches a LoadMoreMsg.
+	m, _ = rootApplyMsg(m, rootKeyPress("M"))
+
+	// Precondition: confirm we are mid-load.
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, "loading...") {
+		t.Fatalf("precondition: expected 'loading...' after pressing M, got:\n%s", plain)
+	}
+
+	// Pop the view (simulate Esc back to main menu).
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
+
+	// Re-push ct-events (simulate the user pressing Enter on it again in the menu).
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ct-events",
+	})
+
+	plain = stripANSI(rootViewContent(m))
+
+	// ASSERTION: the re-entered view must NOT show "loading..." — the new
+	// ResourceListModel is created fresh by NewResourceList with loadingMore=false.
+	// A failure here means the stale loadingMore=true leaked from the previous
+	// visit into the new view, permanently blocking M retries.
+	if strings.Contains(plain, "loading...") {
+		t.Errorf("re-entering ct-events after Esc should show a fresh view (no 'loading...'), got:\n%s", plain)
+	}
+}

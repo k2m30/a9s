@@ -76,7 +76,6 @@ type RegionSelectedMsg struct {
 type ValueRevealedMsg struct {
 	ResourceType string // e.g., "secrets", "ssm"
 	ResourceID   string // secret name or parameter name
-	SecretName   string // deprecated: use ResourceID; retained for backwards compatibility
 	Value        string
 	Err          error
 }

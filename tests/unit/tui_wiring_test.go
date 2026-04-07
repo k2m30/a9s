@@ -200,7 +200,7 @@ func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 
 	// Push a reveal view via SecretRevealedMsg
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "my-secret",
+		ResourceID: "my-secret",
 		Value:      "s3cr3t-value",
 	})
 
@@ -624,7 +624,7 @@ func TestWiring_SecretRevealedMsg_PushesRevealView(t *testing.T) {
 
 	// Send SecretRevealedMsg
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "prod/db-password",
+		ResourceID: "prod/db-password",
 		Value:      "hunter2",
 	})
 

@@ -1008,10 +1008,10 @@ func snsTopicSubscriptionFixtures(topicArn string) []resource.Resource {
 		},
 		{
 			ID:   "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002",
-			Name: "https://hooks.slack.com/services/T00/B00/xxx",
+			Name: "https://hooks.slack.com/services/T00/B00/XXX",
 			Fields: map[string]string{
 				"protocol":            "https",
-				"endpoint":            "https://hooks.slack.com/services/T00/B00/xxx",
+				"endpoint":            "https://hooks.slack.com/services/T00/B00/XXX",
 				"confirmation_status": "Confirmed",
 				"owner":               "123456789012",
 				"subscription_arn":    "arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002",
@@ -1021,7 +1021,7 @@ func snsTopicSubscriptionFixtures(topicArn string) []resource.Resource {
 				SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + topicArn + ":sub-https-002"),
 				TopicArn:        aws.String(topicArn),
 				Protocol:        aws.String("https"),
-				Endpoint:        aws.String("https://hooks.slack.com/services/T00/B00/xxx"),
+				Endpoint:        aws.String("https://hooks.slack.com/services/T00/B00/XXX"),
 				Owner:           aws.String("123456789012"),
 			},
 		},
