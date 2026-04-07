@@ -9,7 +9,19 @@ tools:
   - Glob
   - Grep
   - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - ExitPlanMode
+  - Write
+  - Edit
   - Agent
+  - SendMessage
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
   - mcp__aws-api__call_aws
   - mcp__aws-api__suggest_aws_commands
 skills:
