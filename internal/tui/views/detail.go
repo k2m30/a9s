@@ -109,12 +109,31 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		}
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
+	case tea.PasteMsg:
+		// Route bracketed paste to search when in search input mode.
+		if m.search.IsInputMode() {
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, cmd
+		}
+		return m, nil
+	case searchPasteMsg:
+		// Route ctrl+V clipboard result to search when in search input mode.
+		if m.search.IsInputMode() {
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, cmd
+		}
+		return m, nil
 	case tea.KeyMsg:
 		// Search input mode captures all keys.
 		if m.search.IsInputMode() {
-			m.search, _ = m.search.Update(msg)
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
 			m.refreshViewportContent()
-			return m, nil
+			return m, cmd
 		}
 		// When right column is focused, delegate navigation keys to it.
 		if m.rightColShowing() && m.rightCol.IsFocused() {
