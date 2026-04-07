@@ -3,6 +3,7 @@ package views
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -19,8 +20,9 @@ import (
 type rightColumnRow struct {
 	targetType  string
 	displayName string
-	count       int      // -1 = loading, 0+ = resolved
-	resourceIDs []string // IDs from checker result (for navigation in US3)
+	count       int               // -1 = loading, 0+ = resolved
+	resourceIDs []string          // IDs from checker result (for navigation in US3)
+	fetchFilter map[string]string // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
 }
@@ -75,6 +77,7 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 				m.rows[i].err = msg.Result.Err
 				m.rows[i].count = msg.Result.Count
 				m.rows[i].resourceIDs = msg.Result.ResourceIDs
+				m.rows[i].fetchFilter = msg.Result.FetchFilter
 				break
 			}
 		}
@@ -149,6 +152,7 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 					TargetType:     row.targetType,
 					SourceResource: m.parentRes,
 					RelatedIDs:     row.resourceIDs,
+					FetchFilter:    row.fetchFilter,
 				}
 			}
 		}
@@ -167,9 +171,7 @@ func (m rightColumnModel) View() string {
 	// Header: "RELATED" centered.
 	header := "RELATED"
 	padLeft := (m.width - lipgloss.Width(header)) / 2
-	if padLeft < 0 {
-		padLeft = 0
-	}
+	padLeft = max(padLeft, 0)
 	centeredHeader := strings.Repeat(" ", padLeft) + header
 	lines = append(lines, styles.DimText.Render(centeredHeader))
 
@@ -180,16 +182,10 @@ func (m rightColumnModel) View() string {
 	case len(visible) == 0:
 		lines = append(lines, styles.DimText.Render("  No matches"))
 	default:
-		usableHeight := m.height - 1 // after header
-		if usableHeight < 1 {
-			usableHeight = 1
-		}
+		usableHeight := max(m.height-1, 1) // after header
 
 		start := m.scrollOffset
-		end := start + usableHeight
-		if end > len(visible) {
-			end = len(visible)
-		}
+		end := min(start+usableHeight, len(visible))
 
 		for _, idx := range visible[start:end] {
 			row := m.rows[idx]
@@ -203,6 +199,9 @@ func (m rightColumnModel) View() string {
 			case row.err != nil:
 				rowText = "  " + row.displayName + "  \u2014" // em dash
 				rowStyle = styles.DimText
+			case row.count == -1 && len(row.fetchFilter) > 0:
+				rowText = "  " + row.displayName
+				rowStyle = styles.RowNormal
 			case row.count == -1:
 				rowText = "  " + row.displayName
 				rowStyle = styles.DimText
@@ -267,7 +266,14 @@ func (m rightColumnModel) SelectedTypeName() string {
 }
 
 func isActionableRow(row rightColumnRow) bool {
-	return !row.loading && row.err == nil && row.count > 0
+	if row.loading || row.err != nil {
+		return false
+	}
+	// Count=-1 with a FetchFilter means "navigate — server-side fetch determines real count".
+	if row.count == -1 {
+		return len(row.fetchFilter) > 0
+	}
+	return row.count > 0
 }
 
 func (m rightColumnModel) visibleIndexes() []int {
@@ -298,13 +304,7 @@ func (m *rightColumnModel) ensureCursorValid() {
 		m.scrollOffset = 0
 		return
 	}
-	isVisible := false
-	for _, idx := range visible {
-		if idx == m.cursor {
-			isVisible = true
-			break
-		}
-	}
+	isVisible := slices.Contains(visible, m.cursor)
 	if !isVisible {
 		m.cursor = visible[0]
 	}
@@ -334,10 +334,7 @@ func (m *rightColumnModel) ensureScrollVisible() {
 	if len(visible) == 0 {
 		return
 	}
-	usableHeight := m.height - 1
-	if usableHeight < 1 {
-		usableHeight = 1
-	}
+	usableHeight := max(m.height-1, 1)
 	selectedPos := 0
 	for i, idx := range visible {
 		if idx == m.cursor {
@@ -351,12 +348,8 @@ func (m *rightColumnModel) ensureScrollVisible() {
 	if selectedPos >= m.scrollOffset+usableHeight {
 		m.scrollOffset = selectedPos - usableHeight + 1
 	}
-	if m.scrollOffset < 0 {
-		m.scrollOffset = 0
-	}
-	if m.scrollOffset > len(visible)-1 {
-		m.scrollOffset = len(visible) - 1
-	}
+	m.scrollOffset = max(m.scrollOffset, 0)
+	m.scrollOffset = min(m.scrollOffset, len(visible)-1)
 }
 
 func (m *rightColumnModel) moveCursor(dir int) {

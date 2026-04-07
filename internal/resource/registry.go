@@ -165,6 +165,28 @@ func UnregisterPaginatedChild(shortName string) {
 	delete(paginatedChildRegistry, shortName)
 }
 
+// FilteredPaginatedFetcher returns a single page of resources filtered server-side.
+// The filter map keys are service-specific attribute names (e.g., "Username" for CloudTrail).
+type FilteredPaginatedFetcher func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (FetchResult, error)
+
+var filteredPaginatedRegistry = map[string]FilteredPaginatedFetcher{}
+
+// RegisterFilteredPaginated adds a filtered paginated fetcher for the given resource short name.
+func RegisterFilteredPaginated(shortName string, f FilteredPaginatedFetcher) {
+	filteredPaginatedRegistry[shortName] = f
+}
+
+// GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name,
+// or nil if none is registered.
+func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
+	return filteredPaginatedRegistry[shortName]
+}
+
+// UnregisterFilteredPaginated removes a filtered paginated fetcher. Used only in tests for cleanup.
+func UnregisterFilteredPaginated(shortName string) {
+	delete(filteredPaginatedRegistry, shortName)
+}
+
 // RevealFetcher is the function signature for reveal value fetchers.
 // Each resource type that supports reveal (x key) registers a fetcher
 // that takes a context, clients, and resource ID, returning the value string.

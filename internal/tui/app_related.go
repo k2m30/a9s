@@ -131,6 +131,18 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 	}
 
+	// FetchFilter path: use server-side filtered fetcher — skip frozen relatedIDSet entirely.
+	if len(msg.FetchFilter) > 0 {
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+		rl.SetFetchFilter(msg.FetchFilter)
+		rl.SetEscPops(true)
+		rl.SetSize(m.innerSize())
+		rl, initCmd := rl.Init()
+		m.pushView(&rl)
+		return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, msg.FetchFilter))
+	}
+
 	// Bug 1 fix: TargetID set → find resource in cache and push detail directly.
 	if msg.TargetID != "" {
 		if entry, ok := m.resourceCache[msg.TargetType]; ok {
