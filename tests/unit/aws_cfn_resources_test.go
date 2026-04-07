@@ -672,6 +672,7 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 			"AWS::SQS::Queue",
 			"AWS::SNS::Topic",
 		}
+		// end expectedTypes
 		allResources := make([]resource.Resource, 0, len(result.Resources)+len(result2.Resources))
 		allResources = append(allResources, result.Resources...)
 		allResources = append(allResources, result2.Resources...)

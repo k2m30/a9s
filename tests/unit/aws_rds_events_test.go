@@ -893,3 +893,5 @@ func (m *tokenCapturingRDSEventsMock) DescribeEvents(ctx context.Context, params
 	m.capturedMarker = params.Marker
 	return m.inner.DescribeEvents(ctx, params, optFns...)
 }
+
+// ============================================================================
