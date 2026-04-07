@@ -50,12 +50,27 @@ func (m YAMLModel) Init() (YAMLModel, tea.Cmd) {
 // Update delegates scroll to viewport; handles c (copy), esc (back).
 func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		if m.search.IsInputMode() {
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, cmd
+		}
+	case searchPasteMsg:
+		if m.search.IsInputMode() {
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
+			m.refreshViewportContent()
+			return m, cmd
+		}
 	case tea.KeyMsg:
 		// Search input mode captures all keys.
 		if m.search.IsInputMode() {
-			m.search, _ = m.search.Update(msg)
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Update(msg)
 			m.refreshViewportContent()
-			return m, nil
+			return m, cmd
 		}
 		switch {
 		case key.Matches(msg, m.keys.Search):
