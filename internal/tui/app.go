@@ -47,6 +47,7 @@ type resourceCacheEntry struct {
 	resources     []resource.Resource
 	pagination    *resource.PaginationMeta
 	filterText    string
+	attentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
 	sortField     views.SortField
 	sortAsc       bool
 	cursorPos     int
@@ -340,6 +341,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						resources:     rl.AllResources(),
 						pagination:    rl.PaginationState(),
 						filterText:    rl.FilterText(),
+						attentionOnly: rl.AttentionOnly(),
 						sortField:     sortField,
 						sortAsc:       sortAsc,
 						cursorPos:     rl.CursorPosition(),
@@ -608,6 +610,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 		resources:     rl.AllResources(),
 		pagination:    rl.PaginationState(),
 		filterText:    rl.FilterText(),
+		attentionOnly: rl.AttentionOnly(),
 		sortField:     sortField,
 		sortAsc:       sortAsc,
 		cursorPos:     rl.CursorPosition(),

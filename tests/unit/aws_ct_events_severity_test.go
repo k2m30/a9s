@@ -197,20 +197,20 @@ func TestCTSeverity_SensitiveReadSSMGetParameter(t *testing.T) {
 	}
 }
 
-// TestCTSeverity_SensitiveReadSTSAssumeRole — §1.3: sts:AssumeRole → ct-attention.
+// TestCTSeverity_SensitiveReadSTSAssumeRole — sts:AssumeRole → ct-attention via verb W.
+// sts:AssumeRole is REMOVED from the §1.3 sensitive-reads allowlist (too noisy as
+// sensitive-read; verb W via Assume prefix already yields ct-attention independently).
 func TestCTSeverity_SensitiveReadSTSAssumeRole(t *testing.T) {
-	// Spec: §1.3 sensitive-reads allowlist: sts:AssumeRole
-	// Note: ClassifyCTVerb currently classifies AssumeRole as W (Assume prefix).
-	// Under the v2 spec §2.1 the Assume prefix stays in W, but §1.3 independently
-	// escalates sts:AssumeRole to ct-attention regardless of verb.
-	// Since W already yields ct-attention, this test verifies the combined outcome.
+	// sts:AssumeRole → ct-attention because verb=W (Assume* prefix), NOT via §1.3 sensitive-reads.
+	// AssumeRole was removed from the sensitive-reads allowlist; the ct-attention outcome
+	// is retained solely through the §1.2 verb-W escalation path.
 	event := buildSeverityCTEvent(
 		"sev-10", "AssumeRole", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
 	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRole per §1.3 sensitive-reads (verb W also yields ct-attention)", got)
+		t.Errorf("Status = %q, want ct-attention — sts:AssumeRole verb W (Assume prefix) per §1.2; NOT via §1.3 sensitive-reads (removed)", got)
 	}
 }
 
@@ -282,185 +282,208 @@ func TestCTSeverity_AwsServiceEventIsInfo(t *testing.T) {
 }
 
 // ===========================================================================
-// §1.3 sensitive-reads allowlist — exhaustive coverage of all 16 entries.
+// §1.3 sensitive-reads allowlist — property test locking all entries.
 //
-// Each test sends a read verb event that would otherwise be ct-info, but is
-// escalated to ct-attention because it appears in the sensitive-reads allowlist.
-// Test IDs: sr-01..sr-16, matching the order in the allowlist.
+// TestCTSeverity_AllowlistEntries_AreSensitiveAttention replaces 40 individual
+// per-entry subtests. It iterates the full expected allowlist inline and asserts
+// every entry yields ct-attention for a plain IAMUser, same-account, no-error
+// fixture. The 3 original named tests above remain as logic-path coverage.
 // ===========================================================================
 
-// TestCTSeverity_SensitiveRead_BatchGetSecretValue — §1.3 entry 2.
-func TestCTSeverity_SensitiveRead_BatchGetSecretValue(t *testing.T) {
-	// secretsmanager:BatchGetSecretValue → ct-attention (sensitive-read; verb is R from BatchGet prefix)
-	event := buildSeverityCTEvent(
-		"sr-02", "BatchGetSecretValue", "secretsmanager.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — secretsmanager:BatchGetSecretValue is §1.3 entry 2", got)
+// TestCTSeverity_AllowlistEntries_AreSensitiveAttention is a property test
+// that locks the membership of the §1.3 sensitive-reads allowlist. It builds
+// the expected list inline (the source of truth lives in
+// internal/aws/ct_events.go::isSensitiveRead) and asserts each entry yields
+// ct-attention when surrounded by a plain non-escalating context.
+//
+// Replaces 40 individual subtests that mirrored each switch case 1:1.
+// Failure modes caught:
+//   - An entry was removed from isSensitiveRead
+//   - svc extraction in isSensitiveRead is broken
+//   - The severity ladder no longer escalates sensitive reads to ct-attention
+func TestCTSeverity_AllowlistEntries_AreSensitiveAttention(t *testing.T) {
+	allowlist := []struct {
+		eventSource string
+		eventName   string
+	}{
+		// Secrets / parameters
+		{"secretsmanager.amazonaws.com", "GetSecretValue"},
+		{"secretsmanager.amazonaws.com", "BatchGetSecretValue"},
+		{"secretsmanager.amazonaws.com", "GetRandomPassword"},
+		{"secretsmanager.amazonaws.com", "ListSecrets"},
+		{"ssm.amazonaws.com", "GetParameter"},
+		{"ssm.amazonaws.com", "GetParameters"},
+		{"ssm.amazonaws.com", "GetParametersByPath"},
+		{"ssm.amazonaws.com", "GetParameterHistory"},
+		{"ssm.amazonaws.com", "DescribeParameters"},
+
+		// STS session vending (NOT AssumeRole — those are W via prefix)
+		{"sts.amazonaws.com", "GetSessionToken"},
+		{"sts.amazonaws.com", "GetFederationToken"},
+
+		// Cognito admin auth
+		{"cognito-idp.amazonaws.com", "AdminInitiateAuth"},
+		{"cognito-idp.amazonaws.com", "AdminGetUser"},
+
+		// Code signing
+		{"signer.amazonaws.com", "GetSigningProfile"},
+
+		// IAM credential / privilege recon
+		{"iam.amazonaws.com", "GetAccessKeyLastUsed"},
+		{"iam.amazonaws.com", "ListAccessKeys"},
+		{"iam.amazonaws.com", "GetCredentialReport"},
+		{"iam.amazonaws.com", "GenerateCredentialReport"},
+		{"iam.amazonaws.com", "GetLoginProfile"},
+		{"iam.amazonaws.com", "GetAccountAuthorizationDetails"},
+		{"iam.amazonaws.com", "SimulatePrincipalPolicy"},
+		{"iam.amazonaws.com", "SimulateCustomPolicy"},
+		{"iam.amazonaws.com", "ListUsers"},
+		{"iam.amazonaws.com", "ListRoles"},
+		{"iam.amazonaws.com", "ListPolicies"},
+		{"iam.amazonaws.com", "ListAttachedRolePolicies"},
+		{"iam.amazonaws.com", "ListRolePolicies"},
+		{"iam.amazonaws.com", "ListMFADevices"},
+		{"iam.amazonaws.com", "ListVirtualMFADevices"},
+		{"iam.amazonaws.com", "ListSSHPublicKeys"},
+		{"iam.amazonaws.com", "ListServiceSpecificCredentials"},
+
+		// Organizations enumeration
+		{"organizations.amazonaws.com", "ListAccounts"},
+		{"organizations.amazonaws.com", "DescribeOrganization"},
+
+		// Bulk data exfil
+		{"dynamodb.amazonaws.com", "Scan"},
+		{"rds.amazonaws.com", "DownloadDBLogFilePortion"},
+
+		// EC2 console / secret exfil
+		{"ec2.amazonaws.com", "GetPasswordData"},
+		{"ec2.amazonaws.com", "GetConsoleOutput"},
+		{"ec2.amazonaws.com", "GetConsoleScreenshot"},
+
+		// Account-wide recon
+		{"support.amazonaws.com", "DescribeTrustedAdvisorChecks"},
+		{"ce.amazonaws.com", "GetCostAndUsage"},
+	}
+
+	for _, entry := range allowlist {
+		entry := entry // capture loop variable
+		t.Run(entry.eventSource+"/"+entry.eventName, func(t *testing.T) {
+			event := buildSeverityCTEvent(
+				"al-"+entry.eventName, entry.eventName, entry.eventSource,
+				"123456789012", "123456789012", "IAMUser", "Management", "AwsApiCall", "",
+			)
+			got := fetchOneStatus(t, event)
+			if got != "ct-attention" {
+				t.Errorf("status = %q, want ct-attention — %s:%s must be on §1.3 sensitive-reads allowlist",
+					got, entry.eventSource, entry.eventName)
+			}
+		})
 	}
 }
 
-// TestCTSeverity_SensitiveRead_GetParameters — §1.3 entry 4.
-func TestCTSeverity_SensitiveRead_GetParameters(t *testing.T) {
-	// ssm:GetParameters → ct-attention (sensitive-read; verb is R)
-	event := buildSeverityCTEvent(
-		"sr-04", "GetParameters", "ssm.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — ssm:GetParameters is §1.3 entry 4", got)
-	}
-}
-
-// TestCTSeverity_SensitiveRead_GetParametersByPath — §1.3 entry 5.
-func TestCTSeverity_SensitiveRead_GetParametersByPath(t *testing.T) {
-	// ssm:GetParametersByPath → ct-attention (sensitive-read; verb is R)
-	event := buildSeverityCTEvent(
-		"sr-05", "GetParametersByPath", "ssm.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — ssm:GetParametersByPath is §1.3 entry 5", got)
-	}
-}
-
-// TestCTSeverity_SensitiveRead_GetSessionToken — §1.3 entry 6.
-func TestCTSeverity_SensitiveRead_GetSessionToken(t *testing.T) {
-	// sts:GetSessionToken → ct-attention (sensitive-read; verb is R from Get prefix)
-	event := buildSeverityCTEvent(
-		"sr-06", "GetSessionToken", "sts.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:GetSessionToken is §1.3 entry 6", got)
-	}
-}
-
-// TestCTSeverity_SensitiveRead_GetFederationToken — §1.3 entry 7.
-func TestCTSeverity_SensitiveRead_GetFederationToken(t *testing.T) {
-	// sts:GetFederationToken → ct-attention (sensitive-read; verb is R from Get prefix)
-	event := buildSeverityCTEvent(
-		"sr-07", "GetFederationToken", "sts.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:GetFederationToken is §1.3 entry 7", got)
-	}
-}
-
-// TestCTSeverity_SensitiveRead_AssumeRoleWithSAML — §1.3 entry 9.
-// Note: AssumeRoleWithSAML has verb W (Assume* prefix), which already yields
-// ct-attention. The sensitive-read list independently escalates it too; this
-// test verifies the final outcome is ct-attention.
-func TestCTSeverity_SensitiveRead_AssumeRoleWithSAML(t *testing.T) {
-	// sts:AssumeRoleWithSAML → ct-attention (both §1.2 verb W and §1.3 sensitive-read)
-	event := buildSeverityCTEvent(
-		"sr-09", "AssumeRoleWithSAML", "sts.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
-	)
-	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRoleWithSAML is §1.3 entry 9", got)
-	}
-}
-
-// TestCTSeverity_SensitiveRead_AssumeRoleWithWebIdentity — §1.3 entry 10.
-func TestCTSeverity_SensitiveRead_AssumeRoleWithWebIdentity(t *testing.T) {
-	// sts:AssumeRoleWithWebIdentity → ct-attention
+// TestCTSeverity_AssumeRoleWithWebIdentity_IsInfo — §1.4 removal.
+// AssumeRoleWithWebIdentity is the normal IRSA/OIDC flow (e.g. EKS pod assuming
+// its service-account role). It is NOT a sensitive read — it is removed from the
+// §1.3 allowlist and classified via exact-match verb=R, yielding ct-info.
+// No root identity, same account, no error.
+func TestCTSeverity_AssumeRoleWithWebIdentity_IsInfo(t *testing.T) {
+	// sts:AssumeRoleWithWebIdentity → ct-info (plain IRSA/OIDC; no escalation)
 	event := buildSeverityCTEvent(
 		"sr-10", "AssumeRoleWithWebIdentity", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRoleWithWebIdentity is §1.3 entry 10", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — sts:AssumeRoleWithWebIdentity removed from §1.3 allowlist; plain IRSA/OIDC is §1.4 ct-info", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_GetAccessKeyLastUsed — §1.3 entry 11.
-func TestCTSeverity_SensitiveRead_GetAccessKeyLastUsed(t *testing.T) {
-	// iam:GetAccessKeyLastUsed → ct-attention (sensitive-read; verb is R from Get prefix)
+// TestCTSeverity_AssumeRole_StillAttention — sts:AssumeRole still yields ct-attention via verb W.
+// AssumeRole was REMOVED from the §1.3 sensitive-reads allowlist (per user direction).
+// ct-attention is preserved because verb=W (Assume* prefix) per §1.2.
+func TestCTSeverity_AssumeRole_StillAttention(t *testing.T) {
+	// sts:AssumeRole → ct-attention via §1.2 verb W (Assume prefix), NOT via §1.3.
 	event := buildSeverityCTEvent(
-		"sr-11", "GetAccessKeyLastUsed", "iam.amazonaws.com",
+		"sr-10a", "AssumeRole", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
 	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — iam:GetAccessKeyLastUsed is §1.3 entry 11", got)
+		t.Errorf("Status = %q, want ct-attention — sts:AssumeRole verb W (Assume prefix); removed from §1.3 sensitive-reads but §1.2 W-verb path still escalates", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_ListAccessKeys — §1.3 entry 12.
-func TestCTSeverity_SensitiveRead_ListAccessKeys(t *testing.T) {
-	// iam:ListAccessKeys → ct-attention (sensitive-read; verb is R from List prefix)
+// TestCTSeverity_AssumeRoleWithSAML_StillAttention — sts:AssumeRoleWithSAML still yields ct-attention via verb W.
+// AssumeRoleWithSAML was REMOVED from the §1.3 sensitive-reads allowlist.
+// ct-attention is preserved because verb=W (Assume* prefix) per §1.2.
+func TestCTSeverity_AssumeRoleWithSAML_StillAttention(t *testing.T) {
+	// sts:AssumeRoleWithSAML → ct-attention via §1.2 verb W (Assume prefix), NOT via §1.3.
 	event := buildSeverityCTEvent(
-		"sr-12", "ListAccessKeys", "iam.amazonaws.com",
+		"sr-09b", "AssumeRoleWithSAML", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
 	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — iam:ListAccessKeys is §1.3 entry 12", got)
+		t.Errorf("Status = %q, want ct-attention — sts:AssumeRoleWithSAML verb W (Assume prefix); removed from §1.3 sensitive-reads but §1.2 W-verb path still escalates", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_GetCredentialReport — §1.3 entry 13.
-func TestCTSeverity_SensitiveRead_GetCredentialReport(t *testing.T) {
-	// iam:GetCredentialReport → ct-attention (sensitive-read; verb is R from Get prefix)
+// ===========================================================================
+// §1.4 NOT-sensitive regression tests — noisy read ops that must NOT escalate.
+//
+// These 4 tests assert that high-volume read ops deliberately excluded from
+// the §1.3 allowlist remain at ct-info. They should PASS immediately and
+// serve as regression guards to prevent accidental re-escalation.
+// ===========================================================================
+
+// TestCTSeverity_NotSensitive_STS_GetCallerIdentity — regression: must remain ct-info.
+func TestCTSeverity_NotSensitive_STS_GetCallerIdentity(t *testing.T) {
+	// sts:GetCallerIdentity → ct-info (too noisy — every SDK startup; excluded from §1.3)
 	event := buildSeverityCTEvent(
-		"sr-13", "GetCredentialReport", "iam.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
+		"ns-01", "GetCallerIdentity", "sts.amazonaws.com",
+		"123456789012", "123456789012", "IAMUser", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — iam:GetCredentialReport is §1.3 entry 13", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — sts:GetCallerIdentity is deliberately excluded from §1.3 (too noisy)", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_GenerateCredentialReport — §1.3 entry 14.
-// Note: GenerateCredentialReport has verb W (Generate* is NOT in the R table),
-// which already yields ct-attention. The sensitive-read list also covers it.
-func TestCTSeverity_SensitiveRead_GenerateCredentialReport(t *testing.T) {
-	// iam:GenerateCredentialReport → ct-attention
+// TestCTSeverity_NotSensitive_ECR_GetAuthorizationToken — regression: must remain ct-info.
+func TestCTSeverity_NotSensitive_ECR_GetAuthorizationToken(t *testing.T) {
+	// ecr:GetAuthorizationToken → ct-info (too noisy — every docker login; excluded from §1.3)
 	event := buildSeverityCTEvent(
-		"sr-14", "GenerateCredentialReport", "iam.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
+		"ns-02", "GetAuthorizationToken", "ecr.amazonaws.com",
+		"123456789012", "123456789012", "IAMUser", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — iam:GenerateCredentialReport is §1.3 entry 14", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — ecr:GetAuthorizationToken is deliberately excluded from §1.3 (too noisy)", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_GetLoginProfile — §1.3 entry 15.
-func TestCTSeverity_SensitiveRead_GetLoginProfile(t *testing.T) {
-	// iam:GetLoginProfile → ct-attention (sensitive-read; verb is R from Get prefix)
+// TestCTSeverity_NotSensitive_ECR_GetDownloadUrlForLayer — regression: must remain ct-info.
+func TestCTSeverity_NotSensitive_ECR_GetDownloadUrlForLayer(t *testing.T) {
+	// ecr:GetDownloadUrlForLayer → ct-info (too noisy — every container pull; excluded from §1.3)
 	event := buildSeverityCTEvent(
-		"sr-15", "GetLoginProfile", "iam.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
+		"ns-03", "GetDownloadUrlForLayer", "ecr.amazonaws.com",
+		"123456789012", "123456789012", "IAMUser", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — iam:GetLoginProfile is §1.3 entry 15", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — ecr:GetDownloadUrlForLayer is deliberately excluded from §1.3 (too noisy)", got)
 	}
 }
 
-// TestCTSeverity_SensitiveRead_ExportCertificate — §1.3 entry 16.
-// Note: ExportCertificate has verb W (Export* prefix), which already yields
-// ct-attention. The sensitive-read list also covers it.
-func TestCTSeverity_SensitiveRead_ExportCertificate(t *testing.T) {
-	// acm:ExportCertificate → ct-attention (both verb W and §1.3 sensitive-read)
+// TestCTSeverity_NotSensitive_RDS_DescribeDBSnapshots — regression: must remain ct-info.
+func TestCTSeverity_NotSensitive_RDS_DescribeDBSnapshots(t *testing.T) {
+	// rds:DescribeDBSnapshots → ct-info (noisy — backup polling; excluded from §1.3)
 	event := buildSeverityCTEvent(
-		"sr-16", "ExportCertificate", "acm.amazonaws.com",
-		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
+		"ns-04", "DescribeDBSnapshots", "rds.amazonaws.com",
+		"123456789012", "123456789012", "IAMUser", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — acm:ExportCertificate is §1.3 entry 16", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — rds:DescribeDBSnapshots is deliberately excluded from §1.3 (noisy backup polling)", got)
 	}
 }
