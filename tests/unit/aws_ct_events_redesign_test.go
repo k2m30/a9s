@@ -80,13 +80,26 @@ func TestCTVerb_WritePrefixes(t *testing.T) {
 		{"AttachGroupPolicy", "W"},
 		{"RunInstances", "W"},
 		{"AssumeRole", "W"},
-		{"AssumeRoleWithWebIdentity", "W"},
+		// AssumeRoleWithWebIdentity is intentionally NOT in this W-prefix list.
+		// §1.4 adds an exact-match override that classifies it as R (IRSA/OIDC flow).
+		// See TestCTVerb_AssumeRoleWithWebIdentity_IsR for the positive assertion.
 	}
 	for _, tc := range cases {
 		got := awsclient.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
 		if got != tc.want {
 			t.Errorf("ClassifyCTVerb(%q, Management, AwsApiCall) = %q, want %q", tc.eventName, got, tc.want)
 		}
+	}
+}
+
+// TestCTVerb_AssumeRoleWithWebIdentity_IsR — §1.4 exact-match override.
+// AssumeRoleWithWebIdentity is the standard IRSA/OIDC mechanism in EKS and
+// other OIDC providers. It does not mutate IAM state; the role assumption is
+// transient. Under §1.4 it is classified as R, not W.
+func TestCTVerb_AssumeRoleWithWebIdentity_IsR(t *testing.T) {
+	got := awsclient.ClassifyCTVerb("AssumeRoleWithWebIdentity", "Management", "AwsApiCall")
+	if got != "R" {
+		t.Errorf("ClassifyCTVerb(AssumeRoleWithWebIdentity, Management, AwsApiCall) = %q, want %q (§1.4 exact-match override)", got, "R")
 	}
 }
 

@@ -387,6 +387,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				entry.resources, entry.pagination,
 				entry.filterText, entry.sortField, entry.sortAsc,
 				entry.cursorPos, entry.hScrollOffset,
+				entry.attentionOnly,
 			)
 			rl.SetSize(m.innerSize())
 			m.pushView(&rl)

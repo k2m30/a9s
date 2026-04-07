@@ -10,9 +10,9 @@ package unit
 // §8 column spec:
 //   V       width=1   key="_ct.verb"
 //   TIME    width=15  key="time"
-//   ACTOR   width=26  key="_ct.actor"
+//   ACTOR   width=36  key="_ct.actor"
 //   ORIGIN  width=7   key="_ct.origin"
-//   EVENT   width=24  path="EventName"
+//   EVENT   width=34  path="EventName"
 //   TARGET  width=36  key="_ct.target"
 //   OUTCOME width=14  key="_ct.outcome"
 
@@ -32,9 +32,9 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 	}{
 		{"V", 1},
 		{"TIME", 15},
-		{"ACTOR", 26},
+		{"ACTOR", 36},
 		{"ORIGIN", 7},
-		{"EVENT", 24},
+		{"EVENT", 34},
 		{"TARGET", 36},
 		{"OUTCOME", 14},
 	}

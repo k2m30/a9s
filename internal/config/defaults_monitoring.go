@@ -86,9 +86,9 @@ func monitoringDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "V", Key: "_ct.verb", Width: 1},
 				{Title: "TIME", Key: "time", Width: 15},
-				{Title: "ACTOR", Key: "_ct.actor", Width: 26},
+				{Title: "ACTOR", Key: "_ct.actor", Width: 36},
 				{Title: "ORIGIN", Key: "_ct.origin", Width: 7},
-				{Title: "EVENT", Path: "EventName", Width: 24},
+				{Title: "EVENT", Path: "EventName", Width: 34},
 				{Title: "TARGET", Key: "_ct.target", Width: 36},
 				{Title: "OUTCOME", Key: "_ct.outcome", Width: 14},
 			},

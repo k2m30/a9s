@@ -15,8 +15,9 @@ package unit
 //   - Legend shown from main-menu context (wrong context gate)
 //   - Legend missing required verb glyphs (R/W/D/S/I/N)
 //   - Legend missing severity-tier labels (ct-info / ct-attention / ct-danger)
-//   - Legend missing actor/outcome cell-color entries (ROOT, OK, FAILED)
 //   - "CloudTrail" section header absent from legend
+//   - Obsolete CELL COLORS section still present (ROOT/OK/FAILED per-cell colors
+//     were removed in the P3 tear-down; the block must NOT appear)
 
 import (
 	"strings"
@@ -100,28 +101,25 @@ func TestHelpCTEventsLegend_ContainsSeverityTierLabels(t *testing.T) {
 	}
 }
 
-func TestHelpCTEventsLegend_ContainsActorCellColorLabels(t *testing.T) {
+func TestHelpCTEventsLegend_NoCellColorsSection(t *testing.T) {
+	// The CELL COLORS block (ROOT actor / OK / FAILED outcome per-cell colors)
+	// was removed in the P3 redesign tear-down. The coder deletes lines 485–505
+	// from help.go. This test asserts those labels are ABSENT so a future
+	// accidental re-addition is caught.
 	h := helpWithCTEvents(views.HelpFromResourceList)
 	out := renderHelp(h)
 	plain := stripANSI(out)
 
-	// The legend must mention ROOT actor styling per design doc §8a.
-	if !strings.Contains(plain, "ROOT") {
-		t.Error("help legend missing 'ROOT' actor cell-color entry in ct-events legend")
+	// "CELL COLORS" section header must not appear.
+	if strings.Contains(plain, "CELL COLORS") {
+		t.Error("help legend must NOT contain 'CELL COLORS' section — obsolete block deleted in P3 tear-down")
 	}
-}
-
-func TestHelpCTEventsLegend_ContainsOutcomeCellColorLabels(t *testing.T) {
-	h := helpWithCTEvents(views.HelpFromResourceList)
-	out := renderHelp(h)
-	plain := stripANSI(out)
-
-	// The legend must mention both OK and FAILED outcome colors per design doc §8a.
-	if !strings.Contains(plain, "OK") {
-		t.Error("help legend missing 'OK' outcome cell-color entry in ct-events legend")
-	}
-	if !strings.Contains(plain, "FAILED") {
-		t.Error("help legend missing 'FAILED' outcome cell-color entry in ct-events legend")
+	// Per-cell color labels that lived only in the CELL COLORS block must be absent.
+	// NOTE: "ROOT" may appear in other contexts (ACTOR column description), so we
+	// specifically check the section-header guard above. "cross-acct" is unique to
+	// the deleted block.
+	if strings.Contains(plain, "cross-acct") {
+		t.Error("help legend must NOT contain 'cross-acct' — obsolete CELL COLORS entry")
 	}
 }
 
