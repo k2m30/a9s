@@ -76,6 +76,11 @@ func TestIssue189_DemoFixtures_AllConfiguredDetailFieldsResolved(t *testing.T) {
 			for i, r := range list {
 				v := strings.TrimSpace(fieldpath.ExtractSubtree(r.RawStruct, path))
 				if v == "" || v == "-" || strings.EqualFold(v, "<nil>") {
+					if fv := strings.TrimSpace(r.Fields[path]); fv != "" {
+						v = fv // Fields map is checked first by ExtractFieldList at runtime
+					}
+				}
+				if v == "" || v == "-" || strings.EqualFold(v, "<nil>") {
 					t.Errorf("%s fixture[%d] ID=%s navigable path=%q resolved empty", short, i, r.ID, path)
 				}
 			}

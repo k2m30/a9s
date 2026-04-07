@@ -156,6 +156,11 @@ func TestDemoInfrastructureIntegrity(t *testing.T) {
 								continue
 							}
 							raw := fieldpath.ExtractSubtree(r.RawStruct, nf.FieldPath)
+							if strings.TrimSpace(raw) == "" {
+								if fv, ok := r.Fields[nf.FieldPath]; ok && fv != "" {
+									raw = fv // Fields map is checked first by ExtractFieldList at runtime
+								}
+							}
 							// ExtractSubtree returns newline-separated values for slice paths.
 							resolvedIDs := strings.Split(raw, "\n")
 							hasValue := false

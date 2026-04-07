@@ -1102,7 +1102,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "CreateBucket",
 				"time":          t1.Format("2006-01-02 15:04:05"),
-				"user":          "deploy-bot",
+				"user":          "alice.johnson",
+				"role_name":     "deploy-bot",
 				"source":        "s3.amazonaws.com",
 				"resource_type": "AWS::S3::Bucket",
 				"resource_name": "webapp-assets-prod",
@@ -1113,9 +1114,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("CreateBucket"),
 				EventTime:       aws.Time(t1),
 				EventSource:     aws.String("s3.amazonaws.com"),
-				Username:        aws.String("deploy-bot"),
+				Username:        aws.String("alice.johnson"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE001","arn":"arn:aws:sts::123456789012:assumed-role/deploy-bot/session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/deploy-bot","userName":"deploy-bot"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"aws-cli/2.15.0","requestParameters":{"bucketName":"acme-prod-assets-2026","CreateBucketConfiguration":{"LocationConstraint":"us-east-1"}},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE001","arn":"arn:aws:sts::123456789012:assumed-role/deploy-bot/alice.johnson-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/deploy-bot","userName":"deploy-bot"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"aws-cli/2.15.0","requestParameters":{"bucketName":"acme-prod-assets-2026","CreateBucketConfiguration":{"LocationConstraint":"us-east-1"}},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources: []cloudtrailtypes.Resource{
 					{
 						ResourceType: aws.String("AWS::S3::Bucket"),
@@ -1131,7 +1132,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "RunInstances",
 				"time":          t2.Format("2006-01-02 15:04:05"),
-				"user":          "admin",
+				"user":          "bob.smith",
+				"role_name":     "acme-ci-deploy-role",
 				"source":        "ec2.amazonaws.com",
 				"resource_type": "AWS::EC2::Instance",
 				"resource_name": "i-0a1b2c3d4e5f60007",
@@ -1142,9 +1144,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("RunInstances"),
 				EventTime:       aws.Time(t2),
 				EventSource:     aws.String("ec2.amazonaws.com"),
-				Username:        aws.String("admin"),
+				Username:        aws.String("bob.smith"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE002","arn":"arn:aws:iam::123456789012:user/admin","accountId":"123456789012"},"eventTime":"2026-03-28T13:45:22Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.20","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instanceType":"t3.large","instancesSet":{"items":[{"imageId":"ami-0abc123def456789"}]},"subnetId":"subnet-0a1b2c3d4e5f6001"},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60007"}]}},"requestID":"req-ec2-run-001","eventID":"evt-0a1b2c3d4e5f60002","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE002","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/bob.smith-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/acme-ci-deploy-role","userName":"acme-ci-deploy-role"}}},"eventTime":"2026-03-28T13:45:22Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.20","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instanceType":"t3.large","instancesSet":{"items":[{"imageId":"ami-0abc123def456789"}]},"subnetId":"subnet-0a1b2c3d4e5f6001"},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60007"}]}},"requestID":"req-ec2-run-001","eventID":"evt-0a1b2c3d4e5f60002","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources: []cloudtrailtypes.Resource{
 					{
 						ResourceType: aws.String("AWS::EC2::Instance"),
@@ -1160,7 +1162,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "StopInstances",
 				"time":          t3.Format("2006-01-02 15:04:05"),
-				"user":          "admin",
+				"user":          "bob.smith",
+				"role_name":     "acme-ci-deploy-role",
 				"source":        "ec2.amazonaws.com",
 				"resource_type": "AWS::EC2::Instance",
 				"resource_name": "i-0a1b2c3d4e5f60004",
@@ -1171,9 +1174,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("StopInstances"),
 				EventTime:       aws.Time(t3),
 				EventSource:     aws.String("ec2.amazonaws.com"),
-				Username:        aws.String("admin"),
+				Username:        aws.String("bob.smith"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE002","arn":"arn:aws:iam::123456789012:user/admin","accountId":"123456789012"},"eventTime":"2026-03-28T12:10:05Z","eventSource":"ec2.amazonaws.com","eventName":"StopInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.20","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60004"}]},"force":false},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60004","currentState":{"code":64,"name":"stopping"}}]}},"requestID":"req-ec2-stop-001","eventID":"evt-0a1b2c3d4e5f60003","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE002","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/bob.smith-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/acme-ci-deploy-role","userName":"acme-ci-deploy-role"}}},"eventTime":"2026-03-28T12:10:05Z","eventSource":"ec2.amazonaws.com","eventName":"StopInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.20","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60004"}]},"force":false},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0a1b2c3d4e5f60004","currentState":{"code":64,"name":"stopping"}}]}},"requestID":"req-ec2-stop-001","eventID":"evt-0a1b2c3d4e5f60003","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources: []cloudtrailtypes.Resource{
 					{
 						ResourceType: aws.String("AWS::EC2::Instance"),
@@ -1189,7 +1192,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "DeleteTable",
 				"time":          t4.Format("2006-01-02 15:04:05"),
-				"user":          "ci-runner",
+				"user":          "ci-service-account",
+				"role_name":     "ci-runner",
 				"source":        "dynamodb.amazonaws.com",
 				"resource_type": "AWS::DynamoDB::Table",
 				"resource_name": "acme-sessions",
@@ -1200,9 +1204,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("DeleteTable"),
 				EventTime:       aws.Time(t4),
 				EventSource:     aws.String("dynamodb.amazonaws.com"),
-				Username:        aws.String("ci-runner"),
+				Username:        aws.String("ci-service-account"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE003","arn":"arn:aws:sts::123456789012:assumed-role/ci-runner/build-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/ci-runner","userName":"ci-runner"}}},"eventTime":"2026-03-28T11:55:48Z","eventSource":"dynamodb.amazonaws.com","eventName":"DeleteTable","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-sdk-go-v2/1.25.0","requestParameters":{"tableName":"acme-sessions-staging"},"responseElements":{"tableDescription":{"tableName":"acme-sessions-staging","tableStatus":"DELETING"}},"requestID":"req-ddb-del-001","eventID":"evt-0a1b2c3d4e5f60004","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE003","arn":"arn:aws:sts::123456789012:assumed-role/ci-runner/ci-service-account-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/ci-runner","userName":"ci-runner"}}},"eventTime":"2026-03-28T11:55:48Z","eventSource":"dynamodb.amazonaws.com","eventName":"DeleteTable","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-sdk-go-v2/1.25.0","requestParameters":{"tableName":"acme-sessions-staging"},"responseElements":{"tableDescription":{"tableName":"acme-sessions-staging","tableStatus":"DELETING"}},"requestID":"req-ddb-del-001","eventID":"evt-0a1b2c3d4e5f60004","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources: []cloudtrailtypes.Resource{
 					{
 						ResourceType: aws.String("AWS::DynamoDB::Table"),
@@ -1218,7 +1222,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "AssumeRole",
 				"time":          t5.Format("2006-01-02 15:04:05"),
-				"user":          "deploy-bot",
+				"user":          "alice.johnson",
+				"role_name":     "deploy-bot",
 				"source":        "sts.amazonaws.com",
 				"resource_type": "AWS::IAM::Role",
 				"resource_name": "acme-ci-deploy-role",
@@ -1229,9 +1234,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("AssumeRole"),
 				EventTime:       aws.Time(t5),
 				EventSource:     aws.String("sts.amazonaws.com"),
-				Username:        aws.String("deploy-bot"),
+				Username:        aws.String("alice.johnson"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE001","arn":"arn:aws:sts::123456789012:assumed-role/deploy-bot/session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/deploy-bot","userName":"deploy-bot"}}},"eventTime":"2026-03-28T10:20:33Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme-deploy-role","roleSessionName":"deploy-session","durationSeconds":3600},"responseElements":{"credentials":{"accessKeyId":"ASIAEXAMPLE001","expiration":"2026-03-28T11:20:33Z"},"assumedRoleUser":{"arn":"arn:aws:sts::123456789012:assumed-role/acme-deploy-role/deploy-session"}},"requestID":"req-sts-assume-001","eventID":"evt-0a1b2c3d4e5f60005","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE001","arn":"arn:aws:sts::123456789012:assumed-role/deploy-bot/alice.johnson-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/deploy-bot","userName":"deploy-bot"}}},"eventTime":"2026-03-28T10:20:33Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme-deploy-role","roleSessionName":"deploy-session","durationSeconds":3600},"responseElements":{"credentials":{"accessKeyId":"ASIAEXAMPLE001","expiration":"2026-03-28T11:20:33Z"},"assumedRoleUser":{"arn":"arn:aws:sts::123456789012:assumed-role/acme-deploy-role/deploy-session"}},"requestID":"req-sts-assume-001","eventID":"evt-0a1b2c3d4e5f60005","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources: []cloudtrailtypes.Resource{
 					{
 						ResourceType: aws.String("AWS::IAM::Role"),
@@ -1247,7 +1252,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 			Fields: map[string]string{
 				"event_name":    "DescribeInstances",
 				"time":          t6.Format("2006-01-02 15:04:05"),
-				"user":          "monitoring-agent",
+				"user":          "alice.johnson",
+				"role_name":     "monitoring-agent",
 				"source":        "ec2.amazonaws.com",
 				"resource_type": "",
 				"resource_name": "",
@@ -1258,9 +1264,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("DescribeInstances"),
 				EventTime:       aws.Time(t6),
 				EventSource:     aws.String("ec2.amazonaws.com"),
-				Username:        aws.String("monitoring-agent"),
+				Username:        aws.String("alice.johnson"),
 				ReadOnly:        aws.String("true"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE004","arn":"arn:aws:sts::123456789012:assumed-role/monitoring-agent/session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/monitoring-agent","userName":"monitoring-agent"}}},"eventTime":"2026-03-28T09:05:11Z","eventSource":"ec2.amazonaws.com","eventName":"DescribeInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.40","userAgent":"aws-sdk-python/1.34.0","requestParameters":{"instancesSet":{},"filterSet":{}},"responseElements":null,"requestID":"req-ec2-desc-001","eventID":"evt-0a1b2c3d4e5f60006","readOnly":true,"eventType":"AwsApiCall","managementEvent":true}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE004","arn":"arn:aws:sts::123456789012:assumed-role/monitoring-agent/alice.johnson-session","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/monitoring-agent","userName":"monitoring-agent"}}},"eventTime":"2026-03-28T09:05:11Z","eventSource":"ec2.amazonaws.com","eventName":"DescribeInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.40","userAgent":"aws-sdk-python/1.34.0","requestParameters":{"instancesSet":{},"filterSet":{}},"responseElements":null,"requestID":"req-ec2-desc-001","eventID":"evt-0a1b2c3d4e5f60006","readOnly":true,"eventType":"AwsApiCall","managementEvent":true}`),
 				Resources:       []cloudtrailtypes.Resource{},
 			},
 		},
