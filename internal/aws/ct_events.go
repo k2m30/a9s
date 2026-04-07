@@ -285,10 +285,12 @@ func cloudTrailResourceFields(resources []cloudtrailtypes.Resource) (string, str
 }
 
 // ctEventJSONUserIdentity is a minimal struct for parsing the CloudTrailEvent JSON string
-// to extract the userIdentity.sessionContext.sessionIssuer.userName for AssumedRole events.
+// to extract the userIdentity.sessionContext.sessionIssuer.userName for AssumedRole events,
+// or userIdentity.invokedBy for AWSService events.
 type ctEventJSONUserIdentity struct {
 	UserIdentity struct {
-		Type           string `json:"type"`
+		Type      string `json:"type"`
+		InvokedBy string `json:"invokedBy"`
 		SessionContext struct {
 			SessionIssuer struct {
 				UserName string `json:"userName"`
@@ -298,8 +300,12 @@ type ctEventJSONUserIdentity struct {
 }
 
 // extractRoleNameFromCTEventJSON parses the raw CloudTrailEvent JSON string and returns
-// the role name from userIdentity.sessionContext.sessionIssuer.userName when the identity
-// type is "AssumedRole" or "Role". Returns "" for nil input, parse errors, or other types.
+// a human-readable identity string for the event:
+//   - AssumedRole/Role: userIdentity.sessionContext.sessionIssuer.userName (e.g., "AccountAccessRole")
+//   - AWSService: userIdentity.invokedBy (e.g., "ec2.amazonaws.com")
+//
+// Returns "" for nil input, parse errors, or unrecognised identity types (e.g., IAMUser — those
+// events already have Username set on the CloudTrail Event struct itself).
 func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) string {
 	if cloudTrailEvent == nil || *cloudTrailEvent == "" {
 		return ""
@@ -308,9 +314,11 @@ func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) string {
 	if err := json.Unmarshal([]byte(*cloudTrailEvent), &parsed); err != nil {
 		return ""
 	}
-	t := parsed.UserIdentity.Type
-	if t == "AssumedRole" || t == "Role" {
+	switch parsed.UserIdentity.Type {
+	case "AssumedRole", "Role":
 		return parsed.UserIdentity.SessionContext.SessionIssuer.UserName
+	case "AWSService":
+		return parsed.UserIdentity.InvokedBy
 	}
 	return ""
 }
