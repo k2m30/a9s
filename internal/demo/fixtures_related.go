@@ -276,15 +276,15 @@ func init() {
 
 	resource.RegisterRelatedDemo("iam-group", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "iam-user", Count: 3},
-			{TargetType: "policy", Count: 2},
+			{TargetType: "iam-user", Count: 3, ResourceIDs: []string{relatedIAMGroupUserID1, relatedIAMGroupUserID2, relatedIAMGroupUserID3}},
+			{TargetType: "policy", Count: 2, ResourceIDs: []string{relatedIAMGroupPolicyID1, relatedIAMGroupPolicyID2}},
 		}
 	})
 
 	resource.RegisterRelatedDemo("iam-user", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "iam-group", Count: 2},
-			{TargetType: "policy",    Count: 3},
+			{TargetType: "iam-group", Count: 2, ResourceIDs: []string{"admins", "developers"}},
+			{TargetType: "policy",    Count: 3, ResourceIDs: []string{"acme-s3-read-only", "acme-deploy-policy", "acme-cloudwatch-logs"}},
 			{TargetType: "ct-events", Count: 0},
 		}
 	})
@@ -381,9 +381,9 @@ func init() {
 
 	resource.RegisterRelatedDemo("policy", func(res resource.Resource) []resource.RelatedCheckResult {
 		return []resource.RelatedCheckResult{
-			{TargetType: "role", Count: 5},
-			{TargetType: "iam-user", Count: 2},
-			{TargetType: "iam-group", Count: 1},
+			{TargetType: "role", Count: 5, ResourceIDs: []string{relatedPolicyRoleID1, relatedPolicyRoleID2, relatedPolicyRoleID3, relatedPolicyRoleID4, relatedPolicyRoleID5}},
+			{TargetType: "iam-user", Count: 2, ResourceIDs: []string{relatedPolicyUserID1, relatedPolicyUserID2}},
+			{TargetType: "iam-group", Count: 1, ResourceIDs: []string{relatedPolicyGroupID1}},
 		}
 	})
 
@@ -481,7 +481,7 @@ func init() {
 			}
 		case "acme-lambda-execution":
 			return []resource.RelatedCheckResult{
-				{TargetType: "lambda", Count: 4, ResourceIDs: []string{relatedRoleLambdaID1}},
+				{TargetType: "lambda", Count: 4, ResourceIDs: []string{relatedRoleLambdaID1, relatedRoleLambdaID2, relatedRoleLambdaID3, relatedRoleLambdaID4}},
 				{TargetType: "glue", Count: 0},
 				{TargetType: "ng", Count: 0},
 				{TargetType: "policy", Count: 0},
@@ -490,7 +490,7 @@ func init() {
 		case "acme-glue-role":
 			return []resource.RelatedCheckResult{
 				{TargetType: "lambda", Count: 0},
-				{TargetType: "glue", Count: 3, ResourceIDs: []string{relatedRoleGlueID1}},
+				{TargetType: "glue", Count: 3, ResourceIDs: []string{relatedRoleGlueID1, relatedRoleGlueID2, relatedRoleGlueID3}},
 				{TargetType: "ng", Count: 0},
 				{TargetType: "policy", Count: 0},
 				{TargetType: "ec2", Count: 0},

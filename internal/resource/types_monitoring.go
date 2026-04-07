@@ -6,7 +6,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 			Name:      "CloudWatch Alarms",
 			ShortName: "alarm",
 			ListTitle: "alarms",
-			Aliases:   []string{"alarm", "alarms", "cloudwatch"},
+			Aliases:   []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
 			Category:  "MONITORING",
 			Columns: []Column{
 				{Key: "alarm_name", Title: "Alarm Name", Width: 36, Sortable: true},
@@ -25,7 +25,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "CloudWatch Log Groups",
 			ShortName: "logs",
-			Aliases:   []string{"logs", "loggroups", "log-groups", "cwlogs"},
+			Aliases:   []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
 			Category:  "MONITORING",
 			Columns: []Column{
 				{Key: "log_group_name", Title: "Log Group Name", Width: 48, Sortable: true},

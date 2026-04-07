@@ -253,9 +253,31 @@ const (
 	// redshift related-view IDs
 	relatedRedshiftAlarmID = "redshift-cluster-cpu-utilization"
 
+	// iam-group related-view IDs
+	relatedIAMGroupUserID1   = "alice.johnson"
+	relatedIAMGroupUserID2   = "bob.smith"
+	relatedIAMGroupUserID3   = "ci-service-account"
+	relatedIAMGroupPolicyID1 = "acme-s3-read-only"
+	relatedIAMGroupPolicyID2 = "acme-deploy-policy"
+
+	// policy related-view IDs
+	relatedPolicyRoleID1  = "acme-eks-node-role"
+	relatedPolicyRoleID2  = "acme-lambda-execution"
+	relatedPolicyRoleID3  = "acme-ci-deploy-role"
+	relatedPolicyRoleID4  = "acme-rds-monitoring"
+	relatedPolicyRoleID5  = "acme-glue-role"
+	relatedPolicyUserID1  = "alice.johnson"
+	relatedPolicyUserID2  = "bob.smith"
+	relatedPolicyGroupID1 = "admins"
+
 	// role related-view IDs
 	relatedRoleLambdaID1 = "api-gateway-authorizer"
+	relatedRoleLambdaID2 = "data-pipeline-transform"
+	relatedRoleLambdaID3 = "image-thumbnail-gen"
+	relatedRoleLambdaID4 = "payment-webhook"
 	relatedRoleGlueID1   = "acme-etl-orders"
+	relatedRoleGlueID2   = "acme-etl-clickstream"
+	relatedRoleGlueID3   = "acme-data-catalog-crawler"
 
 	// rtb related-view IDs
 	relatedRTBSubnetID1 = prodPublicSubnetA

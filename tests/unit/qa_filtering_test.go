@@ -531,7 +531,7 @@ func TestQA_Filter_11_20_RevealView_SlashIgnored(t *testing.T) {
 
 	// Navigate to reveal view via SecretRevealedMsg
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "test-secret",
+		ResourceID: "test-secret",
 		Value:      "s3cr3t-value",
 	})
 
