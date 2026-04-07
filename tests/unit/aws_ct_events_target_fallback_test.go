@@ -120,6 +120,9 @@ func TestCTTargetFallback_EmptyJSONResources_UsesSDKResources(t *testing.T) {
 
 func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
 	// JSON has a concrete resource entry.
+	// Note: _ct.target stores the ARN-stripped value (FormatCTTarget runs at fetch time, §5).
+	// The assertion verifies JSON resources[] wins over event.Resources — the discriminating
+	// factor is the source (JSON="json-wins-bucket" vs SDK="sdk-resource-bucket"), not raw ARN.
 	jsonWithResource := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","accountId":"111122223333"}` +
 		`,"eventTime":"2026-03-28T14:00:00Z","eventSource":"s3.amazonaws.com","eventName":"GetObject"` +
 		`,"awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","userAgent":"aws-cli/2.0"` +
@@ -127,7 +130,7 @@ func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
 		`,"recipientAccountId":"111122223333"` +
 		`,"resources":[{"ARN":"arn:aws:s3:::json-wins-bucket","accountId":"111122223333","type":"AWS::S3::Bucket"}]}`
 
-	// event.Resources has a different value.
+	// event.Resources has a different value — SDK value should NOT win.
 	sdkResources := []cloudtrailtypes.Resource{
 		{
 			ResourceName: aws.String("arn:aws:s3:::sdk-resource-bucket"),
@@ -141,8 +144,14 @@ func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
 	}
 	target := result.Resources[0].Fields["_ct.target"]
-	if target != "arn:aws:s3:::json-wins-bucket" {
-		t.Errorf("_ct.target = %q; expected arn:aws:s3:::json-wins-bucket from JSON resources[] (JSON must win over event.Resources)", target)
+	// FormatCTTarget strips "arn:aws:s3:::json-wins-bucket" → "json-wins-bucket" (same-account S3 ARN).
+	// The key assertion: JSON resources[] wins over event.Resources (sdk-resource-bucket must NOT appear).
+	if target != "json-wins-bucket" {
+		t.Errorf("_ct.target = %q; expected \"json-wins-bucket\" (ARN stripped per §5 from JSON resources[]); "+
+			"JSON resources[] must win over event.Resources (would yield \"sdk-resource-bucket\")", target)
+	}
+	if target == "sdk-resource-bucket" || target == "arn:aws:s3:::sdk-resource-bucket" {
+		t.Errorf("_ct.target = %q; SDK event.Resources must NOT win when JSON resources[] is populated", target)
 	}
 }
 
@@ -170,5 +179,245 @@ func TestCTTargetFallback_BothEmpty_IsNone_RegressionGuard(t *testing.T) {
 	// The important invariant is that it is NOT empty string.
 	if target == "" {
 		t.Errorf("_ct.target is empty string; expected a non-empty fallback (at minimum '(none)')")
+	}
+}
+
+// ===========================================================================
+// §4 per-event-name fallback table tests.
+//
+// Each test embeds requestParameters in the CloudTrailEvent JSON and asserts
+// that _ct.target resolves to the expected value via the fallback table.
+//
+// These tests are expected to FAIL until the P1 coder implements the §4
+// fallback table in ExtractCTTarget / buildCTResource.
+// ===========================================================================
+
+// buildCTEventWithRequestParams constructs a cloudtrailtypes.Event whose
+// CloudTrailEvent JSON contains the given requestParameters JSON object.
+func buildCTEventWithRequestParams(id, eventName, eventSource, requestParamsJSON string) cloudtrailtypes.Event {
+	ctJSON := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","accountId":"123456789012"` +
+		`,"sessionContext":{"sessionIssuer":{"userName":"test-role","type":"Role"}}}` +
+		`,"eventTime":"2026-04-07T17:00:00Z","eventSource":"` + eventSource +
+		`","eventName":"` + eventName +
+		`","awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","userAgent":"aws-cli/2.0"` +
+		`,"errorCode":"","eventCategory":"Management","eventType":"AwsApiCall"` +
+		`,"recipientAccountId":"123456789012"` +
+		`,"requestParameters":` + requestParamsJSON + `}`
+	return cloudtrailtypes.Event{
+		EventId:         aws.String(id),
+		EventName:       aws.String(eventName),
+		EventTime:       aws.Time(time.Date(2026, 4, 7, 17, 0, 0, 0, time.UTC)),
+		EventSource:     aws.String(eventSource),
+		Username:        aws.String("testuser"),
+		ReadOnly:        aws.String("false"),
+		CloudTrailEvent: aws.String(ctJSON),
+		Resources:       nil,
+	}
+}
+
+// TestCTTargetFallback_DescribeInstances_WithItems — §4: DescribeInstances with
+// instancesSet.items populated → "i-abc,i-def".
+func TestCTTargetFallback_DescribeInstances_WithItems(t *testing.T) {
+	// Spec: §4 — DescribeInstances, instancesSet.items[*].instanceId joined ","
+	event := buildCTEventWithRequestParams(
+		"tf-di-01", "DescribeInstances", "ec2.amazonaws.com",
+		`{"instancesSet":{"items":[{"instanceId":"i-abc"},{"instanceId":"i-def"}]}}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "i-abc,i-def" {
+		t.Errorf("_ct.target = %q, want %q per §4 DescribeInstances with items", target, "i-abc,i-def")
+	}
+}
+
+// TestCTTargetFallback_DescribeInstances_EmptyItems — §4: empty instancesSet.items → "(all)".
+func TestCTTargetFallback_DescribeInstances_EmptyItems(t *testing.T) {
+	// Spec: §4 — DescribeInstances with empty items list → "(all)"
+	event := buildCTEventWithRequestParams(
+		"tf-di-02", "DescribeInstances", "ec2.amazonaws.com",
+		`{"instancesSet":{"items":[]}}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "(all)" {
+		t.Errorf("_ct.target = %q, want %q per §4 DescribeInstances empty items", target, "(all)")
+	}
+}
+
+// TestCTTargetFallback_UpdateInstanceInformation — §4: instanceId field.
+func TestCTTargetFallback_UpdateInstanceInformation(t *testing.T) {
+	// Spec: §4 — UpdateInstanceInformation → requestParameters.instanceId
+	event := buildCTEventWithRequestParams(
+		"tf-uii-01", "UpdateInstanceInformation", "ssm.amazonaws.com",
+		`{"instanceId":"i-123"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "i-123" {
+		t.Errorf("_ct.target = %q, want %q per §4 UpdateInstanceInformation", target, "i-123")
+	}
+}
+
+// TestCTTargetFallback_GetParameter — §4: single SSM parameter name.
+func TestCTTargetFallback_GetParameter(t *testing.T) {
+	// Spec: §4 — GetParameter → requestParameters.name
+	event := buildCTEventWithRequestParams(
+		"tf-gp-01", "GetParameter", "ssm.amazonaws.com",
+		`{"name":"/foo/bar"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "/foo/bar" {
+		t.Errorf("_ct.target = %q, want %q per §4 GetParameter", target, "/foo/bar")
+	}
+}
+
+// TestCTTargetFallback_GetParameters — §4: multiple SSM parameter names joined.
+func TestCTTargetFallback_GetParameters(t *testing.T) {
+	// Spec: §4 — GetParameters → requestParameters.names[] joined ","
+	event := buildCTEventWithRequestParams(
+		"tf-gps-01", "GetParameters", "ssm.amazonaws.com",
+		`{"names":["/a","/b"]}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "/a,/b" {
+		t.Errorf("_ct.target = %q, want %q per §4 GetParameters", target, "/a,/b")
+	}
+}
+
+// TestCTTargetFallback_GetSecretValue — §4: secretId field.
+func TestCTTargetFallback_GetSecretValue(t *testing.T) {
+	// Spec: §4 — GetSecretValue → requestParameters.secretId
+	event := buildCTEventWithRequestParams(
+		"tf-gsv-01", "GetSecretValue", "secretsmanager.amazonaws.com",
+		`{"secretId":"prod/db"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "prod/db" {
+		t.Errorf("_ct.target = %q, want %q per §4 GetSecretValue", target, "prod/db")
+	}
+}
+
+// TestCTTargetFallback_Decrypt_WithKeyID — §4: keyId present → use it.
+func TestCTTargetFallback_Decrypt_WithKeyID(t *testing.T) {
+	// Spec: §4 — Decrypt → requestParameters.keyId
+	event := buildCTEventWithRequestParams(
+		"tf-dec-01", "Decrypt", "kms.amazonaws.com",
+		`{"keyId":"alias/foo"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "alias/foo" {
+		t.Errorf("_ct.target = %q, want %q per §4 Decrypt with keyId", target, "alias/foo")
+	}
+}
+
+// TestCTTargetFallback_Decrypt_NoKeyID — §4: no keyId → "(by alias)".
+func TestCTTargetFallback_Decrypt_NoKeyID(t *testing.T) {
+	// Spec: §4 — Decrypt with absent keyId → "(by alias)"
+	event := buildCTEventWithRequestParams(
+		"tf-dec-02", "Decrypt", "kms.amazonaws.com",
+		`{"encryptionContext":{"aws:s3:arn":"arn:aws:s3:::mybucket"}}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "(by alias)" {
+		t.Errorf("_ct.target = %q, want %q per §4 Decrypt without keyId", target, "(by alias)")
+	}
+}
+
+// TestCTTargetFallback_AssumeRole — §4: roleArn stripped per §5.
+func TestCTTargetFallback_AssumeRole(t *testing.T) {
+	// Spec: §4 — AssumeRole* → requestParameters.roleArn, then strip ARN per §5
+	// arn:aws:iam::123456789012:role/Admin → "role/Admin" (same-account strip)
+	event := buildCTEventWithRequestParams(
+		"tf-ar-01", "AssumeRole", "sts.amazonaws.com",
+		`{"roleArn":"arn:aws:iam::123456789012:role/Admin","roleSessionName":"mysession"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "role/Admin" {
+		t.Errorf("_ct.target = %q, want %q per §4 AssumeRole (ARN stripped per §5)", target, "role/Admin")
+	}
+}
+
+// TestCTTargetFallback_BatchGetImage — §4: repositoryName field.
+func TestCTTargetFallback_BatchGetImage(t *testing.T) {
+	// Spec: §4 — BatchGetImage → requestParameters.repositoryName
+	event := buildCTEventWithRequestParams(
+		"tf-bgi-01", "BatchGetImage", "ecr.amazonaws.com",
+		`{"repositoryName":"myrepo","imageIds":[{"imageTag":"latest"}]}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "myrepo" {
+		t.Errorf("_ct.target = %q, want %q per §4 BatchGetImage", target, "myrepo")
+	}
+}
+
+// TestCTTargetFallback_ListBuckets — §4: ListBuckets has no target → "(none)".
+func TestCTTargetFallback_ListBuckets(t *testing.T) {
+	// Spec: §4 — ListBuckets → "(none)" literal (there is no target)
+	event := buildCTEventWithRequestParams(
+		"tf-lb-01", "ListBuckets", "s3.amazonaws.com",
+		`null`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "(none)" {
+		t.Errorf("_ct.target = %q, want %q per §4 ListBuckets (no target)", target, "(none)")
+	}
+}
+
+// TestCTTargetFallback_CatchAll_AnyKeyMatchingID — §4 catch-all: scan for *Id/*Name/*Arn key.
+func TestCTTargetFallback_CatchAll_AnyKeyMatchingID(t *testing.T) {
+	// Spec: §4 catch-all — scan requestParameters for any key matching *Id/*Name/*Arn
+	// FrobnicateThingy has requestParameters.thingyId → "t-1"
+	event := buildCTEventWithRequestParams(
+		"tf-ca-01", "FrobnicateThingy", "example.amazonaws.com",
+		`{"thingyId":"t-1","otherParam":"ignored"}`,
+	)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	target := result.Resources[0].Fields["_ct.target"]
+	if target != "t-1" {
+		t.Errorf("_ct.target = %q, want %q per §4 catch-all scan for *Id key", target, "t-1")
 	}
 }
