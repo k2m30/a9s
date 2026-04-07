@@ -291,8 +291,10 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		t.Errorf("after re-entering ct-events, expected 'ct-events(100)' (both pages cached), got:\n%s", plain)
 	}
 
-	// Verify first-page and second-page items are both present.
-	if !strings.Contains(plain, "evt-0000") {
-		t.Errorf("after cache hit with 2 pages, first-page resource 'evt-0000' should be visible")
+	// Verify first-page items are still present after the cache update.
+	// We check for "usr-0000" which is the _ct.actor value rendered in the ACTOR column
+	// for the first ctEventsResources() entry (the ID "evt-0000" is not rendered in any column).
+	if !strings.Contains(plain, "usr-0000") {
+		t.Errorf("after cache hit with 2 pages, first-page resource actor 'usr-0000' should be visible in ACTOR column")
 	}
 }

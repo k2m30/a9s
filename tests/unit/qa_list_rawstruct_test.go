@@ -1382,30 +1382,41 @@ func TestQA_ListRawStruct_CloudTrailEvent(t *testing.T) {
 	cfg := configForType("ct-events")
 
 	event := realisticCloudTrailEvent()
+	// New schema: Status is verb-based ("ct-write"/"ct-read"), not ReadOnly.
+	// RunInstances → "Run" prefix → write verb → "ct-write".
+	// Default columns: GLYPH(_ct.verb) | TIME(event_time) | ACTOR(_ct.actor) | ORIGIN(_ct.origin) | EVENT(EventName via RawStruct) | TARGET(_ct.target) | OUTCOME(_ct.outcome).
+	// SOURCE column no longer exists in defaults; ec2.amazonaws.com is in Fields["source"] (compat) but not rendered.
 	res := resource.Resource{
 		ID:     "evt-0001-abcd-1234-5678-abcdef012345",
 		Name:   "RunInstances",
-		Status: "false",
+		Status: "ct-write",
 		Fields: map[string]string{
 			"event_name":    "RunInstances",
 			"time":          "2025-03-15 12:00:00",
+			"event_time":    "2025-03-15 12:00:00",
 			"user":          "admin",
 			"source":        "ec2.amazonaws.com",
 			"resource_type": "AWS::EC2::Instance",
 			"resource_name": "i-0abc123456def789",
 			"read_only":     "false",
+			// New _ct.* fields for the redesigned column layout.
+			"_ct.verb":    "W",
+			"_ct.actor":   "admin",
+			"_ct.origin":  "?",
+			"_ct.target":  "i-0abc123456def789",
+			"_ct.outcome": "OK",
 		},
 		RawStruct: event,
 	}
 
 	view := newListModel(t, "ct-events", cfg, []resource.Resource{res})
 
-	// EventName from RawStruct
+	// EventName from RawStruct (EVENT column uses Path: "EventName").
 	if !strings.Contains(view, "RunInstances") {
-		t.Errorf("CloudTrail Event list should contain event name from RawStruct, got:\n%s", view)
+		t.Errorf("CloudTrail Event list should contain event name from RawStruct (EVENT column), got:\n%s", view)
 	}
-	// EventSource from RawStruct
-	if !strings.Contains(view, "ec2.amazonaws.com") {
-		t.Errorf("CloudTrail Event list should contain event source from RawStruct, got:\n%s", view)
+	// Actor from Fields["_ct.actor"] (ACTOR column replaces old USERNAME column).
+	if !strings.Contains(view, "admin") {
+		t.Errorf("CloudTrail Event list should contain actor 'admin' from _ct.actor field (ACTOR column), got:\n%s", view)
 	}
 }

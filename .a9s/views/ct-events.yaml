@@ -1,22 +1,37 @@
 list:
-  Event ID:
-    key: "@id"
+  "":
+    key: "_ct.verb"
+    width: 1
+    color: "verb"
+  TIME:
+    key: "event_time"
+    width: 19
+  ACTOR:
+    key: "_ct.actor"
+    width: 26
+    color: "actor"
+  ORIGIN:
+    key: "_ct.origin"
+    width: 7
+    color: "origin"
+  EVENT:
+    path: "EventName"
     width: 22
-  Time:
-    path: EventTime
-    width: 22
-  Event Name:
-    path: EventName
+    color: "verb"
+  TARGET:
+    key: "_ct.target"
     width: 28
-  User:
-    path: Username
-    width: 24
-  Source:
-    path: EventSource
-    width: 28
-  Read Only:
-    path: ReadOnly
-    width: 10
+  OUTCOME:
+    key: "_ct.outcome"
+    width: 14
+    color: "outcome"
+  # Hidden by default — re-enable in your per-resource YAML to show these columns.
+  # REGION:
+  #   key: "_ct.region"
+  #   width: 11
+  # SRC IP:
+  #   key: "_ct.source_ip"
+  #   width: 15
 
 detail:
   - EventId

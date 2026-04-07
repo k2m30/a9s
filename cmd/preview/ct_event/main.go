@@ -75,7 +75,6 @@ var (
 	stBadgeDim  = lipgloss.NewStyle().Foreground(colDim)                              // [AWS-INTERNAL]
 	stBadgeRoot = lipgloss.NewStyle().Foreground(colError).Bold(true)                 // [ROOT]
 	stRootBar   = lipgloss.NewStyle().Foreground(colHeaderFg).Background(colError).Bold(true)
-	stHintBar   = lipgloss.NewStyle().Foreground(colDim)
 
 	// Navigable value: accent-colored + underlined. No trailing glyph —
 	// matches styles.NavigableField in internal/tui/styles/styles.go:195.
@@ -407,11 +406,11 @@ func renderRightColumn(rows []relatedRow) string {
 		//   default              -> "  name (N)" (normal)
 		var text string
 		var style lipgloss.Style
-		switch {
-		case r.count == -1:
+		switch r.count {
+		case -1:
 			text = "  " + r.label
 			style = stRColRow
-		case r.count == 0:
+		case 0:
 			text = "  " + r.label + " (0)"
 			style = stRColZero
 		default:

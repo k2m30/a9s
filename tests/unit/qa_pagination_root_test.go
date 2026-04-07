@@ -51,22 +51,34 @@ import (
 // ---------------------------------------------------------------------------
 
 // ctEventsResources returns n ct-events resources with sequential IDs.
+// Uses the new _ct.* field schema (Status is verb-based, not ReadOnly).
+// CreateBucket → "Create" prefix → write verb → "ct-write".
+// _ct.actor is set to "usr-NNNN" so it renders in the ACTOR column and can be
+// used as a unique per-resource assertion target.
 func ctEventsResources(n int) []resource.Resource {
 	resources := make([]resource.Resource, n)
 	for i := range n {
 		id := fmt.Sprintf("evt-%04d", i)
+		actor := fmt.Sprintf("usr-%04d", i)
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("CreateBucket-%d", i),
-			Status: "false",
+			Status: "ct-write",
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("CreateBucket-%d", i),
 				"time":          "2026-03-28 14:30:15",
+				"event_time":    "2026-03-28 14:30:15",
 				"user":          "admin",
 				"source":        "s3.amazonaws.com",
 				"resource_type": "",
 				"resource_name": "",
 				"read_only":     "false",
+				// New _ct.* fields required by the redesigned list columns.
+				"_ct.verb":    "W",
+				"_ct.actor":   actor,
+				"_ct.origin":  "CLI",
+				"_ct.target":  "(none)",
+				"_ct.outcome": "OK",
 			},
 		}
 	}
@@ -75,22 +87,32 @@ func ctEventsResources(n int) []resource.Resource {
 
 // ctEventsResources2 returns n additional ct-events resources whose IDs start
 // at offset, so they can be distinguished from the first page.
+// DeleteObject → "Delete" prefix → destructive verb → "ct-write".
 func ctEventsResources2(n, offset int) []resource.Resource {
 	resources := make([]resource.Resource, n)
 	for i := range n {
-		id := fmt.Sprintf("evt-%04d", offset+i)
+		idx := offset + i
+		id := fmt.Sprintf("evt-%04d", idx)
+		actor := fmt.Sprintf("usr-%04d", idx)
 		resources[i] = resource.Resource{
 			ID:     id,
-			Name:   fmt.Sprintf("DeleteObject-%d", offset+i),
-			Status: "false",
+			Name:   fmt.Sprintf("DeleteObject-%d", idx),
+			Status: "ct-write",
 			Fields: map[string]string{
-				"event_name":    fmt.Sprintf("DeleteObject-%d", offset+i),
-				"time":          "2026-03-28 15:00:00",
+				"event_name":    fmt.Sprintf("DeleteObject-%d", idx),
+				"time":          "2026-03-28 14:30:15",
+				"event_time":    "2026-03-28 14:30:15",
 				"user":          "admin",
 				"source":        "s3.amazonaws.com",
 				"resource_type": "",
 				"resource_name": "",
 				"read_only":     "false",
+				// New _ct.* fields required by the redesigned list columns.
+				"_ct.verb":    "D",
+				"_ct.actor":   actor,
+				"_ct.origin":  "CLI",
+				"_ct.target":  "(none)",
+				"_ct.outcome": "OK",
 			},
 		}
 	}
@@ -307,9 +329,11 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 		t.Errorf("after re-entering ct-events, expected 'ct-events(100)' (from cache), got:\n%s", plain)
 	}
 
-	// The first resource from page 1 must still be present
-	if !strings.Contains(plain, "evt-0000") {
-		t.Errorf("after re-entering ct-events, first-page resource 'evt-0000' should be visible")
+	// The first resource from page 1 must still be present.
+	// We check for "usr-0000" which is the _ct.actor value rendered in the ACTOR column
+	// for the first ctEventsResources() entry (the ID "evt-0000" is not rendered in any column).
+	if !strings.Contains(plain, "usr-0000") {
+		t.Errorf("after re-entering ct-events, first-page resource actor 'usr-0000' should be visible in ACTOR column")
 	}
 }
 

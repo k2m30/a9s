@@ -1,6 +1,7 @@
 package views
 
 import (
+	gocolor "image/color"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -34,15 +35,24 @@ const HelpFromRevealListPaginated = HelpFromSecretsListPaginated
 // HelpModel renders context-sensitive keybinding reference inside the frame.
 // Any key press closes help (parent pops the view).
 type HelpModel struct {
-	keys    keys.Map
-	context HelpContext
-	width   int
-	height  int
+	keys              keys.Map
+	context           HelpContext
+	resourceShortName string
+	width             int
+	height            int
 }
 
 // NewHelp returns a HelpModel with the given view context.
+// The resource short name is empty; no resource-specific legend is shown.
 func NewHelp(k keys.Map, ctx HelpContext) HelpModel {
 	return HelpModel{keys: k, context: ctx}
+}
+
+// NewHelpWithResource returns a HelpModel scoped to a specific resource type.
+// When ctx is HelpFromResourceList or HelpFromResourceListPaginated and
+// resourceShortName is "ct-events", a CloudTrail Events legend is appended.
+func NewHelpWithResource(k keys.Map, ctx HelpContext, resourceShortName string) HelpModel {
+	return HelpModel{keys: k, context: ctx, resourceShortName: resourceShortName}
 }
 
 // Init implements tea.Model.
@@ -141,6 +151,13 @@ func (m HelpModel) View() string {
 			}
 		}
 		sb.WriteString(" " + strings.Join(parts, ""))
+	}
+
+	// Append CloudTrail Events legend when context + resource match.
+	if (m.context == HelpFromResourceList || m.context == HelpFromResourceListPaginated) &&
+		m.resourceShortName == "ct-events" {
+		sb.WriteString("\n")
+		sb.WriteString(m.ctEventsLegend())
 	}
 
 	sb.WriteString("\n\n")
@@ -399,6 +416,94 @@ func (m HelpModel) revealGroups() []helpGroup {
 			},
 		},
 	}
+}
+
+// ctEventsLegend renders the CloudTrail Events glyph + row-tint + cell-color legend
+// per design doc §8a. Called only when context is HelpFromResourceList* and
+// resourceShortName is "ct-events".
+func (m HelpModel) ctEventsLegend() string {
+	catStyle := helpCatStyle
+	hkStyle := helpKeyStyle
+	descStyle := helpDescStyle
+
+	verbStyle := func(col gocolor.Color, bold bool) lipgloss.Style {
+		s := lipgloss.NewStyle().Foreground(col)
+		if bold {
+			s = s.Bold(true)
+		}
+		return s
+	}
+
+	var sb strings.Builder
+
+	// Header.
+	sb.WriteString(" " + catStyle.Render("CloudTrail Events Legend"))
+	sb.WriteString("\n\n")
+
+	// --- Verb glyphs ---
+	sb.WriteString(" " + catStyle.Render("VERB GLYPHS"))
+	sb.WriteString("\n")
+	verbRows := []struct {
+		glyph string
+		style lipgloss.Style
+		desc  string
+	}{
+		{"R", verbStyle(styles.ColDim, false), "Read  (Describe*, Get*, List*, Head*)"},
+		{"W", verbStyle(styles.ColPending, true), "Write (Create*, Put*, Update*, Attach*)"},
+		{"D", verbStyle(styles.ColStopped, true), "Destructive (Delete*, Terminate*, Revoke*)"},
+		{"S", verbStyle(styles.ColAccent, true), "Service event (eventType=AwsServiceEvent)"},
+		{"I", verbStyle(styles.ColYAMLBool, true), "Insight event (eventCategory=Insight)"},
+		{"N", verbStyle(styles.ColAccent, false), "NetworkActivity (eventCategory=NetworkActivity)"},
+		{"?", verbStyle(styles.ColHeaderFg, false), "Ambiguous (no classifier match)"},
+	}
+	for _, row := range verbRows {
+		glyph := row.style.Render(text.PadOrTrunc(row.glyph, 3))
+		sb.WriteString(" " + glyph + descStyle.Render(row.desc) + "\n")
+	}
+
+	sb.WriteString("\n")
+
+	// --- Row tints ---
+	sb.WriteString(" " + catStyle.Render("ROW TINTS  (foreground only, no background)"))
+	sb.WriteString("\n")
+	tintRows := []struct {
+		label string
+		col   gocolor.Color
+		desc  string
+	}{
+		{"ct-write", styles.ColStopped, "W/D verbs — write or destructive"},
+		{"ct-read", styles.ColPending, "R/S/I/N verbs — read, service, insight, network"},
+	}
+	for _, row := range tintRows {
+		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 10))
+		sb.WriteString(" " + label + descStyle.Render(row.desc) + "\n")
+	}
+
+	sb.WriteString("\n")
+
+	// --- Cell colors ---
+	sb.WriteString(" " + catStyle.Render("CELL COLORS"))
+	sb.WriteString("\n")
+	cellRows := []struct {
+		cell  string
+		label string
+		style lipgloss.Style
+		desc  string
+	}{
+		{"ACTOR", "ROOT", lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true), "root identity (bold red)"},
+		{"ACTOR", "cross-acct", lipgloss.NewStyle().Foreground(styles.ColPending), "cross-account principal (yellow)"},
+		{"ACTOR", "service", lipgloss.NewStyle().Foreground(styles.ColDim), "AWS service principal (dim)"},
+		{"OUTCOME", "OK", lipgloss.NewStyle().Foreground(styles.ColRunning), "success (dim green)"},
+		{"OUTCOME", "FAILED", lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true), "error code (bold red)"},
+		{"OUTCOME", "START/END", lipgloss.NewStyle().Foreground(styles.ColPending), "Insight state transitions (yellow)"},
+	}
+	for _, row := range cellRows {
+		cellLabel := hkStyle.Render(text.PadOrTrunc(row.cell, 8))
+		valueLabel := row.style.Render(text.PadOrTrunc(row.label, 10))
+		sb.WriteString(" " + cellLabel + valueLabel + descStyle.Render(row.desc) + "\n")
+	}
+
+	return sb.String()
 }
 
 // CopyContent returns empty — nothing to copy from the help view.

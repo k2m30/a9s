@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -65,13 +66,21 @@ type ResourceListModel struct {
 // NewResourceList creates a ResourceListModel in loading state.
 func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
 	sp := spinner.New()
-	return ResourceListModel{
+	m := ResourceListModel{
 		typeDef:    typeDef,
 		viewConfig: viewConfig,
 		loading:    true,
 		spinner:    sp,
 		keys:       k,
 	}
+	// ct-events: default sort is by event_time DESC (newest first).
+	// Only apply when a viewConfig is present (full app mode); unit tests
+	// that pass nil viewConfig work with synthetic data and are not affected.
+	if typeDef.ShortName == "ct-events" && viewConfig != nil {
+		m.sort = SortAge
+		m.sortAsc = false
+	}
+	return m
 }
 
 // NewChildResourceList creates a ResourceListModel for a child resource type.
@@ -857,4 +866,97 @@ func FilterResources(query string, resources []resource.Resource) []resource.Res
 		}
 	}
 	return result
+}
+
+// ApplyCellColor applies a per-cell color classifier to a rendered cell value.
+// classifier is one of "verb", "actor", "outcome", "origin", or "" (no classifier).
+// Unknown classifier values return value unchanged.
+func ApplyCellColor(classifier, value string) string {
+	if classifier == "" || value == "" {
+		return value
+	}
+	switch classifier {
+	case "verb":
+		return applyVerbColor(value)
+	case "actor":
+		return applyActorColor(value)
+	case "outcome":
+		return applyOutcomeColor(value)
+	case "origin":
+		return applyOriginColor(value)
+	default:
+		return value
+	}
+}
+
+// applyVerbColor styles the CloudTrail verb abbreviation cell.
+// R → dim; W → orange bold; D → red bold; S → accent bold; I → purple bold;
+// N → accent (no bold); ? → ColHeaderFg (no bold).
+func applyVerbColor(value string) string {
+	switch value {
+	case "R":
+		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
+	case "W":
+		return lipgloss.NewStyle().Foreground(styles.ColYAMLNum).Bold(true).Render(value)
+	case "D":
+		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
+	case "S":
+		return lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true).Render(value)
+	case "I":
+		return lipgloss.NewStyle().Foreground(styles.ColYAMLBool).Bold(true).Render(value)
+	case "N":
+		return lipgloss.NewStyle().Foreground(styles.ColAccent).Render(value)
+	default:
+		// "?" and any unrecognised verb → plain (ColHeaderFg, no bold).
+		return lipgloss.NewStyle().Foreground(styles.ColHeaderFg).Render(value)
+	}
+}
+
+// applyActorColor styles the CloudTrail actor cell.
+// "ROOT" (exact, case-sensitive) → red bold;
+// values ending in ".amazonaws.com" → dim;
+// values with "[cross] " prefix → yellow (ColPending);
+// everything else → no extra styling (return value unchanged).
+func applyActorColor(value string) string {
+	if value == "ROOT" {
+		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
+	}
+	if strings.HasSuffix(value, ".amazonaws.com") {
+		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
+	}
+	if strings.HasPrefix(value, "[cross] ") {
+		return lipgloss.NewStyle().Foreground(styles.ColPending).Render(value)
+	}
+	return value
+}
+
+// applyOutcomeColor styles the CloudTrail outcome cell.
+// "OK" → dim green (ColRunning, no bold);
+// values starting with "FAILED" → red bold;
+// "START" or "END" → yellow (ColPending);
+// everything else → no extra styling.
+func applyOutcomeColor(value string) string {
+	if value == "OK" {
+		return lipgloss.NewStyle().Foreground(styles.ColRunning).Render(value)
+	}
+	if strings.HasPrefix(value, "FAILED") {
+		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
+	}
+	if value == "START" || value == "END" {
+		return lipgloss.NewStyle().Foreground(styles.ColPending).Render(value)
+	}
+	return value
+}
+
+// applyOriginColor styles the CloudTrail origin cell.
+// "Service" → dim; "Console" → accent; everything else → no extra styling.
+func applyOriginColor(value string) string {
+	switch value {
+	case "Service":
+		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
+	case "Console":
+		return lipgloss.NewStyle().Foreground(styles.ColAccent).Render(value)
+	default:
+		return value
+	}
 }

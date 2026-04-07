@@ -84,12 +84,13 @@ func monitoringDefaultViews() map[string]ViewDef {
 		},
 		"ct-events": {
 			List: []ListColumn{
-				{Title: "Event ID", Key: "@id", Width: 22},
-				{Title: "Time", Path: "EventTime", Width: 22},
-				{Title: "Event Name", Path: "EventName", Width: 28},
-				{Title: "User", Path: "Username", Width: 24},
-				{Title: "Source", Path: "EventSource", Width: 28},
-				{Title: "Read Only", Path: "ReadOnly", Width: 10},
+				{Title: "", Key: "_ct.verb", Width: 1, Color: "verb"},
+				{Title: "TIME", Key: "event_time", Width: 19},
+				{Title: "ACTOR", Key: "_ct.actor", Width: 26, Color: "actor"},
+				{Title: "ORIGIN", Key: "_ct.origin", Width: 7, Color: "origin"},
+				{Title: "EVENT", Path: "EventName", Width: 22, Color: "verb"},
+				{Title: "TARGET", Key: "_ct.target", Width: 28},
+				{Title: "OUTCOME", Key: "_ct.outcome", Width: 14, Color: "outcome"},
 			},
 			Detail: []string{
 				"EventId", "EventName", "EventTime", "EventSource",

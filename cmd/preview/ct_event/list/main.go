@@ -31,8 +31,7 @@ var (
 	colOrange   = lipgloss.Color("#ff9e64")
 	colPurple   = lipgloss.Color("#bb9af7")
 	// EC2-style row-color tokens (match internal/tui/styles/palette.go):
-	// ColRunning=green, ColStopped=red, ColPending=yellow, ColTerminated=dim.
-	colRunning    = colSuccess
+	// ColStopped=red, ColPending=yellow, ColTerminated=dim.
 	colStopped    = colError
 	colPending    = colWarning
 	colTerminated = colDim
@@ -85,7 +84,6 @@ var (
 	stTintError   = lipgloss.NewStyle().Foreground(colStopped)
 	stTintXAcct   = lipgloss.NewStyle().Foreground(colPending)
 	stTintService = lipgloss.NewStyle().Foreground(colTerminated)
-	stTintOK      = lipgloss.NewStyle().Foreground(colRunning)
 
 	stHint   = lipgloss.NewStyle().Foreground(colDim)
 	stFilter = lipgloss.NewStyle().Foreground(colWarning).Bold(true)
