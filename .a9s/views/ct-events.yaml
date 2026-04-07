@@ -7,13 +7,13 @@ list:
     width: 15
   ACTOR:
     key: _ct.actor
-    width: 26
+    width: 36
   ORIGIN:
     key: _ct.origin
     width: 7
   EVENT:
     path: EventName
-    width: 24
+    width: 34
   TARGET:
     key: _ct.target
     width: 36

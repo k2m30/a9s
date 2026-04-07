@@ -69,7 +69,6 @@ sts:GetSessionToken
 sts:GetFederationToken
 sts:AssumeRole
 sts:AssumeRoleWithSAML
-sts:AssumeRoleWithWebIdentity
 iam:GetAccessKeyLastUsed
 iam:ListAccessKeys
 iam:GetCredentialReport
@@ -78,7 +77,11 @@ iam:GetLoginProfile
 acm:ExportCertificate
 ```
 
-KMS is **excluded** per user direction. Match key is exact `<service>:<EventName>`
+KMS is **excluded** per user direction. `sts:AssumeRoleWithWebIdentity` is
+also **excluded** because IRSA/OIDC flows (k8s service accounts, mobile SDK
+identity pools) generate high-volume noise. It is classified as verb=R via
+an exact-match in `ClassifyCTVerb` (so the `Assume` write-prefix does not
+catch it) and stays `ct-info`. Match key is exact `<service>:<EventName>`
 where service is derived from `eventSource` (e.g. `s3.amazonaws.com` → `s3`).
 
 ### 1.4 Cross-account visibility
@@ -280,14 +283,18 @@ func IsDimRowColor(status string) bool
 
 ### 7.3 Persistence and scope
 
-- **Per-view, per-session.** Toggle state lives on
-  `ResourceListModel.attentionOnly bool`. Each list view has its own.
-- Reset to off when the view is popped from the view stack (same lifecycle
-  as text filter).
+- **Per-resource-type, per-session.** Toggle state lives on
+  `ResourceListModel.attentionOnly bool` and is persisted to
+  `resourceCacheEntry.attentionOnly` alongside `filterText`/`sortField`/
+  `cursorPos`. When a view is popped and later re-entered for the same
+  resource type (esc + enter, or `:ec2` + `:ec2`), the toggle is restored
+  from cache along with the filter text — same lifecycle as text filter.
 - Status line indicator: append `[!]` next to the filter indicator when
-  active. Example: `:ec2 [filter:web] [!]`.
+  active. Example: `:ec2 [filter:web] [!]`. Also surfaced as a
+  `ctrl+z Only !` hint in the bottom-bar key line.
 - The toggle does NOT bleed across resource types. Switching from `:ec2` to
-  `:ct-events` starts with attentionOnly=off in the new view.
+  `:ct-events` uses each type's own cached toggle state (default off on
+  first entry).
 
 ### 7.4 ec2 case — what counts as "interesting"?
 
@@ -331,13 +338,13 @@ list:
     width: 15
   ACTOR:
     key: "_ct.actor"
-    width: 26
+    width: 36
   ORIGIN:
     key: "_ct.origin"
     width: 7
   EVENT:
     path: "EventName"
-    width: 24
+    width: 34
   TARGET:
     key: "_ct.target"
     width: 36

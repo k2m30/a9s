@@ -340,10 +340,12 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	if strings.HasPrefix(eventName, "BatchGet") {
 		return "R"
 	}
-	// KMS use-key ops — exact matches (§2.1 row 2 additional).
+	// KMS use-key ops and federation reads — exact matches (§2.1 row 2 additional).
+	// AssumeRoleWithWebIdentity is a read (OIDC token exchange), not a write.
 	switch eventName {
 	case "Decrypt", "Encrypt", "Sign", "Verify",
-		"ReEncrypt", "GenerateDataKey", "GenerateDataKeyWithoutPlaintext":
+		"ReEncrypt", "GenerateDataKey", "GenerateDataKeyWithoutPlaintext",
+		"AssumeRoleWithWebIdentity":
 		return "R"
 	}
 
@@ -683,22 +685,71 @@ func isSensitiveRead(eventSource, eventName string) bool {
 	}
 	key := svc + ":" + eventName
 	switch key {
+	// Secrets / parameters
 	case "secretsmanager:GetSecretValue",
 		"secretsmanager:BatchGetSecretValue",
+		"secretsmanager:GetRandomPassword",
+		"secretsmanager:ListSecrets",
 		"ssm:GetParameter",
 		"ssm:GetParameters",
 		"ssm:GetParametersByPath",
-		"sts:GetSessionToken",
-		"sts:GetFederationToken",
-		"sts:AssumeRole",
-		"sts:AssumeRoleWithSAML",
-		"sts:AssumeRoleWithWebIdentity",
-		"iam:GetAccessKeyLastUsed",
+		"ssm:GetParameterHistory",
+		"ssm:DescribeParameters":
+		return true
+
+	// STS session vending (AssumeRole* deliberately excluded — too noisy via IRSA/SSO)
+	case "sts:GetSessionToken",
+		"sts:GetFederationToken":
+		return true
+
+	// Cognito admin auth surface
+	case "cognito-idp:AdminInitiateAuth",
+		"cognito-idp:AdminGetUser":
+		return true
+
+	// Code signing
+	case "signer:GetSigningProfile":
+		return true
+
+	// IAM credential / privilege recon
+	case "iam:GetAccessKeyLastUsed",
 		"iam:ListAccessKeys",
 		"iam:GetCredentialReport",
 		"iam:GenerateCredentialReport",
 		"iam:GetLoginProfile",
-		"acm:ExportCertificate":
+		"iam:GetAccountAuthorizationDetails",
+		"iam:SimulatePrincipalPolicy",
+		"iam:SimulateCustomPolicy",
+		"iam:ListUsers",
+		"iam:ListRoles",
+		"iam:ListPolicies",
+		"iam:ListAttachedRolePolicies",
+		"iam:ListRolePolicies",
+		"iam:ListMFADevices",
+		"iam:ListVirtualMFADevices",
+		"iam:ListSSHPublicKeys",
+		"iam:ListServiceSpecificCredentials":
+		return true
+
+	// Organizations enumeration
+	case "organizations:ListAccounts",
+		"organizations:DescribeOrganization":
+		return true
+
+	// Bulk data exfil via reads
+	case "dynamodb:Scan",
+		"rds:DownloadDBLogFilePortion":
+		return true
+
+	// EC2 instance secret/console exfil
+	case "ec2:GetPasswordData",
+		"ec2:GetConsoleOutput",
+		"ec2:GetConsoleScreenshot":
+		return true
+
+	// Account-wide recon
+	case "support:DescribeTrustedAdvisorChecks",
+		"ce:GetCostAndUsage":
 		return true
 	}
 	return false

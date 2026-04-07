@@ -423,7 +423,6 @@ func (m HelpModel) revealGroups() []helpGroup {
 // resourceShortName is "ct-events".
 func (m HelpModel) ctEventsLegend() string {
 	catStyle := helpCatStyle
-	hkStyle := helpKeyStyle
 	descStyle := helpDescStyle
 
 	verbStyle := func(col gocolor.Color, bold bool) lipgloss.Style {
@@ -480,29 +479,6 @@ func (m HelpModel) ctEventsLegend() string {
 		sb.WriteString(" " + label + descStyle.Render(row.desc) + "\n")
 	}
 
-	sb.WriteString("\n")
-
-	// --- Cell colors ---
-	sb.WriteString(" " + catStyle.Render("CELL COLORS"))
-	sb.WriteString("\n")
-	cellRows := []struct {
-		cell  string
-		label string
-		style lipgloss.Style
-		desc  string
-	}{
-		{"ACTOR", "ROOT", lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true), "root identity (bold red)"},
-		{"ACTOR", "cross-acct", lipgloss.NewStyle().Foreground(styles.ColPending), "cross-account principal (yellow)"},
-		{"ACTOR", "service", lipgloss.NewStyle().Foreground(styles.ColDim), "AWS service principal (dim)"},
-		{"OUTCOME", "OK", lipgloss.NewStyle().Foreground(styles.ColRunning), "success (dim green)"},
-		{"OUTCOME", "FAILED", lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true), "error code (bold red)"},
-		{"OUTCOME", "START/END", lipgloss.NewStyle().Foreground(styles.ColPending), "Insight state transitions (yellow)"},
-	}
-	for _, row := range cellRows {
-		cellLabel := hkStyle.Render(text.PadOrTrunc(row.cell, 8))
-		valueLabel := row.style.Render(text.PadOrTrunc(row.label, 10))
-		sb.WriteString(" " + cellLabel + valueLabel + descStyle.Render(row.desc) + "\n")
-	}
 
 	return sb.String()
 }
