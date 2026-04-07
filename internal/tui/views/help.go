@@ -447,13 +447,13 @@ func (m HelpModel) ctEventsLegend() string {
 		style lipgloss.Style
 		desc  string
 	}{
-		{"R", verbStyle(styles.ColDim, false), "Read  (Describe*, Get*, List*, Head*)"},
+		{"R", verbStyle(styles.ColTerminated, false), "Read  (Describe*, Get*, List*, Head*)"},
 		{"W", verbStyle(styles.ColPending, true), "Write (Create*, Put*, Update*, Attach*)"},
 		{"D", verbStyle(styles.ColStopped, true), "Destructive (Delete*, Terminate*, Revoke*)"},
-		{"S", verbStyle(styles.ColAccent, true), "Service event (eventType=AwsServiceEvent)"},
-		{"I", verbStyle(styles.ColYAMLBool, true), "Insight event (eventCategory=Insight)"},
-		{"N", verbStyle(styles.ColAccent, false), "NetworkActivity (eventCategory=NetworkActivity)"},
-		{"?", verbStyle(styles.ColHeaderFg, false), "Ambiguous (no classifier match)"},
+		{"S", verbStyle(styles.ColTerminated, false), "Service event (eventType=AwsServiceEvent)"},
+		{"I", verbStyle(styles.ColTerminated, false), "Insight event (eventCategory=Insight)"},
+		{"N", verbStyle(styles.ColTerminated, false), "NetworkActivity (eventCategory=NetworkActivity)"},
+		{"?", verbStyle(styles.ColTerminated, false), "Ambiguous (no classifier match)"},
 	}
 	for _, row := range verbRows {
 		glyph := row.style.Render(text.PadOrTrunc(row.glyph, 3))
@@ -463,7 +463,7 @@ func (m HelpModel) ctEventsLegend() string {
 	sb.WriteString("\n")
 
 	// --- Row tints ---
-	sb.WriteString(" " + catStyle.Render("SEVERITY TIERS  (foreground only, no background)"))
+	sb.WriteString(" " + catStyle.Render("SEVERITY TIERS"))
 	sb.WriteString("\n")
 	tintRows := []struct {
 		label string
@@ -475,7 +475,7 @@ func (m HelpModel) ctEventsLegend() string {
 		{"ct-danger",    styles.ColStopped,    "worth investigating — destructive ops or failures"},
 	}
 	for _, row := range tintRows {
-		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 12))
+		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 14))
 		sb.WriteString(" " + label + descStyle.Render(row.desc) + "\n")
 	}
 
