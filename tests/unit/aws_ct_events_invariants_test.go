@@ -55,7 +55,7 @@ func TestSensitiveReads_AreReadVerbs(t *testing.T) {
 		{"ssm.amazonaws.com", "GetParameterHistory"},
 		{"ssm.amazonaws.com", "DescribeParameters"},
 
-		// STS session vending (NOT AssumeRole — those are W via prefix)
+		// STS session vending (NOT AssumeRole* — those are exact-match R, not on this allowlist)
 		{"sts.amazonaws.com", "GetSessionToken"},
 		{"sts.amazonaws.com", "GetFederationToken"},
 
