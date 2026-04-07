@@ -22,6 +22,8 @@ type RelatedCheckResult struct {
 	Count       int      // -1 = unknown; 0+ = count
 	ResourceIDs []string // IDs of found related resources (empty when Count <= 0)
 	Err         error    // non-nil = error
+	// FetchFilter when non-nil signals navigation to use a server-side filtered fetcher instead of relatedIDSet.
+	FetchFilter map[string]string
 }
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus

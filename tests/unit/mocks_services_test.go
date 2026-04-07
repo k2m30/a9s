@@ -1168,6 +1168,20 @@ func (m *mockIAMListAccountAliasesClient) ListAccountAliases(ctx context.Context
 	return m.output, m.err
 }
 
+// ---------------------------------------------------------------------------
+// IAM ListAttachedUserPolicies mock
+// ---------------------------------------------------------------------------
+
+// mockIAMListAttachedUserPoliciesClient implements awsclient.IAMListAttachedUserPoliciesAPI.
+type mockIAMListAttachedUserPoliciesClient struct {
+	output *iam.ListAttachedUserPoliciesOutput
+	err    error
+}
+
+func (m *mockIAMListAttachedUserPoliciesClient) ListAttachedUserPolicies(ctx context.Context, params *iam.ListAttachedUserPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error) {
+	return m.output, m.err
+}
+
 // Ensure unused imports are used
 var _ = time.Now
 var _ = aws.String

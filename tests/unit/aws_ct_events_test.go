@@ -11,6 +11,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // capturingCloudTrailClient captures the LookupEventsInput for assertion.
@@ -595,5 +596,220 @@ func TestFetchCloudTrailEventsPage_FieldExtraction(t *testing.T) {
 	}
 	if r.Fields["read_only"] != "false" {
 		t.Errorf("Fields[\"read_only\"]: expected %q, got %q", "false", r.Fields["read_only"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// FetchCloudTrailEventsPageFiltered tests
+// ---------------------------------------------------------------------------
+
+// TestFetchCloudTrailEventsPageFiltered_UsernameFilter verifies that a "Username"
+// filter key is wired to LookupAttributeKeyUsername in the API request.
+func TestFetchCloudTrailEventsPageFiltered_UsernameFilter(t *testing.T) {
+	eventTime := time.Date(2025, 4, 1, 10, 0, 0, 0, time.UTC)
+	mock := &capturingCloudTrailClient{
+		output: &cloudtrail.LookupEventsOutput{
+			Events: []cloudtrailtypes.Event{
+				{
+					EventId:   aws.String("evt-filter-user-001"),
+					EventName: aws.String("AssumeRole"),
+					EventTime: &eventTime,
+					Username:  aws.String("s3manager"),
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, map[string]string{"Username": "s3manager"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mock.captured == nil {
+		t.Fatal("LookupEvents was not called")
+	}
+	if len(mock.captured.LookupAttributes) != 1 {
+		t.Fatalf("LookupAttributes length = %d, want 1", len(mock.captured.LookupAttributes))
+	}
+	attr := mock.captured.LookupAttributes[0]
+	if attr.AttributeKey != cloudtrailtypes.LookupAttributeKeyUsername {
+		t.Errorf("AttributeKey = %v, want LookupAttributeKeyUsername", attr.AttributeKey)
+	}
+	if attr.AttributeValue == nil || *attr.AttributeValue != "s3manager" {
+		t.Errorf("AttributeValue = %v, want %q", attr.AttributeValue, "s3manager")
+	}
+	if len(result.Resources) != 1 {
+		t.Errorf("expected 1 resource, got %d", len(result.Resources))
+	}
+	if result.Resources[0].ID != "evt-filter-user-001" {
+		t.Errorf("Resource ID = %q, want %q", result.Resources[0].ID, "evt-filter-user-001")
+	}
+}
+
+// TestFetchCloudTrailEventsPageFiltered_ResourceNameFilter verifies that a "ResourceName"
+// filter key maps to LookupAttributeKeyResourceName.
+func TestFetchCloudTrailEventsPageFiltered_ResourceNameFilter(t *testing.T) {
+	mock := &capturingCloudTrailClient{
+		output: &cloudtrail.LookupEventsOutput{},
+	}
+
+	_, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, map[string]string{"ResourceName": "i-abc123"}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mock.captured == nil {
+		t.Fatal("LookupEvents was not called")
+	}
+	if len(mock.captured.LookupAttributes) != 1 {
+		t.Fatalf("LookupAttributes length = %d, want 1", len(mock.captured.LookupAttributes))
+	}
+	attr := mock.captured.LookupAttributes[0]
+	if attr.AttributeKey != cloudtrailtypes.LookupAttributeKeyResourceName {
+		t.Errorf("AttributeKey = %v, want LookupAttributeKeyResourceName", attr.AttributeKey)
+	}
+	if attr.AttributeValue == nil || *attr.AttributeValue != "i-abc123" {
+		t.Errorf("AttributeValue = %v, want %q", attr.AttributeValue, "i-abc123")
+	}
+}
+
+// TestFetchCloudTrailEventsPageFiltered_EmptyFilter verifies that an empty filter
+// map results in no LookupAttributes being added to the request.
+func TestFetchCloudTrailEventsPageFiltered_EmptyFilter(t *testing.T) {
+	mock := &capturingCloudTrailClient{
+		output: &cloudtrail.LookupEventsOutput{},
+	}
+
+	_, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, map[string]string{}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mock.captured == nil {
+		t.Fatal("LookupEvents was not called")
+	}
+	if len(mock.captured.LookupAttributes) != 0 {
+		t.Errorf("LookupAttributes = %v, want empty (no filter keys)", mock.captured.LookupAttributes)
+	}
+}
+
+// TestFetchCloudTrailEventsPageFiltered_ContinuationToken verifies that a non-empty
+// continuation token is forwarded as NextToken in the API request.
+func TestFetchCloudTrailEventsPageFiltered_ContinuationToken(t *testing.T) {
+	mock := &capturingCloudTrailClient{
+		output: &cloudtrail.LookupEventsOutput{},
+	}
+
+	_, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, map[string]string{}, "tok")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mock.captured == nil {
+		t.Fatal("LookupEvents was not called")
+	}
+	if mock.captured.NextToken == nil {
+		t.Fatal("NextToken is nil, want non-nil")
+	}
+	if *mock.captured.NextToken != "tok" {
+		t.Errorf("NextToken = %q, want %q", *mock.captured.NextToken, "tok")
+	}
+}
+
+// TestFetchCloudTrailEventsPageFiltered_Error verifies that API errors are
+// propagated and the returned FetchResult is empty.
+func TestFetchCloudTrailEventsPageFiltered_Error(t *testing.T) {
+	mock := &capturingCloudTrailClient{
+		err: fmt.Errorf("cloudtrail API unavailable"),
+	}
+
+	result, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, map[string]string{"Username": "alice"}, "")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected empty Resources on error, got %d", len(result.Resources))
+	}
+}
+
+// TestFetchCloudTrailEventsPageFiltered_RegisteredAsFilteredFetcher verifies
+// that "ct-events" is registered in the FilteredPaginatedFetcher registry.
+func TestFetchCloudTrailEventsPageFiltered_RegisteredAsFilteredFetcher(t *testing.T) {
+	fetcher := resource.GetFilteredPaginatedFetcher("ct-events")
+	if fetcher == nil {
+		t.Fatal("GetFilteredPaginatedFetcher(\"ct-events\") returned nil — not registered")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// AssumedRole: role_name field extraction via CloudTrailEvent JSON
+// ---------------------------------------------------------------------------
+
+// TestFetchCloudTrailEventsPage_RoleNameFieldExtracted verifies that when a
+// CloudTrail event contains CloudTrailEvent JSON with
+// userIdentity.sessionContext.sessionIssuer.userName, the fetcher populates
+// Fields["role_name"] with that value.
+func TestFetchCloudTrailEventsPage_RoleNameFieldExtracted(t *testing.T) {
+	ctEventJSON := `{"userIdentity":{"type":"AssumedRole","sessionContext":{"sessionIssuer":{"userName":"my-role"}}}}`
+
+	mock := &capturingCloudTrailClient{
+		output: &cloudtrail.LookupEventsOutput{
+			Events: []cloudtrailtypes.Event{
+				{
+					EventId:         aws.String("evt-role-001"),
+					EventName:       aws.String("AssumeRole"),
+					CloudTrailEvent: aws.String(ctEventJSON),
+					Resources:       []cloudtrailtypes.Resource{},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	roleName := result.Resources[0].Fields["role_name"]
+	if roleName != "my-role" {
+		t.Errorf("Fields[\"role_name\"] = %q, want %q", roleName, "my-role")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NavigableFields registration for ct-events
+// ---------------------------------------------------------------------------
+
+// TestCtEvents_NavigableFields_Registered verifies that ct-events has navigable
+// fields registered for both "user" → "iam-user" and "role_name" → "role".
+func TestCtEvents_NavigableFields_Registered(t *testing.T) {
+	fields := resource.GetNavigableFields("ct-events")
+	if len(fields) == 0 {
+		t.Fatal("GetNavigableFields(\"ct-events\") returned empty — navigable fields not registered")
+	}
+
+	type want struct {
+		fieldPath  string
+		targetType string
+	}
+	expectations := []want{
+		{"user", "iam-user"},
+		{"role_name", "role"},
+	}
+
+	for _, exp := range expectations {
+		found := false
+		for _, nf := range fields {
+			if nf.FieldPath == exp.fieldPath && nf.TargetType == exp.targetType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("navigable field {FieldPath: %q, TargetType: %q} not found in ct-events navigable fields", exp.fieldPath, exp.targetType)
+		}
 	}
 }

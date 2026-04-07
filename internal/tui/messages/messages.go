@@ -42,6 +42,7 @@ type LoadMoreMsg struct {
 	ResourceType      string
 	ContinuationToken string
 	ParentContext     map[string]string // non-nil for child views
+	FetchFilter       map[string]string
 }
 
 // APIErrorMsg is sent when an AWS API call fails.
@@ -159,6 +160,7 @@ type RelatedNavigateMsg struct {
 	SourceType     string            // source resource short name (e.g., "ec2")
 	TargetID       string            // specific ID for navigable field case (e.g., "vpc-0abc")
 	RelatedIDs     []string          // IDs from checker for right-column case
+	FetchFilter    map[string]string
 }
 
 // AvailabilityCacheLoadedMsg delivers cached availability data loaded from disk.

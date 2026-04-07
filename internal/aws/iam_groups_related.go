@@ -53,8 +53,8 @@ func checkGroupPolicy(_ context.Context, clients any, res resource.Resource, _ r
 	}
 	var ids []string
 	for _, p := range out.AttachedPolicies {
-		if p.PolicyArn != nil {
-			ids = append(ids, *p.PolicyArn)
+		if p.PolicyName != nil {
+			ids = append(ids, *p.PolicyName)
 		}
 	}
 	return relatedResult("policy", ids)

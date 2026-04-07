@@ -49,6 +49,36 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 	}
 }
 
+// fetchResourcesFiltered returns a tea.Cmd that calls the registered FilteredPaginatedFetcher
+// for the given resource type with the provided filter parameters.
+func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string) tea.Cmd {
+	clients := m.clients
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.APIErrorMsg{
+				ResourceType: resourceType,
+				Err:          fmt.Errorf("AWS clients not initialized"),
+			}
+		}
+		pf := resource.GetFilteredPaginatedFetcher(resourceType)
+		if pf == nil {
+			return messages.APIErrorMsg{
+				ResourceType: resourceType,
+				Err:          fmt.Errorf("no filtered fetcher registered for: %s", resourceType),
+			}
+		}
+		result, err := pf(context.Background(), clients, filter, "")
+		if err != nil {
+			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
+		}
+		return messages.ResourcesLoadedMsg{
+			ResourceType: resourceType,
+			Resources:    result.Resources,
+			Pagination:   result.Pagination,
+		}
+	}
+}
+
 func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 	clients := m.clients
 	return func() tea.Msg {
@@ -123,6 +153,23 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 			}
 		}
 		ctx := context.Background()
+
+		// Filtered fetch path: used by related navigation with server-side filters (e.g., CloudTrail LookupAttributes).
+		if len(msg.FetchFilter) > 0 {
+			pf := resource.GetFilteredPaginatedFetcher(rt)
+			if pf != nil {
+				result, err := pf(ctx, clients, msg.FetchFilter, token)
+				if err != nil {
+					return messages.APIErrorMsg{ResourceType: rt, Err: err}
+				}
+				return messages.ResourcesLoadedMsg{
+					ResourceType: rt,
+					Resources:    result.Resources,
+					Pagination:   result.Pagination,
+					Append:       true,
+				}
+			}
+		}
 
 		// Try paginated child fetcher first (for child views).
 		if len(parentCtx) > 0 {

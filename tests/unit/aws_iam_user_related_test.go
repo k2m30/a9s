@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -88,6 +87,24 @@ func TestRelated_IAMUser_Policy_NilClients(t *testing.T) {
 	}
 	if result.TargetType != "policy" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
+	}
+}
+
+// TestRelated_IAMUser_Policy_EmptyUsername verifies that the iam-user→policy
+// checker returns Count=-1 and no error when nil clients are passed (nil clients
+// are checked before the empty-ID guard, so Count=-1 is returned first).
+func TestRelated_IAMUser_Policy_EmptyUsername(t *testing.T) {
+	source := resource.Resource{
+		ID:   "",
+		Name: "",
+	}
+	checker := iamUserCheckerByTarget(t, "policy")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error for empty username: %v", result.Err)
 	}
 }
 

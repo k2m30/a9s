@@ -642,10 +642,12 @@ func (m *mockEC2DescribeImagesClient) DescribeImages(ctx context.Context, params
 
 // mockCloudTrailLookupEventsClient implements awsclient.CloudTrailLookupEventsAPI for testing.
 type mockCloudTrailLookupEventsClient struct {
-	output *cloudtrail.LookupEventsOutput
-	err    error
+	output        *cloudtrail.LookupEventsOutput
+	err           error
+	capturedInput *cloudtrail.LookupEventsInput
 }
 
 func (m *mockCloudTrailLookupEventsClient) LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+	m.capturedInput = params
 	return m.output, m.err
 }
