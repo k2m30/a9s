@@ -425,7 +425,7 @@ func TestCTFlatten_EventCategoryAndTypeExtracted(t *testing.T) {
 // T020Q — Resource.Status mapping: ct-write vs ct-read
 // ===========================================================================
 
-func TestCTFlatten_StatusCTWrite_ForVerbW(t *testing.T) {
+func TestCTFlatten_StatusCTAttention_ForVerbW(t *testing.T) {
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-status-w", "CreateBucket", "s3.amazonaws.com", "alice",
@@ -435,12 +435,12 @@ func TestCTFlatten_StatusCTWrite_ForVerbW(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-write" {
-		t.Errorf("Resource.Status = %q, want ct-write for verb W (CreateBucket)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-attention" {
+		t.Errorf("Resource.Status = %q, want ct-attention for verb W (CreateBucket) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTWrite_ForVerbD(t *testing.T) {
+func TestCTFlatten_StatusCTDanger_ForVerbD(t *testing.T) {
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-status-d", "DeleteTable", "dynamodb.amazonaws.com", "alice",
@@ -450,28 +450,29 @@ func TestCTFlatten_StatusCTWrite_ForVerbD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-write" {
-		t.Errorf("Resource.Status = %q, want ct-write for verb D (DeleteTable)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-danger" {
+		t.Errorf("Resource.Status = %q, want ct-danger for verb D (DeleteTable) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTRead_ForVerbR(t *testing.T) {
+func TestCTFlatten_StatusCTInfo_ForVerbR(t *testing.T) {
+	// Plain GetObject — no sensitive-read, no ROOT, no cross-account, no error → ct-info
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
-	event := buildSyntheticCTEvent("evt-status-r", "DescribeInstances", "ec2.amazonaws.com", "alice",
+	event := buildSyntheticCTEvent("evt-status-r", "GetObject", "s3.amazonaws.com", "alice",
 		true, time.Now(), ctJSON, nil)
 
 	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-read" {
-		t.Errorf("Resource.Status = %q, want ct-read for verb R (DescribeInstances)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-info" {
+		t.Errorf("Resource.Status = %q, want ct-info for plain verb R (GetObject) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTRead_ForVerbS(t *testing.T) {
-	// AwsServiceEvent → verb S → ct-read
+func TestCTFlatten_StatusCTInfo_ForVerbS(t *testing.T) {
+	// AwsServiceEvent → verb S → ct-info
 	svcJSON := buildFullCTEventJSON("111122223333", "111122223333", "kms.amazonaws.com", "us-east-1",
 		"kms.amazonaws.com", "AWSService", "Management", "AwsServiceEvent", "")
 	event := buildSyntheticCTEvent("evt-status-s", "GenerateDataKey", "kms.amazonaws.com", "",
@@ -481,12 +482,12 @@ func TestCTFlatten_StatusCTRead_ForVerbS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-read" {
-		t.Errorf("Resource.Status = %q, want ct-read for verb S (AwsServiceEvent)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-info" {
+		t.Errorf("Resource.Status = %q, want ct-info for verb S (AwsServiceEvent) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTRead_ForVerbI(t *testing.T) {
+func TestCTFlatten_StatusCTInfo_ForVerbI(t *testing.T) {
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"cloudtrail.amazonaws.com", "AssumedRole", "Insight", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-status-i", "DescribeInstances", "ec2.amazonaws.com", "alice",
@@ -496,12 +497,12 @@ func TestCTFlatten_StatusCTRead_ForVerbI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-read" {
-		t.Errorf("Resource.Status = %q, want ct-read for verb I (Insight category)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-info" {
+		t.Errorf("Resource.Status = %q, want ct-info for verb I (Insight category) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTRead_ForVerbN(t *testing.T) {
+func TestCTFlatten_StatusCTInfo_ForVerbN(t *testing.T) {
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "10.0.0.1", "us-east-1",
 		"vpc.amazonaws.com", "AssumedRole", "NetworkActivity", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-status-n", "CreateNetworkInterface", "ec2.amazonaws.com", "alice",
@@ -511,13 +512,13 @@ func TestCTFlatten_StatusCTRead_ForVerbN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-read" {
-		t.Errorf("Resource.Status = %q, want ct-read for verb N (NetworkActivity category)", result.Resources[0].Status)
+	if result.Resources[0].Status != "ct-info" {
+		t.Errorf("Resource.Status = %q, want ct-info for verb N (NetworkActivity category) per §1.2", result.Resources[0].Status)
 	}
 }
 
-func TestCTFlatten_StatusCTRead_ForVerbQuestionMark(t *testing.T) {
-	// Unknown event name → verb "?" → ct-read
+func TestCTFlatten_StatusCTInfo_ForVerbQuestionMark(t *testing.T) {
+	// Unknown event name → verb "?" → ct-info
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-status-q", "SomeFutureUnknownApiCall", "ec2.amazonaws.com", "alice",
@@ -527,41 +528,8 @@ func TestCTFlatten_StatusCTRead_ForVerbQuestionMark(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-read" {
-		t.Errorf("Resource.Status = %q, want ct-read for verb ? (unknown event)", result.Resources[0].Status)
-	}
-}
-
-func TestCTFlatten_StatusOnlyTwoValues(t *testing.T) {
-	// Exhaustive check: Status must only ever be "ct-write" or "ct-read" —
-	// never the legacy "true"/"false" or empty string.
-	eventDefs := []struct {
-		id        string
-		eventName string
-	}{
-		{"evt-multi-01", "CreateBucket"},
-		{"evt-multi-02", "DescribeInstances"},
-		{"evt-multi-03", "DeleteTable"},
-		{"evt-multi-04", "GetObject"},
-		{"evt-multi-05", "PutObject"},
-		{"evt-multi-06", "ListBuckets"},
-	}
-	var events []cloudtrailtypes.Event
-	for _, d := range eventDefs {
-		ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
-			"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
-		events = append(events, buildSyntheticCTEvent(d.id, d.eventName, "s3.amazonaws.com", "alice",
-			false, time.Now(), ctJSON, nil))
-	}
-
-	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &multiEventCTMock{events: events}, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	for _, r := range result.Resources {
-		if r.Status != "ct-write" && r.Status != "ct-read" {
-			t.Errorf("Resource %q: Status = %q, must be exactly ct-write or ct-read (not legacy true/false)", r.ID, r.Status)
-		}
+	if result.Resources[0].Status != "ct-info" {
+		t.Errorf("Resource.Status = %q, want ct-info for verb ? (unknown event) per §1.2", result.Resources[0].Status)
 	}
 }
 

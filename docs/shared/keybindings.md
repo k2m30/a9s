@@ -23,6 +23,7 @@
 | `c` | Copy resource ID to clipboard |
 | `i` | IAM identity view |
 | `/` | Filter |
+| `Ctrl+Z` | Show only attention-worthy rows (hide dim/routine) |
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
