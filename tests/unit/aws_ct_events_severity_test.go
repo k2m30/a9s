@@ -197,20 +197,20 @@ func TestCTSeverity_SensitiveReadSSMGetParameter(t *testing.T) {
 	}
 }
 
-// TestCTSeverity_SensitiveReadSTSAssumeRole — sts:AssumeRole → ct-attention via verb W.
-// sts:AssumeRole is REMOVED from the §1.3 sensitive-reads allowlist (too noisy as
-// sensitive-read; verb W via Assume prefix already yields ct-attention independently).
+// TestCTSeverity_SensitiveReadSTSAssumeRole — sts:AssumeRole → ct-info (verb R, no escalation).
+// sts:AssumeRole is STS session vending (identity exchange, not state mutation).
+// It is NOT on the §1.3 sensitive-reads allowlist and is exact-matched as verb=R
+// before the "Assume" W-prefix table runs. With no error, no Root, same account: ct-info.
 func TestCTSeverity_SensitiveReadSTSAssumeRole(t *testing.T) {
-	// sts:AssumeRole → ct-attention because verb=W (Assume* prefix), NOT via §1.3 sensitive-reads.
-	// AssumeRole was removed from the sensitive-reads allowlist; the ct-attention outcome
-	// is retained solely through the §1.2 verb-W escalation path.
+	// sts:AssumeRole → ct-info because verb=R (exact-match STS session-vending), no escalation.
+	// Not a sensitive read, not cross-account, not root, no error.
 	event := buildSeverityCTEvent(
 		"sev-10", "AssumeRole", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRole verb W (Assume prefix) per §1.2; NOT via §1.3 sensitive-reads (removed)", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — sts:AssumeRole is STS session-vending (verb R exact-match); not sensitive-read, same account, no error", got)
 	}
 }
 
@@ -317,7 +317,7 @@ func TestCTSeverity_AllowlistEntries_AreSensitiveAttention(t *testing.T) {
 		{"ssm.amazonaws.com", "GetParameterHistory"},
 		{"ssm.amazonaws.com", "DescribeParameters"},
 
-		// STS session vending (NOT AssumeRole — those are W via prefix)
+		// STS session vending (NOT AssumeRole* — those are exact-match R, not on this allowlist)
 		{"sts.amazonaws.com", "GetSessionToken"},
 		{"sts.amazonaws.com", "GetFederationToken"},
 
@@ -398,33 +398,35 @@ func TestCTSeverity_AssumeRoleWithWebIdentity_IsInfo(t *testing.T) {
 	}
 }
 
-// TestCTSeverity_AssumeRole_StillAttention — sts:AssumeRole still yields ct-attention via verb W.
-// AssumeRole was REMOVED from the §1.3 sensitive-reads allowlist (per user direction).
-// ct-attention is preserved because verb=W (Assume* prefix) per §1.2.
-func TestCTSeverity_AssumeRole_StillAttention(t *testing.T) {
-	// sts:AssumeRole → ct-attention via §1.2 verb W (Assume prefix), NOT via §1.3.
+// TestCTSeverity_AssumeRole_IsInfo — sts:AssumeRole yields ct-info (verb R, no escalation).
+// AssumeRole is STS session vending (identity exchange, not state mutation).
+// It is NOT on the §1.3 sensitive-reads allowlist and is exact-matched as verb=R.
+// With no error, same account, no root identity: ct-info.
+func TestCTSeverity_AssumeRole_IsInfo(t *testing.T) {
+	// sts:AssumeRole → ct-info (verb R exact-match; not sensitive-read, same account, no error).
 	event := buildSeverityCTEvent(
 		"sr-10a", "AssumeRole", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRole verb W (Assume prefix); removed from §1.3 sensitive-reads but §1.2 W-verb path still escalates", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — sts:AssumeRole is STS session-vending (verb R exact-match); not sensitive-read, same account, no error", got)
 	}
 }
 
-// TestCTSeverity_AssumeRoleWithSAML_StillAttention — sts:AssumeRoleWithSAML still yields ct-attention via verb W.
-// AssumeRoleWithSAML was REMOVED from the §1.3 sensitive-reads allowlist.
-// ct-attention is preserved because verb=W (Assume* prefix) per §1.2.
-func TestCTSeverity_AssumeRoleWithSAML_StillAttention(t *testing.T) {
-	// sts:AssumeRoleWithSAML → ct-attention via §1.2 verb W (Assume prefix), NOT via §1.3.
+// TestCTSeverity_AssumeRoleWithSAML_IsInfo — sts:AssumeRoleWithSAML yields ct-info (verb R, no escalation).
+// AssumeRoleWithSAML is STS session vending (SAML federation, not state mutation).
+// It is NOT on the §1.3 sensitive-reads allowlist and is exact-matched as verb=R.
+// With no error, same account, no root identity: ct-info.
+func TestCTSeverity_AssumeRoleWithSAML_IsInfo(t *testing.T) {
+	// sts:AssumeRoleWithSAML → ct-info (verb R exact-match; not sensitive-read, same account, no error).
 	event := buildSeverityCTEvent(
 		"sr-09b", "AssumeRoleWithSAML", "sts.amazonaws.com",
 		"123456789012", "123456789012", "AssumedRole", "Management", "AwsApiCall", "",
 	)
 	got := fetchOneStatus(t, event)
-	if got != "ct-attention" {
-		t.Errorf("Status = %q, want ct-attention — sts:AssumeRoleWithSAML verb W (Assume prefix); removed from §1.3 sensitive-reads but §1.2 W-verb path still escalates", got)
+	if got != "ct-info" {
+		t.Errorf("Status = %q, want ct-info — sts:AssumeRoleWithSAML is STS session-vending (verb R exact-match); not sensitive-read, same account, no error", got)
 	}
 }
 
