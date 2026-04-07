@@ -101,6 +101,11 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 			user = *event.Username
 		}
 
+		roleName := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+		if user == "" && roleName != "" {
+			user = roleName
+		}
+
 		source := ""
 		if event.EventSource != nil {
 			source = *event.EventSource
@@ -113,8 +118,6 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 		if event.ReadOnly != nil {
 			readOnly = *event.ReadOnly
 		}
-
-		roleName := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
 
 		r := resource.Resource{
 			ID:     eventID,
@@ -199,6 +202,11 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 			user = *event.Username
 		}
 
+		roleName := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+		if user == "" && roleName != "" {
+			user = roleName
+		}
+
 		source := ""
 		if event.EventSource != nil {
 			source = *event.EventSource
@@ -211,8 +219,6 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 		if event.ReadOnly != nil {
 			readOnly = *event.ReadOnly
 		}
-
-		roleName := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
 
 		r := resource.Resource{
 			ID:     eventID,

@@ -279,6 +279,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
+	case tea.PasteMsg:
+		if m.inputMode == modeFilter || m.inputMode == modeCommand {
+			var cmd tea.Cmd
+			m.cmdInput, cmd = m.cmdInput.Update(msg)
+			if m.inputMode == modeFilter {
+				m.applyFilterToActiveView(m.cmdInput.Value())
+			}
+			return m, cmd
+		}
+		return m.updateActiveView(msg)
 	case messages.NavigateMsg:
 		return m.handleNavigate(msg)
 	case messages.PopViewMsg:
@@ -403,6 +413,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateActiveView(msg)
 	case messages.RelatedNavigateMsg:
 		return m.handleRelatedNavigate(msg)
+	}
+	// Route unmatched messages to cmdInput when in filter/command mode.
+	// This handles textinput-internal clipboard messages (e.g., pasteMsg returned
+	// by textinput.Paste) that need to reach m.cmdInput to complete the paste.
+	if m.inputMode == modeFilter || m.inputMode == modeCommand {
+		var cmd tea.Cmd
+		m.cmdInput, cmd = m.cmdInput.Update(msg)
+		if m.inputMode == modeFilter {
+			m.applyFilterToActiveView(m.cmdInput.Value())
+		}
+		return m, cmd
 	}
 	return m.updateActiveView(msg)
 }
