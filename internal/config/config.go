@@ -27,6 +27,8 @@ type ListColumn struct {
 	Path  string `yaml:"path"`
 	Key   string `yaml:"key"`
 	Width int    `yaml:"width"`
+	// Color selects a per-cell color classifier (e.g. "verb", "actor", "outcome", "origin"). Empty = no classifier.
+	Color string `yaml:"color,omitempty"`
 }
 
 // UnmarshalYAML implements custom unmarshaling for ViewDef to preserve

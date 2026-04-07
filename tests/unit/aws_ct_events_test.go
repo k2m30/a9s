@@ -97,8 +97,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r0.Name != "RunInstances" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "RunInstances", r0.Name)
 	}
-	if r0.Status != "false" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "false", r0.Status)
+	// RunInstances has "Run" prefix → write verb → Status must be "ct-write".
+	if r0.Status != "ct-write" {
+		t.Errorf("resource[0].Status: expected %q (RunInstances is a write event), got %q", "ct-write", r0.Status)
 	}
 
 	// Verify second event (read-only, empty Resources)
@@ -109,8 +110,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r1.Name != "GetObject" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "GetObject", r1.Name)
 	}
-	if r1.Status != "true" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "true", r1.Status)
+	// GetObject has "Get" prefix → read verb → Status must be "ct-read".
+	if r1.Status != "ct-read" {
+		t.Errorf("resource[1].Status: expected %q (GetObject is a read event), got %q", "ct-read", r1.Status)
 	}
 }
 
@@ -316,7 +318,10 @@ func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
 }
 
 func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
-	// ReadOnly is *string ("true" or "false"), not *bool
+	// ReadOnly is *string ("true" or "false"), not *bool.
+	// The legacy ReadOnly→Status mapping is removed; Status is now verb-based ("ct-read"/"ct-write").
+	// This test verifies: (a) Fields["read_only"] is preserved as-is, (b) Status is verb-based,
+	// and (c) Fields["_ct.outcome"] is a non-empty string.
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 
 	mock := &mockCloudTrailLookupEventsClient{
@@ -341,11 +346,17 @@ func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	}
 
 	r := resources[0]
+	// read_only field is preserved for backwards compat.
 	if r.Fields["read_only"] != "true" {
 		t.Errorf("Fields[\"read_only\"]: expected %q, got %q", "true", r.Fields["read_only"])
 	}
-	if r.Status != "true" {
-		t.Errorf("Status: expected %q (read_only mapped to status), got %q", "true", r.Status)
+	// DescribeInstances has "Describe" prefix → read verb → Status must be "ct-read".
+	if r.Status != "ct-read" {
+		t.Errorf("Status: expected %q (DescribeInstances is a read event), got %q", "ct-read", r.Status)
+	}
+	// _ct.outcome is always a non-empty string ("OK" or an error code).
+	if r.Fields["_ct.outcome"] == "" {
+		t.Errorf("Fields[\"_ct.outcome\"]: expected non-empty string, got empty")
 	}
 }
 

@@ -175,6 +175,13 @@ func initStyles() {
 		"grey":        lipgloss.NewStyle().Foreground(ColTerminated), // EB Health
 		"not_started": lipgloss.NewStyle().Foreground(ColTerminated), // SES
 		"paused":      lipgloss.NewStyle().Foreground(ColTerminated), // Redshift
+
+		// --- CloudTrail verb classifiers (fg only, no bg, no bold) ---
+		"ct-write": lipgloss.NewStyle().Foreground(ColStopped), // CT events: verb W or D (red fg)
+		"ct-read":  lipgloss.NewStyle().Foreground(ColPending), // CT events: verb R/S/I/N (yellow fg)
+
+		// --- CloudTrail row-status classifiers ---
+		"ct-root": lipgloss.NewStyle().Foreground(ColStopped).Bold(true), // CT events: Root identity (red bold)
 	}
 
 	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)
