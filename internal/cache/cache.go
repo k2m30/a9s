@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // DefaultTTL is the default cache expiration duration.
@@ -80,6 +82,24 @@ func Load(profile, region string) (*File, error) {
 	var f File
 	if err := yaml.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("parsing cache %s: %w", p, err)
+	}
+	// Strip resource keys that are not in the registry. This guards against
+	// stale cache files from older versions containing unknown type keys.
+	// Both ShortNames and Aliases are valid keys (aliases allow old cache files
+	// written under a previous name to survive gracefully).
+	if len(f.Resources) > 0 {
+		known := make(map[string]bool)
+		for _, rt := range resource.AllResourceTypes() {
+			known[rt.ShortName] = true
+			for _, alias := range rt.Aliases {
+				known[alias] = true
+			}
+		}
+		for key := range f.Resources {
+			if !known[key] {
+				delete(f.Resources, key)
+			}
+		}
 	}
 	return &f, nil
 }

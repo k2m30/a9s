@@ -423,7 +423,7 @@ func TestQA_Coverage_PropagateSize_RevealView(t *testing.T) {
 
 	// Push a secret reveal view via SecretRevealedMsg
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "my-secret",
+		ResourceID: "my-secret",
 		Value:      "super-secret-value-123",
 	})
 
@@ -500,7 +500,7 @@ func TestQA_Coverage_UpdateActiveView_RevealDelegation(t *testing.T) {
 
 	// Push reveal view
 	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
-		SecretName: "my-secret",
+		ResourceID: "my-secret",
 		Value:      "secret-val",
 	})
 
