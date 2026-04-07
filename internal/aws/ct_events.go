@@ -222,25 +222,24 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	actor := computeCTActor(parsed, user, crossAccount == "true")
 	origin := computeCTOrigin(parsed)
 	target := ExtractCTTarget(parsed)
+	if target == "(none)" || target == "" {
+		// LookupEvents fallback: use event.Resources from the SDK convenience slice.
+		for _, res := range event.Resources {
+			if res.ResourceName != nil && *res.ResourceName != "" {
+				target = *res.ResourceName
+				break
+			}
+		}
+	}
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
-	// Set Resource.Status based on priority ladder:
-	// 1. Root identity → "ct-root"
-	// 2. Error code present → "error"
-	// 3. Cross-account → "pending"
-	// 4. AwsServiceEvent → "terminated"
-	// 5. Default → "running"
-	status := "running"
-	switch {
-	case isRoot == "true":
-		status = "ct-root"
-	case errorCode != "":
-		status = "error"
-	case crossAccount == "true":
-		status = "pending"
-	case eventType == "AwsServiceEvent":
-		status = "terminated"
+	// Set Resource.Status from verb (binary, foreground-only row tint).
+	// Errors, root, cross-account, and service events are signalled at CELL level
+	// (ACTOR / OUTCOME / EVENT classifiers), NOT via Status.
+	status := "ct-read"
+	if verb == "W" || verb == "D" {
+		status = "ct-write"
 	}
 
 	r := resource.Resource{

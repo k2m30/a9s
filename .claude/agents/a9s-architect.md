@@ -10,6 +10,8 @@ tools:
   - Grep
   - Bash
   - Agent
+  - mcp__aws-api__call_aws
+  - mcp__aws-api__suggest_aws_commands
 skills:
   - a9s-common
   - a9s-bt-v2

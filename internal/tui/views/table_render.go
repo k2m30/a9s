@@ -3,6 +3,8 @@ package views
 import (
 	"strings"
 
+	lipgloss "charm.land/lipgloss/v2"
+
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -116,11 +118,17 @@ func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 }
 
 // renderDataRow renders a single data row.
-func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) string {
-	cells := make([]string, len(cols))
+func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, base lipgloss.Style, totalWidth int, isSelected bool) string {
+	var b strings.Builder
+	// Leading single space carries base style.
+	b.WriteString(base.Render(" "))
+	used := 1
 	for i, c := range cols {
+		if i > 0 {
+			b.WriteString(base.Render("  "))
+			used += 2
+		}
 		val := m.extractCellValue(c, r)
-		// Prepend status check indicator to the state cell for running instances.
 		if (c.key == "state" || c.path == "State.Name") && val == "running" {
 			sysStatus := r.Fields["system_status"]
 			instStatus := r.Fields["instance_status"]
@@ -131,12 +139,33 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource) st
 			}
 		}
 		padded := text.PadOrTrunc(val, c.width)
-		if c.color != "" {
-			padded = ApplyCellColor(c.color, padded)
+		used += c.width
+		// Compose per-cell style on top of base so the row's background
+		// (cursor highlight) and any inherited base attributes survive on
+		// classified cells.  Override only sets foreground (and optional bold);
+		// base supplies background and any unset attributes.
+		// On the cursor row, suppress per-cell overrides so the cursor highlight
+		// foreground/bold wins (mirrors ec2/list behavior — uniform readable text
+		// on cursor bg).
+		style := base
+		if c.color != "" && !isSelected {
+			raw := strings.TrimRight(padded, " ")
+			if fg, bold, ok := cellOverrideFor(c.color, raw); ok {
+				style = base.Foreground(fg)
+				if bold {
+					style = style.Bold(true)
+				}
+			}
 		}
-		cells[i] = padded
+		b.WriteString(style.Render(padded))
 	}
-	return " " + strings.Join(cells, "  ")
+	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
+	// Non-cursor rows are not padded (preserving the same plain-text length as the
+	// pre-fix RowColorStyle.Render approach, which did not add Width padding).
+	if isSelected && totalWidth > used {
+		b.WriteString(base.Render(strings.Repeat(" ", totalWidth-used)))
+	}
+	return b.String()
 }
 
 // extractCellValue gets the cell value for a column from a resource.
