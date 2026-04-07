@@ -97,10 +97,11 @@ type ServiceClients struct {
 	STS              *sts.Client
 }
 
-// NewAWSSession creates a new AWS config using the given profile and region.
-// If profile is empty, the default profile is used.
-// If region is empty, the default region from the config/environment is used.
-func NewAWSSession(profile, region string) (aws.Config, error) {
+// NewAWSSessionContext creates a new AWS config using the given context, profile,
+// and region. If profile is empty, the default profile is used. If region is
+// empty, the default region from the config/environment is used.
+// The provided context is forwarded to the AWS SDK config loader.
+func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Config, error) {
 	var opts []func(*config.LoadOptions) error
 
 	if profile != "" {
@@ -110,7 +111,7 @@ func NewAWSSession(profile, region string) (aws.Config, error) {
 		opts = append(opts, config.WithRegion(region))
 	}
 
-	return config.LoadDefaultConfig(context.Background(), opts...)
+	return config.LoadDefaultConfig(ctx, opts...)
 }
 
 // CreateServiceClients creates all service clients from the given AWS config.

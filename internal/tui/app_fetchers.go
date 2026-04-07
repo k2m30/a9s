@@ -20,6 +20,7 @@ import (
 // are handled by fetchChildResources instead.
 func (m *Model) fetchResources(resourceType string) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.APIErrorMsg{
@@ -27,8 +28,6 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 				Err:          fmt.Errorf("AWS clients not initialized"),
 			}
 		}
-
-		ctx := context.Background()
 
 		pf := resource.GetPaginatedFetcher(resourceType)
 		if pf == nil {
@@ -53,6 +52,7 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 // for the given resource type with the provided filter parameters.
 func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.APIErrorMsg{
@@ -67,7 +67,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 				Err:          fmt.Errorf("no filtered fetcher registered for: %s", resourceType),
 			}
 		}
-		result, err := pf(context.Background(), clients, filter, "")
+		result, err := pf(ctx, clients, filter, "")
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
@@ -81,6 +81,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 
 func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.FlashMsg{
@@ -88,7 +89,7 @@ func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 				IsError: true,
 			}
 		}
-		res, err := awsclient.FetchAMIByID(context.Background(), clients.EC2, imageID)
+		res, err := awsclient.FetchAMIByID(ctx, clients.EC2, imageID)
 		if err != nil {
 			return messages.FlashMsg{
 				Text:    err.Error(),
@@ -107,6 +108,7 @@ func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 // for the given child type, passing an empty continuation token for the initial page.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.APIErrorMsg{
@@ -115,7 +117,6 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 			}
 		}
 
-		ctx := context.Background()
 		pc := resource.ParentContext(parentCtx)
 
 		pf := resource.GetPaginatedChildFetcher(childType)
@@ -141,6 +142,7 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 // resource list using the continuation token from LoadMoreMsg.
 func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	rt := msg.ResourceType
 	token := msg.ContinuationToken
 	parentCtx := msg.ParentContext
@@ -152,7 +154,6 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 				Err:          fmt.Errorf("AWS clients not initialized"),
 			}
 		}
-		ctx := context.Background()
 
 		// Filtered fetch path: used by related navigation with server-side filters (e.g., CloudTrail LookupAttributes).
 		if len(msg.FetchFilter) > 0 {
@@ -213,11 +214,12 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 
 func (m *Model) fetchIdentity() tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.IdentityErrorMsg{Err: "AWS clients not initialized"}
 		}
-		identity, err := awsclient.FetchCallerIdentity(context.Background(), clients.STS, clients.IAM)
+		identity, err := awsclient.FetchCallerIdentity(ctx, clients.STS, clients.IAM)
 		if err != nil {
 			return messages.IdentityErrorMsg{Err: err.Error()}
 		}
@@ -245,11 +247,11 @@ type profilesLoadedMsg struct {
 
 func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 	clients := m.clients
+	ctx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.FlashMsg{Text: "AWS clients not initialized", IsError: true}
 		}
-		ctx := context.Background()
 		fetcher := resource.GetRevealFetcher(resourceType)
 		if fetcher == nil {
 			return messages.FlashMsg{Text: "no reveal support for " + resourceType, IsError: true}
@@ -263,16 +265,17 @@ func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 }
 
 func (m *Model) connectAWS(profile, region string, gen int) tea.Cmd {
+	ctx := m.appCtx
 	return func() tea.Msg {
 		// First attempt: let SDK resolve region from env vars + config file.
-		cfg, err := awsclient.NewAWSSession(profile, region)
+		cfg, err := awsclient.NewAWSSessionContext(ctx, profile, region)
 		if err != nil {
 			// If SDK fails due to missing region and we didn't provide one,
 			// fall back to config-file / us-east-1 (issue #82 safety net).
 			if region == "" && isMissingRegionError(err) {
 				configPath := awsclient.DefaultConfigPath()
 				fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
-				cfg, err = awsclient.NewAWSSession(profile, fallbackRegion)
+				cfg, err = awsclient.NewAWSSessionContext(ctx, profile, fallbackRegion)
 			}
 			if err != nil {
 				return messages.ClientsReadyMsg{Err: err, Gen: gen}
@@ -283,7 +286,7 @@ func (m *Model) connectAWS(profile, region string, gen int) tea.Cmd {
 		if cfg.Region == "" && region == "" {
 			configPath := awsclient.DefaultConfigPath()
 			fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
-			cfg, err = awsclient.NewAWSSession(profile, fallbackRegion)
+			cfg, err = awsclient.NewAWSSessionContext(ctx, profile, fallbackRegion)
 			if err != nil {
 				return messages.ClientsReadyMsg{Err: err, Gen: gen}
 			}
@@ -336,6 +339,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 // reported as "(N+)" in the main menu.
 func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 	clients := m.clients
+	appCtx := m.appCtx
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.AvailabilityCheckedMsg{
@@ -344,7 +348,7 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 				Gen:          gen,
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
 
 		pf := resource.GetPaginatedFetcher(shortName)

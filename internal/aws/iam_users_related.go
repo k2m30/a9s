@@ -12,7 +12,7 @@ import (
 
 // checkUserGroup uses the IAM ListGroupsForUser API to return the groups
 // this IAM user belongs to.
-func checkUserGroup(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1}
@@ -21,7 +21,7 @@ func checkUserGroup(_ context.Context, clients any, res resource.Resource, _ res
 	if userName == "" {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
 	}
-	out, err := c.IAM.ListGroupsForUser(context.Background(), &iam.ListGroupsForUserInput{
+	out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
 		UserName: &userName,
 	})
 	if err != nil {
@@ -38,7 +38,7 @@ func checkUserGroup(_ context.Context, clients any, res resource.Resource, _ res
 
 // checkUserPolicy uses the IAM ListAttachedUserPolicies API to return the
 // managed policies attached to this IAM user.
-func checkUserPolicy(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
@@ -47,7 +47,7 @@ func checkUserPolicy(_ context.Context, clients any, res resource.Resource, _ re
 	if userName == "" {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
 	}
-	out, err := c.IAM.ListAttachedUserPolicies(context.Background(), &iam.ListAttachedUserPoliciesInput{
+	out, err := c.IAM.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
 		UserName: &userName,
 	})
 	if err != nil {
