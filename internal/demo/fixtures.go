@@ -123,9 +123,15 @@ func GetChildResources(childType string, parentCtx map[string]string) ([]resourc
 	return gen(parentCtx), true
 }
 
+// ParseTime parses a time string in RFC3339 format, returning an error on failure.
+// This is the error-returning counterpart of mustParseTime; exported for testing.
+func ParseTime(s string) (time.Time, error) {
+	return time.Parse(time.RFC3339, s)
+}
+
 // mustParseTime parses a time string in RFC3339 format or panics.
 func mustParseTime(s string) time.Time {
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := ParseTime(s)
 	if err != nil {
 		panic("demo: invalid time literal: " + s)
 	}

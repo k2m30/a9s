@@ -338,3 +338,81 @@ func TestGolden_DemoRelatedNavRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test 6: Demo-mode related counter mismatch — announced count vs. navigable items.
+//
+// This is a hard assertion for CONCERNS.md #5 (Known Bugs).
+//
+// The bug: a demo checker returns Count > 0 but either:
+//   (a) ResourceIDs is empty — right column shows "3" but navigation opens an empty list, OR
+//   (b) Count != len(ResourceIDs) — right column shows "4" but only 1 ID is provided,
+//       so the filtered list has at most 1 item.
+//
+// Both cases produce a detail-view counter that disagrees with what the user actually
+// sees when they press Enter to navigate. The test deliberately fails on every known
+// mismatch pair so the coder knows exactly what to fix.
+//
+// Known failing pairs at time of authoring (2026-04-07):
+//   - iam-group → iam-user  : Count=3, ResourceIDs=[]
+//   - iam-group → policy    : Count=2, ResourceIDs=[]
+//   - policy → role         : Count=5, ResourceIDs=[]
+//   - policy → iam-user     : Count=2, ResourceIDs=[]
+//   - policy → iam-group    : Count=1, ResourceIDs=[]
+//   - role (acme-lambda-execution) → lambda : Count=4, len(ResourceIDs)=1
+//
+// Fix: either populate ResourceIDs with the correct IDs, or lower Count to
+// len(ResourceIDs). Do NOT suppress this test to make it pass; fix the data.
+// ---------------------------------------------------------------------------
+
+func TestGoldenDemoRelated_CountMatchesResourceIDs(t *testing.T) {
+	for _, shortName := range resource.AllShortNames() {
+		demoFn := resource.GetRelatedDemo(shortName)
+		if demoFn == nil {
+			continue
+		}
+		fixtures, ok := demo.GetResources(shortName)
+		if !ok || len(fixtures) == 0 {
+			continue
+		}
+
+		// Evaluate the checker against every fixture, not just fixtures[0], so
+		// that per-resource-ID switch cases (e.g. "role") are also exercised.
+		for _, res := range fixtures {
+			results := demoFn(res)
+			for _, r := range results {
+				if r.Count <= 0 {
+					// Count=0 or Count=-1 are fine: no items announced, no mismatch possible.
+					continue
+				}
+
+				// Case (a): Count > 0 but no ResourceIDs — navigation opens an empty list.
+				if len(r.ResourceIDs) == 0 {
+					t.Run(fmt.Sprintf("%s/%s→%s/no-ids", shortName, res.ID, r.TargetType), func(t *testing.T) {
+						t.Errorf(
+							"%s (res=%q) → %s: demo checker announces Count=%d but ResourceIDs is empty — "+
+								"right column counter will be %d but navigation opens an empty list. "+
+								"Fix: populate ResourceIDs with the actual fixture IDs.",
+							shortName, res.ID, r.TargetType, r.Count, r.Count,
+						)
+					})
+					continue
+				}
+
+				// Case (b): Count != len(ResourceIDs) — counter disagrees with navigable items.
+				if r.Count != len(r.ResourceIDs) {
+					t.Run(fmt.Sprintf("%s/%s→%s/count-mismatch", shortName, res.ID, r.TargetType), func(t *testing.T) {
+						t.Errorf(
+							"%s (res=%q) → %s: demo checker announces Count=%d but len(ResourceIDs)=%d — "+
+								"right column shows %d but navigation filters to at most %d items. "+
+								"Fix: set Count=len(ResourceIDs) or add the missing IDs.",
+							shortName, res.ID, r.TargetType,
+							r.Count, len(r.ResourceIDs),
+							r.Count, len(r.ResourceIDs),
+						)
+					})
+				}
+			}
+		}
+	}
+}

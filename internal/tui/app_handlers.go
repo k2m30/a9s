@@ -322,12 +322,7 @@ func (m Model) handleValueRevealed(msg messages.ValueRevealedMsg) (tea.Model, te
 			return messages.FlashMsg{Text: errText, IsError: true}
 		}
 	}
-	// ResourceID is the canonical field; fall back to SecretName for backward compatibility.
-	id := msg.ResourceID
-	if id == "" {
-		id = msg.SecretName
-	}
-	rv := views.NewReveal(id, msg.Value, m.keys)
+	rv := views.NewReveal(msg.ResourceID, msg.Value, m.keys)
 	rv.SetSize(m.innerSize())
 	m.pushView(&rv)
 	return m, nil
