@@ -4,6 +4,21 @@ description: "Implements related-view Steps 1-7 for a single resource type in a9
 model: sonnet
 color: yellow
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - Write
+  - Edit
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 skills:
   - a9s-common
   - a9s-add-related-view

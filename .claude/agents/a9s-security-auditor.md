@@ -1,7 +1,19 @@
 ---
 name: a9s-security-auditor
 description: Audits a9s for security issues — verifies read-only AWS API usage, checks for hardcoded secrets, reviews dependency vulnerabilities, and inspects injection vectors. Use after code changes or before releases.
-tools: Read, Glob, Grep, Bash
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 model: sonnet
 ---
 

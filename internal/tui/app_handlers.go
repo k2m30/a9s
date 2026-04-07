@@ -48,7 +48,11 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.updateActiveView(msg)
 		}
 		ctx := m.helpContext()
-		help := views.NewHelp(m.keys, ctx)
+		activeShortName := ""
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			activeShortName = rl.ShortName()
+		}
+		help := views.NewHelpWithResource(m.keys, ctx, activeShortName)
 		help.SetSize(m.innerSize())
 		m.pushView(&help)
 		return m, nil
@@ -318,12 +322,7 @@ func (m Model) handleValueRevealed(msg messages.ValueRevealedMsg) (tea.Model, te
 			return messages.FlashMsg{Text: errText, IsError: true}
 		}
 	}
-	// ResourceID is the canonical field; fall back to SecretName for backward compatibility.
-	id := msg.ResourceID
-	if id == "" {
-		id = msg.SecretName
-	}
-	rv := views.NewReveal(id, msg.Value, m.keys)
+	rv := views.NewReveal(msg.ResourceID, msg.Value, m.keys)
 	rv.SetSize(m.innerSize())
 	m.pushView(&rv)
 	return m, nil
@@ -383,6 +382,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				entry.resources, entry.pagination,
 				entry.filterText, entry.sortField, entry.sortAsc,
 				entry.cursorPos, entry.hScrollOffset,
+				entry.attentionOnly,
 			)
 			rl.SetSize(m.innerSize())
 			m.pushView(&rl)
@@ -437,7 +437,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 
 	case messages.TargetHelp:
 		ctx := m.helpContext()
-		h := views.NewHelp(m.keys, ctx)
+		activeShortName := ""
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			activeShortName = rl.ShortName()
+		}
+		h := views.NewHelpWithResource(m.keys, ctx, activeShortName)
 		h.SetSize(m.innerSize())
 		m.pushView(&h)
 		return m, nil
