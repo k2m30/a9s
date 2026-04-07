@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/ansi"
 
 	tea "charm.land/bubbletea/v2"
@@ -51,6 +52,19 @@ var (
 				Underline(true).
 				Foreground(lipgloss.Color("#e0af68"))
 )
+
+// searchPasteMsg carries clipboard text pasted into a search query.
+type searchPasteMsg string
+
+// searchReadClipboard is a tea.Cmd that reads the system clipboard and
+// returns a searchPasteMsg with the content, or nil on error.
+func searchReadClipboard() tea.Msg {
+	str, err := clipboard.ReadAll()
+	if err != nil {
+		return nil
+	}
+	return searchPasteMsg(str)
+}
 
 // NewSearch returns a zero-value SearchModel ready for use.
 func NewSearch() SearchModel {
@@ -133,6 +147,18 @@ func (s SearchModel) MatchInfo() string {
 //   - Enter: exits input mode (keeps highlights).
 //   - Esc: calls Deactivate().
 func (s SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
+	// Handle bracketed paste (Cmd+V on macOS via terminal bracketed-paste).
+	if pm, ok := msg.(tea.PasteMsg); ok {
+		s.query += pm.Content
+		s.recomputeMatches()
+		return s, nil
+	}
+	// Handle clipboard read result (ctrl+V async clipboard fetch).
+	if pm, ok := msg.(searchPasteMsg); ok {
+		s.query += string(pm)
+		s.recomputeMatches()
+		return s, nil
+	}
 	kp, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return s, nil
@@ -154,6 +180,10 @@ func (s SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
 	case tea.KeyEscape:
 		s.Deactivate()
 	default:
+		if k.Code == 'v' && k.Mod == tea.ModCtrl {
+			// ctrl+V: async clipboard read; result arrives as searchPasteMsg.
+			return s, searchReadClipboard
+		}
 		if k.Text != "" {
 			s.query += k.Text
 			s.recomputeMatches()
