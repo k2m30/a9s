@@ -4,6 +4,21 @@ description: "Writes related-view test Steps 8-12 for a single resource type in 
 model: sonnet
 color: red
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - Write
+  - Edit
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 skills:
   - a9s-common
   - a9s-add-related-view

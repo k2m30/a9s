@@ -53,6 +53,9 @@ type Map struct {
 	// Detail / YAML
 	ToggleWrap key.Binding
 
+	// Resource list attention filter
+	ToggleAttentionOnly key.Binding
+
 	// Related views
 	ToggleRelated key.Binding
 
@@ -104,6 +107,8 @@ func Default() Map {
 		LoadMore: key.NewBinding(key.WithKeys("m", "M"), key.WithHelp("m", "load more")),
 
 		ToggleWrap: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap")),
+
+		ToggleAttentionOnly: key.NewBinding(key.WithKeys("ctrl+z"), key.WithHelp("ctrl+z", "show only attention-worthy rows")),
 
 		ToggleRelated: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "related")),
 

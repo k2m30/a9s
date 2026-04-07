@@ -57,7 +57,14 @@ func registerLambdaHandlers(t *Transport) {
 
 		// Read pagination marker from query param
 		marker := req.URL.Query().Get("Marker")
-		page, nextToken := Paginate(fns, 20, marker)
+		page, nextToken, err := Paginate(fns, 20, marker)
+		if err != nil {
+			return &http.Response{
+				StatusCode: 400,
+				Status:     "400 Bad Request",
+				Body:       io.NopCloser(strings.NewReader(err.Error())),
+			}, nil
+		}
 
 		out := &lambda.ListFunctionsOutput{
 			Functions:  page,
