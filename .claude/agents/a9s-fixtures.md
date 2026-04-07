@@ -4,6 +4,23 @@ description: "Fetches real AWS data from dev-account profile via AWS API MCP too
 model: sonnet
 color: orange
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - Write
+  - Edit
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
+  - mcp__aws-api__call_aws
+  - mcp__aws-api__suggest_aws_commands
 skills:
   - a9s-common
 ---
