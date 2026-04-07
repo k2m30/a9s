@@ -12,6 +12,7 @@ import (
 
 func init() {
 	demoData["ecs-svc"] = ecsServiceFixtures
+	demoData["ecs_svc"] = ecsServiceFixtures
 	demoData["ecs"] = ecsClusterFixtures
 	demoData["ecs-task"] = ecsTaskFixtures
 }
