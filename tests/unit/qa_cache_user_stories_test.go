@@ -250,8 +250,8 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 			"_ct.verb": "R", "_ct.actor": "LookupEvents top-level", "_ct.origin": "CLI",
 			"_ct.target": "(none)", "_ct.outcome": "OK", "event_time": "2026-03-28 14:30:15",
 		}},
-		{ID: "evt-top-2", Name: "AssumeRole top-level", Status: "ct-attention", Fields: map[string]string{
-			"_ct.verb": "W", "_ct.actor": "AssumeRole top-level", "_ct.origin": "CLI",
+		{ID: "evt-top-2", Name: "AssumeRole top-level", Status: "ct-info", Fields: map[string]string{
+			"_ct.verb": "R", "_ct.actor": "AssumeRole top-level", "_ct.origin": "CLI",
 			"_ct.target": "(none)", "_ct.outcome": "OK", "event_time": "2026-03-28 14:30:15",
 		}},
 	}

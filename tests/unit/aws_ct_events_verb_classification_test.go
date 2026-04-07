@@ -74,15 +74,15 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"GenerateDataKeyWithoutPlaintext_R", "GenerateDataKeyWithoutPlaintext", "", "", "R"},
 
 		// ---------------------------------------------------------------
-		// §1.4 exact-match overrides — AssumeRoleWithWebIdentity is R, not W.
-		// AssumeRole and AssumeRoleWithSAML keep their Assume* → W classification.
+		// §1.4 exact-match overrides — all AssumeRole* ops are R (STS session-vending).
+		// Identity exchange, not state mutation. Exact-matched before the W prefix table runs.
 		// ---------------------------------------------------------------
 		// AssumeRoleWithWebIdentity: exact-match R (IRSA/OIDC — not a write op)
 		{"AssumeRoleWithWebIdentity_R", "AssumeRoleWithWebIdentity", "", "", "R"},
-		// AssumeRole: still W via "Assume" prefix (human/automation cross-role)
-		{"AssumeRole_W", "AssumeRole", "", "", "W"},
-		// AssumeRoleWithSAML: still W via "Assume" prefix (enterprise federation)
-		{"AssumeRoleWithSAML_W", "AssumeRoleWithSAML", "", "", "W"},
+		// AssumeRole: exact-match R (STS session-vending — identity exchange, not state mutation)
+		{"AssumeRole_R", "AssumeRole", "", "", "R"},
+		// AssumeRoleWithSAML: exact-match R (SAML federation — STS session-vending, not state mutation)
+		{"AssumeRoleWithSAML_R", "AssumeRoleWithSAML", "", "", "R"},
 
 		// ---------------------------------------------------------------
 		// Write prefixes — §2.1 W row
