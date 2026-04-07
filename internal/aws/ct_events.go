@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -340,6 +341,10 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	if strings.HasPrefix(eventName, "BatchGet") {
 		return "R"
 	}
+	// BatchDelete* must beat the Batch write prefix.
+	if strings.HasPrefix(eventName, "BatchDelete") {
+		return "D"
+	}
 	// KMS use-key ops and federation reads — exact matches (§2.1 row 2 additional).
 	// AssumeRoleWithWebIdentity is a read (OIDC token exchange), not a write.
 	switch eventName {
@@ -391,10 +396,12 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 // computeCTActor computes the _ct.actor string from parsed JSON and the top-level Username.
 // Never returns blank — falls back to "-" if no identity can be determined.
 // When crossAccount is true, the result is prefixed with "<counterpartyAccountID>/" per §1.4
-// (except for "ROOT" and "-"). counterpartyAccount is the userIdentity.accountId.
+// (except for "-", which indicates no actor was identified). counterpartyAccount is the
+// userIdentity.accountId. Note: ROOT actors DO receive the prefix — the counterparty account
+// identity is exactly the high-signal information the user needs for cross-account root events.
 func computeCTActor(parsed map[string]any, topLevelUser string, crossAccount bool, counterpartyAccount string) string {
 	actor := computeCTActorInner(parsed, topLevelUser)
-	if crossAccount && actor != "ROOT" && actor != "-" && counterpartyAccount != "" {
+	if crossAccount && actor != "-" && counterpartyAccount != "" {
 		return counterpartyAccount + "/" + actor
 	}
 	return actor
@@ -792,6 +799,12 @@ func FormatCTTarget(rawARN, localAccount string) string {
 	if account == "" {
 		return resource
 	}
+	// When localAccount is unknown (recipientAccountId missing from event),
+	// we can't tell if this is cross-account — strip the account so same-account
+	// events don't render with a spurious prefix.
+	if localAccount == "" {
+		return resource
+	}
 	if account != localAccount {
 		return account + ":" + resource
 	}
@@ -881,6 +894,17 @@ func extractTargetByEventName(eventName string, parsed map[string]any) string {
 		if req != nil {
 			if r, _ := req["repositoryName"].(string); r != "" {
 				return r
+			}
+		}
+	case "BatchGetItem":
+		if req != nil {
+			if items, _ := req["requestItems"].(map[string]any); len(items) > 0 {
+				tables := make([]string, 0, len(items))
+				for tableName := range items {
+					tables = append(tables, tableName)
+				}
+				sort.Strings(tables) // deterministic order
+				return strings.Join(tables, ",")
 			}
 		}
 	case "ListBuckets":
