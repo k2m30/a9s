@@ -14,7 +14,7 @@ package unit
 //   - Legend shown on ALL resource lists (not gated on ct-events short name)
 //   - Legend shown from main-menu context (wrong context gate)
 //   - Legend missing required verb glyphs (R/W/D/S/I/N)
-//   - Legend missing row-tint labels (ct-write / ct-read)
+//   - Legend missing severity-tier labels (ct-info / ct-attention / ct-danger)
 //   - Legend missing actor/outcome cell-color entries (ROOT, OK, FAILED)
 //   - "CloudTrail" section header absent from legend
 
@@ -80,21 +80,23 @@ func TestHelpCTEventsLegend_ContainsAllVerbGlyphs(t *testing.T) {
 	}
 }
 
-func TestHelpCTEventsLegend_ContainsRowTintLabels(t *testing.T) {
+func TestHelpCTEventsLegend_ContainsSeverityTierLabels(t *testing.T) {
 	h := helpWithCTEvents(views.HelpFromResourceList)
 	out := renderHelp(h)
 	plain := stripANSI(out)
 
-	// The legend must describe both row-tint states.
-	// Accept either the raw status values ("ct-write", "ct-read") or
-	// human-readable equivalents ("Write", "Read") — the exact wording is
-	// up to the coder; we test for the canonical status value strings as the
-	// spec defines them in data-model.md.
-	if !strings.Contains(plain, "ct-write") && !strings.Contains(plain, "Write") {
-		t.Error("help legend missing write row-tint label (ct-write or Write) in ct-events legend")
+	// The legend must describe all three severity tiers per §1.1.
+	// Must contain all new severity-tier status names.
+	for _, want := range []string{"ct-info", "ct-attention", "ct-danger"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("help legend missing severity tier %q in ct-events legend", want)
+		}
 	}
-	if !strings.Contains(plain, "ct-read") && !strings.Contains(plain, "Read") {
-		t.Error("help legend missing read row-tint label (ct-read or Read) in ct-events legend")
+	// Must NOT contain the obsolete binary status names.
+	for _, banned := range []string{"ct-write", "ct-read"} {
+		if strings.Contains(plain, banned) {
+			t.Errorf("help legend still contains obsolete status name %q; must use ct-info/ct-attention/ct-danger", banned)
+		}
 	}
 }
 

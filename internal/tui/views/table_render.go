@@ -18,7 +18,18 @@ type listCol struct {
 	width int
 	key   string // resource.Fields key (fallback)
 	path  string // config-driven path for ExtractScalar
-	color string // per-cell color classifier (e.g. "verb", "actor", "outcome", "origin")
+}
+
+// colSortKey returns the stable identifier for a column used to match against
+// ResourceListModel.sortColKey. Key is preferred, path fallback, title last resort.
+func colSortKey(c listCol) string {
+	if c.key != "" {
+		return c.key
+	}
+	if c.path != "" {
+		return c.path
+	}
+	return c.title
 }
 
 // resolveColumns determines the column definitions to use.
@@ -34,7 +45,6 @@ func (m ResourceListModel) resolveColumns() []listCol {
 					width: lc.Width,
 					path:  lc.Path,
 					key:   lc.Key,
-					color: lc.Color,
 				}
 			}
 			return cols
@@ -92,22 +102,14 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 	return styles.TableHeader.Render(headerText)
 }
 
-// colHeaderTitle returns the column title with sort indicator if applicable.
+// colHeaderTitle returns the column title with a sort indicator if this column
+// is the active sort column. Per §6, the indicator is bound to exactly one
+// column via ResourceListModel.sortColKey — set when the sort mode changes.
+// Substring matching is intentionally removed to prevent double-glyph bugs
+// (e.g. ct-events: both TIME and EVENT previously matched SortAge via isAgeKey).
 func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
 	title := c.title
-	// Add sort indicator based on active sort field.
-	// Match by common patterns: first column is often "name-ish", etc.
-	var isActive bool
-	switch m.sort {
-	case SortName:
-		// Name sort applies to column with key "name" or title containing "Name"
-		isActive = strings.EqualFold(c.key, "name") || strings.Contains(strings.ToLower(c.title), "name")
-	case SortID:
-		isActive = strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID")
-	case SortAge:
-		isActive = isAgeKey(c.key) || isAgeKey(c.title)
-	}
-	if isActive {
+	if m.sortColKey != "" && colSortKey(c) == m.sortColKey {
 		if m.sortAsc {
 			title += "\u2191"
 		} else {
@@ -140,24 +142,7 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 		}
 		padded := text.PadOrTrunc(val, c.width)
 		used += c.width
-		// Compose per-cell style on top of base so the row's background
-		// (cursor highlight) and any inherited base attributes survive on
-		// classified cells.  Override only sets foreground (and optional bold);
-		// base supplies background and any unset attributes.
-		// On the cursor row, suppress per-cell overrides so the cursor highlight
-		// foreground/bold wins (mirrors ec2/list behavior — uniform readable text
-		// on cursor bg).
-		style := base
-		if c.color != "" && !isSelected {
-			raw := strings.TrimRight(padded, " ")
-			if fg, bold, ok := cellOverrideFor(c.color, raw); ok {
-				style = base.Foreground(fg)
-				if bold {
-					style = style.Bold(true)
-				}
-			}
-		}
-		b.WriteString(style.Render(padded))
+		b.WriteString(base.Render(padded))
 	}
 	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
 	// Non-cursor rows are not padded (preserving the same plain-text length as the
@@ -196,10 +181,12 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	}
 	// Final fallback: use resource Name for name-style columns when Fields has no value.
 	// This handles test fixtures and resources where Fields is sparse but r.Name is set.
-	// Matches columns whose key or title contains "name" (e.g., "alarm_name", "Alarm Name").
+	// Matches columns whose key, title, or path contains "name"
+	// (e.g., "alarm_name", "Alarm Name", "EventName").
 	if r.Name != "" &&
 		(strings.Contains(strings.ToLower(c.key), "name") ||
-			strings.Contains(strings.ToLower(c.title), "name")) {
+			strings.Contains(strings.ToLower(c.title), "name") ||
+			strings.Contains(strings.ToLower(c.path), "name")) {
 		return r.Name
 	}
 	return ""

@@ -1382,14 +1382,14 @@ func TestQA_ListRawStruct_CloudTrailEvent(t *testing.T) {
 	cfg := configForType("ct-events")
 
 	event := realisticCloudTrailEvent()
-	// New schema: Status is verb-based ("ct-write"/"ct-read"), not ReadOnly.
-	// RunInstances → "Run" prefix → write verb → "ct-write".
+	// New schema: Status is severity-based ("ct-info"/"ct-attention"/"ct-danger"), not ReadOnly.
+	// RunInstances → "Run" prefix → W verb → ct-attention.
 	// Default columns: GLYPH(_ct.verb) | TIME(event_time) | ACTOR(_ct.actor) | ORIGIN(_ct.origin) | EVENT(EventName via RawStruct) | TARGET(_ct.target) | OUTCOME(_ct.outcome).
 	// SOURCE column no longer exists in defaults; ec2.amazonaws.com is in Fields["source"] (compat) but not rendered.
 	res := resource.Resource{
 		ID:     "evt-0001-abcd-1234-5678-abcdef012345",
 		Name:   "RunInstances",
-		Status: "ct-write",
+		Status: "ct-attention",
 		Fields: map[string]string{
 			"event_name":    "RunInstances",
 			"time":          "2025-03-15 12:00:00",

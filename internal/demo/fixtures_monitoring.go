@@ -1104,44 +1104,44 @@ func cloudTrailEventFixtures() []resource.Resource {
 
 	return []resource.Resource{
 		{
-			// Row 1 (W, ct-write, Console+Root): Root identity creates IAM access key via Console.
+			// Row 1 (W, ct-attention, Console+Root): Root identity creates S3 bucket via Console.
 			// userIdentity.type=Root satisfies TestCTEventsFixtureCoverage_AtLeastOneRootEvent.
 			// sessionCredentialFromConsole=true → ORIGIN=Console.
-			// resources=[IAM User alice.johnson] → TARGET=alice.johnson; resources[] present.
+			// resources=[S3 Bucket webapp-assets-prod] → TARGET from resources[]; resources[] present.
 			// Fields["user"]=alice.johnson and Fields["role_name"]=deploy-bot cross-link to real fixtures.
 			ID:     "evt-0a1b2c3d4e5f60001",
-			Name:   "CreateAccessKey",
-			Status: "ct-write",
+			Name:   "CreateBucket",
+			Status: "ct-attention",
 			Fields: map[string]string{
-				"event_name": "CreateAccessKey",
+				"event_name": "CreateBucket",
 				"time":       t1.Format("2006-01-02 15:04:05"),
 				"event_time": t1.Format("2006-01-02 15:04:05"),
 				"user":       "alice.johnson",
 				"role_name":  "deploy-bot",
-				"source":     "iam.amazonaws.com",
+				"source":     "s3.amazonaws.com",
 				"read_only":  "false",
 			},
 			RawStruct: cloudtrailtypes.Event{
 				EventId:         aws.String("evt-0a1b2c3d4e5f60001"),
-				EventName:       aws.String("CreateAccessKey"),
+				EventName:       aws.String("CreateBucket"),
 				EventTime:       aws.Time(t1),
-				EventSource:     aws.String("iam.amazonaws.com"),
+				EventSource:     aws.String("s3.amazonaws.com"),
 				Username:        aws.String("alice.johnson"),
 				ReadOnly:        aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012","sessionContext":{"sessionCredentialFromConsole":"true","attributes":{"mfaAuthenticated":"true","creationDate":"2026-03-28T14:20:00Z"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"iam.amazonaws.com","eventName":"CreateAccessKey","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"signin.amazonaws.com","requestParameters":{"userName":"alice.johnson"},"responseElements":null,"requestID":"req-iam-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","type":"AWS::IAM::User"}]}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012","sessionContext":{"sessionCredentialFromConsole":"true","attributes":{"mfaAuthenticated":"true","creationDate":"2026-03-28T14:20:00Z"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"signin.amazonaws.com","requestParameters":{"bucketName":"webapp-assets-prod"},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:s3:::webapp-assets-prod","accountId":"123456789012","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
-					{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("alice.johnson")},
+					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("webapp-assets-prod")},
 				},
 			},
 		},
 		{
-			// Row 2 (D, ct-write, CLI+error): IAMUser bob.smith attempts DeleteBucket — AccessDenied.
+			// Row 2 (D, ct-danger, CLI+error): IAMUser bob.smith attempts DeleteBucket — AccessDenied.
 			// CLI userAgent; direct IAMUser identity; Resources use webapp-assets-prod (real S3 fixture).
 			// Fields["role_name"]=acme-ci-deploy-role cross-links to real role fixture.
 			// errorCode=AccessDenied satisfies TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent.
 			ID:     "evt-0a1b2c3d4e5f60002",
 			Name:   "DeleteBucket",
-			Status: "ct-write",
+			Status: "ct-danger",
 			Fields: map[string]string{
 				"event_name": "DeleteBucket",
 				"time":       t2.Format("2006-01-02 15:04:05"),
@@ -1165,14 +1165,14 @@ func cloudTrailEventFixtures() []resource.Resource {
 			},
 		},
 		{
-			// Row 3 (R, ct-read, Console+AssumedRole): AssumedRole reads EC2 via Console.
+			// Row 3 (R, ct-info, Console+AssumedRole): AssumedRole reads EC2 via Console.
 			// sessionCredentialFromConsole=true → ORIGIN=Console; no resources[] → Management+no-resources fallback.
 			// AssumedRole sessionIssuer ARN leaf = acme-eks-node-role (real role fixture).
 			// Fields["user"]=alice.johnson (real iam-user fixture for navigable-field integrity).
 			// Satisfies TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent: Management+no-resources.
 			ID:     "evt-0a1b2c3d4e5f60003",
 			Name:   "DescribeInstances",
-			Status: "ct-read",
+			Status: "ct-info",
 			Fields: map[string]string{
 				"event_name": "DescribeInstances",
 				"time":       t3.Format("2006-01-02 15:04:05"),
@@ -1194,14 +1194,14 @@ func cloudTrailEventFixtures() []resource.Resource {
 			},
 		},
 		{
-			// Row 4 (S, ct-read, AwsServiceEvent+resources[]): autoscaling terminates EC2 instance.
+			// Row 4 (S, ct-info, AwsServiceEvent+resources[]): autoscaling terminates EC2 instance.
 			// AWSService identity (invokedBy=autoscaling.amazonaws.com) — no sessionIssuer.
 			// eventType=AwsServiceEvent satisfies TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent.
 			// resources=[EC2 i-0a1b2c3d4e5f60001] → resources[] present (satisfies hasResources).
 			// Fields["user"]=alice.johnson and Fields["role_name"]=monitoring-agent real fixtures.
 			ID:     "evt-0a1b2c3d4e5f60004",
 			Name:   "TerminateInstanceInAutoScalingGroup",
-			Status: "ct-read",
+			Status: "ct-info",
 			Fields: map[string]string{
 				"event_name": "TerminateInstanceInAutoScalingGroup",
 				"time":       t4.Format("2006-01-02 15:04:05"),
@@ -1225,13 +1225,13 @@ func cloudTrailEventFixtures() []resource.Resource {
 			},
 		},
 		{
-			// Row 5 (I, ct-read, Insight): ApiCallRateInsight — eventCategory=Insight, I verb.
+			// Row 5 (I, ct-info, Insight): ApiCallRateInsight — eventCategory=Insight, I verb.
 			// No sessionIssuer; Fields["user"]=bob.smith and Fields["role_name"]=acme-rds-monitoring
 			// provide navigable-field cross-references to real fixtures.
 			// insightDetails with baseline/insight statistics for detail view.
 			ID:     "evt-0a1b2c3d4e5f60005",
 			Name:   "ApiCallRateInsight",
-			Status: "ct-read",
+			Status: "ct-info",
 			Fields: map[string]string{
 				"event_name": "ApiCallRateInsight",
 				"time":       t5.Format("2006-01-02 15:04:05"),
@@ -1253,7 +1253,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			},
 		},
 		{
-			// Row 6 (N, ct-read, NetworkActivity+cross-account): AssumedRole ci-runner accesses VPC endpoint.
+			// Row 6 (N, ct-attention, NetworkActivity+cross-account): AssumedRole ci-runner accesses VPC endpoint.
 			// eventCategory=NetworkActivity → ClassifyCTVerb returns "N", satisfying AllVerbsPresent.
 			// Satisfies AllTargetFallbackCategoriesPresent: NetworkActivity bucket.
 			// Cross-account: accountId=999988887777 != recipientAccountId=123456789012.
@@ -1261,7 +1261,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			// Fields["user"]=ci-service-account (real iam-user fixture); no resources[].
 			ID:     "evt-0a1b2c3d4e5f60006",
 			Name:   "VpcEndpointAccess",
-			Status: "ct-read",
+			Status: "ct-attention",
 			Fields: map[string]string{
 				"event_name": "VpcEndpointAccess",
 				"time":       t6.Format("2006-01-02 15:04:05"),

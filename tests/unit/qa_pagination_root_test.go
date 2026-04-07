@@ -51,8 +51,8 @@ import (
 // ---------------------------------------------------------------------------
 
 // ctEventsResources returns n ct-events resources with sequential IDs.
-// Uses the new _ct.* field schema (Status is verb-based, not ReadOnly).
-// CreateBucket → "Create" prefix → write verb → "ct-write".
+// Uses the new _ct.* field schema (Status is severity-based, not ReadOnly).
+// CreateBucket → W verb → "ct-attention".
 // _ct.actor is set to "usr-NNNN" so it renders in the ACTOR column and can be
 // used as a unique per-resource assertion target.
 func ctEventsResources(n int) []resource.Resource {
@@ -63,7 +63,7 @@ func ctEventsResources(n int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("CreateBucket-%d", i),
-			Status: "ct-write",
+			Status: "ct-attention",
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("CreateBucket-%d", i),
 				"time":          "2026-03-28 14:30:15",
@@ -87,7 +87,7 @@ func ctEventsResources(n int) []resource.Resource {
 
 // ctEventsResources2 returns n additional ct-events resources whose IDs start
 // at offset, so they can be distinguished from the first page.
-// DeleteObject → "Delete" prefix → destructive verb → "ct-write".
+// DeleteObject → D verb → "ct-danger".
 func ctEventsResources2(n, offset int) []resource.Resource {
 	resources := make([]resource.Resource, n)
 	for i := range n {
@@ -97,7 +97,7 @@ func ctEventsResources2(n, offset int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("DeleteObject-%d", idx),
-			Status: "ct-write",
+			Status: "ct-danger",
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("DeleteObject-%d", idx),
 				"time":          "2026-03-28 14:30:15",

@@ -97,9 +97,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r0.Name != "RunInstances" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "RunInstances", r0.Name)
 	}
-	// RunInstances has "Run" prefix → write verb → Status must be "ct-write".
-	if r0.Status != "ct-write" {
-		t.Errorf("resource[0].Status: expected %q (RunInstances is a write event), got %q", "ct-write", r0.Status)
+	// RunInstances has "Run" prefix → write verb W → Status must be "ct-attention".
+	if r0.Status != "ct-attention" {
+		t.Errorf("resource[0].Status: expected %q (RunInstances is W verb → ct-attention per §1.2), got %q", "ct-attention", r0.Status)
 	}
 
 	// Verify second event (read-only, empty Resources)
@@ -110,9 +110,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r1.Name != "GetObject" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "GetObject", r1.Name)
 	}
-	// GetObject has "Get" prefix → read verb → Status must be "ct-read".
-	if r1.Status != "ct-read" {
-		t.Errorf("resource[1].Status: expected %q (GetObject is a read event), got %q", "ct-read", r1.Status)
+	// GetObject has "Get" prefix → read verb R, plain, same-account → Status must be "ct-info".
+	if r1.Status != "ct-info" {
+		t.Errorf("resource[1].Status: expected %q (GetObject is plain R verb → ct-info per §1.2), got %q", "ct-info", r1.Status)
 	}
 }
 
@@ -221,8 +221,8 @@ func TestFetchCloudTrailEvents_FieldExtraction(t *testing.T) {
 	if r.Fields["event_name"] != "RunInstances" {
 		t.Errorf("Fields[\"event_name\"]: expected %q, got %q", "RunInstances", r.Fields["event_name"])
 	}
-	if r.Fields["time"] != "2025-03-15 12:00:00" {
-		t.Errorf("Fields[\"time\"]: expected %q, got %q", "2025-03-15 12:00:00", r.Fields["time"])
+	if r.Fields["time"] != "Mar 15 12:00:00" {
+		t.Errorf("Fields[\"time\"]: expected %q, got %q", "Mar 15 12:00:00", r.Fields["time"])
 	}
 	if r.Fields["user"] != "admin" {
 		t.Errorf("Fields[\"user\"]: expected %q, got %q", "admin", r.Fields["user"])
@@ -319,8 +319,8 @@ func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
 
 func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	// ReadOnly is *string ("true" or "false"), not *bool.
-	// The legacy ReadOnly→Status mapping is removed; Status is now verb-based ("ct-read"/"ct-write").
-	// This test verifies: (a) Fields["read_only"] is preserved as-is, (b) Status is verb-based,
+	// The legacy ReadOnly→Status mapping is removed; Status is now severity-based ("ct-info"/"ct-attention"/"ct-danger").
+	// This test verifies: (a) Fields["read_only"] is preserved as-is, (b) Status is severity-based,
 	// and (c) Fields["_ct.outcome"] is a non-empty string.
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 
@@ -350,9 +350,9 @@ func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	if r.Fields["read_only"] != "true" {
 		t.Errorf("Fields[\"read_only\"]: expected %q, got %q", "true", r.Fields["read_only"])
 	}
-	// DescribeInstances has "Describe" prefix → read verb → Status must be "ct-read".
-	if r.Status != "ct-read" {
-		t.Errorf("Status: expected %q (DescribeInstances is a read event), got %q", "ct-read", r.Status)
+	// DescribeInstances has "Describe" prefix → read verb R, plain → Status must be "ct-info".
+	if r.Status != "ct-info" {
+		t.Errorf("Status: expected %q (DescribeInstances is plain R verb → ct-info per §1.2), got %q", "ct-info", r.Status)
 	}
 	// _ct.outcome is always a non-empty string ("OK" or an error code).
 	if r.Fields["_ct.outcome"] == "" {
@@ -590,8 +590,8 @@ func TestFetchCloudTrailEventsPage_FieldExtraction(t *testing.T) {
 	if r.Fields["event_name"] != "PutObject" {
 		t.Errorf("Fields[\"event_name\"]: expected %q, got %q", "PutObject", r.Fields["event_name"])
 	}
-	if r.Fields["time"] != "2025-06-20 09:30:00" {
-		t.Errorf("Fields[\"time\"]: expected %q, got %q", "2025-06-20 09:30:00", r.Fields["time"])
+	if r.Fields["time"] != "Jun 20 09:30:00" {
+		t.Errorf("Fields[\"time\"]: expected %q, got %q", "Jun 20 09:30:00", r.Fields["time"])
 	}
 	if r.Fields["user"] != "deploy-bot" {
 		t.Errorf("Fields[\"user\"]: expected %q, got %q", "deploy-bot", r.Fields["user"])

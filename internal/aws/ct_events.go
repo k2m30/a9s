@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
@@ -14,7 +15,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name"})
+	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "_ct.target_raw"})
 
 	// Paginated fetcher for resource list browsing (M key load-more).
 	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -164,10 +165,11 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		eventName = *event.EventName
 	}
 
-	eventTime := ""
+	eventTimeRaw := ""
 	if event.EventTime != nil {
-		eventTime = event.EventTime.Format("2006-01-02 15:04:05")
+		eventTimeRaw = event.EventTime.Format(time.RFC3339)
 	}
+	eventTimeDisplay := FormatCTTimestamp(eventTimeRaw)
 
 	user := ""
 	if event.Username != nil {
@@ -205,23 +207,31 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		outcome = errorCode
 	}
 	accountID := ""
+	uiType := ""
 	if ui, ok := parsed["userIdentity"].(map[string]any); ok {
 		accountID, _ = ui["accountId"].(string)
+		uiType, _ = ui["type"].(string)
 	}
 	recipientAccount := strFromMap(parsed, "recipientAccountId")
 	isRoot := "false"
-	if ui, ok := parsed["userIdentity"].(map[string]any); ok {
-		if t, _ := ui["type"].(string); t == "Root" {
-			isRoot = "true"
-		}
+	if uiType == "Root" {
+		isRoot = "true"
 	}
 	crossAccount := "false"
 	if accountID != "" && recipientAccount != "" && accountID != recipientAccount {
 		crossAccount = "true"
 	}
-	actor := computeCTActor(parsed, user, crossAccount == "true")
+	actor := computeCTActor(parsed, user, crossAccount == "true", accountID)
 	origin := computeCTOrigin(parsed)
 	target := ExtractCTTarget(parsed)
+	if target == "(none)" || target == "" {
+		// Step 1.5: per-event-name fallback table (§4).
+		// Only fires when resources[] is empty and event is a management event.
+		eventNameForTarget, _ := parsed["eventName"].(string)
+		if t := extractTargetByEventName(eventNameForTarget, parsed); t != "" {
+			target = t
+		}
+	}
 	if target == "(none)" || target == "" {
 		// LookupEvents fallback: use event.Resources from the SDK convenience slice.
 		for _, res := range event.Resources {
@@ -231,16 +241,13 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			}
 		}
 	}
+	targetRaw := target
+	target = FormatCTTarget(target, recipientAccount)
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
-	// Set Resource.Status from verb (binary, foreground-only row tint).
-	// Errors, root, cross-account, and service events are signalled at CELL level
-	// (ACTOR / OUTCOME / EVENT classifiers), NOT via Status.
-	status := "ct-read"
-	if verb == "W" || verb == "D" {
-		status = "ct-write"
-	}
+	// Set Resource.Status using §1.2 severity ladder.
+	status := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
 
 	r := resource.Resource{
 		ID:     eventID,
@@ -249,8 +256,9 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		Fields: map[string]string{
 			// Existing keys (kept for backwards compat with related-checkers and tests).
 			"event_name":    eventName,
-			"time":          eventTime,
-			"event_time":    eventTime,
+			"time":          eventTimeDisplay,
+			"event_time":    eventTimeRaw,
+			"event_time_raw": eventTimeRaw,
 			"user":          user,
 			"source":        source,
 			"resource_type": resourceType,
@@ -262,6 +270,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"_ct.actor":             actor,
 			"_ct.origin":            origin,
 			"_ct.target":            target,
+			"_ct.target_raw":        targetRaw,
 			"_ct.outcome":           outcome,
 			"_ct.error_code":        errorCode,
 			"_ct.account_id":        accountID,
@@ -304,13 +313,18 @@ func strFromMap(m map[string]any, key string) string {
 // "R" (read), "W" (write), "D" (destructive), "S" (service event),
 // "I" (insight), "N" (network activity), "?" (unknown).
 //
-// Precedence (highest first):
+// Implements §2.1 of docs/design/ct-event-list-v2.md. Order matters; first match wins.
 //  1. eventCategory == "Insight" → "I"
 //  2. eventCategory == "NetworkActivity" → "N"
 //  3. eventType == "AwsServiceEvent" → "S"
-//  4. Prefix-based matching on eventName
-//  5. "?" (no match)
+//  4. BatchGet* prefix → "R" (must beat Batch write prefix)
+//  5. KMS use-key exact names → "R" (Decrypt, Encrypt, Sign, Verify, ReEncrypt, GenerateDataKey*)
+//  6. Destructive prefix table → "D"
+//  7. Read prefix table → "R"
+//  8. Write prefix table → "W" (includes Assume* e.g. AssumeRole, AssumeRoleWithWebIdentity)
+//  9. "?" (no match)
 func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
+	// Category / type overrides (highest precedence).
 	switch eventCategory {
 	case "Insight":
 		return "I"
@@ -320,53 +334,66 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	if eventType == "AwsServiceEvent" {
 		return "S"
 	}
-	// Prefix-based matching on event name.
-	readPrefixes := []string{
-		"Describe", "Get", "List", "Head", "Lookup", "Scan",
-		"Query", "Search", "View", "Check", "Validate", "Verify",
-		"Preview", "Estimate", "Simulate", "Test",
+
+	// Special-case reads BEFORE prefix matching.
+	// BatchGet* must beat the Batch write prefix.
+	if strings.HasPrefix(eventName, "BatchGet") {
+		return "R"
 	}
-	writePrefixes := []string{
-		"Create", "Put", "Update", "Modify", "Set", "Enable",
-		"Disable", "Add", "Register", "Attach", "Associate",
-		"Import", "Restore", "Replicate", "Copy", "Clone",
-		"Publish", "Send", "Invoke", "Start", "Stop",
-		"Reboot", "Reset", "Activate", "Deactivate", "Assign",
-		"Rotate", "Upload", "Tag", "Untag", "Label", "Unlabel",
-		"Batch", "Apply", "Execute", "Run", "Assume",
-		"Change", "Configure", "Deploy", "Remove", "Replace",
-		"Mount", "Unmount",
+	// KMS use-key ops — exact matches (§2.1 row 2 additional).
+	switch eventName {
+	case "Decrypt", "Encrypt", "Sign", "Verify",
+		"ReEncrypt", "GenerateDataKey", "GenerateDataKeyWithoutPlaintext":
+		return "R"
 	}
-	destructivePrefixes := []string{
-		"Delete", "Terminate", "Revoke", "Detach", "Deregister",
-		"Disassociate", "Purge", "Cancel", "Reject", "Abort",
-		"Deprovision", "Release",
-	}
-	for _, p := range destructivePrefixes {
+
+	// Destructive prefix table (§2.1 row 1).
+	for _, p := range []string{
+		"Delete", "Terminate", "Destroy", "Remove", "Revoke", "Disable",
+		"Stop", "Detach", "Cancel", "Reject", "Abort", "Purge",
+		"Deregister", "Disassociate",
+	} {
 		if strings.HasPrefix(eventName, p) {
 			return "D"
 		}
 	}
-	for _, p := range writePrefixes {
-		if strings.HasPrefix(eventName, p) {
-			return "W"
-		}
-	}
-	for _, p := range readPrefixes {
+
+	// Read prefix table (§2.1 row 2).
+	for _, p := range []string{
+		"Get", "Describe", "List", "Lookup", "Search", "Query",
+		"Scan", "Head", "Test", "Check", "Validate", "Verify",
+	} {
 		if strings.HasPrefix(eventName, p) {
 			return "R"
 		}
 	}
+
+	// Write prefix table (§2.1 row 4).
+	for _, p := range []string{
+		"Create", "Put", "Update", "Modify", "Set", "Add",
+		"Attach", "Associate", "Register", "Enable", "Start", "Run",
+		"Restore", "Restart", "Reboot", "Tag", "Untag", "Activate",
+		"Reset", "Replace", "Apply", "Import", "Export", "Copy",
+		"Move", "Upload", "Submit", "Send", "Publish", "Invoke",
+		"Execute", "Transition", "Issue", "Renew", "Rotate",
+		"Batch", "Assume",
+	} {
+		if strings.HasPrefix(eventName, p) {
+			return "W"
+		}
+	}
+
 	return "?"
 }
 
 // computeCTActor computes the _ct.actor string from parsed JSON and the top-level Username.
 // Never returns blank — falls back to "-" if no identity can be determined.
-// When crossAccount is true, the result is prefixed with "[cross] " (except for "ROOT" and "-").
-func computeCTActor(parsed map[string]any, topLevelUser string, crossAccount bool) string {
+// When crossAccount is true, the result is prefixed with "<counterpartyAccountID>/" per §1.4
+// (except for "ROOT" and "-"). counterpartyAccount is the userIdentity.accountId.
+func computeCTActor(parsed map[string]any, topLevelUser string, crossAccount bool, counterpartyAccount string) string {
 	actor := computeCTActorInner(parsed, topLevelUser)
-	if crossAccount && actor != "ROOT" && actor != "-" {
-		return "[cross] " + actor
+	if crossAccount && actor != "ROOT" && actor != "-" && counterpartyAccount != "" {
+		return counterpartyAccount + "/" + actor
 	}
 	return actor
 }
@@ -616,6 +643,208 @@ func extractInsightRatio(parsed map[string]any) string {
 	formatted := fmt.Sprintf("%.1f", ratio)
 	formatted = strings.TrimSuffix(formatted, ".0")
 	return formatted
+}
+
+// computeCTStatus implements the §1.2 severity ladder.
+// Precedence: danger > attention > info. Highest match wins, top to bottom.
+func computeCTStatus(verb, eventName, eventSource, errorCode, userIdentityType, accountID, recipientAccountID string) string {
+	// 1. ct-danger
+	if errorCode != "" {
+		return "ct-danger"
+	}
+	if verb == "D" {
+		return "ct-danger"
+	}
+	// 2. ct-attention
+	if verb == "W" {
+		return "ct-attention"
+	}
+	if userIdentityType == "Root" {
+		return "ct-attention"
+	}
+	if accountID != "" && recipientAccountID != "" && accountID != recipientAccountID {
+		return "ct-attention"
+	}
+	if isSensitiveRead(eventSource, eventName) {
+		return "ct-attention"
+	}
+	// 3. ct-info (default)
+	return "ct-info"
+}
+
+// isSensitiveRead reports whether an event is in the §1.3 hard-coded
+// sensitive-reads allowlist. Match is exact "<service>:<eventName>" where
+// service is derived from eventSource by stripping ".amazonaws.com".
+// KMS is deliberately excluded.
+func isSensitiveRead(eventSource, eventName string) bool {
+	svc := eventSource
+	if idx := strings.Index(svc, "."); idx > 0 {
+		svc = svc[:idx]
+	}
+	key := svc + ":" + eventName
+	switch key {
+	case "secretsmanager:GetSecretValue",
+		"secretsmanager:BatchGetSecretValue",
+		"ssm:GetParameter",
+		"ssm:GetParameters",
+		"ssm:GetParametersByPath",
+		"sts:GetSessionToken",
+		"sts:GetFederationToken",
+		"sts:AssumeRole",
+		"sts:AssumeRoleWithSAML",
+		"sts:AssumeRoleWithWebIdentity",
+		"iam:GetAccessKeyLastUsed",
+		"iam:ListAccessKeys",
+		"iam:GetCredentialReport",
+		"iam:GenerateCredentialReport",
+		"iam:GetLoginProfile",
+		"acm:ExportCertificate":
+		return true
+	}
+	return false
+}
+
+// FormatCTTimestamp formats an RFC3339 timestamp as "Jan 02 15:04:05" (15 chars).
+// Empty input returns "". Invalid input returns the raw input unchanged.
+func FormatCTTimestamp(rfc3339 string) string {
+	if rfc3339 == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return rfc3339
+	}
+	return t.UTC().Format("Jan 02 15:04:05")
+}
+
+// FormatCTTarget collapses an ARN to its resource portion per §5 of
+// docs/design/ct-event-list-v2.md. When the ARN's account segment differs
+// from localAccount, the account ID is retained inline as "<acct>:<resource>".
+// Non-ARN input is returned unchanged.
+func FormatCTTarget(rawARN, localAccount string) string {
+	if rawARN == "" {
+		return ""
+	}
+	if !strings.HasPrefix(rawARN, "arn:") {
+		return rawARN
+	}
+	// arn:aws:<service>:<region>:<account>:<resource>
+	// Split on ":" with limit 6 so the resource can itself contain colons.
+	parts := strings.SplitN(rawARN, ":", 6)
+	if len(parts) < 6 {
+		return rawARN
+	}
+	account := parts[4]
+	resource := parts[5]
+	// When account is empty (e.g. S3 bucket ARNs like arn:aws:s3:::bucket),
+	// return the resource portion — there is no account segment to compare.
+	if account == "" {
+		return resource
+	}
+	if account != localAccount {
+		return account + ":" + resource
+	}
+	return resource
+}
+
+// extractTargetByEventName implements the §4 per-event-name fallback table.
+// Called when resources[] is empty and the event is a management event.
+func extractTargetByEventName(eventName string, parsed map[string]any) string {
+	req, _ := parsed["requestParameters"].(map[string]any)
+	switch eventName {
+	case "DescribeInstances":
+		// requestParameters.instancesSet.items[*].instanceId → joined "," or "(all)"
+		if req == nil {
+			return "(all)"
+		}
+		set, _ := req["instancesSet"].(map[string]any)
+		if set == nil {
+			return "(all)"
+		}
+		items, _ := set["items"].([]any)
+		if len(items) == 0 {
+			return "(all)"
+		}
+		var ids []string
+		for _, it := range items {
+			m, _ := it.(map[string]any)
+			if id, _ := m["instanceId"].(string); id != "" {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) == 0 {
+			return "(all)"
+		}
+		return strings.Join(ids, ",")
+	case "UpdateInstanceInformation":
+		if req != nil {
+			if id, _ := req["instanceId"].(string); id != "" {
+				return id
+			}
+		}
+	case "GetParameter":
+		if req != nil {
+			if n, _ := req["name"].(string); n != "" {
+				return n
+			}
+		}
+	case "GetParameters":
+		if req != nil {
+			if names, _ := req["names"].([]any); len(names) > 0 {
+				var out []string
+				for _, n := range names {
+					if s, ok := n.(string); ok {
+						out = append(out, s)
+					}
+				}
+				return strings.Join(out, ",")
+			}
+		}
+	case "GetParametersByPath":
+		if req != nil {
+			if p, _ := req["path"].(string); p != "" {
+				return p
+			}
+		}
+	case "GetSecretValue":
+		if req != nil {
+			if id, _ := req["secretId"].(string); id != "" {
+				return id
+			}
+		}
+	case "Decrypt":
+		if req != nil {
+			if id, _ := req["keyId"].(string); id != "" {
+				return id
+			}
+		}
+		return "(by alias)"
+	case "AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
+		if req != nil {
+			if arn, _ := req["roleArn"].(string); arn != "" {
+				// Return raw ARN; FormatCTTarget in buildCTResource will strip it.
+				return arn
+			}
+		}
+	case "BatchGetImage":
+		if req != nil {
+			if r, _ := req["repositoryName"].(string); r != "" {
+				return r
+			}
+		}
+	case "ListBuckets":
+		return "(none)"
+	}
+	// Catch-all: scan for any *Id / *Name / *Arn key at top level of requestParameters.
+	// Ranging over a nil map is a no-op in Go, so the nil check is not needed.
+	for k, v := range req {
+		if s, ok := v.(string); ok && s != "" {
+			if strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "Name") || strings.HasSuffix(k, "Arn") {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func cloudTrailResourceFields(resources []cloudtrailtypes.Resource) (string, string) {

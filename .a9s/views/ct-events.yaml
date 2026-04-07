@@ -1,37 +1,25 @@
 list:
-  "":
-    key: "_ct.verb"
+  V:
+    key: _ct.verb
     width: 1
-    color: "verb"
   TIME:
-    key: "event_time"
-    width: 19
+    key: time
+    width: 15
   ACTOR:
-    key: "_ct.actor"
+    key: _ct.actor
     width: 26
-    color: "actor"
   ORIGIN:
-    key: "_ct.origin"
+    key: _ct.origin
     width: 7
-    color: "origin"
   EVENT:
-    path: "EventName"
-    width: 22
-    color: "verb"
+    path: EventName
+    width: 24
   TARGET:
-    key: "_ct.target"
-    width: 28
+    key: _ct.target
+    width: 36
   OUTCOME:
-    key: "_ct.outcome"
+    key: _ct.outcome
     width: 14
-    color: "outcome"
-  # Hidden by default — re-enable in your per-resource YAML to show these columns.
-  # REGION:
-  #   key: "_ct.region"
-  #   width: 11
-  # SRC IP:
-  #   key: "_ct.source_ip"
-  #   width: 15
 
 detail:
   - EventId

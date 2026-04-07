@@ -1,7 +1,6 @@
 package views
 
 import (
-	"image/color"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -28,10 +27,12 @@ type ResourceListModel struct {
 	scroll        ScrollState
 	hScrollOffset int
 
-	sort    SortField
-	sortAsc bool
+	sort       SortField
+	sortAsc    bool
+	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
 	filterText           string
+	attentionOnly        bool                // §7: ctrl+z toggle — when true, hide dim/neutral rows
 	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
 	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
 	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
@@ -74,6 +75,7 @@ func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsC
 	if typeDef.ShortName == "ct-events" && viewConfig != nil {
 		m.sort = SortAge
 		m.sortAsc = false
+		m.sortColKey = "time" // §6: TIME column is bound to SortAge for ct-events
 	}
 	return m
 }
@@ -121,6 +123,7 @@ func NewResourceListFromCache(
 		keys:          k,
 	}
 	m.applySortAndFilter()
+	m.updateSortColKey()
 	// Restore cursor position after filter application resets scroll.
 	if cursorPos >= 0 && cursorPos < len(m.filteredResources) {
 		m.scroll.SetCursor(cursorPos)
@@ -280,6 +283,12 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 					}
 				}
 			}
+		case key.Matches(msg, m.keys.ToggleAttentionOnly):
+			m.attentionOnly = !m.attentionOnly
+			m.applySortAndFilter()
+			m.scroll.SetCursor(0)
+			m.styledRowCache = nil
+			return m, nil
 		case key.Matches(msg, m.keys.SortByName):
 			if m.sort == SortName {
 				m.sortAsc = !m.sortAsc
@@ -287,6 +296,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortName
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.SortByID):
 			if m.sort == SortID {
@@ -295,6 +305,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortID
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.SortByAge):
 			if m.sort == SortAge {
@@ -303,6 +314,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.sort = SortAge
 				m.sortAsc = true
 			}
+			m.updateSortColKey()
 			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.Events):
 			if r := m.SelectedResource(); r != nil {
@@ -447,6 +459,40 @@ func (m *ResourceListModel) applySortAndFilter() {
 	m.applyFilter()
 	m.sortFiltered()
 	m.styledRowCache = nil
+}
+
+// updateSortColKey sets m.sortColKey to the canonical column key for the current
+// sort mode on the current resource type. This is the single source of truth for
+// which column header receives the sort glyph (§6).
+//
+// Matching is exact against resolved column keys:
+//   - SortName → first column whose key/title is "name" or contains "Name"
+//   - SortID   → first column whose key contains "id" or title contains "ID"
+//   - SortAge  → first column whose key or path matches isAgeKey
+//
+// If no column matches, sortColKey is set to "" (no glyph rendered).
+func (m *ResourceListModel) updateSortColKey() {
+	cols := m.resolveColumns()
+	for _, c := range cols {
+		switch m.sort {
+		case SortName:
+			if strings.EqualFold(c.key, "name") || strings.Contains(strings.ToLower(c.title), "name") {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		case SortID:
+			if strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID") {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		case SortAge:
+			if isAgeKey(c.key) || isAgeKey(c.path) {
+				m.sortColKey = colSortKey(c)
+				return
+			}
+		}
+	}
+	m.sortColKey = ""
 }
 
 func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
@@ -715,11 +761,17 @@ func (m ResourceListModel) FrameTitle() string {
 		if m.titleSuffix != "" {
 			title += m.titleSuffix
 		}
+		if m.attentionOnly {
+			title += " [!]"
+		}
 		return title
 	}
 	title := name + "(" + totalStr + ")"
 	if m.titleSuffix != "" {
 		title += m.titleSuffix
+	}
+	if m.attentionOnly {
+		title += " [!]"
 	}
 	return title
 }
@@ -821,7 +873,20 @@ func (m *ResourceListModel) applyFilter() {
 		}
 		base = subset
 	}
-	m.filteredResources = FilterResources(m.filterText, base)
+	result := FilterResources(m.filterText, base)
+
+	// §7 attention filter — hide dim rows when toggle is on.
+	if m.attentionOnly {
+		kept := make([]resource.Resource, 0, len(result))
+		for _, r := range result {
+			if !styles.IsDimRowColor(r.Status) {
+				kept = append(kept, r)
+			}
+		}
+		result = kept
+	}
+
+	m.filteredResources = result
 	m.scroll.SetTotal(len(m.filteredResources))
 }
 
@@ -850,223 +915,13 @@ func FilterResources(query string, resources []resource.Resource) []resource.Res
 	return result
 }
 
-// ApplyCellColor applies a per-cell color classifier to a rendered cell value.
-// classifier is one of "verb", "actor", "outcome", "origin", or "" (no classifier).
-// Unknown classifier values return value unchanged.
-func ApplyCellColor(classifier, value string) string {
-	if classifier == "" || value == "" {
-		return value
-	}
-	switch classifier {
-	case "verb":
-		return applyVerbColor(value)
-	case "actor":
-		return applyActorColor(value)
-	case "outcome":
-		return applyOutcomeColor(value)
-	case "origin":
-		return applyOriginColor(value)
-	default:
-		return value
-	}
-}
 
-// applyVerbColor styles the CloudTrail verb abbreviation cell.
-// R → dim; W → orange bold; D → red bold; S → accent bold; I → purple bold;
-// N → accent (no bold); ? → ColHeaderFg (no bold).
-// Classification uses the trimmed value so that padded strings are classified correctly.
-func applyVerbColor(value string) string {
-	raw := strings.TrimRight(value, " ")
-	switch raw {
-	case "R":
-		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
-	case "W":
-		return lipgloss.NewStyle().Foreground(styles.ColYAMLNum).Bold(true).Render(value)
-	case "D":
-		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
-	case "S":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true).Render(value)
-	case "I":
-		return lipgloss.NewStyle().Foreground(styles.ColYAMLBool).Bold(true).Render(value)
-	case "N":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent).Render(value)
-	default:
-		// "?" and any unrecognised verb → plain (ColHeaderFg, no bold).
-		return lipgloss.NewStyle().Foreground(styles.ColHeaderFg).Render(value)
-	}
-}
 
-// applyActorColor styles the CloudTrail actor cell.
-// "ROOT" (exact, case-sensitive) → red bold;
-// values ending in ".amazonaws.com" → dim;
-// values with "[cross] " prefix → yellow (ColPending);
-// everything else → no extra styling (return value unchanged).
-// Classification uses the trimmed value so that padded strings (from table rendering)
-// are classified correctly; styling is applied to the original (padded) value.
-func applyActorColor(value string) string {
-	raw := strings.TrimRight(value, " ")
-	if raw == "ROOT" {
-		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
-	}
-	if strings.HasSuffix(raw, ".amazonaws.com") {
-		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
-	}
-	if strings.HasPrefix(raw, "[cross] ") {
-		return lipgloss.NewStyle().Foreground(styles.ColPending).Render(value)
-	}
-	return value
-}
 
-// applyOutcomeColor styles the CloudTrail outcome cell.
-// "OK" → dim green (ColRunning, no bold);
-// "START" or "END" → yellow (ColPending);
-// everything else (FAILED*, AccessDenied, Throttling, etc.) → red bold (ColStopped).
-// Classification uses the trimmed value so that padded strings are classified correctly.
-func applyOutcomeColor(value string) string {
-	raw := strings.TrimRight(value, " ")
-	if raw == "OK" {
-		return lipgloss.NewStyle().Foreground(styles.ColRunning).Render(value)
-	}
-	if raw == "START" || raw == "END" {
-		return lipgloss.NewStyle().Foreground(styles.ColPending).Render(value)
-	}
-	// Any non-OK, non-START/END value is an error code → red bold.
-	// This covers FAILED*, AccessDenied, Throttling, ValidationException, etc.
-	return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true).Render(value)
-}
 
-// applyOriginColor styles the CloudTrail origin cell.
-// "Service" → dim; "Console" → accent; everything else → no extra styling.
-// Classification uses the trimmed value so that padded strings are classified correctly.
-func applyOriginColor(value string) string {
-	raw := strings.TrimRight(value, " ")
-	switch raw {
-	case "Service":
-		return lipgloss.NewStyle().Foreground(styles.ColDim).Render(value)
-	case "Console":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent).Render(value)
-	default:
-		return value
-	}
-}
 
-// verbStyle returns the lipgloss.Style for the CloudTrail verb abbreviation cell.
-// Mirrors applyVerbColor rules but returns a Style so it can be composed with a base style.
-// Returns zero lipgloss.Style{} for unrecognised raw values.
-//
-//nolint:unused // retained as a style-returning companion to applyVerbColor; may be used by future callers
-func verbStyle(raw string) lipgloss.Style {
-	switch raw {
-	case "R":
-		return lipgloss.NewStyle().Foreground(styles.ColDim)
-	case "W":
-		return lipgloss.NewStyle().Foreground(styles.ColYAMLNum).Bold(true)
-	case "D":
-		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true)
-	case "S":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true)
-	case "I":
-		return lipgloss.NewStyle().Foreground(styles.ColYAMLBool).Bold(true)
-	case "N":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent)
-	default:
-		// "?" and any unrecognised verb → plain (ColHeaderFg, no bold).
-		return lipgloss.NewStyle().Foreground(styles.ColHeaderFg)
-	}
-}
 
-// actorStyle returns the lipgloss.Style for the CloudTrail actor cell.
-// Mirrors applyActorColor rules. Returns zero lipgloss.Style{} for no override.
-//
-//nolint:unused // retained as a style-returning companion to applyActorColor; may be used by future callers
-func actorStyle(raw string) lipgloss.Style {
-	if raw == "ROOT" {
-		return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true)
-	}
-	if strings.HasSuffix(raw, ".amazonaws.com") {
-		return lipgloss.NewStyle().Foreground(styles.ColDim)
-	}
-	if strings.HasPrefix(raw, "[cross] ") {
-		return lipgloss.NewStyle().Foreground(styles.ColPending)
-	}
-	return lipgloss.Style{}
-}
 
-// outcomeStyle returns the lipgloss.Style for the CloudTrail outcome cell.
-// Mirrors applyOutcomeColor rules. Returns zero lipgloss.Style{} for no override.
-//
-//nolint:unused // retained as a style-returning companion to applyOutcomeColor; may be used by future callers
-func outcomeStyle(raw string) lipgloss.Style {
-	if raw == "OK" {
-		return lipgloss.NewStyle().Foreground(styles.ColRunning)
-	}
-	if raw == "START" || raw == "END" {
-		return lipgloss.NewStyle().Foreground(styles.ColPending)
-	}
-	// Any non-OK, non-START/END value is an error code → red bold.
-	return lipgloss.NewStyle().Foreground(styles.ColStopped).Bold(true)
-}
 
-// originStyle returns the lipgloss.Style for the CloudTrail origin cell.
-// Mirrors applyOriginColor rules. Returns zero lipgloss.Style{} for no override.
-//
-//nolint:unused // retained as a style-returning companion to applyOriginColor; may be used by future callers
-func originStyle(raw string) lipgloss.Style {
-	switch raw {
-	case "Service":
-		return lipgloss.NewStyle().Foreground(styles.ColDim)
-	case "Console":
-		return lipgloss.NewStyle().Foreground(styles.ColAccent)
-	default:
-		return lipgloss.Style{}
-	}
-}
 
-// cellStyleFor returns the lipgloss.Style for a cell given a classifier and trimmed value.
-// Returns zero lipgloss.Style{} for unknown or empty classifiers.
-//
-//nolint:unused // retained for future use; renderDataRow now calls cellOverrideFor directly
-func cellStyleFor(classifier, raw string) lipgloss.Style {
-	switch classifier {
-	case "verb":
-		return verbStyle(raw)
-	case "actor":
-		return actorStyle(raw)
-	case "outcome":
-		return outcomeStyle(raw)
-	case "origin":
-		return originStyle(raw)
-	default:
-		return lipgloss.Style{}
-	}
-}
 
-// cellOverrideFor returns (fg, bold, set) for the given cell classifier and
-// trimmed raw value. When the classifier maps to a known override it returns
-// set=true with the foreground color and bold flag; otherwise set=false and
-// the caller should use the base style unchanged.
-//
-// This is used by renderDataRow to compose per-cell colour overrides on top of
-// the row base style (RowSelected / RowColorStyle) rather than wrapping — which
-// would lose the base Background / Foreground after each cell's ANSI reset.
-func cellOverrideFor(classifier, raw string) (fg color.Color, bold, set bool) {
-	var s lipgloss.Style
-	switch classifier {
-	case "verb":
-		s = verbStyle(raw)
-	case "actor":
-		s = actorStyle(raw)
-	case "outcome":
-		s = outcomeStyle(raw)
-	case "origin":
-		s = originStyle(raw)
-	default:
-		return nil, false, false
-	}
-	// A zero lipgloss.Style{} has no foreground set; treat as no override.
-	fg = s.GetForeground()
-	if fg == nil {
-		return nil, false, false
-	}
-	return fg, s.GetBold(), true
-}
