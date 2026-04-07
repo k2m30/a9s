@@ -464,18 +464,19 @@ func (m HelpModel) ctEventsLegend() string {
 	sb.WriteString("\n")
 
 	// --- Row tints ---
-	sb.WriteString(" " + catStyle.Render("ROW TINTS  (foreground only, no background)"))
+	sb.WriteString(" " + catStyle.Render("SEVERITY TIERS  (foreground only, no background)"))
 	sb.WriteString("\n")
 	tintRows := []struct {
 		label string
 		col   gocolor.Color
 		desc  string
 	}{
-		{"ct-write", styles.ColStopped, "W/D verbs — write or destructive"},
-		{"ct-read", styles.ColPending, "R/S/I/N verbs — read, service, insight, network"},
+		{"ct-info",      styles.ColTerminated, "routine reads — normal-volume noise"},
+		{"ct-attention", styles.ColPending,    "worth a glance — writes, ROOT, sensitive reads, cross-account"},
+		{"ct-danger",    styles.ColStopped,    "worth investigating — destructive ops or failures"},
 	}
 	for _, row := range tintRows {
-		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 10))
+		label := lipgloss.NewStyle().Foreground(row.col).Render(text.PadOrTrunc(row.label, 12))
 		sb.WriteString(" " + label + descStyle.Render(row.desc) + "\n")
 	}
 
