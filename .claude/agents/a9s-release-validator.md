@@ -1,7 +1,19 @@
 ---
 name: a9s-release-validator
 description: Validates a9s release readiness — checks GoReleaser config, verifies builds across architectures, validates changelog, and confirms CI status. Use before tagging a release.
-tools: Read, Glob, Grep, Bash
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - BashOutput
+  - KillShell
+  - WebFetch
+  - WebSearch
+  - TodoWrite
+  - Skill
+  - mcp__context7__resolve-library-id
+  - mcp__context7__get-library-docs
 model: sonnet
 ---
 
