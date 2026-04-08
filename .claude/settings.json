@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65"
+  },
   "permissions": {
     "deny": [
       "Bash(git commit * -F*)",
@@ -23,7 +26,6 @@
     ],
     "allow": [
       "Bash(rtk*)",
-
       "Bash(cd*)",
       "Bash(echo *)",
       "Bash(env)",
@@ -37,21 +39,17 @@
       "Bash(xattr*)",
       "Bash(xxd*)",
       "Bash(yq *)",
-
       "Bash(./a9s*)",
       "Bash(make*)",
       "Bash(bash .claude/scripts/*)",
       "Bash(bash .specify/scripts/*)",
-
       "Bash(brew *)",
-
       "Bash(dig *)",
       "Bash(nc *)",
       "Bash(nslookup *)",
       "Bash(openssl *)",
       "Bash(ping *)",
       "Bash(ssh *)",
-
       "Bash(chmod*)",
       "Bash(cp *)",
       "Bash(do *)",
@@ -63,9 +61,7 @@
       "Bash(python3*)",
       "Bash(rm *)",
       "Bash(vhs*)",
-
       "Bash(/tmp/*)",
-
       "Edit(/tmp/**)",
       "Read(/tmp/**)",
       "Write(/tmp/**)",
@@ -80,7 +76,6 @@
       "Read(.claude/**)",
       "Edit(.claude/**)",
       "Write(.claude/**)",
-
       "mcp__aws-api__call_aws",
       "mcp__ide__getDiagnostics",
       "mcp__plugin_context7_context7__query-docs",
@@ -106,12 +101,10 @@
       "mcp__plugin_playwright_playwright__browser_navigate",
       "mcp__plugin_playwright_playwright__browser_resize",
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
-
       "Skill(code-review:code-review)",
       "Skill(commit-commands:commit)",
       "Skill(commit-commands:commit-push-pr)",
       "Skill(update-config)",
-
       "WebFetch",
       "WebSearch"
     ]

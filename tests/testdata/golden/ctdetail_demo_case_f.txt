@@ -5,13 +5,13 @@
  Event:                s3:GetObject                                                                                                                │  S3 Buckets
  TARGET                                                                                                                                            │  S3 Objects
  Bucket:               checkout-config                                                                                                             │  Lambda Functions
- Object:               checkout-config/prod/config.json                                                                                            │  RDS Instances
- CONTEXT                                                                                                                                           │  KMS Keys
- Region:               eu-west-1                                                                                                                   │  Secrets
- Source IP:            10.42.3.18                                                                                                                  │  VPC Endpoints
- Time:                 2026-04-07T14:20:21Z                                                                                                        │  Security Groups
-                                                                                                                                                   │  DynamoDB Tables
-                                                                                                                                                   │  CloudFormation Stacks
+ CONTEXT                                                                                                                                           │  RDS Instances
+ Region:               eu-west-1                                                                                                                   │  KMS Keys
+ Source IP:            10.42.3.18                                                                                                                  │  Secrets
+ Time:                 2026-04-07T14:20:21Z                                                                                                        │  VPC Endpoints
+ REQUEST                                                                                                                                           │  Security Groups
+ bucketName:           checkout-config                                                                                                             │  DynamoDB Tables
+ key:                  prod/config.json                                                                                                            │  CloudFormation Stacks
                                                                                                                                                    │  CT events by AccessKeyId
                                                                                                                                                    │  CT events by Username
                                                                                                                                                    │  CT events by EventName

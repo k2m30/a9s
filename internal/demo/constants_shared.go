@@ -120,8 +120,6 @@ const (
 
 	relatedCodeartifactCbID = "acme-api-build"
 
-	relatedCtEventsRoleID = "deploy-bot"
-
 	relatedDbcSGID = "sg-0ccc333333333333c"
 
 	relatedDbiSGID  = "sg-0ccc333333333333c" // prodRDSSGID
@@ -155,9 +153,6 @@ const (
 	relatedCfWAFID = "a1b2c3d4-5678-90ab-cdef-222222222222"
 	relatedCfACMID = prodACMCertARN2
 	relatedCfR53ID = "/hostedzone/Z0123456789ABCDEFGHIJ"
-
-	// ct-events→iam-user
-	relatedCtEventsUserID = "alice.johnson"
 
 	// dbc related-view IDs
 	relatedDbcAlarmID  = "docdb-cpu-utilization"

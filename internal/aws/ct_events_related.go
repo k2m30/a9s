@@ -110,7 +110,7 @@ func ctEventsRelatedResources(ctx context.Context, clients any, cache resource.R
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
+			return []resource.Resource{}, false, nil
 		}
 	}
 	return resources, isTruncated, err
@@ -302,7 +302,7 @@ func checkCtEventsS3Objects(_ context.Context, _ any, res resource.Resource, _ r
 			bucket := ctJSONString(req, "bucketName")
 			key := ctJSONString(req, "key")
 			if bucket != "" && key != "" {
-				ids = append(ids, bucket+"/"+key)
+				ids = append(ids, bucket+"|"+key)
 			} else if key != "" {
 				ids = append(ids, key)
 			}
