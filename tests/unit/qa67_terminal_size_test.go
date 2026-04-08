@@ -227,8 +227,14 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
 
-	// Navigate into the bucket (child view)
-	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	// Navigate into the bucket (child view) — execute the returned cmd to actually push the child view
+	var cmd tea.Cmd
+	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
 
 	// Load some objects
 	objects := []resource.Resource{

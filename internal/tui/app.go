@@ -460,7 +460,7 @@ func (m Model) View() tea.View {
 	if m.width == 0 {
 		return alt("")
 	}
-	if m.width < 60 {
+	if m.width < layout.MinTerminalWidth {
 		return alt("Terminal too narrow (min 60 columns)")
 	}
 	if m.height < 7 {
