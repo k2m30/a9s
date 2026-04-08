@@ -6,14 +6,14 @@
  Event:                s3:PutObject                                                                                                                │  S3 Objects
  TARGET                                                                                                                                            │  Lambda Functions
  Bucket:               shared-artifacts                                                                                                            │  RDS Instances
- Object:               shared-artifacts/build-4821.tar.gz                                                                                          │  KMS Keys
- CONTEXT                                                                                                                                           │  Secrets
- Region:               us-east-2                                                                                                                   │  VPC Endpoints
- Source IP:            52.14.88.201                                                                                                                │  Security Groups
- Recipient:            777777777777 (cross-account)                                                                                                │  DynamoDB Tables
- Time:                 2026-04-07T14:31:55Z                                                                                                        │  CloudFormation Stacks
-                                                                                                                                                   │  CT events by AccessKeyId
-                                                                                                                                                   │  CT events by Username
+ CONTEXT                                                                                                                                           │  KMS Keys
+ Region:               us-east-2                                                                                                                   │  Secrets
+ Source IP:            52.14.88.201                                                                                                                │  VPC Endpoints
+ Recipient:            777777777777 (cross-account)                                                                                                │  Security Groups
+ Time:                 2026-04-07T14:31:55Z                                                                                                        │  DynamoDB Tables
+ REQUEST                                                                                                                                           │  CloudFormation Stacks
+ bucketName:           shared-artifacts                                                                                                            │  CT events by AccessKeyId
+ key:                  build-4821.tar.gz                                                                                                           │  CT events by Username
                                                                                                                                                    │  CT events by EventName
                                                                                                                                                    │  CT events by SharedEventId
                                                                                                                                                    │

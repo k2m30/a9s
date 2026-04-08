@@ -10,8 +10,8 @@
  Source IP:            203.0.113.17                                                                                                                │  Secrets
  Time:                 2026-04-07T03:42:18Z                                                                                                        │  VPC Endpoints
  REQUEST                                                                                                                                           │  Security Groups
- policy:               {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::prod│  DynamoDB Tables
-                                                                                                                                                   │  CloudFormation Stacks
+ bucketName:           prod-artifacts                                                                                                              │  DynamoDB Tables
+ policy:               {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::prod│  CloudFormation Stacks
                                                                                                                                                    │  CT events by AccessKeyId
                                                                                                                                                    │  CT events by Username
                                                                                                                                                    │  CT events by EventName

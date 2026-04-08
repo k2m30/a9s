@@ -106,7 +106,15 @@ func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
 		val = ref.ARN
 	}
 	isNav, target := navFromLabel(key)
-	return Row{Key: key, Value: val, IsNavigable: isNav, TargetType: target}
+	// NavID is the bare resource identifier stripped of any type/ prefix
+	// (e.g. "instance/i-0abc" → "i-0abc", "bucket-name" → "").
+	// When the display value already lacks a "/" prefix, NavID is left empty
+	// so the navigation layer falls back to Value directly.
+	navID := ""
+	if idx := strings.LastIndex(val, "/"); idx >= 0 {
+		navID = val[idx+1:]
+	}
+	return Row{Key: key, Value: val, IsNavigable: isNav, TargetType: target, NavID: navID}
 }
 
 // labelFromType derives the Row.Key label from an AWS resource type string.
@@ -308,12 +316,12 @@ func extractS3ObjectEvent(params map[string]any, cleanedParams map[string]any) (
 func extractInstancesSetEvent(eventName string, params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
 	isDescribe := eventName == "DescribeInstances"
 
-	instancesNav, instancesTarget := navFromLabel("Instances")
-	instanceNav, instanceTarget := navFromLabel("Instance")
+	_, instanceTarget := navFromLabel("Instance")
 
 	if params == nil {
 		if isDescribe {
-			return []Row{{Key: "Instances", Value: "(all)", IsNavigable: instancesNav, TargetType: instancesTarget}}, cleanedParams
+			// "(all)" is a display-only placeholder — not a real instance ID, so not navigable.
+			return []Row{{Key: "Instances", Value: "(all)"}}, cleanedParams
 		}
 		return nil, cleanedParams
 	}
@@ -321,7 +329,7 @@ func extractInstancesSetEvent(eventName string, params map[string]any, cleanedPa
 	set, _ := params["instancesSet"].(map[string]any)
 	if set == nil {
 		if isDescribe {
-			return []Row{{Key: "Instances", Value: "(all)", IsNavigable: instancesNav, TargetType: instancesTarget}}, cleanedParams
+			return []Row{{Key: "Instances", Value: "(all)"}}, cleanedParams
 		}
 		return nil, cleanedParams
 	}
@@ -329,7 +337,7 @@ func extractInstancesSetEvent(eventName string, params map[string]any, cleanedPa
 	items, _ := set["items"].([]any)
 	if len(items) == 0 {
 		if isDescribe {
-			return []Row{{Key: "Instances", Value: "(all)", IsNavigable: instancesNav, TargetType: instancesTarget}}, cleanedParams
+			return []Row{{Key: "Instances", Value: "(all)"}}, cleanedParams
 		}
 		return nil, cleanedParams
 	}
@@ -338,12 +346,12 @@ func extractInstancesSetEvent(eventName string, params map[string]any, cleanedPa
 	for _, it := range items {
 		m, _ := it.(map[string]any)
 		if id, _ := m["instanceId"].(string); id != "" {
-			rows = append(rows, Row{Key: "Instance", Value: id, IsNavigable: instanceNav, TargetType: instanceTarget})
+			rows = append(rows, Row{Key: "Instance", Value: id, IsNavigable: true, TargetType: instanceTarget})
 		}
 	}
 	if len(rows) == 0 {
 		if isDescribe {
-			return []Row{{Key: "Instances", Value: "(all)", IsNavigable: instancesNav, TargetType: instancesTarget}}, cleanedParams
+			return []Row{{Key: "Instances", Value: "(all)"}}, cleanedParams
 		}
 		return nil, cleanedParams
 	}

@@ -8,7 +8,6 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -150,8 +149,10 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	// Nil clients + empty cache is the demo/test scenario: the target list is
+	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
 	}
 }
 
@@ -241,28 +242,13 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	// Nil clients + empty cache is the demo/test scenario: the target list is
+	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
 	}
 }
 
-func TestRelatedDemo_CtEvents_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ct-events")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ct-events")
-	}
-
-	results := checker(resource.Resource{ID: "evt-0a1b2c3d4e5f60001"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-}
 
 // ---------------------------------------------------------------------------
 // FetchFilter propagation: checkIAMUserCtEvents (iam-user → ct-events)

@@ -427,7 +427,30 @@ func iamPolicyFixtures() []resource.Resource {
 		},
 	}
 
-	// Generate 18 more policies to reach 22 total
+	// AWS-managed AdministratorAccess policy — required by ct-events Case K
+	// (AttachUserPolicy ResourceName cross-reference).
+	policies = append(policies, resource.Resource{
+		ID:     "arn:aws:iam::aws:policy/AdministratorAccess",
+		Name:   "AdministratorAccess",
+		Status: "",
+		Fields: map[string]string{
+			"policy_name":      "AdministratorAccess",
+			"policy_id":        "ANPAEXAMPLE000000001",
+			"attachment_count": "12",
+			"path":             "/",
+			"create_date":      "2015-02-06T18:40:16+00:00",
+		},
+		RawStruct: iamtypes.Policy{
+			PolicyName:      aws.String("AdministratorAccess"),
+			PolicyId:        aws.String("ANPAEXAMPLE000000001"),
+			Arn:             aws.String("arn:aws:iam::aws:policy/AdministratorAccess"),
+			AttachmentCount: aws.Int32(12),
+			Path:            aws.String("/"),
+			CreateDate:      aws.Time(mustParseTime("2015-02-06T18:40:16+00:00")),
+		},
+	})
+
+	// Generate 18 more policies to reach 23 total
 	for i := 0; i < 18; i++ {
 		name := policyNamePool[i]
 		policyID := fmt.Sprintf("ANPAEXAMPLE%09d", 500+i)
@@ -550,6 +573,27 @@ func iamUserFixtures() []resource.Resource {
 				Path:             aws.String("/"),
 				CreateDate:       aws.Time(mustParseTime("2025-11-01T09:00:00+00:00")),
 				PasswordLastUsed: aws.Time(mustParseTime("2026-04-07T16:00:00+00:00")),
+			},
+		},
+		// CT-event cross-reference user required by Case J (CreateUser demo fixture).
+		// Case J resourceName "charlie" must resolve in demo.GetResources("iam-user").
+		{
+			ID:     "charlie",
+			Name:   "charlie",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "charlie",
+				"user_id":            "AIDAEXAMPLE555555555",
+				"path":               "/",
+				"create_date":        "2026-04-07T15:10:05+00:00",
+				"password_last_used": "Never",
+			},
+			RawStruct: iamtypes.User{
+				UserName:   aws.String("charlie"),
+				UserId:     aws.String("AIDAEXAMPLE555555555"),
+				Arn:        aws.String("arn:aws:iam::123456789012:user/charlie"),
+				Path:       aws.String("/"),
+				CreateDate: aws.Time(mustParseTime("2026-04-07T15:10:05+00:00")),
 			},
 		},
 	}

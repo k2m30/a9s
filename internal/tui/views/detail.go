@@ -291,7 +291,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			m.rightColVisible = !m.rightColVisible
 			if m.rightColVisible {
 				defs := resource.GetRelated(m.resourceType)
-				m.rightCol = newRightColumn(defs, m.res)
+				m.rightCol = newRightColumn(defs, m.res, m.resourceType)
 				m.rightCol.keys = m.keys
 				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 				m.recalcViewportWidth()
@@ -458,7 +458,7 @@ func (m *DetailModel) SetSize(w, h int) {
 	if w >= 60 && len(resource.GetRelated(m.resourceType)) > 0 &&
 		(!m.ready || (!m.rightColShowing() && !m.rightColUserToggled)) {
 		m.rightColAutoShown = true
-		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
+		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res, m.resourceType)
 		m.rightCol.keys = m.keys
 		if m.ready { // resize case — first paint is handled via Init/first Update
 			m.pendingRelatedDispatch = true
@@ -719,7 +719,7 @@ func (m *DetailModel) ResetRightColumn() {
 		return
 	}
 	defs := resource.GetRelated(m.resourceType)
-	m.rightCol = newRightColumn(defs, m.res)
+	m.rightCol = newRightColumn(defs, m.res, m.resourceType)
 	m.rightCol.keys = m.keys
 	m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 }

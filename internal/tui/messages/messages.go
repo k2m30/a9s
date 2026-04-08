@@ -136,6 +136,7 @@ type RelatedCheckStartedMsg struct {
 type RelatedCheckResultMsg struct {
 	ResourceType     string
 	SourceResourceID string // ID of the source resource (for cache keying)
+	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
 	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
 	// CachedPages contains resource pages fetched from AWS on a cold cache miss,

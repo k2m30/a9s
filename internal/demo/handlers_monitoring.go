@@ -1,6 +1,8 @@
 package demo
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -65,9 +67,9 @@ func registerCWLogsHandlers(t *Transport) {
 		resources := demoData["logs"]()
 		logGroups := ExtractSDK[cwlogstypes.LogGroup](resources)
 
-		groups := make([]map[string]interface{}, 0, len(logGroups))
+		groups := make([]map[string]any, 0, len(logGroups))
 		for _, lg := range logGroups {
-			m := map[string]interface{}{
+			m := map[string]any{
 				"logGroupName": aws.ToString(lg.LogGroupName),
 			}
 			if lg.StoredBytes != nil {
@@ -82,7 +84,7 @@ func registerCWLogsHandlers(t *Transport) {
 			groups = append(groups, m)
 		}
 
-		return JSONResponse(map[string]interface{}{"logGroups": groups})
+		return JSONResponse(map[string]any{"logGroups": groups})
 	})
 }
 
@@ -96,12 +98,12 @@ func registerCloudTrailHandlers(t *Transport) {
 		resources := demoData["trail"]()
 		trails := ExtractSDK[cloudtrailtypes.Trail](resources)
 
-		list := make([]map[string]interface{}, 0, len(trails))
+		list := make([]map[string]any, 0, len(trails))
 		for _, tr := range trails {
-			m := map[string]interface{}{
-				"Name":        aws.ToString(tr.Name),
-				"TrailARN":    aws.ToString(tr.TrailARN),
-				"HomeRegion":  aws.ToString(tr.HomeRegion),
+			m := map[string]any{
+				"Name":               aws.ToString(tr.Name),
+				"TrailARN":           aws.ToString(tr.TrailARN),
+				"HomeRegion":         aws.ToString(tr.HomeRegion),
 				"IsMultiRegionTrail": tr.IsMultiRegionTrail != nil && *tr.IsMultiRegionTrail,
 			}
 			if tr.S3BucketName != nil {
@@ -110,16 +112,27 @@ func registerCloudTrailHandlers(t *Transport) {
 			list = append(list, m)
 		}
 
-		return JSONResponse(map[string]interface{}{"trailList": list})
+		return JSONResponse(map[string]any{"trailList": list})
 	})
 
-	t.Handle("cloudtrail", "LookupEvents", func(_ *http.Request) (*http.Response, error) {
+	t.Handle("cloudtrail", "LookupEvents", func(r *http.Request) (*http.Response, error) {
 		resources := demoData["ct-events"]()
 		events := ExtractSDK[cloudtrailtypes.Event](resources)
 
-		eventList := make([]map[string]interface{}, 0, len(events))
+		attrs := parseLookupAttributes(r)
+		if len(attrs) > 0 {
+			filtered := make([]cloudtrailtypes.Event, 0, len(events))
+			for _, ev := range events {
+				if lookupEventMatches(ev, attrs) {
+					filtered = append(filtered, ev)
+				}
+			}
+			events = filtered
+		}
+
+		eventList := make([]map[string]any, 0, len(events))
 		for _, ev := range events {
-			m := map[string]interface{}{
+			m := map[string]any{
 				"EventId":     aws.ToString(ev.EventId),
 				"EventName":   aws.ToString(ev.EventName),
 				"EventSource": aws.ToString(ev.EventSource),
@@ -133,9 +146,9 @@ func registerCloudTrailHandlers(t *Transport) {
 				m["CloudTrailEvent"] = *ev.CloudTrailEvent
 			}
 			if len(ev.Resources) > 0 {
-				resList := make([]map[string]interface{}, 0, len(ev.Resources))
+				resList := make([]map[string]any, 0, len(ev.Resources))
 				for _, r := range ev.Resources {
-					resList = append(resList, map[string]interface{}{
+					resList = append(resList, map[string]any{
 						"ResourceType": aws.ToString(r.ResourceType),
 						"ResourceName": aws.ToString(r.ResourceName),
 					})
@@ -145,6 +158,105 @@ func registerCloudTrailHandlers(t *Transport) {
 			eventList = append(eventList, m)
 		}
 
-		return JSONResponse(map[string]interface{}{"Events": eventList})
+		return JSONResponse(map[string]any{"Events": eventList})
 	})
+}
+
+// parseLookupAttributes reads the JSON request body and returns the
+// LookupAttributes slice as a key→value map. Returns nil on any parse error
+// so the caller falls back to the unfiltered path.
+func parseLookupAttributes(r *http.Request) map[string]string {
+	if r == nil || r.Body == nil {
+		return nil
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil || len(body) == 0 {
+		return nil
+	}
+	var req struct {
+		LookupAttributes []struct {
+			AttributeKey   string `json:"AttributeKey"`
+			AttributeValue string `json:"AttributeValue"`
+		} `json:"LookupAttributes"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil
+	}
+	if len(req.LookupAttributes) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(req.LookupAttributes))
+	for _, a := range req.LookupAttributes {
+		if a.AttributeKey != "" {
+			out[a.AttributeKey] = a.AttributeValue
+		}
+	}
+	return out
+}
+
+// lookupEventMatches reports whether a fixture event matches all requested
+// LookupAttributes (AND semantics). Keys not handled here return false so
+// the event is excluded — prefer strictness over permissiveness.
+func lookupEventMatches(ev cloudtrailtypes.Event, attrs map[string]string) bool {
+	for key, want := range attrs {
+		switch key {
+		case "Username":
+			if aws.ToString(ev.Username) != want {
+				return false
+			}
+		case "EventName":
+			if aws.ToString(ev.EventName) != want {
+				return false
+			}
+		case "EventSource":
+			if aws.ToString(ev.EventSource) != want {
+				return false
+			}
+		case "ResourceType":
+			if !anyResourceMatchesField(ev.Resources, "type", want) {
+				return false
+			}
+		case "ResourceName":
+			if !anyResourceMatchesField(ev.Resources, "name", want) {
+				return false
+			}
+		case "AccessKeyId":
+			if extractAccessKeyIdFromCTEvent(ev) != want {
+				return false
+			}
+		default:
+			// Unknown attribute key — be strict, exclude the event.
+			return false
+		}
+	}
+	return true
+}
+
+func anyResourceMatchesField(resources []cloudtrailtypes.Resource, field, want string) bool {
+	for _, r := range resources {
+		switch field {
+		case "type":
+			if aws.ToString(r.ResourceType) == want {
+				return true
+			}
+		case "name":
+			if aws.ToString(r.ResourceName) == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func extractAccessKeyIdFromCTEvent(ev cloudtrailtypes.Event) string {
+	if ev.CloudTrailEvent == nil {
+		return ""
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(*ev.CloudTrailEvent), &parsed); err != nil {
+		return ""
+	}
+	ui, _ := parsed["userIdentity"].(map[string]any)
+	s, _ := ui["accessKeyId"].(string)
+	return s
 }

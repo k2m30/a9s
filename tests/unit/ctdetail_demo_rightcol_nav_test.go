@@ -88,24 +88,25 @@ func loadCTEventsFixtureByID(t *testing.T, id string) resource.Resource {
 // ---------------------------------------------------------------------------
 
 // buildRightColModel creates a DetailModel with the right column auto-shown
-// and populated with demo checker results via ApplyRelatedResults.
+// and populated with real checker results via ApplyRelatedResults.
 // Width 180 triggers auto-show (>= 60). Returns the model ready for Tab+Enter.
+//
+// ct-events has no RegisterRelatedDemo override: the real checkers are pure
+// field-readers (no AWS calls) and produce correct results from demo fixture data.
+// Source of truth: real checkers in internal/aws/ct_events_related.go.
 func buildRightColModel(t *testing.T, res resource.Resource) views.DetailModel {
 	t.Helper()
 
-	// Get the demo checker for ct-events.
-	demoFn := resource.GetRelatedDemo("ct-events")
-	if demoFn == nil {
-		t.Fatal("no demo checker registered for ct-events — RegisterRelatedDemo was not called")
-	}
+	// Build a cache from demo fixtures — real checkers read from this.
+	cache := buildDemoResourceCache(t)
 
 	cfg := configForType("ct-events")
 	m := newDetailModel(res, "ct-events", cfg)
 	// Width 180 → right column auto-shown.
 	m.SetSize(180, 40)
 
-	// Populate the right column with demo checker results.
-	results := demoFn(res)
+	// Populate the right column with real checker results.
+	results := ctEventsRealCheckerResults(res, cache)
 	m.ApplyRelatedResults(results)
 
 	return m
@@ -128,11 +129,10 @@ func buildRightColModel(t *testing.T, res resource.Resource) views.DetailModel {
 func dispatchRightColumnEnter(t *testing.T, m *views.DetailModel, targetGroup string) messages.RelatedNavigateMsg {
 	t.Helper()
 
-	demoFn := resource.GetRelatedDemo("ct-events")
-	if demoFn == nil {
-		t.Fatal("no demo checker registered for ct-events")
-	}
-	results := demoFn(m.SourceResource())
+	// ct-events has no demo override — use real checkers with demo fixture cache.
+	// Source of truth: real checkers in internal/aws/ct_events_related.go.
+	cache := buildDemoResourceCache(t)
+	results := ctEventsRealCheckerResults(m.SourceResource(), cache)
 
 	// Build a map of targetType → RelatedCheckResult for quick lookup.
 	resultByType := make(map[string]resource.RelatedCheckResult, len(results))
@@ -387,8 +387,8 @@ func TestCtEventsRightColumnNav_CaseG(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCtEventsRightColumnNav_CaseH asserts that the Insight fixture has no
-// actionable right-column rows: the right column should not be focusable via
-// Tab, and pressing Enter on any row must not emit a RelatedNavigateMsg.
+// actionable TYPED-group rows; self-pivots (EventName, Username, etc.) may
+// still fire because those pivots apply to any event with the relevant field set.
 func TestCtEventsRightColumnNav_CaseH(t *testing.T) {
 	ensureNoColor(t)
 
@@ -408,9 +408,16 @@ func TestCtEventsRightColumnNav_CaseH(t *testing.T) {
 		_, cmd := m.Update(enterKey)
 		if cmd != nil {
 			msg := cmd()
-			if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
-				t.Errorf("Case H cursor pos %d: Enter emitted RelatedNavigateMsg — "+
-					"Insight fixture must have ZERO actionable right-column rows (design violation)", pos)
+			if nav, isNav := msg.(messages.RelatedNavigateMsg); isNav {
+				// Self-pivots (EventName, Username, etc.) may fire for Insight events
+				// because those pivots apply to any event with the relevant field set.
+				// Only typed-group navigations (role, ec2, s3, ...) must be empty
+				// because Insight events reference no resources.
+				if nav.TargetType != "ct-events" {
+					t.Errorf("Case H cursor pos %d: Enter emitted typed-group RelatedNavigateMsg "+
+						"TargetType=%q — Insight fixture must have ZERO actionable TYPED rows "+
+						"(self-pivots are allowed)", pos, nav.TargetType)
+				}
 			}
 		}
 		m, _ = m.Update(jKey)

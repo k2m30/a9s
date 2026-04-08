@@ -116,7 +116,9 @@ func TestCTDetailDemoNav_CaseH(t *testing.T) {
 // Case G fixture ("e-a7b8c9d0", cross-account PutObject) each dispatch a
 // RelatedNavigateMsg with the correct TargetType, TargetID, and SourceType.
 //
-// FieldList layout for Case G (AssumedRole, Management/AwsApiCall, cross-account):
+// FieldList layout for Case G (AssumedRole, Management/AwsApiCall, cross-account).
+// The Object row was removed from TARGET by the fixture cleanup — the key is now
+// displayed in a REQUEST section (not navigable). Verified against golden file.
 //
 //	idx 0 — ACTOR      (IsSection)
 //	idx 1 — Principal  (AssumedRole ARN, IsNavigable=true, TargetType="role")
@@ -126,13 +128,17 @@ func TestCTDetailDemoNav_CaseH(t *testing.T) {
 //	idx 5 — Event      (s3:PutObject, severity=ct-attention)
 //	idx 6 — TARGET     (IsSection)
 //	idx 7 — Bucket     (IsNavigable=true, TargetType="s3", Value="shared-artifacts")
-//	idx 8 — Object     (IsNavigable=true, TargetType="s3", Value="shared-artifacts/build-4821.tar.gz")
+//	idx 8 — CONTEXT    (IsSection)
+//	idx 9 — Region
+//	...
+//	idx N — REQUEST    (IsSection)
+//	idx N+1 — bucketName
+//	idx N+2 — key      (not navigable)
 //
 // Cursor navigation (section headers are auto-skipped by 'j'):
 //
 //	Principal → j×1
 //	Bucket    → j×5  (skips ACTION header at 4, TARGET header at 6)
-//	Object    → j×6
 func TestCTDetailDemoNav_CaseG(t *testing.T) {
 	ensureNoColor(t)
 
@@ -233,39 +239,8 @@ func TestCTDetailDemoNav_CaseG(t *testing.T) {
 		assertTargetResolves(t, navMsg, "TestCTDetailDemoNav_CaseG/Bucket dispatches s3 navigate")
 	})
 
-	// -----------------------------------------------------------------------
-	// Subtest 3: Object row → RelatedNavigateMsg{TargetType:"s3", TargetID:"shared-artifacts"}
-	// Navigate j×6: one additional j from Bucket position (idx 7 → idx 8).
-	// NavID is set to the bucket name so Enter on the Object row navigates to the
-	// parent bucket, not the object path. The display Value retains the full key.
-	// -----------------------------------------------------------------------
-	t.Run("Object dispatches s3 navigate", func(t *testing.T) {
-		m := base
-		for i := 0; i < 6; i++ {
-			m, _ = m.Update(jPress)
-		}
-
-		_, cmd := m.Update(enterPress)
-		if cmd == nil {
-			t.Fatal("Enter on Object row returned nil cmd — Object row is not navigable")
-		}
-		msg := cmd()
-		navMsg, ok := msg.(messages.RelatedNavigateMsg)
-		if !ok {
-			t.Fatalf("Enter on Object returned %T, want messages.RelatedNavigateMsg", msg)
-		}
-
-		if navMsg.TargetType != "s3" {
-			t.Errorf("Object TargetType = %q, want %q", navMsg.TargetType, "s3")
-		}
-		if navMsg.SourceType != "ct-events" {
-			t.Errorf("Object SourceType = %q, want %q", navMsg.SourceType, "ct-events")
-		}
-		if navMsg.TargetID != "shared-artifacts" {
-			t.Errorf("Object TargetID = %q, want %q", navMsg.TargetID, "shared-artifacts")
-		}
-		assertTargetResolves(t, navMsg, "TestCTDetailDemoNav_CaseG/Object dispatches s3 navigate")
-	})
+	// NOTE: the Object row was removed from TARGET by the fixture cleanup — the
+	// s3 key is now displayed in a non-navigable REQUEST section. No Object subtest.
 }
 
 // TestCTDetailDemoNav_CaseA verifies that the Principal row of the Karpenter
@@ -650,8 +625,8 @@ func TestCTDetailDemoNav_CaseE(t *testing.T) {
 //
 // TargetID values verified against fixtures_monitoring.go "e-c3d4e5f6":
 //   - Principal: userIdentity.arn          = "arn:aws:iam::333333333333:user/bob"
-//   - Bucket:    requestParameters.bucketName = "prod-logs"
-//   - Object:    requestParameters.key        = "prod-logs/2026/04/07/app.log"
+//   - Bucket:    requestParameters.bucketName = "webapp-assets-prod"
+//   - Object:    requestParameters.key        = "webapp-assets-prod/2026/04/07/app.log"
 //
 // Field list layout (confirmed from golden testdata/golden/ctdetail_demo_case_c.txt
 // and sections.go buildActorRows — IAMUser, has AccessKeyID and UserAgent, no MFA):
@@ -664,8 +639,8 @@ func TestCTDetailDemoNav_CaseE(t *testing.T) {
 //	    4  ACTION       (section header)
 //	    5  Event        (s3:PutObject, ct-danger)
 //	    6  TARGET       (section header)
-//	    7  Bucket       (navigable, s3, "prod-logs")
-//	    8  Object       (navigable, s3, "prod-logs/2026/04/07/app.log")
+//	    7  Bucket       (navigable, s3, "webapp-assets-prod")
+//	    8  Object       (navigable, s3, "webapp-assets-prod/2026/04/07/app.log")
 //	    9  CONTEXT      (section header)
 //	   ...
 //
@@ -772,8 +747,8 @@ func TestCTDetailDemoNav_CaseC(t *testing.T) {
 		if nav.TargetType != "s3" {
 			t.Errorf("Bucket: TargetType = %q, want %q", nav.TargetType, "s3")
 		}
-		if nav.TargetID != "prod-logs" {
-			t.Errorf("Bucket: TargetID = %q, want %q", nav.TargetID, "prod-logs")
+		if nav.TargetID != "webapp-assets-prod" {
+			t.Errorf("Bucket: TargetID = %q, want %q", nav.TargetID, "webapp-assets-prod")
 		}
 		if nav.SourceType != "ct-events" {
 			t.Errorf("Bucket: SourceType = %q, want %q", nav.SourceType, "ct-events")
@@ -786,7 +761,7 @@ func TestCTDetailDemoNav_CaseC(t *testing.T) {
 	// 6 Down presses (one additional j from Bucket at idx 7) → idx 8
 	// (Object, IsNavigable=true, TargetType="s3").
 	// navFromLabel("Object") returns (true, "s3").
-	// NavID = "prod-logs" (bucket name) — pressing Enter on the Object row navigates
+	// NavID = "webapp-assets-prod" (bucket name) — pressing Enter on the Object row navigates
 	// to the parent bucket, not the object path. Display Value remains the full key.
 	// -----------------------------------------------------------------------
 	t.Run("Object TARGET row navigates to s3", func(t *testing.T) {
@@ -807,8 +782,8 @@ func TestCTDetailDemoNav_CaseC(t *testing.T) {
 		if nav.TargetType != "s3" {
 			t.Errorf("Object: TargetType = %q, want %q", nav.TargetType, "s3")
 		}
-		if nav.TargetID != "prod-logs" {
-			t.Errorf("Object: TargetID = %q, want %q", nav.TargetID, "prod-logs")
+		if nav.TargetID != "webapp-assets-prod" {
+			t.Errorf("Object: TargetID = %q, want %q", nav.TargetID, "webapp-assets-prod")
 		}
 		if nav.SourceType != "ct-events" {
 			t.Errorf("Object: SourceType = %q, want %q", nav.SourceType, "ct-events")
@@ -991,7 +966,9 @@ func TestCTDetailDemoNav_CaseB(t *testing.T) {
 //
 // The resources[] array in the CloudTrailEvent JSON is absent, so ExtractTarget
 // falls through to the §2 per-event-name lookup (extractS3ObjectEvent) which
-// produces navigable Bucket and Object rows from requestParameters.
+// produces a navigable Bucket row from requestParameters.bucketName.
+// The Object row was removed from TARGET by the fixture cleanup — the key is
+// now displayed in a non-navigable REQUEST section. Verified against golden file.
 //
 // NOTE on Federation row: the CloudTrail JSON places "webIdFederationData" at the
 // userIdentity level (not inside sessionContext). The rawUserIdentity parser maps
@@ -1009,9 +986,11 @@ func TestCTDetailDemoNav_CaseB(t *testing.T) {
 //	    4  Event      (s3:GetObject, severity=ct-info, not navigable)
 //	    5  TARGET     (section header, auto-skipped)
 //	    6  Bucket     (checkout-config, IsNavigable=true, TargetType="s3")
-//	    7  Object     (checkout-config/prod/config.json, IsNavigable=true, TargetType="s3")
-//	    8  CONTEXT    (section header)
+//	    7  CONTEXT    (section header)
 //	   ...
+//	   N  REQUEST    (section header)
+//	   N+1 bucketName (not navigable)
+//	   N+2 key        (not navigable)
 //
 // Down-key trace from initial position 0 (section headers auto-skipped by 'j'):
 //
@@ -1019,7 +998,6 @@ func TestCTDetailDemoNav_CaseB(t *testing.T) {
 //	2 press: 1→2 (User agent)
 //	3 press: 2→3 (ACTION, IsSection) skip→4 (Event — stop)
 //	4 press: 4→5 (TARGET, IsSection) skip→6 (Bucket — stop)
-//	5 press: 6→7 (Object — stop)
 func TestCTDetailDemoNav_CaseF(t *testing.T) {
 	ensureNoColor(t)
 
@@ -1123,40 +1101,8 @@ func TestCTDetailDemoNav_CaseF(t *testing.T) {
 		assertTargetResolves(t, nav, "TestCTDetailDemoNav_CaseF/Bucket dispatches s3 navigate")
 	})
 
-	// -----------------------------------------------------------------------
-	// Subtest 3: Object (TARGET) → s3 navigate
-	// 5 Down presses: one additional j from Bucket (idx 6) → idx 7 (Object).
-	// navFromLabel("Object") returns (true, "s3").
-	// NavID = "checkout-config" (bucket name) — pressing Enter on the Object row
-	// navigates to the parent bucket, not the object path.
-	// -----------------------------------------------------------------------
-	t.Run("Object dispatches s3 navigate", func(t *testing.T) {
-		m := base
-		for i := 0; i < 5; i++ {
-			m, _ = m.Update(jPress)
-		}
-
-		_, cmd := m.Update(enterPress)
-		if cmd == nil {
-			t.Fatal("Enter on Object row returned nil cmd — Object row is not navigable " +
-				"(verify extractS3ObjectEvent returns an Object row for requestParameters.key)")
-		}
-		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
-		if !ok {
-			t.Fatalf("cmd() returned %T, want messages.RelatedNavigateMsg", msg)
-		}
-		if nav.TargetType != "s3" {
-			t.Errorf("Object: TargetType = %q, want %q", nav.TargetType, "s3")
-		}
-		if nav.TargetID != "checkout-config" {
-			t.Errorf("Object: TargetID = %q, want %q", nav.TargetID, "checkout-config")
-		}
-		if nav.SourceType != "ct-events" {
-			t.Errorf("Object: SourceType = %q, want %q", nav.SourceType, "ct-events")
-		}
-		assertTargetResolves(t, nav, "TestCTDetailDemoNav_CaseF/Object dispatches s3 navigate")
-	})
+	// NOTE: the Object row was removed from TARGET by the fixture cleanup — the
+	// s3 key is now displayed in a non-navigable REQUEST section. No Object subtest.
 }
 
 // TestCTDetailDemoNav_CaseI verifies navigation for the Case I fixture
@@ -1167,7 +1113,9 @@ func TestCTDetailDemoNav_CaseF(t *testing.T) {
 //   - requestParameters.bucketName = "prod-lake"
 //   - requestParameters.key        = "prod-lake/landing/2026/04/07/batch-0719.parquet"
 //
-// FieldList layout (AssumedRole, NetworkActivity/AwsVpceEvent, has error section):
+// FieldList layout (AssumedRole, NetworkActivity/AwsVpceEvent, has error section).
+// The Object row was removed from TARGET by the fixture cleanup — the key is now
+// displayed in a non-navigable REQUEST section. Verified against golden file.
 //
 //	idx 0  ACTOR      (section header — initial cursor position, auto-skipped)
 //	idx 1  Principal  (full assumed-role ARN, IsNavigable=true, TargetType="role")
@@ -1177,24 +1125,24 @@ func TestCTDetailDemoNav_CaseF(t *testing.T) {
 //	idx 5  Category   (NetworkActivity / AwsVpceEvent)
 //	idx 6  TARGET     (section header, auto-skipped)
 //	idx 7  Bucket     (prod-lake, IsNavigable=true, TargetType="s3")
-//	idx 8  Object     (prod-lake/landing/2026/04/07/batch-0719.parquet, IsNavigable=true, TargetType="s3")
-//	idx 9  CONTEXT    (section header)
-//	idx 10 Region
-//	idx 11 Source IP
-//	idx 12 Time
-//	idx 13 ERROR      (section header)
-//	idx 14 errorCode
-//	idx 15 errorMessage
+//	idx 8  CONTEXT    (section header)
+//	idx 9  Region
+//	idx 10 Source IP
+//	idx 11 Time
+//	idx 12 ERROR      (section header)
+//	idx 13 errorCode
+//	idx 14 errorMessage
+//	idx 15 REQUEST    (section header)
+//	idx 16 bucketName (not navigable)
+//	idx 17 key        (not navigable)
 //
 // Down-key trace from initial position 0 (section headers auto-skipped by 'j'):
 //
 //	j×1 → Principal (idx 1)
 //	j×5 → Bucket    (skips ACTION header at 3 and TARGET header at 6)
-//	j×6 → Object    (one additional j from Bucket)
 //
 // The Principal subtest expects "DataPipelineRole" (bare role name) — this will FAIL
-// until the ARN-stripping bug is fixed. Bucket and Object subtests expect the full
-// bucket/key values and should PASS.
+// until the ARN-stripping bug is fixed. Bucket subtest expects prod-lake and should PASS.
 func TestCTDetailDemoNav_CaseI(t *testing.T) {
 	ensureNoColor(t)
 
@@ -1300,38 +1248,8 @@ func TestCTDetailDemoNav_CaseI(t *testing.T) {
 		assertTargetResolves(t, nav, "TestCTDetailDemoNav_CaseI/Bucket dispatches s3 navigate")
 	})
 
-	// -----------------------------------------------------------------------
-	// Subtest 3: Object (TARGET) → s3 navigate
-	// j×6: one additional j from Bucket (idx 7) → idx 8 (Object).
-	// NavID = "prod-lake" (bucket name) — pressing Enter on the Object row navigates
-	// to the parent bucket, not the object path. Display Value retains the full key.
-	// -----------------------------------------------------------------------
-	t.Run("Object dispatches s3 navigate", func(t *testing.T) {
-		m := base
-		for i := 0; i < 6; i++ {
-			m, _ = m.Update(jPress)
-		}
-
-		_, cmd := m.Update(enterPress)
-		if cmd == nil {
-			t.Fatal("Enter on Object row returned nil cmd — Object row is not navigable")
-		}
-		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
-		if !ok {
-			t.Fatalf("cmd() returned %T, want messages.RelatedNavigateMsg", msg)
-		}
-		if nav.TargetType != "s3" {
-			t.Errorf("Object: TargetType = %q, want %q", nav.TargetType, "s3")
-		}
-		if nav.TargetID != "prod-lake" {
-			t.Errorf("Object: TargetID = %q, want %q", nav.TargetID, "prod-lake")
-		}
-		if nav.SourceType != "ct-events" {
-			t.Errorf("Object: SourceType = %q, want %q", nav.SourceType, "ct-events")
-		}
-		assertTargetResolves(t, nav, "TestCTDetailDemoNav_CaseI/Object dispatches s3 navigate")
-	})
+	// NOTE: the Object row was removed from TARGET by the fixture cleanup — the
+	// s3 key is now displayed in a non-navigable REQUEST section. No Object subtest.
 }
 
 // countFields returns the number of rows in the fieldList for the given model
