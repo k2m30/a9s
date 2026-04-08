@@ -135,6 +135,60 @@ func vpceFixtures() []resource.Resource {
 				},
 			},
 		},
+		// ct-events case F cross-ref: IRSA GetObject via VPC endpoint in eu-west-1.
+		{
+			ID:     "vpce-0abc123def456",
+			Name:   "com.amazonaws.eu-west-1.s3",
+			Status: "available",
+			Fields: map[string]string{
+				"vpce_id":      "vpce-0abc123def456",
+				"service_name": "com.amazonaws.eu-west-1.s3",
+				"type":         "Interface",
+				"state":        "available",
+				"vpc_id":       prodVPCID,
+			},
+			RawStruct: ec2types.VpcEndpoint{
+				VpcEndpointId:     aws.String("vpce-0abc123def456"),
+				ServiceName:       aws.String("com.amazonaws.eu-west-1.s3"),
+				VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+				State:             ec2types.StateAvailable,
+				VpcId:             aws.String(prodVPCID),
+				SubnetIds:         []string{prodPrivateSubnetA, prodPrivateSubnetB},
+				PrivateDnsEnabled: aws.Bool(true),
+				OwnerId:           aws.String("666666666666"),
+				CreationTimestamp:  aws.Time(mustParseTime("2026-01-10T11:00:00+00:00")),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("eks-s3-endpoint-eu-west-1")},
+				},
+			},
+		},
+		// ct-events case I cross-ref: DataPipelineRole VPCE deny in eu-central-1.
+		{
+			ID:     "vpce-0ff11223344556677",
+			Name:   "com.amazonaws.eu-central-1.s3",
+			Status: "available",
+			Fields: map[string]string{
+				"vpce_id":      "vpce-0ff11223344556677",
+				"service_name": "com.amazonaws.eu-central-1.s3",
+				"type":         "Interface",
+				"state":        "available",
+				"vpc_id":       prodVPCID,
+			},
+			RawStruct: ec2types.VpcEndpoint{
+				VpcEndpointId:     aws.String("vpce-0ff11223344556677"),
+				ServiceName:       aws.String("com.amazonaws.eu-central-1.s3"),
+				VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+				State:             ec2types.StateAvailable,
+				VpcId:             aws.String(prodVPCID),
+				SubnetIds:         []string{prodPrivateSubnetA, prodPrivateSubnetB},
+				PrivateDnsEnabled: aws.Bool(true),
+				OwnerId:           aws.String("111111111111"),
+				CreationTimestamp:  aws.Time(mustParseTime("2025-11-15T08:30:00+00:00")),
+				Tags: []ec2types.Tag{
+					{Key: aws.String("Name"), Value: aws.String("data-pipeline-s3-endpoint-eu-central-1")},
+				},
+			},
+		},
 	}
 }
 

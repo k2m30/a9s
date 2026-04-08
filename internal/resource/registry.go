@@ -114,6 +114,25 @@ func GetChildType(shortName string) *ResourceTypeDef {
 	return childTypes[shortName]
 }
 
+// AllChildTypes returns all registered child type definitions.
+// The returned slice is in no guaranteed order.
+func AllChildTypes() []ResourceTypeDef {
+	result := make([]ResourceTypeDef, 0, len(childTypes))
+	for _, def := range childTypes {
+		result = append(result, *def)
+	}
+	return result
+}
+
+// AllChildShortNames returns the ShortName of every registered child type.
+func AllChildShortNames() []string {
+	names := make([]string, 0, len(childTypes))
+	for name := range childTypes {
+		names = append(names, name)
+	}
+	return names
+}
+
 // UnregisterChildType removes a child type. Used only in tests for cleanup.
 func UnregisterChildType(shortName string) {
 	delete(childTypes, shortName)
