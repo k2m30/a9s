@@ -108,9 +108,224 @@ func init() {
 	})
 
 	resource.RegisterRelatedDemo("ct-events", func(res resource.Resource) []resource.RelatedCheckResult {
-		return []resource.RelatedCheckResult{
-			{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCtEventsRoleID}},
-			{TargetType: "iam-user", Count: 1, ResourceIDs: []string{relatedCtEventsUserID}},
+		// allZero returns the full result set (13 typed groups + 4 self-pivots) with all counts=0.
+		allZero := func() []resource.RelatedCheckResult {
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 0},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 0},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				// Self-pivots: all absent for allZero cases (Insight events have no userIdentity).
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+			}
+		}
+		switch res.ID {
+		case "e-a1b2c3d4": // Case A — Karpenter DescribeInstances (AssumedRole, read-only)
+			// accessKeyId: ASIAY44QH8DCKARPEXMP; user: alice.johnson; same-account (no SharedEventId).
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{"KarpenterNodeRole"}},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 0},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"AccessKeyId": "ASIAY44QH8DCKARPEXMP"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "alice.johnson"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "DescribeInstances"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-b2c3d4e5": // Case B — SSO TerminateInstances (AssumedRole via SSO, two instances)
+			// accessKeyId: ASIAZK7L9PQRSSOXEXMP; user: alice.johnson; same-account (no SharedEventId).
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{"AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d"}},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 2, ResourceIDs: []string{"i-0a1b2c3d4e5f60001", "i-0a1b2c3d4e5f60002"}},
+				{TargetType: "s3", Count: 0},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"AccessKeyId": "ASIAZK7L9PQRSSOXEXMP"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "alice.johnson"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "TerminateInstances"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-c3d4e5f6": // Case C — IAMUser PutObject AccessDenied
+			// accessKeyId: AKIAIOSFODNN7BOB1XMP; user: bob.smith; same-account (no SharedEventId).
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 0},
+				{TargetType: "iam-user", Count: 1, ResourceIDs: []string{"bob.smith"}},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{"webapp-assets-prod"}},
+				{TargetType: "s3_objects", Count: 1, ResourceIDs: []string{"prod-logs|prod-logs/2026/04/07/app.log"}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"AccessKeyId": "AKIAIOSFODNN7BOB1XMP"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "bob.smith"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "PutObject"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-d4e5f6a7": // Case D — KMS RotateKey AwsServiceEvent
+			// AWSService type — no accessKeyId; user: ci-service-account; same-account.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 0},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 0},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 1, ResourceIDs: []string{"2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"}},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "ci-service-account"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "RotateKey"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-e5f6a7b8": // Case E — Root PutBucketPolicy
+			// Root identity — no accessKeyId; user: ci-service-account; same-account.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 0},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{"webapp-assets-prod"}},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "ci-service-account"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "PutBucketPolicy"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-f6a7b8c9": // Case F — IRSA GetObject via VPC endpoint
+			// AssumedRole (no accessKeyId in JSON); user: alice.johnson; same-account.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{"eks-checkout-svc-sa"}},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{"data-pipeline-logs"}},
+				{TargetType: "s3_objects", Count: 1, ResourceIDs: []string{"checkout-config|checkout-config/prod/config.json"}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 1, ResourceIDs: []string{"vpce-0abc123def456"}},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "alice.johnson"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "GetObject"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		case "e-a7b8c9d0": // Case G — Cross-account PutObject
+			// accessKeyId: ASIAQF3M2N8KCIB1XMPL; cross-account (888888888888 → 777777777777); SharedEventId pivot present.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{"CiBuildRole"}},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{"ml-training-data"}},
+				{TargetType: "s3_objects", Count: 1, ResourceIDs: []string{"shared-artifacts|shared-artifacts/build-4821.tar.gz"}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"AccessKeyId": "ASIAQF3M2N8KCIB1XMPL"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "bob.smith"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "PutObject"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"SharedEventId": "e-a7b8c9d0"}},
+			}
+		case "e-b8c9d0e1": // Case H — Insight RunInstances (no pivots: Insight events have no userIdentity)
+			return allZero()
+		case "e-c9d0e1f2": // Case I — NetworkActivity VPCE deny
+			// AssumedRole (no accessKeyId in JSON); user: alice.johnson; same-account.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{"DataPipelineRole"}},
+				{TargetType: "iam-user", Count: 0},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 1, ResourceIDs: []string{"cloudtrail-audit-logs"}},
+				{TargetType: "s3_objects", Count: 1, ResourceIDs: []string{"prod-lake|prod-lake/landing/2026/04/07/batch-0719.parquet"}},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 1, ResourceIDs: []string{"vpce-0ff11223344556677"}},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "alice.johnson"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "PutObject"}},
+				{TargetType: "ct-events", Count: 0},
+			}
+		default:
+			// Legacy events (evt-0a1b2c3d4e5f6000*) and any unknown IDs: return the
+			// original flat demo result so Part4 integrity tests continue to pass.
+			// Include self-pivot stubs so TestGolden_DemoRelatedCoverage finds ct-events targets.
+			return []resource.RelatedCheckResult{
+				{TargetType: "role", Count: 1, ResourceIDs: []string{relatedCtEventsRoleID}},
+				{TargetType: "iam-user", Count: 1, ResourceIDs: []string{relatedCtEventsUserID}},
+				{TargetType: "ec2", Count: 0},
+				{TargetType: "s3", Count: 0},
+				{TargetType: "s3_objects", Count: 0},
+				{TargetType: "lambda", Count: 0},
+				{TargetType: "rds", Count: 0},
+				{TargetType: "kms", Count: 0},
+				{TargetType: "secrets", Count: 0},
+				{TargetType: "vpce", Count: 0},
+				{TargetType: "sg", Count: 0},
+				{TargetType: "ddb", Count: 0},
+				{TargetType: "cfn", Count: 0},
+				// Self-pivot stubs for legacy events.
+				{TargetType: "ct-events", Count: 0},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"Username": "admin"}},
+				{TargetType: "ct-events", Count: -1, FetchFilter: map[string]string{"EventName": "Unknown"}},
+				{TargetType: "ct-events", Count: 0},
+			}
 		}
 	})
 

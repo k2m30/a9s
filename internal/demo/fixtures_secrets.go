@@ -380,5 +380,29 @@ func kmsKeys() []resource.Resource {
 				Enabled:      false,
 			},
 		},
+		// CT-event cross-reference key required by ctdetail nav tests (T029).
+		// Case D references kms:RotateKey on key "2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b" — this
+		// UUID must resolve in demo.GetResources("kms") for assertTargetResolves to pass.
+		{
+			ID:     "2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b",
+			Name:   "alias/acme-rotation-key",
+			Status: "Enabled",
+			Fields: map[string]string{
+				"key_id":      "2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b",
+				"alias":       "alias/acme-rotation-key",
+				"status":      "Enabled",
+				"description": "Auto-rotation key for production secrets (ct-events case D cross-ref)",
+			},
+			RawStruct: &kmstypes.KeyMetadata{
+				KeyId:        aws.String("2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
+				Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
+				Description:  aws.String("Auto-rotation key for production secrets (ct-events case D cross-ref)"),
+				KeyState:     kmstypes.KeyStateEnabled,
+				KeyManager:   kmstypes.KeyManagerTypeCustomer,
+				KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+				CreationDate: aws.Time(time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)),
+				Enabled:      true,
+			},
+		},
 	}
 }

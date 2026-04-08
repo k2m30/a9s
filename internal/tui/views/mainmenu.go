@@ -45,7 +45,7 @@ type MainMenuModel struct {
 	availTotal   int
 }
 
-// NewMainMenu returns an initialized MainMenuModel with all resource types.
+// NewMainMenu returns an initialized MainMenuModel with all registered resource types.
 func NewMainMenu(k keys.Map) MainMenuModel {
 	all := resource.AllResourceTypes()
 	return MainMenuModel{

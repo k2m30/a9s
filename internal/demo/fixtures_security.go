@@ -274,6 +274,36 @@ func iamRoleFixtures() []resource.Resource {
 		},
 	}
 
+	// Extra roles required by ct-event-detail wireframe cases A, B, F, G, I (T029).
+	for _, rd := range []struct{ id, desc string }{
+		{"KarpenterNodeRole", "Karpenter node provisioner role (ct-events case A cross-ref)"},
+		{"AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d", "SSO AdminAccess reserved role (ct-events case B cross-ref)"},
+		{"eks-checkout-svc-sa", "EKS IRSA service account role for checkout service (ct-events case F cross-ref)"},
+		{"CiBuildRole", "CI/CD build role for cross-account artifact publishing (ct-events case G cross-ref)"},
+		{"DataPipelineRole", "Data pipeline ETL role for VPCE access (ct-events case I cross-ref)"},
+	} {
+		roles = append(roles, resource.Resource{
+			ID:     rd.id,
+			Name:   rd.id,
+			Status: "",
+			Fields: map[string]string{
+				"role_name":   rd.id,
+				"role_id":     fmt.Sprintf("AROACT029%s", rd.id[:8]),
+				"path":        "/",
+				"create_date": "2026-01-01T00:00:00+00:00",
+				"description": rd.desc,
+			},
+			RawStruct: iamtypes.Role{
+				RoleName:    aws.String(rd.id),
+				RoleId:      aws.String(fmt.Sprintf("AROACT029%s", rd.id[:8])),
+				Arn:         aws.String(fmt.Sprintf("arn:aws:iam::111111111111:role/%s", rd.id)),
+				Path:        aws.String("/"),
+				CreateDate:  aws.Time(mustParseTime("2026-01-01T00:00:00+00:00")),
+				Description: aws.String(rd.desc),
+			},
+		})
+	}
+
 	// Generate 18 more roles to reach 25 total
 	paths := []string{"/", "/service-role/", "/", "/aws-service-role/"}
 	for i := 0; i < 18; i++ {
@@ -497,6 +527,29 @@ func iamUserFixtures() []resource.Resource {
 				Path:       aws.String("/service-accounts/"),
 				CreateDate: aws.Time(mustParseTime("2025-01-10T12:00:00+00:00")),
 				// PasswordLastUsed is nil for programmatic-only accounts
+			},
+		},
+		// CT-event cross-reference user required by ctdetail nav tests (T029).
+		// Case C references "arn:aws:iam::333333333333:user/bob" — the bare user name
+		// "bob" must resolve in demo.GetResources("iam-user") for assertTargetResolves.
+		{
+			ID:     "bob",
+			Name:   "bob",
+			Status: "",
+			Fields: map[string]string{
+				"user_name":          "bob",
+				"user_id":            "AIDAEXAMPLE444444444",
+				"path":               "/",
+				"create_date":        "2025-11-01T09:00:00+00:00",
+				"password_last_used": "2026-04-07T16:00:00+00:00",
+			},
+			RawStruct: iamtypes.User{
+				UserName:         aws.String("bob"),
+				UserId:           aws.String("AIDAEXAMPLE444444444"),
+				Arn:              aws.String("arn:aws:iam::333333333333:user/bob"),
+				Path:             aws.String("/"),
+				CreateDate:       aws.Time(mustParseTime("2025-11-01T09:00:00+00:00")),
+				PasswordLastUsed: aws.Time(mustParseTime("2026-04-07T16:00:00+00:00")),
 			},
 		},
 	}

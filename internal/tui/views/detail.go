@@ -314,12 +314,16 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
 				item := m.fieldList[m.fieldCursor]
 				if item.IsNavigable {
+					targetID := item.Value
+					if item.NavID != "" {
+						targetID = item.NavID
+					}
 					return m, func() tea.Msg {
 						return messages.RelatedNavigateMsg{
 							TargetType:     item.TargetType,
 							SourceResource: m.res,
 							SourceType:     m.resourceType,
-							TargetID:       item.Value,
+							TargetID:       targetID,
 						}
 					}
 				}
@@ -356,6 +360,10 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Down):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
 				m.fieldCursor++
+				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
+				for m.fieldCursor < len(m.fieldList)-1 && m.fieldList[m.fieldCursor].IsSection {
+					m.fieldCursor++
+				}
 				m.syncViewportToCursor()
 				m.refreshViewportContent()
 				return m, nil
@@ -364,6 +372,10 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Up):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
 				m.fieldCursor--
+				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
+				for m.fieldCursor > 0 && m.fieldList[m.fieldCursor].IsSection {
+					m.fieldCursor--
+				}
 				m.syncViewportToCursor()
 				m.refreshViewportContent()
 				return m, nil

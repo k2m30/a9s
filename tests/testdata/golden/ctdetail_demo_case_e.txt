@@ -1,0 +1,40 @@
+ ACTOR                                                                                                                                             │            RELATED
+ Principal:            arn:aws:iam::555555555555:root                                                                                              │  IAM Roles
+ User agent:           Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15       │  IAM Users
+ ACTION                                                                                                                                            │  EC2 Instances
+ Event:                s3:PutBucketPolicy                                                                                                          │  S3 Buckets
+ TARGET                                                                                                                                            │  S3 Objects
+ Bucket:               prod-artifacts                                                                                                              │  Lambda Functions
+ CONTEXT                                                                                                                                           │  RDS Instances
+ Region:               us-east-1                                                                                                                   │  KMS Keys
+ Source IP:            203.0.113.17                                                                                                                │  Secrets
+ Time:                 2026-04-07T03:42:18Z                                                                                                        │  VPC Endpoints
+ REQUEST                                                                                                                                           │  Security Groups
+ policy:               {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::prod│  DynamoDB Tables
+                                                                                                                                                   │  CloudFormation Stacks
+                                                                                                                                                   │  CT events by AccessKeyId
+                                                                                                                                                   │  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │

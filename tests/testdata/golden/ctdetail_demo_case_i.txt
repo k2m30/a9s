@@ -1,0 +1,40 @@
+ ACTOR                                                                                                                                             │            RELATED
+ Principal:            arn:aws:sts::111111111111:assumed-role/DataPipelineRole/dp-0719                                                             │  IAM Roles
+ User agent:           aws-sdk-java/2.25.11                                                                                                        │  IAM Users
+ ACTION                                                                                                                                            │  EC2 Instances
+ Event:                s3:PutObject                                                                                                                │  S3 Buckets
+ Category:             NetworkActivity / AwsVpceEvent                                                                                              │  S3 Objects
+ TARGET                                                                                                                                            │  Lambda Functions
+ Bucket:               prod-lake                                                                                                                   │  RDS Instances
+ Object:               prod-lake/landing/2026/04/07/batch-0719.parquet                                                                             │  KMS Keys
+ CONTEXT                                                                                                                                           │  Secrets
+ Region:               eu-central-1                                                                                                                │  VPC Endpoints
+ Source IP:            10.12.4.77                                                                                                                  │  Security Groups
+ Time:                 2026-04-07T14:44:17Z                                                                                                        │  DynamoDB Tables
+ ERROR                                                                                                                                             │  CloudFormation Stacks
+ errorCode:            VpceAccessDenied                                                                                                            │  CT events by AccessKeyId
+ errorMessage:         The VPC endpoint policy denies the s3:PutObject action on arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet      │  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
