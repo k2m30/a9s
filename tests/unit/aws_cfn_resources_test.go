@@ -650,6 +650,15 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 		}
 	})
 
+	t.Run("page2_token_forwarded", func(t *testing.T) {
+		if mock.lastInput == nil {
+			t.Fatal("mock was not called")
+		}
+		if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to ListStackResources: got %v, want %q", mock.lastInput.NextToken, "page2-token")
+		}
+	})
+
 	t.Run("all_fields_populated", func(t *testing.T) {
 		requiredFields := []string{"logical_resource_id", "physical_resource_id", "resource_type", "resource_status", "drift_status", "last_updated"}
 		allResources := make([]resource.Resource, 0, len(result.Resources)+len(result2.Resources))
