@@ -55,7 +55,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 		{
 			Name:      "CloudTrail Events",
 			ShortName: "ct-events",
-			Aliases:   []string{"ct-events", "cloudtrail-events", "events"},
+			Aliases:   []string{"event", "events", "ct-events", "cloudtrail-events"},
 			Category:  "MONITORING",
 			Columns: []Column{
 				{Key: "time", Title: "Time", Width: 22, Sortable: true},
