@@ -66,7 +66,7 @@ a9s supports **66 AWS resource types** across **12 service categories**. All API
 | CloudWatch Alarms | `alarm` |
 | CloudWatch Log Groups | `logs` |
 | CloudTrail Trails | `trail` |
-| CloudTrail Events | `ct-events` |
+| CloudTrail Events | `event` |
 
 ## Messaging
 

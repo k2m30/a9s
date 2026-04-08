@@ -47,35 +47,83 @@ func (m Model) updateCommandMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Escape) {
 		m.inputMode = modeNormal
 		m.cmdInput.Blur()
+		m.resetTabCycle()
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Tab) {
-		m.cmdInput.SetValue(m.autocompleteCommand(m.cmdInput.Value()))
+		m.advanceTabCycle()
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Enter) {
 		m.inputMode = modeNormal
 		cmd := m.cmdInput.Value()
 		m.cmdInput.Blur()
+		m.resetTabCycle()
 		return m.executeCommand(cmd)
 	}
 
+	// Any other keystroke (typing, backspace, etc.) invalidates the cycle.
+	// The current completion is treated as a preview: revert the buffer to
+	// the user's original prefix before forwarding the key, so backspace and
+	// character insertion act on the prefix, not on the completion text.
+	if m.tabPrefix != "" {
+		m.cmdInput.SetValue(m.tabPrefix)
+		m.cmdInput.SetCursor(len(m.tabPrefix))
+	}
+	m.resetTabCycle()
 	var teaCmd tea.Cmd
 	m.cmdInput, teaCmd = m.cmdInput.Update(msg)
 	return m, teaCmd
 }
 
-func (m Model) autocompleteCommand(input string) string {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return input
-	}
+// resetTabCycle clears the tab-completion cycle state so the next Tab press
+// starts fresh from whatever the user has currently typed.
+func (m *Model) resetTabCycle() {
+	m.tabPrefix = ""
+	m.tabMatches = nil
+	m.tabIndex = 0
+}
 
+// advanceTabCycle handles a Tab keypress in command mode. On the first Tab
+// for a given input it computes all matching candidates and shows the first
+// one; on subsequent Tabs it rotates through the candidates. With a single
+// candidate it behaves like the old single-shot completion.
+func (m *Model) advanceTabCycle() {
+	if m.tabPrefix == "" {
+		prefix := strings.TrimSpace(m.cmdInput.Value())
+		if prefix == "" {
+			return
+		}
+		matches := commandMatches(prefix)
+		if len(matches) == 0 {
+			return
+		}
+		m.tabPrefix = prefix
+		m.tabMatches = matches
+		m.tabIndex = 0
+		m.cmdInput.SetValue(matches[0])
+		return
+	}
+	if len(m.tabMatches) == 0 {
+		return
+	}
+	m.tabIndex = (m.tabIndex + 1) % len(m.tabMatches)
+	m.cmdInput.SetValue(m.tabMatches[m.tabIndex])
+}
+
+// commandMatches returns all command/resource-type names (and aliases) whose
+// names start with the given prefix, in a stable order: built-in commands
+// first, then resource ShortNames, then aliases. Used by Tab cycling.
+func commandMatches(prefix string) []string {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return nil
+	}
 	matches := make([]string, 0, 8)
 	seen := map[string]struct{}{}
 	add := func(candidate string) {
 		candidate = strings.TrimSpace(candidate)
-		if candidate == "" || !strings.HasPrefix(candidate, input) {
+		if candidate == "" || !strings.HasPrefix(candidate, prefix) {
 			return
 		}
 		if _, ok := seen[candidate]; ok {
@@ -84,7 +132,6 @@ func (m Model) autocompleteCommand(input string) string {
 		seen[candidate] = struct{}{}
 		matches = append(matches, candidate)
 	}
-
 	for _, cmd := range []string{"q", "quit", "ctx", "profile", "region", "help"} {
 		add(cmd)
 	}
@@ -94,11 +141,7 @@ func (m Model) autocompleteCommand(input string) string {
 			add(alias)
 		}
 	}
-
-	if len(matches) == 1 {
-		return matches[0]
-	}
-	return input
+	return matches
 }
 
 // executeCommand dispatches a colon-command string.

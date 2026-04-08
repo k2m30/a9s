@@ -74,6 +74,14 @@ type Model struct {
 	cmdInput  textinput.Model
 	flash     flashState
 
+	// Tab-completion cycle state for command mode. tabPrefix is the user's
+	// original input at the start of a cycle; tabMatches are all candidates
+	// matching that prefix; tabIndex is the currently shown match. Cleared
+	// (tabPrefix="") on any non-Tab key so the next Tab starts a fresh cycle.
+	tabPrefix  string
+	tabMatches []string
+	tabIndex   int
+
 	keys           keys.Map
 	viewConfig     *config.ViewsConfig
 	pendingRefresh bool   // set after profile/region switch to refresh on ClientsReadyMsg
