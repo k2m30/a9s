@@ -28,6 +28,7 @@ import (
 
 type mockSGPaginatedClient struct {
 	outputs []*ec2.DescribeSecurityGroupsOutput
+	inputs  []*ec2.DescribeSecurityGroupsInput
 	err     error
 	callIdx int
 }
@@ -37,6 +38,7 @@ func (m *mockSGPaginatedClient) DescribeSecurityGroups(
 	params *ec2.DescribeSecurityGroupsInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeSecurityGroupsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -94,6 +96,15 @@ func TestFetchSecurityGroups_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -102,6 +113,7 @@ func TestFetchSecurityGroups_Pagination(t *testing.T) {
 
 type mockSubnetPaginatedClient struct {
 	outputs []*ec2.DescribeSubnetsOutput
+	inputs  []*ec2.DescribeSubnetsInput
 	err     error
 	callIdx int
 }
@@ -111,6 +123,7 @@ func (m *mockSubnetPaginatedClient) DescribeSubnets(
 	params *ec2.DescribeSubnetsInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeSubnetsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -192,6 +205,15 @@ func TestFetchSubnets_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -200,6 +222,7 @@ func TestFetchSubnets_Pagination(t *testing.T) {
 
 type mockVPCPaginatedClient struct {
 	outputs []*ec2.DescribeVpcsOutput
+	inputs  []*ec2.DescribeVpcsInput
 	err     error
 	callIdx int
 }
@@ -209,6 +232,7 @@ func (m *mockVPCPaginatedClient) DescribeVpcs(
 	params *ec2.DescribeVpcsInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeVpcsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -269,6 +293,15 @@ func TestFetchVPCs_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -277,6 +310,7 @@ func TestFetchVPCs_Pagination(t *testing.T) {
 
 type mockVPCEPaginatedClient struct {
 	outputs []*ec2.DescribeVpcEndpointsOutput
+	inputs  []*ec2.DescribeVpcEndpointsInput
 	err     error
 	callIdx int
 }
@@ -286,6 +320,7 @@ func (m *mockVPCEPaginatedClient) DescribeVpcEndpoints(
 	params *ec2.DescribeVpcEndpointsInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeVpcEndpointsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -346,6 +381,15 @@ func TestFetchVPCEndpoints_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -354,6 +398,7 @@ func TestFetchVPCEndpoints_Pagination(t *testing.T) {
 
 type mockNATPaginatedClient struct {
 	outputs []*ec2.DescribeNatGatewaysOutput
+	inputs  []*ec2.DescribeNatGatewaysInput
 	err     error
 	callIdx int
 }
@@ -363,6 +408,7 @@ func (m *mockNATPaginatedClient) DescribeNatGateways(
 	params *ec2.DescribeNatGatewaysInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeNatGatewaysOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -423,6 +469,15 @@ func TestFetchNatGateways_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -431,6 +486,7 @@ func TestFetchNatGateways_Pagination(t *testing.T) {
 
 type mockIGWPaginatedClient struct {
 	outputs []*ec2.DescribeInternetGatewaysOutput
+	inputs  []*ec2.DescribeInternetGatewaysInput
 	err     error
 	callIdx int
 }
@@ -440,6 +496,7 @@ func (m *mockIGWPaginatedClient) DescribeInternetGateways(
 	params *ec2.DescribeInternetGatewaysInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeInternetGatewaysOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -500,6 +557,15 @@ func TestFetchInternetGateways_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -508,6 +574,7 @@ func TestFetchInternetGateways_Pagination(t *testing.T) {
 
 type mockENIPaginatedClient struct {
 	outputs []*ec2.DescribeNetworkInterfacesOutput
+	inputs  []*ec2.DescribeNetworkInterfacesInput
 	err     error
 	callIdx int
 }
@@ -517,6 +584,7 @@ func (m *mockENIPaginatedClient) DescribeNetworkInterfaces(
 	params *ec2.DescribeNetworkInterfacesInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeNetworkInterfacesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -577,6 +645,15 @@ func TestFetchNetworkInterfaces_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -585,6 +662,7 @@ func TestFetchNetworkInterfaces_Pagination(t *testing.T) {
 
 type mockRTBPaginatedClient struct {
 	outputs []*ec2.DescribeRouteTablesOutput
+	inputs  []*ec2.DescribeRouteTablesInput
 	err     error
 	callIdx int
 }
@@ -594,6 +672,7 @@ func (m *mockRTBPaginatedClient) DescribeRouteTables(
 	params *ec2.DescribeRouteTablesInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeRouteTablesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -654,6 +733,15 @@ func TestFetchRouteTables_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -662,6 +750,7 @@ func TestFetchRouteTables_Pagination(t *testing.T) {
 
 type mockTGWPaginatedClient struct {
 	outputs []*ec2.DescribeTransitGatewaysOutput
+	inputs  []*ec2.DescribeTransitGatewaysInput
 	err     error
 	callIdx int
 }
@@ -671,6 +760,7 @@ func (m *mockTGWPaginatedClient) DescribeTransitGateways(
 	params *ec2.DescribeTransitGatewaysInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeTransitGatewaysOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -731,6 +821,15 @@ func TestFetchTransitGateways_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -739,6 +838,7 @@ func TestFetchTransitGateways_Pagination(t *testing.T) {
 
 type mockELBPaginatedClient struct {
 	outputs []*elbv2.DescribeLoadBalancersOutput
+	inputs  []*elbv2.DescribeLoadBalancersInput
 	err     error
 	callIdx int
 }
@@ -748,6 +848,7 @@ func (m *mockELBPaginatedClient) DescribeLoadBalancers(
 	params *elbv2.DescribeLoadBalancersInput,
 	optFns ...func(*elbv2.Options),
 ) (*elbv2.DescribeLoadBalancersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -832,6 +933,15 @@ func TestFetchLoadBalancers_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -840,6 +950,7 @@ func TestFetchLoadBalancers_Pagination(t *testing.T) {
 
 type mockTGPaginatedClient struct {
 	outputs []*elbv2.DescribeTargetGroupsOutput
+	inputs  []*elbv2.DescribeTargetGroupsInput
 	err     error
 	callIdx int
 }
@@ -849,6 +960,7 @@ func (m *mockTGPaginatedClient) DescribeTargetGroups(
 	params *elbv2.DescribeTargetGroupsInput,
 	optFns ...func(*elbv2.Options),
 ) (*elbv2.DescribeTargetGroupsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -909,6 +1021,15 @@ func TestFetchTargetGroups_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -917,6 +1038,7 @@ func TestFetchTargetGroups_Pagination(t *testing.T) {
 
 type mockRedisPaginatedClient struct {
 	outputs []*elasticache.DescribeCacheClustersOutput
+	inputs  []*elasticache.DescribeCacheClustersInput
 	err     error
 	callIdx int
 }
@@ -926,6 +1048,7 @@ func (m *mockRedisPaginatedClient) DescribeCacheClusters(
 	params *elasticache.DescribeCacheClustersInput,
 	optFns ...func(*elasticache.Options),
 ) (*elasticache.DescribeCacheClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -985,6 +1108,15 @@ func TestFetchRedisClusters_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -993,6 +1125,7 @@ func TestFetchRedisClusters_Pagination(t *testing.T) {
 
 type mockDocDBPaginatedClient struct {
 	outputs []*docdb.DescribeDBClustersOutput
+	inputs  []*docdb.DescribeDBClustersInput
 	err     error
 	callIdx int
 }
@@ -1002,6 +1135,7 @@ func (m *mockDocDBPaginatedClient) DescribeDBClusters(
 	params *docdb.DescribeDBClustersInput,
 	optFns ...func(*docdb.Options),
 ) (*docdb.DescribeDBClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -1062,6 +1196,15 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -1070,6 +1213,7 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 
 type mockDocDBSnapshotsPaginatedClient struct {
 	outputs []*docdb.DescribeDBClusterSnapshotsOutput
+	inputs  []*docdb.DescribeDBClusterSnapshotsInput
 	err     error
 	callIdx int
 }
@@ -1079,6 +1223,7 @@ func (m *mockDocDBSnapshotsPaginatedClient) DescribeDBClusterSnapshots(
 	params *docdb.DescribeDBClusterSnapshotsInput,
 	optFns ...func(*docdb.Options),
 ) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -1139,6 +1284,15 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -1147,6 +1301,7 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 
 type mockRDSSnapshotsPaginatedClient struct {
 	outputs []*rds.DescribeDBSnapshotsOutput
+	inputs  []*rds.DescribeDBSnapshotsInput
 	err     error
 	callIdx int
 }
@@ -1156,6 +1311,7 @@ func (m *mockRDSSnapshotsPaginatedClient) DescribeDBSnapshots(
 	params *rds.DescribeDBSnapshotsInput,
 	optFns ...func(*rds.Options),
 ) (*rds.DescribeDBSnapshotsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -1216,6 +1372,15 @@ func TestFetchRDSSnapshots_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -1224,6 +1389,7 @@ func TestFetchRDSSnapshots_Pagination(t *testing.T) {
 
 type mockRedshiftPaginatedClient struct {
 	outputs []*redshift.DescribeClustersOutput
+	inputs  []*redshift.DescribeClustersInput
 	err     error
 	callIdx int
 }
@@ -1233,6 +1399,7 @@ func (m *mockRedshiftPaginatedClient) DescribeClusters(
 	params *redshift.DescribeClustersInput,
 	optFns ...func(*redshift.Options),
 ) (*redshift.DescribeClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -1314,6 +1481,15 @@ func TestFetchRedshiftClusters_Pagination(t *testing.T) {
 	t.Run("api_called_twice", func(t *testing.T) {
 		if mock.callIdx != 2 {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
 		}
 	})
 }

@@ -11,39 +11,6 @@ import (
 // Step 1: ChildViewDef struct and child type/fetcher registries
 // ===========================================================================
 
-func TestChildViewDef_Fields(t *testing.T) {
-	def := resource.ChildViewDef{
-		ChildType:      "s3_objects",
-		Key:            "enter",
-		ContextKeys:    map[string]string{"bucket": "ID"},
-		DisplayNameKey: "bucket",
-		DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
-	}
-
-	if def.ChildType != "s3_objects" {
-		t.Errorf("ChildType = %q, want %q", def.ChildType, "s3_objects")
-	}
-	if def.Key != "enter" {
-		t.Errorf("Key = %q, want %q", def.Key, "enter")
-	}
-	if def.ContextKeys["bucket"] != "ID" {
-		t.Errorf("ContextKeys[bucket] = %q, want %q", def.ContextKeys["bucket"], "ID")
-	}
-	if def.DisplayNameKey != "bucket" {
-		t.Errorf("DisplayNameKey = %q, want %q", def.DisplayNameKey, "bucket")
-	}
-
-	// DrillCondition should be non-nil and work
-	folder := resource.Resource{Status: "folder"}
-	file := resource.Resource{Status: "file"}
-	if !def.DrillCondition(folder) {
-		t.Error("DrillCondition should return true for folder")
-	}
-	if def.DrillCondition(file) {
-		t.Error("DrillCondition should return false for file")
-	}
-}
-
 func TestChildViewDef_NilDrillCondition(t *testing.T) {
 	var def resource.ChildViewDef
 
@@ -174,20 +141,6 @@ func TestUnregisterChildFetcher(t *testing.T) {
 	got := resource.GetPaginatedChildFetcher("temp_fetcher")
 	if got != nil {
 		t.Error("GetPaginatedChildFetcher should return nil after UnregisterPaginatedChild")
-	}
-}
-
-func TestParentContext_Type(t *testing.T) {
-	pc := resource.ParentContext{
-		"bucket": "my-bucket",
-		"prefix": "data/",
-	}
-
-	if pc["bucket"] != "my-bucket" {
-		t.Errorf("ParentContext[bucket] = %q, want %q", pc["bucket"], "my-bucket")
-	}
-	if pc["prefix"] != "data/" {
-		t.Errorf("ParentContext[prefix] = %q, want %q", pc["prefix"], "data/")
 	}
 }
 

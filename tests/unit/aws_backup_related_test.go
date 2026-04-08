@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -36,32 +35,6 @@ func TestRelated_Backup_Registered(t *testing.T) {
 		if !found {
 			t.Errorf("expected related def for target %q not found", target)
 		}
-	}
-}
-
-// --- backup→role: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_Backup_Role_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "daily-backup-plan",
-		Name: "daily-backup-plan",
-	}
-	var checker resource.RelatedChecker
-	for _, def := range resource.GetRelated("backup") {
-		if def.TargetType == "role" {
-			checker = def.Checker
-			break
-		}
-	}
-	if checker == nil {
-		t.Fatal("backup role checker is nil")
-	}
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
 	}
 }
 

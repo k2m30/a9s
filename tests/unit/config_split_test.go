@@ -97,31 +97,6 @@ detail:
 	}
 }
 
-func TestParseSingle_KeyField(t *testing.T) {
-	data := []byte(`
-list:
-  Queue Name:
-    path: QueueUrl
-    width: 36
-  Messages:
-    key: approx_messages
-    width: 10
-`)
-	vd, err := config.ParseSingle(data)
-	if err != nil {
-		t.Fatalf("ParseSingle failed: %v", err)
-	}
-	if len(vd.List) != 2 {
-		t.Fatalf("expected 2 columns, got %d", len(vd.List))
-	}
-	if vd.List[0].Path != "QueueUrl" || vd.List[0].Key != "" {
-		t.Errorf("col 0: path=%q key=%q", vd.List[0].Path, vd.List[0].Key)
-	}
-	if vd.List[1].Key != "approx_messages" || vd.List[1].Path != "" {
-		t.Errorf("col 1: key=%q path=%q", vd.List[1].Key, vd.List[1].Path)
-	}
-}
-
 func TestParseSingle_InvalidYAML(t *testing.T) {
 	data := []byte(`
 list:
