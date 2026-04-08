@@ -102,6 +102,19 @@ func TestIssue189_NavigableFields_TargetFixturesExist(t *testing.T) {
 
 func TestIssue189_RelatedDemo_IDsResolveToRealFixtures(t *testing.T) {
 	fixtures := allDemoByType(t)
+
+	// Extend the fixture lookup to also cover child types (e.g. s3_objects).
+	// Child types are not in AllResourceTypes() — they are browsed via parent
+	// views — but their related-demo IDs must still resolve to real fixtures.
+	for _, ct := range resource.AllChildTypes() {
+		if _, exists := fixtures[ct.ShortName]; exists {
+			continue // already covered by top-level entry with same short name
+		}
+		if resources, ok := demo.GetResources(ct.ShortName); ok && len(resources) > 0 {
+			fixtures[ct.ShortName] = resources
+		}
+	}
+
 	for _, rt := range resource.AllResourceTypes() {
 		checker := resource.GetRelatedDemo(rt.ShortName)
 		if checker == nil {

@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3 (012-ct-events-list-redesign)
 - N/A (in-memory `Resource.Fields` map; YAML view config on disk) (012-ct-events-list-redesign)
+- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib) (013-ct-event-detail-v2)
+- N/A (in-memory parsed event held only for the duration of one detail-view open) (013-ct-event-detail-v2)
 
 ## Project Structure
 
@@ -234,4 +236,6 @@ When code changes affect any of the following, update the shared source and rege
 
 
 ## Recent Changes
+- 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)
+- 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)
 - 012-ct-events-list-redesign: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3

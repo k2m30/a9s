@@ -1,0 +1,40 @@
+ ACTION                                                                                                                                            │            RELATED
+ Event:                ec2:RunInstances                                                                                                            │  IAM Roles
+ Category:             Insight / AwsApiCall                                                                                                        │  IAM Users
+ Insight type:         ApiCallRateInsight                                                                                                          │  EC2 Instances
+ State:                Start                                                                                                                       │  S3 Buckets
+ CONTEXT                                                                                                                                           │  S3 Objects
+ Region:               us-east-1                                                                                                                   │  Lambda Functions
+ Recipient:            999999999999 (cross-account)                                                                                                │  RDS Instances
+ Time:                 2026-04-07T09:14:00Z                                                                                                        │  KMS Keys
+                                                                                                                                                   │  Secrets
+                                                                                                                                                   │  VPC Endpoints
+                                                                                                                                                   │  Security Groups
+                                                                                                                                                   │  DynamoDB Tables
+                                                                                                                                                   │  CloudFormation Stacks
+                                                                                                                                                   │  CT events by AccessKeyId
+                                                                                                                                                   │  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │

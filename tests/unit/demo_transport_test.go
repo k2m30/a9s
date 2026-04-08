@@ -1965,8 +1965,8 @@ func TestDemoTransport_LookupEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LookupEvents returned unexpected error: %v", err)
 	}
-	if len(output.Events) != 6 {
-		t.Fatalf("LookupEvents returned %d events; want 6", len(output.Events))
+	if len(output.Events) != 15 {
+		t.Fatalf("LookupEvents returned %d events; want 15", len(output.Events))
 	}
 
 	first := output.Events[0]

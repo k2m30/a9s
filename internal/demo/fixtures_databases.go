@@ -16,6 +16,10 @@ import (
 
 func init() {
 	demoData["s3"] = s3Buckets
+	// s3_objects is registered to satisfy demo-fixture integrity tests that verify
+	// ct-events related-checker ResourceIDs exist as real fixtures. These IDs use the
+	// "bucket|key" encoding that the ct-events checker emits for S3 object targets.
+	demoData["s3_objects"] = s3ObjectsRelatedFixtures
 	demoData["dbi"] = rdsInstances
 	demoData["redis"] = redisFixtures
 	demoData["dbc"] = docdbClusterFixtures
@@ -410,6 +414,37 @@ func s3Buckets() []resource.Resource {
 		},
 	}
 
+	// CT-event cross-reference buckets required by ctdetail nav tests (T029).
+	// These bucket names are referenced in ct-events demo fixtures and must resolve
+	// in demo.GetResources("s3") for assertTargetResolves to pass.
+	for _, ctBucket := range []struct{ name, created string }{
+		{"prod-logs", "2025-02-10T08:00:00+00:00"},
+		{"prod-artifacts", "2025-03-15T10:30:00+00:00"},
+		{"checkout-config", "2025-05-20T14:00:00+00:00"},
+		{"shared-artifacts", "2025-04-01T09:15:00+00:00"},
+		{"prod-lake", "2025-01-25T11:45:00+00:00"},
+	} {
+		buckets = append(buckets, resource.Resource{
+			ID:     ctBucket.name,
+			Name:   ctBucket.name,
+			Status: "",
+			Fields: map[string]string{
+				"name":               ctBucket.name,
+				"bucket_name":        ctBucket.name,
+				"creation_date":      ctBucket.created,
+				"notification_lambda": "",
+				"notification_sqs":   "",
+				"notification_sns":   "",
+			},
+			RawStruct: s3types.Bucket{
+				Name:         aws.String(ctBucket.name),
+				BucketArn:    aws.String("arn:aws:s3:::" + ctBucket.name),
+				BucketRegion: aws.String("us-east-1"),
+				CreationDate: aws.Time(mustParseTime(ctBucket.created)),
+			},
+		})
+	}
+
 	// Generate 16 more buckets to reach 22 total
 	for i := 0; i < 16; i++ {
 		name := s3NamePool[i]
@@ -445,6 +480,102 @@ func s3Buckets() []resource.Resource {
 	}
 
 	return buckets
+}
+
+// s3ObjectsRelatedFixtures returns S3 object fixtures used as related-navigation
+// targets from ct-events demo checkers. IDs use "bucket|key" format matching the
+// requestParameters encoded by checkCtEventsS3Objects.
+func s3ObjectsRelatedFixtures() []resource.Resource {
+	return []resource.Resource{
+		{
+			ID:     "prod-logs|prod-logs/2026/04/07/app.log",
+			Name:   "prod-logs/2026/04/07/app.log",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "prod-logs/2026/04/07/app.log",
+				"size":          "12.3 KB",
+				"last_modified": "2026-04-07T14:11:03+00:00",
+				"storage_class": "STANDARD",
+			},
+			RawStruct: s3types.Object{
+				Key:               aws.String("prod-logs/2026/04/07/app.log"),
+				Size:              aws.Int64(12596),
+				ETag:              aws.String("\"d41d8cd98f00b204e9800998ecf8427e\""),
+				StorageClass:      s3types.ObjectStorageClassStandard,
+				LastModified:      aws.Time(mustParseTime("2026-04-07T14:11:03+00:00")),
+				ChecksumAlgorithm: []s3types.ChecksumAlgorithm{s3types.ChecksumAlgorithmCrc32},
+				ChecksumType:      s3types.ChecksumTypeFullObject,
+				Owner:             &s3types.Owner{DisplayName: aws.String("data-platform"), ID: aws.String("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")},
+				RestoreStatus:     &s3types.RestoreStatus{IsRestoreInProgress: aws.Bool(false)},
+			},
+		},
+		{
+			ID:     "checkout-config|checkout-config/prod/config.json",
+			Name:   "checkout-config/prod/config.json",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "checkout-config/prod/config.json",
+				"size":          "4.2 KB",
+				"last_modified": "2026-04-07T14:20:21+00:00",
+				"storage_class": "STANDARD",
+			},
+			RawStruct: s3types.Object{
+				Key:               aws.String("checkout-config/prod/config.json"),
+				Size:              aws.Int64(4300),
+				ETag:              aws.String("\"a87ff679a2f3e71d9181a67b7542122c\""),
+				StorageClass:      s3types.ObjectStorageClassStandard,
+				LastModified:      aws.Time(mustParseTime("2026-04-07T14:20:21+00:00")),
+				ChecksumAlgorithm: []s3types.ChecksumAlgorithm{s3types.ChecksumAlgorithmCrc32},
+				ChecksumType:      s3types.ChecksumTypeFullObject,
+				Owner:             &s3types.Owner{DisplayName: aws.String("checkout-svc"), ID: aws.String("b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3")},
+				RestoreStatus:     &s3types.RestoreStatus{IsRestoreInProgress: aws.Bool(false)},
+			},
+		},
+		{
+			ID:     "shared-artifacts|shared-artifacts/build-4821.tar.gz",
+			Name:   "shared-artifacts/build-4821.tar.gz",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "shared-artifacts/build-4821.tar.gz",
+				"size":          "85.7 MB",
+				"last_modified": "2026-04-07T14:31:55+00:00",
+				"storage_class": "STANDARD",
+			},
+			RawStruct: s3types.Object{
+				Key:               aws.String("shared-artifacts/build-4821.tar.gz"),
+				Size:              aws.Int64(89850880),
+				ETag:              aws.String("\"eccbc87e4b5ce2fe28308fd9f2a7baf3\""),
+				StorageClass:      s3types.ObjectStorageClassStandard,
+				LastModified:      aws.Time(mustParseTime("2026-04-07T14:31:55+00:00")),
+				ChecksumAlgorithm: []s3types.ChecksumAlgorithm{s3types.ChecksumAlgorithmCrc32},
+				ChecksumType:      s3types.ChecksumTypeFullObject,
+				Owner:             &s3types.Owner{DisplayName: aws.String("build-system"), ID: aws.String("c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4")},
+				RestoreStatus:     &s3types.RestoreStatus{IsRestoreInProgress: aws.Bool(false)},
+			},
+		},
+		{
+			ID:     "prod-lake|prod-lake/landing/2026/04/07/batch-0719.parquet",
+			Name:   "prod-lake/landing/2026/04/07/batch-0719.parquet",
+			Status: "file",
+			Fields: map[string]string{
+				"key":           "prod-lake/landing/2026/04/07/batch-0719.parquet",
+				"size":          "234.1 MB",
+				"last_modified": "2026-04-07T14:44:17+00:00",
+				"storage_class": "STANDARD",
+			},
+			RawStruct: s3types.Object{
+				Key:               aws.String("prod-lake/landing/2026/04/07/batch-0719.parquet"),
+				Size:              aws.Int64(245470822),
+				ETag:              aws.String("\"c4ca4238a0b923820dcc509a6f75849b\""),
+				StorageClass:      s3types.ObjectStorageClassStandard,
+				LastModified:      aws.Time(mustParseTime("2026-04-07T14:44:17+00:00")),
+				ChecksumAlgorithm: []s3types.ChecksumAlgorithm{s3types.ChecksumAlgorithmCrc32},
+				ChecksumType:      s3types.ChecksumTypeFullObject,
+				Owner:             &s3types.Owner{DisplayName: aws.String("data-lake"), ID: aws.String("d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5")},
+				RestoreStatus:     &s3types.RestoreStatus{IsRestoreInProgress: aws.Bool(false)},
+			},
+		},
+	}
 }
 
 func s3ObjDataPipeline() []resource.Resource {
@@ -1057,3 +1188,4 @@ func dbiEventFixtures(dbIdentifier string) []resource.Resource {
 
 	return resources
 }
+
