@@ -165,7 +165,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
 		Target:       messages.TargetResourceList,
-		ResourceType: "ecs_svc",
+		ResourceType: "ecs-svc",
 	})
 	services := []resource.Resource{
 		{ID: "my-cluster/my-service", Name: "my-service", Status: "ACTIVE", Fields: map[string]string{
@@ -179,10 +179,16 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 			"launch_type":   "FARGATE",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ecs_svc", Resources: services})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ecs-svc", Resources: services})
 
-	// Open Events child view (key 'e') and get an error
-	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
+	// Open Events child view (key 'e') — execute the returned cmd to actually push the child view
+	var cmd tea.Cmd
+	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
 	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
 		ResourceType: "ecs_svc_events",
 		Err:          errAccessDenied("ecs:DescribeServices"),
