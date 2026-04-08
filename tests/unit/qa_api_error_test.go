@@ -523,7 +523,7 @@ func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ExpiredToken") && !strings.Contains(plain, "expired") &&
 		!strings.Contains(plain, "Error") {
-		t.Logf("A.8: error flash before nav: %s", plain[:min(200, len(plain))])
+		t.Errorf("A.8: error flash should show error indication before nav, got: %s", plain[:min(200, len(plain))])
 	}
 
 	// Navigate back to main menu via Esc

@@ -19,9 +19,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockIAMGetGroupClient struct {
-	outputs []*iam.GetGroupOutput
-	err     error
-	callIdx int
+	outputs   []*iam.GetGroupOutput
+	err       error
+	callIdx   int
+	lastInput *iam.GetGroupInput
 }
 
 func (m *mockIAMGetGroupClient) GetGroup(
@@ -29,6 +30,7 @@ func (m *mockIAMGetGroupClient) GetGroup(
 	params *iam.GetGroupInput,
 	optFns ...func(*iam.Options),
 ) (*iam.GetGroupOutput, error) {
+	m.lastInput = params
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -305,6 +307,15 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 		}
 		if result2.Resources[1].Name != "user3" {
 			t.Errorf("page 2: resource[1].Name expected %q, got %q", "user3", result2.Resources[1].Name)
+		}
+	})
+
+	t.Run("page2_marker_forwarded", func(t *testing.T) {
+		if page2Mock.lastInput == nil {
+			t.Fatal("mock was not called")
+		}
+		if page2Mock.lastInput.Marker == nil || *page2Mock.lastInput.Marker != "marker1" {
+			t.Errorf("Marker not forwarded to GetGroup: got %v, want %q", page2Mock.lastInput.Marker, "marker1")
 		}
 	})
 }

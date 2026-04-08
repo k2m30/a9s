@@ -28,12 +28,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockECSListClustersAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ecs.ListClustersOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ecs.ListClustersOutput, error)
+	lastInput *ecs.ListClustersInput
 }
 
-func (m *mockECSListClustersAPIPaginated) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
+func (m *mockECSListClustersAPIPaginated) ListClusters(_ context.Context, in *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -137,6 +139,12 @@ func TestQA_Pagination_FetchECSClustersPage_Continuation(t *testing.T) {
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
+	}
+	if listMock.lastInput == nil {
+		t.Fatal("list mock was not called")
+	}
+	if listMock.lastInput.NextToken == nil || *listMock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.lastInput.NextToken, "token-page-2")
 	}
 }
 
@@ -319,6 +327,12 @@ func TestQA_Pagination_FetchECSServicesPage_Continuation(t *testing.T) {
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
+	}
+	if listClustersMock.lastInput == nil {
+		t.Fatal("list clusters mock was not called")
+	}
+	if listClustersMock.lastInput.NextToken == nil || *listClustersMock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listClustersMock.lastInput.NextToken, "token-page-2")
 	}
 }
 
@@ -508,6 +522,12 @@ func TestQA_Pagination_FetchECSTasksPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if listClustersMock.lastInput == nil {
+		t.Fatal("list clusters mock was not called")
+	}
+	if listClustersMock.lastInput.NextToken == nil || *listClustersMock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listClustersMock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchECSTasksPage_Empty(t *testing.T) {
@@ -573,12 +593,14 @@ func TestQA_Pagination_FetchECSTasksPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockASGDescribeAutoScalingGroupsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+	lastInput *autoscaling.DescribeAutoScalingGroupsInput
 }
 
-func (m *mockASGDescribeAutoScalingGroupsAPIPaginated) DescribeAutoScalingGroups(_ context.Context, _ *autoscaling.DescribeAutoScalingGroupsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
+func (m *mockASGDescribeAutoScalingGroupsAPIPaginated) DescribeAutoScalingGroups(_ context.Context, in *autoscaling.DescribeAutoScalingGroupsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -663,6 +685,12 @@ func TestQA_Pagination_FetchAutoScalingGroupsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchAutoScalingGroupsPage_Empty(t *testing.T) {
@@ -705,12 +733,14 @@ func TestQA_Pagination_FetchAutoScalingGroupsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEBDescribeEnvironmentsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*elasticbeanstalk.DescribeEnvironmentsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*elasticbeanstalk.DescribeEnvironmentsOutput, error)
+	lastInput *elasticbeanstalk.DescribeEnvironmentsInput
 }
 
-func (m *mockEBDescribeEnvironmentsAPIPaginated) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {
+func (m *mockEBDescribeEnvironmentsAPIPaginated) DescribeEnvironments(_ context.Context, in *elasticbeanstalk.DescribeEnvironmentsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -789,6 +819,12 @@ func TestQA_Pagination_FetchEBEnvironmentsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchEBEnvironmentsPage_Empty(t *testing.T) {
@@ -831,12 +867,14 @@ func TestQA_Pagination_FetchEBEnvironmentsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeVpcsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeVpcsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeVpcsOutput, error)
+	lastInput *ec2.DescribeVpcsInput
 }
 
-func (m *mockEC2DescribeVpcsAPIPaginated) DescribeVpcs(_ context.Context, _ *ec2.DescribeVpcsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
+func (m *mockEC2DescribeVpcsAPIPaginated) DescribeVpcs(_ context.Context, in *ec2.DescribeVpcsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -914,6 +952,12 @@ func TestQA_Pagination_FetchVPCsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchVPCsPage_Empty(t *testing.T) {
@@ -956,12 +1000,14 @@ func TestQA_Pagination_FetchVPCsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeSubnetsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeSubnetsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeSubnetsOutput, error)
+	lastInput *ec2.DescribeSubnetsInput
 }
 
-func (m *mockEC2DescribeSubnetsAPIPaginated) DescribeSubnets(_ context.Context, _ *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+func (m *mockEC2DescribeSubnetsAPIPaginated) DescribeSubnets(_ context.Context, in *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1043,6 +1089,12 @@ func TestQA_Pagination_FetchSubnetsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchSubnetsPage_Empty(t *testing.T) {
@@ -1085,12 +1137,14 @@ func TestQA_Pagination_FetchSubnetsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeRouteTablesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeRouteTablesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeRouteTablesOutput, error)
+	lastInput *ec2.DescribeRouteTablesInput
 }
 
-func (m *mockEC2DescribeRouteTablesAPIPaginated) DescribeRouteTables(_ context.Context, _ *ec2.DescribeRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
+func (m *mockEC2DescribeRouteTablesAPIPaginated) DescribeRouteTables(_ context.Context, in *ec2.DescribeRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1162,6 +1216,12 @@ func TestQA_Pagination_FetchRouteTablesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchRouteTablesPage_Empty(t *testing.T) {
@@ -1204,12 +1264,14 @@ func TestQA_Pagination_FetchRouteTablesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeNatGatewaysAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeNatGatewaysOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeNatGatewaysOutput, error)
+	lastInput *ec2.DescribeNatGatewaysInput
 }
 
-func (m *mockEC2DescribeNatGatewaysAPIPaginated) DescribeNatGateways(_ context.Context, _ *ec2.DescribeNatGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error) {
+func (m *mockEC2DescribeNatGatewaysAPIPaginated) DescribeNatGateways(_ context.Context, in *ec2.DescribeNatGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1286,6 +1348,12 @@ func TestQA_Pagination_FetchNatGatewaysPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchNatGatewaysPage_Empty(t *testing.T) {
@@ -1328,12 +1396,14 @@ func TestQA_Pagination_FetchNatGatewaysPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeInternetGatewaysAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeInternetGatewaysOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeInternetGatewaysOutput, error)
+	lastInput *ec2.DescribeInternetGatewaysInput
 }
 
-func (m *mockEC2DescribeInternetGatewaysAPIPaginated) DescribeInternetGateways(_ context.Context, _ *ec2.DescribeInternetGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error) {
+func (m *mockEC2DescribeInternetGatewaysAPIPaginated) DescribeInternetGateways(_ context.Context, in *ec2.DescribeInternetGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1409,6 +1479,12 @@ func TestQA_Pagination_FetchInternetGatewaysPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchInternetGatewaysPage_Empty(t *testing.T) {
@@ -1451,12 +1527,14 @@ func TestQA_Pagination_FetchInternetGatewaysPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeNetworkInterfacesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeNetworkInterfacesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeNetworkInterfacesOutput, error)
+	lastInput *ec2.DescribeNetworkInterfacesInput
 }
 
-func (m *mockEC2DescribeNetworkInterfacesAPIPaginated) DescribeNetworkInterfaces(_ context.Context, _ *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
+func (m *mockEC2DescribeNetworkInterfacesAPIPaginated) DescribeNetworkInterfaces(_ context.Context, in *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1531,6 +1609,12 @@ func TestQA_Pagination_FetchNetworkInterfacesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchNetworkInterfacesPage_Empty(t *testing.T) {
@@ -1573,12 +1657,14 @@ func TestQA_Pagination_FetchNetworkInterfacesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeVpcEndpointsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeVpcEndpointsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeVpcEndpointsOutput, error)
+	lastInput *ec2.DescribeVpcEndpointsInput
 }
 
-func (m *mockEC2DescribeVpcEndpointsAPIPaginated) DescribeVpcEndpoints(_ context.Context, _ *ec2.DescribeVpcEndpointsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
+func (m *mockEC2DescribeVpcEndpointsAPIPaginated) DescribeVpcEndpoints(_ context.Context, in *ec2.DescribeVpcEndpointsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1654,6 +1740,12 @@ func TestQA_Pagination_FetchVPCEndpointsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchVPCEndpointsPage_Empty(t *testing.T) {
@@ -1696,12 +1788,14 @@ func TestQA_Pagination_FetchVPCEndpointsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockEC2DescribeTransitGatewaysAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*ec2.DescribeTransitGatewaysOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*ec2.DescribeTransitGatewaysOutput, error)
+	lastInput *ec2.DescribeTransitGatewaysInput
 }
 
-func (m *mockEC2DescribeTransitGatewaysAPIPaginated) DescribeTransitGateways(_ context.Context, _ *ec2.DescribeTransitGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
+func (m *mockEC2DescribeTransitGatewaysAPIPaginated) DescribeTransitGateways(_ context.Context, in *ec2.DescribeTransitGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1775,6 +1869,12 @@ func TestQA_Pagination_FetchTransitGatewaysPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchTransitGatewaysPage_Empty(t *testing.T) {
@@ -1817,12 +1917,14 @@ func TestQA_Pagination_FetchTransitGatewaysPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockELBv2DescribeLoadBalancersAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*elbv2.DescribeLoadBalancersOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*elbv2.DescribeLoadBalancersOutput, error)
+	lastInput *elbv2.DescribeLoadBalancersInput
 }
 
-func (m *mockELBv2DescribeLoadBalancersAPIPaginated) DescribeLoadBalancers(_ context.Context, _ *elbv2.DescribeLoadBalancersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancersOutput, error) {
+func (m *mockELBv2DescribeLoadBalancersAPIPaginated) DescribeLoadBalancers(_ context.Context, in *elbv2.DescribeLoadBalancersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancersOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1900,6 +2002,12 @@ func TestQA_Pagination_FetchLoadBalancersPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchLoadBalancersPage_Empty(t *testing.T) {
@@ -1942,12 +2050,14 @@ func TestQA_Pagination_FetchLoadBalancersPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockELBv2DescribeTargetGroupsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*elbv2.DescribeTargetGroupsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*elbv2.DescribeTargetGroupsOutput, error)
+	lastInput *elbv2.DescribeTargetGroupsInput
 }
 
-func (m *mockELBv2DescribeTargetGroupsAPIPaginated) DescribeTargetGroups(_ context.Context, _ *elbv2.DescribeTargetGroupsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTargetGroupsOutput, error) {
+func (m *mockELBv2DescribeTargetGroupsAPIPaginated) DescribeTargetGroups(_ context.Context, in *elbv2.DescribeTargetGroupsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTargetGroupsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -2027,6 +2137,12 @@ func TestQA_Pagination_FetchTargetGroupsPage_Continuation(t *testing.T) {
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
+	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
 	}
 }
 

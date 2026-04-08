@@ -21,12 +21,20 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
+	lines := strings.Split(plain, "\n")
 
 	allTypes := resource.AllResourceTypes()
 	for _, rt := range allTypes {
-		name := rt.Name
-		if !strings.Contains(plain, name) {
-			t.Errorf("main menu should contain %q, got:\n%s", name, plain)
+		alias := ":" + rt.ShortName
+		found := false
+		for _, line := range lines {
+			if strings.Contains(line, rt.Name) && strings.Contains(line, alias) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("main menu: no single line contains both %q and %q", rt.Name, alias)
 		}
 	}
 }
