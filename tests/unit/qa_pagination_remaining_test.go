@@ -40,12 +40,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockEventBridgeListRulesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*eventbridge.ListRulesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*eventbridge.ListRulesOutput, error)
+	lastInput *eventbridge.ListRulesInput
 }
 
-func (m *mockEventBridgeListRulesAPIPaginated) ListRules(_ context.Context, _ *eventbridge.ListRulesInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
+func (m *mockEventBridgeListRulesAPIPaginated) ListRules(_ context.Context, in *eventbridge.ListRulesInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -127,6 +129,12 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-eb-rule" {
 		t.Errorf("resource ID: expected %q, got %q", "last-eb-rule", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-eb-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-eb-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_Empty(t *testing.T) {
@@ -175,12 +183,14 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockKinesisListStreamsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*kinesis.ListStreamsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*kinesis.ListStreamsOutput, error)
+	lastInput *kinesis.ListStreamsInput
 }
 
-func (m *mockKinesisListStreamsAPIPaginated) ListStreams(_ context.Context, _ *kinesis.ListStreamsInput, _ ...func(*kinesis.Options)) (*kinesis.ListStreamsOutput, error) {
+func (m *mockKinesisListStreamsAPIPaginated) ListStreams(_ context.Context, in *kinesis.ListStreamsInput, _ ...func(*kinesis.Options)) (*kinesis.ListStreamsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -261,6 +271,12 @@ func TestQA_Pagination_FetchKinesisStreamsPage_Continuation(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-kinesis-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-kinesis-page-2")
+	}
 	if result.Resources[0].ID != "last-kinesis-stream" {
 		t.Errorf("resource ID: expected %q, got %q", "last-kinesis-stream", result.Resources[0].ID)
 	}
@@ -313,12 +329,14 @@ func TestQA_Pagination_FetchKinesisStreamsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockMSKListClustersV2APIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*kafka.ListClustersV2Output, error)
+	Calls     int
+	PageFunc  func(call int) (*kafka.ListClustersV2Output, error)
+	lastInput *kafka.ListClustersV2Input
 }
 
-func (m *mockMSKListClustersV2APIPaginated) ListClustersV2(_ context.Context, _ *kafka.ListClustersV2Input, _ ...func(*kafka.Options)) (*kafka.ListClustersV2Output, error) {
+func (m *mockMSKListClustersV2APIPaginated) ListClustersV2(_ context.Context, in *kafka.ListClustersV2Input, _ ...func(*kafka.Options)) (*kafka.ListClustersV2Output, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -400,6 +418,12 @@ func TestQA_Pagination_FetchMSKClustersPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-msk-cluster" {
 		t.Errorf("resource ID: expected %q, got %q", "last-msk-cluster", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-msk-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-msk-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchMSKClustersPage_Empty(t *testing.T) {
@@ -448,12 +472,14 @@ func TestQA_Pagination_FetchMSKClustersPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockSFNListStateMachinesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*sfn.ListStateMachinesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*sfn.ListStateMachinesOutput, error)
+	lastInput *sfn.ListStateMachinesInput
 }
 
-func (m *mockSFNListStateMachinesAPIPaginated) ListStateMachines(_ context.Context, _ *sfn.ListStateMachinesInput, _ ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error) {
+func (m *mockSFNListStateMachinesAPIPaginated) ListStateMachines(_ context.Context, in *sfn.ListStateMachinesInput, _ ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -535,6 +561,12 @@ func TestQA_Pagination_FetchStepFunctionsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-state-machine" {
 		t.Errorf("resource ID: expected %q, got %q", "last-state-machine", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-sfn-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-sfn-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchStepFunctionsPage_Empty(t *testing.T) {
@@ -583,12 +615,14 @@ func TestQA_Pagination_FetchStepFunctionsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockSNSListSubscriptionsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*sns.ListSubscriptionsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*sns.ListSubscriptionsOutput, error)
+	lastInput *sns.ListSubscriptionsInput
 }
 
-func (m *mockSNSListSubscriptionsAPIPaginated) ListSubscriptions(_ context.Context, _ *sns.ListSubscriptionsInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsOutput, error) {
+func (m *mockSNSListSubscriptionsAPIPaginated) ListSubscriptions(_ context.Context, in *sns.ListSubscriptionsInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -672,6 +706,12 @@ func TestQA_Pagination_FetchSNSSubscriptionsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "arn:aws:sns:us-east-1:123456789012:last-topic:def-456" {
 		t.Errorf("resource ID: expected %q, got %q", "arn:aws:sns:us-east-1:123456789012:last-topic:def-456", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-sns-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-sns-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_Empty(t *testing.T) {
@@ -720,12 +760,14 @@ func TestQA_Pagination_FetchSNSSubscriptionsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockGlueGetJobsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*glue.GetJobsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*glue.GetJobsOutput, error)
+	lastInput *glue.GetJobsInput
 }
 
-func (m *mockGlueGetJobsAPIPaginated) GetJobs(_ context.Context, _ *glue.GetJobsInput, _ ...func(*glue.Options)) (*glue.GetJobsOutput, error) {
+func (m *mockGlueGetJobsAPIPaginated) GetJobs(_ context.Context, in *glue.GetJobsInput, _ ...func(*glue.Options)) (*glue.GetJobsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -807,6 +849,12 @@ func TestQA_Pagination_FetchGlueJobsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-glue-job" {
 		t.Errorf("resource ID: expected %q, got %q", "last-glue-job", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-glue-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-glue-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchGlueJobsPage_Empty(t *testing.T) {
@@ -855,12 +903,14 @@ func TestQA_Pagination_FetchGlueJobsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockAthenaListWorkGroupsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*athena.ListWorkGroupsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*athena.ListWorkGroupsOutput, error)
+	lastInput *athena.ListWorkGroupsInput
 }
 
-func (m *mockAthenaListWorkGroupsAPIPaginated) ListWorkGroups(_ context.Context, _ *athena.ListWorkGroupsInput, _ ...func(*athena.Options)) (*athena.ListWorkGroupsOutput, error) {
+func (m *mockAthenaListWorkGroupsAPIPaginated) ListWorkGroups(_ context.Context, in *athena.ListWorkGroupsInput, _ ...func(*athena.Options)) (*athena.ListWorkGroupsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -941,6 +991,12 @@ func TestQA_Pagination_FetchAthenaWorkgroupsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-workgroup" {
 		t.Errorf("resource ID: expected %q, got %q", "last-workgroup", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-athena-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-athena-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_Empty(t *testing.T) {
@@ -989,12 +1045,14 @@ func TestQA_Pagination_FetchAthenaWorkgroupsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockRedshiftDescribeClustersAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*redshift.DescribeClustersOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*redshift.DescribeClustersOutput, error)
+	lastInput *redshift.DescribeClustersInput
 }
 
-func (m *mockRedshiftDescribeClustersAPIPaginated) DescribeClusters(_ context.Context, _ *redshift.DescribeClustersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClustersOutput, error) {
+func (m *mockRedshiftDescribeClustersAPIPaginated) DescribeClusters(_ context.Context, in *redshift.DescribeClustersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClustersOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1076,6 +1134,12 @@ func TestQA_Pagination_FetchRedshiftClustersPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-redshift-cluster" {
 		t.Errorf("resource ID: expected %q, got %q", "last-redshift-cluster", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-redshift-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-redshift-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchRedshiftClustersPage_Empty(t *testing.T) {
@@ -1124,12 +1188,14 @@ func TestQA_Pagination_FetchRedshiftClustersPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockBackupListBackupPlansAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*backup.ListBackupPlansOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*backup.ListBackupPlansOutput, error)
+	lastInput *backup.ListBackupPlansInput
 }
 
-func (m *mockBackupListBackupPlansAPIPaginated) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
+func (m *mockBackupListBackupPlansAPIPaginated) ListBackupPlans(_ context.Context, in *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1210,6 +1276,12 @@ func TestQA_Pagination_FetchBackupPlansPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "plan-id-def456" {
 		t.Errorf("resource ID: expected %q, got %q", "plan-id-def456", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-backup-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-backup-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchBackupPlansPage_Empty(t *testing.T) {
@@ -1258,12 +1330,14 @@ func TestQA_Pagination_FetchBackupPlansPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockSESv2ListEmailIdentitiesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*sesv2.ListEmailIdentitiesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*sesv2.ListEmailIdentitiesOutput, error)
+	lastInput *sesv2.ListEmailIdentitiesInput
 }
 
-func (m *mockSESv2ListEmailIdentitiesAPIPaginated) ListEmailIdentities(_ context.Context, _ *sesv2.ListEmailIdentitiesInput, _ ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error) {
+func (m *mockSESv2ListEmailIdentitiesAPIPaginated) ListEmailIdentities(_ context.Context, in *sesv2.ListEmailIdentitiesInput, _ ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1348,6 +1422,12 @@ func TestQA_Pagination_FetchSESIdentitiesPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "user@example.com" {
 		t.Errorf("resource ID: expected %q, got %q", "user@example.com", result.Resources[0].ID)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-ses-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-ses-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchSESIdentitiesPage_Empty(t *testing.T) {
@@ -1396,12 +1476,14 @@ func TestQA_Pagination_FetchSESIdentitiesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockWAFv2ListWebACLsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*wafv2.ListWebACLsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*wafv2.ListWebACLsOutput, error)
+	lastInput *wafv2.ListWebACLsInput
 }
 
-func (m *mockWAFv2ListWebACLsAPIPaginated) ListWebACLs(_ context.Context, _ *wafv2.ListWebACLsInput, _ ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error) {
+func (m *mockWAFv2ListWebACLsAPIPaginated) ListWebACLs(_ context.Context, in *wafv2.ListWebACLsInput, _ ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -1484,6 +1566,12 @@ func TestQA_Pagination_FetchWAFWebACLsPage_Continuation(t *testing.T) {
 	}
 	if result.Resources[0].ID != "acl-id-def456" {
 		t.Errorf("resource ID: expected %q, got %q", "acl-id-def456", result.Resources[0].ID)
+	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextMarker == nil || *mock.lastInput.NextMarker != "marker-waf-page-2" {
+		t.Errorf("NextMarker not forwarded: got %v, want %q", mock.lastInput.NextMarker, "marker-waf-page-2")
 	}
 }
 

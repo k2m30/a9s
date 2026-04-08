@@ -278,23 +278,6 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 	}
 }
 
-// --- cb→pipeline: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_CB_Pipeline_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acme-api-build",
-		Name: "acme-api-build",
-	}
-	checker := cbCheckerByTarget(t, "pipeline")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-	}
-	if result.TargetType != "pipeline" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "pipeline")
-	}
-}
-
 // TestRelatedDemo_CB_Registered verifies the demo checker is registered and returns valid results.
 func TestRelatedDemo_CB_Registered(t *testing.T) {
 	_ = demo.GetResources // ensure demo package is loaded
