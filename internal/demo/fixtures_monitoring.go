@@ -1111,6 +1111,9 @@ func cloudTrailEventFixtures() []resource.Resource {
 	tG := time.Date(2026, 4, 7, 14, 31, 55, 0, time.UTC)
 	tH := time.Date(2026, 4, 7, 9, 14, 0, 0, time.UTC)
 	tI := time.Date(2026, 4, 7, 14, 44, 17, 0, time.UTC)
+	tJ := time.Date(2026, 4, 7, 15, 10, 5, 0, time.UTC)
+	tK := time.Date(2026, 4, 7, 15, 12, 33, 0, time.UTC)
+	tL := time.Date(2026, 4, 7, 15, 14, 58, 0, time.UTC)
 
 	return []resource.Resource{
 		{
@@ -1118,7 +1121,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			// userIdentity.type=Root satisfies TestCTEventsFixtureCoverage_AtLeastOneRootEvent.
 			// sessionCredentialFromConsole=true → ORIGIN=Console.
 			// resources=[S3 Bucket webapp-assets-prod] → TARGET from resources[]; resources[] present.
-			// Fields["user"]=alice.johnson and Fields["role_name"]=deploy-bot cross-link to real fixtures.
+			// Root identity: Fields.user and Fields.role_name omitted; Username=nil.
 			ID:     "evt-0a1b2c3d4e5f60001",
 			Name:   "CreateBucket",
 			Status: "ct-attention",
@@ -1126,8 +1129,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"event_name": "CreateBucket",
 				"time":       t1.Format("2006-01-02 15:04:05"),
 				"event_time": t1.Format("2006-01-02 15:04:05"),
-				"user":       "alice.johnson",
-				"role_name":  "deploy-bot",
 				"source":     "s3.amazonaws.com",
 				"read_only":  "false",
 			},
@@ -1136,7 +1137,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventName:       aws.String("CreateBucket"),
 				EventTime:       aws.Time(t1),
 				EventSource:     aws.String("s3.amazonaws.com"),
-				Username:        aws.String("alice.johnson"),
+				Username:        nil,
 				ReadOnly:        aws.String("false"),
 				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012","sessionContext":{"sessionCredentialFromConsole":"true","attributes":{"mfaAuthenticated":"true","creationDate":"2026-03-28T14:20:00Z"}}},"eventTime":"2026-03-28T14:30:15Z","eventSource":"s3.amazonaws.com","eventName":"CreateBucket","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.10","userAgent":"signin.amazonaws.com","requestParameters":{"bucketName":"webapp-assets-prod"},"responseElements":null,"requestID":"req-s3-create-001","eventID":"evt-0a1b2c3d4e5f60001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"arn:aws:s3:::webapp-assets-prod","accountId":"123456789012","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
@@ -1147,7 +1148,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 		{
 			// Row 2 (D, ct-danger, CLI+error): IAMUser bob.smith attempts DeleteBucket — AccessDenied.
 			// CLI userAgent; direct IAMUser identity; Resources use webapp-assets-prod (real S3 fixture).
-			// Fields["role_name"]=acme-ci-deploy-role cross-links to real role fixture.
+			// IAMUser: Fields.role_name omitted; Fields.user=bob.smith retained.
 			// errorCode=AccessDenied satisfies TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent.
 			ID:     "evt-0a1b2c3d4e5f60002",
 			Name:   "DeleteBucket",
@@ -1157,7 +1158,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":       t2.Format("2006-01-02 15:04:05"),
 				"event_time": t2.Format("2006-01-02 15:04:05"),
 				"user":       "bob.smith",
-				"role_name":  "acme-ci-deploy-role",
 				"source":     "s3.amazonaws.com",
 				"read_only":  "false",
 			},
@@ -1178,7 +1178,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			// Row 3 (R, ct-info, Console+AssumedRole): AssumedRole reads EC2 via Console.
 			// sessionCredentialFromConsole=true → ORIGIN=Console; no resources[] → Management+no-resources fallback.
 			// AssumedRole sessionIssuer ARN leaf = acme-eks-node-role (real role fixture).
-			// Fields["user"]=alice.johnson (real iam-user fixture for navigable-field integrity).
+			// AssumedRole: Fields.user omitted; Fields.role_name retained.
 			// Satisfies TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent: Management+no-resources.
 			ID:     "evt-0a1b2c3d4e5f60003",
 			Name:   "DescribeInstances",
@@ -1187,7 +1187,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"event_name": "DescribeInstances",
 				"time":       t3.Format("2006-01-02 15:04:05"),
 				"event_time": t3.Format("2006-01-02 15:04:05"),
-				"user":       "alice.johnson",
 				"role_name":  "acme-eks-node-role",
 				"source":     "ec2.amazonaws.com",
 				"read_only":  "true",
@@ -1208,7 +1207,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			// AWSService identity (invokedBy=autoscaling.amazonaws.com) — no sessionIssuer.
 			// eventType=AwsServiceEvent satisfies TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent.
 			// resources=[EC2 i-0a1b2c3d4e5f60001] → resources[] present (satisfies hasResources).
-			// Fields["user"]=alice.johnson and Fields["role_name"]=monitoring-agent real fixtures.
+			// AWSService: Fields.user and Fields.role_name omitted (no userIdentity).
 			ID:     "evt-0a1b2c3d4e5f60004",
 			Name:   "TerminateInstanceInAutoScalingGroup",
 			Status: "ct-info",
@@ -1216,8 +1215,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"event_name": "TerminateInstanceInAutoScalingGroup",
 				"time":       t4.Format("2006-01-02 15:04:05"),
 				"event_time": t4.Format("2006-01-02 15:04:05"),
-				"user":       "alice.johnson",
-				"role_name":  "monitoring-agent",
 				"source":     "autoscaling.amazonaws.com",
 				"read_only":  "false",
 			},
@@ -1236,8 +1233,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 		},
 		{
 			// Row 5 (I, ct-info, Insight): ApiCallRateInsight — eventCategory=Insight, I verb.
-			// No sessionIssuer; Fields["user"]=bob.smith and Fields["role_name"]=acme-rds-monitoring
-			// provide navigable-field cross-references to real fixtures.
+			// IAMUser identity in JSON; Fields.role_name omitted; Fields.user=bob.smith retained.
 			// insightDetails with baseline/insight statistics for detail view.
 			ID:     "evt-0a1b2c3d4e5f60005",
 			Name:   "ApiCallRateInsight",
@@ -1247,7 +1243,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":       t5.Format("2006-01-02 15:04:05"),
 				"event_time": t5.Format("2006-01-02 15:04:05"),
 				"user":       "bob.smith",
-				"role_name":  "acme-rds-monitoring",
 				"source":     "cloudtrail.amazonaws.com",
 				"read_only":  "false",
 			},
@@ -1268,7 +1263,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 			// Satisfies AllTargetFallbackCategoriesPresent: NetworkActivity bucket.
 			// Cross-account: accountId=999988887777 != recipientAccountId=123456789012.
 			// sessionIssuer ARN leaf = ci-runner (real role fixture).
-			// Fields["user"]=ci-service-account (real iam-user fixture); no resources[].
+			// AssumedRole: Fields.user omitted; Fields.role_name=ci-runner retained.
 			ID:     "evt-0a1b2c3d4e5f60006",
 			Name:   "VpcEndpointAccess",
 			Status: "ct-attention",
@@ -1276,7 +1271,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"event_name": "VpcEndpointAccess",
 				"time":       t6.Format("2006-01-02 15:04:05"),
 				"event_time": t6.Format("2006-01-02 15:04:05"),
-				"user":       "ci-service-account",
 				"role_name":  "ci-runner",
 				"source":     "s3.amazonaws.com",
 				"read_only":  "true",
@@ -1301,7 +1295,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 		{
 			// Case A — Karpenter ec2:DescribeInstances (R, ct-info)
 			// AssumedRole / KarpenterNodeRole, read-only, no error.
-			// user→iam-user: alice.johnson (real fixture); role_name→role: KarpenterNodeRole (new fixture).
+			// AssumedRole: Fields.user omitted; Fields.role_name=KarpenterNodeRole retained.
 			ID:     "e-a1b2c3d4",
 			Name:   "DescribeInstances",
 			Status: "ct-info",
@@ -1310,7 +1304,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tA.Format("Jan 02 15:04:05"),
 				"event_time":     tA.Format(time.RFC3339),
 				"event_time_raw": tA.Format(time.RFC3339),
-				"user":           "alice.johnson",
 				"role_name":      "KarpenterNodeRole",
 				"source":         "ec2.amazonaws.com",
 				"read_only":      "true",
@@ -1329,7 +1322,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 		{
 			// Case B — SSO Console ec2:TerminateInstances (D verb + MFA, ct-danger)
 			// AssumedRole via SSO; two instances terminated; MFA=true.
-			// user→iam-user: alice.johnson; role_name→role: AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d (new fixture).
+			// AssumedRole: Fields.user omitted; Fields.role_name=AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d retained.
 			// Resources use real EC2 fixture IDs i-0a1b2c3d4e5f60001 and i-0a1b2c3d4e5f60002.
 			ID:     "e-b2c3d4e5",
 			Name:   "TerminateInstances",
@@ -1339,7 +1332,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tB.Format("Jan 02 15:04:05"),
 				"event_time":     tB.Format(time.RFC3339),
 				"event_time_raw": tB.Format(time.RFC3339),
-				"user":           "alice.johnson",
 				"role_name":      "AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d",
 				"source":         "ec2.amazonaws.com",
 				"read_only":      "false",
@@ -1360,8 +1352,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 		},
 		{
 			// Case C — IAMUser bob s3:PutObject AccessDenied (errorCode → ct-danger, ERROR hoisted)
-			// user→iam-user: bob.smith (real fixture); role_name→role: acme-ci-deploy-role (real fixture).
-			// Resources use webapp-assets-prod (real S3 fixture).
+			// IAMUser: Fields.role_name omitted; Fields.user=bob.smith retained.
+			// Resources use webapp-assets-prod (real S3 fixture); requestParameters.bucketName matches.
 			ID:     "e-c3d4e5f6",
 			Name:   "PutObject",
 			Status: "ct-danger",
@@ -1371,7 +1363,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"event_time":     tC.Format(time.RFC3339),
 				"event_time_raw": tC.Format(time.RFC3339),
 				"user":           "bob.smith",
-				"role_name":      "acme-ci-deploy-role",
 				"source":         "s3.amazonaws.com",
 				"read_only":      "false",
 			},
@@ -1382,7 +1373,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventSource: aws.String("s3.amazonaws.com"),
 				Username:    aws.String("bob"),
 				ReadOnly:    aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:11:03Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.42","userAgent":"aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0","recipientAccountId":"333333333333","eventID":"e-c3d4e5f6","readOnly":false,"errorCode":"AccessDenied","errorMessage":"User: arn:aws:iam::333333333333:user/bob is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::prod-logs/2026/04/07/app.log because no identity-based policy allows the s3:PutObject action","userIdentity":{"type":"IAMUser","principalId":"AIDAIOSFODNN7BOB1XMP","arn":"arn:aws:iam::333333333333:user/bob","accountId":"333333333333","accessKeyId":"AKIAIOSFODNN7BOB1XMP","userName":"bob"},"requestParameters":{"bucketName":"prod-logs","key":"prod-logs/2026/04/07/app.log"},"responseElements":null}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:11:03Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.42","userAgent":"aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0","recipientAccountId":"333333333333","eventID":"e-c3d4e5f6","readOnly":false,"errorCode":"AccessDenied","errorMessage":"User: arn:aws:iam::333333333333:user/bob is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::webapp-assets-prod/2026/04/07/app.log because no identity-based policy allows the s3:PutObject action","userIdentity":{"type":"IAMUser","principalId":"AIDAIOSFODNN7BOB1XMP","arn":"arn:aws:iam::333333333333:user/bob","accountId":"333333333333","accessKeyId":"AKIAIOSFODNN7BOB1XMP","userName":"bob"},"requestParameters":{"bucketName":"webapp-assets-prod","key":"2026/04/07/app.log"},"responseElements":null}`),
 				Resources: []cloudtrailtypes.Resource{
 					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("webapp-assets-prod")},
 				},
@@ -1391,7 +1382,7 @@ func cloudTrailEventFixtures() []resource.Resource {
 		{
 			// Case D — KMS kms:RotateKey AwsServiceEvent (S verb → ct-attention)
 			// No userIdentity ARN — Service: row in ACTOR. Category row appears in ACTION.
-			// user→iam-user: ci-service-account; role_name→role: monitoring-agent (real fixtures).
+			// AWSService: Fields.user and Fields.role_name omitted (no userIdentity).
 			// No Resources — KMS key ARN not a resolvable fixture ID.
 			ID:     "e-d4e5f6a7",
 			Name:   "RotateKey",
@@ -1401,8 +1392,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tD.Format("Jan 02 15:04:05"),
 				"event_time":     tD.Format(time.RFC3339),
 				"event_time_raw": tD.Format(time.RFC3339),
-				"user":           "ci-service-account",
-				"role_name":      "monitoring-agent",
 				"source":         "kms.amazonaws.com",
 				"read_only":      "false",
 			},
@@ -1419,8 +1408,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 		},
 		{
 			// Case E — Root s3:PutBucketPolicy (Root + W → ct-attention)
-			// user→iam-user: ci-service-account; role_name→role: deploy-bot (real fixtures).
-			// Resources use webapp-assets-prod (real S3 fixture).
+			// Root identity: Fields.user and Fields.role_name omitted; Username=nil.
+			// Resources updated to prod-artifacts to match requestParameters.bucketName.
 			ID:     "e-e5f6a7b8",
 			Name:   "PutBucketPolicy",
 			Status: "ct-attention",
@@ -1429,8 +1418,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tE.Format("Jan 02 15:04:05"),
 				"event_time":     tE.Format(time.RFC3339),
 				"event_time_raw": tE.Format(time.RFC3339),
-				"user":           "ci-service-account",
-				"role_name":      "deploy-bot",
 				"source":         "s3.amazonaws.com",
 				"read_only":      "false",
 			},
@@ -1441,17 +1428,17 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventSource: aws.String("s3.amazonaws.com"),
 				Username:    nil,
 				ReadOnly:    aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T03:42:18Z","eventSource":"s3.amazonaws.com","eventName":"PutBucketPolicy","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.17","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15","recipientAccountId":"555555555555","eventID":"e-e5f6a7b8","readOnly":false,"userIdentity":{"type":"Root","principalId":"555555555555","arn":"arn:aws:iam::555555555555:root","accountId":"555555555555"},"requestParameters":{"bucketName":"prod-artifacts","policy":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"s3:GetObject\",\"Resource\":\"arn:aws:s3:::prod-artifacts/*\"}]}"},"responseElements":null}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T03:42:18Z","eventSource":"s3.amazonaws.com","eventName":"PutBucketPolicy","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.17","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15","recipientAccountId":"555555555555","eventID":"e-e5f6a7b8","readOnly":false,"userIdentity":{"type":"Root","principalId":"555555555555","arn":"arn:aws:iam::555555555555:root","accountId":"555555555555"},"requestParameters":{"bucketName":"prod-artifacts","policy":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"s3:GetObject\",\"Resource\":\"arn:aws:s3:::prod-artifacts/*\"}]}"},"responseElements":null,"resources":[{"ARN":"arn:aws:s3:::prod-artifacts","accountId":"555555555555","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
-					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("webapp-assets-prod")},
+					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("prod-artifacts")},
 				},
 			},
 		},
 		{
 			// Case F — IRSA s3:GetObject via VPC endpoint (WebIdentityUser / IRSA, R → ct-info)
 			// Federation row distinguishes IRSA; VPC endpoint in CONTEXT.
-			// user→iam-user: alice.johnson; role_name→role: eks-checkout-svc-sa (new fixture).
-			// Resources use data-pipeline-logs (real S3 fixture).
+			// AssumedRole: Fields.user omitted; Fields.role_name=eks-checkout-svc-sa retained.
+			// Resources updated to checkout-config to match requestParameters.bucketName.
 			ID:     "e-f6a7b8c9",
 			Name:   "GetObject",
 			Status: "ct-info",
@@ -1460,7 +1447,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tF.Format("Jan 02 15:04:05"),
 				"event_time":     tF.Format(time.RFC3339),
 				"event_time_raw": tF.Format(time.RFC3339),
-				"user":           "alice.johnson",
 				"role_name":      "eks-checkout-svc-sa",
 				"source":         "s3.amazonaws.com",
 				"read_only":      "true",
@@ -1472,16 +1458,16 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventSource: aws.String("s3.amazonaws.com"),
 				Username:    aws.String("eks-checkout-svc-sa"),
 				ReadOnly:    aws.String("true"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:20:21Z","eventSource":"s3.amazonaws.com","eventName":"GetObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"eu-west-1","sourceIPAddress":"10.42.3.18","userAgent":"aws-sdk-go-v2/1.30.3","recipientAccountId":"666666666666","eventID":"e-f6a7b8c9","readOnly":true,"vpcEndpointId":"vpce-0abc123def456","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::666666666666:assumed-role/eks-checkout-svc-sa/1717156821993453824","principalId":"AROAEXAMPLE:1717156821993453824","accountId":"666666666666","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::666666666666:role/eks-checkout-svc-sa","principalId":"AROAEXAMPLE","accountId":"666666666666","userName":"eks-checkout-svc-sa"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:15:00Z"}},"webIdFederationData":{"federatedProvider":"oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE0D8C"}},"requestParameters":{"bucketName":"checkout-config","key":"checkout-config/prod/config.json"},"responseElements":null}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:20:21Z","eventSource":"s3.amazonaws.com","eventName":"GetObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"eu-west-1","sourceIPAddress":"10.42.3.18","userAgent":"aws-sdk-go-v2/1.30.3","recipientAccountId":"666666666666","eventID":"e-f6a7b8c9","readOnly":true,"vpcEndpointId":"vpce-0abc123def456","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::666666666666:assumed-role/eks-checkout-svc-sa/1717156821993453824","principalId":"AROAEXAMPLE:1717156821993453824","accountId":"666666666666","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::666666666666:role/eks-checkout-svc-sa","principalId":"AROAEXAMPLE","accountId":"666666666666","userName":"eks-checkout-svc-sa"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:15:00Z"}},"webIdFederationData":{"federatedProvider":"oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE0D8C"}},"requestParameters":{"bucketName":"checkout-config","key":"prod/config.json"},"responseElements":null,"resources":[{"ARN":"arn:aws:s3:::checkout-config","accountId":"666666666666","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
-					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("data-pipeline-logs")},
+					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("checkout-config")},
 				},
 			},
 		},
 		{
 			// Case G — Cross-account s3:PutObject (caller 888888888888, recipient 777777777777 → ct-attention)
-			// user→iam-user: bob.smith; role_name→role: CiBuildRole (new fixture).
-			// Resources use ml-training-data (real S3 fixture).
+			// AssumedRole: Fields.user omitted; Fields.role_name=CiBuildRole retained.
+			// Resources updated to shared-artifacts to match requestParameters.bucketName.
 			ID:     "e-a7b8c9d0",
 			Name:   "PutObject",
 			Status: "ct-attention",
@@ -1490,7 +1476,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tG.Format("Jan 02 15:04:05"),
 				"event_time":     tG.Format(time.RFC3339),
 				"event_time_raw": tG.Format(time.RFC3339),
-				"user":           "bob.smith",
 				"role_name":      "CiBuildRole",
 				"source":         "s3.amazonaws.com",
 				"read_only":      "false",
@@ -1502,16 +1487,16 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventSource: aws.String("s3.amazonaws.com"),
 				Username:    aws.String("CiBuildRole"),
 				ReadOnly:    aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:31:55Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-2","sourceIPAddress":"52.14.88.201","userAgent":"aws-cli/2.17.9","recipientAccountId":"777777777777","eventID":"e-a7b8c9d0","readOnly":false,"userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::888888888888:assumed-role/CiBuildRole/build-4821","principalId":"AROAEXAMPLE:build-4821","accountId":"888888888888","accessKeyId":"ASIAQF3M2N8KCIB1XMPL","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::888888888888:role/CiBuildRole","principalId":"AROAEXAMPLE","accountId":"888888888888","userName":"CiBuildRole"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:25:00Z"}}},"requestParameters":{"bucketName":"shared-artifacts","key":"shared-artifacts/build-4821.tar.gz"},"responseElements":null}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:31:55Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"Management","eventType":"AwsApiCall","awsRegion":"us-east-2","sourceIPAddress":"52.14.88.201","userAgent":"aws-cli/2.17.9","recipientAccountId":"777777777777","eventID":"e-a7b8c9d0","readOnly":false,"userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::888888888888:assumed-role/CiBuildRole/build-4821","principalId":"AROAEXAMPLE:build-4821","accountId":"888888888888","accessKeyId":"ASIAQF3M2N8KCIB1XMPL","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::888888888888:role/CiBuildRole","principalId":"AROAEXAMPLE","accountId":"888888888888","userName":"CiBuildRole"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:25:00Z"}}},"requestParameters":{"bucketName":"shared-artifacts","key":"build-4821.tar.gz"},"responseElements":null,"resources":[{"ARN":"arn:aws:s3:::shared-artifacts","accountId":"888888888888","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
-					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("ml-training-data")},
+					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("shared-artifacts")},
 				},
 			},
 		},
 		{
 			// Case H — Insight ec2:RunInstances ApiCallRateInsight (no ACTOR, ct-info)
 			// eventCategory=Insight; no userIdentity. ACTOR section omitted in detail view.
-			// user→iam-user: bob.smith; role_name→role: acme-eks-node-role (real fixtures for nav integrity).
+			// Insight (no userIdentity): Fields.user and Fields.role_name omitted.
 			ID:     "e-b8c9d0e1",
 			Name:   "RunInstances",
 			Status: "ct-info",
@@ -1520,8 +1505,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tH.Format("Jan 02 15:04:05"),
 				"event_time":     tH.Format(time.RFC3339),
 				"event_time_raw": tH.Format(time.RFC3339),
-				"user":           "bob.smith",
-				"role_name":      "acme-eks-node-role",
 				"source":         "ec2.amazonaws.com",
 				"read_only":      "false",
 			},
@@ -1539,8 +1522,8 @@ func cloudTrailEventFixtures() []resource.Resource {
 		{
 			// Case I — NetworkActivity s3:PutObject VPCE deny (errorCode → ct-danger)
 			// eventCategory=NetworkActivity, eventType=AwsVpceEvent, VpceAccessDenied.
-			// user→iam-user: alice.johnson; role_name→role: DataPipelineRole (new fixture).
-			// Resources use cloudtrail-audit-logs (real S3 fixture).
+			// AssumedRole: Fields.user omitted; Fields.role_name=DataPipelineRole retained.
+			// Resources updated to prod-lake to match requestParameters.bucketName.
 			ID:     "e-c9d0e1f2",
 			Name:   "PutObject",
 			Status: "ct-danger",
@@ -1549,7 +1532,6 @@ func cloudTrailEventFixtures() []resource.Resource {
 				"time":           tI.Format("Jan 02 15:04:05"),
 				"event_time":     tI.Format(time.RFC3339),
 				"event_time_raw": tI.Format(time.RFC3339),
-				"user":           "alice.johnson",
 				"role_name":      "DataPipelineRole",
 				"source":         "s3.amazonaws.com",
 				"read_only":      "false",
@@ -1561,9 +1543,97 @@ func cloudTrailEventFixtures() []resource.Resource {
 				EventSource: aws.String("s3.amazonaws.com"),
 				Username:    aws.String("DataPipelineRole"),
 				ReadOnly:    aws.String("false"),
-				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:44:17Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"NetworkActivity","eventType":"AwsVpceEvent","awsRegion":"eu-central-1","sourceIPAddress":"10.12.4.77","userAgent":"aws-sdk-java/2.25.11","recipientAccountId":"111111111111","eventID":"e-c9d0e1f2","readOnly":false,"errorCode":"VpceAccessDenied","errorMessage":"The VPC endpoint policy denies the s3:PutObject action on arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet","vpcEndpointId":"vpce-0ff11223344556677","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::111111111111:assumed-role/DataPipelineRole/dp-0719","principalId":"AROAEXAMPLE:dp-0719","accountId":"111111111111","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::111111111111:role/DataPipelineRole","principalId":"AROAEXAMPLE","accountId":"111111111111","userName":"DataPipelineRole"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:40:00Z"}}},"requestParameters":{"bucketName":"prod-lake","key":"prod-lake/landing/2026/04/07/batch-0719.parquet"},"responseElements":null}`),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T14:44:17Z","eventSource":"s3.amazonaws.com","eventName":"PutObject","eventCategory":"NetworkActivity","eventType":"AwsVpceEvent","awsRegion":"eu-central-1","sourceIPAddress":"10.12.4.77","userAgent":"aws-sdk-java/2.25.11","recipientAccountId":"111111111111","eventID":"e-c9d0e1f2","readOnly":false,"errorCode":"VpceAccessDenied","errorMessage":"The VPC endpoint policy denies the s3:PutObject action on arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet","vpcEndpointId":"vpce-0ff11223344556677","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::111111111111:assumed-role/DataPipelineRole/dp-0719","principalId":"AROAEXAMPLE:dp-0719","accountId":"111111111111","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::111111111111:role/DataPipelineRole","principalId":"AROAEXAMPLE","accountId":"111111111111","userName":"DataPipelineRole"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-04-07T14:40:00Z"}}},"requestParameters":{"bucketName":"prod-lake","key":"landing/2026/04/07/batch-0719.parquet"},"responseElements":null,"resources":[{"ARN":"arn:aws:s3:::prod-lake","accountId":"111111111111","type":"AWS::S3::Bucket"}]}`),
 				Resources: []cloudtrailtypes.Resource{
-					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("cloudtrail-audit-logs")},
+					{ResourceType: aws.String("AWS::S3::Bucket"), ResourceName: aws.String("prod-lake")},
+				},
+			},
+		},
+		{
+			// Case J — IAM CreateUser (successful). Actor: alice.johnson (IAM user).
+			// Target: new user charlie at path /. Exercises SummarizeIAM requestParameters branch.
+			// IAMUser: Fields.role_name omitted; Fields.user=alice.johnson retained.
+			ID:     "e-d0e1f2a3",
+			Name:   "CreateUser",
+			Status: "ct-ok",
+			Fields: map[string]string{
+				"event_name":     "CreateUser",
+				"time":           tJ.Format("Jan 02 15:04:05"),
+				"event_time":     tJ.Format(time.RFC3339),
+				"event_time_raw": tJ.Format(time.RFC3339),
+				"user":           "alice.johnson",
+				"source":         "iam.amazonaws.com",
+				"read_only":      "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("e-d0e1f2a3"),
+				EventName:   aws.String("CreateUser"),
+				EventTime:   aws.Time(tJ),
+				EventSource: aws.String("iam.amazonaws.com"),
+				Username:    aws.String("alice.johnson"),
+				ReadOnly:    aws.String("false"),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T15:10:05Z","eventSource":"iam.amazonaws.com","eventName":"CreateUser","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.10","userAgent":"aws-cli/2.15.0 Python/3.11.8 Darwin/24.3.0 botocore/2.15.0","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","principalId":"AIDAIOSFODNN7EXAMPLE","accountId":"123456789012","userName":"alice.johnson"},"requestParameters":{"userName":"charlie","path":"/"},"responseElements":{"user":{"userId":"AIDAIOSFODNN8EXAMPLE","arn":"arn:aws:iam::123456789012:user/charlie","path":"/","userName":"charlie","createDate":"Apr 7, 2026, 3:10:05 PM"}},"recipientAccountId":"123456789012","eventID":"e-d0e1f2a3"}`),
+				Resources: []cloudtrailtypes.Resource{
+					{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("charlie")},
+				},
+			},
+		},
+		{
+			// Case K — IAM AttachUserPolicy (successful). Actor: alice.johnson (IAM user).
+			// Target: user bob, policy AdministratorAccess. Exercises SummarizeIAM policyArn navigable branch.
+			// IAMUser: Fields.role_name omitted; Fields.user=alice.johnson retained.
+			ID:     "e-e1f2a3b4",
+			Name:   "AttachUserPolicy",
+			Status: "ct-ok",
+			Fields: map[string]string{
+				"event_name":     "AttachUserPolicy",
+				"time":           tK.Format("Jan 02 15:04:05"),
+				"event_time":     tK.Format(time.RFC3339),
+				"event_time_raw": tK.Format(time.RFC3339),
+				"user":           "alice.johnson",
+				"source":         "iam.amazonaws.com",
+				"read_only":      "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("e-e1f2a3b4"),
+				EventName:   aws.String("AttachUserPolicy"),
+				EventTime:   aws.Time(tK),
+				EventSource: aws.String("iam.amazonaws.com"),
+				Username:    aws.String("alice.johnson"),
+				ReadOnly:    aws.String("false"),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T15:12:33Z","eventSource":"iam.amazonaws.com","eventName":"AttachUserPolicy","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.10","userAgent":"aws-cli/2.15.0 Python/3.11.8 Darwin/24.3.0 botocore/2.15.0","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","principalId":"AIDAIOSFODNN7EXAMPLE","accountId":"123456789012","userName":"alice.johnson"},"requestParameters":{"userName":"bob","policyArn":"arn:aws:iam::aws:policy/AdministratorAccess"},"responseElements":null,"recipientAccountId":"123456789012","eventID":"e-e1f2a3b4"}`),
+				Resources: []cloudtrailtypes.Resource{
+					{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("bob")},
+					{ResourceType: aws.String("AWS::IAM::ManagedPolicy"), ResourceName: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
+				},
+			},
+		},
+		{
+			// Case L — IAM CreateAccessKey (successful). Actor: alice.johnson (IAM user).
+			// Target: user bob. responseElements contain accessKeyId. Exercises SummarizeIAM responseElements branch.
+			// IAMUser: Fields.role_name omitted; Fields.user=alice.johnson retained.
+			ID:     "e-f2a3b4c5",
+			Name:   "CreateAccessKey",
+			Status: "ct-ok",
+			Fields: map[string]string{
+				"event_name":     "CreateAccessKey",
+				"time":           tL.Format("Jan 02 15:04:05"),
+				"event_time":     tL.Format(time.RFC3339),
+				"event_time_raw": tL.Format(time.RFC3339),
+				"user":           "alice.johnson",
+				"source":         "iam.amazonaws.com",
+				"read_only":      "false",
+			},
+			RawStruct: cloudtrailtypes.Event{
+				EventId:     aws.String("e-f2a3b4c5"),
+				EventName:   aws.String("CreateAccessKey"),
+				EventTime:   aws.Time(tL),
+				EventSource: aws.String("iam.amazonaws.com"),
+				Username:    aws.String("alice.johnson"),
+				ReadOnly:    aws.String("false"),
+				CloudTrailEvent: aws.String(`{"eventVersion":"1.08","eventTime":"2026-04-07T15:14:58Z","eventSource":"iam.amazonaws.com","eventName":"CreateAccessKey","eventType":"AwsApiCall","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.10","userAgent":"aws-cli/2.15.0 Python/3.11.8 Darwin/24.3.0 botocore/2.15.0","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","principalId":"AIDAIOSFODNN7EXAMPLE","accountId":"123456789012","userName":"alice.johnson"},"requestParameters":{"userName":"bob"},"responseElements":{"accessKey":{"accessKeyId":"AKIAIOSFODNN7EXAMPLE","status":"Active","userName":"bob","createDate":"Apr 7, 2026, 3:14:58 PM"}},"recipientAccountId":"123456789012","eventID":"e-f2a3b4c5"}`),
+				Resources: []cloudtrailtypes.Resource{
+					{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("bob")},
 				},
 			},
 		},

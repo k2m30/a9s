@@ -106,11 +106,14 @@ func buildActorRows(event *Event) []Row {
 	var rows []Row
 
 	// Principal row — always present for non-service events with an ARN.
+	// Only navigable when arnTargetType resolves to a known type (e.g. role, iam-user).
+	// Root ARNs (arn:*:root) return "" from arnTargetType and must stay display-only.
+	principalTargetType := arnTargetType(ui.ARN)
 	principalRow := Row{
 		Key:         "Principal",
 		Value:       ui.ARN,
-		IsNavigable: true,
-		TargetType:  arnTargetType(ui.ARN),
+		IsNavigable: principalTargetType != "",
+		TargetType:  principalTargetType,
 		NavID:       arnNavID(ui.ARN),
 	}
 	rows = append(rows, principalRow)

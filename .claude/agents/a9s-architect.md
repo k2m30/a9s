@@ -1,7 +1,14 @@
 ---
 name: a9s-architect
 description: "Architecture owner for a9s. Produces scoped task specs for coder and QA agents. Use for design decisions, component interface reviews, message contract changes, dependency boundaries, AND specifying new resource types for scaling.\n\nExamples:\n\n- user: \"should the filter state live on the root model or the resource list?\"\n  assistant: \"Let me use the a9s-architect agent to evaluate the ownership.\"\n\n- user: \"spec out Lambda, CloudWatch, and IAM as new resource types\"\n  assistant: \"Let me use the a9s-architect agent to produce the handoff specs.\"\n\n- user: \"the coder wants to import layout from a view — is that ok?\"\n  assistant: \"Let me use the a9s-architect agent to check the dependency rules.\""
-model: claude-opus-4-6
+model: default
+agents:
+  - a9s-coder
+  - a9s-qa
+  - a9s-devops
+  - a9s-fixtures
+  - a9s-qa-stories
+  - tui-designer
 color: green
 memory: project
 tools:

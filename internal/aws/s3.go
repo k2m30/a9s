@@ -60,9 +60,22 @@ func init() {
 		// (e.g., from a CloudTrail event detail view).
 		RelatedContextFromIDs: func(relatedIDs []string) map[string]string {
 			for _, id := range relatedIDs {
-				if parts := strings.SplitN(id, "|", 2); len(parts) == 2 && parts[0] != "" {
-					return map[string]string{"bucket": parts[0], "prefix": ""}
+				parts := strings.SplitN(id, "|", 2)
+				if len(parts) != 2 || parts[0] == "" {
+					continue
 				}
+				bucket := parts[0]
+				key := parts[1]
+				// Derive the prefix (folder path) from the key so the child view
+				// lands on the folder containing the object, not the bucket root.
+				// Example: key="prod/config.json" → prefix="prod/"
+				// Example: key="landing/2026/04/07/x.parquet" → prefix="landing/2026/04/07/"
+				// Example: key="build-4821.tar.gz" → prefix=""
+				prefix := ""
+				if idx := strings.LastIndex(key, "/"); idx >= 0 {
+					prefix = key[:idx+1]
+				}
+				return map[string]string{"bucket": bucket, "prefix": prefix}
 			}
 			return map[string]string{"bucket": "", "prefix": ""}
 		},
