@@ -214,7 +214,13 @@ func TestQa67_I7_TabAutocomplete_NoMatch_DoesNothing(t *testing.T) {
 	if viewAfter == "" {
 		t.Error("I.7: View() should not be empty after Tab with no match in command mode")
 	}
-	_ = viewBefore
+	// Tab with no match is a no-op: view content should be unchanged
+	plainBefore := stripANSI(viewBefore)
+	plainAfter := stripANSI(viewAfter)
+	if plainBefore != plainAfter {
+		t.Errorf("I.7: Tab with no match should not change view content;\nbefore: %s\nafter:  %s",
+			plainBefore[:min(200, len(plainBefore))], plainAfter[:min(200, len(plainAfter))])
+	}
 }
 
 // I.8 — Sort key on resource type without status column does not crash.
@@ -337,12 +343,11 @@ func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 	plain := stripANSI(out)
 	// Header warning should show "Secret visible"
 	if !strings.Contains(plain, "Secret visible") {
-		t.Logf("I.4: reveal view output: %s", plain[:min(300, len(plain))])
-		// This is a soft check — the warning may be in the outer frame rendered by app.go
+		t.Errorf("I.4: reveal view should show 'Secret visible' warning, got: %s", plain[:min(300, len(plain))])
 	}
 	// The secret value must be displayed
 	if !strings.Contains(plain, "hunter2-secret-value") {
-		t.Logf("I.4: secret value not found in output; may be in sub-view: %s", plain[:min(300, len(plain))])
+		t.Errorf("I.4: secret value should be visible in output, got: %s", plain[:min(300, len(plain))])
 	}
 	if out == "" {
 		t.Error("I.4: View() should not be empty after reveal")

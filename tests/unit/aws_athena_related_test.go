@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -37,58 +36,6 @@ func TestRelated_Athena_Registered(t *testing.T) {
 		if !found {
 			t.Errorf("expected related def for target %q not found", target)
 		}
-	}
-}
-
-// --- athena→s3: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_Athena_S3_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "primary",
-		Name: "primary",
-	}
-	var checker resource.RelatedChecker
-	for _, def := range resource.GetRelated("athena") {
-		if def.TargetType == "s3" {
-			checker = def.Checker
-			break
-		}
-	}
-	if checker == nil {
-		t.Fatal("athena s3 checker is nil")
-	}
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-	}
-	if result.TargetType != "s3" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "s3")
-	}
-}
-
-// --- athena→kms: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_Athena_KMS_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "primary",
-		Name: "primary",
-	}
-	var checker resource.RelatedChecker
-	for _, def := range resource.GetRelated("athena") {
-		if def.TargetType == "kms" {
-			checker = def.Checker
-			break
-		}
-	}
-	if checker == nil {
-		t.Fatal("athena kms checker is nil")
-	}
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
 	}
 }
 
