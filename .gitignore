@@ -56,6 +56,9 @@ build/
 # Social media assets (generated locally)
 docs/demos/social/
 
+# Worktrees
+.worktrees/
+
 # Hugo build output
 website/public/
 website/.hugo_build.lock
