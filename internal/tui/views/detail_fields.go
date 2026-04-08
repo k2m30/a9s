@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -21,6 +23,18 @@ import (
 // a sub-field under path P whose key K matches navMap["P.K"] is marked IsNavigable
 // with TargetType from the navMap, and its Value is set to the extracted sub-value.
 func (m *DetailModel) buildFieldList() {
+	if m.resourceType == "ct-events" && m.res.Status != "" {
+		raw := extractRawCTEventJSON(m.res)
+		if raw != "" {
+			if event, err := ctdetail.Parse(raw); err == nil {
+				event.Status = m.res.Status // propagate severity status into the parsed event
+				sections := ctdetail.BuildSections(event)
+				m.fieldList = sectionsToFieldItems(sections)
+				return
+			}
+		}
+		// Parse failure or missing JSON → fall through to legacy flat path
+	}
 	var detailPaths []string
 	if m.viewConfig != nil {
 		vd := config.GetViewDef(m.viewConfig, m.resourceType)
@@ -138,6 +152,48 @@ func (m *DetailModel) buildFieldList() {
 	}
 }
 
+// extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
+// Returns "" if RawStruct is nil or not a cloudtrailtypes.Event or has nil CloudTrailEvent.
+func extractRawCTEventJSON(res resource.Resource) string {
+	if res.RawStruct == nil {
+		return ""
+	}
+	ev, ok := res.RawStruct.(cloudtrailtypes.Event)
+	if !ok {
+		return ""
+	}
+	if ev.CloudTrailEvent == nil {
+		return ""
+	}
+	return *ev.CloudTrailEvent
+}
+
+// sectionsToFieldItems flattens a []ctdetail.Section to []fieldpath.FieldItem.
+// Emits one FieldItem{IsSection: true, Key: section.Name} per section header,
+// followed by one FieldItem per Row with IsNavigable/TargetType/ColorTier propagated.
+func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
+	var items []fieldpath.FieldItem
+	for _, sec := range sections {
+		items = append(items, fieldpath.FieldItem{
+			IsSection: true,
+			Key:       sec.Name,
+			Path:      sec.Name,
+		})
+		for _, row := range sec.Rows {
+			items = append(items, fieldpath.FieldItem{
+				Key:         row.Key,
+				Value:       row.Value,
+				Path:        sec.Name + "." + row.Key,
+				IsNavigable: row.IsNavigable,
+				TargetType:  row.TargetType,
+				ColorTier:   row.Severity,
+				NavID:       row.NavID,
+			})
+		}
+	}
+	return items
+}
+
 // statusCheckStyle returns a lipgloss.Style appropriate for the given EC2 status check value.
 func statusCheckStyle(status string) lipgloss.Style {
 	switch status {
@@ -248,6 +304,8 @@ func (m DetailModel) renderFromFieldList() string {
 			// Render selected rows without nested foreground/underline styles so
 			// labels remain legible on selection background across themes.
 			switch {
+			case item.IsSection:
+				line = " " + item.Key // cursor on a section header: plain, no color (cursor skip is handled in detail.go)
 			case item.IsHeader:
 				line = " " + item.Key + ":"
 			case item.IsSubField:
@@ -272,6 +330,8 @@ func (m DetailModel) renderFromFieldList() string {
 			}
 		} else {
 			switch {
+			case item.IsSection:
+				line = " " + lipgloss.NewStyle().Bold(true).Render(item.Key)
 			case item.IsHeader:
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
@@ -300,7 +360,14 @@ func (m DetailModel) renderFromFieldList() string {
 			case item.IsNavigable:
 				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
 			default:
-				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.DetailVal.Render(item.Value)
+				label := styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW))
+				var value string
+				if item.ColorTier != "" {
+					value = styles.RowColorStyle(item.ColorTier).Render(item.Value)
+				} else {
+					value = styles.DetailVal.Render(item.Value)
+				}
+				line = " " + label + value
 			}
 		}
 		// Bug3 fix: apply background highlight to the cursor row (left focused only).

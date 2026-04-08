@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -18,6 +19,13 @@ func init() {
 		"notification_lambda",
 		"notification_sqs",
 		"notification_sns",
+	})
+
+	resource.RegisterFieldKeys("s3_objects", []string{
+		"key",
+		"size",
+		"last_modified",
+		"storage_class",
 	})
 
 	resource.RegisterPaginated("s3", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -47,6 +55,17 @@ func init() {
 			DisplayNameKey: "bucket",
 			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
 		}},
+		// RelatedContextFromIDs extracts the bucket name from related IDs encoded as
+		// "bucket|key". Used when navigating to s3_objects from the related panel
+		// (e.g., from a CloudTrail event detail view).
+		RelatedContextFromIDs: func(relatedIDs []string) map[string]string {
+			for _, id := range relatedIDs {
+				if parts := strings.SplitN(id, "|", 2); len(parts) == 2 && parts[0] != "" {
+					return map[string]string{"bucket": parts[0], "prefix": ""}
+				}
+			}
+			return map[string]string{"bucket": "", "prefix": ""}
+		},
 	})
 }
 

@@ -337,6 +337,12 @@ type FieldItem struct {
 	IndentLevel int    // 0 = top-level, 1 = sub-field
 	IsNavigable bool   // true when FieldPath matches a NavigableField
 	TargetType  string // non-empty when IsNavigable (e.g., "vpc")
+	IsSection   bool   // NEW (v2.1): true for ct-events top-level section headers (ACTOR/ACTION/TARGET/CONTEXT/...)
+	             // Used only by the ct-events detail view branch; inert for all other resource types.
+	ColorTier   string // NEW (v2.1): severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
+	             // Set only on the Event row in ACTION by ct-events. Empty string falls through to neutral DetailVal.
+	NavID       string // Navigation ID override — used by ct-events Principal rows where the display Value is the
+	             // full ARN but navigation needs the bare name. Inert when empty.
 }
 
 // ToSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
