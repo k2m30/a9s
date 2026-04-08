@@ -176,8 +176,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "Loading") {
-		// Some implementations may not show "Loading" text but should not crash
-		t.Logf("F.7: loading state may not show 'Loading' text, got: %s", plain[:min(200, len(plain))])
+		t.Errorf("F.7: loading state should show 'Loading' text, got: %s", plain[:min(200, len(plain))])
 	}
 
 	// Esc before resources arrive — should return to main menu

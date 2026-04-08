@@ -271,9 +271,13 @@ func TestBottomHints_Detail_PlainField_NoRelated(t *testing.T) {
 	m := views.NewDetail(res, "hints_test_no_related", nil, keys.Default())
 
 	hints := m.BottomHints()
-	wantKeys := []string{"y", "ctrl+r", "w"}
-	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
-		t.Errorf("Detail BottomHints keys = %v, want %v", got, wantKeys)
+	want := []layout.KeyHint{
+		{Key: "y", Desc: "YAML"},
+		{Key: "ctrl+r", Desc: "Refresh"},
+		{Key: "w", Desc: "Wrap"},
+	}
+	if !hintsEqual(hints, want) {
+		t.Errorf("Detail BottomHints = %v, want %v", hints, want)
 	}
 }
 
@@ -296,17 +300,14 @@ func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
 	m := views.NewDetail(res, "hints_test_with_related", nil, keys.Default())
 
 	hints := m.BottomHints()
-	wantKeys := []string{"y", "r", "ctrl+r", "w"}
-	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
-		t.Errorf("Detail BottomHints keys = %v, want %v", got, wantKeys)
+	want := []layout.KeyHint{
+		{Key: "y", Desc: "YAML"},
+		{Key: "r", Desc: "Related"},
+		{Key: "ctrl+r", Desc: "Refresh"},
+		{Key: "w", Desc: "Wrap"},
 	}
-	if !hasHint(hints, "r") {
-		t.Error("expected hint with key 'r' for Related")
-	}
-	for _, h := range hints {
-		if h.Key == "r" && h.Desc != "Related" {
-			t.Errorf("r hint Desc = %q, want %q", h.Desc, "Related")
-		}
+	if !hintsEqual(hints, want) {
+		t.Errorf("Detail BottomHints = %v, want %v", hints, want)
 	}
 }
 
