@@ -52,6 +52,91 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// Shared assertion helpers
+// ---------------------------------------------------------------------------
+
+// assertFirstPage verifies a successful first-page fetch.
+func assertFirstPage(t *testing.T, result resource.FetchResult, err error, wantToken string, wantIDs []string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if !result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=true")
+	}
+	if result.Pagination.NextToken != wantToken {
+		t.Errorf("NextToken: expected %q, got %q", wantToken, result.Pagination.NextToken)
+	}
+	if len(result.Resources) != len(wantIDs) {
+		t.Fatalf("expected %d resources, got %d", len(wantIDs), len(result.Resources))
+	}
+	for i, want := range wantIDs {
+		if result.Resources[i].ID != want {
+			t.Errorf("Resources[%d].ID: expected %q, got %q", i, want, result.Resources[i].ID)
+		}
+	}
+}
+
+// assertContinuation verifies a continuation fetch (second page, no more pages).
+func assertContinuation(t *testing.T, result resource.FetchResult, err error, wantIDs []string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=false")
+	}
+	if result.Pagination.NextToken != "" {
+		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
+	}
+	if len(result.Resources) != len(wantIDs) {
+		t.Fatalf("expected %d resources, got %d", len(wantIDs), len(result.Resources))
+	}
+	for i, want := range wantIDs {
+		if result.Resources[i].ID != want {
+			t.Errorf("Resources[%d].ID: expected %q, got %q", i, want, result.Resources[i].ID)
+		}
+	}
+}
+
+// assertEmpty verifies an empty-response fetch.
+func assertEmpty(t *testing.T, result resource.FetchResult, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Pagination == nil {
+		t.Fatal("expected Pagination, got nil")
+	}
+	if result.Pagination.IsTruncated {
+		t.Error("expected IsTruncated=false")
+	}
+	if result.Pagination.NextToken != "" {
+		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
+	}
+}
+
+// assertErrorPropagated verifies the mock error is returned up from the fetcher.
+func assertErrorPropagated(t *testing.T, err error, want error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, want) {
+		t.Errorf("expected error %v, got %v", want, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Mock: S3 ListObjectsV2
 // ---------------------------------------------------------------------------
 
@@ -77,24 +162,7 @@ func TestQA_ChildPagination_FetchS3Objects_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchS3Objects(context.Background(), mock, "my-app-bucket", "", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "cont-token-page-2" {
-		t.Errorf("NextToken: expected %q, got %q", "cont-token-page-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "reports/jan.csv" {
-		t.Errorf("resource ID: expected %q, got %q", "reports/jan.csv", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "cont-token-page-2", []string{"reports/jan.csv"})
 }
 
 func TestQA_ChildPagination_FetchS3Objects_Continuation(t *testing.T) {
@@ -108,18 +176,7 @@ func TestQA_ChildPagination_FetchS3Objects_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchS3Objects(context.Background(), mock, "my-app-bucket", "", "cont-token-page-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"reports/feb.csv"})
 }
 
 func TestQA_ChildPagination_FetchS3Objects_Empty(t *testing.T) {
@@ -130,30 +187,18 @@ func TestQA_ChildPagination_FetchS3Objects_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchS3Objects(context.Background(), mock, "empty-bucket", "", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchS3Objects_Error(t *testing.T) {
+	wantErr := errors.New("list objects failed")
 	mock := &mockS3ListObjectsV2APIChildPaginated{
 		PageFunc: func(_ int) (*s3.ListObjectsV2Output, error) {
-			return nil, errors.New("list objects failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchS3Objects(context.Background(), mock, "my-app-bucket", "", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -180,24 +225,7 @@ func TestQA_ChildPagination_FetchLogStreams_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "stream-alpha" {
-		t.Errorf("resource ID: expected %q, got %q", "stream-alpha", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "next-token-2", []string{"stream-alpha"})
 }
 
 func TestQA_ChildPagination_FetchLogStreams_Continuation(t *testing.T) {
@@ -210,18 +238,7 @@ func TestQA_ChildPagination_FetchLogStreams_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"stream-beta"})
 }
 
 func TestQA_ChildPagination_FetchLogStreams_Empty(t *testing.T) {
@@ -231,27 +248,18 @@ func TestQA_ChildPagination_FetchLogStreams_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchLogStreams_Error(t *testing.T) {
+	wantErr := errors.New("describe log streams failed")
 	mock := &mockCWLogsDescribeLogStreamsAPIChildPaginated{
 		PageFunc: func(_ int) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
-			return nil, errors.New("describe log streams failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -281,24 +289,7 @@ func TestQA_ChildPagination_FetchCfnEvents_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnEvents(context.Background(), mock, "my-stack", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "cfn-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "cfn-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "evt-001" {
-		t.Errorf("resource ID: expected %q, got %q", "evt-001", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "cfn-next-token-2", []string{"evt-001"})
 }
 
 func TestQA_ChildPagination_FetchCfnEvents_Continuation(t *testing.T) {
@@ -314,18 +305,7 @@ func TestQA_ChildPagination_FetchCfnEvents_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnEvents(context.Background(), mock, "my-stack", "cfn-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"evt-002"})
 }
 
 func TestQA_ChildPagination_FetchCfnEvents_Empty(t *testing.T) {
@@ -335,27 +315,18 @@ func TestQA_ChildPagination_FetchCfnEvents_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnEvents(context.Background(), mock, "my-stack", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchCfnEvents_Error(t *testing.T) {
+	wantErr := errors.New("describe stack events failed")
 	mock := &mockCFNDescribeStackEventsAPIChildPaginated{
 		PageFunc: func(_ int) (*cloudformation.DescribeStackEventsOutput, error) {
-			return nil, errors.New("describe stack events failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchCfnEvents(context.Background(), mock, "my-stack", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -390,24 +361,7 @@ func TestQA_ChildPagination_FetchCfnResources_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnResources(context.Background(), mock, "my-stack", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "cfn-res-next-2" {
-		t.Errorf("NextToken: expected %q, got %q", "cfn-res-next-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "MyBucket" {
-		t.Errorf("resource ID: expected %q, got %q", "MyBucket", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "cfn-res-next-2", []string{"MyBucket"})
 }
 
 func TestQA_ChildPagination_FetchCfnResources_Continuation(t *testing.T) {
@@ -428,18 +382,7 @@ func TestQA_ChildPagination_FetchCfnResources_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnResources(context.Background(), mock, "my-stack", "cfn-res-next-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"MyQueue"})
 }
 
 func TestQA_ChildPagination_FetchCfnResources_Empty(t *testing.T) {
@@ -449,27 +392,18 @@ func TestQA_ChildPagination_FetchCfnResources_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchCfnResources(context.Background(), mock, "my-stack", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchCfnResources_Error(t *testing.T) {
+	wantErr := errors.New("list stack resources failed")
 	mock := &mockCFNListStackResourcesAPIChildPaginated{
 		PageFunc: func(_ int) (*cloudformation.ListStackResourcesOutput, error) {
-			return nil, errors.New("list stack resources failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchCfnResources(context.Background(), mock, "my-stack", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -500,18 +434,7 @@ func TestQA_ChildPagination_FetchR53Records_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchR53Records(context.Background(), mock, "Z1234567890ABC", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
+	assertFirstPage(t, result, err, `{"n":"www.example.com.","t":"A"}`, []string{"api.example.com.|A"})
 }
 
 func TestQA_ChildPagination_FetchR53Records_Continuation(t *testing.T) {
@@ -528,15 +451,7 @@ func TestQA_ChildPagination_FetchR53Records_Continuation(t *testing.T) {
 	// Pass a JSON continuation token as the function expects
 	token := `{"n":"www.example.com.","t":"A"}`
 	result, err := awsclient.FetchR53Records(context.Background(), mock, "Z1234567890ABC", token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertContinuation(t, result, err, []string{"www.example.com.|A"})
 }
 
 func TestQA_ChildPagination_FetchR53Records_Empty(t *testing.T) {
@@ -549,27 +464,18 @@ func TestQA_ChildPagination_FetchR53Records_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchR53Records(context.Background(), mock, "Z1234567890ABC", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchR53Records_Error(t *testing.T) {
+	wantErr := errors.New("list resource record sets failed")
 	mock := &mockRoute53ListResourceRecordSetsAPIChildPaginated{
 		PageFunc: func(_ int) (*route53.ListResourceRecordSetsOutput, error) {
-			return nil, errors.New("list resource record sets failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchR53Records(context.Background(), mock, "Z1234567890ABC", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -600,24 +506,7 @@ func TestQA_ChildPagination_FetchECRImages_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"repository_name": "my-app-repo", "repository_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"}
 	result, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "ecr-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "ecr-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "sha256:abcdef123456" {
-		t.Errorf("resource ID: expected %q, got %q", "sha256:abcdef123456", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "ecr-next-token-2", []string{"sha256:abcdef123456"})
 }
 
 func TestQA_ChildPagination_FetchECRImages_Continuation(t *testing.T) {
@@ -634,18 +523,7 @@ func TestQA_ChildPagination_FetchECRImages_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"repository_name": "my-app-repo", "repository_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"}
 	result, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "ecr-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"sha256:fedcba654321"})
 }
 
 func TestQA_ChildPagination_FetchECRImages_Empty(t *testing.T) {
@@ -656,28 +534,19 @@ func TestQA_ChildPagination_FetchECRImages_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"repository_name": "my-app-repo", "repository_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"}
 	result, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchECRImages_Error(t *testing.T) {
+	wantErr := errors.New("describe images failed")
 	mock := &mockECRDescribeImagesAPIChildPaginated{
 		PageFunc: func(_ int) (*ecr.DescribeImagesOutput, error) {
-			return nil, errors.New("describe images failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"repository_name": "my-app-repo", "repository_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"}
 	_, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -788,21 +657,14 @@ func TestQA_ChildPagination_FetchRolePolicies_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"role_name": "empty-role"}
 	result, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchRolePolicies_Error(t *testing.T) {
+	wantErr := errors.New("list attached role policies failed")
 	attachedMock := &mockIAMListAttachedRolePoliciesAPIChildPaginated{
 		PageFunc: func(_ int) (*iam.ListAttachedRolePoliciesOutput, error) {
-			return nil, errors.New("list attached role policies failed")
+			return nil, wantErr
 		},
 	}
 	inlineMock := &mockIAMListRolePoliciesAPIChildPaginated{
@@ -812,9 +674,7 @@ func TestQA_ChildPagination_FetchRolePolicies_Error(t *testing.T) {
 	}
 	parentCtx := map[string]string{"role_name": "my-app-role"}
 	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -870,24 +730,7 @@ func TestQA_ChildPagination_FetchCBBuilds_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"project_name": "my-project"}
 	result, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "cb-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "cb-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "my-project:build-001" {
-		t.Errorf("resource ID: expected %q, got %q", "my-project:build-001", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "cb-next-token-2", []string{"my-project:build-001"})
 }
 
 func TestQA_ChildPagination_FetchCBBuilds_Continuation(t *testing.T) {
@@ -919,18 +762,7 @@ func TestQA_ChildPagination_FetchCBBuilds_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"project_name": "my-project"}
 	result, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "cb-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"my-project:build-002"})
 }
 
 func TestQA_ChildPagination_FetchCBBuilds_Empty(t *testing.T) {
@@ -946,21 +778,14 @@ func TestQA_ChildPagination_FetchCBBuilds_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"project_name": "my-project"}
 	result, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchCBBuilds_Error(t *testing.T) {
+	wantErr := errors.New("list builds for project failed")
 	listMock := &mockCodeBuildListBuildsForProjectAPIChildPaginated{
 		PageFunc: func(_ int) (*codebuild.ListBuildsForProjectOutput, error) {
-			return nil, errors.New("list builds for project failed")
+			return nil, wantErr
 		},
 	}
 	batchMock := &mockCodeBuildBatchGetBuildsAPIChildPaginated{
@@ -970,9 +795,7 @@ func TestQA_ChildPagination_FetchCBBuilds_Error(t *testing.T) {
 	}
 	parentCtx := map[string]string{"project_name": "my-project"}
 	_, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1003,21 +826,7 @@ func TestQA_ChildPagination_FetchAlarmHistory_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	result, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "cw-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "cw-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
+	assertFirstPage(t, result, err, "cw-next-token-2", []string{"2025-03-15 10:00"})
 }
 
 func TestQA_ChildPagination_FetchAlarmHistory_Continuation(t *testing.T) {
@@ -1034,18 +843,7 @@ func TestQA_ChildPagination_FetchAlarmHistory_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	result, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "cw-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"2025-03-16 10:00"})
 }
 
 func TestQA_ChildPagination_FetchAlarmHistory_Empty(t *testing.T) {
@@ -1056,28 +854,19 @@ func TestQA_ChildPagination_FetchAlarmHistory_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	result, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchAlarmHistory_Error(t *testing.T) {
+	wantErr := errors.New("describe alarm history failed")
 	mock := &mockCloudWatchDescribeAlarmHistoryAPIChildPaginated{
 		PageFunc: func(_ int) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
-			return nil, errors.New("describe alarm history failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	_, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1107,21 +896,7 @@ func TestQA_ChildPagination_FetchRDSEvents_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "rds-marker-2" {
-		t.Errorf("NextToken: expected %q, got %q", "rds-marker-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
+	assertFirstPage(t, result, err, "rds-marker-2", []string{"2025-03-10 14:00/my-db"})
 }
 
 func TestQA_ChildPagination_FetchRDSEvents_Continuation(t *testing.T) {
@@ -1137,18 +912,7 @@ func TestQA_ChildPagination_FetchRDSEvents_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "rds-marker-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"2025-03-11 14:00/my-db"})
 }
 
 func TestQA_ChildPagination_FetchRDSEvents_Empty(t *testing.T) {
@@ -1158,27 +922,18 @@ func TestQA_ChildPagination_FetchRDSEvents_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchRDSEvents_Error(t *testing.T) {
+	wantErr := errors.New("describe events failed")
 	mock := &mockRDSDescribeEventsAPIChildPaginated{
 		PageFunc: func(_ int) (*rds.DescribeEventsOutput, error) {
-			return nil, errors.New("describe events failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1239,18 +994,7 @@ func TestQA_ChildPagination_FetchSNSTopicSubscriptions_Continuation(t *testing.T
 		},
 	}
 	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:111122223333:alerts", "sns-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"arn:aws:sns:us-east-1:111122223333:alerts:sub-002"})
 }
 
 func TestQA_ChildPagination_FetchSNSTopicSubscriptions_Empty(t *testing.T) {
@@ -1260,27 +1004,18 @@ func TestQA_ChildPagination_FetchSNSTopicSubscriptions_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:111122223333:alerts", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchSNSTopicSubscriptions_Error(t *testing.T) {
+	wantErr := errors.New("list subscriptions by topic failed")
 	mock := &mockSNSListSubscriptionsByTopicAPIChildPaginated{
 		PageFunc: func(_ int) (*sns.ListSubscriptionsByTopicOutput, error) {
-			return nil, errors.New("list subscriptions by topic failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:111122223333:alerts", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1311,24 +1046,7 @@ func TestQA_ChildPagination_FetchAsgActivities_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"asg_name": "my-web-asg"}
 	result, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "asg-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "asg-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "act-001" {
-		t.Errorf("resource ID: expected %q, got %q", "act-001", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "asg-next-token-2", []string{"act-001"})
 }
 
 func TestQA_ChildPagination_FetchAsgActivities_Continuation(t *testing.T) {
@@ -1345,18 +1063,7 @@ func TestQA_ChildPagination_FetchAsgActivities_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"asg_name": "my-web-asg"}
 	result, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "asg-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"act-002"})
 }
 
 func TestQA_ChildPagination_FetchAsgActivities_Empty(t *testing.T) {
@@ -1367,28 +1074,19 @@ func TestQA_ChildPagination_FetchAsgActivities_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"asg_name": "my-web-asg"}
 	result, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchAsgActivities_Error(t *testing.T) {
+	wantErr := errors.New("describe scaling activities failed")
 	mock := &mockASGDescribeScalingActivitiesAPIChildPaginated{
 		PageFunc: func(_ int) (*autoscaling.DescribeScalingActivitiesOutput, error) {
-			return nil, errors.New("describe scaling activities failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"asg_name": "my-web-asg"}
 	_, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1419,24 +1117,7 @@ func TestQA_ChildPagination_FetchSFNExecutions_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"state_machine_arn": "arn:aws:states:us-east-1:111122223333:stateMachine:my-sm"}
 	result, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "sfn-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "sfn-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "exec-001" {
-		t.Errorf("resource ID: expected %q, got %q", "exec-001", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "sfn-next-token-2", []string{"exec-001"})
 }
 
 func TestQA_ChildPagination_FetchSFNExecutions_Continuation(t *testing.T) {
@@ -1453,18 +1134,7 @@ func TestQA_ChildPagination_FetchSFNExecutions_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"state_machine_arn": "arn:aws:states:us-east-1:111122223333:stateMachine:my-sm"}
 	result, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "sfn-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"exec-002"})
 }
 
 func TestQA_ChildPagination_FetchSFNExecutions_Empty(t *testing.T) {
@@ -1475,28 +1145,19 @@ func TestQA_ChildPagination_FetchSFNExecutions_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"state_machine_arn": "arn:aws:states:us-east-1:111122223333:stateMachine:my-sm"}
 	result, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchSFNExecutions_Error(t *testing.T) {
+	wantErr := errors.New("list executions failed")
 	mock := &mockSFNListExecutionsAPIChildPaginated{
 		PageFunc: func(_ int) (*sfn.ListExecutionsOutput, error) {
-			return nil, errors.New("list executions failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"state_machine_arn": "arn:aws:states:us-east-1:111122223333:stateMachine:my-sm"}
 	_, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1527,24 +1188,7 @@ func TestQA_ChildPagination_FetchSFNExecutionHistory_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"execution_arn": "arn:aws:states:us-east-1:111122223333:execution:my-sm:exec-001"}
 	result, err := awsclient.FetchSFNExecutionHistory(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "sfn-hist-next-2" {
-		t.Errorf("NextToken: expected %q, got %q", "sfn-hist-next-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "1" {
-		t.Errorf("resource ID: expected %q, got %q", "1", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "sfn-hist-next-2", []string{"1"})
 }
 
 func TestQA_ChildPagination_FetchSFNExecutionHistory_Continuation(t *testing.T) {
@@ -1561,18 +1205,7 @@ func TestQA_ChildPagination_FetchSFNExecutionHistory_Continuation(t *testing.T) 
 	}
 	parentCtx := map[string]string{"execution_arn": "arn:aws:states:us-east-1:111122223333:execution:my-sm:exec-001"}
 	result, err := awsclient.FetchSFNExecutionHistory(context.Background(), mock, parentCtx, "sfn-hist-next-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"2"})
 }
 
 func TestQA_ChildPagination_FetchSFNExecutionHistory_Empty(t *testing.T) {
@@ -1583,28 +1216,19 @@ func TestQA_ChildPagination_FetchSFNExecutionHistory_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"execution_arn": "arn:aws:states:us-east-1:111122223333:execution:my-sm:exec-001"}
 	result, err := awsclient.FetchSFNExecutionHistory(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchSFNExecutionHistory_Error(t *testing.T) {
+	wantErr := errors.New("get execution history failed")
 	mock := &mockSFNGetExecutionHistoryAPIChildPaginated{
 		PageFunc: func(_ int) (*sfn.GetExecutionHistoryOutput, error) {
-			return nil, errors.New("get execution history failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"execution_arn": "arn:aws:states:us-east-1:111122223333:execution:my-sm:exec-001"}
 	_, err := awsclient.FetchSFNExecutionHistory(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1634,24 +1258,7 @@ func TestQA_ChildPagination_FetchGlueJobRuns_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "my-etl-job", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "glue-next-token-2" {
-		t.Errorf("NextToken: expected %q, got %q", "glue-next-token-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	if result.Resources[0].ID != "jr-abcdef12" {
-		t.Errorf("resource ID: expected %q, got %q", "jr-abcdef12", result.Resources[0].ID)
-	}
+	assertFirstPage(t, result, err, "glue-next-token-2", []string{"jr-abcdef12"})
 }
 
 func TestQA_ChildPagination_FetchGlueJobRuns_Continuation(t *testing.T) {
@@ -1667,18 +1274,7 @@ func TestQA_ChildPagination_FetchGlueJobRuns_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "my-etl-job", "glue-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"jr-fedcba98"})
 }
 
 func TestQA_ChildPagination_FetchGlueJobRuns_Empty(t *testing.T) {
@@ -1688,27 +1284,18 @@ func TestQA_ChildPagination_FetchGlueJobRuns_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "my-etl-job", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchGlueJobRuns_Error(t *testing.T) {
+	wantErr := errors.New("get job runs failed")
 	mock := &mockGlueGetJobRunsAPIChildPaginated{
 		PageFunc: func(_ int) (*glue.GetJobRunsOutput, error) {
-			return nil, errors.New("get job runs failed")
+			return nil, wantErr
 		},
 	}
 	_, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "my-etl-job", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1771,18 +1358,7 @@ func TestQA_ChildPagination_FetchIAMGroupMembers_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"group_name": "dev-team"}
 	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "iam-marker-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"bob"})
 }
 
 func TestQA_ChildPagination_FetchIAMGroupMembers_Empty(t *testing.T) {
@@ -1798,28 +1374,19 @@ func TestQA_ChildPagination_FetchIAMGroupMembers_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"group_name": "empty-group"}
 	result, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchIAMGroupMembers_Error(t *testing.T) {
+	wantErr := errors.New("get group failed")
 	mock := &mockIAMGetGroupAPIChildPaginated{
 		PageFunc: func(_ int) (*iam.GetGroupOutput, error) {
-			return nil, errors.New("get group failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"group_name": "dev-team"}
 	_, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1850,21 +1417,7 @@ func TestQA_ChildPagination_FetchELBListeners_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/abc"}
 	result, err := awsclient.FetchELBListeners(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true")
-	}
-	if result.Pagination.NextToken != "elb-next-marker-2" {
-		t.Errorf("NextToken: expected %q, got %q", "elb-next-marker-2", result.Pagination.NextToken)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
+	assertFirstPage(t, result, err, "elb-next-marker-2", []string{"arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"})
 }
 
 func TestQA_ChildPagination_FetchELBListeners_Continuation(t *testing.T) {
@@ -1881,18 +1434,7 @@ func TestQA_ChildPagination_FetchELBListeners_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/abc"}
 	result, err := awsclient.FetchELBListeners(context.Background(), mock, parentCtx, "elb-next-marker-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/ghi"})
 }
 
 func TestQA_ChildPagination_FetchELBListeners_Empty(t *testing.T) {
@@ -1903,28 +1445,19 @@ func TestQA_ChildPagination_FetchELBListeners_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/abc"}
 	result, err := awsclient.FetchELBListeners(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchELBListeners_Error(t *testing.T) {
+	wantErr := errors.New("describe listeners failed")
 	mock := &mockELBv2DescribeListenersAPIChildPaginated{
 		PageFunc: func(_ int) (*elbv2.DescribeListenersOutput, error) {
-			return nil, errors.New("describe listeners failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/abc"}
 	_, err := awsclient.FetchELBListeners(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -1986,15 +1519,7 @@ func TestQA_ChildPagination_FetchELBListenerRules_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
 	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, parentCtx, "some-ignored-token")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertContinuation(t, result, err, []string{"arn:aws:elasticloadbalancing:us-east-1:111122223333:listener-rule/app/my-alb/abc/def/default"})
 }
 
 func TestQA_ChildPagination_FetchELBListenerRules_Empty(t *testing.T) {
@@ -2005,28 +1530,19 @@ func TestQA_ChildPagination_FetchELBListenerRules_Empty(t *testing.T) {
 	}
 	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
 	result, err := awsclient.FetchELBListenerRules(context.Background(), mock, parentCtx, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchELBListenerRules_Error(t *testing.T) {
+	wantErr := errors.New("describe rules failed")
 	mock := &mockELBv2DescribeRulesAPIChildPaginated{
 		PageFunc: func(_ int) (*elbv2.DescribeRulesOutput, error) {
-			return nil, errors.New("describe rules failed")
+			return nil, wantErr
 		},
 	}
 	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
 	_, err := awsclient.FetchELBListenerRules(context.Background(), mock, parentCtx, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // ---------------------------------------------------------------------------
@@ -2116,18 +1632,7 @@ func TestQA_ChildPagination_FetchEcsSvcTasks_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "ecs-next-token-2")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result.Pagination == nil {
-		t.Fatal("expected Pagination, got nil")
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
-	if result.Pagination.NextToken != "" {
-		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
-	}
+	assertContinuation(t, result, err, []string{"taskid002"})
 }
 
 func TestQA_ChildPagination_FetchEcsSvcTasks_Empty(t *testing.T) {
@@ -2142,21 +1647,14 @@ func TestQA_ChildPagination_FetchEcsSvcTasks_Empty(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(result.Resources))
-	}
-	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false")
-	}
+	assertEmpty(t, result, err)
 }
 
 func TestQA_ChildPagination_FetchEcsSvcTasks_Error(t *testing.T) {
+	wantErr := errors.New("list tasks failed")
 	listMock := &mockECSListTasksAPIChildPaginated{
 		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
-			return nil, errors.New("list tasks failed")
+			return nil, wantErr
 		},
 	}
 	describeMock := &mockECSDescribeTasksAPIChildPaginated{
@@ -2165,9 +1663,7 @@ func TestQA_ChildPagination_FetchEcsSvcTasks_Error(t *testing.T) {
 		},
 	}
 	_, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "my-cluster", "my-svc", "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assertErrorPropagated(t, err, wantErr)
 }
 
 // Ensure resource package import is used (type check only).

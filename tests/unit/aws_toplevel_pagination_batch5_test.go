@@ -22,6 +22,7 @@ import (
 // results, controlled by NextToken.
 type mockPaginatedECSListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
+	inputs  []*ecs.ListClustersInput
 	callIdx int
 }
 
@@ -30,6 +31,7 @@ func (m *mockPaginatedECSListClustersClient) ListClusters(
 	params *ecs.ListClustersInput,
 	optFns ...func(*ecs.Options),
 ) (*ecs.ListClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.callIdx >= len(m.outputs) {
 		return &ecs.ListClustersOutput{}, nil
 	}
@@ -128,6 +130,15 @@ func TestFetchECSClusters_Pagination(t *testing.T) {
 			t.Errorf("expected ListClusters called 2 times, got %d", listMock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(listMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 ListClusters inputs captured, got %d", len(listMock.inputs))
+		}
+		if listMock.inputs[1].NextToken == nil || *listMock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -140,6 +151,7 @@ func TestFetchECSClusters_Pagination(t *testing.T) {
 // for the ECS Services fetcher.
 type mockPaginatedECSSvcListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
+	inputs  []*ecs.ListClustersInput
 	callIdx int
 }
 
@@ -148,6 +160,7 @@ func (m *mockPaginatedECSSvcListClustersClient) ListClusters(
 	params *ecs.ListClustersInput,
 	optFns ...func(*ecs.Options),
 ) (*ecs.ListClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.callIdx >= len(m.outputs) {
 		return &ecs.ListClustersOutput{}, nil
 	}
@@ -288,6 +301,15 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 			t.Errorf("expected DescribeServices called 2 times (once per cluster), got %d", describeServicesMock.callCount)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(listClustersMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 ListClusters inputs captured, got %d", len(listClustersMock.inputs))
+		}
+		if listClustersMock.inputs[1].NextToken == nil || *listClustersMock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listClustersMock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -300,6 +322,7 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 // for the ECS Tasks fetcher.
 type mockPaginatedECSTaskListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
+	inputs  []*ecs.ListClustersInput
 	callIdx int
 }
 
@@ -308,6 +331,7 @@ func (m *mockPaginatedECSTaskListClustersClient) ListClusters(
 	params *ecs.ListClustersInput,
 	optFns ...func(*ecs.Options),
 ) (*ecs.ListClustersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.callIdx >= len(m.outputs) {
 		return &ecs.ListClustersOutput{}, nil
 	}
@@ -448,6 +472,15 @@ func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 			t.Errorf("expected DescribeTasks called 2 times (once per cluster), got %d", describeTasksMock.callCount)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(listClustersMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 ListClusters inputs captured, got %d", len(listClustersMock.inputs))
+		}
+		if listClustersMock.inputs[1].NextToken == nil || *listClustersMock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listClustersMock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -458,6 +491,7 @@ func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 // mockPaginatedKinesisClient returns multiple pages of ListStreams results.
 type mockPaginatedKinesisClient struct {
 	outputs []*kinesis.ListStreamsOutput
+	inputs  []*kinesis.ListStreamsInput
 	callIdx int
 }
 
@@ -466,6 +500,7 @@ func (m *mockPaginatedKinesisClient) ListStreams(
 	params *kinesis.ListStreamsInput,
 	optFns ...func(*kinesis.Options),
 ) (*kinesis.ListStreamsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.callIdx >= len(m.outputs) {
 		return &kinesis.ListStreamsOutput{
 			HasMoreStreams: aws.Bool(false),
@@ -552,6 +587,15 @@ func TestFetchKinesisStreams_Pagination(t *testing.T) {
 	t.Run("api_called_twice", func(t *testing.T) {
 		if mock.callIdx != 2 {
 			t.Errorf("expected ListStreams called 2 times, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
 		}
 	})
 }

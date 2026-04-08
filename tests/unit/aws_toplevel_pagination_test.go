@@ -33,6 +33,7 @@ import (
 
 type mockEC2PaginatedClient struct {
 	outputs []*ec2.DescribeInstancesOutput
+	inputs  []*ec2.DescribeInstancesInput
 	err     error
 	callIdx int
 }
@@ -42,6 +43,7 @@ func (m *mockEC2PaginatedClient) DescribeInstances(
 	params *ec2.DescribeInstancesInput,
 	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeInstancesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -133,6 +135,15 @@ func TestFetchEC2Instances_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +152,7 @@ func TestFetchEC2Instances_Pagination(t *testing.T) {
 
 type mockLambdaPaginatedClient struct {
 	outputs []*lambda.ListFunctionsOutput
+	inputs  []*lambda.ListFunctionsInput
 	err     error
 	callIdx int
 }
@@ -150,6 +162,7 @@ func (m *mockLambdaPaginatedClient) ListFunctions(
 	params *lambda.ListFunctionsInput,
 	optFns ...func(*lambda.Options),
 ) (*lambda.ListFunctionsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -231,6 +244,15 @@ func TestFetchLambdaFunctions_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +261,7 @@ func TestFetchLambdaFunctions_Pagination(t *testing.T) {
 
 type mockRDSPaginatedClient struct {
 	outputs []*rds.DescribeDBInstancesOutput
+	inputs  []*rds.DescribeDBInstancesInput
 	err     error
 	callIdx int
 }
@@ -248,6 +271,7 @@ func (m *mockRDSPaginatedClient) DescribeDBInstances(
 	params *rds.DescribeDBInstancesInput,
 	optFns ...func(*rds.Options),
 ) (*rds.DescribeDBInstancesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -326,6 +350,15 @@ func TestFetchRDSInstances_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -334,6 +367,7 @@ func TestFetchRDSInstances_Pagination(t *testing.T) {
 
 type mockIAMListRolesPaginatedClient struct {
 	outputs []*iam.ListRolesOutput
+	inputs  []*iam.ListRolesInput
 	err     error
 	callIdx int
 }
@@ -343,6 +377,7 @@ func (m *mockIAMListRolesPaginatedClient) ListRoles(
 	params *iam.ListRolesInput,
 	optFns ...func(*iam.Options),
 ) (*iam.ListRolesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -405,6 +440,15 @@ func TestFetchIAMRoles_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -413,6 +457,7 @@ func TestFetchIAMRoles_Pagination(t *testing.T) {
 
 type mockIAMListUsersPaginatedClient struct {
 	outputs []*iam.ListUsersOutput
+	inputs  []*iam.ListUsersInput
 	err     error
 	callIdx int
 }
@@ -422,6 +467,7 @@ func (m *mockIAMListUsersPaginatedClient) ListUsers(
 	params *iam.ListUsersInput,
 	optFns ...func(*iam.Options),
 ) (*iam.ListUsersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -484,6 +530,15 @@ func TestFetchIAMUsers_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -492,6 +547,7 @@ func TestFetchIAMUsers_Pagination(t *testing.T) {
 
 type mockIAMListPoliciesPaginatedClient struct {
 	outputs []*iam.ListPoliciesOutput
+	inputs  []*iam.ListPoliciesInput
 	err     error
 	callIdx int
 }
@@ -501,6 +557,7 @@ func (m *mockIAMListPoliciesPaginatedClient) ListPolicies(
 	params *iam.ListPoliciesInput,
 	optFns ...func(*iam.Options),
 ) (*iam.ListPoliciesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -559,6 +616,15 @@ func TestFetchIAMPolicies_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -567,6 +633,7 @@ func TestFetchIAMPolicies_Pagination(t *testing.T) {
 
 type mockCWLogsPaginatedClient struct {
 	outputs []*cloudwatchlogs.DescribeLogGroupsOutput
+	inputs  []*cloudwatchlogs.DescribeLogGroupsInput
 	err     error
 	callIdx int
 }
@@ -576,6 +643,7 @@ func (m *mockCWLogsPaginatedClient) DescribeLogGroups(
 	params *cloudwatchlogs.DescribeLogGroupsInput,
 	optFns ...func(*cloudwatchlogs.Options),
 ) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -636,6 +704,15 @@ func TestFetchCloudWatchLogGroups_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -644,6 +721,7 @@ func TestFetchCloudWatchLogGroups_Pagination(t *testing.T) {
 
 type mockDDBListTablesPaginatedClient struct {
 	outputs []*dynamodb.ListTablesOutput
+	inputs  []*dynamodb.ListTablesInput
 	err     error
 	callIdx int
 }
@@ -653,6 +731,7 @@ func (m *mockDDBListTablesPaginatedClient) ListTables(
 	params *dynamodb.ListTablesInput,
 	optFns ...func(*dynamodb.Options),
 ) (*dynamodb.ListTablesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -734,6 +813,15 @@ func TestFetchDynamoDBTables_Pagination(t *testing.T) {
 			t.Errorf("expected 2 ListTables API calls, got %d", listMock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_exclusive_start_table", func(t *testing.T) {
+		if len(listMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(listMock.inputs))
+		}
+		if listMock.inputs[1].ExclusiveStartTableName == nil || *listMock.inputs[1].ExclusiveStartTableName != "page1-table-2" {
+			t.Errorf("ExclusiveStartTableName not forwarded to page 2: got %v, want %q", listMock.inputs[1].ExclusiveStartTableName, "page1-table-2")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -742,6 +830,7 @@ func TestFetchDynamoDBTables_Pagination(t *testing.T) {
 
 type mockSQSListQueuesPaginatedClient struct {
 	outputs []*sqs.ListQueuesOutput
+	inputs  []*sqs.ListQueuesInput
 	err     error
 	callIdx int
 }
@@ -751,6 +840,7 @@ func (m *mockSQSListQueuesPaginatedClient) ListQueues(
 	params *sqs.ListQueuesInput,
 	optFns ...func(*sqs.Options),
 ) (*sqs.ListQueuesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -837,6 +927,15 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 			t.Errorf("expected 2 ListQueues API calls, got %d", listMock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(listMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(listMock.inputs))
+		}
+		if listMock.inputs[1].NextToken == nil || *listMock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -845,6 +944,7 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 
 type mockSNSPaginatedClient struct {
 	outputs []*sns.ListTopicsOutput
+	inputs  []*sns.ListTopicsInput
 	err     error
 	callIdx int
 }
@@ -854,6 +954,7 @@ func (m *mockSNSPaginatedClient) ListTopics(
 	params *sns.ListTopicsInput,
 	optFns ...func(*sns.Options),
 ) (*sns.ListTopicsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -914,6 +1015,15 @@ func TestFetchSNSTopics_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -922,6 +1032,7 @@ func TestFetchSNSTopics_Pagination(t *testing.T) {
 
 type mockKMSListKeysPaginatedClient struct {
 	outputs []*kms.ListKeysOutput
+	inputs  []*kms.ListKeysInput
 	err     error
 	callIdx int
 }
@@ -931,6 +1042,7 @@ func (m *mockKMSListKeysPaginatedClient) ListKeys(
 	params *kms.ListKeysInput,
 	optFns ...func(*kms.Options),
 ) (*kms.ListKeysOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -1058,6 +1170,15 @@ func TestFetchKMSKeys_Pagination(t *testing.T) {
 	t.Run("list_aliases_called_twice", func(t *testing.T) {
 		if listAliasesMock.callIdx != 2 {
 			t.Errorf("expected 2 ListAliases API calls, got %d", listAliasesMock.callIdx)
+		}
+	})
+
+	t.Run("keys_page2_received_marker", func(t *testing.T) {
+		if len(listKeysMock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(listKeysMock.inputs))
+		}
+		if listKeysMock.inputs[1].Marker == nil || *listKeysMock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", listKeysMock.inputs[1].Marker, "page2-marker")
 		}
 	})
 }

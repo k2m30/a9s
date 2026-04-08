@@ -88,7 +88,7 @@ func TestQa67_H5_ResizeFromBelowToAboveMinimum_RestoresUI(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 24})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "narrow") {
-		t.Logf("H.5: pre-condition: expected 'narrow' at width=50, got: %s", plain[:min(150, len(plain))])
+		t.Errorf("H.5: pre-condition: expected 'narrow' at width=50, got: %s", plain[:min(150, len(plain))])
 	}
 
 	// Resize to above minimum
@@ -111,7 +111,7 @@ func TestQa67_H6_ResizeFromAboveToBelowMinimum_ShowsError(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	plain := stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "narrow") {
-		t.Logf("H.6: pre-condition: unexpected 'narrow' at width=120")
+		t.Errorf("H.6: pre-condition: unexpected 'narrow' at width=120, got: %s", plain[:min(150, len(plain))])
 	}
 
 	// Resize to below minimum
@@ -152,6 +152,10 @@ func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("H.7: detail view should not be empty after resize")
+	}
+	plain := stripANSI(out)
+	if !strings.Contains(plain, "resize-test-instance") {
+		t.Errorf("H.7: detail view should show resource name 'resize-test-instance' after resize, got: %s", plain[:min(300, len(plain))])
 	}
 }
 
@@ -196,6 +200,10 @@ func TestQa67_H9_ResizeDuringHelpScreen_NoCrash(t *testing.T) {
 	if out == "" {
 		t.Error("H.9: help view should not be empty after resize")
 	}
+	plain := stripANSI(out)
+	if !strings.Contains(plain, "NAVIGATION") {
+		t.Errorf("H.9: help view should show 'NAVIGATION' section after resize, got: %s", plain[:min(300, len(plain))])
+	}
 }
 
 // H.10 — Resize during child view re-renders without crash.
@@ -238,6 +246,10 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("H.10: child view should not be empty after resize")
+	}
+	plain := stripANSI(out)
+	if !strings.Contains(plain, "resize-bucket") {
+		t.Errorf("H.10: child view should show bucket name 'resize-bucket' after resize, got: %s", plain[:min(300, len(plain))])
 	}
 }
 

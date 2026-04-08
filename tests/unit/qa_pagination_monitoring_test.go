@@ -27,12 +27,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockCloudWatchDescribeAlarmsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*cloudwatch.DescribeAlarmsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*cloudwatch.DescribeAlarmsOutput, error)
+	lastInput *cloudwatch.DescribeAlarmsInput
 }
 
-func (m *mockCloudWatchDescribeAlarmsAPIPaginated) DescribeAlarms(_ context.Context, _ *cloudwatch.DescribeAlarmsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
+func (m *mockCloudWatchDescribeAlarmsAPIPaginated) DescribeAlarms(_ context.Context, in *cloudwatch.DescribeAlarmsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -115,6 +117,12 @@ func TestQA_Pagination_FetchCloudWatchAlarmsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_Empty(t *testing.T) {
@@ -157,12 +165,14 @@ func TestQA_Pagination_FetchCloudWatchAlarmsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockCWLogsDescribeLogGroupsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
+	lastInput *cloudwatchlogs.DescribeLogGroupsInput
 }
 
-func (m *mockCWLogsDescribeLogGroupsAPIPaginated) DescribeLogGroups(_ context.Context, _ *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+func (m *mockCWLogsDescribeLogGroupsAPIPaginated) DescribeLogGroups(_ context.Context, in *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -245,6 +255,12 @@ func TestQA_Pagination_FetchCloudWatchLogGroupsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchCloudWatchLogGroupsPage_Empty(t *testing.T) {
@@ -287,12 +303,14 @@ func TestQA_Pagination_FetchCloudWatchLogGroupsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockDDBListTablesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*dynamodb.ListTablesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*dynamodb.ListTablesOutput, error)
+	lastInput *dynamodb.ListTablesInput
 }
 
-func (m *mockDDBListTablesAPIPaginated) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+func (m *mockDDBListTablesAPIPaginated) ListTables(_ context.Context, in *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -402,6 +420,12 @@ func TestQA_Pagination_FetchDynamoDBTablesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if listMock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if listMock.lastInput.ExclusiveStartTableName == nil || *listMock.lastInput.ExclusiveStartTableName != "orders" {
+		t.Errorf("ExclusiveStartTableName not forwarded: got %v, want %q", listMock.lastInput.ExclusiveStartTableName, "orders")
+	}
 }
 
 func TestQA_Pagination_FetchDynamoDBTablesPage_Empty(t *testing.T) {
@@ -454,12 +478,14 @@ func TestQA_Pagination_FetchDynamoDBTablesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockSQSListQueuesAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*sqs.ListQueuesOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*sqs.ListQueuesOutput, error)
+	lastInput *sqs.ListQueuesInput
 }
 
-func (m *mockSQSListQueuesAPIPaginated) ListQueues(_ context.Context, _ *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
+func (m *mockSQSListQueuesAPIPaginated) ListQueues(_ context.Context, in *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -560,6 +586,12 @@ func TestQA_Pagination_FetchSQSQueuesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
+	if listMock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if listMock.lastInput.NextToken == nil || *listMock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.lastInput.NextToken, "token-page-2")
+	}
 }
 
 func TestQA_Pagination_FetchSQSQueuesPage_Empty(t *testing.T) {
@@ -612,12 +644,14 @@ func TestQA_Pagination_FetchSQSQueuesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockSNSListTopicsAPIPaginated struct {
-	Calls    int
-	PageFunc func(call int) (*sns.ListTopicsOutput, error)
+	Calls     int
+	PageFunc  func(call int) (*sns.ListTopicsOutput, error)
+	lastInput *sns.ListTopicsInput
 }
 
-func (m *mockSNSListTopicsAPIPaginated) ListTopics(_ context.Context, _ *sns.ListTopicsInput, _ ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
+func (m *mockSNSListTopicsAPIPaginated) ListTopics(_ context.Context, in *sns.ListTopicsInput, _ ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
 	m.Calls++
+	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
@@ -690,6 +724,12 @@ func TestQA_Pagination_FetchSNSTopicsPage_Continuation(t *testing.T) {
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
+	}
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
 	}
 }
 
