@@ -59,10 +59,13 @@ var s3ObjectData = map[string]map[string]func() []resource.Resource{
 		"logs/2026/02/": s3ObjDataPipelineLogs202602,
 	},
 	"webapp-assets-prod": {
-		"":        s3ObjWebapp,
-		"css/":    s3ObjWebappCSS,
-		"js/":     s3ObjWebappJS,
-		"images/": s3ObjWebappImages,
+		"":            s3ObjWebapp,
+		"css/":        s3ObjWebappCSS,
+		"js/":         s3ObjWebappJS,
+		"images/":     s3ObjWebappImages,
+		"2026/":       s3ObjWebappAssets2026,
+		"2026/04/":    s3ObjWebappAssets202604,
+		"2026/04/07/": s3ObjWebappAssetsPutLog,
 	},
 	"ml-training-data": {
 		"":           s3ObjMLTraining,
@@ -82,6 +85,20 @@ var s3ObjectData = map[string]map[string]func() []resource.Resource{
 		"":       s3ObjBackups,
 		"rds/":   s3ObjBackupsRDS,
 		"docdb/": s3ObjBackupsDocDB,
+	},
+	"checkout-config": {
+		"":      s3ObjCheckoutConfigRoot,
+		"prod/": s3ObjCheckoutConfigProd,
+	},
+	"shared-artifacts": {
+		"": s3ObjSharedArtifactsRoot,
+	},
+	"prod-lake": {
+		"":                   s3ObjProdLakeRoot,
+		"landing/":           s3ObjProdLakeLanding,
+		"landing/2026/":      s3ObjProdLakeLanding2026,
+		"landing/2026/04/":   s3ObjProdLakeLanding202604,
+		"landing/2026/04/07/": s3ObjProdLakeLanding20260407,
 	},
 }
 

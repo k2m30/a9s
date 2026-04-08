@@ -86,6 +86,13 @@ func TestGolden_DemoRelatedCoverage(t *testing.T) {
 
 		demoFn := resource.GetRelatedDemo(shortName)
 		if demoFn == nil {
+			// ct-events intentionally has no RegisterRelatedDemo override: its real
+			// checkers are pure field-readers that work correctly with in-memory demo
+			// fixture data. app_related.go falls through to the real checkers when no
+			// demo override is registered. See internal/demo/fixtures_related.go.
+			if shortName == "ct-events" {
+				continue
+			}
 			t.Errorf("%s: has %d RelatedDefs but no RegisterRelatedDemo — entire right column broken in demo", shortName, len(defs))
 			continue
 		}

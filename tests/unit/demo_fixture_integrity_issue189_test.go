@@ -81,6 +81,15 @@ func TestIssue189_DemoFixtures_AllConfiguredDetailFieldsResolved(t *testing.T) {
 					}
 				}
 				if v == "" || v == "-" || strings.EqualFold(v, "<nil>") {
+					// ct-events "user" and "role_name" are legitimately absent on Root,
+					// AWSService, and Insight events — those identity types have no
+					// userIdentity ARN leaf or IAM username. The "iff present, must resolve"
+					// semantic applies: if the key is not in Fields, skip rather than error.
+					if short == "ct-events" && (path == "user" || path == "role_name") {
+						t.Logf("SKIP %s fixture[%d] ID=%s: navigable path=%q absent on Root/AWSService/Insight event — expected",
+							short, i, r.ID, path)
+						continue
+					}
 					t.Errorf("%s fixture[%d] ID=%s navigable path=%q resolved empty", short, i, r.ID, path)
 				}
 			}

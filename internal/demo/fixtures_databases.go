@@ -484,21 +484,29 @@ func s3Buckets() []resource.Resource {
 
 // s3ObjectsRelatedFixtures returns S3 object fixtures used as related-navigation
 // targets from ct-events demo checkers. IDs use "bucket|key" format matching the
-// requestParameters encoded by checkCtEventsS3Objects.
+// requestParameters encoded by checkCtEventsS3Objects, where key is the raw S3 key
+// exactly as it appears in the CloudTrail event requestParameters.key field.
+//
+// ID mapping to demo ct-events fixtures (Cases C/F/G/I):
+//   - Case C (e-c3d4e5f6): webapp-assets-prod + key=2026/04/07/app.log
+//   - Case F (e-f6a7b8c9): checkout-config   + key=prod/config.json
+//   - Case G (e-a7b8c9d0): shared-artifacts   + key=build-4821.tar.gz
+//   - Case I (e-c9d0e1f2): prod-lake          + key=landing/2026/04/07/batch-0719.parquet
 func s3ObjectsRelatedFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "prod-logs|prod-logs/2026/04/07/app.log",
-			Name:   "prod-logs/2026/04/07/app.log",
+			// Case C: webapp-assets-prod bucket, raw S3 key 2026/04/07/app.log
+			ID:     "webapp-assets-prod|2026/04/07/app.log",
+			Name:   "2026/04/07/app.log",
 			Status: "file",
 			Fields: map[string]string{
-				"key":           "prod-logs/2026/04/07/app.log",
+				"key":           "2026/04/07/app.log",
 				"size":          "12.3 KB",
 				"last_modified": "2026-04-07T14:11:03+00:00",
 				"storage_class": "STANDARD",
 			},
 			RawStruct: s3types.Object{
-				Key:               aws.String("prod-logs/2026/04/07/app.log"),
+				Key:               aws.String("2026/04/07/app.log"),
 				Size:              aws.Int64(12596),
 				ETag:              aws.String("\"d41d8cd98f00b204e9800998ecf8427e\""),
 				StorageClass:      s3types.ObjectStorageClassStandard,
@@ -510,17 +518,18 @@ func s3ObjectsRelatedFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID:     "checkout-config|checkout-config/prod/config.json",
-			Name:   "checkout-config/prod/config.json",
+			// Case F: checkout-config bucket, raw S3 key prod/config.json
+			ID:     "checkout-config|prod/config.json",
+			Name:   "prod/config.json",
 			Status: "file",
 			Fields: map[string]string{
-				"key":           "checkout-config/prod/config.json",
+				"key":           "prod/config.json",
 				"size":          "4.2 KB",
 				"last_modified": "2026-04-07T14:20:21+00:00",
 				"storage_class": "STANDARD",
 			},
 			RawStruct: s3types.Object{
-				Key:               aws.String("checkout-config/prod/config.json"),
+				Key:               aws.String("prod/config.json"),
 				Size:              aws.Int64(4300),
 				ETag:              aws.String("\"a87ff679a2f3e71d9181a67b7542122c\""),
 				StorageClass:      s3types.ObjectStorageClassStandard,
@@ -532,17 +541,18 @@ func s3ObjectsRelatedFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID:     "shared-artifacts|shared-artifacts/build-4821.tar.gz",
-			Name:   "shared-artifacts/build-4821.tar.gz",
+			// Case G: shared-artifacts bucket, raw S3 key build-4821.tar.gz
+			ID:     "shared-artifacts|build-4821.tar.gz",
+			Name:   "build-4821.tar.gz",
 			Status: "file",
 			Fields: map[string]string{
-				"key":           "shared-artifacts/build-4821.tar.gz",
+				"key":           "build-4821.tar.gz",
 				"size":          "85.7 MB",
 				"last_modified": "2026-04-07T14:31:55+00:00",
 				"storage_class": "STANDARD",
 			},
 			RawStruct: s3types.Object{
-				Key:               aws.String("shared-artifacts/build-4821.tar.gz"),
+				Key:               aws.String("build-4821.tar.gz"),
 				Size:              aws.Int64(89850880),
 				ETag:              aws.String("\"eccbc87e4b5ce2fe28308fd9f2a7baf3\""),
 				StorageClass:      s3types.ObjectStorageClassStandard,
@@ -554,17 +564,18 @@ func s3ObjectsRelatedFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID:     "prod-lake|prod-lake/landing/2026/04/07/batch-0719.parquet",
-			Name:   "prod-lake/landing/2026/04/07/batch-0719.parquet",
+			// Case I: prod-lake bucket, raw S3 key landing/2026/04/07/batch-0719.parquet
+			ID:     "prod-lake|landing/2026/04/07/batch-0719.parquet",
+			Name:   "landing/2026/04/07/batch-0719.parquet",
 			Status: "file",
 			Fields: map[string]string{
-				"key":           "prod-lake/landing/2026/04/07/batch-0719.parquet",
+				"key":           "landing/2026/04/07/batch-0719.parquet",
 				"size":          "234.1 MB",
 				"last_modified": "2026-04-07T14:44:17+00:00",
 				"storage_class": "STANDARD",
 			},
 			RawStruct: s3types.Object{
-				Key:               aws.String("prod-lake/landing/2026/04/07/batch-0719.parquet"),
+				Key:               aws.String("landing/2026/04/07/batch-0719.parquet"),
 				Size:              aws.Int64(245470822),
 				ETag:              aws.String("\"c4ca4238a0b923820dcc509a6f75849b\""),
 				StorageClass:      s3types.ObjectStorageClassStandard,
@@ -820,6 +831,98 @@ func s3ObjBackupsRDS() []resource.Resource {
 func s3ObjBackupsDocDB() []resource.Resource {
 	return []resource.Resource{
 		{ID: "docdb/orders-cluster-2026-03-19.snap", Name: "docdb/orders-cluster-2026-03-19.snap", Status: "file", Fields: map[string]string{"key": "docdb/orders-cluster-2026-03-19.snap", "size": "1.1 GB", "last_modified": "2026-03-19T04:30:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("docdb/orders-cluster-2026-03-19.snap"), Size: aws.Int64(1181116006), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-03-19T04:30:00Z"))}},
+	}
+}
+
+// checkout-config bucket fixtures (Case F — GetObject prod/config.json)
+
+func s3ObjCheckoutConfigRoot() []resource.Resource {
+	return []resource.Resource{
+		{ID: "prod/", Name: "prod/", Status: "folder", Fields: map[string]string{"key": "prod/", "size": "-", "last_modified": "2026-04-07T11:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("prod/")}},
+		{ID: "staging/", Name: "staging/", Status: "folder", Fields: map[string]string{"key": "staging/", "size": "-", "last_modified": "2026-04-06T09:30:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("staging/")}},
+		{ID: "README.md", Name: "README.md", Status: "file", Fields: map[string]string{"key": "README.md", "size": "2.1 KB", "last_modified": "2026-01-15T08:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("README.md"), Size: aws.Int64(2150), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-01-15T08:00:00Z"))}},
+	}
+}
+
+func s3ObjCheckoutConfigProd() []resource.Resource {
+	return []resource.Resource{
+		{ID: "prod/config.json", Name: "prod/config.json", Status: "file", Fields: map[string]string{"key": "prod/config.json", "size": "8.4 KB", "last_modified": "2026-04-07T11:02:33+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("prod/config.json"), Size: aws.Int64(8602), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T11:02:33Z"))}},
+		{ID: "prod/config.json.bak", Name: "prod/config.json.bak", Status: "file", Fields: map[string]string{"key": "prod/config.json.bak", "size": "8.1 KB", "last_modified": "2026-04-06T10:15:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("prod/config.json.bak"), Size: aws.Int64(8294), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-06T10:15:00Z"))}},
+		{ID: "prod/schema.json", Name: "prod/schema.json", Status: "file", Fields: map[string]string{"key": "prod/schema.json", "size": "3.2 KB", "last_modified": "2026-03-01T09:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("prod/schema.json"), Size: aws.Int64(3277), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-03-01T09:00:00Z"))}},
+	}
+}
+
+// shared-artifacts bucket fixtures (Case G — PutObject build-4821.tar.gz)
+
+func s3ObjSharedArtifactsRoot() []resource.Resource {
+	return []resource.Resource{
+		{ID: "build-4821.tar.gz", Name: "build-4821.tar.gz", Status: "file", Fields: map[string]string{"key": "build-4821.tar.gz", "size": "54.3 MB", "last_modified": "2026-04-07T14:38:12+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("build-4821.tar.gz"), Size: aws.Int64(56963891), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T14:38:12Z"))}},
+		{ID: "build-4820.tar.gz", Name: "build-4820.tar.gz", Status: "file", Fields: map[string]string{"key": "build-4820.tar.gz", "size": "54.1 MB", "last_modified": "2026-04-07T12:15:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("build-4820.tar.gz"), Size: aws.Int64(56754278), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T12:15:00Z"))}},
+		{ID: "build-4819.tar.gz", Name: "build-4819.tar.gz", Status: "file", Fields: map[string]string{"key": "build-4819.tar.gz", "size": "53.9 MB", "last_modified": "2026-04-07T09:50:00+00:00", "storage_class": "STANDARD_IA"}, RawStruct: s3types.Object{Key: aws.String("build-4819.tar.gz"), Size: aws.Int64(56544870), StorageClass: s3types.ObjectStorageClassStandardIa, LastModified: aws.Time(mustParseTime("2026-04-07T09:50:00Z"))}},
+		{ID: "latest.tar.gz", Name: "latest.tar.gz", Status: "file", Fields: map[string]string{"key": "latest.tar.gz", "size": "54.3 MB", "last_modified": "2026-04-07T14:38:20+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("latest.tar.gz"), Size: aws.Int64(56963891), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T14:38:20Z"))}},
+	}
+}
+
+// prod-lake bucket fixtures (Case I — PutObject landing/2026/04/07/batch-0719.parquet)
+
+func s3ObjProdLakeRoot() []resource.Resource {
+	return []resource.Resource{
+		{ID: "landing/", Name: "landing/", Status: "folder", Fields: map[string]string{"key": "landing/", "size": "-", "last_modified": "2026-04-07T19:05:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/")}},
+		{ID: "processed/", Name: "processed/", Status: "folder", Fields: map[string]string{"key": "processed/", "size": "-", "last_modified": "2026-04-07T20:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("processed/")}},
+		{ID: "archive/", Name: "archive/", Status: "folder", Fields: map[string]string{"key": "archive/", "size": "-", "last_modified": "2026-03-31T06:00:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("archive/")}},
+	}
+}
+
+func s3ObjProdLakeLanding() []resource.Resource {
+	return []resource.Resource{
+		{ID: "landing/2026/", Name: "landing/2026/", Status: "folder", Fields: map[string]string{"key": "landing/2026/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2026/")}},
+		{ID: "landing/2025/", Name: "landing/2025/", Status: "folder", Fields: map[string]string{"key": "landing/2025/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2025/")}},
+	}
+}
+
+func s3ObjProdLakeLanding2026() []resource.Resource {
+	return []resource.Resource{
+		{ID: "landing/2026/04/", Name: "landing/2026/04/", Status: "folder", Fields: map[string]string{"key": "landing/2026/04/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2026/04/")}},
+		{ID: "landing/2026/03/", Name: "landing/2026/03/", Status: "folder", Fields: map[string]string{"key": "landing/2026/03/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2026/03/")}},
+	}
+}
+
+func s3ObjProdLakeLanding202604() []resource.Resource {
+	return []resource.Resource{
+		{ID: "landing/2026/04/07/", Name: "landing/2026/04/07/", Status: "folder", Fields: map[string]string{"key": "landing/2026/04/07/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2026/04/07/")}},
+		{ID: "landing/2026/04/06/", Name: "landing/2026/04/06/", Status: "folder", Fields: map[string]string{"key": "landing/2026/04/06/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("landing/2026/04/06/")}},
+	}
+}
+
+func s3ObjProdLakeLanding20260407() []resource.Resource {
+	return []resource.Resource{
+		{ID: "landing/2026/04/07/batch-0719.parquet", Name: "landing/2026/04/07/batch-0719.parquet", Status: "file", Fields: map[string]string{"key": "landing/2026/04/07/batch-0719.parquet", "size": "128.7 MB", "last_modified": "2026-04-07T19:05:44+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("landing/2026/04/07/batch-0719.parquet"), Size: aws.Int64(134963814), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T19:05:44Z"))}},
+		{ID: "landing/2026/04/07/batch-0718.parquet", Name: "landing/2026/04/07/batch-0718.parquet", Status: "file", Fields: map[string]string{"key": "landing/2026/04/07/batch-0718.parquet", "size": "131.2 MB", "last_modified": "2026-04-07T18:05:11+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("landing/2026/04/07/batch-0718.parquet"), Size: aws.Int64(137597338), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T18:05:11Z"))}},
+		{ID: "landing/2026/04/07/batch-0717.parquet", Name: "landing/2026/04/07/batch-0717.parquet", Status: "file", Fields: map[string]string{"key": "landing/2026/04/07/batch-0717.parquet", "size": "126.4 MB", "last_modified": "2026-04-07T17:05:02+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("landing/2026/04/07/batch-0717.parquet"), Size: aws.Int64(132578918), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T17:05:02Z"))}},
+	}
+}
+
+// webapp-assets-prod date-prefix fixtures (Case C — PutObject 2026/04/07/app.log)
+
+func s3ObjWebappAssets2026() []resource.Resource {
+	return []resource.Resource{
+		{ID: "2026/04/", Name: "2026/04/", Status: "folder", Fields: map[string]string{"key": "2026/04/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("2026/04/")}},
+		{ID: "2026/03/", Name: "2026/03/", Status: "folder", Fields: map[string]string{"key": "2026/03/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("2026/03/")}},
+	}
+}
+
+func s3ObjWebappAssets202604() []resource.Resource {
+	return []resource.Resource{
+		{ID: "2026/04/07/", Name: "2026/04/07/", Status: "folder", Fields: map[string]string{"key": "2026/04/07/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("2026/04/07/")}},
+		{ID: "2026/04/06/", Name: "2026/04/06/", Status: "folder", Fields: map[string]string{"key": "2026/04/06/", "size": "", "last_modified": "", "storage_class": ""}, RawStruct: s3types.CommonPrefix{Prefix: aws.String("2026/04/06/")}},
+	}
+}
+
+func s3ObjWebappAssetsPutLog() []resource.Resource {
+	return []resource.Resource{
+		{ID: "2026/04/07/app.log", Name: "2026/04/07/app.log", Status: "file", Fields: map[string]string{"key": "2026/04/07/app.log", "size": "4.8 MB", "last_modified": "2026-04-07T22:15:09+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("2026/04/07/app.log"), Size: aws.Int64(5033164), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T22:15:09Z"))}},
+		{ID: "2026/04/07/error.log", Name: "2026/04/07/error.log", Status: "file", Fields: map[string]string{"key": "2026/04/07/error.log", "size": "312 KB", "last_modified": "2026-04-07T22:14:55+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("2026/04/07/error.log"), Size: aws.Int64(319488), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T22:14:55Z"))}},
+		{ID: "2026/04/07/access.log", Name: "2026/04/07/access.log", Status: "file", Fields: map[string]string{"key": "2026/04/07/access.log", "size": "11.2 MB", "last_modified": "2026-04-07T22:15:00+00:00", "storage_class": "STANDARD"}, RawStruct: s3types.Object{Key: aws.String("2026/04/07/access.log"), Size: aws.Int64(11744051), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustParseTime("2026-04-07T22:15:00Z"))}},
 	}
 }
 
