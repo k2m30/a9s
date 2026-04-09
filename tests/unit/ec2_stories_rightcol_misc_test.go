@@ -63,10 +63,10 @@ func ec2StoryDetail(t *testing.T, width, height int, withDefs bool) (views.Detai
 	cleanup := func() {}
 	if withDefs {
 		resource.RegisterRelated("ec2", []resource.RelatedDef{
-			{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
-			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
-			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: nil},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: noopChecker},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: noopChecker},
 		})
 		cleanup = func() { resource.UnregisterRelated("ec2") }
 	} else {
@@ -105,8 +105,8 @@ func ec2StoryDetailWithConfig(t *testing.T, width, height int, withDefs bool) (v
 	}
 	if withDefs {
 		resource.RegisterRelated("ec2", []resource.RelatedDef{
-			{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 		})
 		cleanup = func() {
 			resource.UnregisterNavigableFields("ec2")

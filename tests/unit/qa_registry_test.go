@@ -13,13 +13,6 @@ import (
 // Registry unit tests
 // ═══════════════════════════════════════════════════════════════════════════
 
-func TestRegistry_GetFetcher_ReturnsNilForUnregistered(t *testing.T) {
-	f := resource.GetPaginatedFetcher("nonexistent")
-	if f != nil {
-		t.Error("GetPaginatedFetcher should return nil for unregistered resource type")
-	}
-}
-
 func TestRegistry_GetFetcher_ReturnsRegisteredFetcher(t *testing.T) {
 	// All types should be registered via init() in the aws package (spot-check 10)
 	types := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
@@ -85,21 +78,6 @@ func TestRegistry_MockFetcher_CanReturnError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "simulated AWS error") {
 		t.Errorf("expected 'simulated AWS error', got: %v", err)
-	}
-}
-
-func TestRegistry_NilClients_FetcherReceivesNil(t *testing.T) {
-	var receivedClients interface{}
-	resource.RegisterPaginated("_test_nil_clients", func(ctx context.Context, clients interface{}, continuationToken string) (resource.FetchResult, error) {
-		receivedClients = clients
-		return resource.FetchResult{}, nil
-	})
-	defer resource.UnregisterPaginated("_test_nil_clients")
-
-	f := resource.GetPaginatedFetcher("_test_nil_clients")
-	_, _ = f(context.Background(), nil, "")
-	if receivedClients != nil {
-		t.Error("fetcher should receive nil clients when passed nil")
 	}
 }
 

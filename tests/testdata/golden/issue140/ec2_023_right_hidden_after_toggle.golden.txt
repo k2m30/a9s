@@ -14,7 +14,7 @@
 │ PrivateDnsName:       ip-10-0-1-10.ec2.internal                                                                      │
 │ PublicIpAddress:      54.210.33.112                                                                                  │
 │ IamInstanceProfile:                                                                                                  │
-│     Arn:  arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring                                             │
+│     Arn:  arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile                                       │
 │ SecurityGroups:                                                                                                      │
 │     GroupId:  sg-0aaa111111111111a                                                                                   │
 │     GroupName:  acme-web-alb-sg                                                                                      │

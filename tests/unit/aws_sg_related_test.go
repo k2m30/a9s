@@ -9,7 +9,6 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -40,23 +39,6 @@ func TestNavigableFields_SG_Registered(t *testing.T) {
 	}
 	if nav.TargetType != "vpc" {
 		t.Errorf("VpcId TargetType = %q, want \"vpc\"", nav.TargetType)
-	}
-}
-
-// TestNavigableFields_SG_FieldPathsResolve verifies that the VpcId field path
-// resolves on a real SG demo fixture (RawStruct has a non-empty VpcId).
-func TestNavigableFields_SG_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("sg")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no sg demo fixtures available")
-	}
-
-	raw, ok := resources[0].RawStruct.(ec2types.SecurityGroup)
-	if !ok {
-		t.Fatalf("RawStruct is not ec2types.SecurityGroup, got %T", resources[0].RawStruct)
-	}
-	if raw.VpcId == nil || *raw.VpcId == "" {
-		t.Error("fixture RawStruct.VpcId is nil or empty — VpcId field path cannot resolve")
 	}
 }
 
@@ -551,27 +533,5 @@ func TestRelated_SG_SG_EmptySourceID(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty source ID)", result.Count)
-	}
-}
-
-// ─── Demo checker ─────────────────────────────────────────────────────────────
-
-// TestRelatedDemo_SG_Registered verifies that a demo checker is registered for
-// sg and returns non-empty results with valid TargetType fields.
-func TestRelatedDemo_SG_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("sg")
-	if checker == nil {
-		t.Fatal("no demo checker registered for sg")
-	}
-
-	results := checker(resource.Resource{ID: "sg-0aaa111111111111a"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

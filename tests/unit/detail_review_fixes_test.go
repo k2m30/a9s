@@ -119,8 +119,8 @@ func deliverResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) view
 // The fix: Tab checks rightColShowing() which includes auto-shown state.
 func TestDetail_TabWorksOnAutoShownPanel(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -149,7 +149,7 @@ func TestDetail_TabWorksOnAutoShownPanel(t *testing.T) {
 // the auto-shown right column, the RELATED header is still present.
 func TestDetail_TabOnAutoShownPanel_RightColVisible(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -171,7 +171,7 @@ func TestDetail_TabOnAutoShownPanel_RightColVisible(t *testing.T) {
 // twice on an auto-shown panel focuses then unfocuses the right column.
 func TestDetail_TabOnAutoShownPanel_ThenTabUnfocuses(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -386,7 +386,7 @@ func TestDetail_FieldCursorUp_AtZeroStaysZero(t *testing.T) {
 // Row is in loading state (count == -1, loading == true).
 func TestRightColumn_EnterBlockedOnLoadingRow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -417,7 +417,7 @@ func TestRightColumn_EnterBlockedOnLoadingRow(t *testing.T) {
 // right-column row with count == 0 returns nil cmd (nothing to navigate to).
 func TestRightColumn_EnterBlockedOnZeroCountRow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -459,7 +459,7 @@ func TestRightColumn_EnterBlockedOnZeroCountRow(t *testing.T) {
 // a right-column row with count > 0 emits a RelatedNavigateMsg.
 func TestRightColumn_EnterAllowedOnPositiveCountRow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -512,7 +512,7 @@ func TestRightColumn_EnterAllowedOnPositiveCountRow(t *testing.T) {
 // behavior when the right column was never explicitly toggled (auto-shown path).
 func TestRightColumn_EnterBlockedOnLoadingRow_AutoShown(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -545,7 +545,7 @@ func TestRightColumn_EnterBlockedOnLoadingRow_AutoShown(t *testing.T) {
 // right column does NOT render "(-1)" but DOES show the display name.
 func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -583,8 +583,8 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
 // the same behavior when the right column was auto-shown (no explicit toggle).
 func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 
@@ -639,8 +639,8 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testi
 // rendered differently from count==0: count==0 shows "(0)", count==-1 shows no number.
 func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer cleanup()
 

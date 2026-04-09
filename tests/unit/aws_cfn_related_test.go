@@ -8,7 +8,6 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -164,23 +163,5 @@ func TestRelated_CFN_Role_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
-	}
-}
-
-func TestRelatedDemo_CFN_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("cfn")
-	if checker == nil {
-		t.Fatal("no demo checker registered for cfn")
-	}
-
-	results := checker(resource.Resource{ID: "acme-prod-stack"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

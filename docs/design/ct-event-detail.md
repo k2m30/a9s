@@ -1,4 +1,12 @@
-# CloudTrail Event Detail View — Design
+# CloudTrail Event Detail View — Design (v1, HISTORICAL)
+
+> **Status: superseded by [`ct-event-detail-v2.md`](./ct-event-detail-v2.md)**
+> as of 2026-04-08. This document is preserved as a historical artifact —
+> it captures the per-field/per-section color approach that was rejected
+> after #246 simplified the list view to one-row-one-color. The v2 doc
+> drops all per-field color, the ROOT bar, the colored badges, and the
+> RAW section. Read v2 for the current truth; read v1 only for historical
+> context on what was tried and why it was changed.
 
 Status: design spec, not implemented. No code under `internal/`, `cmd/a9s/`,
 `tests/`, or `.a9s/` changes as part of this document. Source of truth for

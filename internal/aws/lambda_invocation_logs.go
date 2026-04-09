@@ -41,6 +41,9 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 		FilterPattern: &filterPattern,
 		StartTime:     &startTime,
 	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
 
 	output, err := api.FilterLogEvents(ctx, input)
 	if err != nil {
@@ -91,12 +94,17 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 		resources = append(resources, r)
 	}
 
+	pagination := &resource.PaginationMeta{
+		IsTruncated: false,
+		TotalHint:   len(resources),
+		PageSize:    len(resources),
+	}
+	if output.NextToken != nil && *output.NextToken != "" {
+		pagination.IsTruncated = true
+		pagination.NextToken = *output.NextToken
+	}
 	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
+		Resources:  resources,
+		Pagination: pagination,
 	}, nil
 }

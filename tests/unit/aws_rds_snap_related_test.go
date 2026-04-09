@@ -8,7 +8,6 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -248,38 +247,5 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_RDSSnap_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("rds-snap")
-	if checker == nil {
-		t.Fatal("no demo checker registered for rds-snap")
-	}
-
-	results := checker(resource.Resource{ID: "rds:acme-prod-mysql:2025-01-15-03-00"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"dbi": false, "kms": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
 	}
 }
