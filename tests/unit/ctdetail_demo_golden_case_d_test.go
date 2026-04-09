@@ -14,12 +14,14 @@ package unit_test
 //	go test ./tests/unit -run TestCTDetailDemoGolden_CaseD -v
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 )
 
 // TestCTDetailDemoGolden_CaseD renders the ct-events detail view for fixture
@@ -32,9 +34,10 @@ func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 	ensureNoColor(t)
 
 	// Load the demo fixture for ct-events.
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(resources))
 	}
 
 	// Find fixture "e-d4e5f6a7" (Case D -- kms:RotateKey AwsServiceEvent).

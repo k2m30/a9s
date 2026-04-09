@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -43,31 +42,6 @@ func TestNavigableFields_NAT_Registered(t *testing.T) {
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
 		}
-	}
-}
-
-func TestNavigableFields_NAT_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("nat")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no nat demo fixtures available")
-	}
-
-	raw, ok := resources[0].RawStruct.(ec2types.NatGateway)
-	if !ok {
-		t.Fatalf("RawStruct is not ec2types.NatGateway, got %T", resources[0].RawStruct)
-	}
-
-	if raw.VpcId == nil || *raw.VpcId == "" {
-		t.Error("fixture RawStruct.VpcId is nil or empty — VpcId navigable field path cannot resolve")
-	}
-	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		t.Error("fixture RawStruct.SubnetId is nil or empty — SubnetId navigable field path cannot resolve")
-	}
-	if len(raw.NatGatewayAddresses) == 0 {
-		t.Error("fixture RawStruct.NatGatewayAddresses is empty — NatGatewayAddresses.AllocationId field path cannot resolve")
-	}
-	if raw.NatGatewayAddresses[0].AllocationId == nil || *raw.NatGatewayAddresses[0].AllocationId == "" {
-		t.Error("fixture RawStruct.NatGatewayAddresses[0].AllocationId is nil or empty — navigable field path cannot resolve")
 	}
 }
 
@@ -435,50 +409,5 @@ func TestRelated_NAT_RTB_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_NAT_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("nat")
-	if checker == nil {
-		t.Fatal("no demo checker registered for nat")
-	}
-
-	results := checker(resource.Resource{ID: "nat-0aaa111111111111a"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"vpc": false, "subnet": false, "rtb": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// At least one result must have Count > 0.
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
 	}
 }

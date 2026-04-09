@@ -330,37 +330,15 @@ Run: `go run ./cmd/viewsgen/`
 
 Add import if new service types package.
 
-### 8. Demo fixtures: `internal/demo/fixtures_{category}.go` (ADD to init + fixture function)
+### 8. Demo fixtures
 
-Every resource type needs demo mode fixtures. Add to the appropriate category file's `init()`:
+Every resource type needs demo mode fixtures. All services use typed fakes — there is no legacy fixture store.
 
-```go
-demoData["{shortname}"] = {shortname}Fixtures
-```
+Add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`. If the service already has a fake, add new SDK-typed fixture objects to the existing fixture struct and implement any new methods on the fake. If the service is new, create both files following the EC2 pattern.
 
-Then add the fixture function returning `[]resource.Resource` with realistic synthetic data:
+Wire the new fake into `internal/demo/client.go` (`NewServiceClients()`) if it's a new service.
 
-```go
-func {shortname}Fixtures() []resource.Resource {
-    return []resource.Resource{
-        {
-            ID:     "synthetic-id-1",
-            Name:   "synthetic-name-1",
-            Status: "active",
-            Fields: map[string]string{
-                "key1": "value1",
-                // all column keys from types_{category}.go
-            },
-            RawStruct: {service}types.{SDKType}{
-                // populate SDK struct fields for detail/YAML views
-            },
-        },
-        // 3-5 fixtures with varied realistic data
-    }
-}
-```
-
-**Reference:** See `internal/demo/fixtures_backup.go` for the canonical pattern with `aws.String()`, `aws.Time()`, and `RawStruct` population.
+**Reference:** See `internal/demo/fixtures/ec2.go` for the canonical fixture pattern and `internal/demo/fakes/ec2.go` for the fake pattern.
 
 ---
 

@@ -94,8 +94,8 @@ func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) 
 
 func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -117,8 +117,8 @@ func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 
 func TestRightColumn_ShowsLoadingState(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -143,8 +143,8 @@ func TestRightColumn_ShowsLoadingState(t *testing.T) {
 
 func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -175,7 +175,7 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 
 func TestRightColumn_ZeroCountDim(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -206,7 +206,7 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 
 func TestRightColumn_ErrorShowsDash(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -238,8 +238,8 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 
 func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -268,8 +268,8 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 
 func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -319,8 +319,8 @@ func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 
 func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -363,7 +363,7 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 
 func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -395,7 +395,7 @@ func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
 
 func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -417,7 +417,7 @@ func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 
 func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 

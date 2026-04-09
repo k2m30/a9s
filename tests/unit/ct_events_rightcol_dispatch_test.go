@@ -28,7 +28,6 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -125,10 +124,7 @@ func ctExecuteCmd(cmd tea.Cmd) tea.Msg {
 func TestCtEventsRightColumnDispatch(t *testing.T) {
 	ensureNoColor(t)
 
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
-	}
+	fixtures := loadAllCTFixtures(t)
 
 	defs := resource.GetRelated("ct-events")
 	if len(defs) == 0 {
@@ -138,7 +134,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 	// ct-events has no demo override: the real checkers are pure field-readers
 	// and produce correct results when given a cache populated from demo fixtures.
 	// Source of truth: internal/aws/ct_events_related.go.
-	cache := buildDemoResourceCache(t)
+	cache := buildFakeResourceCache(t)
 
 	for _, fixture := range fixtures {
 		fixture := fixture
@@ -292,10 +288,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 func TestCtEventsRightColumnDispatch_LoadingRowNotActionable(t *testing.T) {
 	ensureNoColor(t)
 
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("no ct-events fixtures")
-	}
+	fixtures := loadAllCTFixtures(t)
 
 	// Use the first fixture — all rows stay in loading state (no results injected).
 	fixture := fixtures[0]

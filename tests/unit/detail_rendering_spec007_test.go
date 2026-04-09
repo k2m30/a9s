@@ -84,7 +84,7 @@ func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailMod
 func register007EC2Defs(t *testing.T) {
 	t.Helper()
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 }

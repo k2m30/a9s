@@ -342,36 +342,24 @@ type {TypeName}{APICall}API interface {
 }
 ```
 
-### 4. Demo overrides: `internal/demo/fixtures_related.go` (APPEND)
+### 4. Demo overrides
 
 Register a demo checker so the related panel shows realistic data in demo mode.
-The `RelatedDemoChecker` type is `func(res resource.Resource) []resource.RelatedCheckResult`.
 
-```go
-func init() {
-    resource.RegisterRelatedDemo("{source}", func(res resource.Resource) []resource.RelatedCheckResult {
-        return []resource.RelatedCheckResult{
-            {TargetType: "{target1}", Count: 2, ResourceIDs: []string{"related-id-1", "related-id-2"}},
-            {TargetType: "{target2}", Count: 1, ResourceIDs: []string{"related-id-3"}},
-            {TargetType: "{target3}", Count: 0},
-        }
-    })
-}
-```
+**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`internal/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`internal/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
 
-Add constant IDs to `internal/demo/constants_shared.go` so the navigate-to flow works.
-**Do not** look for them in `fixtures_compute.go`.
-**Never** amend tests if fixtures do not have related IDs/fields. Fix fixtures, not tests
-**Naming convention for demo constants — MUST follow this pattern to avoid collisions:**
+- **Preferred (migrated services):** add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`.
+- **Legacy (non-migrated services):** add fixture data to the matching `internal/demo/fixtures_*.go` category file and (if needed) extend handlers in `internal/demo/handlers.go`.
 
-```
-related{SourceCamel}{TargetCamel}ID[N]
-```
+When adding a new resource type, match the service's current layer. Do not mix layers for the same service.
 
-Examples from the existing file:
-- `relatedEC2TGID` — EC2 → Target Group
-- `relatedEC2AlarmID1`, `relatedEC2AlarmID2` — EC2 → CloudWatch Alarm (multiple)
-- `relatedEC2EBSVolID1` — EC2 → EBS Volume
+#### Demo fixture support for related views
+
+No separate demo registry is needed. Related checkers run against the typed fakes automatically. Ensure the target resource type's fixtures contain IDs that match what the source resource's fields reference. For example, if EC2 instances reference `vpc-prod-main` in their VpcId field, the VPC fake's fixtures must include a VPC with that ID.
+
+Add fixture data to `internal/demo/fixtures/<service>.go` for the target resource type. The related checker will find it via the standard prefetch + cache path.
+
+**Never** amend tests if fixtures do not have related IDs/fields. Fix fixtures, not tests.
 
 Use the resource short name in PascalCase as `{SourceCamel}` and `{TargetCamel}`:
 `ec2` → `EC2`, `rds` → `RDS`, `s3` → `S3`, `tg` → `TG`, `ebs` → `EBS`, etc.
@@ -612,28 +600,15 @@ func TestRelated_{Source}_{Target}_EmptySourceID(t *testing.T) {
 }
 ```
 
-### 10. Demo checker tests (MANDATORY for every registered source type)
+### 10. Cold-cache checker tests (MANDATORY for every registered source type)
 
-Add to the same `tests/unit/aws_{source}_related_test.go` file:
+Add to the same `tests/unit/aws_{source}_related_test.go` file. Tests drive the real checker through the typed fakes via the cold-cache harness — no demo registry needed:
 
 ```go
-func TestRelatedDemo_{Source}_Registered(t *testing.T) {
-    checker := resource.GetRelatedDemo("{source}")
-    if checker == nil {
-        t.Fatal("no demo checker registered for {source}")
-    }
-
-    results := checker(resource.Resource{ID: "demo-id"})
-    if len(results) == 0 {
-        t.Fatal("demo checker returned no results")
-    }
-
-    // Verify each result has a non-empty TargetType
-    for _, r := range results {
-        if r.TargetType == "" {
-            t.Error("demo result has empty TargetType")
-        }
-    }
+func TestRelated_{Source}_ColdCacheChecker(t *testing.T) {
+    m := newDemoColdCacheApp(t)
+    // Size, inject clients, navigate to source, fetch, open detail
+    // Assert related check produces non-empty results via the real checker path
 }
 ```
 
@@ -730,8 +705,7 @@ Files to create:
   internal/aws/{source}_related.go -- checker functions + cache helper (reuse shared relatedResult and assertStruct from ec2_related.go — do NOT redefine)
 Files to modify:
   internal/aws/{source}.go -- append RegisterRelated + RegisterNavigableFields in init()
-  internal/demo/fixtures_related.go -- append RegisterRelatedDemo
-    Append point: last RegisterRelatedDemo call in file
+  internal/demo/fixtures/<service>.go -- ensure target resource fixtures contain matching IDs
   internal/aws/interfaces.go -- append new interfaces (only if live-fetch fallback needs them)
     Append point: last interface in file
 Context files (read-only):
@@ -752,7 +726,7 @@ Test files to modify:
 What to test:
   - Navigable field registration: all expected fields registered with correct target types
   - Checkers: found / not found / cache-miss-no-clients / empty-source-ID
-  - Demo checker: registered and returns non-empty results with valid TargetTypes
+  - Cold-cache checker: drives real checker through typed fakes via newDemoColdCacheApp
   - Registry: all expected defs registered
 Context files (read-only):
   internal/aws/{source}_related.go -- function signatures
