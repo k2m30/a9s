@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_id", "attachment_count", "path", "create_date"})
+	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "path", "create_date"})
 
 	resource.RegisterPaginated("policy", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -72,11 +72,6 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 			policyName = *policy.PolicyName
 		}
 
-		policyID := ""
-		if policy.PolicyId != nil {
-			policyID = *policy.PolicyId
-		}
-
 		attachmentCount := "0"
 		if policy.AttachmentCount != nil {
 			attachmentCount = fmt.Sprintf("%d", *policy.AttachmentCount)
@@ -98,7 +93,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 			Status: "",
 			Fields: map[string]string{
 				"policy_name":      policyName,
-				"policy_id":        policyID,
+				"policy_type":      "managed",
 				"attachment_count": attachmentCount,
 				"path":             path,
 				"create_date":      createDate,

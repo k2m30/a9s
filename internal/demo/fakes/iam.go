@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
@@ -26,8 +27,26 @@ func (f *IAMFake) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(
 	return &iam.ListRolesOutput{Roles: f.fix.Roles}, nil
 }
 
-func (f *IAMFake) ListPolicies(_ context.Context, _ *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
-	return &iam.ListPoliciesOutput{Policies: f.fix.Policies}, nil
+func (f *IAMFake) ListPolicies(_ context.Context, input *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
+	policies := make([]iamtypes.Policy, 0, len(f.fix.Policies))
+	for _, policy := range f.fix.Policies {
+		if policy.Arn == nil {
+			policies = append(policies, policy)
+			continue
+		}
+		isCustomerManaged := fixtures.IsCustomerManagedPolicyARN(*policy.Arn)
+		switch {
+		case input == nil || input.Scope == "":
+			policies = append(policies, policy)
+		case input.Scope == iamtypes.PolicyScopeTypeAll:
+			policies = append(policies, policy)
+		case input.Scope == iamtypes.PolicyScopeTypeLocal && isCustomerManaged:
+			policies = append(policies, policy)
+		case input.Scope == iamtypes.PolicyScopeTypeAws && !isCustomerManaged:
+			policies = append(policies, policy)
+		}
+	}
+	return &iam.ListPoliciesOutput{Policies: policies}, nil
 }
 
 func (f *IAMFake) ListUsers(_ context.Context, _ *iam.ListUsersInput, _ ...func(*iam.Options)) (*iam.ListUsersOutput, error) {
@@ -115,4 +134,10 @@ func (f *IAMFake) GetGroup(_ context.Context, input *iam.GetGroupInput, _ ...fun
 		return nil, fmt.Errorf("group %q not found", *input.GroupName)
 	}
 	return &iam.GetGroupOutput{Group: group, Users: users}, nil
+}
+
+func (f *IAMFake) ListGroupPolicies(_ context.Context, input *iam.ListGroupPoliciesInput, _ ...func(*iam.Options)) (*iam.ListGroupPoliciesOutput, error) {
+	name := aws.ToString(input.GroupName)
+	policies := f.fix.InlineGroupPolicies[name]
+	return &iam.ListGroupPoliciesOutput{PolicyNames: policies}, nil
 }

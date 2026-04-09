@@ -581,6 +581,11 @@ type IAMGetGroupAPI interface {
 	GetGroup(ctx context.Context, params *iam.GetGroupInput, optFns ...func(*iam.Options)) (*iam.GetGroupOutput, error)
 }
 
+// IAMListGroupPoliciesAPI defines the interface for the IAM ListGroupPolicies operation.
+type IAMListGroupPoliciesAPI interface {
+	ListGroupPolicies(ctx context.Context, params *iam.ListGroupPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListGroupPoliciesOutput, error)
+}
+
 // ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
 type ELBv2DescribeRulesAPI interface {
 	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)
@@ -780,6 +785,7 @@ type IAMAPI interface {
 	IAMListEntitiesForPolicyAPI
 	IAMListAccountAliasesAPI
 	IAMGetGroupAPI
+	IAMListGroupPoliciesAPI
 }
 
 // WAFv2API is the aggregate interface covering all WAFv2 operations used by a9s fetchers.
