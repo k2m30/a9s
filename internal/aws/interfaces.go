@@ -649,3 +649,328 @@ type EC2DescribeTransitGatewayAttachmentsAPI interface {
 type WAFv2ListResourcesForWebACLAPI interface {
 	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
 }
+
+// EC2API is the aggregate interface covering all 16 EC2 operations used by a9s fetchers.
+// *ec2.Client structurally satisfies this interface; the EC2 fake must implement all 16 methods.
+type EC2API interface {
+	EC2DescribeInstancesAPI
+	EC2DescribeVpcsAPI
+	EC2DescribeSecurityGroupsAPI
+	EC2DescribeSubnetsAPI
+	EC2DescribeRouteTablesAPI
+	EC2DescribeNatGatewaysAPI
+	EC2DescribeInternetGatewaysAPI
+	EC2DescribeAddressesAPI
+	EC2DescribeTransitGatewaysAPI
+	EC2DescribeTransitGatewayAttachmentsAPI
+	EC2DescribeVpcEndpointsAPI
+	EC2DescribeNetworkInterfacesAPI
+	EC2DescribeVolumesAPI
+	EC2DescribeSnapshotsAPI
+	EC2DescribeImagesAPI
+}
+
+// S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
+// *s3.Client structurally satisfies this interface.
+type S3API interface {
+	S3ListBucketsAPI
+	S3ListObjectsV2API
+	S3GetBucketNotificationConfigurationAPI
+}
+
+// CloudTrailAPI is the aggregate interface covering all CloudTrail operations used by a9s fetchers.
+// *cloudtrail.Client structurally satisfies this interface.
+type CloudTrailAPI interface {
+	CloudTrailDescribeTrailsAPI
+	CloudTrailLookupEventsAPI
+}
+
+// RDSAPI is the aggregate interface covering all RDS operations used by a9s fetchers.
+// *rds.Client structurally satisfies this interface.
+type RDSAPI interface {
+	RDSDescribeDBInstancesAPI
+	RDSDescribeDBSnapshotsAPI
+	RDSDescribeEventsAPI
+}
+
+// ElastiCacheAPI is the aggregate interface covering all ElastiCache operations used by a9s fetchers.
+// *elasticache.Client structurally satisfies this interface.
+type ElastiCacheAPI interface {
+	ElastiCacheDescribeCacheClustersAPI
+}
+
+// DynamoDBAPI is the aggregate interface covering all DynamoDB operations used by a9s fetchers.
+// *dynamodb.Client structurally satisfies this interface.
+type DynamoDBAPI interface {
+	DDBListTablesAPI
+	DDBDescribeTableAPI
+}
+
+// DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
+// *docdb.Client structurally satisfies this interface.
+type DocDBAPI interface {
+	DocDBDescribeDBClustersAPI
+	DocDBDescribeDBClusterSnapshotsAPI
+}
+
+// LambdaAPI is the aggregate interface covering all Lambda operations used by a9s fetchers.
+// *lambda.Client structurally satisfies this interface.
+type LambdaAPI interface {
+	LambdaListFunctionsAPI
+	LambdaListEventSourceMappingsAPI
+	LambdaGetFunctionAPI
+}
+
+// ECSAPI is the aggregate interface covering all ECS operations used by a9s fetchers.
+// *ecs.Client structurally satisfies this interface.
+type ECSAPI interface {
+	ECSListClustersAPI
+	ECSDescribeClustersAPI
+	ECSListServicesAPI
+	ECSDescribeServicesAPI
+	ECSListTasksAPI
+	ECSDescribeTasksAPI
+	ECSDescribeTaskDefinitionAPI
+}
+
+// EKSAPI is the aggregate interface covering all EKS operations used by a9s fetchers.
+// *eks.Client structurally satisfies this interface.
+type EKSAPI interface {
+	EKSListClustersAPI
+	EKSDescribeClusterAPI
+	EKSListNodegroupsAPI
+	EKSDescribeNodegroupAPI
+}
+
+// ASGAPI is the aggregate interface covering all AutoScaling operations used by a9s fetchers.
+// *autoscaling.Client structurally satisfies this interface.
+type ASGAPI interface {
+	ASGDescribeAutoScalingGroupsAPI
+	ASGDescribeScalingActivitiesAPI
+}
+
+// ElasticBeanstalkAPI is the aggregate interface covering all ElasticBeanstalk operations used by a9s fetchers.
+// *elasticbeanstalk.Client structurally satisfies this interface.
+type ElasticBeanstalkAPI interface {
+	EBDescribeEnvironmentsAPI
+}
+
+// ELBv2API is the aggregate interface covering all ELBv2 operations used by a9s fetchers.
+// *elbv2.Client structurally satisfies this interface.
+type ELBv2API interface {
+	ELBv2DescribeLoadBalancersAPI
+	ELBv2DescribeTargetGroupsAPI
+	ELBv2DescribeTargetHealthAPI
+	ELBv2DescribeListenersAPI
+	ELBv2DescribeRulesAPI
+}
+
+// IAMAPI is the aggregate interface covering all IAM operations used by a9s fetchers.
+// *iam.Client structurally satisfies this interface.
+type IAMAPI interface {
+	IAMListRolesAPI
+	IAMListPoliciesAPI
+	IAMListUsersAPI
+	IAMListGroupsAPI
+	IAMListAttachedRolePoliciesAPI
+	IAMListRolePoliciesAPI
+	IAMListAttachedUserPoliciesAPI
+	IAMListAttachedGroupPoliciesAPI
+	IAMListGroupsForUserAPI
+	IAMListEntitiesForPolicyAPI
+	IAMListAccountAliasesAPI
+	IAMGetGroupAPI
+}
+
+// WAFv2API is the aggregate interface covering all WAFv2 operations used by a9s fetchers.
+// *wafv2.Client structurally satisfies this interface.
+type WAFv2API interface {
+	WAFv2ListWebACLsAPI
+	WAFv2ListResourcesForWebACLAPI
+}
+
+// SecretsManagerAPI is the aggregate interface covering all SecretsManager operations used by a9s fetchers.
+// *secretsmanager.Client structurally satisfies this interface.
+type SecretsManagerAPI interface {
+	SecretsManagerListSecretsAPI
+	SecretsManagerGetSecretValueAPI
+}
+
+// SSMAPI is the aggregate interface covering all SSM operations used by a9s fetchers.
+// *ssm.Client structurally satisfies this interface.
+type SSMAPI interface {
+	SSMDescribeParametersAPI
+	SSMGetParameterAPI
+}
+
+// KMSAPI is the aggregate interface covering all KMS operations used by a9s fetchers.
+// *kms.Client structurally satisfies this interface.
+type KMSAPI interface {
+	KMSListKeysAPI
+	KMSDescribeKeyAPI
+	KMSListAliasesAPI
+}
+
+// Route53API is the aggregate interface covering all Route53 operations used by a9s fetchers.
+// *route53.Client structurally satisfies this interface.
+type Route53API interface {
+	Route53ListHostedZonesAPI
+	Route53ListResourceRecordSetsAPI
+}
+
+// CloudFrontAPI is the aggregate interface covering all CloudFront operations used by a9s fetchers.
+// *cloudfront.Client structurally satisfies this interface.
+type CloudFrontAPI interface {
+	CloudFrontListDistributionsAPI
+}
+
+// ACMAPI is the aggregate interface covering all ACM operations used by a9s fetchers.
+// *acm.Client structurally satisfies this interface.
+type ACMAPI interface {
+	ACMListCertificatesAPI
+}
+
+// APIGatewayV2API is the aggregate interface covering all APIGatewayV2 operations used by a9s fetchers.
+// *apigatewayv2.Client structurally satisfies this interface.
+type APIGatewayV2API interface {
+	APIGatewayV2GetApisAPI
+}
+
+// CFNAPI is the aggregate interface covering all CloudFormation operations used by a9s fetchers.
+// *cloudformation.Client structurally satisfies this interface.
+type CFNAPI interface {
+	CFNDescribeStacksAPI
+	CFNDescribeStackEventsAPI
+	CFNListStackResourcesAPI
+}
+
+// CodeBuildAPI is the aggregate interface covering all CodeBuild operations used by a9s fetchers.
+// *codebuild.Client structurally satisfies this interface.
+type CodeBuildAPI interface {
+	CodeBuildListProjectsAPI
+	CodeBuildBatchGetProjectsAPI
+	CodeBuildListBuildsForProjectAPI
+	CodeBuildBatchGetBuildsAPI
+}
+
+// CodePipelineAPI is the aggregate interface covering all CodePipeline operations used by a9s fetchers.
+// *codepipeline.Client structurally satisfies this interface.
+type CodePipelineAPI interface {
+	CodePipelineListPipelinesAPI
+	CodePipelineGetPipelineStateAPI
+}
+
+// ECRAPI is the aggregate interface covering all ECR operations used by a9s fetchers.
+// *ecr.Client structurally satisfies this interface.
+type ECRAPI interface {
+	ECRDescribeRepositoriesAPI
+	ECRDescribeImagesAPI
+}
+
+// CodeArtifactAPI is the aggregate interface covering all CodeArtifact operations used by a9s fetchers.
+// *codeartifact.Client structurally satisfies this interface.
+type CodeArtifactAPI interface {
+	CodeArtifactListRepositoriesAPI
+}
+
+// CloudWatchAPI is the aggregate interface covering all CloudWatch operations used by a9s fetchers.
+// *cloudwatch.Client structurally satisfies this interface.
+type CloudWatchAPI interface {
+	CloudWatchDescribeAlarmsAPI
+	CloudWatchDescribeAlarmHistoryAPI
+}
+
+// CWLogsAPI is the aggregate interface covering all CloudWatchLogs operations used by a9s fetchers.
+// *cloudwatchlogs.Client structurally satisfies this interface.
+type CWLogsAPI interface {
+	CWLogsDescribeLogGroupsAPI
+	CWLogsDescribeLogStreamsAPI
+	CWLogsGetLogEventsAPI
+	CWLogsFilterLogEventsAPI
+}
+
+// SQSAPI is the aggregate interface covering all SQS operations used by a9s fetchers.
+// *sqs.Client structurally satisfies this interface.
+type SQSAPI interface {
+	SQSListQueuesAPI
+	SQSGetQueueAttributesAPI
+}
+
+// SNSAPI is the aggregate interface covering all SNS operations used by a9s fetchers.
+// *sns.Client structurally satisfies this interface.
+type SNSAPI interface {
+	SNSListTopicsAPI
+	SNSListSubscriptionsAPI
+	SNSListSubscriptionsByTopicAPI
+}
+
+// EventBridgeAPI is the aggregate interface covering all EventBridge operations used by a9s fetchers.
+// *eventbridge.Client structurally satisfies this interface.
+type EventBridgeAPI interface {
+	EventBridgeListRulesAPI
+	EventBridgeListTargetsByRuleAPI
+}
+
+// KinesisAPI is the aggregate interface covering all Kinesis operations used by a9s fetchers.
+// *kinesis.Client structurally satisfies this interface.
+type KinesisAPI interface {
+	KinesisListStreamsAPI
+}
+
+// SFNAPI is the aggregate interface covering all SFN operations used by a9s fetchers.
+// *sfn.Client structurally satisfies this interface.
+type SFNAPI interface {
+	SFNListStateMachinesAPI
+	SFNListExecutionsAPI
+	SFNGetExecutionHistoryAPI
+}
+
+// MSKAPI is the aggregate interface covering all MSK operations used by a9s fetchers.
+// *kafka.Client structurally satisfies this interface.
+type MSKAPI interface {
+	MSKListClustersV2API
+}
+
+// GlueAPI is the aggregate interface covering all Glue operations used by a9s fetchers.
+// *glue.Client structurally satisfies this interface.
+type GlueAPI interface {
+	GlueGetJobsAPI
+	GlueGetJobRunsAPI
+}
+
+// AthenaAPI is the aggregate interface covering all Athena operations used by a9s fetchers.
+// *athena.Client structurally satisfies this interface.
+type AthenaAPI interface {
+	AthenaListWorkGroupsAPI
+}
+
+// OpenSearchAPI is the aggregate interface covering all OpenSearch operations used by a9s fetchers.
+// *opensearch.Client structurally satisfies this interface.
+type OpenSearchAPI interface {
+	OpenSearchListDomainNamesAPI
+	OpenSearchDescribeDomainsAPI
+}
+
+// RedshiftAPI is the aggregate interface covering all Redshift operations used by a9s fetchers.
+// *redshift.Client structurally satisfies this interface.
+type RedshiftAPI interface {
+	RedshiftDescribeClustersAPI
+}
+
+// BackupAPI is the aggregate interface covering all Backup operations used by a9s fetchers.
+// *backup.Client structurally satisfies this interface.
+type BackupAPI interface {
+	BackupListBackupPlansAPI
+}
+
+// SESv2API is the aggregate interface covering all SESv2 operations used by a9s fetchers.
+// *sesv2.Client structurally satisfies this interface.
+type SESv2API interface {
+	SESv2ListEmailIdentitiesAPI
+}
+
+// EFSAPI is the aggregate interface covering all EFS operations used by a9s fetchers.
+// *efs.Client structurally satisfies this interface.
+type EFSAPI interface {
+	EFSDescribeFileSystemsAPI
+}

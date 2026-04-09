@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Demo mode (`--demo`) refactored to a hybrid transport: the legacy HTTP transport mock continues to back most AWS services, while a new per-service typed-fake pattern (currently used for EC2) provides stronger correctness for migrated services. New code: `internal/demo/fakes/<service>.go` per fake, `internal/demo/fixtures/<service>.go` per fixture file. The typed `EC2API` interface in `internal/aws/interfaces.go` aggregates all 16 EC2 methods a9s calls. Removed the `demoMode` field from `tui.Model` and all `demoMode` branches above the client layer (15 sites in 5 files), the AMI demo workaround in `app_related.go`, and the EC2 nil-client guard in `tgw_related.go`.
+
 ## [3.33.0] - 2026-04-07
 
 ### Changed

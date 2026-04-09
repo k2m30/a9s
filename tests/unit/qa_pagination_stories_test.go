@@ -764,13 +764,21 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
+	clients := demo.NewServiceClients()
+	ctx := context.Background()
+
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName, func(t *testing.T) {
 			// Simulate first-page pagination from demo fixture data.
-			allResources, ok := demo.GetResources(rt.ShortName)
-			if !ok {
+			fetcher := resource.GetPaginatedFetcher(rt.ShortName)
+			if fetcher == nil {
 				t.Skipf("no demo data for %s", rt.ShortName)
 			}
+			fetchResult, fetchErr := fetcher(ctx, clients, "")
+			if fetchErr != nil || len(fetchResult.Resources) == 0 {
+				t.Skipf("no demo data for %s (err=%v)", rt.ShortName, fetchErr)
+			}
+			allResources := fetchResult.Resources
 			total := len(allResources)
 
 			// Simulate first-page pagination (page size 5)
@@ -854,13 +862,21 @@ func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
 		{"asg_activities", map[string]string{"AutoScalingGroupName": "web-asg"}},
 	}
 
+	clients2 := demo.NewServiceClients()
+	ctx2 := context.Background()
+
 	for _, tc := range childTypes {
 		t.Run(tc.childType, func(t *testing.T) {
 			// Simulate first-page pagination from demo fixture data.
-			allResources, ok := demo.GetChildResources(tc.childType, tc.parentCtx)
-			if !ok {
+			childFetcher := resource.GetPaginatedChildFetcher(tc.childType)
+			if childFetcher == nil {
 				t.Skipf("no demo data for child type %s", tc.childType)
 			}
+			childResult, childErr := childFetcher(ctx2, clients2, resource.ParentContext(tc.parentCtx), "")
+			if childErr != nil || len(childResult.Resources) == 0 {
+				t.Skipf("no demo data for child type %s (err=%v)", tc.childType, childErr)
+			}
+			allResources := childResult.Resources
 			total := len(allResources)
 
 			pageSize := 5
