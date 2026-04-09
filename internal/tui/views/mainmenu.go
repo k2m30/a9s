@@ -247,6 +247,9 @@ func (m MainMenuModel) View() string {
 		item := m.filteredItems[rl.itemIndex]
 
 		aliasStr := ":" + item.ShortName
+		if len(item.Aliases) > 0 {
+			aliasStr = ":" + item.Aliases[0]
+		}
 		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
 
 		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.

@@ -40,7 +40,12 @@ func TestContentMainMenu_ViewContainsShortNames(t *testing.T) {
 	m.SetSize(120, 80)
 	out := m.View()
 	for _, rt := range resource.AllResourceTypes() {
-		alias := ":" + rt.ShortName
+		// Menu renders Aliases[0] when present, else ShortName — match that logic.
+		aliasKey := rt.ShortName
+		if len(rt.Aliases) > 0 {
+			aliasKey = rt.Aliases[0]
+		}
+		alias := ":" + aliasKey
 		// The alias column is 13 chars wide; aliases longer than that get truncated.
 		// Check for the prefix that fits within the column.
 		if len(alias) > 13 {
