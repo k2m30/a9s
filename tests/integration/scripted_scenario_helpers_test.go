@@ -188,6 +188,9 @@ func (s *fullIntegrationScenario) OpenList(resourceType string) {
 		return
 	}
 	if s.lastResourcesLoaded == nil || s.lastResourcesLoaded.ResourceType != resourceType {
+		if s.currentListType == resourceType && strings.Contains(s.currentView(), resourceType+"(") {
+			return
+		}
 		s.failf("open list %s did not produce ResourcesLoadedMsg", resourceType)
 	}
 }
@@ -213,6 +216,11 @@ func (s *fullIntegrationScenario) OpenDetailFromCurrentListByName(name string) {
 	s.t.Helper()
 	res := s.findCurrentListResource(func(res resource.Resource) bool { return res.Name == name }, "name="+name)
 	s.OpenDetailResource(s.currentListType, res)
+}
+
+func (s *fullIntegrationScenario) OpenSelectedDetail() {
+	s.t.Helper()
+	s.Press("d")
 }
 
 func (s *fullIntegrationScenario) FollowRelated(displayName string) {
@@ -257,6 +265,75 @@ func (s *fullIntegrationScenario) Command(cmd string) {
 		Text:    fmt.Sprintf("unknown command: %s", cmd),
 		IsError: true,
 	})
+}
+
+func (s *fullIntegrationScenario) Type(text string) {
+	s.t.Helper()
+	for _, r := range text {
+		s.record("type %q", string(r))
+		s.applyAndDrain(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+}
+
+func (s *fullIntegrationScenario) StartFilter() {
+	s.t.Helper()
+	s.beginAction("start filter")
+	s.applyAndDrain(fullIntegrationScenarioKeyPress(s.t, "/"))
+}
+
+func (s *fullIntegrationScenario) ApplyFilter(text string) {
+	s.t.Helper()
+	s.StartFilter()
+	s.Type(text)
+	s.ConfirmInput()
+}
+
+func (s *fullIntegrationScenario) StartSearch() {
+	s.t.Helper()
+	s.beginAction("start search")
+	s.applyAndDrain(fullIntegrationScenarioKeyPress(s.t, "/"))
+}
+
+func (s *fullIntegrationScenario) ApplySearch(text string) {
+	s.t.Helper()
+	s.StartSearch()
+	s.Type(text)
+	s.ConfirmInput()
+}
+
+func (s *fullIntegrationScenario) ConfirmInput() {
+	s.t.Helper()
+	s.Press("enter")
+}
+
+func (s *fullIntegrationScenario) SearchNext() {
+	s.t.Helper()
+	s.Press("n")
+}
+
+func (s *fullIntegrationScenario) SearchPrev() {
+	s.t.Helper()
+	s.Press("N")
+}
+
+func (s *fullIntegrationScenario) SortByName() {
+	s.t.Helper()
+	s.Press("N")
+}
+
+func (s *fullIntegrationScenario) SortByID() {
+	s.t.Helper()
+	s.Press("I")
+}
+
+func (s *fullIntegrationScenario) SortByAge() {
+	s.t.Helper()
+	s.Press("A")
+}
+
+func (s *fullIntegrationScenario) OpenYAML() {
+	s.t.Helper()
+	s.Press("y")
 }
 
 func (s *fullIntegrationScenario) ChooseRegion(region string) {
@@ -317,6 +394,18 @@ func (s *fullIntegrationScenario) ExpectViewContains(want string) {
 	}
 }
 
+func (s *fullIntegrationScenario) ExpectViewNotContains(unwanted string) {
+	s.t.Helper()
+	if strings.Contains(s.currentView(), unwanted) {
+		s.failf("view unexpectedly contains %q", unwanted)
+	}
+}
+
+func (s *fullIntegrationScenario) ExpectHeaderContains(want string) {
+	s.t.Helper()
+	s.ExpectViewContains(want)
+}
+
 func (s *fullIntegrationScenario) ExpectFlashContains(want string) {
 	s.t.Helper()
 	if s.lastFlash == nil {
@@ -365,6 +454,13 @@ func (s *fullIntegrationScenario) ExpectCurrentListType(resourceType string) {
 	s.t.Helper()
 	if s.currentListType != resourceType {
 		s.failf("current list type = %q, expected %q", s.currentListType, resourceType)
+	}
+}
+
+func (s *fullIntegrationScenario) ExpectLoadedCount(want int) {
+	s.t.Helper()
+	if got := len(s.currentListResources); got != want {
+		s.failf("current loaded count = %d, expected %d", got, want)
 	}
 }
 
@@ -583,6 +679,8 @@ func fullIntegrationScenarioKeyPress(t *testing.T, key string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyLeft}
 	case "right":
 		return tea.KeyPressMsg{Code: tea.KeyRight}
+	case "tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab}
 	case "pgup":
 		return tea.KeyPressMsg{Code: tea.KeyPgUp}
 	case "pgdown":
