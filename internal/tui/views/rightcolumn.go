@@ -28,21 +28,23 @@ type rightColumnRow struct {
 }
 
 type rightColumnModel struct {
-	rows         []rightColumnRow
-	cursor       int
-	focused      bool
-	width        int
-	height       int
-	scrollOffset int
-	filterQuery  string
-	filterActive bool
-	parentRes    resource.Resource // stored for RelatedNavigateMsg construction
-	keys         keys.Map
+	rows               []rightColumnRow
+	cursor             int
+	focused            bool
+	width              int
+	height             int
+	scrollOffset       int
+	filterQuery        string
+	filterActive       bool
+	parentRes          resource.Resource // stored for RelatedNavigateMsg construction
+	sourceResourceType string            // short name of the resource type being detailed (e.g. "ct-events")
+	keys               keys.Map
 }
 
 // newRightColumn constructs a rightColumnModel from related definitions and a parent resource.
+// sourceType is the short name of the resource type being detailed (e.g. "ct-events").
 // All rows start in loading state; checkers are dispatched by app.go.
-func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource) rightColumnModel {
+func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sourceType string) rightColumnModel {
 	rows := make([]rightColumnRow, len(defs))
 	for i, def := range defs {
 		rows[i] = rightColumnRow{
@@ -53,9 +55,10 @@ func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource) rig
 		}
 	}
 	return rightColumnModel{
-		rows:      rows,
-		parentRes: parentRes,
-		keys:      keys.Default(),
+		rows:               rows,
+		parentRes:          parentRes,
+		sourceResourceType: sourceType,
+		keys:               keys.Default(),
 	}
 }
 
@@ -71,15 +74,42 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 		return m.updateKeyMsg(msg)
 
 	case messages.RelatedCheckResultMsg:
+		// When multiple rows share the same TargetType (e.g. the 4 ct-events
+		// self-pivot rows all have TargetType="ct-events"), results arrive as
+		// separate messages. To resolve all rows, prefer the first STILL-LOADING
+		// row with the matching TargetType (FIFO). Only fall back to the first row
+		// of that type if all are already resolved (late-arriving duplicate).
+		// Match by DefDisplayName which is unique per def (multiple defs can share TargetType,
+		// e.g. the 4 ct-events self-pivots all have TargetType="ct-events" but distinct
+		// display names "CT events by AccessKeyId/Username/EventName/SharedEventId").
+		targetIdx := -1
 		for i := range m.rows {
-			if m.rows[i].targetType == msg.Result.TargetType {
-				m.rows[i].loading = false
-				m.rows[i].err = msg.Result.Err
-				m.rows[i].count = msg.Result.Count
-				m.rows[i].resourceIDs = msg.Result.ResourceIDs
-				m.rows[i].fetchFilter = msg.Result.FetchFilter
+			if m.rows[i].displayName == msg.DefDisplayName {
+				targetIdx = i
 				break
 			}
+		}
+		// Fallback for messages without DefDisplayName (legacy/test injection):
+		// use the old loading-first-match-by-TargetType logic.
+		if targetIdx < 0 && msg.DefDisplayName == "" {
+			for i := range m.rows {
+				if m.rows[i].targetType == msg.Result.TargetType {
+					if m.rows[i].loading {
+						targetIdx = i
+						break
+					}
+					if targetIdx < 0 {
+						targetIdx = i
+					}
+				}
+			}
+		}
+		if targetIdx >= 0 {
+			m.rows[targetIdx].loading = false
+			m.rows[targetIdx].err = msg.Result.Err
+			m.rows[targetIdx].count = msg.Result.Count
+			m.rows[targetIdx].resourceIDs = msg.Result.ResourceIDs
+			m.rows[targetIdx].fetchFilter = msg.Result.FetchFilter
 		}
 		// Keep selection on an actionable row when possible.
 		m.ensureCursorValid()
@@ -276,6 +306,20 @@ func isActionableRow(row rightColumnRow) bool {
 	return row.count > 0
 }
 
+// isSelfPivotZeroRow reports whether a row is a self-pivot row (its TargetType equals
+// the source resource type) that has resolved with count=0 and no error.
+// Self-pivot rows are filters (navigate to a filtered self-list), not counts —
+// showing "(0)" for a self-pivot is semantically meaningless and must be hidden.
+// Non-self target types (e.g. "ec2" rows visible on a different source type) always
+// remain visible even when their count is 0.
+func (m rightColumnModel) isSelfPivotZeroRow(row rightColumnRow) bool {
+	return !row.loading &&
+		row.err == nil &&
+		row.count == 0 &&
+		m.sourceResourceType != "" &&
+		row.targetType == m.sourceResourceType
+}
+
 func (m rightColumnModel) visibleIndexes() []int {
 	if len(m.rows) == 0 {
 		return nil
@@ -283,14 +327,16 @@ func (m rightColumnModel) visibleIndexes() []int {
 	query := strings.TrimSpace(strings.ToLower(m.filterQuery))
 	if query == "" {
 		idx := make([]int, 0, len(m.rows))
-		for i := range m.rows {
-			idx = append(idx, i)
+		for i, row := range m.rows {
+			if !m.isSelfPivotZeroRow(row) {
+				idx = append(idx, i)
+			}
 		}
 		return idx
 	}
 	idx := make([]int, 0, len(m.rows))
 	for i, row := range m.rows {
-		if strings.Contains(strings.ToLower(row.displayName), query) {
+		if !m.isSelfPivotZeroRow(row) && strings.Contains(strings.ToLower(row.displayName), query) {
 			idx = append(idx, i)
 		}
 	}

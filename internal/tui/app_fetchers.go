@@ -382,9 +382,9 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 }
 
 // saveAvailabilityCache returns a tea.Cmd that persists the current availability state to disk.
-// No-op in demo mode (no cache files for synthetic data).
+// No-op when caching is disabled (e.g. demo mode or --no-cache).
 func (m *Model) saveAvailabilityCache() tea.Cmd {
-	if m.demoMode {
+	if m.noCache {
 		return nil
 	}
 	profile := m.profile
@@ -418,5 +418,39 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 		// Best-effort save — don't flash errors for cache write failures
 		_ = cache.Save(cf)
 		return nil
+	}
+}
+
+// demoPrefetchCounts returns a tea.Cmd that synchronously calls all registered
+// paginated fetchers and returns AvailabilityPrefetchedMsg with all counts
+// pre-filled. Used when pre-supplied clients are present and no-cache is active,
+// so the main menu shows counts immediately without the async probe pipeline.
+func (m *Model) demoPrefetchCounts() tea.Cmd {
+	clients := m.clients
+	appCtx := m.appCtx
+	return func() tea.Msg {
+		allNames := resource.AllShortNames()
+		entries := make(map[string]int, len(allNames))
+		truncated := make(map[string]bool)
+		ctx, cancel := context.WithTimeout(appCtx, 30*time.Second)
+		defer cancel()
+		for _, shortName := range allNames {
+			pf := resource.GetPaginatedFetcher(shortName)
+			if pf == nil {
+				continue
+			}
+			result, err := pf(ctx, clients, "")
+			if err != nil {
+				continue
+			}
+			entries[shortName] = len(result.Resources)
+			if result.Pagination != nil && result.Pagination.IsTruncated {
+				truncated[shortName] = true
+			}
+		}
+		return messages.AvailabilityPrefetchedMsg{
+			Entries:   entries,
+			Truncated: truncated,
+		}
 	}
 }

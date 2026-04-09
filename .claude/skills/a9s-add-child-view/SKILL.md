@@ -78,8 +78,10 @@ Files to modify:
   .a9s/views/{child_shortname}.yaml — regenerate via viewsgen
   cmd/refgen/main.go — append entry (if SDK struct)
     Append point: last entry in resources slice
-  internal/demo/fixtures_{category}.go — register child demo
-    Append point: grep "RegisterChildDemo" in file
+  internal/demo/fixtures/<service>.go — add child fixture data to the parent service's fixture file
+    Append point: last fixture builder function in the service file
+  internal/demo/fakes/<service>.go — extend the fake to serve the child data
+    Append point: last method on the fake struct
 Context files (read-only):
   internal/aws/{parent}.go — parent fetcher for ContextKeys verification
   internal/aws/ec2.go — canonical example
@@ -184,7 +186,14 @@ type {InterfaceName} interface {
 
 **7. Refgen:** `cmd/refgen/main.go` (APPEND if SDK struct)
 
-**8. Demo fixtures:** `internal/demo/fixtures_{category}.go`
+**8. Demo fixtures:**
+
+**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`internal/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`internal/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
+
+- **Preferred (migrated services):** add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`.
+- **Legacy (non-migrated services):** add fixture data to the matching `internal/demo/fixtures_*.go` category file and (if needed) extend handlers in `internal/demo/handlers.go`.
+
+When adding a new child view, match the parent service's current layer. Do not mix layers for the same service.
 
 **9. Parent fetcher** (IF needed): add missing Fields (e.g., ARN)
 

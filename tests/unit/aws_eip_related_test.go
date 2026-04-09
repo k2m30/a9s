@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -219,36 +218,5 @@ func TestRelated_EIP_NAT_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_EIP_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("eip")
-	if checker == nil {
-		t.Fatal("no demo checker registered for eip")
-	}
-
-	results := checker(resource.Resource{ID: "eipalloc-0a1b2c3d4e5f60001"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all three target types are covered by the demo
-	covered := map[string]bool{}
-	for _, r := range results {
-		covered[r.TargetType] = true
-	}
-	for _, target := range []string{"ec2", "eni", "nat"} {
-		if !covered[target] {
-			t.Errorf("demo checker missing result for target type %q", target)
-		}
 	}
 }

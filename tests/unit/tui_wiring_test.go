@@ -6,7 +6,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"context"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -414,27 +418,21 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 
 func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	// Step 1: Find a resource type with known fixture count.
-	var targetType string
-	var totalCount int
-	for _, shortName := range resource.AllShortNames() {
-		all, ok := demo.GetResources(shortName)
-		if !ok {
-			continue
-		}
-		if len(all) > 0 {
-			targetType = shortName
-			totalCount = len(all)
-			break
-		}
+	// Use ec2 which always has typed-fake fixtures.
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
-	if targetType == "" {
-		t.Fatal("test requires at least one resource type with demo fixtures")
-	}
+	targetType := "ec2"
+	totalCount := len(ec2Res)
 
-	// Step 2: Create a demo-mode model with real clients backed by the demo transport.
+	// Step 2: Create a demo-mode model with real clients backed by the typed fakes.
+	// Using demo.NewServiceClients() so the probe uses the same typed-fake data
+	// that FetchEC2Instances returned above.
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, demoClientsReadyMsg())
+	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: demo.NewServiceClients()})
 
 	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
 	// In demo mode, loadAvailabilityCache returns Expired: true (no cache file),

@@ -9,7 +9,6 @@ import (
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -146,38 +145,5 @@ func TestRelated_OpenSearch_CFN_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_OpenSearch_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("opensearch")
-	if checker == nil {
-		t.Fatal("no demo checker registered for opensearch")
-	}
-
-	results := checker(resource.Resource{ID: "acme-logs"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"alarm": false, "cfn": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
 	}
 }

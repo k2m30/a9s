@@ -3,7 +3,6 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -40,24 +39,6 @@ func TestRelated_DocdbSnap_Registered(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("expected related def for target %q not found", target)
-		}
-	}
-}
-
-func TestRelatedDemo_DocdbSnap_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("docdb-snap")
-	if checker == nil {
-		t.Fatal("no demo checker registered for docdb-snap")
-	}
-
-	results := checker(resource.Resource{ID: "acme-docdb-snap-prod"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
 		}
 	}
 }

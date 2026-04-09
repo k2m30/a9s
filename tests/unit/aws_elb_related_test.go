@@ -9,7 +9,6 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -44,31 +43,6 @@ func TestNavigableFields_ELB_Registered(t *testing.T) {
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
 		}
-	}
-}
-
-func TestNavigableFields_ELB_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("elb")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no elb demo fixtures available")
-	}
-
-	// Verify that the first fixture has a non-empty VpcId in its RawStruct.
-	raw, ok := resources[0].RawStruct.(elbv2types.LoadBalancer)
-	if !ok {
-		t.Fatalf("RawStruct is not elbv2types.LoadBalancer, got %T", resources[0].RawStruct)
-	}
-	if raw.VpcId == nil || *raw.VpcId == "" {
-		t.Error("fixture RawStruct.VpcId is nil or empty — VpcId field path cannot resolve")
-	}
-	if len(raw.SecurityGroups) == 0 {
-		t.Error("fixture RawStruct.SecurityGroups is empty — SecurityGroups field path cannot resolve")
-	}
-	if len(raw.AvailabilityZones) == 0 {
-		t.Error("fixture RawStruct.AvailabilityZones is empty — AvailabilityZones.SubnetId field path cannot resolve")
-	}
-	if raw.AvailabilityZones[0].SubnetId == nil || *raw.AvailabilityZones[0].SubnetId == "" {
-		t.Error("fixture RawStruct.AvailabilityZones[0].SubnetId is nil or empty")
 	}
 }
 
@@ -321,50 +295,5 @@ func TestRelated_ELB_CFN_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_ELB_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("elb")
-	if checker == nil {
-		t.Fatal("no demo checker registered for elb")
-	}
-
-	results := checker(resource.Resource{ID: "acme-prod-web"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"tg": false, "alarm": false, "cfn": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// At least one result must have Count > 0 (tg or alarm).
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
 	}
 }

@@ -6,7 +6,6 @@ import (
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -146,24 +145,5 @@ func TestRelated_AMI_ASG_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "asg" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "asg")
-	}
-}
-
-// --- Demo Checker Test ---
-
-func TestRelatedDemo_AMI_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ami")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ami")
-	}
-	results := checker(resource.Resource{ID: "ami-demo"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

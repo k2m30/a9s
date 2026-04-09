@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,6 +112,11 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1}
+	}
+	// Inline policies: extract group name from path "inline/<group>"
+	if path := res.Fields["path"]; strings.HasPrefix(path, "inline/") {
+		groupName := strings.TrimPrefix(path, "inline/")
+		return relatedResult("iam-group", []string{groupName})
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {

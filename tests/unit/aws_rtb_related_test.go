@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -43,56 +42,6 @@ func TestNavigableFields_RTB_Registered(t *testing.T) {
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
 		}
-	}
-}
-
-func TestNavigableFields_RTB_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("rtb")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no rtb demo fixtures available")
-	}
-
-	// First fixture: rtb-0aaa111111111111a (main RTB — has NatGatewayId, no SubnetId in assoc)
-	raw, ok := resources[0].RawStruct.(ec2types.RouteTable)
-	if !ok {
-		t.Fatalf("RawStruct is not ec2types.RouteTable, got %T", resources[0].RawStruct)
-	}
-	if raw.VpcId == nil || *raw.VpcId == "" {
-		t.Error("fixture[0] RawStruct.VpcId is nil or empty — VpcId field path cannot resolve")
-	}
-	if len(raw.Routes) == 0 {
-		t.Error("fixture[0] RawStruct.Routes is empty — Routes.NatGatewayId field path cannot resolve")
-	}
-
-	hasNatGW := false
-	for _, r := range raw.Routes {
-		if r.NatGatewayId != nil && *r.NatGatewayId != "" {
-			hasNatGW = true
-			break
-		}
-	}
-	if !hasNatGW {
-		t.Error("fixture[0] RawStruct.Routes has no route with non-nil NatGatewayId")
-	}
-
-	// Second fixture: rtb-0bbb222222222222b (public RTB — has SubnetId in associations)
-	if len(resources) < 2 {
-		t.Fatal("expected at least 2 rtb demo fixtures")
-	}
-	raw2, ok := resources[1].RawStruct.(ec2types.RouteTable)
-	if !ok {
-		t.Fatalf("fixture[1] RawStruct is not ec2types.RouteTable, got %T", resources[1].RawStruct)
-	}
-
-	hasSubnetID := false
-	for _, assoc := range raw2.Associations {
-		if assoc.SubnetId != nil && *assoc.SubnetId != "" {
-			hasSubnetID = true
-			break
-		}
-	}
-	if !hasSubnetID {
-		t.Error("fixture[1] RawStruct.Associations has no association with non-nil SubnetId")
 	}
 }
 
@@ -504,61 +453,5 @@ func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_RTB_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("rtb")
-	if checker == nil {
-		t.Fatal("no demo checker registered for rtb")
-	}
-
-	// Use the first fixture: rtb-0aaa111111111111a (main RTB with NAT gateway route)
-	results := checker(resource.Resource{ID: "rtb-0aaa111111111111a"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"subnet": false, "nat": false, "igw": false, "cfn": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// At least one result must have Count > 0. The first fixture has a NAT gateway route.
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
-	}
-
-	// Specifically verify nat has Count=1 for rtb-0aaa111111111111a.
-	for _, r := range results {
-		if r.TargetType == "nat" {
-			if r.Count != 1 {
-				t.Errorf("nat Count = %d, want 1 for rtb-0aaa111111111111a", r.Count)
-			}
-			break
-		}
 	}
 }
