@@ -2,14 +2,14 @@
 // Run with: go run ./cmd/preview-pagination/
 //
 // Shows all states from docs/design/pagination-interactions.md:
-//   1. Truncated list (200+ items, first page)
-//   2. Loading more (in progress)
-//   3. All pages loaded (no truncation)
-//   4. Filter active on truncated list
-//   5. Filter active, zero matches, truncated
-//   6. After refresh (Ctrl+R)
-//   7. Non-paginated list (legacy fetcher, no changes)
-//   8. Sorted truncated list
+//  1. Truncated list (200+ items, first page)
+//  2. Loading more (in progress)
+//  3. All pages loaded (no truncation)
+//  4. Filter active on truncated list
+//  5. Filter active, zero matches, truncated
+//  6. After refresh (Ctrl+R)
+//  7. Non-paginated list (legacy fetcher, no changes)
+//  8. Sorted truncated list
 package main
 
 import (
@@ -72,10 +72,7 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 	rightW := lipgloss.Width(rightContent)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -112,10 +109,7 @@ func renderFramedBox(lines []string, title string, w int) string {
 		titleRendered := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render(title)
 		titleVis := lipgloss.Width(titleRendered)
 
-		totalDashes := w - 2 - titleVis - 2
-		if totalDashes < 2 {
-			totalDashes = 2
-		}
+		totalDashes := max(w-2-titleVis-2, 2)
 		leftDashes := totalDashes / 2
 		rightDashes := totalDashes - leftDashes
 

@@ -70,8 +70,10 @@ const dangerCTJSON = `{
 }`
 
 // awsStrPtr returns a *string pointing to s — helper for cloudtrailtypes.Event fields.
+//
+//go:fix inline
 func awsStrPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
@@ -79,9 +81,9 @@ func awsStrPtr(s string) *string {
 // internal/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
 func buildCTEventsResource(id, eventName, status, rawJSON string) resource.Resource {
 	ct := cloudtrailtypes.Event{
-		EventId:        awsStrPtr(id),
-		EventName:      awsStrPtr(eventName),
-		CloudTrailEvent: awsStrPtr(rawJSON),
+		EventId:         new(id),
+		EventName:       new(eventName),
+		CloudTrailEvent: new(rawJSON),
 	}
 	return resource.Resource{
 		ID:        id,
@@ -258,8 +260,8 @@ func TestDetailViewCTEvents_NonCTEventsUnaffected(t *testing.T) {
 		"i-0aabbccdd11223344",
 		"web-server",
 		map[string]string{
-			"InstanceId":    "i-0aabbccdd11223344",
-			"InstanceType":  "t3.medium",
+			"InstanceId":       "i-0aabbccdd11223344",
+			"InstanceType":     "t3.medium",
 			"PrivateIpAddress": "10.0.1.42",
 		},
 	)
@@ -371,9 +373,9 @@ const assumedRoleCTJSON = `{
 // TargetType == "role" (because the ARN is an assumed-role ARN).
 //
 // This tests that:
-//   1. sectionsToFieldItems propagates IsNavigable/TargetType from the Row struct.
-//   2. The Enter key handler in detail.go dispatches RelatedNavigateMsg correctly.
-//   3. arnTargetType correctly maps assumed-role ARNs to "role".
+//  1. sectionsToFieldItems propagates IsNavigable/TargetType from the Row struct.
+//  2. The Enter key handler in detail.go dispatches RelatedNavigateMsg correctly.
+//  3. arnTargetType correctly maps assumed-role ARNs to "role".
 func TestDetailViewCTEvents_NavigatePrincipalRow(t *testing.T) {
 	ensureNoColor(t)
 
@@ -506,7 +508,7 @@ func TestDetailViewCTEvents_Regression_S3TargetNavigability(t *testing.T) {
 
 	// Navigate to Bucket row: j×4 (skips ACTOR header and ACTION header automatically).
 	mBucket := m
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		mBucket, _ = mBucket.Update(jPress)
 	}
 

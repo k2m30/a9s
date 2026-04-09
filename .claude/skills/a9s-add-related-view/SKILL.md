@@ -402,9 +402,10 @@ that appears in the rendered output.
 ### 7. Post-implementation verification
 
 ```bash
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
-go build -o a9s ./cmd/a9s/
+make test
+make lint
+make gofix
+make build
 ```
 
 ---
@@ -653,8 +654,9 @@ func TestRelated_{Source}_Registered(t *testing.T) {
 ```bash
 go test ./tests/unit/ -count=1 -timeout 120s -run "Related_{Source}"
 go test ./tests/unit/ -count=1 -timeout 120s -run "NavigableFields_{Source}"
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
+make test
+make lint
+make gofix
 ```
 
 ---

@@ -42,10 +42,7 @@ func RetryOnThrottle[T any](ctx context.Context, cfg RetryConfig, fn func() (T, 
 
 		lastErr = err
 
-		delay := cfg.BaseDelay * time.Duration(1<<attempt)
-		if delay > cfg.MaxDelay {
-			delay = cfg.MaxDelay
-		}
+		delay := min(cfg.BaseDelay*time.Duration(1<<attempt), cfg.MaxDelay)
 		if cfg.Jitter {
 			delay = delay/2 + time.Duration(rand.Int63n(int64(delay/2))) //nolint:gosec // jitter does not need crypto rand
 		}

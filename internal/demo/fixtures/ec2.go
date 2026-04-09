@@ -3,6 +3,7 @@ package fixtures
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -32,23 +33,23 @@ type EC2Fixtures struct {
 
 // shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
 const (
-	fixtProdVPCID          = "vpc-0abc123def456789a"
-	fixtStagingVPCID       = "vpc-0def456789abc123d"
-	fixtProdPublicSubnetA  = "subnet-0aaa111111111111a"
-	fixtProdPublicSubnetB  = "subnet-0bbb222222222222b"
-	fixtProdPrivateSubnetA = "subnet-0ccc333333333333c"
-	fixtProdPrivateSubnetB = "subnet-0ddd444444444444d"
-	fixtStagingSubnetA     = "subnet-0eee555555555555e"
-	fixtStagingSubnetB     = "subnet-0fff666666666666f"
-	fixtProdWebALBSGID     = "sg-0aaa111111111111a"
-	fixtProdAPIInternalSGID = "sg-0bbb222222222222b"
-	fixtProdRDSSGID        = "sg-0ccc333333333333c"
-	fixtProdDBProxySGID    = "sg-0ddd444444444444d"
-	fixtProdAMIID1         = "ami-0a1b2c3d4e5f60001"
-	fixtProdAMIID2         = "ami-0a1b2c3d4e5f60002"
-	fixtProdAMIID3         = "ami-0a1b2c3d4e5f60003"
-	fixtProdInstanceProfileARN = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
-	fixtProdEKSClusterName = "acme-prod-eks"
+	fixtProdVPCID               = "vpc-0abc123def456789a"
+	fixtStagingVPCID            = "vpc-0def456789abc123d"
+	fixtProdPublicSubnetA       = "subnet-0aaa111111111111a"
+	fixtProdPublicSubnetB       = "subnet-0bbb222222222222b"
+	fixtProdPrivateSubnetA      = "subnet-0ccc333333333333c"
+	fixtProdPrivateSubnetB      = "subnet-0ddd444444444444d"
+	fixtStagingSubnetA          = "subnet-0eee555555555555e"
+	fixtStagingSubnetB          = "subnet-0fff666666666666f"
+	fixtProdWebALBSGID          = "sg-0aaa111111111111a"
+	fixtProdAPIInternalSGID     = "sg-0bbb222222222222b"
+	fixtProdRDSSGID             = "sg-0ccc333333333333c"
+	fixtProdDBProxySGID         = "sg-0ddd444444444444d"
+	fixtProdAMIID1              = "ami-0a1b2c3d4e5f60001"
+	fixtProdAMIID2              = "ami-0a1b2c3d4e5f60002"
+	fixtProdAMIID3              = "ami-0a1b2c3d4e5f60003"
+	fixtProdInstanceProfileARN  = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
+	fixtProdEKSClusterName      = "acme-prod-eks"
 	fixtRelatedEC2NGNodeGroupID = "acme-node-group-01"
 )
 
@@ -207,15 +208,15 @@ func stateCode(name ec2types.InstanceStateName) int32 {
 }
 
 func privateDNS(ip string) string {
-	dashed := ""
+	var dashed strings.Builder
 	for _, ch := range ip {
 		if ch == '.' {
-			dashed += "-"
+			dashed.WriteString("-")
 		} else {
-			dashed += string(ch)
+			dashed.WriteString(string(ch))
 		}
 	}
-	return "ip-" + dashed + ".ec2.internal"
+	return "ip-" + dashed.String() + ".ec2.internal"
 }
 
 func volumeIDForInstance(instanceID string) string {
@@ -356,7 +357,7 @@ func buildReservations() []ec2types.Reservation {
 		})
 	}
 
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		idx := i + 11
 		name := fmt.Sprintf("%s-%02d", namePool[i%len(namePool)], idx)
 		state := statePool[i%len(statePool)]
@@ -599,7 +600,7 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 	vpcIDs := []string{fixtProdVPCID, fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	sgNames := []string{"app-sg", "cache-sg", "worker-sg", "monitoring-sg", "lambda-sg", "batch-sg", "data-sg", "analytics-sg", "admin-sg", "internal-sg"}
 	sgDescs := []string{"Application tier", "Cache tier", "Worker tier", "Monitoring", "Lambda functions", "Batch jobs", "Data pipeline", "Analytics", "Admin access", "Internal services"}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		sgID := fmt.Sprintf("sg-0gen%016x", i+100)
 		name := sgNames[i%len(sgNames)]
 		desc := sgDescs[i%len(sgDescs)]
@@ -734,7 +735,7 @@ func buildSubnets() []ec2types.Subnet {
 
 	vpcPool := []string{fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	azPool := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		subnetID := fmt.Sprintf("subnet-0gen%016x", i+100)
 		vpcID := vpcPool[i%len(vpcPool)]
 		az := azPool[i%len(azPool)]
@@ -969,7 +970,7 @@ func buildAddresses() []ec2types.Address {
 		{
 			AllocationId: aws.String("eipalloc-0ccc333333333333c"), PublicIp: aws.String("52.87.100.10"),
 			AssociationId: aws.String("eipassoc-0ccc333333333333c"),
-			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
 			NetworkInterfaceId: aws.String("eni-0aaa111111111111a"), PrivateIpAddress: aws.String("10.1.1.50"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-nat-eip")},
@@ -1003,7 +1004,7 @@ func buildTransitGateways() []ec2types.TransitGateway {
 			Description:       aws.String("Central hub transit gateway for Acme Corp VPCs"),
 			CreationTime:      t1,
 			Options: &ec2types.TransitGatewayOptions{
-				AmazonSideAsn:               aws.Int64(64512),
+				AmazonSideAsn:                aws.Int64(64512),
 				AutoAcceptSharedAttachments:  ec2types.AutoAcceptSharedAttachmentsValueEnable,
 				DefaultRouteTableAssociation: ec2types.DefaultRouteTableAssociationValueEnable,
 				DefaultRouteTablePropagation: ec2types.DefaultRouteTablePropagationValueEnable,
@@ -1124,13 +1125,13 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 	t4 := aws.Time(time.Date(2026, 3, 21, 7, 0, 0, 0, time.UTC))
 	return []ec2types.VpcEndpoint{
 		{
-			VpcEndpointId:   aws.String("vpce-0aaa111111111111a"),
-			ServiceName:     aws.String("com.amazonaws.us-east-1.s3"),
-			VpcEndpointType: ec2types.VpcEndpointTypeGateway,
-			State:           ec2types.StateAvailable,
-			VpcId:           aws.String(fixtProdVPCID),
-			RouteTableIds:   []string{"rtb-0aaa111111111111a", "rtb-0ccc333333333333c"},
-			SubnetIds:       []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
+			VpcEndpointId:       aws.String("vpce-0aaa111111111111a"),
+			ServiceName:         aws.String("com.amazonaws.us-east-1.s3"),
+			VpcEndpointType:     ec2types.VpcEndpointTypeGateway,
+			State:               ec2types.StateAvailable,
+			VpcId:               aws.String(fixtProdVPCID),
+			RouteTableIds:       []string{"rtb-0aaa111111111111a", "rtb-0ccc333333333333c"},
+			SubnetIds:           []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 			NetworkInterfaceIds: []string{"eni-0ccc333333333333c"},
 			Groups: []ec2types.SecurityGroupIdentifier{
 				{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
@@ -1157,16 +1158,16 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			},
 		},
 		{
-			VpcEndpointId:     aws.String("vpce-0ccc333333333333c"),
-			ServiceName:       aws.String("com.amazonaws.us-east-1.secretsmanager"),
-			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateAvailable,
-			VpcId:             aws.String(fixtProdVPCID),
-			SubnetIds:         []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
+			VpcEndpointId:       aws.String("vpce-0ccc333333333333c"),
+			ServiceName:         aws.String("com.amazonaws.us-east-1.secretsmanager"),
+			VpcEndpointType:     ec2types.VpcEndpointTypeInterface,
+			State:               ec2types.StateAvailable,
+			VpcId:               aws.String(fixtProdVPCID),
+			SubnetIds:           []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 			NetworkInterfaceIds: []string{"eni-0ccc333333333333c", "eni-0ddd444444444444d"},
-			PrivateDnsEnabled: aws.Bool(true),
-			OwnerId:           aws.String("123456789012"),
-			CreationTimestamp: t3,
+			PrivateDnsEnabled:   aws.Bool(true),
+			OwnerId:             aws.String("123456789012"),
+			CreationTimestamp:   t3,
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-secrets-endpoint")},
 			},
@@ -1340,10 +1341,10 @@ func buildVolumes() []ec2types.Volume {
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), State: ec2types.VolumeStateInUse,
 			Size: aws.Int32(50), VolumeType: ec2types.VolumeTypeGp3, Iops: aws.Int32(3000), Throughput: aws.Int32(125),
 			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1a"), CreateTime: aws.Time(t2),
-			KmsKeyId: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			KmsKeyId:           aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			MultiAttachEnabled: aws.Bool(false),
-			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60001")}},
-			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")}},
+			Attachments:        []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60001")}},
+			Tags:               []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")}},
 		},
 		{
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60002"), State: ec2types.VolumeStateInUse,
@@ -1392,7 +1393,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			Encrypted: aws.Bool(true), Description: aws.String("Quarterly backup of web-prod-01 root volume"),
 			StartTime: aws.Time(t1), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
-			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")}},
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")}},
 		},
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60002"), State: ec2types.SnapshotStateCompleted,
@@ -1400,7 +1401,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			Encrypted: aws.Bool(true), Description: aws.String("Q1 2026 backup of api-staging-data volume"),
 			StartTime: aws.Time(t2), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
-			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("api-data-snapshot-2026q1")}},
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("api-data-snapshot-2026q1")}},
 		},
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60003"), State: ec2types.SnapshotStateCompleted,
@@ -1408,7 +1409,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			Encrypted: aws.Bool(true), Description: aws.String("Pre-deletion backup"),
 			StartTime: aws.Time(t3), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("c3d4e5f6-7890-12ab-cdef-333333333333"),
-			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphaned-vol-snapshot")}},
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphaned-vol-snapshot")}},
 		},
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60004"), State: ec2types.SnapshotStatePending,

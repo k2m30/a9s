@@ -88,8 +88,8 @@ func serviceFromHost(host string) string {
 	}
 
 	// Take the first segment before "."
-	if idx := strings.Index(host, "."); idx != -1 {
-		return host[:idx]
+	if before, _, ok := strings.Cut(host, "."); ok {
+		return before
 	}
 	return host
 }

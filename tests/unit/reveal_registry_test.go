@@ -23,7 +23,7 @@ import (
 // can be retrieved with GetRevealFetcher.
 func TestRevealRegistry_RegisterAndGet(t *testing.T) {
 	const shortName = "test_reveal_register"
-	fetcher := func(_ context.Context, _ interface{}, _ string) (string, error) {
+	fetcher := func(_ context.Context, _ any, _ string) (string, error) {
 		return "value", nil
 	}
 
@@ -66,7 +66,7 @@ func TestRevealRegistry_GetUnregistered(t *testing.T) {
 // true for registered types and false for unregistered ones.
 func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 	const shortName = "test_has_reveal"
-	fetcher := func(_ context.Context, _ interface{}, _ string) (string, error) {
+	fetcher := func(_ context.Context, _ any, _ string) (string, error) {
 		return "", nil
 	}
 
@@ -92,7 +92,7 @@ func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 // a previously registered fetcher.
 func TestRevealRegistry_Unregister(t *testing.T) {
 	const shortName = "test_unregister_reveal"
-	fetcher := func(_ context.Context, _ interface{}, _ string) (string, error) {
+	fetcher := func(_ context.Context, _ any, _ string) (string, error) {
 		return "", nil
 	}
 

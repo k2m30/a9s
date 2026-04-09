@@ -11,8 +11,8 @@ import (
 	"errors"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -83,7 +83,7 @@ func TestFetchRelatedTarget_CacheMiss_NoFetcher(t *testing.T) {
 func TestFetchRelatedTarget_CacheMiss_FetcherError(t *testing.T) {
 	// Register a temporary fetcher that always fails.
 	fetchErr := errors.New("simulated fetch failure")
-	resource.RegisterPaginated("test-fetch-err", func(_ context.Context, _ interface{}, _ string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("test-fetch-err", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, fetchErr
 	})
 	defer resource.UnregisterPaginated("test-fetch-err")

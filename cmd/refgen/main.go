@@ -61,122 +61,122 @@ type resourceDef struct {
 // SQS GetQueueAttributes (QueueAttributeNameAll). SQS returns a map[string]string
 // so there is no SDK struct to reflect on.
 type SQSQueueAttributes struct {
-	QueueArn                          string
-	ApproximateNumberOfMessages       string
+	QueueArn                              string
+	ApproximateNumberOfMessages           string
 	ApproximateNumberOfMessagesNotVisible string
-	ApproximateNumberOfMessagesDelayed string
-	CreatedTimestamp                   string
-	LastModifiedTimestamp              string
-	VisibilityTimeout                 string
-	MaximumMessageSize                string
-	MessageRetentionPeriod            string
-	DelaySeconds                      string
-	Policy                            string
-	RedrivePolicy                     string
-	RedriveAllowPolicy                string
-	DeadLetterTargetArn               string
-	FifoQueue                         string
-	ContentBasedDeduplication         string
-	DeduplicationScope                string
-	FifoThroughputLimit               string
-	KmsMasterKeyId                    string
-	KmsDataKeyReusePeriodSeconds      string
-	SqsManagedSseEnabled              string
+	ApproximateNumberOfMessagesDelayed    string
+	CreatedTimestamp                      string
+	LastModifiedTimestamp                 string
+	VisibilityTimeout                     string
+	MaximumMessageSize                    string
+	MessageRetentionPeriod                string
+	DelaySeconds                          string
+	Policy                                string
+	RedrivePolicy                         string
+	RedriveAllowPolicy                    string
+	DeadLetterTargetArn                   string
+	FifoQueue                             string
+	ContentBasedDeduplication             string
+	DeduplicationScope                    string
+	FifoThroughputLimit                   string
+	KmsMasterKeyId                        string
+	KmsDataKeyReusePeriodSeconds          string
+	SqsManagedSseEnabled                  string
 }
 
 func main() {
 	resources := []resourceDef{
-		{"s3", "s3types.Bucket", reflect.TypeOf(s3types.Bucket{})},
-		{"s3_objects", "s3types.Object", reflect.TypeOf(s3types.Object{})},
-		{"ec2", "ec2types.Instance", reflect.TypeOf(ec2types.Instance{})},
-		{"dbi", "rdstypes.DBInstance", reflect.TypeOf(rdstypes.DBInstance{})},
-		{"dbi_events", "rdstypes.Event", reflect.TypeOf(rdstypes.Event{})},
-		{"redis", "elasticachetypes.CacheCluster", reflect.TypeOf(elasticachetypes.CacheCluster{})},
-		{"dbc", "docdbtypes.DBCluster", reflect.TypeOf(docdbtypes.DBCluster{})},
-		{"eks", "ekstypes.Cluster", reflect.TypeOf(ekstypes.Cluster{})},
-		{"secrets", "smtypes.SecretListEntry", reflect.TypeOf(smtypes.SecretListEntry{})},
-		{"vpc", "ec2types.Vpc", reflect.TypeOf(ec2types.Vpc{})},
-		{"sg", "ec2types.SecurityGroup", reflect.TypeOf(ec2types.SecurityGroup{})},
-		{"ng", "ekstypes.Nodegroup", reflect.TypeOf(ekstypes.Nodegroup{})},
-		{"subnet", "ec2types.Subnet", reflect.TypeOf(ec2types.Subnet{})},
-		{"rtb", "ec2types.RouteTable", reflect.TypeOf(ec2types.RouteTable{})},
-		{"nat", "ec2types.NatGateway", reflect.TypeOf(ec2types.NatGateway{})},
-		{"igw", "ec2types.InternetGateway", reflect.TypeOf(ec2types.InternetGateway{})},
-		{"lambda", "lambdatypes.FunctionConfiguration", reflect.TypeOf(lambdatypes.FunctionConfiguration{})},
-		{"alarm", "cwtypes.MetricAlarm", reflect.TypeOf(cwtypes.MetricAlarm{})},
-		{"sns", "snstypes.Topic", reflect.TypeOf(snstypes.Topic{})},
-		{"elb", "elbv2types.LoadBalancer", reflect.TypeOf(elbv2types.LoadBalancer{})},
-		{"tg", "elbv2types.TargetGroup", reflect.TypeOf(elbv2types.TargetGroup{})},
-		{"ecs", "ecstypes.Cluster", reflect.TypeOf(ecstypes.Cluster{})},
-		{"ecs-svc", "ecstypes.Service", reflect.TypeOf(ecstypes.Service{})},
-		{"cfn", "cfntypes.Stack", reflect.TypeOf(cfntypes.Stack{})},
-		{"role", "iamtypes.Role", reflect.TypeOf(iamtypes.Role{})},
-		{"logs", "cwlogstypes.LogGroup", reflect.TypeOf(cwlogstypes.LogGroup{})},
-		{"ssm", "ssmtypes.ParameterMetadata", reflect.TypeOf(ssmtypes.ParameterMetadata{})},
-		{"ddb", "ddbtypes.TableDescription", reflect.TypeOf(ddbtypes.TableDescription{})},
-		{"eip", "ec2types.Address", reflect.TypeOf(ec2types.Address{})},
-		{"acm", "acmtypes.CertificateSummary", reflect.TypeOf(acmtypes.CertificateSummary{})},
-		{"asg", "asgtypes.AutoScalingGroup", reflect.TypeOf(asgtypes.AutoScalingGroup{})},
-		{"ecs-task", "ecstypes.Task", reflect.TypeOf(ecstypes.Task{})},
-		{"policy", "iamtypes.Policy", reflect.TypeOf(iamtypes.Policy{})},
-		{"rds-snap", "rdstypes.DBSnapshot", reflect.TypeOf(rdstypes.DBSnapshot{})},
-		{"tgw", "ec2types.TransitGateway", reflect.TypeOf(ec2types.TransitGateway{})},
-		{"vpce", "ec2types.VpcEndpoint", reflect.TypeOf(ec2types.VpcEndpoint{})},
-		{"eni", "ec2types.NetworkInterface", reflect.TypeOf(ec2types.NetworkInterface{})},
-		{"sns-sub", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
-		{"sns_subscriptions", "snstypes.Subscription", reflect.TypeOf(snstypes.Subscription{})},
-		{"sqs", "SQSQueueAttributes (synthetic)", reflect.TypeOf(SQSQueueAttributes{})},
-		{"iam-user", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
-		{"iam-group", "iamtypes.Group", reflect.TypeOf(iamtypes.Group{})},
-		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeOf(docdbtypes.DBClusterSnapshot{})},
-		{"cf", "cftypes.DistributionSummary", reflect.TypeOf(cftypes.DistributionSummary{})},
-		{"r53", "r53types.HostedZone", reflect.TypeOf(r53types.HostedZone{})},
-		{"r53_records", "r53types.ResourceRecordSet", reflect.TypeOf(r53types.ResourceRecordSet{})},
-		{"apigw", "apigwtypes.Api", reflect.TypeOf(apigwtypes.Api{})},
-		{"ecr", "ecrtypes.Repository", reflect.TypeOf(ecrtypes.Repository{})},
-		{"efs", "efstypes.FileSystemDescription", reflect.TypeOf(efstypes.FileSystemDescription{})},
-		{"eb-rule", "eventbridgetypes.Rule", reflect.TypeOf(eventbridgetypes.Rule{})},
-		{"eb_rule_targets", "eventbridgetypes.Target", reflect.TypeOf(eventbridgetypes.Target{})},
-		{"sfn", "sfntypes.StateMachineListItem", reflect.TypeOf(sfntypes.StateMachineListItem{})},
-		{"pipeline", "cptypes.PipelineSummary", reflect.TypeOf(cptypes.PipelineSummary{})},
-		{"kinesis", "kinesistypes.StreamSummary", reflect.TypeOf(kinesistypes.StreamSummary{})},
-		{"waf", "wafv2types.WebACLSummary", reflect.TypeOf(wafv2types.WebACLSummary{})},
-		{"glue", "gluetypes.Job", reflect.TypeOf(gluetypes.Job{})},
-		{"glue_runs", "gluetypes.JobRun", reflect.TypeOf(gluetypes.JobRun{})},
-		{"eb", "ebtypes.EnvironmentDescription", reflect.TypeOf(ebtypes.EnvironmentDescription{})},
-		{"ses", "sesv2types.IdentityInfo", reflect.TypeOf(sesv2types.IdentityInfo{})},
-		{"redshift", "redshifttypes.Cluster", reflect.TypeOf(redshifttypes.Cluster{})},
-		{"trail", "cloudtrailtypes.Trail", reflect.TypeOf(cloudtrailtypes.Trail{})},
-		{"athena", "athenatypes.WorkGroupSummary", reflect.TypeOf(athenatypes.WorkGroupSummary{})},
-		{"codeartifact", "codeartifacttypes.RepositorySummary", reflect.TypeOf(codeartifacttypes.RepositorySummary{})},
-		{"cb", "cbtypes.Project", reflect.TypeOf(cbtypes.Project{})},
-		{"opensearch", "ostypes.DomainStatus", reflect.TypeOf(ostypes.DomainStatus{})},
-		{"kms", "kmstypes.KeyMetadata", reflect.TypeOf(kmstypes.KeyMetadata{})},
-		{"msk", "kafkatypes.Cluster", reflect.TypeOf(kafkatypes.Cluster{})},
-		{"backup", "backuptypes.BackupPlansListMember", reflect.TypeOf(backuptypes.BackupPlansListMember{})},
-		{"log_streams", "cwlogstypes.LogStream", reflect.TypeOf(cwlogstypes.LogStream{})},
-		{"log_events", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
-		{"tg_health", "elbv2types.TargetHealthDescription", reflect.TypeOf(elbv2types.TargetHealthDescription{})},
-		{"ecs_svc_events", "ecstypes.ServiceEvent", reflect.TypeOf(ecstypes.ServiceEvent{})},
-		{"ecs_tasks", "ecstypes.Task", reflect.TypeOf(ecstypes.Task{})},
-		{"ecs_svc_logs", "cwlogstypes.FilteredLogEvent", reflect.TypeOf(cwlogstypes.FilteredLogEvent{})},
-		{"cfn_events", "cfntypes.StackEvent", reflect.TypeOf(cfntypes.StackEvent{})},
-		{"cfn_resources", "cfntypes.StackResourceSummary", reflect.TypeOf(cfntypes.StackResourceSummary{})},
-		{"asg_activities", "asgtypes.Activity", reflect.TypeOf(asgtypes.Activity{})},
-		{"alarm_history", "cwtypes.AlarmHistoryItem", reflect.TypeOf(cwtypes.AlarmHistoryItem{})},
-		{"elb_listeners", "elbv2types.Listener", reflect.TypeOf(elbv2types.Listener{})},
-		{"sfn_executions", "sfntypes.ExecutionListItem", reflect.TypeOf(sfntypes.ExecutionListItem{})},
-		{"sfn_execution_history", "sfntypes.HistoryEvent", reflect.TypeOf(sfntypes.HistoryEvent{})},
-		{"cb_builds", "cbtypes.Build", reflect.TypeOf(cbtypes.Build{})},
-		{"cb_build_logs", "cwlogstypes.OutputLogEvent", reflect.TypeOf(cwlogstypes.OutputLogEvent{})},
-		{"ecr_images", "ecrtypes.ImageDetail", reflect.TypeOf(ecrtypes.ImageDetail{})},
-		{"role_policies", "awsclient.RolePolicyRow", reflect.TypeOf(awsclient.RolePolicyRow{})},
-		{"iam_group_members", "iamtypes.User", reflect.TypeOf(iamtypes.User{})},
-		{"elb_listener_rules", "elbv2types.Rule", reflect.TypeOf(elbv2types.Rule{})},
-		{"ebs", "ec2types.Volume", reflect.TypeOf(ec2types.Volume{})},
-		{"ebs-snap", "ec2types.Snapshot", reflect.TypeOf(ec2types.Snapshot{})},
-		{"ami", "ec2types.Image", reflect.TypeOf(ec2types.Image{})},
-		{"ct-events", "cloudtrailtypes.Event", reflect.TypeOf(cloudtrailtypes.Event{})},
+		{"s3", "s3types.Bucket", reflect.TypeFor[s3types.Bucket]()},
+		{"s3_objects", "s3types.Object", reflect.TypeFor[s3types.Object]()},
+		{"ec2", "ec2types.Instance", reflect.TypeFor[ec2types.Instance]()},
+		{"dbi", "rdstypes.DBInstance", reflect.TypeFor[rdstypes.DBInstance]()},
+		{"dbi_events", "rdstypes.Event", reflect.TypeFor[rdstypes.Event]()},
+		{"redis", "elasticachetypes.CacheCluster", reflect.TypeFor[elasticachetypes.CacheCluster]()},
+		{"dbc", "docdbtypes.DBCluster", reflect.TypeFor[docdbtypes.DBCluster]()},
+		{"eks", "ekstypes.Cluster", reflect.TypeFor[ekstypes.Cluster]()},
+		{"secrets", "smtypes.SecretListEntry", reflect.TypeFor[smtypes.SecretListEntry]()},
+		{"vpc", "ec2types.Vpc", reflect.TypeFor[ec2types.Vpc]()},
+		{"sg", "ec2types.SecurityGroup", reflect.TypeFor[ec2types.SecurityGroup]()},
+		{"ng", "ekstypes.Nodegroup", reflect.TypeFor[ekstypes.Nodegroup]()},
+		{"subnet", "ec2types.Subnet", reflect.TypeFor[ec2types.Subnet]()},
+		{"rtb", "ec2types.RouteTable", reflect.TypeFor[ec2types.RouteTable]()},
+		{"nat", "ec2types.NatGateway", reflect.TypeFor[ec2types.NatGateway]()},
+		{"igw", "ec2types.InternetGateway", reflect.TypeFor[ec2types.InternetGateway]()},
+		{"lambda", "lambdatypes.FunctionConfiguration", reflect.TypeFor[lambdatypes.FunctionConfiguration]()},
+		{"alarm", "cwtypes.MetricAlarm", reflect.TypeFor[cwtypes.MetricAlarm]()},
+		{"sns", "snstypes.Topic", reflect.TypeFor[snstypes.Topic]()},
+		{"elb", "elbv2types.LoadBalancer", reflect.TypeFor[elbv2types.LoadBalancer]()},
+		{"tg", "elbv2types.TargetGroup", reflect.TypeFor[elbv2types.TargetGroup]()},
+		{"ecs", "ecstypes.Cluster", reflect.TypeFor[ecstypes.Cluster]()},
+		{"ecs-svc", "ecstypes.Service", reflect.TypeFor[ecstypes.Service]()},
+		{"cfn", "cfntypes.Stack", reflect.TypeFor[cfntypes.Stack]()},
+		{"role", "iamtypes.Role", reflect.TypeFor[iamtypes.Role]()},
+		{"logs", "cwlogstypes.LogGroup", reflect.TypeFor[cwlogstypes.LogGroup]()},
+		{"ssm", "ssmtypes.ParameterMetadata", reflect.TypeFor[ssmtypes.ParameterMetadata]()},
+		{"ddb", "ddbtypes.TableDescription", reflect.TypeFor[ddbtypes.TableDescription]()},
+		{"eip", "ec2types.Address", reflect.TypeFor[ec2types.Address]()},
+		{"acm", "acmtypes.CertificateSummary", reflect.TypeFor[acmtypes.CertificateSummary]()},
+		{"asg", "asgtypes.AutoScalingGroup", reflect.TypeFor[asgtypes.AutoScalingGroup]()},
+		{"ecs-task", "ecstypes.Task", reflect.TypeFor[ecstypes.Task]()},
+		{"policy", "iamtypes.Policy", reflect.TypeFor[iamtypes.Policy]()},
+		{"rds-snap", "rdstypes.DBSnapshot", reflect.TypeFor[rdstypes.DBSnapshot]()},
+		{"tgw", "ec2types.TransitGateway", reflect.TypeFor[ec2types.TransitGateway]()},
+		{"vpce", "ec2types.VpcEndpoint", reflect.TypeFor[ec2types.VpcEndpoint]()},
+		{"eni", "ec2types.NetworkInterface", reflect.TypeFor[ec2types.NetworkInterface]()},
+		{"sns-sub", "snstypes.Subscription", reflect.TypeFor[snstypes.Subscription]()},
+		{"sns_subscriptions", "snstypes.Subscription", reflect.TypeFor[snstypes.Subscription]()},
+		{"sqs", "SQSQueueAttributes (synthetic)", reflect.TypeFor[SQSQueueAttributes]()},
+		{"iam-user", "iamtypes.User", reflect.TypeFor[iamtypes.User]()},
+		{"iam-group", "iamtypes.Group", reflect.TypeFor[iamtypes.Group]()},
+		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeFor[docdbtypes.DBClusterSnapshot]()},
+		{"cf", "cftypes.DistributionSummary", reflect.TypeFor[cftypes.DistributionSummary]()},
+		{"r53", "r53types.HostedZone", reflect.TypeFor[r53types.HostedZone]()},
+		{"r53_records", "r53types.ResourceRecordSet", reflect.TypeFor[r53types.ResourceRecordSet]()},
+		{"apigw", "apigwtypes.Api", reflect.TypeFor[apigwtypes.Api]()},
+		{"ecr", "ecrtypes.Repository", reflect.TypeFor[ecrtypes.Repository]()},
+		{"efs", "efstypes.FileSystemDescription", reflect.TypeFor[efstypes.FileSystemDescription]()},
+		{"eb-rule", "eventbridgetypes.Rule", reflect.TypeFor[eventbridgetypes.Rule]()},
+		{"eb_rule_targets", "eventbridgetypes.Target", reflect.TypeFor[eventbridgetypes.Target]()},
+		{"sfn", "sfntypes.StateMachineListItem", reflect.TypeFor[sfntypes.StateMachineListItem]()},
+		{"pipeline", "cptypes.PipelineSummary", reflect.TypeFor[cptypes.PipelineSummary]()},
+		{"kinesis", "kinesistypes.StreamSummary", reflect.TypeFor[kinesistypes.StreamSummary]()},
+		{"waf", "wafv2types.WebACLSummary", reflect.TypeFor[wafv2types.WebACLSummary]()},
+		{"glue", "gluetypes.Job", reflect.TypeFor[gluetypes.Job]()},
+		{"glue_runs", "gluetypes.JobRun", reflect.TypeFor[gluetypes.JobRun]()},
+		{"eb", "ebtypes.EnvironmentDescription", reflect.TypeFor[ebtypes.EnvironmentDescription]()},
+		{"ses", "sesv2types.IdentityInfo", reflect.TypeFor[sesv2types.IdentityInfo]()},
+		{"redshift", "redshifttypes.Cluster", reflect.TypeFor[redshifttypes.Cluster]()},
+		{"trail", "cloudtrailtypes.Trail", reflect.TypeFor[cloudtrailtypes.Trail]()},
+		{"athena", "athenatypes.WorkGroupSummary", reflect.TypeFor[athenatypes.WorkGroupSummary]()},
+		{"codeartifact", "codeartifacttypes.RepositorySummary", reflect.TypeFor[codeartifacttypes.RepositorySummary]()},
+		{"cb", "cbtypes.Project", reflect.TypeFor[cbtypes.Project]()},
+		{"opensearch", "ostypes.DomainStatus", reflect.TypeFor[ostypes.DomainStatus]()},
+		{"kms", "kmstypes.KeyMetadata", reflect.TypeFor[kmstypes.KeyMetadata]()},
+		{"msk", "kafkatypes.Cluster", reflect.TypeFor[kafkatypes.Cluster]()},
+		{"backup", "backuptypes.BackupPlansListMember", reflect.TypeFor[backuptypes.BackupPlansListMember]()},
+		{"log_streams", "cwlogstypes.LogStream", reflect.TypeFor[cwlogstypes.LogStream]()},
+		{"log_events", "cwlogstypes.OutputLogEvent", reflect.TypeFor[cwlogstypes.OutputLogEvent]()},
+		{"tg_health", "elbv2types.TargetHealthDescription", reflect.TypeFor[elbv2types.TargetHealthDescription]()},
+		{"ecs_svc_events", "ecstypes.ServiceEvent", reflect.TypeFor[ecstypes.ServiceEvent]()},
+		{"ecs_tasks", "ecstypes.Task", reflect.TypeFor[ecstypes.Task]()},
+		{"ecs_svc_logs", "cwlogstypes.FilteredLogEvent", reflect.TypeFor[cwlogstypes.FilteredLogEvent]()},
+		{"cfn_events", "cfntypes.StackEvent", reflect.TypeFor[cfntypes.StackEvent]()},
+		{"cfn_resources", "cfntypes.StackResourceSummary", reflect.TypeFor[cfntypes.StackResourceSummary]()},
+		{"asg_activities", "asgtypes.Activity", reflect.TypeFor[asgtypes.Activity]()},
+		{"alarm_history", "cwtypes.AlarmHistoryItem", reflect.TypeFor[cwtypes.AlarmHistoryItem]()},
+		{"elb_listeners", "elbv2types.Listener", reflect.TypeFor[elbv2types.Listener]()},
+		{"sfn_executions", "sfntypes.ExecutionListItem", reflect.TypeFor[sfntypes.ExecutionListItem]()},
+		{"sfn_execution_history", "sfntypes.HistoryEvent", reflect.TypeFor[sfntypes.HistoryEvent]()},
+		{"cb_builds", "cbtypes.Build", reflect.TypeFor[cbtypes.Build]()},
+		{"cb_build_logs", "cwlogstypes.OutputLogEvent", reflect.TypeFor[cwlogstypes.OutputLogEvent]()},
+		{"ecr_images", "ecrtypes.ImageDetail", reflect.TypeFor[ecrtypes.ImageDetail]()},
+		{"role_policies", "awsclient.RolePolicyRow", reflect.TypeFor[awsclient.RolePolicyRow]()},
+		{"iam_group_members", "iamtypes.User", reflect.TypeFor[iamtypes.User]()},
+		{"elb_listener_rules", "elbv2types.Rule", reflect.TypeFor[elbv2types.Rule]()},
+		{"ebs", "ec2types.Volume", reflect.TypeFor[ec2types.Volume]()},
+		{"ebs-snap", "ec2types.Snapshot", reflect.TypeFor[ec2types.Snapshot]()},
+		{"ami", "ec2types.Image", reflect.TypeFor[ec2types.Image]()},
+		{"ct-events", "cloudtrailtypes.Event", reflect.TypeFor[cloudtrailtypes.Event]()},
 	}
 
 	fmt.Println("# views_reference.yaml")

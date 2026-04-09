@@ -61,8 +61,8 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 		context.Background(),
 		mock,
 		"my-db-instance",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -182,8 +182,8 @@ func TestFetchRDSEvents_Empty(t *testing.T) {
 		context.Background(),
 		mock,
 		"empty-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -202,8 +202,8 @@ func TestFetchRDSEvents_APIError(t *testing.T) {
 		context.Background(),
 		mock,
 		"err-db",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -238,8 +238,8 @@ func TestFetchRDSEvents_NilOptionalFields(t *testing.T) {
 		context.Background(),
 		mock,
 		"nil-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -301,8 +301,8 @@ func TestFetchRDSEvents_NewlineStripping(t *testing.T) {
 		context.Background(),
 		mock,
 		"nl-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -343,8 +343,8 @@ func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 		context.Background(),
 		mock,
 		"ts-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -383,8 +383,8 @@ func TestFetchRDSEvents_RawStruct(t *testing.T) {
 		context.Background(),
 		mock,
 		"raw-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -457,8 +457,8 @@ func TestFetchRDSEvents_EventCategoriesJoined(t *testing.T) {
 		context.Background(),
 		mock,
 		"cat-db",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -553,7 +553,7 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 	})
 
 	t.Run("page1_messages", func(t *testing.T) {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			expected := fmt.Sprintf("Event page 1 item %d", i+1)
 			if result1.Resources[i].Fields["message"] != expected {
 				t.Errorf("resources[%d].Fields[message]: expected %q, got %q", i, expected, result1.Resources[i].Fields["message"])
@@ -626,7 +626,7 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 	})
 
 	t.Run("page2_messages", func(t *testing.T) {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			expected := fmt.Sprintf("Event page 2 item %d", i+1)
 			if result2.Resources[i].Fields["message"] != expected {
 				t.Errorf("page 2: resources[%d].Fields[message]: expected %q, got %q", i, expected, result2.Resources[i].Fields["message"])
@@ -644,7 +644,7 @@ func TestFetchRDSEvents_MaxEventsCap(t *testing.T) {
 
 	// Build one page of 50 events with a Marker indicating more pages exist.
 	var events []rdstypes.Event
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		events = append(events, rdstypes.Event{
 			Date:             &ts,
 			EventCategories:  []string{"notification"},

@@ -828,8 +828,8 @@ func TestQA_DocDB_NoSeparatorBelowHeaders(t *testing.T) {
 	m := loadedDocDBModel(t)
 	out := m.View()
 
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(out, "\n")
+	for line := range lines {
 		stripped := strings.TrimSpace(line)
 		if stripped == "" {
 			continue

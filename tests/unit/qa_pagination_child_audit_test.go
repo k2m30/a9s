@@ -57,9 +57,9 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sfn.ListExecutionsOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var executions []sfntypes.ExecutionListItem
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			executions = append(executions, sfntypes.ExecutionListItem{
 				ExecutionArn:    aws.String(fmt.Sprintf("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p%d-%d", page, i)),
 				Name:            aws.String(fmt.Sprintf("exec-p%d-%d", page, i)),
@@ -143,9 +143,9 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 streams each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var streams []cwlogstypes.LogStream
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			streams = append(streams, cwlogstypes.LogStream{
 				LogStreamName:      aws.String(fmt.Sprintf("stream-p%d-s%d", page, i)),
 				LastEventTimestamp: aws.Int64(1711065600000),
@@ -222,9 +222,9 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 activities each. Page 0 has NextToken, page 1 does not.
 	var outputs []*autoscaling.DescribeScalingActivitiesOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var activities []asgtypes.Activity
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			activities = append(activities, asgtypes.Activity{
 				ActivityId:           aws.String(fmt.Sprintf("act-p%d-%d", page, i)),
 				AutoScalingGroupName: aws.String("test-asg"),
@@ -305,9 +305,9 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 build IDs each. Page 0 has NextToken, page 1 does not.
 	var listOutputs []*codebuild.ListBuildsForProjectOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var ids []string
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			ids = append(ids, fmt.Sprintf("my-project:build-p%d-%d", page, i))
 		}
 		out := &codebuild.ListBuildsForProjectOutput{Ids: ids}
@@ -420,9 +420,9 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 runs each. Page 0 has NextToken, page 1 does not.
 	var outputs []*glue.GetJobRunsOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var runs []gluetypes.JobRun
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			runs = append(runs, gluetypes.JobRun{
 				Id:            aws.String(fmt.Sprintf("jr_p%d_%d", page, i)),
 				JobName:       aws.String("test-etl-job"),
@@ -500,9 +500,9 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatch.DescribeAlarmHistoryOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var items []cwtypes.AlarmHistoryItem
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			items = append(items, cwtypes.AlarmHistoryItem{
 				AlarmName:       aws.String("test-alarm"),
 				AlarmType:       cwtypes.AlarmTypeMetricAlarm,
@@ -581,9 +581,9 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 images each. Page 0 has NextToken, page 1 does not.
 	var pages []*ecr.DescribeImagesOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var images []ecrtypes.ImageDetail
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			pt := pushTime.Add(time.Duration(-(page*50 + i)) * time.Second)
 			images = append(images, ecrtypes.ImageDetail{
 				ImageDigest:      aws.String(fmt.Sprintf("sha256:p%d-img%d", page, i)),
@@ -683,9 +683,9 @@ func TestStory_B3_EcsSvcLogs_LoadMore(t *testing.T) {
 
 	// Build mock: 5 pages of 50 log events each (250 total). Cap is 200.
 	var logOutputs []*cloudwatchlogs.FilterLogEventsOutput
-	for page := 0; page < 5; page++ {
+	for page := range 5 {
 		var events []cwlogstypes.FilteredLogEvent
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			events = append(events, cwlogstypes.FilteredLogEvent{
 				EventId:       aws.String(fmt.Sprintf("event-p%d-%d", page, i)),
 				Timestamp:     aws.Int64(1711065600000 + int64(page*50+i)*1000),
@@ -767,9 +767,9 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 events each. Page 0 has Marker, page 1 does not.
 	var outputs []*rds.DescribeEventsOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var events []rdstypes.Event
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			events = append(events, rdstypes.Event{
 				SourceIdentifier: aws.String("my-db-instance"),
 				SourceType:       rdstypes.SourceTypeDbInstance,
@@ -845,9 +845,9 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 50 subscriptions each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sns.ListSubscriptionsByTopicOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var subs []snstypes.Subscription
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			subs = append(subs, snstypes.Subscription{
 				SubscriptionArn: aws.String(fmt.Sprintf("arn:aws:sns:us-east-1:123456789012:test-topic:sub-p%d-%d", page, i)),
 				TopicArn:        aws.String(topicArn),
@@ -922,9 +922,9 @@ func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 
 	// Build mock: 2 pages of 40 REPORT events each (80 total). Cap is 50.
 	var outputs []*cloudwatchlogs.FilterLogEventsOutput
-	for page := 0; page < 2; page++ {
+	for page := range 2 {
 		var events []cwlogstypes.FilteredLogEvent
-		for i := 0; i < 40; i++ {
+		for i := range 40 {
 			events = append(events, cwlogstypes.FilteredLogEvent{
 				EventId:   aws.String(fmt.Sprintf("evt-p%d-%d", page, i)),
 				Timestamp: aws.Int64(1711065600000 + int64(page*40+i)*1000),

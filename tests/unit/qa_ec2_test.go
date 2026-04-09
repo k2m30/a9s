@@ -102,8 +102,8 @@ func TestQA_EC2_A1_12_NoPipeSeparators(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
 
-	lines := strings.Split(plain, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(plain, "\n")
+	for line := range lines {
 		// Skip border lines
 		if strings.ContainsAny(line, "\u250c\u2510\u2514\u2518\u2500") {
 			continue
@@ -255,11 +255,11 @@ func TestQA_EC2_A4_StatusColoring_TerminatedRowHasANSI(t *testing.T) {
 func TestQA_EC2_A5_5_FirstRowSelected(t *testing.T) {
 	m := newEC2ListModel(t)
 	content := rootViewContent(m)
-	lines := strings.Split(content, "\n")
+	lines := strings.SplitSeq(content, "\n")
 
 	// First data row should have the selected row style (blue background).
 	// Find a line containing "g4dn.xlarge" (first instance's type)
-	for _, line := range lines {
+	for line := range lines {
 		plain := stripANSI(line)
 		if strings.Contains(plain, "g4dn.xlarge") {
 			// This line should have ANSI styling for selection

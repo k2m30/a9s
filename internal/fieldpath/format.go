@@ -14,7 +14,7 @@ func FormatValue(val reflect.Value) string {
 	}
 
 	// 2. Pointer: dereference
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return ""
 		}
@@ -22,7 +22,7 @@ func FormatValue(val reflect.Value) string {
 	}
 
 	// 3. time.Time (check BEFORE Kind-based dispatch, since time.Time is a struct)
-	if val.Type() == reflect.TypeOf(time.Time{}) {
+	if val.Type() == reflect.TypeFor[time.Time]() {
 		t := val.Interface().(time.Time)
 		if t.IsZero() {
 			return ""

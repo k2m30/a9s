@@ -366,7 +366,6 @@ func TestCTSeverity_AllowlistEntries_AreSensitiveAttention(t *testing.T) {
 	}
 
 	for _, entry := range allowlist {
-		entry := entry // capture loop variable
 		t.Run(entry.eventSource+"/"+entry.eventName, func(t *testing.T) {
 			event := buildSeverityCTEvent(
 				"al-"+entry.eventName, entry.eventName, entry.eventSource,

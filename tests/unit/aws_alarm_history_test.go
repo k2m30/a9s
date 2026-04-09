@@ -605,7 +605,7 @@ func TestFetchAlarmHistory_MaxCap(t *testing.T) {
 
 	// Build one page of 50 items with a NextToken indicating more pages exist.
 	var items []cwtypes.AlarmHistoryItem
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		itemTs := ts.Add(time.Duration(i) * time.Second)
 		items = append(items, cwtypes.AlarmHistoryItem{
 			AlarmName:       aws.String("BigAlarm"),

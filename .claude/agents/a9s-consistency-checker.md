@@ -74,7 +74,7 @@ Verify it matches in:
 **Source of truth:** `cmd/a9s/main.go` — the `version` constant
 
 Build and verify:
-- `go build -o /tmp/a9s-check ./cmd/a9s/`
+- `make build` (or `go build -o /tmp/a9s-check ./cmd/a9s/` for temp binary)
 - `/tmp/a9s-check --version` output matches the constant
 - Clean up: `rm /tmp/a9s-check`
 

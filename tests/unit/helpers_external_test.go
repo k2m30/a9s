@@ -92,7 +92,7 @@ func detailApplyMsg(m views.DetailModel, msg tea.Msg) (views.DetailModel, tea.Cm
 // ---------------------------------------------------------------------------
 
 // buildResource constructs a resource.Resource with a RawStruct set.
-func buildResource(id, name string, rawStruct interface{}) resource.Resource {
+func buildResource(id, name string, rawStruct any) resource.Resource {
 	return resource.Resource{
 		ID:        id,
 		Name:      name,

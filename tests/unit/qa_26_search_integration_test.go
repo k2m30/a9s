@@ -248,7 +248,7 @@ func TestSearch_K01_ViewportScrollsToOffScreenMatch(t *testing.T) {
 
 	// Resource with "match" in many fields so there are multiple matches.
 	fields := map[string]string{}
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		fields[strings.Repeat("a", i+1)] = "placeholder"
 	}
 	fields["state"] = "match-target"
@@ -1205,13 +1205,13 @@ func TestSearch_R05_YAMLFindsMoreMatchesThanDetail(t *testing.T) {
 		ID:   "mydb-prod",
 		Name: "mydb-prod",
 		Fields: map[string]string{
-			"db_instance_status":             "available",
-			"db_instance_identifier":         "mydb-prod",
-			"engine":                         "postgres",
-			"engine_version":                 "14.5",
-			"availability_zone":              "us-east-1a",
-			"multi_az":                       "false",
-			"storage_type":                   "gp3",
+			"db_instance_status":              "available",
+			"db_instance_identifier":          "mydb-prod",
+			"engine":                          "postgres",
+			"engine_version":                  "14.5",
+			"availability_zone":               "us-east-1a",
+			"multi_az":                        "false",
+			"storage_type":                    "gp3",
 			"vpc_security_group_ids_0_status": "available",
 		},
 	}

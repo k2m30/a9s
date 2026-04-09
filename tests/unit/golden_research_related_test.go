@@ -36,8 +36,8 @@ var reParenShortname = regexp.MustCompile(`\(([a-z0-9][a-z0-9\-]*)\)`)
 // resolveShortname resolves a raw token (from a filename base or a parenthesised
 // reference in a table row) to the canonical resource shortname registered in
 // resource.FindResourceType.  It tries:
-//   1. exact match
-//   2. token + "s"  (handles ct-event → ct-events and similar doc typos)
+//  1. exact match
+//  2. token + "s"  (handles ct-event → ct-events and similar doc typos)
 //
 // Returns the resolved name, or the original token when no match is found.
 func resolveShortname(token string) string {
@@ -133,7 +133,7 @@ func extractP0Targets(content string) []string {
 	seen := map[string]bool{}
 	var targets []string
 
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		if !reP0Row.MatchString(line) {
 			continue
 		}

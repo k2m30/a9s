@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	internalaws "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	internalaws "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -50,8 +50,8 @@ func TestRelated_Policy_Role_ReturnsRoleNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
 		out: &iam.ListEntitiesForPolicyOutput{
 			PolicyRoles: []iamtypes.PolicyRole{
-				{RoleName: strPtr("admin-role")},
-				{RoleName: strPtr("readonly-role")},
+				{RoleName: new("admin-role")},
+				{RoleName: new("readonly-role")},
 			},
 		},
 	})
@@ -140,8 +140,8 @@ func TestRelated_Policy_User_ReturnsUserNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
 		out: &iam.ListEntitiesForPolicyOutput{
 			PolicyUsers: []iamtypes.PolicyUser{
-				{UserName: strPtr("alice")},
-				{UserName: strPtr("bob")},
+				{UserName: new("alice")},
+				{UserName: new("bob")},
 			},
 		},
 	})
@@ -198,8 +198,8 @@ func TestRelated_Policy_Group_ReturnsGroupNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
 		out: &iam.ListEntitiesForPolicyOutput{
 			PolicyGroups: []iamtypes.PolicyGroup{
-				{GroupName: strPtr("developers")},
-				{GroupName: strPtr("ops")},
+				{GroupName: new("developers")},
+				{GroupName: new("ops")},
 			},
 		},
 	})
@@ -288,7 +288,7 @@ func TestRelated_Policy_TTLCache(t *testing.T) {
 	callCount := 0
 	mock := &mockIAMListEntitiesAPICounter{
 		out: &iam.ListEntitiesForPolicyOutput{
-			PolicyRoles: []iamtypes.PolicyRole{{RoleName: strPtr("cached-role")}},
+			PolicyRoles: []iamtypes.PolicyRole{{RoleName: new("cached-role")}},
 		},
 		counter: &callCount,
 	}

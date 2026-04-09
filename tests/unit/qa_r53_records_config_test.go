@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -44,13 +45,7 @@ func TestConfigDefaultViewDef_R53Records_DetailPaths(t *testing.T) {
 	// Verify key detail fields are present
 	wantPaths := []string{"Name", "Type", "TTL", "ResourceRecords", "AliasTarget"}
 	for _, want := range wantPaths {
-		found := false
-		for _, p := range vd.Detail {
-			if p == want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(vd.Detail, want)
 		if !found {
 			t.Errorf("r53_records default Detail missing path %q", want)
 		}

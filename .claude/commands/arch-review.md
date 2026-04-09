@@ -19,15 +19,19 @@ Read `/tmp/arch-review.txt` for the structured PASS/FAIL report.
 Run these three checks and save their output:
 
 ```bash
-golangci-lint run ./... > /tmp/arch-lint.txt 2>&1
+make lint > /tmp/arch-lint.txt 2>&1
 ```
 
 ```bash
-go test -race ./tests/unit/ -count=1 -timeout 120s > /tmp/arch-tests.txt 2>&1
+make test > /tmp/arch-tests.txt 2>&1
 ```
 
 ```bash
-govulncheck ./... > /tmp/arch-vulncheck.txt 2>&1
+make security > /tmp/arch-vulncheck.txt 2>&1
+```
+
+```bash
+make gofix > /tmp/arch-gofix.txt 2>&1
 ```
 
 Read all three output files.

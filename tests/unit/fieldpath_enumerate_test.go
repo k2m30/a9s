@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -23,10 +24,10 @@ type enumTag struct {
 }
 
 type enumSimple struct {
-	Name  string      `json:"name"`
-	Count int32       `json:"count"`
-	State enumState   `json:"state"`
-	Tags  []enumTag   `json:"tags"`
+	Name  string    `json:"name"`
+	Count int32     `json:"count"`
+	State enumState `json:"state"`
+	Tags  []enumTag `json:"tags"`
 }
 
 // Named string type (like AWS SDK's StateName)
@@ -44,7 +45,7 @@ type enumEdge struct {
 // ---------------------------------------------------------------------------
 
 func TestEnumeratePaths_ScalarStringField(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumSimple{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumSimple](), "")
 
 	if !containsPath(paths, "name") {
 		t.Errorf("expected paths to contain %q, got %v", "name", paths)
@@ -52,7 +53,7 @@ func TestEnumeratePaths_ScalarStringField(t *testing.T) {
 }
 
 func TestEnumeratePaths_Int32Field(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumSimple{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumSimple](), "")
 
 	if !containsPath(paths, "count") {
 		t.Errorf("expected paths to contain %q, got %v", "count", paths)
@@ -60,7 +61,7 @@ func TestEnumeratePaths_Int32Field(t *testing.T) {
 }
 
 func TestEnumeratePaths_NestedStruct(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumSimple{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumSimple](), "")
 
 	if !containsPath(paths, "state.name") {
 		t.Errorf("expected paths to contain %q, got %v", "state.name", paths)
@@ -71,7 +72,7 @@ func TestEnumeratePaths_NestedStruct(t *testing.T) {
 }
 
 func TestEnumeratePaths_SliceField(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumSimple{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumSimple](), "")
 
 	if !containsPath(paths, "tags[].key") {
 		t.Errorf("expected paths to contain %q, got %v", "tags[].key", paths)
@@ -86,7 +87,7 @@ func TestEnumeratePaths_SliceField(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestEnumeratePaths_PointerToStruct(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumEdge{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumEdge](), "")
 
 	// Pointer to struct should be dereferenced — no "*" in path
 	if !containsPath(paths, "state.name") {
@@ -103,7 +104,7 @@ func TestEnumeratePaths_PointerToStruct(t *testing.T) {
 }
 
 func TestEnumeratePaths_TimeFieldIsLeaf(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumEdge{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumEdge](), "")
 
 	// time.Time should be treated as leaf — just "launchTime", not "launchTime.wall" etc.
 	if !containsPath(paths, "launchTime") {
@@ -117,7 +118,7 @@ func TestEnumeratePaths_TimeFieldIsLeaf(t *testing.T) {
 }
 
 func TestEnumeratePaths_NamedStringTypeIsLeaf(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumEdge{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumEdge](), "")
 
 	if !containsPath(paths, "status") {
 		t.Errorf("expected paths to contain %q, got %v", "status", paths)
@@ -125,7 +126,7 @@ func TestEnumeratePaths_NamedStringTypeIsLeaf(t *testing.T) {
 }
 
 func TestEnumeratePaths_PointerToStringIsLeaf(t *testing.T) {
-	paths := fieldpath.EnumeratePaths(reflect.TypeOf(enumEdge{}), "")
+	paths := fieldpath.EnumeratePaths(reflect.TypeFor[enumEdge](), "")
 
 	if !containsPath(paths, "name") {
 		t.Errorf("expected paths to contain %q, got %v", "name", paths)
@@ -137,10 +138,5 @@ func TestEnumeratePaths_PointerToStringIsLeaf(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func containsPath(paths []string, target string) bool {
-	for _, p := range paths {
-		if p == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(paths, target)
 }

@@ -30,12 +30,12 @@ import (
 func TestQA_Detail_LogStream_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ls := cwlogstypes.LogStream{
-		LogStreamName:       ptrString("2024/03/22/[$LATEST]abcdef1234567890"),
-		Arn:                 ptrString("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/my-func:log-stream:2024/03/22/[$LATEST]abcdef1234567890"),
-		FirstEventTimestamp: ptrInt64(1711065600000),
-		LastEventTimestamp:  ptrInt64(1711152000000),
-		StoredBytes:         ptrInt64(14336),
-		CreationTime:        ptrInt64(1711060000000),
+		LogStreamName:       new("2024/03/22/[$LATEST]abcdef1234567890"),
+		Arn:                 new("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/my-func:log-stream:2024/03/22/[$LATEST]abcdef1234567890"),
+		FirstEventTimestamp: new(int64(1711065600000)),
+		LastEventTimestamp:  new(int64(1711152000000)),
+		StoredBytes:         new(int64(14336)),
+		CreationTime:        new(int64(1711060000000)),
 	}
 	res := buildResource(
 		"2024/03/22/[$LATEST]abcdef1234567890",
@@ -75,9 +75,9 @@ func TestQA_Detail_LogStream_NilFields(t *testing.T) {
 func TestQA_Detail_LogEvent_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.OutputLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("ERROR NullPointerException in com.example.App.main"),
-		IngestionTime: ptrInt64(1711065601000),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("ERROR NullPointerException in com.example.App.main"),
+		IngestionTime: new(int64(1711065601000)),
 	}
 	res := buildResource(
 		"evt-1711065600000",
@@ -117,9 +117,9 @@ func TestQA_Detail_LogEvent_NilFields(t *testing.T) {
 func TestQA_Detail_LogEvent_FormattedTimestamps(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.OutputLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("test message"),
-		IngestionTime: ptrInt64(1711065601000),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("test message"),
+		IngestionTime: new(int64(1711065601000)),
 	}
 	res := buildResource("evt-001", "test message", ev)
 	// Fetcher populates Fields with formatted values
@@ -150,16 +150,16 @@ func TestQA_Detail_TargetHealth_ViewContainsExpectedFields(t *testing.T) {
 	port := int32(8080)
 	thd := elbtypes.TargetHealthDescription{
 		Target: &elbtypes.TargetDescription{
-			Id:               ptrString("i-0abc1234def56789a"),
+			Id:               new("i-0abc1234def56789a"),
 			Port:             &port,
-			AvailabilityZone: ptrString("us-east-1a"),
+			AvailabilityZone: new("us-east-1a"),
 		},
 		TargetHealth: &elbtypes.TargetHealth{
 			State:       elbtypes.TargetHealthStateEnumUnhealthy,
 			Reason:      elbtypes.TargetHealthReasonEnumFailedHealthChecks,
-			Description: ptrString("Health checks failed with 503"),
+			Description: new("Health checks failed with 503"),
 		},
-		HealthCheckPort: ptrString("8080"),
+		HealthCheckPort: new("8080"),
 	}
 	res := buildResource(
 		"i-0abc1234def56789a",
@@ -200,13 +200,13 @@ func TestQA_Detail_LongFieldNames(t *testing.T) {
 	port := int32(80)
 	thd := elbtypes.TargetHealthDescription{
 		Target: &elbtypes.TargetDescription{
-			Id:               ptrString("10.10.19.75"),
+			Id:               new("10.10.19.75"),
 			Port:             &port,
-			AvailabilityZone: ptrString("eu-west-2b"),
+			AvailabilityZone: new("eu-west-2b"),
 		},
 		TargetHealth: &elbtypes.TargetHealth{
 			State:       elbtypes.TargetHealthStateEnumHealthy,
-			Description: ptrString("Target is healthy"),
+			Description: new("Target is healthy"),
 		},
 	}
 	res := buildResource("10.10.19.75", "10.10.19.75", thd)
@@ -234,11 +234,11 @@ func TestQA_Detail_LongFieldNames(t *testing.T) {
 func TestLambdaInvocationDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
-		IngestionTime: ptrInt64(1711065601000),
-		LogStreamName: ptrString("2024/03/22/[$LATEST]abcdef"),
-		EventId:       ptrString("evt-001"),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
+		IngestionTime: new(int64(1711065601000)),
+		LogStreamName: new("2024/03/22/[$LATEST]abcdef"),
+		EventId:       new("evt-001"),
 	}
 	res := buildResource(
 		"12345678-1234-1234-1234-123456789012",
@@ -289,10 +289,10 @@ func TestLambdaInvocationDetailViewNilFields(t *testing.T) {
 func TestLambdaInvocationLogDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("INFO Processing request for user abc-123"),
-		IngestionTime: ptrInt64(1711065600500),
-		EventId:       ptrString("log-002"),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("INFO Processing request for user abc-123"),
+		IngestionTime: new(int64(1711065600500)),
+		EventId:       new("log-002"),
 	}
 	res := buildResource(
 		"log-002",
@@ -337,9 +337,9 @@ func TestQA_Detail_EcsSvcEvents_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	ev := ecstypes.ServiceEvent{
-		Id:        ptrString("evt-detail-001"),
+		Id:        new("evt-detail-001"),
 		CreatedAt: &ts,
-		Message:   ptrString("(service web-service) has reached a steady state."),
+		Message:   new("(service web-service) has reached a steady state."),
 	}
 	res := buildResource(
 		"evt-detail-001",
@@ -384,17 +384,17 @@ func TestQA_Detail_EcsSvcTasks_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	task := ecstypes.Task{
-		TaskArn:           ptrString("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
-		LastStatus:        ptrString("RUNNING"),
-		DesiredStatus:     ptrString("RUNNING"),
+		TaskArn:           new("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+		LastStatus:        new("RUNNING"),
+		DesiredStatus:     new("RUNNING"),
 		HealthStatus:      ecstypes.HealthStatusHealthy,
-		TaskDefinitionArn: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
+		TaskDefinitionArn: new("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
 		StartedAt:         &startedAt,
-		Cpu:               ptrString("256"),
-		Memory:            ptrString("512"),
+		Cpu:               new("256"),
+		Memory:            new("512"),
 		LaunchType:        ecstypes.LaunchTypeFargate,
-		PlatformVersion:   ptrString("1.4.0"),
-		Group:             ptrString("service:web-service"),
+		PlatformVersion:   new("1.4.0"),
+		Group:             new("service:web-service"),
 	}
 	res := buildResource(
 		"abc123def456",
@@ -442,11 +442,11 @@ func TestQA_Detail_EcsSvcTasks_NilFields(t *testing.T) {
 func TestQA_Detail_EcsSvcLogs_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711036800000),
-		Message:       ptrString("INFO Starting application server on port 8080"),
-		IngestionTime: ptrInt64(1711036801000),
-		LogStreamName: ptrString("ecs/web/abc123def456"),
-		EventId:       ptrString("evt-svc-log-001"),
+		Timestamp:     new(int64(1711036800000)),
+		Message:       new("INFO Starting application server on port 8080"),
+		IngestionTime: new(int64(1711036801000)),
+		LogStreamName: new("ecs/web/abc123def456"),
+		EventId:       new("evt-svc-log-001"),
 	}
 	res := buildResource(
 		"evt-svc-log-001",
@@ -492,16 +492,16 @@ func TestCfnEventsDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	ev := cfntypes.StackEvent{
-		EventId:              ptrString("evt-detail-001"),
-		StackId:              ptrString("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
-		StackName:            ptrString("my-stack"),
+		EventId:              new("evt-detail-001"),
+		StackId:              new("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
+		StackName:            new("my-stack"),
 		Timestamp:            &ts,
-		LogicalResourceId:    ptrString("MyBucket"),
-		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
-		ResourceType:         ptrString("AWS::S3::Bucket"),
+		LogicalResourceId:    new("MyBucket"),
+		PhysicalResourceId:   new("my-stack-mybucket-abc123"),
+		ResourceType:         new("AWS::S3::Bucket"),
 		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
-		ResourceStatusReason: ptrString("Resource creation complete"),
-		ClientRequestToken:   ptrString("console-token-12345"),
+		ResourceStatusReason: new("Resource creation complete"),
+		ClientRequestToken:   new("console-token-12345"),
 	}
 	res := buildResource(
 		"evt-detail-001",
@@ -550,11 +550,11 @@ func TestCfnResourcesDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	res_summary := cfntypes.StackResourceSummary{
-		LogicalResourceId:    ptrString("MyBucket"),
-		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
-		ResourceType:         ptrString("AWS::S3::Bucket"),
+		LogicalResourceId:    new("MyBucket"),
+		PhysicalResourceId:   new("my-stack-mybucket-abc123"),
+		ResourceType:         new("AWS::S3::Bucket"),
 		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
-		ResourceStatusReason: ptrString(""),
+		ResourceStatusReason: new(""),
 		LastUpdatedTimestamp: &ts,
 		DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
 			StackResourceDriftStatus: cfntypes.StackResourceDriftStatusInSync,
@@ -610,17 +610,17 @@ func TestAsgActivityDetailViewContainsExpectedFields(t *testing.T) {
 	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 	progress := int32(100)
 	activity := asgtypes.Activity{
-		ActivityId:            ptrString("act-detail-001"),
-		AutoScalingGroupName:  ptrString("my-asg"),
-		AutoScalingGroupARN:   ptrString("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/my-asg"),
-		AutoScalingGroupState: ptrString("InService"),
-		Cause:                 ptrString("At 2024-03-22T10:00:00Z an instance was started"),
-		Description:           ptrString("Launching a new EC2 instance: i-0abc1234"),
-		Details:               ptrString("{\"Subnet ID\":\"subnet-12345\"}"),
+		ActivityId:            new("act-detail-001"),
+		AutoScalingGroupName:  new("my-asg"),
+		AutoScalingGroupARN:   new("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/my-asg"),
+		AutoScalingGroupState: new("InService"),
+		Cause:                 new("At 2024-03-22T10:00:00Z an instance was started"),
+		Description:           new("Launching a new EC2 instance: i-0abc1234"),
+		Details:               new("{\"Subnet ID\":\"subnet-12345\"}"),
 		StartTime:             &ts,
 		EndTime:               &endTs,
 		StatusCode:            asgtypes.ScalingActivityStatusCodeSuccessful,
-		StatusMessage:         ptrString(""),
+		StatusMessage:         new(""),
 		Progress:              &progress,
 	}
 	res := buildResource(
@@ -672,11 +672,11 @@ func TestAlarmHistoryDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	item := cwtypes.AlarmHistoryItem{
-		AlarmName:       ptrString("HighCPUAlarm"),
+		AlarmName:       new("HighCPUAlarm"),
 		AlarmType:       cwtypes.AlarmTypeMetricAlarm,
-		HistoryData:     ptrString(`{"version":"1.0","oldState":{"stateValue":"OK"}}`),
+		HistoryData:     new(`{"version":"1.0","oldState":{"stateValue":"OK"}}`),
 		HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
-		HistorySummary:  ptrString("Alarm updated from OK to ALARM"),
+		HistorySummary:  new("Alarm updated from OK to ALARM"),
 		Timestamp:       &ts,
 	}
 	res := buildResource("2024-03-22 10:00", "2024-03-22 10:00", item)
@@ -721,16 +721,16 @@ func TestAlarmHistoryDetailViewNilFields(t *testing.T) {
 func TestQA_Detail_ELBListeners_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	listener := elbtypes.Listener{
-		ListenerArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
-		Port:        ptrInt32(443),
+		ListenerArn: new("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
+		Port:        new(int32(443)),
 		Protocol:    elbtypes.ProtocolEnumHttps,
-		SslPolicy:   ptrString("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+		SslPolicy:   new("ELBSecurityPolicy-TLS13-1-2-2021-06"),
 		Certificates: []elbtypes.Certificate{{
-			CertificateArn: ptrString("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
+			CertificateArn: new("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
 		}},
 		DefaultActions: []elbtypes.Action{{
 			Type:           elbtypes.ActionTypeEnumForward,
-			TargetGroupArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
+			TargetGroupArn: new("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
 		}},
 	}
 	res := buildResource(
@@ -779,18 +779,18 @@ func TestQA_Detail_SFNExecutions_ViewContainsExpectedFields(t *testing.T) {
 	redriveTs := time.Date(2024, 6, 15, 11, 0, 0, 0, time.UTC)
 
 	item := sfntypes.ExecutionListItem{
-		ExecutionArn:           ptrString("arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001"),
-		Name:                   ptrString("exec-001"),
+		ExecutionArn:           new("arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001"),
+		Name:                   new("exec-001"),
 		StartDate:              &startTs,
 		StopDate:               &stopTs,
-		StateMachineArn:        ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine"),
+		StateMachineArn:        new("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine"),
 		Status:                 sfntypes.ExecutionStatusSucceeded,
 		ItemCount:              &itemCount,
-		MapRunArn:              ptrString("arn:aws:states:us-east-1:123456789012:mapRun:my-state-machine/exec-001:map-run-id"),
+		MapRunArn:              new("arn:aws:states:us-east-1:123456789012:mapRun:my-state-machine/exec-001:map-run-id"),
 		RedriveCount:           &redriveCount,
 		RedriveDate:            &redriveTs,
-		StateMachineAliasArn:   ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:prod"),
-		StateMachineVersionArn: ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:1"),
+		StateMachineAliasArn:   new("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:prod"),
+		StateMachineVersionArn: new("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:1"),
 	}
 	res := buildResource("exec-001", "exec-001", item)
 	res.Status = "SUCCEEDED"
@@ -853,8 +853,8 @@ func TestQA_Detail_SFNExecutionHistory_ViewContainsExpectedFields(t *testing.T) 
 		Timestamp: &ts,
 		Type:      sfntypes.HistoryEventTypeTaskStateEntered,
 		StateEnteredEventDetails: &sfntypes.StateEnteredEventDetails{
-			Name:  ptrString("ProcessOrder"),
-			Input: ptrString(`{"orderId":"12345"}`),
+			Name:  new("ProcessOrder"),
+			Input: new(`{"orderId":"12345"}`),
 		},
 	}
 	res := buildResource("1", "Task State Entered", event)
@@ -893,10 +893,10 @@ func TestQA_Detail_SFNExecutionHistory_FailedEvent(t *testing.T) {
 		Timestamp:       &ts,
 		Type:            sfntypes.HistoryEventTypeTaskFailed,
 		TaskFailedEventDetails: &sfntypes.TaskFailedEventDetails{
-			Resource:     ptrString("lambda:invoke"),
-			ResourceType: ptrString("lambda"),
-			Error:        ptrString("States.TaskFailed"),
-			Cause:        ptrString("Lambda function returned error"),
+			Resource:     new("lambda:invoke"),
+			ResourceType: new("lambda"),
+			Error:        new("States.TaskFailed"),
+			Cause:        new("Lambda function returned error"),
 		},
 	}
 	res := buildResource("5", "Task Failed", event)
@@ -948,20 +948,20 @@ func TestQA_Detail_CBBuilds_ViewContainsExpectedFields(t *testing.T) {
 	endTs := time.Date(2024, 6, 15, 10, 4, 12, 0, time.UTC)
 
 	build := cbtypes.Build{
-		Id:                    ptrString("my-project:build-id-001"),
-		Arn:                   ptrString("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
-		BuildNumber:           ptrInt64(142),
+		Id:                    new("my-project:build-id-001"),
+		Arn:                   new("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
+		BuildNumber:           new(int64(142)),
 		BuildStatus:           cbtypes.StatusTypeSucceeded,
 		StartTime:             &startTs,
 		EndTime:               &endTs,
-		CurrentPhase:          ptrString("COMPLETED"),
-		SourceVersion:         ptrString("abc123def456789012345678901234567890abcd"),
-		ResolvedSourceVersion: ptrString("abc123def456789012345678901234567890abcd"),
-		Initiator:             ptrString("codepipeline/my-pipeline"),
-		ProjectName:           ptrString("my-project"),
+		CurrentPhase:          new("COMPLETED"),
+		SourceVersion:         new("abc123def456789012345678901234567890abcd"),
+		ResolvedSourceVersion: new("abc123def456789012345678901234567890abcd"),
+		Initiator:             new("codepipeline/my-pipeline"),
+		ProjectName:           new("my-project"),
 		Logs: &cbtypes.LogsLocation{
-			GroupName:  ptrString("/aws/codebuild/my-project"),
-			StreamName: ptrString("build-id-001"),
+			GroupName:  new("/aws/codebuild/my-project"),
+			StreamName: new("build-id-001"),
 		},
 	}
 	res := buildResource("my-project:build-id-001", "#142", build)
@@ -1017,9 +1017,9 @@ func TestQA_Detail_CBBuilds_NilFields(t *testing.T) {
 func TestQA_Detail_CBBuildLogs_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	ev := cwlogstypes.OutputLogEvent{
-		Timestamp:     ptrInt64(1718445600000),
-		Message:       ptrString("[Container] Running command echo hello"),
-		IngestionTime: ptrInt64(1718445601000),
+		Timestamp:     new(int64(1718445600000)),
+		Message:       new("[Container] Running command echo hello"),
+		IngestionTime: new(int64(1718445601000)),
 	}
 	res := buildResource(
 		"evt-1718445600000-0",
@@ -1069,10 +1069,10 @@ func TestQA_Detail_ECRImages_ViewContainsExpectedFields(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
 	img := ecrtypes.ImageDetail{
-		ImageDigest:      ptrString("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+		ImageDigest:      new("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
 		ImageTags:        []string{"latest", "v1.0.0"},
 		ImagePushedAt:    &pushedAt,
-		ImageSizeInBytes: ptrInt64(52428800),
+		ImageSizeInBytes: new(int64(52428800)),
 		ImageScanStatus: &ecrtypes.ImageScanStatus{
 			Status: ecrtypes.ScanStatusComplete,
 		},
@@ -1130,17 +1130,17 @@ func TestQA_Detail_PipelineStages_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 
 	row := awsclient.PipelineStageRow{
-		StageName:       "Source",
-		StageStatus:     "Succeeded",
-		ActionName:      "GitHub",
-		ActionStatus:    "Succeeded",
-		LastStatusChange: ptrTime(time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)),
-		ExternalURL:     "https://github.com/org/repo/commit/abc123",
-		Token:           "approval-token-xyz",
-		ErrorCode:       "",
-		ErrorMessage:    "",
-		RevisionId:      "abc123def456",
-		RevisionSummary: "commit-sha-abc",
+		StageName:        "Source",
+		StageStatus:      "Succeeded",
+		ActionName:       "GitHub",
+		ActionStatus:     "Succeeded",
+		LastStatusChange: new(time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)),
+		ExternalURL:      "https://github.com/org/repo/commit/abc123",
+		Token:            "approval-token-xyz",
+		ErrorCode:        "",
+		ErrorMessage:     "",
+		RevisionId:       "abc123def456",
+		RevisionSummary:  "commit-sha-abc",
 	}
 	res := buildResource("Source/GitHub", "GitHub", row)
 	res.Status = "running"
@@ -1238,10 +1238,10 @@ func TestQA_Detail_IAMGroupMembers_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	createDate := time.Date(2024, 3, 15, 9, 30, 0, 0, time.UTC)
 	user := iamtypes.User{
-		UserName:   ptrString("alice"),
-		UserId:     ptrString("AIDAEXAMPLE1111111111"),
-		Arn:        ptrString("arn:aws:iam::123456789012:user/alice"),
-		Path:       ptrString("/"),
+		UserName:   new("alice"),
+		UserId:     new("AIDAEXAMPLE1111111111"),
+		Arn:        new("arn:aws:iam::123456789012:user/alice"),
+		Path:       new("/"),
 		CreateDate: &createDate,
 	}
 	res := buildResource("alice", "alice", user)
@@ -1286,11 +1286,11 @@ func TestQA_Detail_IAMGroupMembers_NilFields(t *testing.T) {
 func TestQA_Detail_ELBListenerRules_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	rule := elbtypes.Rule{
-		RuleArn:  ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/api/abc/def/rule1"),
-		Priority: ptrString("100"),
+		RuleArn:  new("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/api/abc/def/rule1"),
+		Priority: new("100"),
 		Conditions: []elbtypes.RuleCondition{
 			{
-				Field: ptrString("path-pattern"),
+				Field: new("path-pattern"),
 				PathPatternConfig: &elbtypes.PathPatternConditionConfig{
 					Values: []string{"/api/*"},
 				},
@@ -1299,10 +1299,10 @@ func TestQA_Detail_ELBListenerRules_ViewContainsExpectedFields(t *testing.T) {
 		Actions: []elbtypes.Action{
 			{
 				Type:           elbtypes.ActionTypeEnumForward,
-				TargetGroupArn: ptrString("arn:tg/api-tg"),
+				TargetGroupArn: new("arn:tg/api-tg"),
 			},
 		},
-		IsDefault: ptrBool(false),
+		IsDefault: new(false),
 	}
 	res := buildResource("arn:rule/1", "100", rule)
 	res.Status = ""
@@ -1349,10 +1349,10 @@ func TestDbiEventsDetailViewContainsExpectedFields(t *testing.T) {
 	ev := rdstypes.Event{
 		Date:             &ts,
 		EventCategories:  []string{"maintenance"},
-		Message:          ptrString("Applying offline patches to DB instance"),
-		SourceIdentifier: ptrString("my-db-instance"),
+		Message:          new("Applying offline patches to DB instance"),
+		SourceIdentifier: new("my-db-instance"),
 		SourceType:       rdstypes.SourceTypeDbInstance,
-		SourceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
+		SourceArn:        new("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
 	}
 	res := buildResource(
 		"2024-06-15 10:00/my-db-instance",
@@ -1403,11 +1403,11 @@ func TestDbiEventsDetailViewNilFields(t *testing.T) {
 func TestSnsSubscriptionsDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	sub := snstypes.Subscription{
-		SubscriptionArn: ptrString("arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4"),
-		TopicArn:        ptrString("arn:aws:sns:us-east-1:123456789012:my-topic"),
-		Protocol:        ptrString("email"),
-		Endpoint:        ptrString("user@example.com"),
-		Owner:           ptrString("123456789012"),
+		SubscriptionArn: new("arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4"),
+		TopicArn:        new("arn:aws:sns:us-east-1:123456789012:my-topic"),
+		Protocol:        new("email"),
+		Endpoint:        new("user@example.com"),
+		Owner:           new("123456789012"),
 	}
 	res := buildResource(
 		"arn:aws:sns:us-east-1:123456789012:my-topic:a1b2c3d4",
@@ -1459,10 +1459,10 @@ func TestSnsSubscriptionsDetailViewNilFields(t *testing.T) {
 func TestEbRuleTargetsDetailViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
 	target := ebtypes.Target{
-		Id:      ptrString("lambda-target-1"),
-		Arn:     ptrString("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
-		RoleArn: ptrString("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
-		Input:   ptrString(`{"source":"eventbridge"}`),
+		Id:      new("lambda-target-1"),
+		Arn:     new("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
+		RoleArn: new("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
+		Input:   new(`{"source":"eventbridge"}`),
 	}
 	res := buildResource("lambda-target-1", "lambda-target-1", target)
 	res.Status = ""
@@ -1511,25 +1511,25 @@ func TestGlueRunsDetailViewContainsExpectedFields(t *testing.T) {
 	dpuSec := 45000.0
 
 	run := gluetypes.JobRun{
-		Id:            ptrString("jr_abc12345-6789-0abc-def0-123456789012"),
-		JobName:       ptrString("etl-daily-load"),
+		Id:            new("jr_abc12345-6789-0abc-def0-123456789012"),
+		JobName:       new("etl-daily-load"),
 		JobRunState:   gluetypes.JobRunStateSucceeded,
 		StartedOn:     &startTs,
 		ExecutionTime: 2843,
-		ErrorMessage:  ptrString(""),
+		ErrorMessage:  new(""),
 		DPUSeconds:    &dpuSec,
 	}
 	res := buildResource("jr_abc12345-6789-0abc-def0-123456789012", "2024-08-10 14:30", run)
 	res.Status = "SUCCEEDED"
 	res.Fields = map[string]string{
-		"run_id_short":        "jr_abc12",
-		"job_run_state":       "SUCCEEDED",
-		"started_on":          "2024-08-10 14:30",
+		"run_id_short":         "jr_abc12",
+		"job_run_state":        "SUCCEEDED",
+		"started_on":           "2024-08-10 14:30",
 		"execution_time_human": "47m 23s",
-		"error_message":       "",
-		"dpu_hours":           "12.5",
-		"run_id":              "jr_abc12345-6789-0abc-def0-123456789012",
-		"job_name":            "etl-daily-load",
+		"error_message":        "",
+		"dpu_hours":            "12.5",
+		"run_id":               "jr_abc12345-6789-0abc-def0-123456789012",
+		"job_name":             "etl-daily-load",
 	}
 	cfg := detailConfigForType("glue_runs")
 	m := newDetailModel(res, "glue_runs", cfg)
@@ -1548,7 +1548,6 @@ func TestGlueRunsDetailViewContainsExpectedFields(t *testing.T) {
 		}
 	}
 }
-
 
 func TestGlueRunsDetailViewNilFields(t *testing.T) {
 	ensureNoColor(t)
