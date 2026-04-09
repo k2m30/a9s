@@ -14,8 +14,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // Scenario-driven golden snapshots for Issue #119.
@@ -447,7 +447,7 @@ func issueStorySections(t *testing.T) map[string][]string {
 
 	sections := make(map[string][]string)
 	current := ""
-	for _, line := range strings.Split(string(body), "\n") {
+	for line := range strings.SplitSeq(string(body), "\n") {
 		switch {
 		case strings.HasPrefix(line, "## "):
 			current = strings.TrimSpace(strings.TrimPrefix(line, "## "))

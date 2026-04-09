@@ -86,12 +86,10 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 	emptyCache := make(resource.ResourceCache)
 
 	for _, fixture := range fixtures {
-		fixture := fixture
 		t.Run(fixture.ID, func(t *testing.T) {
 			allResults := ctEventsRealCheckerResults(fixture, emptyCache)
 
 			for _, result := range allResults {
-				result := result
 				if !cacheBackedTypes[result.TargetType] {
 					continue
 				}
@@ -231,7 +229,6 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 	}
 
 	for _, bc := range bugECases {
-		bc := bc
 		t.Run(bc.fixtureID, func(t *testing.T) {
 			t.Errorf("Bug E: event=%s: checkCtEventsRole returned Count=-1 with nil clients"+
 				" and empty cache — short-circuit in ctEventsRelatedResources ignores the nil"+

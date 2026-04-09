@@ -720,7 +720,7 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 func TestFetchELBListeners_MaxCap(t *testing.T) {
 	// Build one page of 50 listeners with a NextMarker indicating more pages exist.
 	var listeners []elbtypes.Listener
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		portNum := int32(1000 + i)
 		listeners = append(listeners, elbtypes.Listener{
 			ListenerArn: aws.String(fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cap-alb/abc123/p0-l%d", i)),

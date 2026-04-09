@@ -91,7 +91,7 @@ func TestUnregisterChildType(t *testing.T) {
 
 func TestRegisterChildFetcher(t *testing.T) {
 	called := false
-	resource.RegisterPaginatedChild("test_child_fetch", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("test_child_fetch", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		called = true
 		resources := []resource.Resource{{ID: "test-1", Name: "Test"}}
 		return resource.FetchResult{
@@ -133,7 +133,7 @@ func TestGetChildFetcher_NotRegistered(t *testing.T) {
 }
 
 func TestUnregisterChildFetcher(t *testing.T) {
-	resource.RegisterPaginatedChild("temp_fetcher", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("temp_fetcher", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
 	resource.UnregisterPaginatedChild("temp_fetcher")
@@ -174,7 +174,7 @@ func TestResourceTypeDef_MultipleChildren(t *testing.T) {
 
 func TestChildFetcher_ReceivesParentContext(t *testing.T) {
 	var receivedCtx resource.ParentContext
-	resource.RegisterPaginatedChild("ctx_test", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("ctx_test", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		receivedCtx = parentCtx
 		return resource.FetchResult{}, nil
 	})

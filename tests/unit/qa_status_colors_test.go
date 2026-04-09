@@ -85,7 +85,7 @@ func multiStatusColorModel(t *testing.T) views.ResourceListModel {
 // findLineContaining returns the raw (ANSI-included) line containing the
 // given plain-text substring, or "" if not found.
 func findLineContaining(rendered, substr string) string {
-	for _, line := range strings.Split(rendered, "\n") {
+	for line := range strings.SplitSeq(rendered, "\n") {
 		if strings.Contains(stripANSI(line), substr) {
 			return line
 		}
@@ -190,7 +190,7 @@ func TestQA_StatusColor_AllFourStatusesDistinct(t *testing.T) {
 	}
 
 	// Verify all four colors are pairwise distinct
-	for i := 0; i < len(statuses); i++ {
+	for i := range statuses {
 		for j := i + 1; j < len(statuses); j++ {
 			si := styles.RowColorStyle(statuses[i].name).GetForeground()
 			sj := styles.RowColorStyle(statuses[j].name).GetForeground()

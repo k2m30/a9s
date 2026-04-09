@@ -121,7 +121,6 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		c := c // capture
 		t.Run(c.name, func(t *testing.T) {
 			got := awsclient.ClassifyCTVerb(c.eventName, c.eventCategory, c.eventType)
 			if got != c.want {

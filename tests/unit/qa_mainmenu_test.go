@@ -109,13 +109,13 @@ func TestQA_MainMenu_FirstRowSelectedByDefault(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 	content := rootViewContent(m)
-	lines := strings.Split(content, "\n")
+	lines := strings.SplitSeq(content, "\n")
 
 	// EC2 Instances is the first resource type in AllResourceTypes()
 	// The selected row should have different rendering (ANSI sequences for bold/bg)
 	// than non-selected rows. We verify by checking raw content (with ANSI) for
 	// EC2 Instances line having background styling (escape codes present).
-	for _, line := range lines {
+	for line := range lines {
 		plain := stripANSI(line)
 		if strings.Contains(plain, "EC2 Instances") {
 			// Selected row should have ANSI styling that differs from raw text
@@ -316,7 +316,7 @@ func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Press PageDown many times — should clamp at last item
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgDown))
 	}
 
@@ -337,10 +337,10 @@ func TestQA_MainMenu_PageUpClampsAtTop(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Move down a bit, then PageUp many times — should clamp at first item
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyPgUp))
 	}
 
@@ -420,7 +420,7 @@ func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Move down 4 times, then press g
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
@@ -511,7 +511,7 @@ func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 			m := newRootSizedModel()
 
 			// Navigate to position i
-			for j := 0; j < i; j++ {
+			for range i {
 				m, _ = rootApplyMsg(m, rootKeyPress("j"))
 			}
 
@@ -540,7 +540,7 @@ func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Press j 5 times -> should land on index 5 (Auto Scaling Groups)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 
@@ -562,7 +562,7 @@ func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
@@ -589,7 +589,7 @@ func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Move cursor to item index 11 (EKS Node Groups, 0-indexed)
-	for i := 0; i < 11; i++ {
+	for range 11 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 
@@ -665,7 +665,7 @@ func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 
 	// Items 0-5 should be visible (EC2 through ASG)
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		if !strings.Contains(plain, allTypes[i].Name) {
 			t.Errorf("item %d (%s) should be visible at scroll offset 0", i, allTypes[i].Name)
 		}
@@ -854,7 +854,7 @@ func TestQA_MainMenu_FirstHeaderVisibleAfterScrollDownAndBackUp(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Scroll down past the first header
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 
@@ -878,7 +878,7 @@ func TestQA_MainMenu_ScrollAccountsForHeaders(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 8})
 
 	// Navigate to item index 10 (EKS Clusters, first CONTAINERS item)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 

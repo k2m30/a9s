@@ -43,9 +43,9 @@ func TestQA_ListRawStruct_LogStreams(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ls := cwlogstypes.LogStream{
-		LogStreamName:       ptrString("2024/03/22/[$LATEST]abcdef1234567890"),
-		FirstEventTimestamp: ptrInt64(1711065600000),
-		LastEventTimestamp:  ptrInt64(1711152000000),
+		LogStreamName:       new("2024/03/22/[$LATEST]abcdef1234567890"),
+		FirstEventTimestamp: new(int64(1711065600000)),
+		LastEventTimestamp:  new(int64(1711152000000)),
 	}
 
 	resources := []resource.Resource{
@@ -88,9 +88,9 @@ func TestQA_ListRawStruct_LogEvents(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ev := cwlogstypes.OutputLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("ERROR Failed to connect to database"),
-		IngestionTime: ptrInt64(1711065601000),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("ERROR Failed to connect to database"),
+		IngestionTime: new(int64(1711065601000)),
 	}
 
 	resources := []resource.Resource{
@@ -135,14 +135,14 @@ func TestQA_ListRawStruct_TargetHealth(t *testing.T) {
 	port := int32(8080)
 	thd := elbtypes.TargetHealthDescription{
 		Target: &elbtypes.TargetDescription{
-			Id:               ptrString("i-0abc1234def56789a"),
+			Id:               new("i-0abc1234def56789a"),
 			Port:             &port,
-			AvailabilityZone: ptrString("us-east-1a"),
+			AvailabilityZone: new("us-east-1a"),
 		},
 		TargetHealth: &elbtypes.TargetHealth{
 			State:       elbtypes.TargetHealthStateEnumUnhealthy,
 			Reason:      elbtypes.TargetHealthReasonEnumFailedHealthChecks,
-			Description: ptrString("Health checks failed with 503"),
+			Description: new("Health checks failed with 503"),
 		},
 	}
 
@@ -189,10 +189,10 @@ func TestLambdaInvocationsListRawStruct(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
-		IngestionTime: ptrInt64(1711065601000),
-		EventId:       ptrString("evt-001"),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("REPORT RequestId: 12345678-1234-1234-1234-123456789012\tDuration: 2103.45 ms\tBilled Duration: 2200 ms\tMemory Size: 256 MB\tMax Memory Used: 128 MB\t"),
+		IngestionTime: new(int64(1711065601000)),
+		EventId:       new("evt-001"),
 	}
 
 	resources := []resource.Resource{
@@ -238,10 +238,10 @@ func TestLambdaInvocationLogsListRawStruct(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711065600000),
-		Message:       ptrString("INFO Processing request for user abc-123"),
-		IngestionTime: ptrInt64(1711065600500),
-		EventId:       ptrString("log-002"),
+		Timestamp:     new(int64(1711065600000)),
+		Message:       new("INFO Processing request for user abc-123"),
+		IngestionTime: new(int64(1711065600500)),
+		EventId:       new("log-002"),
 	}
 
 	resources := []resource.Resource{
@@ -284,9 +284,9 @@ func TestQA_ListRawStruct_EcsSvcEvents(t *testing.T) {
 
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	ev := ecstypes.ServiceEvent{
-		Id:        ptrString("evt-list-001"),
+		Id:        new("evt-list-001"),
 		CreatedAt: &ts,
-		Message:   ptrString("(service web-service) has reached a steady state."),
+		Message:   new("(service web-service) has reached a steady state."),
 	}
 
 	resources := []resource.Resource{
@@ -329,11 +329,11 @@ func TestQA_ListRawStruct_EcsSvcTasks(t *testing.T) {
 
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	task := ecstypes.Task{
-		TaskArn:           ptrString("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
-		LastStatus:        ptrString("RUNNING"),
-		DesiredStatus:     ptrString("RUNNING"),
+		TaskArn:           new("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+		LastStatus:        new("RUNNING"),
+		DesiredStatus:     new("RUNNING"),
 		HealthStatus:      ecstypes.HealthStatusHealthy,
-		TaskDefinitionArn: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
+		TaskDefinitionArn: new("arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"),
 		StartedAt:         &startedAt,
 	}
 
@@ -380,11 +380,11 @@ func TestQA_ListRawStruct_EcsSvcLogs(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ev := cwlogstypes.FilteredLogEvent{
-		Timestamp:     ptrInt64(1711036800000),
-		Message:       ptrString("INFO Starting application server on port 8080"),
-		IngestionTime: ptrInt64(1711036801000),
-		LogStreamName: ptrString("ecs/web/abc123def456"),
-		EventId:       ptrString("evt-svc-log-list"),
+		Timestamp:     new(int64(1711036800000)),
+		Message:       new("INFO Starting application server on port 8080"),
+		IngestionTime: new(int64(1711036801000)),
+		LogStreamName: new("ecs/web/abc123def456"),
+		EventId:       new("evt-svc-log-list"),
 	}
 
 	resources := []resource.Resource{
@@ -428,14 +428,14 @@ func TestQA_ListRawStruct_CfnEvents(t *testing.T) {
 
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	ev := cfntypes.StackEvent{
-		EventId:              ptrString("evt-list-cfn-001"),
-		StackId:              ptrString("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
-		StackName:            ptrString("my-stack"),
+		EventId:              new("evt-list-cfn-001"),
+		StackId:              new("arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/guid1"),
+		StackName:            new("my-stack"),
 		Timestamp:            &ts,
-		LogicalResourceId:    ptrString("MyBucket"),
-		ResourceType:         ptrString("AWS::S3::Bucket"),
+		LogicalResourceId:    new("MyBucket"),
+		ResourceType:         new("AWS::S3::Bucket"),
 		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
-		ResourceStatusReason: ptrString("Resource creation complete"),
+		ResourceStatusReason: new("Resource creation complete"),
 	}
 
 	resources := []resource.Resource{
@@ -481,9 +481,9 @@ func TestQA_ListRawStruct_CfnResources(t *testing.T) {
 
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	summary := cfntypes.StackResourceSummary{
-		LogicalResourceId:    ptrString("MyBucket"),
-		PhysicalResourceId:   ptrString("my-stack-mybucket-abc123"),
-		ResourceType:         ptrString("AWS::S3::Bucket"),
+		LogicalResourceId:    new("MyBucket"),
+		PhysicalResourceId:   new("my-stack-mybucket-abc123"),
+		ResourceType:         new("AWS::S3::Bucket"),
 		ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
 		LastUpdatedTimestamp: &ts,
 		DriftInformation: &cfntypes.StackResourceDriftInformationSummary{
@@ -535,10 +535,10 @@ func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
 
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	activity := asgtypes.Activity{
-		ActivityId:           ptrString("act-list-001"),
-		AutoScalingGroupName: ptrString("my-asg"),
-		Cause:                ptrString("At 2024-03-22T10:00:00Z an instance was started"),
-		Description:          ptrString("Launching a new EC2 instance: i-0abc1234"),
+		ActivityId:           new("act-list-001"),
+		AutoScalingGroupName: new("my-asg"),
+		Cause:                new("At 2024-03-22T10:00:00Z an instance was started"),
+		Description:          new("Launching a new EC2 instance: i-0abc1234"),
 		StartTime:            &ts,
 		StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
 	}
@@ -585,10 +585,10 @@ func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
 
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	item := cwtypes.AlarmHistoryItem{
-		AlarmName:       ptrString("HighCPUAlarm"),
+		AlarmName:       new("HighCPUAlarm"),
 		AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 		HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
-		HistorySummary:  ptrString("Alarm updated from OK to ALARM"),
+		HistorySummary:  new("Alarm updated from OK to ALARM"),
 		Timestamp:       &ts,
 	}
 
@@ -632,16 +632,16 @@ func TestQA_ListRawStruct_ELBListeners(t *testing.T) {
 	m.SetSize(400, 50)
 
 	listener := elbtypes.Listener{
-		ListenerArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
-		Port:        ptrInt32(443),
+		ListenerArn: new("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456"),
+		Port:        new(int32(443)),
 		Protocol:    elbtypes.ProtocolEnumHttps,
-		SslPolicy:   ptrString("ELBSecurityPolicy-TLS13-1-2-2021-06"),
+		SslPolicy:   new("ELBSecurityPolicy-TLS13-1-2-2021-06"),
 		Certificates: []elbtypes.Certificate{{
-			CertificateArn: ptrString("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
+			CertificateArn: new("arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123"),
 		}},
 		DefaultActions: []elbtypes.Action{{
 			Type:           elbtypes.ActionTypeEnumForward,
-			TargetGroupArn: ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
+			TargetGroupArn: new("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
 		}},
 	}
 
@@ -696,18 +696,18 @@ func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	endTs := time.Date(2024, 6, 15, 10, 4, 12, 0, time.UTC)
 	build := cbtypes.Build{
-		Id:            ptrString("my-project:build-id-001"),
-		Arn:           ptrString("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
-		BuildNumber:   ptrInt64(142),
+		Id:            new("my-project:build-id-001"),
+		Arn:           new("arn:aws:codebuild:us-east-1:123456789012:build/my-project:build-id-001"),
+		BuildNumber:   new(int64(142)),
 		BuildStatus:   cbtypes.StatusTypeSucceeded,
 		StartTime:     &startTs,
 		EndTime:       &endTs,
-		CurrentPhase:  ptrString("COMPLETED"),
-		SourceVersion: ptrString("abc123de"),
-		Initiator:     ptrString("codepipeline/my-pipeline"),
+		CurrentPhase:  new("COMPLETED"),
+		SourceVersion: new("abc123de"),
+		Initiator:     new("codepipeline/my-pipeline"),
 		Logs: &cbtypes.LogsLocation{
-			GroupName:  ptrString("/aws/codebuild/my-project"),
-			StreamName: ptrString("build-id-001"),
+			GroupName:  new("/aws/codebuild/my-project"),
+			StreamName: new("build-id-001"),
 		},
 	}
 
@@ -757,9 +757,9 @@ func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
 	m.SetSize(400, 50)
 
 	ev := cwlogstypes.OutputLogEvent{
-		Timestamp:     ptrInt64(1718445600000),
-		Message:       ptrString("[Container] Running command echo hello"),
-		IngestionTime: ptrInt64(1718445601000),
+		Timestamp:     new(int64(1718445600000)),
+		Message:       new("[Container] Running command echo hello"),
+		IngestionTime: new(int64(1718445601000)),
 	}
 
 	resources := []resource.Resource{
@@ -804,10 +804,10 @@ func TestQA_ListRawStruct_ECRImages(t *testing.T) {
 
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	img := ecrtypes.ImageDetail{
-		ImageDigest:      ptrString("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+		ImageDigest:      new("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
 		ImageTags:        []string{"latest", "v1.0.0"},
 		ImagePushedAt:    &pushedAt,
-		ImageSizeInBytes: ptrInt64(52428800),
+		ImageSizeInBytes: new(int64(52428800)),
 		ImageScanStatus: &ecrtypes.ImageScanStatus{
 			Status: ecrtypes.ScanStatusComplete,
 		},
@@ -969,8 +969,8 @@ func TestQA_ListRawStruct_ELBListenerRules(t *testing.T) {
 	m.SetSize(400, 50)
 
 	rule := elbtypes.Rule{
-		RuleArn:  ptrString("arn:rule/1"),
-		Priority: ptrString("100"),
+		RuleArn:  new("arn:rule/1"),
+		Priority: new("100"),
 	}
 
 	resources := []resource.Resource{
@@ -1020,10 +1020,10 @@ func TestQA_ListRawStruct_DbiEvents(t *testing.T) {
 	ev := rdstypes.Event{
 		Date:             &ts,
 		EventCategories:  []string{"maintenance"},
-		Message:          ptrString("Applying offline patches to DB instance"),
-		SourceIdentifier: ptrString("my-db-instance"),
+		Message:          new("Applying offline patches to DB instance"),
+		SourceIdentifier: new("my-db-instance"),
 		SourceType:       rdstypes.SourceTypeDbInstance,
-		SourceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
+		SourceArn:        new("arn:aws:rds:us-east-1:123456789012:db:my-db-instance"),
 	}
 
 	resources := []resource.Resource{
@@ -1071,9 +1071,9 @@ func TestQA_ListRawStruct_EbRuleTargets(t *testing.T) {
 	m.SetSize(400, 50)
 
 	target := ebtypes.Target{
-		Id:      ptrString("lambda-target-1"),
-		Arn:     ptrString("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
-		RoleArn: ptrString("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
+		Id:      new("lambda-target-1"),
+		Arn:     new("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily"),
+		RoleArn: new("arn:aws:iam::123456789012:role/EventBridgeLambdaRole"),
 	}
 
 	resources := []resource.Resource{
@@ -1123,8 +1123,8 @@ func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
 	dpuSec := 45000.0
 
 	run := gluetypes.JobRun{
-		Id:            ptrString("jr_abc12345-6789-0abc-def0-123456789012"),
-		JobName:       ptrString("etl-daily-load"),
+		Id:            new("jr_abc12345-6789-0abc-def0-123456789012"),
+		JobName:       new("etl-daily-load"),
 		JobRunState:   gluetypes.JobRunStateSucceeded,
 		StartedOn:     &startTs,
 		ExecutionTime: 2843,

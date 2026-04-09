@@ -63,7 +63,7 @@ func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) 
 
 	// Move until the selected row is VpcId.
 	foundSelectedVpc := false
-	for i := 0; i < 80; i++ {
+	for range 80 {
 		sel := findSelectedLine(d.View())
 		if strings.Contains(sel, "VpcId:") {
 			foundSelectedVpc = true
@@ -275,7 +275,7 @@ func withIssue140EC2RelatedDefs(t *testing.T) {
 }
 
 func findLineContaining(view, needle string) string {
-	for _, ln := range strings.Split(view, "\n") {
+	for ln := range strings.SplitSeq(view, "\n") {
 		if strings.Contains(ln, needle) {
 			return ln
 		}
@@ -284,7 +284,7 @@ func findLineContaining(view, needle string) string {
 }
 
 func findSelectedLine(view string) string {
-	for _, ln := range strings.Split(view, "\n") {
+	for ln := range strings.SplitSeq(view, "\n") {
 		if strings.Contains(ln, "\x1b[48;") {
 			return ln
 		}

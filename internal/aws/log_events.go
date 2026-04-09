@@ -34,7 +34,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 	input := &cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  &logGroupName,
 		LogStreamName: &logStreamName,
-		StartFromHead: boolPtr(false),
+		StartFromHead: new(false),
 	}
 
 	output, err := api.GetLogEvents(ctx, input)
@@ -118,8 +118,4 @@ func classifyLogEventStatus(message string) string {
 	default:
 		return ""
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

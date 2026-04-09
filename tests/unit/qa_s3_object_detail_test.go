@@ -22,11 +22,11 @@ func TestQA_S3ObjectsHasDetailDefaults(t *testing.T) {
 func TestQA_S3ObjectFile_DetailPaths(t *testing.T) {
 	now := time.Now()
 	obj := s3types.Object{
-		Key:          strPtr("path/to/file.txt"),
-		Size:         int64Ptr(2048),
+		Key:          new("path/to/file.txt"),
+		Size:         new(int64(2048)),
 		LastModified: &now,
 		StorageClass: s3types.ObjectStorageClassStandard,
-		ETag:         strPtr("\"abc123\""),
+		ETag:         new("\"abc123\""),
 	}
 
 	viewDef := config.DefaultViewDef("s3_objects")
@@ -46,7 +46,7 @@ func TestQA_S3ObjectFile_DetailPaths(t *testing.T) {
 // TestQA_S3ObjectFolder_DetailPaths verifies detail extraction works for s3types.CommonPrefix.
 func TestQA_S3ObjectFolder_DetailPaths(t *testing.T) {
 	cp := s3types.CommonPrefix{
-		Prefix: strPtr("my-folder/"),
+		Prefix: new("my-folder/"),
 	}
 
 	viewDef := config.DefaultViewDef("s3_objects")

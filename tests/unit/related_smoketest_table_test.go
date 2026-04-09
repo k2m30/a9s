@@ -19,11 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -1016,7 +1016,6 @@ func deliverAll(d views.DetailModel, shortName string, deliveries []smokeDeliver
 
 func Test_RelatedSmoke(t *testing.T) {
 	for _, tc := range relatedSmokeTable {
-		tc := tc // capture for parallel subtests
 		t.Run(tc.shortName, func(t *testing.T) {
 			// S01 — right column visible at width=120
 			t.Run("S01_RightColVisible", func(t *testing.T) {

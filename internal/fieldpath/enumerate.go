@@ -12,7 +12,7 @@ import (
 // named string types) terminate recursion.
 func EnumeratePaths(t reflect.Type, prefix string) []string {
 	// Unwrap pointer
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
@@ -22,7 +22,7 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 	}
 
 	// time.Time is a leaf
-	if t == reflect.TypeOf(time.Time{}) {
+	if t == reflect.TypeFor[time.Time]() {
 		if prefix != "" {
 			return []string{prefix}
 		}
@@ -30,9 +30,7 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 	}
 
 	var paths []string
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-
+	for field := range t.Fields() {
 		// Skip unexported fields
 		if !field.IsExported() {
 			continue
@@ -60,7 +58,7 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 
 		ft := field.Type
 		// Unwrap pointer
-		for ft.Kind() == reflect.Ptr {
+		for ft.Kind() == reflect.Pointer {
 			ft = ft.Elem()
 		}
 
@@ -73,7 +71,7 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 		// Slice: recurse into element type with [] suffix
 		if ft.Kind() == reflect.Slice {
 			elemType := ft.Elem()
-			for elemType.Kind() == reflect.Ptr {
+			for elemType.Kind() == reflect.Pointer {
 				elemType = elemType.Elem()
 			}
 			if isLeafType(elemType) {
@@ -99,7 +97,7 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 }
 
 func isLeafType(t reflect.Type) bool {
-	if t == reflect.TypeOf(time.Time{}) {
+	if t == reflect.TypeFor[time.Time]() {
 		return true
 	}
 	switch t.Kind() {

@@ -105,7 +105,7 @@ func feedEC2Results(t *testing.T, m tui.Model) tui.Model {
 // rendered view string. ANSI sequences are counted correctly by lipgloss.Width.
 func maxLineWidth(view string) int {
 	maxW := 0
-	for _, line := range strings.Split(view, "\n") {
+	for line := range strings.SplitSeq(view, "\n") {
 		if w := lipgloss.Width(line); w > maxW {
 			maxW = w
 		}
@@ -118,10 +118,12 @@ func maxLineWidth(view string) int {
 // view does not exceed the terminal width.
 //
 // The Ctrl+R handler (detail.go:189) calls:
-//   m.rightCol.SetSize(m.rightColWidth, m.height)   ← BUG: uses 32
+//
+//	m.rightCol.SetSize(m.rightColWidth, m.height)   ← BUG: uses 32
 //
 // With the fix it calls:
-//   m.rightCol.SetSize(m.currentRightColWidth(), m.height)  ← correct: 26 at 80 cols
+//
+//	m.rightCol.SetSize(m.currentRightColWidth(), m.height)  ← correct: 26 at 80 cols
 //
 // When the right column is set to 32 wide and results are re-fed, its View()
 // produces 32-wide content. The detail View() pads the left pane to

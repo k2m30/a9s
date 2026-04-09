@@ -141,7 +141,7 @@ func TestNonFilterable_DetailDoesNotSatisfyFilterable(t *testing.T) {
 	k := keys.Default()
 	res := resource.Resource{ID: "test-id"}
 	m := views.NewDetail(res, "ec2", nil, k)
-	var v interface{} = &m
+	var v any = &m
 	if _, ok := v.(views.Filterable); ok {
 		t.Error("DetailModel should NOT satisfy Filterable interface")
 	}
@@ -151,7 +151,7 @@ func TestNonFilterable_YAMLDoesNotSatisfyFilterable(t *testing.T) {
 	k := keys.Default()
 	res := resource.Resource{ID: "test-id"}
 	m := views.NewYAML(res, k)
-	var v interface{} = &m
+	var v any = &m
 	if _, ok := v.(views.Filterable); ok {
 		t.Error("YAMLModel should NOT satisfy Filterable interface")
 	}
@@ -160,7 +160,7 @@ func TestNonFilterable_YAMLDoesNotSatisfyFilterable(t *testing.T) {
 func TestNonFilterable_HelpDoesNotSatisfyFilterable(t *testing.T) {
 	k := keys.Default()
 	m := views.NewHelp(k, views.HelpFromMainMenu)
-	var v interface{} = &m
+	var v any = &m
 	if _, ok := v.(views.Filterable); ok {
 		t.Error("HelpModel should NOT satisfy Filterable interface")
 	}
@@ -169,7 +169,7 @@ func TestNonFilterable_HelpDoesNotSatisfyFilterable(t *testing.T) {
 func TestNonFilterable_RevealDoesNotSatisfyFilterable(t *testing.T) {
 	k := keys.Default()
 	m := views.NewReveal("s", "v", k)
-	var v interface{} = &m
+	var v any = &m
 	if _, ok := v.(views.Filterable); ok {
 		t.Error("RevealModel should NOT satisfy Filterable interface")
 	}

@@ -24,7 +24,8 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-func ptrFloat64(f float64) *float64 { return &f }
+//go:fix inline
+func ptrFloat64(f float64) *float64 { return new(f) }
 
 var svcTestTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 
@@ -34,74 +35,74 @@ var svcTestTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 
 func realisticLambdaFunction() lambdatypes.FunctionConfiguration {
 	return lambdatypes.FunctionConfiguration{
-		FunctionName: ptrString("my-api-handler"),
-		FunctionArn:  ptrString("arn:aws:lambda:us-east-1:123456789012:function:my-api-handler"),
+		FunctionName: new("my-api-handler"),
+		FunctionArn:  new("arn:aws:lambda:us-east-1:123456789012:function:my-api-handler"),
 		Runtime:      lambdatypes.RuntimePython312,
-		Handler:      ptrString("index.handler"),
-		MemorySize:   ptrInt32(256),
-		Timeout:      ptrInt32(30),
+		Handler:      new("index.handler"),
+		MemorySize:   new(int32(256)),
+		Timeout:      new(int32(30)),
 		CodeSize:     5242880,
-		Description:  ptrString("API request handler"),
-		Role:         ptrString("arn:aws:iam::123456789012:role/lambda-exec-role"),
+		Description:  new("API request handler"),
+		Role:         new("arn:aws:iam::123456789012:role/lambda-exec-role"),
 		State:        lambdatypes.StateActive,
-		LastModified: ptrString("2025-06-15T10:30:00.000+0000"),
+		LastModified: new("2025-06-15T10:30:00.000+0000"),
 	}
 }
 
 func realisticAlarm() cwtypes.MetricAlarm {
 	return cwtypes.MetricAlarm{
-		AlarmName:          ptrString("HighCPUAlarm"),
-		AlarmArn:           ptrString("arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUAlarm"),
+		AlarmName:          new("HighCPUAlarm"),
+		AlarmArn:           new("arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUAlarm"),
 		StateValue:         cwtypes.StateValueAlarm,
-		MetricName:         ptrString("CPUUtilization"),
-		Namespace:          ptrString("AWS/EC2"),
+		MetricName:         new("CPUUtilization"),
+		Namespace:          new("AWS/EC2"),
 		Statistic:          cwtypes.StatisticAverage,
-		Period:             ptrInt32(300),
-		EvaluationPeriods:  ptrInt32(3),
-		Threshold:          ptrFloat64(80.0),
+		Period:             new(int32(300)),
+		EvaluationPeriods:  new(int32(3)),
+		Threshold:          new(80.0),
 		ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
 	}
 }
 
 func realisticSNSTopic() snstypes.Topic {
 	return snstypes.Topic{
-		TopicArn: ptrString("arn:aws:sns:us-east-1:123456789012:my-notifications"),
+		TopicArn: new("arn:aws:sns:us-east-1:123456789012:my-notifications"),
 	}
 }
 
 func realisticELB() elbv2types.LoadBalancer {
 	return elbv2types.LoadBalancer{
-		LoadBalancerName: ptrString("my-app-alb"),
-		LoadBalancerArn:  ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-app-alb/50dc6c495c0c9188"),
-		DNSName:          ptrString("my-app-alb-123456789.us-east-1.elb.amazonaws.com"),
+		LoadBalancerName: new("my-app-alb"),
+		LoadBalancerArn:  new("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-app-alb/50dc6c495c0c9188"),
+		DNSName:          new("my-app-alb-123456789.us-east-1.elb.amazonaws.com"),
 		Type:             elbv2types.LoadBalancerTypeEnumApplication,
 		Scheme:           elbv2types.LoadBalancerSchemeEnumInternetFacing,
 		State: &elbv2types.LoadBalancerState{
 			Code: elbv2types.LoadBalancerStateEnumActive,
 		},
-		VpcId:       ptrString("vpc-0abc1234"),
-		CreatedTime: ptrTime(svcTestTime),
+		VpcId:       new("vpc-0abc1234"),
+		CreatedTime: new(svcTestTime),
 	}
 }
 
 func realisticTargetGroup() elbv2types.TargetGroup {
 	return elbv2types.TargetGroup{
-		TargetGroupName:    ptrString("my-app-tg"),
-		TargetGroupArn:     ptrString("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-app-tg/50dc6c495c0c9188"),
-		Port:               ptrInt32(8080),
+		TargetGroupName:    new("my-app-tg"),
+		TargetGroupArn:     new("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-app-tg/50dc6c495c0c9188"),
+		Port:               new(int32(8080)),
 		Protocol:           elbv2types.ProtocolEnumHttp,
-		VpcId:              ptrString("vpc-0abc1234"),
+		VpcId:              new("vpc-0abc1234"),
 		TargetType:         elbv2types.TargetTypeEnumInstance,
-		HealthCheckPath:    ptrString("/health"),
-		HealthCheckEnabled: ptrBool(true),
+		HealthCheckPath:    new("/health"),
+		HealthCheckEnabled: new(true),
 	}
 }
 
 func realisticECSClusterStruct() ecstypes.Cluster {
 	return ecstypes.Cluster{
-		ClusterName:         ptrString("prod-cluster"),
-		ClusterArn:          ptrString("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
-		Status:              ptrString("ACTIVE"),
+		ClusterName:         new("prod-cluster"),
+		ClusterArn:          new("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
+		Status:              new("ACTIVE"),
 		RunningTasksCount:   5,
 		PendingTasksCount:   1,
 		ActiveServicesCount: 3,
@@ -110,123 +111,123 @@ func realisticECSClusterStruct() ecstypes.Cluster {
 
 func realisticECSService() ecstypes.Service {
 	return ecstypes.Service{
-		ServiceName:    ptrString("api-service"),
-		ServiceArn:     ptrString("arn:aws:ecs:us-east-1:123456789012:service/prod-cluster/api-service"),
-		ClusterArn:     ptrString("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
-		Status:         ptrString("ACTIVE"),
+		ServiceName:    new("api-service"),
+		ServiceArn:     new("arn:aws:ecs:us-east-1:123456789012:service/prod-cluster/api-service"),
+		ClusterArn:     new("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
+		Status:         new("ACTIVE"),
 		DesiredCount:   3,
 		RunningCount:   3,
 		LaunchType:     ecstypes.LaunchTypeFargate,
-		TaskDefinition: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/api-service:42"),
+		TaskDefinition: new("arn:aws:ecs:us-east-1:123456789012:task-definition/api-service:42"),
 	}
 }
 
 func realisticECSTask() ecstypes.Task {
 	return ecstypes.Task{
-		TaskArn:           ptrString("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
-		ClusterArn:        ptrString("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
-		LastStatus:        ptrString("RUNNING"),
-		DesiredStatus:     ptrString("RUNNING"),
-		TaskDefinitionArn: ptrString("arn:aws:ecs:us-east-1:123456789012:task-definition/api-service:42"),
+		TaskArn:           new("arn:aws:ecs:us-east-1:123456789012:task/prod-cluster/abc123def456"),
+		ClusterArn:        new("arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"),
+		LastStatus:        new("RUNNING"),
+		DesiredStatus:     new("RUNNING"),
+		TaskDefinitionArn: new("arn:aws:ecs:us-east-1:123456789012:task-definition/api-service:42"),
 		LaunchType:        ecstypes.LaunchTypeFargate,
-		Cpu:               ptrString("256"),
-		Memory:            ptrString("512"),
-		StartedAt:         ptrTime(svcTestTime),
+		Cpu:               new("256"),
+		Memory:            new("512"),
+		StartedAt:         new(svcTestTime),
 	}
 }
 
 func realisticCFNStack() cfntypes.Stack {
 	return cfntypes.Stack{
-		StackName:    ptrString("my-app-stack"),
-		StackId:      ptrString("arn:aws:cloudformation:us-east-1:123456789012:stack/my-app-stack/guid-1234"),
+		StackName:    new("my-app-stack"),
+		StackId:      new("arn:aws:cloudformation:us-east-1:123456789012:stack/my-app-stack/guid-1234"),
 		StackStatus:  cfntypes.StackStatusCreateComplete,
-		CreationTime: ptrTime(svcTestTime),
-		Description:  ptrString("Application infrastructure stack"),
+		CreationTime: new(svcTestTime),
+		Description:  new("Application infrastructure stack"),
 	}
 }
 
 func realisticIAMRole() iamtypes.Role {
 	return iamtypes.Role{
-		RoleName:           ptrString("lambda-exec-role"),
-		RoleId:             ptrString("AROAEXAMPLEROLEID"),
-		Arn:                ptrString("arn:aws:iam::123456789012:role/lambda-exec-role"),
-		Path:               ptrString("/"),
-		CreateDate:         ptrTime(svcTestTime),
-		Description:        ptrString("Execution role for Lambda functions"),
-		MaxSessionDuration: ptrInt32(3600),
+		RoleName:           new("lambda-exec-role"),
+		RoleId:             new("AROAEXAMPLEROLEID"),
+		Arn:                new("arn:aws:iam::123456789012:role/lambda-exec-role"),
+		Path:               new("/"),
+		CreateDate:         new(svcTestTime),
+		Description:        new("Execution role for Lambda functions"),
+		MaxSessionDuration: new(int32(3600)),
 	}
 }
 
 func realisticLogGroup() cwlogstypes.LogGroup {
 	return cwlogstypes.LogGroup{
-		LogGroupName:  ptrString("/aws/lambda/my-api-handler"),
-		LogGroupArn:   ptrString("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/my-api-handler:*"),
-		StoredBytes:   ptrInt64(1073741824),
-		RetentionInDays: ptrInt32(30),
-		CreationTime:  ptrInt64(1718444400000),
+		LogGroupName:    new("/aws/lambda/my-api-handler"),
+		LogGroupArn:     new("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/my-api-handler:*"),
+		StoredBytes:     new(int64(1073741824)),
+		RetentionInDays: new(int32(30)),
+		CreationTime:    new(int64(1718444400000)),
 	}
 }
 
 func realisticSSMParameter() ssmtypes.ParameterMetadata {
 	return ssmtypes.ParameterMetadata{
-		Name:             ptrString("/app/config/db-host"),
+		Name:             new("/app/config/db-host"),
 		Type:             ssmtypes.ParameterTypeString,
 		Version:          1,
-		LastModifiedDate: ptrTime(svcTestTime),
-		Description:      ptrString("Database host parameter"),
+		LastModifiedDate: new(svcTestTime),
+		Description:      new("Database host parameter"),
 	}
 }
 
 func realisticDDBTable() ddbtypes.TableDescription {
 	return ddbtypes.TableDescription{
-		TableName:        ptrString("users-table"),
-		TableArn:         ptrString("arn:aws:dynamodb:us-east-1:123456789012:table/users-table"),
+		TableName:        new("users-table"),
+		TableArn:         new("arn:aws:dynamodb:us-east-1:123456789012:table/users-table"),
 		TableStatus:      ddbtypes.TableStatusActive,
-		ItemCount:        ptrInt64(50000),
-		TableSizeBytes:   ptrInt64(10485760),
-		CreationDateTime: ptrTime(svcTestTime),
+		ItemCount:        new(int64(50000)),
+		TableSizeBytes:   new(int64(10485760)),
+		CreationDateTime: new(svcTestTime),
 	}
 }
 
 func realisticACMCertificate() acmtypes.CertificateSummary {
 	return acmtypes.CertificateSummary{
-		DomainName:     ptrString("example.com"),
-		CertificateArn: ptrString("arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"),
+		DomainName:     new("example.com"),
+		CertificateArn: new("arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"),
 		Status:         acmtypes.CertificateStatusIssued,
 		Type:           acmtypes.CertificateTypeAmazonIssued,
-		CreatedAt:      ptrTime(svcTestTime),
+		CreatedAt:      new(svcTestTime),
 	}
 }
 
 func realisticASG() autoscalingtypes.AutoScalingGroup {
 	return autoscalingtypes.AutoScalingGroup{
-		AutoScalingGroupName: ptrString("my-app-asg"),
-		AutoScalingGroupARN:  ptrString("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/my-app-asg"),
-		MinSize:              ptrInt32(2),
-		MaxSize:              ptrInt32(10),
-		DesiredCapacity:      ptrInt32(4),
+		AutoScalingGroupName: new("my-app-asg"),
+		AutoScalingGroupARN:  new("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:guid:autoScalingGroupName/my-app-asg"),
+		MinSize:              new(int32(2)),
+		MaxSize:              new(int32(10)),
+		DesiredCapacity:      new(int32(4)),
 		AvailabilityZones:    []string{"us-east-1a", "us-east-1b"},
-		CreatedTime:          ptrTime(svcTestTime),
+		CreatedTime:          new(svcTestTime),
 	}
 }
 
 func realisticIAMUser() iamtypes.User {
 	return iamtypes.User{
-		UserName:   ptrString("deploy-user"),
-		UserId:     ptrString("AIDAEXAMPLEUSERID"),
-		Arn:        ptrString("arn:aws:iam::123456789012:user/deploy-user"),
-		Path:       ptrString("/"),
-		CreateDate: ptrTime(svcTestTime),
+		UserName:   new("deploy-user"),
+		UserId:     new("AIDAEXAMPLEUSERID"),
+		Arn:        new("arn:aws:iam::123456789012:user/deploy-user"),
+		Path:       new("/"),
+		CreateDate: new(svcTestTime),
 	}
 }
 
 func realisticIAMGroup() iamtypes.Group {
 	return iamtypes.Group{
-		GroupName:  ptrString("developers"),
-		GroupId:    ptrString("AGPAEXAMPLEGROUPID"),
-		Arn:        ptrString("arn:aws:iam::123456789012:group/developers"),
-		Path:       ptrString("/"),
-		CreateDate: ptrTime(svcTestTime),
+		GroupName:  new("developers"),
+		GroupId:    new("AGPAEXAMPLEGROUPID"),
+		Arn:        new("arn:aws:iam::123456789012:group/developers"),
+		Path:       new("/"),
+		CreateDate: new(svcTestTime),
 	}
 }
 
@@ -234,7 +235,7 @@ func realisticIAMGroup() iamtypes.Group {
 // produced by internal/aws/ses.go FetchSESIdentities.
 func realisticSESIdentity() sesv2types.IdentityInfo {
 	return sesv2types.IdentityInfo{
-		IdentityName:       ptrString("example.com"),
+		IdentityName:       new("example.com"),
 		IdentityType:       sesv2types.IdentityTypeDomain,
 		SendingEnabled:     true,
 		VerificationStatus: sesv2types.VerificationStatusSuccess,
@@ -389,8 +390,8 @@ func TestQA_Detail_SQS_ViewContainsExpectedFields(t *testing.T) {
 		"QueueUrl":                    "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
 		"ApproximateNumberOfMessages": "42",
 		"VisibilityTimeout":           "30",
-		"CreatedTimestamp":             "1718444400",
-		"MaximumMessageSize":           "262144",
+		"CreatedTimestamp":            "1718444400",
+		"MaximumMessageSize":          "262144",
 	})
 	// SQS uses map[string]string, not SDK struct — use nil config for Fields-map fallback
 	m := newDetailModel(res, "sqs", nil)
@@ -686,9 +687,9 @@ func TestQA_Detail_CFN_ViewContainsExpectedFields(t *testing.T) {
 func TestQA_Detail_CFN_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	stack := cfntypes.Stack{
-		StackName:    ptrString("empty-stack"),
+		StackName:    new("empty-stack"),
 		StackStatus:  cfntypes.StackStatusCreateComplete,
-		CreationTime: ptrTime(svcTestTime),
+		CreationTime: new(svcTestTime),
 	}
 	res := buildResource("empty-stack", "empty-stack", stack)
 	m := newDetailModel(res, "cfn", configForType("cfn"))
@@ -737,11 +738,11 @@ func TestQA_Detail_Role_ViewContainsExpectedFields(t *testing.T) {
 func TestQA_Detail_Role_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	role := iamtypes.Role{
-		RoleName:   ptrString("empty-role"),
-		RoleId:     ptrString("AROAEMPTY"),
-		Arn:        ptrString("arn:aws:iam::123456789012:role/empty-role"),
-		Path:       ptrString("/"),
-		CreateDate: ptrTime(svcTestTime),
+		RoleName:   new("empty-role"),
+		RoleId:     new("AROAEMPTY"),
+		Arn:        new("arn:aws:iam::123456789012:role/empty-role"),
+		Path:       new("/"),
+		CreateDate: new(svcTestTime),
 	}
 	res := buildResource("empty-role", "empty-role", role)
 	m := newDetailModel(res, "role", configForType("role"))
@@ -967,11 +968,11 @@ func TestQA_Detail_ASG_ViewContainsExpectedFields(t *testing.T) {
 func TestQA_Detail_ASG_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	asg := autoscalingtypes.AutoScalingGroup{
-		AutoScalingGroupName: ptrString("empty-asg"),
-		MinSize:              ptrInt32(0),
-		MaxSize:              ptrInt32(0),
-		DesiredCapacity:      ptrInt32(0),
-		CreatedTime:          ptrTime(svcTestTime),
+		AutoScalingGroupName: new("empty-asg"),
+		MinSize:              new(int32(0)),
+		MaxSize:              new(int32(0)),
+		DesiredCapacity:      new(int32(0)),
+		CreatedTime:          new(svcTestTime),
 		AvailabilityZones:    []string{},
 	}
 	res := buildResource("empty-asg", "empty-asg", asg)
@@ -1019,11 +1020,11 @@ func TestQA_Detail_IAMUser_ViewContainsExpectedFields(t *testing.T) {
 func TestQA_Detail_IAMUser_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	user := iamtypes.User{
-		UserName:   ptrString("empty-user"),
-		UserId:     ptrString("AIDAEMPTY"),
-		Arn:        ptrString("arn:aws:iam::123456789012:user/empty-user"),
-		Path:       ptrString("/"),
-		CreateDate: ptrTime(svcTestTime),
+		UserName:   new("empty-user"),
+		UserId:     new("AIDAEMPTY"),
+		Arn:        new("arn:aws:iam::123456789012:user/empty-user"),
+		Path:       new("/"),
+		CreateDate: new(svcTestTime),
 	}
 	res := buildResource("empty-user", "empty-user", user)
 	m := newDetailModel(res, "iam-user", configForType("iam-user"))
@@ -1070,11 +1071,11 @@ func TestQA_Detail_IAMGroup_ViewContainsExpectedFields(t *testing.T) {
 func TestQA_Detail_IAMGroup_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	group := iamtypes.Group{
-		GroupName:  ptrString("empty-group"),
-		GroupId:    ptrString("AGPAEMPTY"),
-		Arn:        ptrString("arn:aws:iam::123456789012:group/empty-group"),
-		Path:       ptrString("/"),
-		CreateDate: ptrTime(svcTestTime),
+		GroupName:  new("empty-group"),
+		GroupId:    new("AGPAEMPTY"),
+		Arn:        new("arn:aws:iam::123456789012:group/empty-group"),
+		Path:       new("/"),
+		CreateDate: new(svcTestTime),
 	}
 	res := buildResource("empty-group", "empty-group", group)
 	m := newDetailModel(res, "iam-group", configForType("iam-group"))

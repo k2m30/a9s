@@ -279,7 +279,7 @@ func TestResourceListView_HorizontalScroll_ClampsAtLastColumn(t *testing.T) {
 	})
 
 	// Scroll right many times — more than the number of columns
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = m.Update(rlKeyPress("l"))
 	}
 
@@ -456,8 +456,8 @@ func TestResourceListView_NoSeparatorBelowHeaders(t *testing.T) {
 	m := rlLoadedModel(t)
 	out := m.View()
 
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(out, "\n")
+	for line := range lines {
 		stripped := strings.TrimSpace(line)
 		if stripped == "" {
 			continue
@@ -494,7 +494,7 @@ func TestResourceList_DownPastEnd_CursorStaysAtLast(t *testing.T) {
 	}
 
 	// Press Down 10 times past the end
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		m, _ = m.Update(rlKeyPress("j"))
 	}
 
@@ -542,7 +542,7 @@ func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
 
 	// Create 30 resources — more than fit on screen
 	var resources []resource.Resource
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		resources = append(resources, resource.Resource{
 			ID: fmt.Sprintf("stream-%02d", i), Name: fmt.Sprintf("stream-%02d", i),
 			Fields: map[string]string{
@@ -567,7 +567,7 @@ func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
 	}
 
 	// Press Down 10 more times past the end
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		m, _ = m.Update(rlKeyPress("j"))
 	}
 

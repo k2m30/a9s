@@ -81,4 +81,4 @@ User action → View.Update returns Msg → Root.Update receives → handleX →
 - You MAY add new message types to messages/messages.go
 - ALL I/O in tea.Cmd — NEVER block Update()
 - ALL AWS calls must handle errors and send APIErrorMsg or FlashMsg
-- Test with `go test ./tests/unit/ -count=1 -timeout 120s` after every change
+- Test with `make test` after every change

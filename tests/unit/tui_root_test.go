@@ -656,7 +656,7 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, clients interface{}, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, clients any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		// This should not be reached if clients are nil — the model checks first
 		return resource.FetchResult{}, nil
 	})
@@ -703,7 +703,7 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, _ interface{}, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
 	defer resource.UnregisterChildType(testChildType)
