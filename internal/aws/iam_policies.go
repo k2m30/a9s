@@ -19,7 +19,16 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
+		result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
+		if err != nil {
+			return result, err
+		}
+		inlines := fetchInlineGroupPolicies(ctx, c.IAM)
+		result.Resources = append(result.Resources, inlines...)
+		if result.Pagination != nil {
+			result.Pagination.PageSize = len(result.Resources)
+		}
+		return result, nil
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
@@ -125,4 +134,35 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) []resource.Resource {
+	var resources []resource.Resource
+	groupsOut, err := api.ListGroups(ctx, &iam.ListGroupsInput{})
+	if err != nil {
+		return nil
+	}
+	for _, group := range groupsOut.Groups {
+		if group.GroupName == nil {
+			continue
+		}
+		out, err := api.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: group.GroupName})
+		if err != nil {
+			continue
+		}
+		for _, name := range out.PolicyNames {
+			resources = append(resources, resource.Resource{
+				ID:   name,
+				Name: name,
+				Fields: map[string]string{
+					"policy_name":      name,
+					"policy_type":      "inline",
+					"attachment_count": "",
+					"path":             "inline/" + *group.GroupName,
+					"create_date":      "",
+				},
+			})
+		}
+	}
+	return resources
 }

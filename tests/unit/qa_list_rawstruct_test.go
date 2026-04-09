@@ -961,7 +961,7 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"rds-snap", realisticRDSSnapshot(), []string{"rds-snap-prod-20250615", "prod-db-01", "available"}},
 		{"docdb-snap", realisticDocDBSnapshot(), []string{"docdb-snap-prod-20250615", "available"}},
 		{"sns-sub", realisticSNSSubscription(), []string{"email", "user@example.com"}},
-		{"policy", realisticIAMPolicy(), []string{"ReadOnlyAccess", "ANPAI1234567890EXAMPLE"}},
+		// policy has no path: columns (all columns use key: from Fields) — tested in TestQA_List instead
 		{"iam-user", realisticIAMUser(), []string{"deploy-user", "AIDAEXAMPLEUSERID"}},
 		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
 		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "Deployed"}},
@@ -1090,12 +1090,7 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			map[string]string{"role_name": "WRONG-ROLE", "path": "WRONG-PATH"},
 			[]string{"lambda-exec-role", "/"},
 		},
-		{
-			"policy",
-			realisticIAMPolicy(),
-			map[string]string{"policy_name": "WRONG-POL", "policy_id": "WRONG-PID"},
-			[]string{"ReadOnlyAccess", "ANPAI1234567890EXAMPLE"},
-		},
+		// policy omitted: all list columns use key: (Fields), not path: (RawStruct) — override concept doesn't apply
 		{
 			"cf",
 			realisticCFDistribution(),
