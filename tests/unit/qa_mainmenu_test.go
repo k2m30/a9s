@@ -25,7 +25,12 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 
 	allTypes := resource.AllResourceTypes()
 	for _, rt := range allTypes {
-		alias := ":" + rt.ShortName
+		// Menu renders Aliases[0] when present, else ShortName — match that logic.
+		aliasKey := rt.ShortName
+		if len(rt.Aliases) > 0 {
+			aliasKey = rt.Aliases[0]
+		}
+		alias := ":" + aliasKey
 		found := false
 		for _, line := range lines {
 			if strings.Contains(line, rt.Name) && strings.Contains(line, alias) {
@@ -49,7 +54,12 @@ func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	aliases := make([]string, len(allTypes))
 	for i, rt := range allTypes {
-		aliases[i] = ":" + rt.ShortName
+		// Menu renders Aliases[0] when present, else ShortName — match that logic.
+		aliasKey := rt.ShortName
+		if len(rt.Aliases) > 0 {
+			aliasKey = rt.Aliases[0]
+		}
+		aliases[i] = ":" + aliasKey
 	}
 	for _, alias := range aliases {
 		if !strings.Contains(plain, alias) {
