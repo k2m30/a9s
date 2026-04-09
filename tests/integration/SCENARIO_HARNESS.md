@@ -55,6 +55,78 @@ scenario := fullIntegrationNewLiveScenario(t, "profile-name", "")
 
 If the region argument is empty, the app resolves it from the profile.
 
+## Live Profile Workflow
+
+When a bug can only be reproduced against a real AWS profile, use this workflow:
+
+1. Add a focused local-only integration test under `tests/integration/` with a name like `local_repro_*_test.go`.
+2. Read the real profile, user/resource identifier, and region from environment variables.
+3. Use the scenario harness plus discovery helpers to locate the real resource at runtime.
+4. Run only that single test against the live profile until the bug is reproduced and fixed.
+5. Keep the local-only repro test untracked unless every real value has been removed and the test has been generalized for public use.
+
+Example pattern:
+
+```go
+func TestLiveScenario_ReproSomething(t *testing.T) {
+	profile := strings.TrimSpace(os.Getenv("A9S_REPRO_PROFILE"))
+	userNeedle := strings.TrimSpace(os.Getenv("A9S_REPRO_IAM_USER"))
+	region := strings.TrimSpace(os.Getenv("A9S_REPRO_REGION"))
+	if profile == "" || userNeedle == "" || region == "" {
+		t.Skip("set A9S_REPRO_PROFILE, A9S_REPRO_IAM_USER, and A9S_REPRO_REGION")
+	}
+
+	scenario := fullIntegrationNewLiveScenario(t, profile, "")
+	user := fullIntegrationMustFindResourceByNameContains(t, scenario.clients, "iam-user", userNeedle)
+
+	// Repro steps...
+}
+```
+
+Run it like this:
+
+```sh
+A9S_REPRO_PROFILE='real-profile' \
+A9S_REPRO_IAM_USER='real-user@example.com' \
+A9S_REPRO_REGION='eu-central-1' \
+go test -tags integration ./tests/integration -run TestLiveScenario_ReproSomething -count=1 -v
+```
+
+## Sensitive Value Rules
+
+Never put real AWS or customer values into committed code, docs, fixtures, snapshots, or test names.
+
+That includes:
+
+- real AWS profile names
+- real email addresses or IAM usernames
+- real account IDs
+- real ARNs
+- real bucket names, queue names, secret names, or domain names
+- real access keys, tokens, or any credential material
+- any production-only resource ID that can identify a customer or tenant
+
+Required practice:
+
+- committed code must use placeholders like `"profile-name"`, `"user@example.com"`, or `"bucket-name"`
+- real values must come from environment variables, local shell state, or other non-committed local configuration
+- focused live repro tests with real values must remain local and untracked
+- before committing a formerly local repro test, replace every real value with a placeholder or a runtime lookup driven by env vars
+
+Bad:
+
+```go
+scenario := fullIntegrationNewLiveScenario(t, "some-real-profile", "")
+user := fullIntegrationMustFindResourceByNameContains(t, scenario.clients, "iam-user", "real-user@example.com")
+```
+
+Good:
+
+```go
+scenario := fullIntegrationNewLiveScenario(t, "profile-name", "")
+user := fullIntegrationMustFindResourceByNameContains(t, scenario.clients, "iam-user", userNeedle)
+```
+
 ## Common Actions
 
 Navigation:
