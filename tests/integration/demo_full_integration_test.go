@@ -8,13 +8,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/demo"
+	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
 	clients := demo.NewServiceClients()
-	expectedTopLevel := fullIntegrationExpectedFirstPageCounts(t, clients)
+	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCounts())
 
 	m := tui.New(
 		demo.DemoProfile,
@@ -38,12 +39,12 @@ func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
 
 	fullIntegrationRunAllResourceBaseline(t, clients, func() tui.Model {
 		return fullIntegrationNewReadyModelWithClients(t, demo.DemoProfile, demo.DemoRegion, clients)
-	}, expectedTopLevel)
+	}, fullIntegrationStaticCountResolver(expectedTopLevel))
 }
 
 func TestDemoFullIntegration_RelatedHopScenarios(t *testing.T) {
 	clients := demo.NewServiceClients()
-	expectedTopLevel := fullIntegrationExpectedFirstPageCounts(t, clients)
+	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCounts())
 
 	m := tui.New(
 		demo.DemoProfile,

@@ -63,7 +63,7 @@ func TestLiveFullIntegration_AllResourcesBaseline(t *testing.T) {
 
 	fullIntegrationRunAllResourceBaseline(t, clients, func() tui.Model {
 		return fullIntegrationNewReadyModelWithClients(t, profile, region, clients)
-	}, expectedTopLevel)
+	}, fullIntegrationLiveCountResolver(clients))
 }
 
 func TestLiveFullIntegration_RelatedHopScenarios(t *testing.T) {
