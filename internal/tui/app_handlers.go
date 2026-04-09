@@ -232,9 +232,8 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if m.pendingRefresh {
 			m.pendingRefresh = false
 			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-				rt := rl.ResourceType()
 				m.flash = flashState{text: "Connected. Refreshing...", active: true}
-				cmd := m.fetchResources(rt)
+				cmd := m.refreshResourceList(*rl)
 				return m, tea.Batch(cmd, availCmd)
 			}
 		}
@@ -251,9 +250,8 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	if m.pendingRefresh {
 		m.pendingRefresh = false
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
-			cmd := m.fetchResources(rt)
+			cmd := m.refreshResourceList(*rl)
 			return m, tea.Batch(cmd, identityCmd, availCmd)
 		}
 	}
@@ -555,16 +553,24 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rt := rl.ResourceType()
 	delete(m.resourceCache, rt) // clear cache for refreshed type only
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+	return m, m.refreshResourceList(*rl)
+}
 
-	// If the view has a parent context, it's a child view — use child fetch path.
-	if pc := rl.ParentContext(); pc != nil {
-		cmd := m.fetchChildResources(rt, pc)
-		return m, cmd
+func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
+	rt := rl.ResourceType()
+
+	// Filtered lists must refresh through the same filtered fetcher so their
+	// pagination token remains valid for subsequent load-more requests.
+	if ff := rl.FetchFilter(); len(ff) > 0 {
+		return m.fetchResourcesFiltered(rt, ff)
 	}
 
-	// Top-level resource list — fetch via registry.
-	cmd := m.fetchResources(rt)
-	return m, cmd
+	// Child lists refresh through the child fetcher using their parent context.
+	if pc := rl.ParentContext(); pc != nil {
+		return m.fetchChildResources(rt, pc)
+	}
+
+	return m.fetchResources(rt)
 }
 
 // handleReveal fetches a revealed value using the resource type's registered reveal fetcher.
@@ -715,4 +721,3 @@ func copyToClipboard(content, successLabel string) tea.Cmd {
 		return messages.FlashMsg{Text: successLabel, IsError: false}
 	}
 }
-
