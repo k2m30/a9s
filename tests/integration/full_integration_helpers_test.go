@@ -34,44 +34,78 @@ type fullIntegrationRelatedHopScenario struct {
 	returnDisplayName string
 }
 
-func fullIntegrationExpectedFirstPageCounts(t *testing.T, clients *awsclient.ServiceClients) map[string]fullIntegrationCountExpectation {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+type fullIntegrationCountResolver func(t *testing.T, resourceType string) fullIntegrationCountExpectation
 
-	expected := make(map[string]fullIntegrationCountExpectation)
-	for _, rt := range resource.AllResourceTypes() {
-		pf := resource.GetPaginatedFetcher(rt.ShortName)
-		if pf == nil {
-			t.Fatalf("resource %s (%s) has no paginated fetcher; full integration test cannot show a count", rt.ShortName, rt.Name)
-		}
-		result, err := pf(ctx, clients, "")
-		if err != nil {
-			t.Fatalf("fetcher for %s (%s) failed: %v", rt.ShortName, rt.Name, err)
-		}
-		truncated := result.Pagination != nil && result.Pagination.IsTruncated
-		expected[rt.ShortName] = fullIntegrationCountExpectation{count: len(result.Resources), truncated: truncated}
+func fullIntegrationCountExpectationsFromCounts(counts map[string]int) map[string]fullIntegrationCountExpectation {
+	expected := make(map[string]fullIntegrationCountExpectation, len(counts))
+	for shortName, count := range counts {
+		expected[shortName] = fullIntegrationCountExpectation{count: count}
 	}
 	return expected
 }
 
-func fullIntegrationRunAllResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, newModel func() tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation) {
+func fullIntegrationStaticCountResolver(expected map[string]fullIntegrationCountExpectation) fullIntegrationCountResolver {
+	return func(t *testing.T, resourceType string) fullIntegrationCountExpectation {
+		t.Helper()
+		exp, ok := expected[resourceType]
+		if !ok {
+			t.Fatalf("missing first-page expectation for %s", resourceType)
+		}
+		return exp
+	}
+}
+
+func fullIntegrationLiveCountResolver(clients *awsclient.ServiceClients) fullIntegrationCountResolver {
+	return func(t *testing.T, resourceType string) fullIntegrationCountExpectation {
+		t.Helper()
+		return fullIntegrationExpectedFirstPageCount(t, clients, resourceType)
+	}
+}
+
+func fullIntegrationExpectedFirstPageCount(t *testing.T, clients *awsclient.ServiceClients, resourceType string) fullIntegrationCountExpectation {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rt := resource.FindResourceType(resourceType)
+	if rt == nil {
+		t.Fatalf("unknown resource type %s", resourceType)
+	}
+	pf := resource.GetPaginatedFetcher(resourceType)
+	if pf == nil {
+		t.Fatalf("resource %s (%s) has no paginated fetcher; full integration test cannot show a count", rt.ShortName, rt.Name)
+	}
+	result, err := pf(ctx, clients, "")
+	if err != nil {
+		t.Fatalf("fetcher for %s (%s) failed: %v", rt.ShortName, rt.Name, err)
+	}
+	truncated := result.Pagination != nil && result.Pagination.IsTruncated
+	return fullIntegrationCountExpectation{count: len(result.Resources), truncated: truncated}
+}
+
+func fullIntegrationExpectedFirstPageCounts(t *testing.T, clients *awsclient.ServiceClients) map[string]fullIntegrationCountExpectation {
+	t.Helper()
+	expected := make(map[string]fullIntegrationCountExpectation)
+	for _, rt := range resource.AllResourceTypes() {
+		expected[rt.ShortName] = fullIntegrationExpectedFirstPageCount(t, clients, rt.ShortName)
+	}
+	return expected
+}
+
+func fullIntegrationRunAllResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, newModel func() tui.Model, resolveExpected fullIntegrationCountResolver) {
 	t.Helper()
 	for _, rt := range resource.AllResourceTypes() {
 		rt := rt
 		t.Run(rt.ShortName, func(t *testing.T) {
 			m := newModel()
-			fullIntegrationRunResourceBaseline(t, clients, m, expectedTopLevel, rt)
+			fullIntegrationRunResourceBaseline(t, clients, m, resolveExpected, rt)
 		})
 	}
 }
 
-func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, m tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, rt resource.ResourceTypeDef) {
+func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, m tui.Model, resolveExpected fullIntegrationCountResolver, rt resource.ResourceTypeDef) {
 	t.Helper()
-	expected, ok := expectedTopLevel[rt.ShortName]
-	if !ok {
-		t.Fatalf("missing first-page expectation for %s", rt.ShortName)
-	}
+	expected := resolveExpected(t, rt.ShortName)
 
 	loaded := fullIntegrationOpenResourceList(t, &m, rt.ShortName)
 	frameDisplayed, _ := fullIntegrationFindFrameDisplayCount(fullIntegrationStripANSI(fullIntegrationViewContent(m)), rt.ShortName)
@@ -93,9 +127,11 @@ func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.Service
 	if !ok {
 		return
 	}
+	detailContext := fullIntegrationDetailContext(rt.ShortName+" baseline detail", selected)
+	t.Logf("%s selected resource: id=%s name=%q", rt.ShortName, selected.ID, selected.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, rt.ShortName, selected)
-	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, rt.ShortName+" baseline detail")
-	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, rt.ShortName+" baseline detail")
+	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, detailContext)
+	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, detailContext)
 }
 
 func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.ServiceClients, m *tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, scenario fullIntegrationRelatedHopScenario) {
@@ -117,14 +153,18 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	fullIntegrationAssertFrameContains(t, *m, fullIntegrationFrameCount(scenario.sourceType, sourceExpected))
 
 	firstResource, firstResults := fullIntegrationDescribeSelectedResource(t, m, scenario.sourceType)
+	sourceContext := fullIntegrationDetailContext(scenario.name+" source detail", firstResource)
+	t.Logf("%s source selected resource: id=%s name=%q", scenario.name, firstResource.ID, firstResource.Name)
 	expectedFirst := fullIntegrationExpectedRelatedCounts(t, clients, scenario.sourceType, firstResource)
-	fullIntegrationAssertRelatedResults(t, expectedFirst, firstResults, scenario.name+" source detail")
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, scenario.name+" source detail")
+	fullIntegrationAssertRelatedResults(t, expectedFirst, firstResults, sourceContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, sourceContext)
 
 	relatedResource, relatedResults := fullIntegrationEnterRelatedSingleDetail(t, m, scenario.firstTargetType, scenario.firstDisplayName)
+	firstRelatedContext := fullIntegrationDetailContext(scenario.name+" first related detail", relatedResource)
+	t.Logf("%s first related selected resource: id=%s name=%q", scenario.name, relatedResource.ID, relatedResource.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, scenario.firstTargetType, relatedResource)
-	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, scenario.name+" first related detail")
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, scenario.name+" first related detail")
+	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, firstRelatedContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, firstRelatedContext)
 
 	returnCount := expectedRelated[scenario.returnDisplayName]
 	if returnCount <= 0 {
@@ -139,9 +179,11 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 		*m, _ = fullIntegrationApplyMsg(*m, fullIntegrationKeyPress("j"))
 	}
 	returnResource, returnResults := fullIntegrationDescribeSelectedResource(t, m, scenario.returnTargetType)
+	returnContext := fullIntegrationDetailContext(scenario.name+" return detail", returnResource)
+	t.Logf("%s return selected resource: id=%s name=%q", scenario.name, returnResource.ID, returnResource.Name)
 	expectedReturn := fullIntegrationExpectedRelatedCounts(t, clients, scenario.returnTargetType, returnResource)
-	fullIntegrationAssertRelatedResults(t, expectedReturn, returnResults, scenario.name+" return detail")
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, scenario.name+" return detail")
+	fullIntegrationAssertRelatedResults(t, expectedReturn, returnResults, returnContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, returnContext)
 }
 
 func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients) tui.Model {
@@ -459,6 +501,13 @@ func fullIntegrationFrameCount(name string, exp fullIntegrationCountExpectation)
 		return fmt.Sprintf("%s(%d+)", name, exp.count)
 	}
 	return fmt.Sprintf("%s(%d)", name, exp.count)
+}
+
+func fullIntegrationDetailContext(prefix string, res resource.Resource) string {
+	if res.Name != "" {
+		return fmt.Sprintf("%s [%s %q]", prefix, res.ID, res.Name)
+	}
+	return fmt.Sprintf("%s [%s]", prefix, res.ID)
 }
 
 func fullIntegrationExpectedDisplay(exp fullIntegrationCountExpectation) string {
