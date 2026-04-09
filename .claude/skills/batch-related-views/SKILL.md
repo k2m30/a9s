@@ -127,9 +127,10 @@ Run these commands in order (stop on first failure, diagnose before retrying):
 
 ```bash
 go test ./tests/unit/ -count=1 -timeout 120s -run "Related_{ShortNamePascal}|NavigableFields_{ShortNamePascal}"
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
-go build -o a9s ./cmd/a9s/
+make test
+make lint
+make gofix
+make build
 ```
 
 If any command fails, scope a targeted fix to the appropriate agent (coder or QA) with the exact error and file location. Do NOT proceed to Step 4.5 until all four pass.
@@ -208,10 +209,11 @@ After all 65 issues are done:
 
 1. Run full verification:
 ```bash
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
-govulncheck ./...
-go build -o a9s ./cmd/a9s/
+make test
+make lint
+make security
+make gofix
+make build
 ```
 
 2. Run pre-push checklist agents:

@@ -87,7 +87,7 @@ func TestRelated_AMI_EC2_EmptyAMIID(t *testing.T) {
 func TestRelated_AMI_EBSSnaps_Found(t *testing.T) {
 	snapID := "snap-0abc123"
 	img := ec2types.Image{
-		ImageId: strPtr("ami-0abc123"),
+		ImageId: new("ami-0abc123"),
 		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
 			{Ebs: &ec2types.EbsBlockDevice{SnapshotId: &snapID}},
 		},
@@ -107,7 +107,7 @@ func TestRelated_AMI_EBSSnaps_Found(t *testing.T) {
 
 func TestRelated_AMI_EBSSnaps_NoSnapshots(t *testing.T) {
 	img := ec2types.Image{
-		ImageId:             strPtr("ami-0abc123"),
+		ImageId:             new("ami-0abc123"),
 		BlockDeviceMappings: []ec2types.BlockDeviceMapping{},
 	}
 	res := resource.Resource{ID: "ami-0abc123", RawStruct: img}

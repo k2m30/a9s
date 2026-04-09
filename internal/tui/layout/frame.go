@@ -3,8 +3,8 @@ package layout
 import (
 	"strings"
 
-	"github.com/charmbracelet/x/ansi"
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
@@ -92,7 +92,7 @@ func RenderFrame(lines []string, title string, w, h int) string {
 
 	// Content lines: h-2 rows (minus top and bottom borders)
 	contentRows := h - 2
-	for i := 0; i < contentRows; i++ {
+	for i := range contentRows {
 		sb.WriteString("\n")
 		var content string
 		if i < len(lines) {
@@ -136,7 +136,7 @@ func RenderFramePrepadded(lines []string, title string, w, h int) string {
 	sb.WriteString(topBorder)
 
 	contentRows := h - 2
-	for i := 0; i < contentRows; i++ {
+	for i := range contentRows {
 		sb.WriteString("\n")
 		var padded string
 		if i < len(lines) {
@@ -208,10 +208,7 @@ func BottomBorderWithHints(hints []KeyHint, w int) string {
 	// hintsWidth = usedWidth - 1(corner) - 1(min-dash) - 3(──┘)
 	// leadingDashes = w - 1(└) - hintsWidth - 3(──┘)
 	hintsWidth := usedWidth - 1 - 1 - 3
-	leadingDashes := w - 1 - hintsWidth - 3
-	if leadingDashes < 0 {
-		leadingDashes = 0
-	}
+	leadingDashes := max(w-1-hintsWidth-3, 0)
 
 	var sb strings.Builder
 	sb.WriteString(borderStyle.Render("\u2514" + strings.Repeat("\u2500", leadingDashes)))
@@ -235,7 +232,7 @@ func RenderFrameWithHints(lines []string, title string, hints []KeyHint, w, h in
 	sb.WriteString(topBorder)
 
 	contentRows := h - 2
-	for i := 0; i < contentRows; i++ {
+	for i := range contentRows {
 		sb.WriteString("\n")
 		var content string
 		if i < len(lines) {
@@ -301,16 +298,10 @@ func RenderHeader(profile, region, version string, w int, rightContent, accountB
 	gap := innerW - leftW - rightW
 	if gap < 1 {
 		// Content too wide — truncate left side to fit
-		maxLeftW := innerW - rightW - 1
-		if maxLeftW < 3 {
-			maxLeftW = 3
-		}
+		maxLeftW := max(innerW-rightW-1, 3)
 		left = ansi.Truncate(left, maxLeftW, "\u2026")
 		leftW = lipgloss.Width(left)
-		gap = innerW - leftW - rightW
-		if gap < 1 {
-			gap = 1
-		}
+		gap = max(innerW-leftW-rightW, 1)
 	}
 
 	content := left + strings.Repeat(" ", gap) + rightContent

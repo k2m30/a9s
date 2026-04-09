@@ -28,10 +28,10 @@ func NewRDSFixtures() *RDSFixtures {
 }
 
 const (
-	rdsProdRDSSGID   = "sg-0ccc333333333333c"
-	rdsProdVPCID     = "vpc-0abc123def456789a"
-	rdsSubnetGroup   = "acme-rds-subnet-group"
-	rdsKMSKeyID      = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
+	rdsProdRDSSGID = "sg-0ccc333333333333c"
+	rdsProdVPCID   = "vpc-0abc123def456789a"
+	rdsSubnetGroup = "acme-rds-subnet-group"
+	rdsKMSKeyID    = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 )
 
 var rdsNamePool = []string{
@@ -208,21 +208,21 @@ func buildRDSInstances() []rdstypes.DBInstance {
 			},
 		},
 		{
-			DBInstanceIdentifier:       aws.String("dev-feature-branch"),
-			DBInstanceArn:              aws.String("arn:aws:rds:us-east-1:123456789012:db:dev-feature-branch"),
-			Engine:                     aws.String("aurora-postgresql"),
-			EngineVersion:              aws.String("16.4"),
-			DBInstanceStatus:           aws.String("creating"),
-			DBInstanceClass:            aws.String("db.t3.medium"),
-			MasterUsername:             aws.String("pgadmin"),
-			AvailabilityZone:           aws.String("us-east-1a"),
-			AllocatedStorage:           aws.Int32(20),
-			StorageType:                aws.String("aurora"),
-			StorageEncrypted:           aws.Bool(true),
-			BackupRetentionPeriod:      aws.Int32(1),
-			DeletionProtection:         aws.Bool(false),
-			PubliclyAccessible:         aws.Bool(false),
-			MultiAZ:                    aws.Bool(false),
+			DBInstanceIdentifier:  aws.String("dev-feature-branch"),
+			DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:dev-feature-branch"),
+			Engine:                aws.String("aurora-postgresql"),
+			EngineVersion:         aws.String("16.4"),
+			DBInstanceStatus:      aws.String("creating"),
+			DBInstanceClass:       aws.String("db.t3.medium"),
+			MasterUsername:        aws.String("pgadmin"),
+			AvailabilityZone:      aws.String("us-east-1a"),
+			AllocatedStorage:      aws.Int32(20),
+			StorageType:           aws.String("aurora"),
+			StorageEncrypted:      aws.Bool(true),
+			BackupRetentionPeriod: aws.Int32(1),
+			DeletionProtection:    aws.Bool(false),
+			PubliclyAccessible:    aws.Bool(false),
+			MultiAZ:               aws.Bool(false),
 			VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
 				{VpcSecurityGroupId: aws.String(rdsProdRDSSGID), Status: aws.String("active")},
 			},
@@ -237,7 +237,7 @@ func buildRDSInstances() []rdstypes.DBInstance {
 		"available", "available", "modifying", "available", "available",
 		"available", "available", "available", "stopped", "available",
 		"available", "available"}
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		eng := rdsEnginePool[i]
 		name := rdsNamePool[i]
 		status := statuses[i]
@@ -246,21 +246,21 @@ func buildRDSInstances() []rdstypes.DBInstance {
 			port = 3306
 		}
 		named = append(named, rdstypes.DBInstance{
-			DBInstanceIdentifier:       aws.String(name),
-			DBInstanceArn:              aws.String("arn:aws:rds:us-east-1:123456789012:db:" + name),
-			Engine:                     aws.String(eng.engine),
-			EngineVersion:              aws.String(eng.version),
-			DBInstanceStatus:           aws.String(status),
-			DBInstanceClass:            aws.String(eng.class),
-			MasterUsername:             aws.String("admin"),
-			AvailabilityZone:           aws.String("us-east-1a"),
-			AllocatedStorage:           aws.Int32(20),
-			StorageType:                aws.String("gp3"),
-			StorageEncrypted:           aws.Bool(true),
-			BackupRetentionPeriod:      aws.Int32(7),
-			DeletionProtection:         aws.Bool(false),
-			PubliclyAccessible:         aws.Bool(false),
-			MultiAZ:                    aws.Bool(false),
+			DBInstanceIdentifier:  aws.String(name),
+			DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:" + name),
+			Engine:                aws.String(eng.engine),
+			EngineVersion:         aws.String(eng.version),
+			DBInstanceStatus:      aws.String(status),
+			DBInstanceClass:       aws.String(eng.class),
+			MasterUsername:        aws.String("admin"),
+			AvailabilityZone:      aws.String("us-east-1a"),
+			AllocatedStorage:      aws.Int32(20),
+			StorageType:           aws.String("gp3"),
+			StorageEncrypted:      aws.Bool(true),
+			BackupRetentionPeriod: aws.Int32(7),
+			DeletionProtection:    aws.Bool(false),
+			PubliclyAccessible:    aws.Bool(false),
+			MultiAZ:               aws.Bool(false),
 			Endpoint: &rdstypes.Endpoint{
 				Address: aws.String(name + ".c9xyz123.us-east-1.rds.amazonaws.com"),
 				Port:    aws.Int32(port),

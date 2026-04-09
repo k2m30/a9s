@@ -111,17 +111,11 @@ func (s *ScrollState) VisibleWindow(viewHeight int) (int, int) {
 	}
 
 	half := viewHeight / 2
-	start := s.cursor - half
-	if start < 0 {
-		start = 0
-	}
+	start := max(s.cursor-half, 0)
 	end := start + viewHeight
 	if end > total {
 		end = total
-		start = end - viewHeight
-		if start < 0 {
-			start = 0
-		}
+		start = max(end-viewHeight, 0)
 	}
 	return start, end
 }

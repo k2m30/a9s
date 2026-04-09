@@ -261,7 +261,7 @@ func TestQA_DetailKeyMatch_GMovesToTop_BothPaths(t *testing.T) {
 	setupAtIndex3 := func(t *testing.T) views.DetailModel {
 		t.Helper()
 		d := makeDetailDualPath(t)
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 		}
 		if d.FieldCursor() != 3 {
@@ -1100,7 +1100,7 @@ func TestQA_DetailKeyMatch_GBehaviorIsIdentical_KeyPressVsKeyRelease(t *testing.
 	setup := func(t *testing.T) views.DetailModel {
 		t.Helper()
 		d := makeDetailDualPath(t)
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 		}
 		return d

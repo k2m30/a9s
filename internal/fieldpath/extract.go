@@ -13,13 +13,13 @@ import (
 )
 
 // ExtractValue navigates a struct using a dot-separated path matched against JSON tags.
-func ExtractValue(obj interface{}, dotPath string) (reflect.Value, error) {
+func ExtractValue(obj any, dotPath string) (reflect.Value, error) {
 	segments := strings.Split(dotPath, ".")
 	current := reflect.ValueOf(obj)
 
 	for _, seg := range segments {
 		// Dereference pointers
-		for current.Kind() == reflect.Ptr {
+		for current.Kind() == reflect.Pointer {
 			if current.IsNil() {
 				return reflect.Value{}, fmt.Errorf("nil pointer at segment %q", seg)
 			}
@@ -67,7 +67,7 @@ func ExtractValue(obj interface{}, dotPath string) (reflect.Value, error) {
 
 // isScalar reports whether a reflect.Value holds a scalar type.
 func isScalar(val reflect.Value) bool {
-	if val.Type() == reflect.TypeOf(time.Time{}) {
+	if val.Type() == reflect.TypeFor[time.Time]() {
 		return true
 	}
 	switch val.Kind() {
@@ -82,14 +82,14 @@ func isScalar(val reflect.Value) bool {
 
 // ExtractScalar extracts a scalar value as a formatted string.
 // Returns "" for non-scalar types (slices, maps, structs), errors, or nil pointers.
-func ExtractScalar(obj interface{}, dotPath string) string {
+func ExtractScalar(obj any, dotPath string) string {
 	val, err := ExtractValue(obj, dotPath)
 	if err != nil {
 		return ""
 	}
 
 	// Dereference pointer
-	for val.Kind() == reflect.Ptr {
+	for val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return ""
 		}
@@ -106,7 +106,7 @@ func ExtractScalar(obj interface{}, dotPath string) string {
 
 // ExtractSubtree extracts a value and returns it as a formatted string (scalar)
 // or YAML (struct/slice/map).
-func ExtractSubtree(obj interface{}, dotPath string) string {
+func ExtractSubtree(obj any, dotPath string) string {
 	val, err := ExtractValue(obj, dotPath)
 	if err != nil {
 		// Fallback for paths that traverse slices without explicit indexes,
@@ -118,7 +118,7 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 	}
 
 	// Dereference pointer
-	for val.Kind() == reflect.Ptr {
+	for val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return ""
 		}
@@ -159,7 +159,7 @@ func ExtractSubtree(obj interface{}, dotPath string) string {
 // extractMultiScalars walks a dot path and supports traversing slices/arrays
 // without explicit indices. It returns all scalar leaf values found.
 func extractMultiScalars(v reflect.Value, segments []string) []string {
-	for v.IsValid() && v.Kind() == reflect.Ptr {
+	for v.IsValid() && v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
@@ -217,8 +217,8 @@ func extractMultiScalars(v reflect.Value, segments []string) []string {
 
 // ToSafeValue recursively converts a reflect.Value into a representation
 // that only contains exported fields, safe for yaml.Marshal.
-func ToSafeValue(val reflect.Value) interface{} {
-	for val.Kind() == reflect.Ptr {
+func ToSafeValue(val reflect.Value) any {
+	for val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return nil
 		}
@@ -230,7 +230,7 @@ func ToSafeValue(val reflect.Value) interface{} {
 		if isScalar(val) {
 			return FormatValue(val)
 		}
-		m := make(map[string]interface{})
+		m := make(map[string]any)
 		t := val.Type()
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
@@ -262,7 +262,7 @@ func ToSafeValue(val reflect.Value) interface{} {
 		if val.Len() == 0 {
 			return nil
 		}
-		var result []interface{}
+		var result []any
 		for i := 0; i < val.Len(); i++ {
 			sv := ToSafeValue(val.Index(i))
 			if sv != nil {
@@ -278,7 +278,7 @@ func ToSafeValue(val reflect.Value) interface{} {
 		if val.Len() == 0 {
 			return nil
 		}
-		m := make(map[string]interface{})
+		m := make(map[string]any)
 		for _, key := range val.MapKeys() {
 			m[fmt.Sprintf("%v", key.Interface())] = ToSafeValue(val.MapIndex(key))
 		}
@@ -303,7 +303,7 @@ func ToSafeValue(val reflect.Value) interface{} {
 // isZeroOrNil checks if a value is nil (for pointers/slices/maps) or the zero value.
 func isZeroOrNil(v reflect.Value) bool {
 	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		return v.IsNil()
 	case reflect.Slice, reflect.Map:
 		return v.IsNil() || v.Len() == 0
@@ -315,12 +315,12 @@ func isZeroOrNil(v reflect.Value) bool {
 // tryParseJSON attempts to parse s as JSON. Returns the parsed structure
 // (map/slice/scalar) on success, or nil on failure.
 // Only attempts parsing if s starts with '{' or '[' (quick rejection for non-JSON strings).
-func tryParseJSON(s string) interface{} {
+func tryParseJSON(s string) any {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
 		return nil
 	}
-	var parsed interface{}
+	var parsed any
 	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
 		return nil
 	}
@@ -338,11 +338,11 @@ type FieldItem struct {
 	IsNavigable bool   // true when FieldPath matches a NavigableField
 	TargetType  string // non-empty when IsNavigable (e.g., "vpc")
 	IsSection   bool   // NEW (v2.1): true for ct-events top-level section headers (ACTOR/ACTION/TARGET/CONTEXT/...)
-	             // Used only by the ct-events detail view branch; inert for all other resource types.
-	ColorTier   string // NEW (v2.1): severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
-	             // Set only on the Event row in ACTION by ct-events. Empty string falls through to neutral DetailVal.
-	NavID       string // Navigation ID override — used by ct-events Principal rows where the display Value is the
-	             // full ARN but navigation needs the bare name. Inert when empty.
+	// Used only by the ct-events detail view branch; inert for all other resource types.
+	ColorTier string // NEW (v2.1): severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
+	// Set only on the Event row in ACTION by ct-events. Empty string falls through to neutral DetailVal.
+	NavID string // Navigation ID override — used by ct-events Principal rows where the display Value is the
+	// full ARN but navigation needs the bare name. Inert when empty.
 }
 
 // ToSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".
@@ -378,7 +378,7 @@ func ToSnakeCase(s string) string {
 // Check navigable map for IsNavigable/TargetType annotation on top-level scalar items.
 //
 // Always returns a non-nil slice (empty []FieldItem{} for empty paths).
-func ExtractFieldList(obj interface{}, fields map[string]string, paths []string, navigable map[string]string) []FieldItem {
+func ExtractFieldList(obj any, fields map[string]string, paths []string, navigable map[string]string) []FieldItem {
 	if len(paths) == 0 {
 		return []FieldItem{}
 	}
@@ -412,7 +412,7 @@ func ExtractFieldList(obj interface{}, fields map[string]string, paths []string,
 			val = ExtractSubtree(obj, path)
 			if val != "" {
 				if rv, err := ExtractValue(obj, path); err == nil {
-					for rv.Kind() == reflect.Ptr {
+					for rv.Kind() == reflect.Pointer {
 						if rv.IsNil() {
 							break
 						}

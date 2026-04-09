@@ -15,6 +15,7 @@
 //  7. Initial load -- right column all dim (120 cols)
 //  8. Deep navigation -- depth indicator (120 cols)
 //  9. Lambda detail -- algorithmic relationships (120 cols)
+//
 // 10. Smart Enter: filtered list from right column (120 cols)
 // 11. Smart Enter: direct to detail from left column navigable field
 // 12. Help screen for two-column detail view (120 cols)
@@ -68,7 +69,7 @@ var (
 	kStyle       = lipgloss.NewStyle().Foreground(colDetailKey)
 	vStyle       = lipgloss.NewStyle().Foreground(colDetailVal)
 	navStyle     = lipgloss.NewStyle().Foreground(colAccent).Underline(true) // navigable value
-	greenStyle = lipgloss.NewStyle().Foreground(colGreen) //nolint:unused // design style — reserved for future use in preview
+	greenStyle   = lipgloss.NewStyle().Foreground(colGreen)                  //nolint:unused // design style — reserved for future use in preview
 	helpKeyStyle = lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
 	helpCatStyle = lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
 
@@ -127,10 +128,7 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 	rightW := lipgloss.Width(rightContent)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -163,10 +161,7 @@ func renderHeaderDepth(depth int, profile, region string, w int) string {
 	rightW := lipgloss.Width(right)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + right
 	return lipgloss.NewStyle().
@@ -187,10 +182,7 @@ func renderFramedBox(lines []string, title string, w int) string {
 		titleRendered := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render(title)
 		titleVis := lipgloss.Width(titleRendered)
 
-		totalDashes := w - 2 - titleVis - 2
-		if totalDashes < 2 {
-			totalDashes = 2
-		}
+		totalDashes := max(w-2-titleVis-2, 2)
 		leftDashes := totalDashes / 2
 		rightDashes := totalDashes - leftDashes
 
@@ -404,10 +396,7 @@ func renderTwoColBox(
 	leftW := innerW - rightW - 1 // -1 for separator
 
 	// Determine the number of content lines (max of left and right)
-	numLines := len(leftFields)
-	if len(rightRows) > numLines {
-		numLines = len(rightRows)
-	}
+	numLines := max(len(rightRows), len(leftFields))
 	numLines++ // bottom padding line
 
 	// Build content lines
@@ -452,10 +441,7 @@ func renderTwoColBoxCustomLeft(
 	rightW := rightColWidth
 	leftW := innerW - rightW - 1 //nolint:unused // needed for proportion reference
 
-	numLines := len(leftLines)
-	if len(rightRows) > numLines {
-		numLines = len(rightRows)
-	}
+	numLines := max(len(rightRows), len(leftLines))
 	numLines++
 
 	_ = leftW // suppress unused warning

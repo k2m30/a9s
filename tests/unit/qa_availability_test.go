@@ -547,7 +547,7 @@ func TestQA_Availability_TopSkipsEmpty(t *testing.T) {
 	m.SetAvailability(allTypes[1].ShortName, 0)
 
 	// Move cursor past the empty items first.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		m, _ = m.Update(menuKeyDown())
 	}
 
@@ -621,10 +621,10 @@ func TestQA_Availability_AllEmpty(t *testing.T) {
 	m, _ = m.Update(menuKeyBottom())
 
 	// Multiple rapid presses — no infinite loop.
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = m.Update(menuKeyDown())
 	}
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = m.Update(menuKeyUp())
 	}
 
@@ -874,7 +874,7 @@ func TestQA_Availability_NavigateAllResourceTypes(t *testing.T) {
 
 	// Navigate Down through all items — should only visit even-indexed items.
 	visited := []string{m.SelectedItem().ShortName}
-	for i := 0; i < len(allTypes); i++ {
+	for range allTypes {
 		prev := m.SelectedItem().ShortName
 		m, _ = m.Update(menuKeyDown())
 		curr := m.SelectedItem().ShortName

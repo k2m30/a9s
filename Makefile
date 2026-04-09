@@ -1,4 +1,4 @@
-.PHONY: build install test lint fmt run clean cover integration security coverage verify-readonly demo readme check-readme
+.PHONY: build install test lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -20,6 +20,13 @@ test:
 
 lint:
 	golangci-lint run ./...
+
+gofix:
+	@if go fix -inline -diff ./... 2>&1 | grep -q '^'; then \
+		echo "FAIL: unfixed //go:fix inline directives — run 'go fix -inline ./...'"; exit 1; \
+	else \
+		echo "PASS: no unfixed inline directives"; \
+	fi
 
 fmt:
 	gofmt -w $(GOFILES)

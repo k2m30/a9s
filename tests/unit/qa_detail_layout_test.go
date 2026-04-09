@@ -32,7 +32,7 @@ func TestDetailLayout_KeysHaveColon(t *testing.T) {
 	plain := stripAnsi(view)
 
 	// Every key-value line should have a colon after the key name
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
@@ -76,7 +76,7 @@ func TestDetailLayout_ScalarFieldsInline(t *testing.T) {
 	plain := stripAnsi(view)
 
 	// "InstanceId" should be on the same line as its value with a colon
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "InstanceId") {
 			if !strings.Contains(line, ":") {
 				t.Errorf("InstanceId line should have colon: %q", line)
@@ -94,12 +94,12 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 	// Build a resource with RawStruct that produces BOTH scalar fields and section fields.
 	// EC2 Instance with a nested State struct is ideal: InstanceId is scalar, State is a section.
 	inst := ec2types.Instance{
-		InstanceId:       ptrString("i-test123"),
+		InstanceId:       new("i-test123"),
 		InstanceType:     ec2types.InstanceTypeT3Large,
-		PrivateIpAddress: ptrString("10.0.1.5"),
+		PrivateIpAddress: new("10.0.1.5"),
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
-			Code: ptrInt32(16),
+			Code: new(int32(16)),
 		},
 	}
 	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
@@ -131,7 +131,7 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 	foundSection := false
 	foundSubField := false
 
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -199,11 +199,11 @@ func TestDetailLayout_EmptySliceShowsDashNotNull(t *testing.T) {
 	// Bug: EC2 instance with empty SecurityGroups slice renders as "null" in detail view.
 	// Expected: "-" (empty) or omitted, never "null".
 	inst := ec2types.Instance{
-		InstanceId:   ptrString("i-0abc123def456789a"),
+		InstanceId:   new("i-0abc123def456789a"),
 		InstanceType: ec2types.InstanceTypeT3Large,
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameTerminated,
-			Code: ptrInt32(48),
+			Code: new(int32(48)),
 		},
 		SecurityGroups: []ec2types.GroupIdentifier{}, // empty slice — triggers the bug
 		Tags:           []ec2types.Tag{},             // another empty slice
@@ -230,7 +230,7 @@ func TestDetailLayout_EmptySliceShowsDashNotNull(t *testing.T) {
 	}
 
 	// SecurityGroups should show "-" (empty/no data), not "null"
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "SecurityGroups") {
 			if strings.Contains(line, "null") {
 				t.Errorf("SecurityGroups line should show '-', not 'null': %q", line)
@@ -249,11 +249,11 @@ func TestDetailLayout_NilSliceShowsDashNotNull(t *testing.T) {
 
 	// Nil slices (not just empty) should also show "-", not "null"
 	inst := ec2types.Instance{
-		InstanceId:   ptrString("i-0abc123def456789a"),
+		InstanceId:   new("i-0abc123def456789a"),
 		InstanceType: ec2types.InstanceTypeT3Large,
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameTerminated,
-			Code: ptrInt32(48),
+			Code: new(int32(48)),
 		},
 		// SecurityGroups and Tags are nil (zero value for slices)
 	}
@@ -298,7 +298,7 @@ func TestDetailLayout_SectionHeadersHaveColon(t *testing.T) {
 	plain := stripAnsi(view)
 
 	// With simple fields, every non-empty line should have ":"
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "Initializing..." {
 			continue

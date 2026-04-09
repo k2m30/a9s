@@ -10,13 +10,13 @@ import (
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
-	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
-	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
+	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	codepipelinetypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -24,10 +24,10 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
-	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
-	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -368,9 +368,9 @@ func TestQA_ListRawStruct_EC2_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("ec2")
 
 	inst := ec2types.Instance{
-		InstanceId:       ptrString("i-correct-id"),
+		InstanceId:       new("i-correct-id"),
 		InstanceType:     ec2types.InstanceTypeT3Medium,
-		PrivateIpAddress: ptrString("10.0.0.99"),
+		PrivateIpAddress: new("10.0.0.99"),
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
 		},
@@ -424,15 +424,15 @@ func TestQA_ListRawStruct_RDS_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("dbi")
 
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("correct-db"),
-		Engine:               ptrString("postgres"),
-		EngineVersion:        ptrString("15.4"),
-		DBInstanceStatus:     ptrString("available"),
-		DBInstanceClass:      ptrString("db.m5.xlarge"),
-		MultiAZ:              ptrBool(false),
+		DBInstanceIdentifier: new("correct-db"),
+		Engine:               new("postgres"),
+		EngineVersion:        new("15.4"),
+		DBInstanceStatus:     new("available"),
+		DBInstanceClass:      new("db.m5.xlarge"),
+		MultiAZ:              new(false),
 		Endpoint: &rdstypes.Endpoint{
-			Address: ptrString("correct-endpoint.rds.amazonaws.com"),
-			Port:    ptrInt32(5432),
+			Address: new("correct-endpoint.rds.amazonaws.com"),
+			Port:    new(int32(5432)),
 		},
 	}
 
@@ -481,15 +481,15 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("redis")
 
 	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     ptrString("correct-redis"),
-		Engine:             ptrString("redis"),
-		EngineVersion:      ptrString("7.0.12"),
-		CacheNodeType:      ptrString("cache.r6g.xlarge"),
-		CacheClusterStatus: ptrString("available"),
-		NumCacheNodes:      ptrInt32(5),
+		CacheClusterId:     new("correct-redis"),
+		Engine:             new("redis"),
+		EngineVersion:      new("7.0.12"),
+		CacheNodeType:      new("cache.r6g.xlarge"),
+		CacheClusterStatus: new("available"),
+		NumCacheNodes:      new(int32(5)),
 		ConfigurationEndpoint: &elasticachetypes.Endpoint{
-			Address: ptrString("correct-redis.cache.amazonaws.com"),
-			Port:    ptrInt32(6379),
+			Address: new("correct-redis.cache.amazonaws.com"),
+			Port:    new(int32(6379)),
 		},
 	}
 
@@ -534,13 +534,13 @@ func TestQA_ListRawStruct_DocDB_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("dbc")
 
 	cluster := docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("correct-docdb"),
-		Engine:              ptrString("dbc"),
-		EngineVersion:       ptrString("5.0.0"),
-		Status:              ptrString("available"),
-		Endpoint:            ptrString("correct-docdb.cluster.us-east-1.docdb.amazonaws.com"),
+		DBClusterIdentifier: new("correct-docdb"),
+		Engine:              new("dbc"),
+		EngineVersion:       new("5.0.0"),
+		Status:              new("available"),
+		Endpoint:            new("correct-docdb.cluster.us-east-1.docdb.amazonaws.com"),
 		DBClusterMembers: []docdbtypes.DBClusterMember{
-			{DBInstanceIdentifier: ptrString("inst-1"), IsClusterWriter: ptrBool(true)},
+			{DBInstanceIdentifier: new("inst-1"), IsClusterWriter: new(true)},
 		},
 	}
 
@@ -584,11 +584,11 @@ func TestQA_ListRawStruct_EKS_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("eks")
 
 	cluster := &ekstypes.Cluster{
-		Name:            ptrString("correct-eks"),
-		Version:         ptrString("1.29"),
+		Name:            new("correct-eks"),
+		Version:         new("1.29"),
 		Status:          ekstypes.ClusterStatusActive,
-		Endpoint:        ptrString("https://correct-eks.gr7.us-east-1.eks.amazonaws.com"),
-		PlatformVersion: ptrString("eks.8"),
+		Endpoint:        new("https://correct-eks.gr7.us-east-1.eks.amazonaws.com"),
+		PlatformVersion: new("eks.8"),
 	}
 
 	res := resource.Resource{
@@ -631,11 +631,11 @@ func TestQA_ListRawStruct_Secrets_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("secrets")
 
 	secret := smtypes.SecretListEntry{
-		Name:            ptrString("correct/secret/name"),
-		Description:     ptrString("Correct description from RawStruct"),
-		RotationEnabled: ptrBool(true),
-		LastAccessedDate: ptrTime(testTime),
-		LastChangedDate:  ptrTime(testTime),
+		Name:             new("correct/secret/name"),
+		Description:      new("Correct description from RawStruct"),
+		RotationEnabled:  new(true),
+		LastAccessedDate: new(testTime),
+		LastChangedDate:  new(testTime),
 	}
 
 	res := resource.Resource{
@@ -675,8 +675,8 @@ func TestQA_ListRawStruct_S3_RawStructOverridesFields(t *testing.T) {
 	cfg := configForType("s3")
 
 	bucket := s3types.Bucket{
-		Name:         ptrString("correct-bucket-name"),
-		CreationDate: ptrTime(testTime),
+		Name:         new("correct-bucket-name"),
+		CreationDate: new(testTime),
 	}
 
 	res := resource.Resource{
@@ -727,9 +727,9 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	// Sub-test for each resource type using production config
 	t.Run("EC2", func(t *testing.T) {
 		inst := ec2types.Instance{
-			InstanceId:       ptrString("i-prod-config-test"),
+			InstanceId:       new("i-prod-config-test"),
 			InstanceType:     ec2types.InstanceTypeM5Large,
-			PrivateIpAddress: ptrString("172.16.0.100"),
+			PrivateIpAddress: new("172.16.0.100"),
 			State: &ec2types.InstanceState{
 				Name: ec2types.InstanceStateNameStopped,
 			},
@@ -751,14 +751,14 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("RDS", func(t *testing.T) {
 		db := rdstypes.DBInstance{
-			DBInstanceIdentifier: ptrString("prod-rds-test"),
-			Engine:               ptrString("aurora-mysql"),
-			EngineVersion:        ptrString("3.04.0"),
-			DBInstanceStatus:     ptrString("available"),
-			DBInstanceClass:      ptrString("db.r6g.2xlarge"),
-			MultiAZ:              ptrBool(true),
+			DBInstanceIdentifier: new("prod-rds-test"),
+			Engine:               new("aurora-mysql"),
+			EngineVersion:        new("3.04.0"),
+			DBInstanceStatus:     new("available"),
+			DBInstanceClass:      new("db.r6g.2xlarge"),
+			MultiAZ:              new(true),
 			Endpoint: &rdstypes.Endpoint{
-				Address: ptrString("prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com"),
+				Address: new("prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com"),
 			},
 		}
 		res := resource.Resource{
@@ -778,13 +778,13 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("Redis", func(t *testing.T) {
 		cluster := elasticachetypes.CacheCluster{
-			CacheClusterId:     ptrString("prod-redis-test"),
-			EngineVersion:      ptrString("7.1.0"),
-			CacheNodeType:      ptrString("cache.m7g.large"),
-			CacheClusterStatus: ptrString("available"),
-			NumCacheNodes:      ptrInt32(2),
+			CacheClusterId:     new("prod-redis-test"),
+			EngineVersion:      new("7.1.0"),
+			CacheNodeType:      new("cache.m7g.large"),
+			CacheClusterStatus: new("available"),
+			NumCacheNodes:      new(int32(2)),
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{
-				Address: ptrString("prod-redis-test.clustercfg.usw2.cache.amazonaws.com"),
+				Address: new("prod-redis-test.clustercfg.usw2.cache.amazonaws.com"),
 			},
 		}
 		res := resource.Resource{
@@ -804,10 +804,10 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("DocDB", func(t *testing.T) {
 		cluster := docdbtypes.DBCluster{
-			DBClusterIdentifier: ptrString("prod-docdb-test"),
-			EngineVersion:       ptrString("5.0.0"),
-			Status:              ptrString("available"),
-			Endpoint:            ptrString("prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com"),
+			DBClusterIdentifier: new("prod-docdb-test"),
+			EngineVersion:       new("5.0.0"),
+			Status:              new("available"),
+			Endpoint:            new("prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com"),
 		}
 		res := resource.Resource{
 			ID:        "prod-docdb-test",
@@ -823,11 +823,11 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("EKS", func(t *testing.T) {
 		cluster := &ekstypes.Cluster{
-			Name:            ptrString("prod-eks-test"),
-			Version:         ptrString("1.30"),
+			Name:            new("prod-eks-test"),
+			Version:         new("1.30"),
 			Status:          ekstypes.ClusterStatusActive,
-			Endpoint:        ptrString("https://prod-eks-test.gr7.us-west-2.eks.amazonaws.com"),
-			PlatformVersion: ptrString("eks.9"),
+			Endpoint:        new("https://prod-eks-test.gr7.us-west-2.eks.amazonaws.com"),
+			PlatformVersion: new("eks.9"),
 		}
 		res := resource.Resource{
 			ID:        "prod-eks-test",
@@ -843,8 +843,8 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("Secrets", func(t *testing.T) {
 		secret := smtypes.SecretListEntry{
-			Name:        ptrString("prod/test/secret"),
-			Description: ptrString("Production test secret"),
+			Name:        new("prod/test/secret"),
+			Description: new("Production test secret"),
 		}
 		res := resource.Resource{
 			ID:        "prod/test/secret",
@@ -863,8 +863,8 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("S3", func(t *testing.T) {
 		bucket := s3types.Bucket{
-			Name:         ptrString("prod-config-bucket"),
-			CreationDate: ptrTime(testTime),
+			Name:         new("prod-config-bucket"),
+			CreationDate: new(testTime),
 		}
 		res := resource.Resource{
 			ID:        "prod-config-bucket",
@@ -920,7 +920,7 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 
 	tests := []struct {
 		shortName    string
-		rawStruct    interface{}
+		rawStruct    any
 		expectInView []string // values that MUST appear from RawStruct
 	}{
 		// -- Already covered individually above, included for completeness --
@@ -1022,14 +1022,14 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	// fall back to Fields for those columns -- we only test path-based columns here.
 	tests := []struct {
 		shortName    string
-		rawStruct    interface{}
+		rawStruct    any
 		wrongFields  map[string]string
 		expectInView []string // values that MUST appear from RawStruct
 	}{
 		{
 			"ec2",
 			ec2types.Instance{
-				InstanceId:   ptrString("i-correct"),
+				InstanceId:   new("i-correct"),
 				InstanceType: ec2types.InstanceTypeT3Medium,
 				State:        &ec2types.InstanceState{Name: ec2types.InstanceStateNameRunning},
 			},
@@ -1162,11 +1162,11 @@ func TestQA_ListRawStruct_SQS_StringRawStruct(t *testing.T) {
 		ID:   "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
 		Name: "my-queue",
 		Fields: map[string]string{
-			"queue_name":          "my-queue",
-			"approx_messages":     "42",
-			"approx_not_visible":  "3",
-			"delay_seconds":       "0",
-			"queue_url":           "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+			"queue_name":         "my-queue",
+			"approx_messages":    "42",
+			"approx_not_visible": "3",
+			"delay_seconds":      "0",
+			"queue_url":          "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
 		},
 		RawStruct: "map[ApproximateNumberOfMessages:42 ApproximateNumberOfMessagesNotVisible:3]",
 	}

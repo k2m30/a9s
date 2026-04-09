@@ -14,7 +14,7 @@ import (
 
 func TestPaginatedRegistry_RegisterAndGet_RoundTrip(t *testing.T) {
 	called := false
-	resource.RegisterPaginated("_test_paginated", func(ctx context.Context, clients interface{}, token string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("_test_paginated", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {
 		called = true
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -67,7 +67,7 @@ func TestPaginatedRegistry_RegisterAndGet_RoundTrip(t *testing.T) {
 
 func TestPaginatedChildRegistry_RegisterAndGet_RoundTrip(t *testing.T) {
 	called := false
-	resource.RegisterPaginatedChild("_test_paginated_child", func(ctx context.Context, clients interface{}, parentCtx resource.ParentContext, token string) (resource.FetchResult, error) {
+	resource.RegisterPaginatedChild("_test_paginated_child", func(ctx context.Context, clients any, parentCtx resource.ParentContext, token string) (resource.FetchResult, error) {
 		called = true
 		if parentCtx["bucket"] != "my-bucket" {
 			t.Errorf("expected parentCtx[bucket]='my-bucket', got %q", parentCtx["bucket"])

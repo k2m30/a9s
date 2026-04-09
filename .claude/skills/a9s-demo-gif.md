@@ -13,7 +13,7 @@ The demo GIF is built in two stages:
 
 - `vhs` — `brew install vhs`
 - `ffmpeg-full` — `brew install ffmpeg-full` (keg-only, needed for `drawtext` filter)
-- Built binary: `go build -o a9s ./cmd/a9s/`
+- Built binary: `make build`
 
 ## Files
 
@@ -28,7 +28,7 @@ The demo GIF is built in two stages:
 
 ### 1. Build the binary
 ```
-go build -o a9s ./cmd/a9s/
+make build
 ```
 
 ### 2. Run VHS

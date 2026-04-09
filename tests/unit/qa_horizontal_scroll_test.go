@@ -129,7 +129,7 @@ func TestQA_HScroll_ScrollRightStopsAtEnd(t *testing.T) {
 	const maxPresses = 10
 	prev := m.View()
 	stoppedChanging := false
-	for i := 0; i < maxPresses; i++ {
+	for range maxPresses {
 		m, _ = m.Update(hScrollKeyPress("l"))
 		curr := m.View()
 		if curr == prev {

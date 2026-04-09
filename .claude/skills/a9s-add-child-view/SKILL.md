@@ -199,9 +199,10 @@ When adding a new child view, match the parent service's current layer. Do not m
 
 ### Verification:
 ```
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
-go build -o a9s ./cmd/a9s/
+make test
+make lint
+make gofix
+make build
 go run ./cmd/viewsgen/                              # always — regenerate from defaults
 go run ./cmd/refgen/ > .a9s/views_reference.yaml    # if SDK struct added to refgen
 ```

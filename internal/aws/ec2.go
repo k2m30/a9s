@@ -215,10 +215,7 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, res
 	// DescribeInstanceStatus accepts max 100 IDs per call.
 	const batchSize = 100
 	for start := 0; start < len(ids); start += batchSize {
-		end := start + batchSize
-		if end > len(ids) {
-			end = len(ids)
-		}
+		end := min(start+batchSize, len(ids))
 		batch := ids[start:end]
 
 		out, err := api.DescribeInstanceStatus(ctx, &ec2.DescribeInstanceStatusInput{
@@ -261,4 +258,3 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, res
 		}
 	}
 }
-

@@ -92,10 +92,7 @@ func FetchCBBuilds(
 	var resources []resource.Resource
 
 	for i := 0; i < len(pageIDs); i += 100 {
-		end := i + 100
-		if end > len(pageIDs) {
-			end = len(pageIDs)
-		}
+		end := min(i+100, len(pageIDs))
 		chunk := pageIDs[i:end]
 
 		batchOutput, err := batchAPI.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
@@ -215,14 +212,14 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 			"end_time":                endTime,
 			"duration":                duration,
 			"source_version_short":    sourceVersionShort,
-			"initiator":              initiator,
-			"build_id":               buildID,
-			"build_arn":              buildArn,
-			"current_phase":          currentPhase,
-			"source_version":         sourceVersion,
+			"initiator":               initiator,
+			"build_id":                buildID,
+			"build_arn":               buildArn,
+			"current_phase":           currentPhase,
+			"source_version":          sourceVersion,
 			"resolved_source_version": resolvedSourceVersion,
-			"log_group_name":         logGroupName,
-			"log_stream_name":        logStreamName,
+			"log_group_name":          logGroupName,
+			"log_stream_name":         logStreamName,
 		},
 		RawStruct: build,
 	}

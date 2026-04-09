@@ -463,7 +463,7 @@ func TestDetailRenderColorTier_LabelIsAlwaysNeutral(t *testing.T) {
 	// Anchor: ACTOR section must exist.
 	// Strip right-column separator (│ and everything after it) before comparing.
 	actorFound := false
-	for _, line := range strings.Split(plain, "\n") {
+	for line := range strings.SplitSeq(plain, "\n") {
 		if colorTierSectionLineText(line) == "ACTOR" {
 			actorFound = true
 			break

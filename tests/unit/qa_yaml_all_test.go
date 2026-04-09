@@ -36,7 +36,6 @@ func TestQA_YAML_AllTypes(t *testing.T) {
 	ctx := context.Background()
 
 	for _, rt := range resource.AllResourceTypes() {
-		rt := rt
 		t.Run(rt.ShortName, func(t *testing.T) {
 			fetcher := resource.GetPaginatedFetcher(rt.ShortName)
 			if fetcher == nil {

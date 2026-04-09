@@ -109,7 +109,7 @@ func pressEnterEC2(d views.DetailModel) (views.DetailModel, tea.Cmd) {
 
 // navigateToIndex presses j exactly n times to move the cursor to index n.
 func navigateToIndex(d views.DetailModel, n int) views.DetailModel {
-	for i := 0; i < n; i++ {
+	for range n {
 		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 	return d
@@ -181,7 +181,7 @@ func TestEC2_006_ViewportScrollsAtEdge(t *testing.T) {
 	}
 
 	// Press j 4 times to reach the last visible row (index 4, the 5th row)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 	if d.FieldCursor() != 4 {
@@ -326,7 +326,7 @@ func TestEC2_008_CursorTraversesHeadersAndSubFields(t *testing.T) {
 	const maxPresses = 100
 	prevCursor := -1
 	pressCount := 0
-	for i := 0; i < maxPresses; i++ {
+	for range maxPresses {
 		cur := d.FieldCursor()
 		if cur == prevCursor {
 			// Cursor stopped moving — we're at the bottom

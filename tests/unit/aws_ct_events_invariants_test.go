@@ -104,7 +104,6 @@ func TestSensitiveReads_AreReadVerbs(t *testing.T) {
 	}
 
 	for _, e := range allowlist {
-		e := e // capture loop variable
 		t.Run(e.eventSource+"/"+e.eventName, func(t *testing.T) {
 			verb := awsclient.ClassifyCTVerb(e.eventName, "", "")
 			// W and D are the only redundant cases: the verb-path already
@@ -227,7 +226,6 @@ func TestSensitiveReads_RejectsUnknownService(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		c := c // capture loop variable
 		t.Run(c.eventSource+"/"+c.eventName, func(t *testing.T) {
 			got := fetchUnknownServiceStatus(t, c.eventSource, c.eventName)
 			if got != c.wantStatus {

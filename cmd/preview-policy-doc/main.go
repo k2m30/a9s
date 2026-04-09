@@ -2,12 +2,12 @@
 // Run with: go run ./cmd/preview-policy-doc/
 //
 // This preview shows all states of the policy-doc view:
-//   1. Managed policy with Allow/Deny statements (full syntax highlighting)
-//   2. Search active with highlighted matches
-//   3. Inline policy with Deny + wildcard Resource "*"
-//   4. Help screen
-//   5. Loading state
-//   6. Error state
+//  1. Managed policy with Allow/Deny statements (full syntax highlighting)
+//  2. Search active with highlighted matches
+//  3. Inline policy with Deny + wildcard Resource "*"
+//  4. Help screen
+//  5. Loading state
+//  6. Error state
 package main
 
 import (
@@ -35,10 +35,10 @@ var (
 	//   colJSONNum  = lipgloss.Color("#ff9e64") // numbers (Condition blocks)
 	//   colJSONBool = lipgloss.Color("#bb9af7") // booleans
 	//   colJSONNull = lipgloss.Color("#565f89") // null values
-	colJSONAllow   = lipgloss.Color("#73daca") // "Allow" -- bright green
-	colJSONDeny    = lipgloss.Color("#f7768e") // "Deny" -- bright red
-	colJSONArn     = lipgloss.Color("#7dcfff") // ARN strings -- cyan
-	colJSONWild    = lipgloss.Color("#f7768e") // "*" wildcard -- red
+	colJSONAllow = lipgloss.Color("#73daca") // "Allow" -- bright green
+	colJSONDeny  = lipgloss.Color("#f7768e") // "Deny" -- bright red
+	colJSONArn   = lipgloss.Color("#7dcfff") // ARN strings -- cyan
+	colJSONWild  = lipgloss.Color("#f7768e") // "*" wildcard -- red
 
 	// Search highlighting
 	colSearchMatchBg  = lipgloss.Color("#e0af68") // amber bg for matches
@@ -94,10 +94,7 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 	rightW := lipgloss.Width(rightContent)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -134,10 +131,7 @@ func renderFramedBox(lines []string, title string, w int) string {
 		titleRendered := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render(title)
 		titleVis := lipgloss.Width(titleRendered)
 
-		totalDashes := w - 2 - titleVis - 2
-		if totalDashes < 2 {
-			totalDashes = 2
-		}
+		totalDashes := max(w-2-titleVis-2, 2)
 		leftDashes := totalDashes / 2
 		rightDashes := totalDashes - leftDashes
 
@@ -427,7 +421,7 @@ func renderPolicyDocMultiMatch() string {
 		"     " + jsonBrace.Render("{"),
 		"       " + jk("", "Effect") + jComma(jsonDeny.Render(`"Deny"`)),
 		// match 3 (non-current): s3: highlighted in amber
-		"       " + jk("", "Action") + jComma(jsonStr.Render(`"`) + matchBg.Render("s3:") + jsonStr.Render(`DeleteBucket"`)),
+		"       " + jk("", "Action") + jComma(jsonStr.Render(`"`)+matchBg.Render("s3:")+jsonStr.Render(`DeleteBucket"`)),
 		"       " + jk("", "Resource") + jsonWild.Render(`"*"`),
 		"     " + jsonBrace.Render("}"),
 		"   " + jsonBrace.Render("]"),

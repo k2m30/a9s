@@ -121,9 +121,9 @@ func TestRelated_SQS_Alarm_Match(t *testing.T) {
 			{
 				ID: "sqs-depth-alarm",
 				RawStruct: cwtypes.MetricAlarm{
-					Namespace: strPtr("AWS/SQS"),
+					Namespace: new("AWS/SQS"),
 					Dimensions: []cwtypes.Dimension{
-						{Name: strPtr("QueueName"), Value: strPtr("payment-processing")},
+						{Name: new("QueueName"), Value: new("payment-processing")},
 					},
 				},
 			},
@@ -148,9 +148,9 @@ func TestRelated_SQS_Alarm_NoMatch(t *testing.T) {
 			{
 				ID: "other-alarm",
 				RawStruct: cwtypes.MetricAlarm{
-					Namespace: strPtr("AWS/SQS"),
+					Namespace: new("AWS/SQS"),
 					Dimensions: []cwtypes.Dimension{
-						{Name: strPtr("QueueName"), Value: strPtr("some-other-queue")},
+						{Name: new("QueueName"), Value: new("some-other-queue")},
 					},
 				},
 			},

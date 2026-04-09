@@ -118,7 +118,7 @@ func TestDetail_008_JAtLastField_10Fields(t *testing.T) {
 	d := makeSpec008Detail(t, fieldPaths, 80, 40)
 
 	// Navigate to last field
-	for i := 0; i < 9; i++ {
+	for range 9 {
 		d, _ = pressJKey(d)
 	}
 	if d.FieldCursor() != 9 {
@@ -162,7 +162,7 @@ func TestDetail_008_KAtFirstField_CursorClamped(t *testing.T) {
 func TestDetail_008_KAtFirstField_MultipleKPresses(t *testing.T) {
 	d := makeSpec008Detail(t, []string{"InstanceId", "VpcId"}, 80, 20)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		d, _ = pressKKey(d)
 	}
 	if d.FieldCursor() != 0 {

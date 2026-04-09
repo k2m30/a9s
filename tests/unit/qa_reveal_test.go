@@ -195,7 +195,7 @@ func TestQA_Reveal_Resize(t *testing.T) {
 func TestQA_Reveal_MultilineValue(t *testing.T) {
 	k := keys.Default()
 	var sb strings.Builder
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		sb.WriteString("line-")
 		sb.WriteString(strings.Repeat("x", i+1))
 		sb.WriteString("\n")

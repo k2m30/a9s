@@ -12,5 +12,5 @@ type Resource struct {
 	// Fields holds all visible column values by key.
 	Fields map[string]string
 	// RawStruct holds the original AWS SDK typed struct for reflection-based field extraction.
-	RawStruct interface{}
+	RawStruct any
 }
