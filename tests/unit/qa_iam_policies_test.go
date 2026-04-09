@@ -60,8 +60,8 @@ func TestQA_IAMPolicies_FetchSuccess(t *testing.T) {
 	if r.Fields["policy_name"] != "my-custom-policy" {
 		t.Errorf("expected policy_name 'my-custom-policy', got %q", r.Fields["policy_name"])
 	}
-	if r.Fields["policy_id"] != "ANPA123456789" {
-		t.Errorf("expected policy_id 'ANPA123456789', got %q", r.Fields["policy_id"])
+	if r.Fields["policy_type"] != "managed" {
+		t.Errorf("expected policy_type 'managed', got %q", r.Fields["policy_type"])
 	}
 	if r.Fields["attachment_count"] != "3" {
 		t.Errorf("expected attachment_count '3', got %q", r.Fields["attachment_count"])
@@ -111,7 +111,7 @@ func TestQA_IAMPolicies_TypeDef(t *testing.T) {
 		title string
 	}{
 		{"policy_name", "Policy Name"},
-		{"policy_id", "Policy ID"},
+		{"policy_type", "Type"},
 		{"attachment_count", "Attached"},
 		{"path", "Path"},
 		{"create_date", "Created"},

@@ -30,7 +30,7 @@ func securityResourceTypes() []ResourceTypeDef {
 			Category:  "SECURITY & IAM",
 			Columns: []Column{
 				{Key: "policy_name", Title: "Policy Name", Width: 36, Sortable: true},
-				{Key: "policy_id", Title: "Policy ID", Width: 22, Sortable: true},
+				{Key: "policy_type", Title: "Type", Width: 10, Sortable: true},
 				{Key: "attachment_count", Title: "Attached", Width: 10, Sortable: true},
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},

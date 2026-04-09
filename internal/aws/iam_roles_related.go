@@ -7,10 +7,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -161,12 +161,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
 	}
-	var ids []string
-	for _, p := range out.AttachedPolicies {
-		if p.PolicyName != nil {
-			ids = append(ids, *p.PolicyName)
-		}
-	}
+	ids := customerManagedAttachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
 }
 

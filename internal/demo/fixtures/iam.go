@@ -3,6 +3,7 @@ package fixtures
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,6 +24,8 @@ type IAMFixtures struct {
 	AttachedUserPolicies map[string][]iamtypes.AttachedPolicy
 	// AttachedGroupPolicies keyed by group name
 	AttachedGroupPolicies map[string][]iamtypes.AttachedPolicy
+	// InlineGroupPolicies keyed by group name
+	InlineGroupPolicies map[string][]string
 	// GroupUsers keyed by group name
 	GroupUsers map[string][]iamtypes.User
 	// GroupsForUser keyed by user name
@@ -44,6 +47,10 @@ const (
 	fixtIAMProdLambdaRoleARN = "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"
 )
 
+func IsCustomerManagedPolicyARN(policyARN string) bool {
+	return policyARN != "" && !strings.Contains(policyARN, ":aws:policy/")
+}
+
 // NewIAMFixtures builds and returns a fully-populated IAMFixtures struct.
 func NewIAMFixtures() *IAMFixtures {
 	f := &IAMFixtures{
@@ -51,6 +58,7 @@ func NewIAMFixtures() *IAMFixtures {
 		InlineRolePolicies:    make(map[string][]string),
 		AttachedUserPolicies:  make(map[string][]iamtypes.AttachedPolicy),
 		AttachedGroupPolicies: make(map[string][]iamtypes.AttachedPolicy),
+		InlineGroupPolicies:   make(map[string][]string),
 		GroupUsers:            make(map[string][]iamtypes.User),
 		GroupsForUser:         make(map[string][]iamtypes.Group),
 		EntitiesForPolicy:     make(map[string]*PolicyEntities),
@@ -61,6 +69,8 @@ func NewIAMFixtures() *IAMFixtures {
 	f.Groups = buildIAMGroups()
 	buildIAMRelations(f)
 	f.AccountAliases = []string{"acme-corp"}
+	f.InlineGroupPolicies["developers"] = []string{"AllowAssumeRole", "AllowChangeOwnPassword"}
+	f.InlineGroupPolicies["readonly"] = []string{"DenyS3Delete"}
 	return f
 }
 
@@ -202,14 +212,14 @@ func buildIAMRoles() []iamtypes.Role {
 func buildIAMPolicies() []iamtypes.Policy {
 	policies := []iamtypes.Policy{
 		{
-			PolicyName:      aws.String("acme-s3-read-only"),
-			PolicyId:        aws.String("ANPAEXAMPLE111111111"),
-			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
-			AttachmentCount: aws.Int32(5),
-			Path:            aws.String("/"),
-			CreateDate:      aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+			PolicyName:       aws.String("acme-s3-read-only"),
+			PolicyId:         aws.String("ANPAEXAMPLE111111111"),
+			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only"),
+			AttachmentCount:  aws.Int32(5),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
 			DefaultVersionId: aws.String("v3"),
-			Description:     aws.String("Allows EC2 and S3 read access"),
+			Description:      aws.String("Allows EC2 and S3 read access"),
 		},
 		{
 			PolicyName:      aws.String("acme-deploy-policy"),
