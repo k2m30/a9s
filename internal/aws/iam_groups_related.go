@@ -34,8 +34,7 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 	return relatedResult("iam-user", ids)
 }
 
-// checkGroupPolicy uses the IAM ListAttachedGroupPolicies API to return the
-// managed policies attached to this IAM group.
+// checkGroupPolicy returns the combined count of managed and inline policies for this IAM group.
 func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -45,17 +44,19 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	if groupName == "" {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
 	}
-	out, err := c.IAM.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
-		GroupName: &groupName,
-	})
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
-	}
 	var ids []string
-	for _, p := range out.AttachedPolicies {
-		if p.PolicyName != nil {
-			ids = append(ids, *p.PolicyName)
-		}
+	// Attached managed policies
+	attached, err := c.IAM.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{GroupName: &groupName})
+	if err == nil {
+		ids = append(ids, customerManagedAttachedPolicyNames(attached.AttachedPolicies)...)
+	}
+	// Inline policies
+	inline, err2 := c.IAM.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})
+	if err2 == nil {
+		ids = append(ids, inline.PolicyNames...)
+	}
+	if err != nil && err2 != nil {
+		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
 	}
 	return relatedResult("policy", ids)
 }
