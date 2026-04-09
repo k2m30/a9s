@@ -1216,8 +1216,8 @@ func TestQA_S3_BucketList_NoSeparatorBelowHeaders(t *testing.T) {
 	m := s3RLBucketModel()
 	out := m.View()
 
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(out, "\n")
+	for line := range lines {
 		stripped := strings.TrimSpace(stripANSI(line))
 		if stripped == "" {
 			continue

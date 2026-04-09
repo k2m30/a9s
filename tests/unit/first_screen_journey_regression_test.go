@@ -78,7 +78,7 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	})
 
 	// Move cursor to ImageId row (default EC2 detail: index 4).
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		m = applyRootAndCmd(t, m, rootKeyPress("j"))
 	}
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
@@ -160,7 +160,7 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 		Resource:     &ec2Res,
 	})
 
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		m = applyRootAndCmd(t, m, rootKeyPress("j"))
 	}
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))

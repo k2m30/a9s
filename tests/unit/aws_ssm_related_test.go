@@ -35,9 +35,9 @@ func ssmSecureRes() resource.Resource {
 			"type": "SecureString",
 		},
 		RawStruct: ssmtypes.ParameterMetadata{
-			Name:  strPtr("/app/db-password"),
+			Name:  new("/app/db-password"),
 			Type:  ssmtypes.ParameterTypeSecureString,
-			KeyId: strPtr("alias/my-key"),
+			KeyId: new("alias/my-key"),
 		},
 	}
 }
@@ -58,8 +58,8 @@ func ssmKMSCache() resource.ResourceCache {
 						"alias":  "alias/my-key",
 					},
 					RawStruct: kmstypes.KeyListEntry{
-						KeyId:  strPtr("abc-123"),
-						KeyArn: strPtr("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
+						KeyId:  new("abc-123"),
+						KeyArn: new("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
 					},
 				},
 			},
@@ -90,8 +90,8 @@ func TestRelated_SSM_KMS_NoMatch(t *testing.T) {
 						"alias":  "alias/other-key",
 					},
 					RawStruct: kmstypes.KeyListEntry{
-						KeyId:  strPtr("ffffffff-0000-0000-0000-ffffffffffff"),
-						KeyArn: strPtr("arn:aws:kms:us-east-1:123456789012:key/ffffffff-0000-0000-0000-ffffffffffff"),
+						KeyId:  new("ffffffff-0000-0000-0000-ffffffffffff"),
+						KeyArn: new("arn:aws:kms:us-east-1:123456789012:key/ffffffff-0000-0000-0000-ffffffffffff"),
 					},
 				},
 			},
@@ -115,7 +115,7 @@ func TestRelated_SSM_KMS_NotSecureString(t *testing.T) {
 			"type": "String",
 		},
 		RawStruct: ssmtypes.ParameterMetadata{
-			Name:  strPtr("/app/config-flag"),
+			Name:  new("/app/config-flag"),
 			Type:  ssmtypes.ParameterTypeString,
 			KeyId: nil,
 		},
@@ -138,7 +138,7 @@ func TestRelated_SSM_KMS_NilKeyId(t *testing.T) {
 			"type": "SecureString",
 		},
 		RawStruct: ssmtypes.ParameterMetadata{
-			Name:  strPtr("/app/db-password"),
+			Name:  new("/app/db-password"),
 			Type:  ssmtypes.ParameterTypeSecureString,
 			KeyId: nil,
 		},

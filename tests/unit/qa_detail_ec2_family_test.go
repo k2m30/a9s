@@ -94,62 +94,62 @@ func detailConfigForType(typeName string) *config.ViewsConfig {
 
 func realisticVPC() ec2types.Vpc {
 	return ec2types.Vpc{
-		VpcId:     ptrString("vpc-0abc1234def56789a"),
-		CidrBlock: ptrString("10.0.0.0/16"),
+		VpcId:     new("vpc-0abc1234def56789a"),
+		CidrBlock: new("10.0.0.0/16"),
 		State:     ec2types.VpcStateAvailable,
-		IsDefault: ptrBool(false),
-		OwnerId:   ptrString("123456789012"),
+		IsDefault: new(false),
+		OwnerId:   new("123456789012"),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-vpc")},
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("Name"), Value: new("prod-vpc")},
+			{Key: new("env"), Value: new("production")},
 		},
 	}
 }
 
 func realisticSecurityGroup() ec2types.SecurityGroup {
 	return ec2types.SecurityGroup{
-		GroupId:     ptrString("sg-0abc1234def56789a"),
-		GroupName:   ptrString("web-sg"),
-		VpcId:       ptrString("vpc-0abc1234"),
-		Description: ptrString("Web server security group"),
-		OwnerId:     ptrString("123456789012"),
+		GroupId:     new("sg-0abc1234def56789a"),
+		GroupName:   new("web-sg"),
+		VpcId:       new("vpc-0abc1234"),
+		Description: new("Web server security group"),
+		OwnerId:     new("123456789012"),
 		IpPermissions: []ec2types.IpPermission{
 			{
-				FromPort:   ptrInt32(443),
-				ToPort:     ptrInt32(443),
-				IpProtocol: ptrString("tcp"),
+				FromPort:   new(int32(443)),
+				ToPort:     new(int32(443)),
+				IpProtocol: new("tcp"),
 				IpRanges: []ec2types.IpRange{
-					{CidrIp: ptrString("0.0.0.0/0"), Description: ptrString("HTTPS from anywhere")},
+					{CidrIp: new("0.0.0.0/0"), Description: new("HTTPS from anywhere")},
 				},
 			},
 		},
 		IpPermissionsEgress: []ec2types.IpPermission{
 			{
-				IpProtocol: ptrString("-1"),
-				IpRanges:   []ec2types.IpRange{{CidrIp: ptrString("0.0.0.0/0")}},
+				IpProtocol: new("-1"),
+				IpRanges:   []ec2types.IpRange{{CidrIp: new("0.0.0.0/0")}},
 			},
 		},
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("web-sg")},
+			{Key: new("Name"), Value: new("web-sg")},
 		},
 	}
 }
 
 func realisticNodeGroup() ekstypes.Nodegroup {
 	return ekstypes.Nodegroup{
-		NodegroupName: ptrString("prod-ng-01"),
-		ClusterName:   ptrString("prod-cluster"),
+		NodegroupName: new("prod-ng-01"),
+		ClusterName:   new("prod-cluster"),
 		Status:        ekstypes.NodegroupStatusActive,
 		InstanceTypes: []string{"t3.large", "t3.xlarge"},
 		AmiType:       ekstypes.AMITypesAl2X8664,
 		CapacityType:  ekstypes.CapacityTypesOnDemand,
-		DiskSize:      ptrInt32(100),
+		DiskSize:      new(int32(100)),
 		ScalingConfig: &ekstypes.NodegroupScalingConfig{
-			DesiredSize: ptrInt32(3),
-			MinSize:     ptrInt32(1),
-			MaxSize:     ptrInt32(5),
+			DesiredSize: new(int32(3)),
+			MinSize:     new(int32(1)),
+			MaxSize:     new(int32(5)),
 		},
-		NodeRole: ptrString("arn:aws:iam::123456789012:role/eks-node-role"),
+		NodeRole: new("arn:aws:iam::123456789012:role/eks-node-role"),
 		Subnets:  []string{"subnet-0abc1234", "subnet-0def5678"},
 		Tags:     map[string]string{"env": "production"},
 	}
@@ -157,172 +157,172 @@ func realisticNodeGroup() ekstypes.Nodegroup {
 
 func realisticSubnet() ec2types.Subnet {
 	return ec2types.Subnet{
-		SubnetId:                ptrString("subnet-0abc1234def56789a"),
-		VpcId:                   ptrString("vpc-0abc1234"),
-		CidrBlock:               ptrString("10.0.1.0/24"),
-		AvailabilityZone:        ptrString("us-east-1a"),
+		SubnetId:                new("subnet-0abc1234def56789a"),
+		VpcId:                   new("vpc-0abc1234"),
+		CidrBlock:               new("10.0.1.0/24"),
+		AvailabilityZone:        new("us-east-1a"),
 		State:                   ec2types.SubnetStateAvailable,
-		AvailableIpAddressCount: ptrInt32(251),
-		MapPublicIpOnLaunch:     ptrBool(true),
+		AvailableIpAddressCount: new(int32(251)),
+		MapPublicIpOnLaunch:     new(true),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("public-subnet-1a")},
+			{Key: new("Name"), Value: new("public-subnet-1a")},
 		},
 	}
 }
 
 func realisticRouteTable() ec2types.RouteTable {
 	return ec2types.RouteTable{
-		RouteTableId: ptrString("rtb-0abc1234def56789a"),
-		VpcId:        ptrString("vpc-0abc1234"),
+		RouteTableId: new("rtb-0abc1234def56789a"),
+		VpcId:        new("vpc-0abc1234"),
 		Routes: []ec2types.Route{
-			{DestinationCidrBlock: ptrString("10.0.0.0/16"), GatewayId: ptrString("local")},
-			{DestinationCidrBlock: ptrString("0.0.0.0/0"), GatewayId: ptrString("igw-0abc1234")},
+			{DestinationCidrBlock: new("10.0.0.0/16"), GatewayId: new("local")},
+			{DestinationCidrBlock: new("0.0.0.0/0"), GatewayId: new("igw-0abc1234")},
 		},
 		Associations: []ec2types.RouteTableAssociation{
 			{
-				RouteTableAssociationId: ptrString("rtbassoc-0abc1234"),
-				SubnetId:                ptrString("subnet-0abc1234"),
-				Main:                    ptrBool(false),
+				RouteTableAssociationId: new("rtbassoc-0abc1234"),
+				SubnetId:                new("subnet-0abc1234"),
+				Main:                    new(false),
 			},
 		},
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("public-rtb")},
+			{Key: new("Name"), Value: new("public-rtb")},
 		},
 	}
 }
 
 func realisticNATGateway() ec2types.NatGateway {
 	return ec2types.NatGateway{
-		NatGatewayId:     ptrString("nat-0abc1234def56789a"),
-		VpcId:            ptrString("vpc-0abc1234"),
-		SubnetId:         ptrString("subnet-0abc1234"),
+		NatGatewayId:     new("nat-0abc1234def56789a"),
+		VpcId:            new("vpc-0abc1234"),
+		SubnetId:         new("subnet-0abc1234"),
 		State:            ec2types.NatGatewayStateAvailable,
 		ConnectivityType: ec2types.ConnectivityTypePublic,
 		NatGatewayAddresses: []ec2types.NatGatewayAddress{
 			{
-				AllocationId:       ptrString("eipalloc-0abc1234"),
-				PublicIp:           ptrString("54.123.45.67"),
-				PrivateIp:          ptrString("10.0.1.100"),
-				NetworkInterfaceId: ptrString("eni-0abc1234"),
+				AllocationId:       new("eipalloc-0abc1234"),
+				PublicIp:           new("54.123.45.67"),
+				PrivateIp:          new("10.0.1.100"),
+				NetworkInterfaceId: new("eni-0abc1234"),
 			},
 		},
-		CreateTime: ptrTime(testTime),
+		CreateTime: new(testTime),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-nat")},
+			{Key: new("Name"), Value: new("prod-nat")},
 		},
 	}
 }
 
 func realisticInternetGateway() ec2types.InternetGateway {
 	return ec2types.InternetGateway{
-		InternetGatewayId: ptrString("igw-0abc1234def56789a"),
+		InternetGatewayId: new("igw-0abc1234def56789a"),
 		Attachments: []ec2types.InternetGatewayAttachment{
-			{VpcId: ptrString("vpc-0abc1234"), State: ec2types.AttachmentStatusAttached},
+			{VpcId: new("vpc-0abc1234"), State: ec2types.AttachmentStatusAttached},
 		},
-		OwnerId: ptrString("123456789012"),
+		OwnerId: new("123456789012"),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-igw")},
+			{Key: new("Name"), Value: new("prod-igw")},
 		},
 	}
 }
 
 func realisticEIP() ec2types.Address {
 	return ec2types.Address{
-		AllocationId:     ptrString("eipalloc-0abc1234def56789a"),
-		PublicIp:         ptrString("54.123.45.67"),
-		AssociationId:    ptrString("eipassoc-0abc1234"),
-		InstanceId:       ptrString("i-0abc1234"),
+		AllocationId:     new("eipalloc-0abc1234def56789a"),
+		PublicIp:         new("54.123.45.67"),
+		AssociationId:    new("eipassoc-0abc1234"),
+		InstanceId:       new("i-0abc1234"),
 		Domain:           ec2types.DomainTypeVpc,
-		PrivateIpAddress: ptrString("10.0.1.42"),
+		PrivateIpAddress: new("10.0.1.42"),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-eip")},
+			{Key: new("Name"), Value: new("prod-eip")},
 		},
 	}
 }
 
 func realisticTransitGateway() ec2types.TransitGateway {
 	return ec2types.TransitGateway{
-		TransitGatewayId: ptrString("tgw-0abc1234def56789a"),
+		TransitGatewayId: new("tgw-0abc1234def56789a"),
 		State:            ec2types.TransitGatewayStateAvailable,
-		OwnerId:          ptrString("123456789012"),
-		Description:      ptrString("Production transit gateway"),
+		OwnerId:          new("123456789012"),
+		Description:      new("Production transit gateway"),
 		Options: &ec2types.TransitGatewayOptions{
 			AutoAcceptSharedAttachments:  ec2types.AutoAcceptSharedAttachmentsValueEnable,
 			DefaultRouteTableAssociation: ec2types.DefaultRouteTableAssociationValueEnable,
 			DnsSupport:                   ec2types.DnsSupportValueEnable,
-			VpnEcmpSupport:              ec2types.VpnEcmpSupportValueEnable,
+			VpnEcmpSupport:               ec2types.VpnEcmpSupportValueEnable,
 		},
-		CreationTime: ptrTime(testTime),
+		CreationTime: new(testTime),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-tgw")},
+			{Key: new("Name"), Value: new("prod-tgw")},
 		},
 	}
 }
 
 func realisticVPCEndpoint() ec2types.VpcEndpoint {
 	return ec2types.VpcEndpoint{
-		VpcEndpointId:    ptrString("vpce-0abc1234def56789a"),
-		ServiceName:      ptrString("com.amazonaws.us-east-1.s3"),
-		VpcEndpointType:  ec2types.VpcEndpointTypeGateway,
-		State:            ec2types.StateAvailable,
-		VpcId:            ptrString("vpc-0abc1234"),
-		CreationTimestamp: ptrTime(testTime),
+		VpcEndpointId:     new("vpce-0abc1234def56789a"),
+		ServiceName:       new("com.amazonaws.us-east-1.s3"),
+		VpcEndpointType:   ec2types.VpcEndpointTypeGateway,
+		State:             ec2types.StateAvailable,
+		VpcId:             new("vpc-0abc1234"),
+		CreationTimestamp: new(testTime),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("s3-endpoint")},
+			{Key: new("Name"), Value: new("s3-endpoint")},
 		},
 	}
 }
 
 func realisticENI() ec2types.NetworkInterface {
 	return ec2types.NetworkInterface{
-		NetworkInterfaceId: ptrString("eni-0abc1234def56789a"),
+		NetworkInterfaceId: new("eni-0abc1234def56789a"),
 		Status:             ec2types.NetworkInterfaceStatusInUse,
 		InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
-		VpcId:              ptrString("vpc-0abc1234"),
-		SubnetId:           ptrString("subnet-0abc1234"),
-		PrivateIpAddress:   ptrString("10.0.1.42"),
-		MacAddress:         ptrString("02:ab:cd:ef:12:34"),
-		Description:        ptrString("Primary network interface"),
+		VpcId:              new("vpc-0abc1234"),
+		SubnetId:           new("subnet-0abc1234"),
+		PrivateIpAddress:   new("10.0.1.42"),
+		MacAddress:         new("02:ab:cd:ef:12:34"),
+		Description:        new("Primary network interface"),
 		Groups: []ec2types.GroupIdentifier{
-			{GroupId: ptrString("sg-0abc1234"), GroupName: ptrString("web-sg")},
+			{GroupId: new("sg-0abc1234"), GroupName: new("web-sg")},
 		},
 		TagSet: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-eni")},
+			{Key: new("Name"), Value: new("prod-eni")},
 		},
 	}
 }
 
 func realisticRDSSnapshot() rdstypes.DBSnapshot {
 	return rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: ptrString("rds-snap-prod-20250615"),
-		DBInstanceIdentifier: ptrString("prod-db-01"),
-		Status:               ptrString("available"),
-		Engine:               ptrString("mysql"),
-		EngineVersion:        ptrString("8.0.35"),
-		SnapshotType:         ptrString("automated"),
-		SnapshotCreateTime:   ptrTime(testTime),
-		AllocatedStorage:     ptrInt32(100),
+		DBSnapshotIdentifier: new("rds-snap-prod-20250615"),
+		DBInstanceIdentifier: new("prod-db-01"),
+		Status:               new("available"),
+		Engine:               new("mysql"),
+		EngineVersion:        new("8.0.35"),
+		SnapshotType:         new("automated"),
+		SnapshotCreateTime:   new(testTime),
+		AllocatedStorage:     new(int32(100)),
 	}
 }
 
 func realisticDocDBSnapshot() docdbtypes.DBClusterSnapshot {
 	return docdbtypes.DBClusterSnapshot{
-		DBClusterSnapshotIdentifier: ptrString("docdb-snap-prod-20250615"),
-		DBClusterIdentifier:         ptrString("docdb-prod-cluster"),
-		Status:                       ptrString("available"),
-		Engine:                       ptrString("docdb"),
-		SnapshotType:                 ptrString("automated"),
-		SnapshotCreateTime:           ptrTime(testTime),
+		DBClusterSnapshotIdentifier: new("docdb-snap-prod-20250615"),
+		DBClusterIdentifier:         new("docdb-prod-cluster"),
+		Status:                      new("available"),
+		Engine:                      new("docdb"),
+		SnapshotType:                new("automated"),
+		SnapshotCreateTime:          new(testTime),
 	}
 }
 
 func realisticSNSSubscription() snstypes.Subscription {
 	return snstypes.Subscription{
-		SubscriptionArn: ptrString("arn:aws:sns:us-east-1:123456789012:alerts:a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"),
-		TopicArn:        ptrString("arn:aws:sns:us-east-1:123456789012:alerts"),
-		Protocol:        ptrString("email"),
-		Endpoint:        ptrString("user@example.com"),
-		Owner:           ptrString("123456789012"),
+		SubscriptionArn: new("arn:aws:sns:us-east-1:123456789012:alerts:a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"),
+		TopicArn:        new("arn:aws:sns:us-east-1:123456789012:alerts"),
+		Protocol:        new("email"),
+		Endpoint:        new("user@example.com"),
+		Owner:           new("123456789012"),
 	}
 }
 
@@ -331,13 +331,13 @@ func realisticSNSSubscription() snstypes.Subscription {
 // uses iamtypes.ManagedPolicyDetail{} directly.
 func realisticManagedPolicyDetail() iamtypes.ManagedPolicyDetail {
 	return iamtypes.ManagedPolicyDetail{
-		PolicyName:      ptrString("ReadOnlyAccess"),
-		PolicyId:        ptrString("ANPAI1234567890EXAMPLE"),
-		Arn:             ptrString("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),
-		Path:            ptrString("/"),
-		AttachmentCount: ptrInt32(5),
-		CreateDate:      ptrTime(testTime),
-		Description:     ptrString("Provides read-only access"),
+		PolicyName:      new("ReadOnlyAccess"),
+		PolicyId:        new("ANPAI1234567890EXAMPLE"),
+		Arn:             new("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),
+		Path:            new("/"),
+		AttachmentCount: new(int32(5)),
+		CreateDate:      new(testTime),
+		Description:     new("Provides read-only access"),
 	}
 }
 
@@ -345,13 +345,13 @@ func realisticManagedPolicyDetail() iamtypes.ManagedPolicyDetail {
 // internal/aws/iam_policies.go FetchIAMPolicies (which uses ListPolicies API).
 func realisticIAMPolicy() iamtypes.Policy {
 	return iamtypes.Policy{
-		PolicyName:      ptrString("ReadOnlyAccess"),
-		PolicyId:        ptrString("ANPAI1234567890EXAMPLE"),
-		Arn:             ptrString("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),
-		Path:            ptrString("/"),
-		AttachmentCount: ptrInt32(5),
-		CreateDate:      ptrTime(testTime),
-		Description:     ptrString("Provides read-only access"),
+		PolicyName:      new("ReadOnlyAccess"),
+		PolicyId:        new("ANPAI1234567890EXAMPLE"),
+		Arn:             new("arn:aws:iam::123456789012:policy/ReadOnlyAccess"),
+		Path:            new("/"),
+		AttachmentCount: new(int32(5)),
+		CreateDate:      new(testTime),
+		Description:     new("Provides read-only access"),
 	}
 }
 

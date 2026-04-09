@@ -186,12 +186,12 @@ func TestQA_Detail_EC2_Tags(t *testing.T) {
 func TestQA_Detail_EC2_NilPublicIP(t *testing.T) {
 	ensureNoColor(t)
 	inst := ec2types.Instance{
-		InstanceId:       ptrString("i-private"),
-		PrivateIpAddress: ptrString("10.0.0.1"),
+		InstanceId:       new("i-private"),
+		PrivateIpAddress: new("10.0.0.1"),
 		// PublicIpAddress is nil
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
-			Code: ptrInt32(16),
+			Code: new(int32(16)),
 		},
 	}
 	res := buildResource("i-private", "i-private", inst)
@@ -211,11 +211,11 @@ func TestQA_Detail_EC2_NilPublicIP(t *testing.T) {
 func TestQA_Detail_EC2_EmptyTags(t *testing.T) {
 	ensureNoColor(t)
 	inst := ec2types.Instance{
-		InstanceId:   ptrString("i-notags"),
+		InstanceId:   new("i-notags"),
 		InstanceType: ec2types.InstanceTypeT3Micro,
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
-			Code: ptrInt32(16),
+			Code: new(int32(16)),
 		},
 		// Tags is nil/empty
 		// SecurityGroups is nil/empty
@@ -237,13 +237,13 @@ func TestQA_Detail_EC2_EmptyTags(t *testing.T) {
 func TestQA_Detail_EC2_TerminatedInstance(t *testing.T) {
 	ensureNoColor(t)
 	inst := ec2types.Instance{
-		InstanceId:   ptrString("i-terminated"),
+		InstanceId:   new("i-terminated"),
 		InstanceType: ec2types.InstanceTypeT3Large,
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameTerminated,
-			Code: ptrInt32(48),
+			Code: new(int32(48)),
 		},
-		LaunchTime: ptrTime(testTime),
+		LaunchTime: new(testTime),
 	}
 	res := buildResource("i-terminated", "i-terminated", inst)
 	cfg := configForType("ec2")
@@ -328,9 +328,9 @@ func TestQA_Detail_RDS_NestedEndpoint(t *testing.T) {
 func TestQA_Detail_RDS_NilEndpoint(t *testing.T) {
 	ensureNoColor(t)
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("creating-db"),
-		DBInstanceStatus:     ptrString("creating"),
-		Engine:               ptrString("mysql"),
+		DBInstanceIdentifier: new("creating-db"),
+		DBInstanceStatus:     new("creating"),
+		Engine:               new("mysql"),
 		// Endpoint is nil during creation
 	}
 	res := buildResource("creating-db", "creating-db", db)
@@ -347,9 +347,9 @@ func TestQA_Detail_RDS_NilEndpoint(t *testing.T) {
 func TestQA_Detail_RDS_BooleanMultiAZFalse(t *testing.T) {
 	ensureNoColor(t)
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("test-db"),
-		Engine:               ptrString("mysql"),
-		MultiAZ:              ptrBool(false),
+		DBInstanceIdentifier: new("test-db"),
+		Engine:               new("mysql"),
+		MultiAZ:              new(false),
 	}
 	res := buildResource("test-db", "test-db", db)
 	cfg := configForType("dbi")
@@ -410,9 +410,9 @@ func TestQA_Detail_Redis_NestedConfigurationEndpoint(t *testing.T) {
 func TestQA_Detail_Redis_NilConfigurationEndpoint(t *testing.T) {
 	ensureNoColor(t)
 	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     ptrString("redis-single"),
-		CacheClusterStatus: ptrString("available"),
-		Engine:             ptrString("redis"),
+		CacheClusterId:     new("redis-single"),
+		CacheClusterStatus: new("available"),
+		Engine:             new("redis"),
 		// ConfigurationEndpoint is nil (single-node cluster)
 	}
 	res := buildResource("redis-single", "redis-single", cluster)
@@ -476,9 +476,9 @@ func TestQA_Detail_DocDB_NestedDBClusterMembers(t *testing.T) {
 func TestQA_Detail_DocDB_EmptyMembers(t *testing.T) {
 	ensureNoColor(t)
 	cluster := docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("docdb-new"),
-		Status:              ptrString("creating"),
-		Engine:              ptrString("dbc"),
+		DBClusterIdentifier: new("docdb-new"),
+		Status:              new("creating"),
+		Engine:              new("dbc"),
 		// DBClusterMembers is nil (newly created)
 	}
 	res := buildResource("docdb-new", "docdb-new", cluster)
@@ -495,10 +495,10 @@ func TestQA_Detail_DocDB_EmptyMembers(t *testing.T) {
 func TestQA_Detail_DocDB_StorageEncryptedFalse(t *testing.T) {
 	ensureNoColor(t)
 	cluster := docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("docdb-unenc"),
-		Status:              ptrString("available"),
-		Engine:              ptrString("dbc"),
-		StorageEncrypted:    ptrBool(false),
+		DBClusterIdentifier: new("docdb-unenc"),
+		Status:              new("available"),
+		Engine:              new("dbc"),
+		StorageEncrypted:    new(false),
 	}
 	res := buildResource("docdb-unenc", "docdb-unenc", cluster)
 	cfg := configForType("dbc")
@@ -557,10 +557,10 @@ func TestQA_Detail_EKS_NestedKubernetesNetworkConfig(t *testing.T) {
 func TestQA_Detail_EKS_NilNetworkConfig(t *testing.T) {
 	ensureNoColor(t)
 	cluster := &ekstypes.Cluster{
-		Name:     ptrString("new-cluster"),
+		Name:     new("new-cluster"),
 		Status:   ekstypes.ClusterStatusCreating,
-		Version:  ptrString("1.29"),
-		Endpoint: ptrString("https://example.eks.amazonaws.com"),
+		Version:  new("1.29"),
+		Endpoint: new("https://example.eks.amazonaws.com"),
 		// KubernetesNetworkConfig is nil
 	}
 	res := buildResource("new-cluster", "new-cluster", cluster)
@@ -631,8 +631,8 @@ func TestQA_Detail_Secrets_Tags(t *testing.T) {
 func TestQA_Detail_Secrets_RotationDisabled(t *testing.T) {
 	ensureNoColor(t)
 	secret := smtypes.SecretListEntry{
-		Name:            ptrString("test-secret"),
-		RotationEnabled: ptrBool(false),
+		Name:            new("test-secret"),
+		RotationEnabled: new(false),
 	}
 	res := buildResource("test-secret", "test-secret", secret)
 	cfg := configForType("secrets")
@@ -647,7 +647,7 @@ func TestQA_Detail_Secrets_RotationDisabled(t *testing.T) {
 func TestQA_Detail_Secrets_MinimalFields(t *testing.T) {
 	ensureNoColor(t)
 	secret := smtypes.SecretListEntry{
-		Name: ptrString("minimal-secret"),
+		Name: new("minimal-secret"),
 		// No description, dates, tags, etc.
 	}
 	res := buildResource("minimal-secret", "minimal-secret", secret)
@@ -664,8 +664,8 @@ func TestQA_Detail_Secrets_MinimalFields(t *testing.T) {
 func TestQA_Detail_Secrets_EmptyTags(t *testing.T) {
 	ensureNoColor(t)
 	secret := smtypes.SecretListEntry{
-		Name: ptrString("no-tags-secret"),
-		ARN:  ptrString("arn:aws:secretsmanager:us-east-1:123:secret:no-tags-secret-XyZ"),
+		Name: new("no-tags-secret"),
+		ARN:  new("arn:aws:secretsmanager:us-east-1:123:secret:no-tags-secret-XyZ"),
 		// Tags is nil
 	}
 	res := buildResource("no-tags-secret", "no-tags-secret", secret)
@@ -691,9 +691,9 @@ func TestQA_Detail_KeyColumnWidth(t *testing.T) {
 	m := newDetailModel(res, "dbi", cfg)
 
 	view := m.View()
-	lines := strings.Split(view, "\n")
+	lines := strings.SplitSeq(view, "\n")
 	// Look for a line with a scalar key-value pair (e.g., Engine: mysql)
-	for _, line := range lines {
+	for line := range lines {
 		if strings.Contains(line, "Engine") && strings.Contains(line, "mysql") {
 			// The key column is padded to 22 chars.
 			// Format: "   " (3-char indent) + key padded to 22 + value
@@ -1096,9 +1096,9 @@ func TestQA_Detail_FixtureSecrets(t *testing.T) {
 func TestQA_Detail_CrossCutting_BooleanYes(t *testing.T) {
 	ensureNoColor(t)
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("bool-yes"),
-		Engine:               ptrString("mysql"),
-		MultiAZ:              ptrBool(true),
+		DBInstanceIdentifier: new("bool-yes"),
+		Engine:               new("mysql"),
+		MultiAZ:              new(true),
 	}
 	res := buildResource("bool-yes", "bool-yes", db)
 	cfg := configForType("dbi")
@@ -1113,9 +1113,9 @@ func TestQA_Detail_CrossCutting_BooleanYes(t *testing.T) {
 func TestQA_Detail_CrossCutting_BooleanNo(t *testing.T) {
 	ensureNoColor(t)
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("bool-no"),
-		Engine:               ptrString("mysql"),
-		MultiAZ:              ptrBool(false),
+		DBInstanceIdentifier: new("bool-no"),
+		Engine:               new("mysql"),
+		MultiAZ:              new(false),
 	}
 	res := buildResource("bool-no", "bool-no", db)
 	cfg := configForType("dbi")
@@ -1494,8 +1494,8 @@ func TestQA_Detail_Resize(t *testing.T) {
 func TestQA_Detail_LongValueNotTruncated(t *testing.T) {
 	ensureNoColor(t)
 	secret := smtypes.SecretListEntry{
-		Name: ptrString("test-secret"),
-		ARN:  ptrString("arn:aws:secretsmanager:us-east-1:123456789012:secret:very/long/path/to/secret-AbCdEfGhIjKl"),
+		Name: new("test-secret"),
+		ARN:  new("arn:aws:secretsmanager:us-east-1:123456789012:secret:very/long/path/to/secret-AbCdEfGhIjKl"),
 	}
 	res := buildResource("test-secret", "test-secret", secret)
 	cfg := configForType("secrets")

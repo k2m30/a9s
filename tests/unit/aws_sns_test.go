@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
@@ -20,10 +20,10 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 		output: &sns.ListTopicsOutput{
 			Topics: []snstypes.Topic{
 				{
-					TopicArn: strPtr("arn:aws:sns:us-east-1:123456789012:my-alerts-topic"),
+					TopicArn: new("arn:aws:sns:us-east-1:123456789012:my-alerts-topic"),
 				},
 				{
-					TopicArn: strPtr("arn:aws:sns:us-east-1:123456789012:prod-notifications"),
+					TopicArn: new("arn:aws:sns:us-east-1:123456789012:prod-notifications"),
 				},
 			},
 		},

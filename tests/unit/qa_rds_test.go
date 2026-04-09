@@ -215,9 +215,9 @@ func TestQA_RDS_ListColumns_NoSeparatorBelowHeaders(t *testing.T) {
 	m := rdsLoadedModelWide(t)
 	out := m.View()
 	plain := stripANSI(out)
-	lines := strings.Split(plain, "\n")
+	lines := strings.SplitSeq(plain, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		stripped := strings.TrimSpace(line)
 		if stripped == "" {
 			continue
@@ -239,9 +239,9 @@ func TestQA_RDS_ListColumns_SpaceAlignedNotPipeSeparated(t *testing.T) {
 	m := rdsLoadedModelWide(t)
 	out := m.View()
 	plain := stripANSI(out)
-	lines := strings.Split(plain, "\n")
+	lines := strings.SplitSeq(plain, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		if strings.Contains(line, "|") {
 			t.Errorf("found pipe character in RDS list output: %q", line)
 		}
@@ -466,8 +466,8 @@ func TestQA_RDS_EdgeCase_CreatingInstanceNoEndpoint(t *testing.T) {
 	}
 
 	// It should NOT show "null" or "<nil>".
-	lines := strings.Split(plain, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(plain, "\n")
+	for line := range lines {
 		if strings.Contains(line, "creating-db") {
 			if strings.Contains(line, "<nil>") || strings.Contains(line, "null") {
 				t.Errorf("creating instance row should not show <nil> or null: %q", line)
@@ -956,13 +956,13 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 		EngineVersion:        &engineVersion,
 		DBInstanceStatus:     &status,
 		DBInstanceClass:      &class,
-		MultiAZ:              boolPtr(true),
-		AllocatedStorage:     int32Val(100),
+		MultiAZ:              new(true),
+		AllocatedStorage:     new(int32(100)),
 		StorageType:          &storageType,
 		AvailabilityZone:     &az,
 		Endpoint: &rdstypes.Endpoint{
-			Address: strPointer("prod-db-01.abc123.us-east-1.rds.amazonaws.com"),
-			Port:    int32Val(3306),
+			Address: new("prod-db-01.abc123.us-east-1.rds.amazonaws.com"),
+			Port:    new(int32(3306)),
 		},
 	}
 
@@ -1142,13 +1142,13 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 		EngineVersion:        &engineVersion,
 		DBInstanceStatus:     &status,
 		DBInstanceClass:      &class,
-		MultiAZ:              boolPtr(true),
-		AllocatedStorage:     int32Val(200),
+		MultiAZ:              new(true),
+		AllocatedStorage:     new(int32(200)),
 		StorageType:          &storageType,
 		AvailabilityZone:     &az,
 		Endpoint: &rdstypes.Endpoint{
-			Address: strPointer("test-yaml-db.abc123.us-east-1.rds.amazonaws.com"),
-			Port:    int32Val(5432),
+			Address: new("test-yaml-db.abc123.us-east-1.rds.amazonaws.com"),
+			Port:    new(int32(5432)),
 		},
 	}
 
@@ -1439,6 +1439,11 @@ func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
 // Small helper functions (local to this file to avoid conflicts)
 // ===========================================================================
 
-func strPointer(s string) *string { return &s }
-func boolPtr(b bool) *bool        { return &b }
-func int32Val(i int32) *int32     { return &i }
+//go:fix inline
+func strPointer(s string) *string { return new(s) }
+
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
+
+//go:fix inline
+func int32Val(i int32) *int32 { return new(i) }

@@ -13,7 +13,9 @@ import (
 )
 
 // float64Ptr returns a pointer to the given float64 value.
-func float64Ptr(v float64) *float64 { return &v }
+//
+//go:fix inline
+func float64Ptr(v float64) *float64 { return new(v) }
 
 // ---------------------------------------------------------------------------
 // CloudWatch Alarms fetcher tests
@@ -28,7 +30,7 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 					StateValue:         cwtypes.StateValueAlarm,
 					MetricName:         aws.String("CPUUtilization"),
 					Namespace:          aws.String("AWS/EC2"),
-					Threshold:          float64Ptr(80.0),
+					Threshold:          new(80.0),
 					ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
 					Statistic:          cwtypes.StatisticAverage,
 					AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:high-cpu-alarm"),
@@ -42,7 +44,7 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 					StateValue:         cwtypes.StateValueOk,
 					MetricName:         aws.String("DiskReadOps"),
 					Namespace:          aws.String("AWS/EC2"),
-					Threshold:          float64Ptr(100.0),
+					Threshold:          new(100.0),
 					ComparisonOperator: cwtypes.ComparisonOperatorLessThanThreshold,
 					Statistic:          cwtypes.StatisticSum,
 					AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:low-disk-alarm"),

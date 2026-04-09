@@ -37,34 +37,34 @@ var secretDescPool = []string{
 func NewSecretsFixtures() *SecretsFixtures {
 	secrets := []smtypes.SecretListEntry{
 		{
-			Name:             aws.String("prod/docdb/acme-docdb-prod"),
-			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),
-			Description:      aws.String("DocumentDB cluster credentials for acme-docdb-prod"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC)),
-			RotationEnabled:  aws.Bool(true),
-			CreatedDate:      aws.Time(time.Date(2025, 2, 5, 9, 0, 0, 0, time.UTC)),
-			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
-			LastRotatedDate:  aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
+			Name:              aws.String("prod/docdb/acme-docdb-prod"),
+			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),
+			Description:       aws.String("DocumentDB cluster credentials for acme-docdb-prod"),
+			LastAccessedDate:  aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:   aws.Time(time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:   aws.Bool(true),
+			CreatedDate:       aws.Time(time.Date(2025, 2, 5, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			LastRotatedDate:   aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
 			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"),
-			PrimaryRegion:    aws.String("us-east-1"),
-			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
-			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+			PrimaryRegion:     aws.String("us-east-1"),
+			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
+			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
 		{
-			Name:             aws.String("prod/database/primary"),
-			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"),
-			Description:      aws.String("Aurora PostgreSQL primary connection string"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC)),
-			RotationEnabled:  aws.Bool(true),
-			CreatedDate:      aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
-			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
-			LastRotatedDate:  aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
-			PrimaryRegion:    aws.String("us-east-1"),
+			Name:              aws.String("prod/database/primary"),
+			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"),
+			Description:       aws.String("Aurora PostgreSQL primary connection string"),
+			LastAccessedDate:  aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:   aws.Time(time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:   aws.Bool(true),
+			CreatedDate:       aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
+			KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			LastRotatedDate:   aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
+			PrimaryRegion:     aws.String("us-east-1"),
 			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-db-credentials"),
-			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
-			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
+			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
 		{
 			Name:             aws.String("prod/api/stripe-key"),
@@ -95,7 +95,7 @@ func NewSecretsFixtures() *SecretsFixtures {
 		},
 	}
 
-	for i := 0; i < 18; i++ {
+	for i := range 18 {
 		name := secretNamePool[i]
 		desc := secretDescPool[i]
 		rotation := i%3 == 0
@@ -117,11 +117,11 @@ func NewSecretsFixtures() *SecretsFixtures {
 	return &SecretsFixtures{
 		Secrets: secrets,
 		SecretValues: map[string]string{
-			"prod/docdb/acme-docdb-prod":  `{"username":"admin","password":"[REDACTED]"}`,
-			"prod/database/primary":       `{"host":"prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com","port":"5432","username":"appuser","password":"[REDACTED]"}`,
-			"prod/api/stripe-key":         `{"api_key":"[REDACTED]"}`,
-			"prod/redis/auth-token":       `{"auth_token":"[REDACTED]"}`,
-			"staging/database/mysql":      `{"host":"staging-mysql.c9xyz456.us-east-1.rds.amazonaws.com","port":"3306","username":"staginguser","password":"[REDACTED]"}`,
+			"prod/docdb/acme-docdb-prod": `{"username":"admin","password":"[REDACTED]"}`,
+			"prod/database/primary":      `{"host":"prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com","port":"5432","username":"appuser","password":"[REDACTED]"}`,
+			"prod/api/stripe-key":        `{"api_key":"[REDACTED]"}`,
+			"prod/redis/auth-token":      `{"auth_token":"[REDACTED]"}`,
+			"staging/database/mysql":     `{"host":"staging-mysql.c9xyz456.us-east-1.rds.amazonaws.com","port":"3306","username":"staginguser","password":"[REDACTED]"}`,
 		},
 	}
 }

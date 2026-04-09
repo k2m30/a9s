@@ -259,10 +259,11 @@ Spin off `a9s-qa` and `a9s-coder` simultaneously with their respective task spec
 ### Step 5.1: Verify after both complete
 
 ```bash
-go test ./tests/unit/ -count=1 -timeout 120s
-golangci-lint run ./...
-govulncheck ./...
-go build -o a9s ./cmd/a9s/
+make test
+make lint
+make security
+make gofix
+make build
 ```
 
 All four must pass. If tests fail, identify whether it's a coder bug or a QA bug and dispatch a fix to the appropriate agent with exact scope.

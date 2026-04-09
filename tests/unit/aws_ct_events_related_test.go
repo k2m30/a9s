@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -249,7 +250,6 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // FetchFilter propagation: checkIAMUserCtEvents (iam-user → ct-events)
 // ---------------------------------------------------------------------------
@@ -416,8 +416,8 @@ func ec2CtEventsCheckerByTarget(t *testing.T) resource.RelatedChecker {
 func TestRelated_CtEvents_EC2_FetchFilterSet(t *testing.T) {
 	instanceID := "i-0abcdef1234567890"
 	eventRes := resource.Resource{
-		ID:        "evt-ec2-001",
-		Fields:    map[string]string{"resource_name": instanceID},
+		ID:     "evt-ec2-001",
+		Fields: map[string]string{"resource_name": instanceID},
 		RawStruct: cloudtrailtypes.Event{
 			Resources: []cloudtrailtypes.Resource{
 				{
@@ -621,13 +621,7 @@ func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 		if def.TargetType == "ct-events" {
 			continue // skip self-pivots — covered by TestCtEventsRelatedGroups_PivotsRegistered
 		}
-		found := false
-		for _, e := range expected {
-			if def.TargetType == e {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(expected, def.TargetType)
 		if !found {
 			unexpected = append(unexpected, def.TargetType)
 		}
@@ -736,7 +730,7 @@ func TestRelated_CtEvents_Role_AssumedRole_NotRoleType(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: cloudtrailtypes.Event{
 			EventId:         aws.String("evt-iam-user-type-001"),
-			Username:        aws.String("alice"),        // no "/" — would match service role path check
+			Username:        aws.String("alice"), // no "/" — would match service role path check
 			CloudTrailEvent: aws.String(ctEventJSON),
 			Resources:       []cloudtrailtypes.Resource{},
 		},

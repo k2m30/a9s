@@ -39,7 +39,7 @@ func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
 
 	d := makePreviewEC2Detail(t, 120, 35)
 	// Move to VpcId.
-	for i := 0; i < 80; i++ {
+	for range 80 {
 		if strings.Contains(findSelectedLine(d.View()), "VpcId:") {
 			break
 		}

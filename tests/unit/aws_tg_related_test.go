@@ -30,10 +30,10 @@ func tgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 }
 
 const (
-	tgTestARN      = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
-	tgTestELBARN   = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/def456"
-	tgOtherELBARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/other-alb/999999"
-	tgOtherTGARN   = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-tg/xyz789"
+	tgTestARN     = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
+	tgTestELBARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/def456"
+	tgOtherELBARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/other-alb/999999"
+	tgOtherTGARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-tg/xyz789"
 )
 
 // tgSrcResource returns a canonical test resource for the TG.
@@ -51,7 +51,7 @@ func tgSrcResource() resource.Resource {
 		RawStruct: elbv2types.TargetGroup{
 			TargetGroupArn:   &tgARN,
 			LoadBalancerArns: []string{tgTestELBARN},
-			VpcId:            strPtr("vpc-abc123"),
+			VpcId:            new("vpc-abc123"),
 		},
 	}
 }
@@ -212,7 +212,7 @@ func TestRelated_TG_Alarm_Match(t *testing.T) {
 			ID: "tg-unhealthy-alarm",
 			RawStruct: cwtypes.MetricAlarm{
 				Dimensions: []cwtypes.Dimension{
-					{Name: strPtr("TargetGroup"), Value: strPtr(tgARNSuffix)},
+					{Name: new("TargetGroup"), Value: new(tgARNSuffix)},
 				},
 			},
 		}}},
@@ -233,7 +233,7 @@ func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
 			ID: "other-alarm",
 			RawStruct: cwtypes.MetricAlarm{
 				Dimensions: []cwtypes.Dimension{
-					{Name: strPtr("TargetGroup"), Value: strPtr("targetgroup/other-tg/xyz789")},
+					{Name: new("TargetGroup"), Value: new("targetgroup/other-tg/xyz789")},
 				},
 			},
 		}}},

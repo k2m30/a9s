@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -81,8 +82,8 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:5",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -190,8 +191,8 @@ func TestFetchEcsSvcLogs_NonAwslogsDriver(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"fluentd-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/fluentd-task:1",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error for non-awslogs driver, got nil")
 	}
@@ -220,8 +221,8 @@ func TestFetchEcsSvcLogs_NoContainers(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"no-containers-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/empty-task:1",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error for empty containers, got nil")
 	}
@@ -243,8 +244,8 @@ func TestFetchEcsSvcLogs_DescribeTaskDefinitionError(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/missing-task:1",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -286,8 +287,8 @@ func TestFetchEcsSvcLogs_FilterLogEventsError(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"throttled-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:5",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -340,8 +341,8 @@ func TestFetchEcsSvcLogs_TimestampFormatting(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/ts-cluster",
 		"ts-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/ts-task:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -407,8 +408,8 @@ func TestFetchEcsSvcLogs_NewlineStripping(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nl-cluster",
 		"nl-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/nl-task:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -465,8 +466,8 @@ func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nil-cluster",
 		"nil-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/nil-task:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -545,8 +546,8 @@ func TestFetchEcsSvcLogs_StreamShortComputation(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/ss-cluster",
 		"ss-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/ss-task:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -610,8 +611,8 @@ func TestFetchEcsSvcLogs_RawStruct(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/raw-cluster",
 		"raw-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/raw-task:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -767,8 +768,8 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod",
 		"web-service",
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web:1",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -838,13 +839,7 @@ func TestEcsSvcLogs_TaskDefinitionFieldOnParent(t *testing.T) {
 		t.Fatal("ecs-svc field keys not registered")
 	}
 
-	found := false
-	for _, key := range fieldKeys {
-		if key == "task_definition" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(fieldKeys, "task_definition")
 	if !found {
 		t.Error("ecs-svc field keys should include 'task_definition' for ecs_svc_logs context")
 	}

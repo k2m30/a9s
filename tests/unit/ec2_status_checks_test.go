@@ -50,7 +50,7 @@ func ec2ListModelWithResources(t *testing.T, resources []resource.Resource) tui.
 // rowContaining returns the first rendered line (with ANSI intact) that
 // contains the given plain-text substring, or "" if not found.
 func rowContaining(content, substr string) string {
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		if strings.Contains(stripANSI(line), substr) {
 			return line
 		}
@@ -97,7 +97,7 @@ func TestEC2StatusChecks_List_ImpairedBangHasANSI(t *testing.T) {
 
 	// Find a row that contains "! running" in its plain text.
 	var bangLine string
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		if strings.Contains(stripANSI(line), "! running") {
 			bangLine = line
 			break
@@ -135,7 +135,7 @@ func TestEC2StatusChecks_List_InitializingTildeHasANSI(t *testing.T) {
 	content := rootViewContent(m)
 
 	var tildeLine string
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		if strings.Contains(stripANSI(line), "~ running") {
 			tildeLine = line
 			break

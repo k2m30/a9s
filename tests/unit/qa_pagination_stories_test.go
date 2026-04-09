@@ -73,10 +73,7 @@ func newStoryEC2PaginatedMock(total, pageSize int) *storyEC2PaginatedMock {
 	remaining := total
 	pageNum := 0
 	for remaining > 0 {
-		count := pageSize
-		if count > remaining {
-			count = remaining
-		}
+		count := min(pageSize, remaining)
 		instances := make([]ec2types.Instance, count)
 		for i := range count {
 			idx := pageNum*pageSize + i
@@ -159,10 +156,7 @@ func newStoryLambdaPaginatedMock(total, pageSize int) *storyLambdaPaginatedMock 
 	remaining := total
 	pageNum := 0
 	for remaining > 0 {
-		count := pageSize
-		if count > remaining {
-			count = remaining
-		}
+		count := min(pageSize, remaining)
 		funcs := make([]lambdatypes.FunctionConfiguration, count)
 		for i := range count {
 			idx := pageNum*pageSize + i
@@ -238,10 +232,7 @@ func newStoryRDSPaginatedMock(total, pageSize int) *storyRDSPaginatedMock {
 	remaining := total
 	pageNum := 0
 	for remaining > 0 {
-		count := pageSize
-		if count > remaining {
-			count = remaining
-		}
+		count := min(pageSize, remaining)
 		instances := make([]rdstypes.DBInstance, count)
 		for i := range count {
 			idx := pageNum*pageSize + i
@@ -315,10 +306,7 @@ func newStoryIAMRolesPaginatedMock(total, pageSize int) *storyIAMRolesPaginatedM
 	remaining := total
 	pageNum := 0
 	for remaining > 0 {
-		count := pageSize
-		if count > remaining {
-			count = remaining
-		}
+		count := min(pageSize, remaining)
 		roles := make([]iamtypes.Role, count)
 		for i := range count {
 			idx := pageNum*pageSize + i
@@ -393,10 +381,7 @@ func newStoryCWLogsPaginatedMock(total, pageSize int) *storyCWLogsPaginatedMock 
 	remaining := total
 	pageNum := 0
 	for remaining > 0 {
-		count := pageSize
-		if count > remaining {
-			count = remaining
-		}
+		count := min(pageSize, remaining)
 		groups := make([]cwlogstypes.LogGroup, count)
 		for i := range count {
 			idx := pageNum*pageSize + i

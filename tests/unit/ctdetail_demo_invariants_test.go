@@ -187,7 +187,6 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
-		res := res
 		t.Run(res.ID, func(t *testing.T) {
 			parsed := parseCTEventForFixture(t, res)
 			sections := ctdetail.BuildSections(parsed)
@@ -303,13 +302,11 @@ func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
 	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
-		res := res
 		t.Run(res.ID, func(t *testing.T) {
 			isRoot := isRootFixture(res)
 			isAWSService := isAWSServiceFixture(res)
 
 			for _, nf := range navFields {
-				nf := nf
 				fieldVal := res.Fields[nf.FieldPath]
 
 				rowLabel := fmt.Sprintf("event=%s field=%s targetType=%s value=%q",
@@ -386,7 +383,6 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
-		res := res
 		t.Run(res.ID, func(t *testing.T) {
 			results := ctEventsRealCheckerResults(res, cache)
 			isRoot := isRootFixture(res)
@@ -398,7 +394,6 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 			}
 
 			for _, result := range results {
-				result := result
 				rowLabel := fmt.Sprintf("event=%s targetType=%s count=%d fetchFilter=%v ids=%v",
 					res.ID, result.TargetType, result.Count, result.FetchFilter, result.ResourceIDs)
 
@@ -414,8 +409,8 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 					for _, rid := range result.ResourceIDs {
 						// Strip compound key to first segment for child types.
 						lookupID := rid
-						if idx := strings.Index(rid, "|"); idx >= 0 {
-							lookupID = rid[:idx]
+						if before, _, ok := strings.Cut(rid, "|"); ok {
+							lookupID = before
 						}
 						if len(fixtureIDs) > 0 && !fixtureIDs[rid] {
 							// Try the stripped ID (for s3_objects composite keys).
@@ -491,7 +486,6 @@ func TestCtEventsDemoRightColumnCheckers_RealCheckers(t *testing.T) {
 	ctx := context.Background()
 
 	for _, res := range fixtures {
-		res := res
 		if !isRootFixture(res) {
 			continue
 		}

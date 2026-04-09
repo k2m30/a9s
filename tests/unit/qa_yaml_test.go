@@ -675,7 +675,7 @@ func TestQA_YAML_FrameTitle_AllTypes(t *testing.T) {
 
 	cases := []testCase{
 		{"S3", s3, s3.Name},
-		{"EC2_NoName", ec2, ec2.ID},       // Name is empty, uses ID
+		{"EC2_NoName", ec2, ec2.ID}, // Name is empty, uses ID
 		{"EC2_Named", ec2Named, ec2Named.Name},
 		{"RDS", rds, rds.Name},
 		{"Redis", redis, redis.Name},
@@ -967,8 +967,8 @@ func TestQA_YAML_NumericColoring(t *testing.T) {
 	}
 
 	// Verify that numbers are colored (have ANSI codes around them)
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(out, "\n")
+	for line := range lines {
 		stripped := stripANSI(line)
 		if strings.Contains(stripped, ": 5432") {
 			if !strings.Contains(line, "\x1b[") {
@@ -1113,8 +1113,8 @@ func TestQA_YAML_EmptyArray(t *testing.T) {
 
 	raw := fakeDocDB{
 		ClusterID:       "docdb-cluster",
-		AssociatedRoles: []string{},                       // empty, will be omitted
-		ActiveRoles:     []string{"reader", "readWrite"},  // non-empty, will appear
+		AssociatedRoles: []string{},                      // empty, will be omitted
+		ActiveRoles:     []string{"reader", "readWrite"}, // non-empty, will appear
 	}
 	res := resource.Resource{
 		ID:        "docdb-cluster",

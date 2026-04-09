@@ -46,7 +46,8 @@ import (
 // Given: a target type whose paginated fetcher returns a first page with NextToken
 // When:  a related checker cold-misses and triggers a prefetch (NeedsTargetCache=true)
 // Then:  the RelatedCheckResultMsg.CachedPages entry carries the full Pagination
-//        (including NextToken), not a synthetic PaginationMeta with an empty token
+//
+//	(including NextToken), not a synthetic PaginationMeta with an empty token
 func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	const (
 		srcType    = "_t237_src"
@@ -499,11 +500,9 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		if cmd == nil {
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			cmd()
-		}()
+		})
 	}
 
 	// Allow checkers to start and stabilize, then release the gate.

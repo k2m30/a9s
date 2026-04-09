@@ -47,13 +47,12 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -134,13 +133,12 @@ func TestFetchLogStreams_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/empty", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/empty", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
@@ -152,13 +150,12 @@ func TestFetchLogStreams_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/err", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/err", "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d", len(resources))
 	}
@@ -301,13 +298,12 @@ func TestFetchLogStreams_TimestampFormatting(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/ts", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/ts", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -347,13 +343,12 @@ func TestFetchLogStreams_NilFields(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/nil", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/nil", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -401,13 +396,12 @@ func TestFetchLogStreams_RawStruct(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/test", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/test", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -482,9 +476,9 @@ func TestFetchLogStreams_MaxResults(t *testing.T) {
 	// Build a mock that returns 20 pages of 50 streams each (1000 total).
 	// The fetcher should stop well before exhausting all pages.
 	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
-	for page := 0; page < 20; page++ {
+	for page := range 20 {
 		var streams []cwlogstypes.LogStream
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			streams = append(streams, cwlogstypes.LogStream{
 				LogStreamName:      aws.String(fmt.Sprintf("stream-p%d-s%d", page, i)),
 				LastEventTimestamp: aws.Int64(1711065600000),
@@ -500,13 +494,12 @@ func TestFetchLogStreams_MaxResults(t *testing.T) {
 	}
 
 	mock := &mockCWLogsDescribeLogStreamsClient{outputs: outputs}
-	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/huge-group", "",
-)
+	result, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/huge-group", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	// Should cap at a reasonable limit (e.g., 500) instead of loading all 1000
 	if len(resources) > 500 {
@@ -537,8 +530,7 @@ func TestFetchLogStreams_ContinuationToken(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchLogStreams(context.Background(), wrapper, "/aws/lambda/my-func", "my-continuation-token",
-	)
+	result, err := awsclient.FetchLogStreams(context.Background(), wrapper, "/aws/lambda/my-func", "my-continuation-token")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

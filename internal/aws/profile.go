@@ -54,9 +54,9 @@ func parseConfigProfiles(path string, seen map[string]bool) error {
 	}
 
 	cfg, err := ini.LoadSources(ini.LoadOptions{
-		Insensitive:  false,
-		AllowShadows:  true,
-		Loose:        true,
+		Insensitive:     false,
+		AllowShadows:    true,
+		Loose:           true,
 		InsensitiveKeys: true,
 	}, path)
 	if err != nil {
@@ -74,8 +74,8 @@ func parseConfigProfiles(path string, seen map[string]bool) error {
 			continue
 		}
 		// Config file uses "profile <name>" prefix
-		if strings.HasPrefix(name, "profile ") {
-			profileName := strings.TrimPrefix(name, "profile ")
+		if after, ok := strings.CutPrefix(name, "profile "); ok {
+			profileName := after
 			if profileName != "" {
 				seen[profileName] = true
 			}
@@ -86,4 +86,3 @@ func parseConfigProfiles(path string, seen map[string]bool) error {
 
 	return nil
 }
-

@@ -43,12 +43,12 @@ var ddbNamePool = []string{
 func buildDynamoDBTables() []*ddbtypes.TableDescription {
 	named := []*ddbtypes.TableDescription{
 		{
-			TableName:      aws.String("acme-orders"),
-			TableStatus:    ddbtypes.TableStatusActive,
-			TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"),
-			TableId:        aws.String("a1b2c3d4-0000-1111-2222-333333333333"),
-			ItemCount:      aws.Int64(2458103),
-			TableSizeBytes: aws.Int64(1073741824),
+			TableName:        aws.String("acme-orders"),
+			TableStatus:      ddbtypes.TableStatusActive,
+			TableArn:         aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"),
+			TableId:          aws.String("a1b2c3d4-0000-1111-2222-333333333333"),
+			ItemCount:        aws.Int64(2458103),
+			TableSizeBytes:   aws.Int64(1073741824),
 			CreationDateTime: aws.Time(mustTime("2025-02-10T09:00:00Z")),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModePayPerRequest,
@@ -76,12 +76,12 @@ func buildDynamoDBTables() []*ddbtypes.TableDescription {
 			},
 		},
 		{
-			TableName:      aws.String("acme-sessions"),
-			TableStatus:    ddbtypes.TableStatusActive,
-			TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-sessions"),
-			TableId:        aws.String("b2c3d4e5-0000-1111-2222-333333333333"),
-			ItemCount:      aws.Int64(145230),
-			TableSizeBytes: aws.Int64(52428800),
+			TableName:        aws.String("acme-sessions"),
+			TableStatus:      ddbtypes.TableStatusActive,
+			TableArn:         aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-sessions"),
+			TableId:          aws.String("b2c3d4e5-0000-1111-2222-333333333333"),
+			ItemCount:        aws.Int64(145230),
+			TableSizeBytes:   aws.Int64(52428800),
 			CreationDateTime: aws.Time(mustTime("2025-03-01T10:00:00Z")),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModePayPerRequest,
@@ -98,12 +98,12 @@ func buildDynamoDBTables() []*ddbtypes.TableDescription {
 			},
 		},
 		{
-			TableName:      aws.String("acme-inventory"),
-			TableStatus:    ddbtypes.TableStatusActive,
-			TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-inventory"),
-			TableId:        aws.String("c3d4e5f6-0000-1111-2222-333333333333"),
-			ItemCount:      aws.Int64(89450),
-			TableSizeBytes: aws.Int64(104857600),
+			TableName:        aws.String("acme-inventory"),
+			TableStatus:      ddbtypes.TableStatusActive,
+			TableArn:         aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-inventory"),
+			TableId:          aws.String("c3d4e5f6-0000-1111-2222-333333333333"),
+			ItemCount:        aws.Int64(89450),
+			TableSizeBytes:   aws.Int64(104857600),
 			CreationDateTime: aws.Time(mustTime("2025-01-15T08:00:00Z")),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModeProvisioned,
@@ -123,12 +123,12 @@ func buildDynamoDBTables() []*ddbtypes.TableDescription {
 			},
 		},
 		{
-			TableName:      aws.String("acme-audit-log"),
-			TableStatus:    ddbtypes.TableStatusActive,
-			TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-audit-log"),
-			TableId:        aws.String("d4e5f6a7-0000-1111-2222-333333333333"),
-			ItemCount:      aws.Int64(9823741),
-			TableSizeBytes: aws.Int64(5368709120),
+			TableName:        aws.String("acme-audit-log"),
+			TableStatus:      ddbtypes.TableStatusActive,
+			TableArn:         aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-audit-log"),
+			TableId:          aws.String("d4e5f6a7-0000-1111-2222-333333333333"),
+			ItemCount:        aws.Int64(9823741),
+			TableSizeBytes:   aws.Int64(5368709120),
 			CreationDateTime: aws.Time(mustTime("2024-06-01T07:00:00Z")),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModePayPerRequest,
@@ -149,15 +149,15 @@ func buildDynamoDBTables() []*ddbtypes.TableDescription {
 	}
 
 	// Generate 18 more tables to reach 22 total.
-	for i := 0; i < 18; i++ {
+	for i := range 18 {
 		name := ddbNamePool[i]
 		named = append(named, &ddbtypes.TableDescription{
-			TableName:      aws.String(name),
-			TableStatus:    ddbtypes.TableStatusActive,
-			TableArn:       aws.String(fmt.Sprintf("arn:aws:dynamodb:us-east-1:123456789012:table/%s", name)),
-			TableId:        aws.String(fmt.Sprintf("e5f6a7b8-00%02d-1111-2222-333333333333", i)),
-			ItemCount:      aws.Int64(int64(1000 + i*500)),
-			TableSizeBytes: aws.Int64(int64(1048576 * (i + 1))),
+			TableName:        aws.String(name),
+			TableStatus:      ddbtypes.TableStatusActive,
+			TableArn:         aws.String(fmt.Sprintf("arn:aws:dynamodb:us-east-1:123456789012:table/%s", name)),
+			TableId:          aws.String(fmt.Sprintf("e5f6a7b8-00%02d-1111-2222-333333333333", i)),
+			ItemCount:        aws.Int64(int64(1000 + i*500)),
+			TableSizeBytes:   aws.Int64(int64(1048576 * (i + 1))),
 			CreationDateTime: aws.Time(mustTime(fmt.Sprintf("2025-%02d-%02dT09:00:00Z", 1+(i%12), 1+(i%28)))),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModePayPerRequest,

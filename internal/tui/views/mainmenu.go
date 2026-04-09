@@ -1,6 +1,7 @@
 package views
 
 import (
+	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -79,17 +80,11 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 			m.scroll.Bottom()
 			m.skipUnavailable(-1)
 		case key.Matches(msg, m.keys.PageUp):
-			pageSize := m.height - 1
-			if pageSize < 1 {
-				pageSize = 1
-			}
+			pageSize := max(m.height-1, 1)
 			m.scroll.PageUp(pageSize)
 			m.skipUnavailable(-1)
 		case key.Matches(msg, m.keys.PageDown):
-			pageSize := m.height - 1
-			if pageSize < 1 {
-				pageSize = 1
-			}
+			pageSize := max(m.height-1, 1)
 			m.scroll.PageDown(pageSize)
 			m.skipUnavailable(+1)
 		case key.Matches(msg, m.keys.Enter):
@@ -253,10 +248,7 @@ func (m MainMenuModel) View() string {
 		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
 
 		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.
-		nameFieldW := m.width - 4 - aliasW - 3
-		if nameFieldW < 10 {
-			nameFieldW = 10
-		}
+		nameFieldW := max(m.width-4-aliasW-3, 10)
 		if rl.itemIndex == m.scroll.Cursor() {
 			// Build name with count suffix if known
 			nameStr := item.Name
@@ -390,9 +382,7 @@ func (m *MainMenuModel) GetAvailability() map[string]int {
 		return nil
 	}
 	cp := make(map[string]int, len(m.availability))
-	for k, v := range m.availability {
-		cp[k] = v
-	}
+	maps.Copy(cp, m.availability)
 	return cp
 }
 
@@ -411,9 +401,7 @@ func (m *MainMenuModel) GetTruncated() map[string]bool {
 		return nil
 	}
 	cp := make(map[string]bool, len(m.truncated))
-	for k, v := range m.truncated {
-		cp[k] = v
-	}
+	maps.Copy(cp, m.truncated)
 	return cp
 }
 

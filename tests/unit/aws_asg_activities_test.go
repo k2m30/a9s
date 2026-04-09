@@ -40,7 +40,7 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 					StartTime:             &ts,
 					EndTime:               &endTs,
 					StatusCode:            asgtypes.ScalingActivityStatusCodeSuccessful,
-					StatusMessage:          aws.String(""),
+					StatusMessage:         aws.String(""),
 					Progress:              &progress,
 				},
 			},
@@ -55,8 +55,8 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -156,8 +156,8 @@ func TestFetchAsgActivities_Empty(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -180,8 +180,8 @@ func TestFetchAsgActivities_APIError(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -220,8 +220,8 @@ func TestFetchAsgActivities_NilOptionalFields(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -273,8 +273,8 @@ func TestFetchAsgActivities_NewlineStripping(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -325,8 +325,8 @@ func TestFetchAsgActivities_TimestampFormatting(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -377,8 +377,8 @@ func TestFetchAsgActivities_RawStruct(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -632,7 +632,7 @@ func TestFetchAsgActivities_LargePage(t *testing.T) {
 
 	// Build one page of 50 activities with a NextToken indicating more pages exist.
 	var activities []asgtypes.Activity
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		actTs := ts.Add(time.Duration(i) * time.Second)
 		activities = append(activities, asgtypes.Activity{
 			ActivityId:           aws.String(fmt.Sprintf("act-p0-%d", i)),

@@ -97,8 +97,9 @@ func newCTDetailModel(t *testing.T, res resource.Resource) views.DetailModel {
 // renders as bold text containing "ACTOR", without a trailing colon, on its own line.
 //
 // The contract (ctdetail-api.md §Renderer contract) specifies:
-//   case item.IsSection:
-//       line = " " + lipgloss.NewStyle().Bold(true).Render(item.Key)
+//
+//	case item.IsSection:
+//	    line = " " + lipgloss.NewStyle().Bold(true).Render(item.Key)
 //
 // Without T028, buildFieldList never produces FieldItem{IsSection:true},
 // so this test fails because "ACTOR" is absent from the rendered output.
@@ -168,13 +169,13 @@ func TestDetailRenderSection_NoColorOnHeader(t *testing.T) {
 	// The viewport may render a │ separator after the content when the right column
 	// is visible. We locate the line by stripping ANSI and checking the left portion
 	// (before │) equals "ACTION".
-	lines := strings.Split(view, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(view, "\n")
+	for line := range lines {
 		plain := stripANSI(line)
 		// Extract just the left-column text (before │ separator).
 		leftPlain := plain
-		if idx := strings.Index(plain, "│"); idx != -1 {
-			leftPlain = plain[:idx]
+		if before, _, ok := strings.Cut(plain, "│"); ok {
+			leftPlain = before
 		}
 		if strings.TrimSpace(leftPlain) != "ACTION" {
 			continue
@@ -227,7 +228,8 @@ func TestDetailRenderSection_NoColorOnHeader(t *testing.T) {
 
 // TestDetailRenderSection_CursorSkipsIsSection asserts that the cursor never lands
 // on a row with IsSection == true. From the contract:
-//   "IsSection items are skipped by cursorNext/cursorPrev the same way IsHeader items are."
+//
+//	"IsSection items are skipped by cursorNext/cursorPrev the same way IsHeader items are."
 //
 // Strategy: navigate down past the initial rows using repeated 'j' presses through
 // Update. The cursor position (tracked by FieldCursor()) must never coincide with
@@ -247,7 +249,7 @@ func TestDetailRenderSection_CursorSkipsIsSection(t *testing.T) {
 
 	// Press 'j' ten times to move the cursor down through multiple rows.
 	jPress := tea.KeyPressMsg{Code: -1, Text: "j"}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		updated, _ := m.Update(jPress)
 		m = updated
 	}
@@ -266,7 +268,7 @@ func TestDetailRenderSection_CursorSkipsIsSection(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	m2 := newCTDetailModel(t, res)
 	jPress2 := tea.KeyPressMsg{Code: -1, Text: "j"}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		updated, _ := m2.Update(jPress2)
 		m2 = updated
 	}

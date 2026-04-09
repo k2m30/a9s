@@ -58,7 +58,7 @@ Execute **CODER STEPS 1-7** from the `a9s-add-related-view` skill (auto-loaded a
 4. Demo overrides in `internal/demo/fixtures_related.go` (append)
 5. Verify parent resource Fields populate the referenced FieldPath keys
 6. Verify navigable field paths match detail view output
-7. Post-implementation verification: `go test`, `golangci-lint run ./...`, `go build`
+7. Post-implementation verification: `make test`, `make lint`, `make gofix`, `make build`
 
 Steps 5-7 MUST pass before reporting completion.
 

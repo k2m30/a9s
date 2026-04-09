@@ -42,7 +42,7 @@ type ResourceCacheEntry struct {
 type ResourceCache map[string]ResourceCacheEntry
 
 // RelatedChecker returns a count of related resources of a specific type.
-type RelatedChecker func(ctx context.Context, clients interface{}, res Resource, cache ResourceCache) RelatedCheckResult
+type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
 
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
@@ -95,4 +95,3 @@ func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
 func UnregisterNavigableFields(shortName string) {
 	delete(navigableFieldRegistry, shortName)
 }
-

@@ -37,7 +37,7 @@ func tgwSrcResource() resource.Resource {
 			"tgw_id": tgwTestID,
 		},
 		RawStruct: ec2types.TransitGateway{
-			TransitGatewayId: strPtr(tgwTestID),
+			TransitGatewayId: new(tgwTestID),
 		},
 	}
 }
@@ -54,7 +54,7 @@ func TestRelated_TGW_RTB_Match(t *testing.T) {
 				ID: "rtb-match",
 				RawStruct: ec2types.RouteTable{
 					Routes: []ec2types.Route{
-						{TransitGatewayId: strPtr(tgwTestID), DestinationCidrBlock: strPtr("10.1.0.0/16")},
+						{TransitGatewayId: new(tgwTestID), DestinationCidrBlock: new("10.1.0.0/16")},
 					},
 				},
 			},
@@ -79,7 +79,7 @@ func TestRelated_TGW_RTB_NoMatch(t *testing.T) {
 				ID: "rtb-other",
 				RawStruct: ec2types.RouteTable{
 					Routes: []ec2types.Route{
-						{TransitGatewayId: strPtr("tgw-different"), DestinationCidrBlock: strPtr("10.2.0.0/16")},
+						{TransitGatewayId: new("tgw-different"), DestinationCidrBlock: new("10.2.0.0/16")},
 					},
 				},
 			},
@@ -130,7 +130,7 @@ func TestRelated_TGW_CFN_HasTag(t *testing.T) {
 		ID: tgwTestID,
 		RawStruct: ec2types.TransitGateway{
 			Tags: []ec2types.Tag{
-				{Key: strPtr("aws:cloudformation:stack-name"), Value: strPtr("network-stack")},
+				{Key: new("aws:cloudformation:stack-name"), Value: new("network-stack")},
 			},
 		},
 	}
@@ -161,4 +161,3 @@ func TestRelated_TGW_CFN_NoTag(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (TGW has no CFN tag)", result.Count)
 	}
 }
-

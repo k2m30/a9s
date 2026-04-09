@@ -249,7 +249,6 @@ func TestRightColumnNoActionableRowsBlocksFocus_AllFixtures(t *testing.T) {
 	}
 
 	for _, fixture := range fixtures {
-		fixture := fixture
 		t.Run(fixture.ID, func(t *testing.T) {
 			d := buildAllZeroDetail(t, fixture)
 

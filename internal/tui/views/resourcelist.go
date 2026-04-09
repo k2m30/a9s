@@ -218,16 +218,10 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Bottom):
 			m.scroll.Bottom()
 		case key.Matches(msg, m.keys.PageUp):
-			pageSize := m.height - 1
-			if pageSize < 1 {
-				pageSize = 1
-			}
+			pageSize := max(m.height-1, 1)
 			m.scroll.PageUp(pageSize)
 		case key.Matches(msg, m.keys.PageDown):
-			pageSize := m.height - 1
-			if pageSize < 1 {
-				pageSize = 1
-			}
+			pageSize := max(m.height-1, 1)
 			m.scroll.PageDown(pageSize)
 		case key.Matches(msg, m.keys.ScrollLeft):
 			if m.hScrollOffset > 0 {
@@ -399,10 +393,7 @@ func (m *ResourceListModel) View() string {
 
 	// Determine visible row count: height minus column header row (1).
 	// Frame borders are already excluded from m.height by the root model.
-	visibleRows := m.height - 1
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
+	visibleRows := max(m.height-1, 1)
 
 	// Reserve one row for the "load more" indicator when paginated and truncated.
 	showLoadMore := m.pagination != nil && m.pagination.IsTruncated

@@ -148,10 +148,11 @@ Follow the spec exactly. Use `/a9s-add-resource` skill for the test steps (8-12 
 ## Running Tests
 
 ```bash
-go test ./tests/unit/ -count=1 -timeout 120s       # all
+make test                                            # all
 go test ./tests/unit/ -run TestResourceList -count=1 -v  # specific
-golangci-lint run ./...                              # lint (must pass before push)
-govulncheck ./...                                    # vuln check (must pass before push)
+make lint                                            # lint (must pass before push)
+make security                                        # vuln check (must pass before push)
+make gofix                                           # inline directives (must pass before push)
 ```
 
 ## Rules
@@ -163,6 +164,6 @@ govulncheck ./...                                    # vuln check (must pass bef
 - Tests go in `tests/unit/` package `unit` (or `unit_test` for external test packages)
 - Use descriptive test names: `TestResourceList_View_StatusColorRunning`
 - When a test fails, report the exact failure message and file:line
-- ALWAYS run `golangci-lint run ./...` after writing tests — test code gets linted too
+- ALWAYS run `make lint` after writing tests — test code gets linted too
 - If a test intentionally discards return values (e.g. crash-verification), use `//nolint:ineffassign,staticcheck // reason` on that line
 - Use exact mock value assertions, NOT `== ""` — catches mapping bugs

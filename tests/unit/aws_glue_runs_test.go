@@ -47,8 +47,8 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 		context.Background(),
 		mock,
 		"etl-daily-load",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -165,8 +165,8 @@ func TestFetchGlueJobRuns_Empty(t *testing.T) {
 		context.Background(),
 		mock,
 		"empty-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -185,8 +185,8 @@ func TestFetchGlueJobRuns_APIError(t *testing.T) {
 		context.Background(),
 		mock,
 		"error-job",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -217,8 +217,8 @@ func TestFetchGlueJobRuns_NilOptionalFields(t *testing.T) {
 		context.Background(),
 		mock,
 		"nil-fields-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -290,8 +290,8 @@ func TestFetchGlueJobRuns_ComputedRunIDShort(t *testing.T) {
 		context.Background(),
 		mock,
 		"truncation-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -349,8 +349,8 @@ func TestFetchGlueJobRuns_ExecutionTimeHuman(t *testing.T) {
 		context.Background(),
 		mock,
 		"duration-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -419,8 +419,8 @@ func TestFetchGlueJobRuns_DPUHours(t *testing.T) {
 		context.Background(),
 		mock,
 		"dpu-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -470,8 +470,8 @@ func TestFetchGlueJobRuns_ErrorMessageNewlineStripping(t *testing.T) {
 		context.Background(),
 		mock,
 		"error-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -666,7 +666,7 @@ func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 
 	// Build one page of 50 runs with a NextToken indicating more pages exist.
 	var runs []gluetypes.JobRun
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		runs = append(runs, gluetypes.JobRun{
 			Id:          aws.String(fmt.Sprintf("run-p0-%d", i)),
 			JobRunState: gluetypes.JobRunStateSucceeded,
@@ -776,8 +776,8 @@ func TestFetchGlueJobRuns_RawStruct(t *testing.T) {
 		context.Background(),
 		mock,
 		"raw-job",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

@@ -58,8 +58,8 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -221,8 +221,8 @@ func TestFetchSFNExecutions_Empty(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -245,8 +245,8 @@ func TestFetchSFNExecutions_APIError(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -535,7 +535,7 @@ func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 
 	// Build one page of 50 executions with a NextToken indicating more pages exist.
 	var executions []sfntypes.ExecutionListItem
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		executions = append(executions, sfntypes.ExecutionListItem{
 			ExecutionArn:    aws.String(fmt.Sprintf("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p0-%d", i)),
 			Name:            aws.String(fmt.Sprintf("exec-p0-%d", i)),
@@ -636,8 +636,8 @@ func TestFetchSFNExecutions_DurationComputed(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -691,8 +691,8 @@ func TestFetchSFNExecutions_DurationRunning(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -752,8 +752,8 @@ func TestFetchSFNExecutions_StatusPreserved(t *testing.T) {
 				context.Background(),
 				mock,
 				parentCtx,
-							"",
-)
+				"",
+			)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}

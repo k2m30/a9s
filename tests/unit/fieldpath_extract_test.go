@@ -41,13 +41,17 @@ type testInstance struct {
 // Helpers
 // ---------------------------------------------------------------------------
 
-func strPtr(s string) *string { return &s }
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
 
-func timePtr(t time.Time) *time.Time { return &t }
+//go:fix inline
+func timePtr(t time.Time) *time.Time { return new(t) }
 
-func int32Ptr(i int32) *int32 { return &i }
+//go:fix inline
+func int32Ptr(i int32) *int32 { return new(i) }
 
 // ---------------------------------------------------------------------------
 // T004 — Dot-path extraction on simple structs
@@ -69,14 +73,14 @@ func TestExtractValue_SimpleStringField(t *testing.T) {
 }
 
 func TestExtractValue_PointerToString(t *testing.T) {
-	inst := testInstance{ID: strPtr("i-abc123")}
+	inst := testInstance{ID: new("i-abc123")}
 
 	val, err := fieldpath.ExtractValue(inst, "instanceId")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// After extraction the pointer should be dereferenced to the underlying string.
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.String() != "i-abc123" {
@@ -108,7 +112,7 @@ func TestExtractValue_NestedStruct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.String() != "running" {
@@ -126,7 +130,7 @@ func TestExtractScalar_SimpleStringField(t *testing.T) {
 }
 
 func TestExtractScalar_PointerToString(t *testing.T) {
-	inst := testInstance{ID: strPtr("i-abc123")}
+	inst := testInstance{ID: new("i-abc123")}
 
 	got := fieldpath.ExtractScalar(inst, "instanceId")
 	if got != "i-abc123" {
@@ -210,7 +214,7 @@ func TestExtractValue_DeeplyNestedThroughPointers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.String() != "us-east-1a" {
@@ -296,7 +300,7 @@ func TestExtractSubtree_SliceReturnsYAML(t *testing.T) {
 }
 
 func TestExtractSubtree_BoolScalar(t *testing.T) {
-	inst := testInstance{MultiAZ: boolPtr(true)}
+	inst := testInstance{MultiAZ: new(true)}
 
 	got := fieldpath.ExtractSubtree(inst, "multiAZ")
 	if got != "Yes" {
@@ -306,7 +310,7 @@ func TestExtractSubtree_BoolScalar(t *testing.T) {
 
 func TestExtractSubtree_TimeScalar(t *testing.T) {
 	ts := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
-	inst := testInstance{LaunchTime: timePtr(ts)}
+	inst := testInstance{LaunchTime: new(ts)}
 
 	got := fieldpath.ExtractSubtree(inst, "launchTime")
 	expected := "2025-06-15 10:30"
@@ -456,7 +460,7 @@ func TestToSafeValue_JSONStringParsedToMap(t *testing.T) {
 
 	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
 
-	m, ok := result.(map[string]interface{})
+	m, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
 	}
@@ -466,7 +470,7 @@ func TestToSafeValue_JSONStringParsedToMap(t *testing.T) {
 		t.Fatalf("ToSafeValue: expected 'jsonData' key in result map, got keys: %v", mapKeys(m))
 	}
 
-	parsed, ok := jsonDataVal.(map[string]interface{})
+	parsed, ok := jsonDataVal.(map[string]any)
 	if !ok {
 		t.Fatalf("ToSafeValue JSON string: expected jsonData to be map[string]interface{} (parsed JSON), got %T: %v", jsonDataVal, jsonDataVal)
 	}
@@ -485,7 +489,7 @@ func TestToSafeValue_JSONStringMalformedFallback(t *testing.T) {
 
 	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
 
-	m, ok := result.(map[string]interface{})
+	m, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
 	}
@@ -495,7 +499,7 @@ func TestToSafeValue_JSONStringMalformedFallback(t *testing.T) {
 		t.Fatalf("ToSafeValue malformed JSON: expected 'jsonData' key in result map")
 	}
 
-	if _, isMap := jsonDataVal.(map[string]interface{}); isMap {
+	if _, isMap := jsonDataVal.(map[string]any); isMap {
 		t.Errorf("ToSafeValue malformed JSON: expected string fallback, got a map")
 	}
 	if _, isString := jsonDataVal.(string); !isString {
@@ -509,7 +513,7 @@ func TestToSafeValue_PlainStringUnchanged(t *testing.T) {
 
 	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
 
-	m, ok := result.(map[string]interface{})
+	m, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
 	}
@@ -534,7 +538,7 @@ func TestToSafeValue_JSONStringArrayParsed(t *testing.T) {
 
 	result := fieldpath.ToSafeValue(reflect.ValueOf(holder))
 
-	m, ok := result.(map[string]interface{})
+	m, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("ToSafeValue: expected map[string]interface{}, got %T", result)
 	}
@@ -544,13 +548,13 @@ func TestToSafeValue_JSONStringArrayParsed(t *testing.T) {
 		t.Fatalf("ToSafeValue JSON array: expected 'jsonData' key in result map")
 	}
 
-	if _, isSlice := jsonDataVal.([]interface{}); !isSlice {
+	if _, isSlice := jsonDataVal.([]any); !isSlice {
 		t.Errorf("ToSafeValue JSON array: expected []interface{} (parsed JSON array), got %T: %v", jsonDataVal, jsonDataVal)
 	}
 }
 
 // mapKeys returns the keys of a map for use in error messages.
-func mapKeys(m map[string]interface{}) []string {
+func mapKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

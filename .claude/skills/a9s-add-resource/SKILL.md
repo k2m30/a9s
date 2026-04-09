@@ -556,6 +556,7 @@ Coverage analysis found these gaps when steps 11-13 were missing:
 
 1. Run viewsgen: `go run ./cmd/viewsgen/`
 2. Run refgen: `go run ./cmd/refgen/ > .a9s/views_reference.yaml`
-3. Run tests: `go test ./tests/unit/ -count=1 -timeout 120s`
-4. Run linter: `golangci-lint run ./...`
-5. Build: `go build -o a9s ./cmd/a9s/`
+3. Run tests: `make test`
+4. Run linter: `make lint`
+5. Run gofix: `make gofix`
+6. Build: `make build`

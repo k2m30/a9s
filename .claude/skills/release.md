@@ -7,14 +7,15 @@ description: Automate the a9s release process — run checks, write release note
 
 Run all of these and stop if any fail:
 
-1. `go test ./tests/unit/ -count=1 -timeout 120s` — all tests must pass
-2. `golangci-lint run ./...` — no lint errors
-3. `govulncheck ./...` — no known vulnerabilities
-4. Run `a9s-consistency-checker` agent — verify code/docs/website alignment
-5. Run `test-coverage-analyzer` agent — check for coverage gaps
-6. Run `a9s-architect` agent — verify architecture (target: 8.5+/10)
-7. `goreleaser check -f .goreleaser.yaml` — validate release config
-8. `go build -o a9s ./cmd/a9s/` — rebuild binary
+1. `make test` — all tests must pass
+2. `make lint` — no lint errors
+3. `make security` — no known vulnerabilities
+4. `make gofix` — no unfixed inline directives
+5. Run `a9s-consistency-checker` agent — verify code/docs/website alignment
+6. Run `test-coverage-analyzer` agent — check for coverage gaps
+7. Run `a9s-architect` agent — verify architecture (target: 8.5+/10)
+8. `goreleaser check -f .goreleaser.yaml` — validate release config
+9. `make build` — rebuild binary
 
 **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require steps 4-6.
 

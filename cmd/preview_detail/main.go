@@ -22,12 +22,12 @@ var (
 	colBorder   = lipgloss.Color("#414868")
 	colHeaderFg = lipgloss.Color("#c0caf5")
 
-	colKey    = lipgloss.Color("#7aa2f7") // all top-level keys
-	colVal    = lipgloss.Color("#c0caf5") // scalar values
-	colOK     = lipgloss.Color("#9ece6a") // running / available / active
-	colErr    = lipgloss.Color("#f7768e") // stopped / failed
-	colWarn   = lipgloss.Color("#e0af68") // pending / starting (kept for completeness)
-	colSub    = lipgloss.Color("#565f89") // sub-field lines inside sections
+	colKey  = lipgloss.Color("#7aa2f7") // all top-level keys
+	colVal  = lipgloss.Color("#c0caf5") // scalar values
+	colOK   = lipgloss.Color("#9ece6a") // running / available / active
+	colErr  = lipgloss.Color("#f7768e") // stopped / failed
+	colWarn = lipgloss.Color("#e0af68") // pending / starting (kept for completeness)
+	colSub  = lipgloss.Color("#565f89") // sub-field lines inside sections
 )
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,18 +73,15 @@ func statusStyle(v string) lipgloss.Style {
 
 func renderHeader(w int) string {
 	accent := lipgloss.NewStyle().Foreground(colAccent).Bold(true).Render("a9s")
-	ver    := lipgloss.NewStyle().Foreground(colDim).Render(" v0.6.0")
-	ctx    := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render("  prod:us-east-1")
-	right  := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
+	ver := lipgloss.NewStyle().Foreground(colDim).Render(" v0.6.0")
+	ctx := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render("  prod:us-east-1")
+	right := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
 
-	left  := accent + ver + ctx
+	left := accent + ver + ctx
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 	content := left + strings.Repeat(" ", gap) + right
 	return lipgloss.NewStyle().Foreground(colHeaderFg).Width(w).Padding(0, 1).Render(content)
 }
@@ -93,15 +90,12 @@ func renderHeader(w int) string {
 // w is the TOTAL width including the border characters.
 func renderBox(lines []string, title string, w int) string {
 	borderSt := lipgloss.NewStyle().Foreground(colBorder)
-	innerW   := w - 2
+	innerW := w - 2
 
 	titleRendered := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render(title)
-	titleVis      := lipgloss.Width(titleRendered)
-	totalDashes   := w - 2 - titleVis - 2
-	if totalDashes < 2 {
-		totalDashes = 2
-	}
-	leftD  := totalDashes / 2
+	titleVis := lipgloss.Width(titleRendered)
+	totalDashes := max(w-2-titleVis-2, 2)
+	leftD := totalDashes / 2
 	rightD := totalDashes - leftD
 	topBorder := borderSt.Render("┌"+strings.Repeat("─", leftD)+" ") +
 		titleRendered +
@@ -146,8 +140,8 @@ func divider(label string) string {
 func renderBefore() string {
 	const w = 84
 
-	kStyle  := lipgloss.NewStyle().Foreground(colKey)
-	vStyle  := lipgloss.NewStyle().Foreground(colVal)
+	kStyle := lipgloss.NewStyle().Foreground(colKey)
+	vStyle := lipgloss.NewStyle().Foreground(colVal)
 	// The existing code uses a distinct amber color for section headers,
 	// making the misalignment even more visually obvious.
 	secStyle := lipgloss.NewStyle().Foreground(colWarn).Bold(true)
@@ -268,18 +262,19 @@ func renderAfter() string {
 
 func renderRuler(w int) string {
 	// Columns 1-based, showing every 5th position
-	ruler := " "
+	var ruler strings.Builder
+	ruler.WriteString(" ")
 	for i := 2; i <= w-2; i++ {
 		switch {
 		case i%10 == 0:
-			ruler += fmt.Sprintf("%d", (i/10)%10)
+			fmt.Fprintf(&ruler, "%d", (i/10)%10)
 		case i%5 == 0:
-			ruler += "┊"
+			ruler.WriteString("┊")
 		default:
-			ruler += "·"
+			ruler.WriteString("·")
 		}
 	}
-	return lipgloss.NewStyle().Foreground(colDim).Render(ruler)
+	return lipgloss.NewStyle().Foreground(colDim).Render(ruler.String())
 }
 
 // ── AFTER: additional resource types to confirm rule holds ────────────────────

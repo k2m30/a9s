@@ -36,10 +36,10 @@ func vpceSrcInterfaceResource() resource.Resource {
 			"type":   "Interface",
 		},
 		RawStruct: ec2types.VpcEndpoint{
-			VpcEndpointId:       strPtr("vpce-abc123"),
-			VpcId:               strPtr("vpc-abc123"),
+			VpcEndpointId:       new("vpce-abc123"),
+			VpcId:               new("vpc-abc123"),
 			SubnetIds:           []string{"subnet-1", "subnet-2"},
-			Groups:              []ec2types.SecurityGroupIdentifier{{GroupId: strPtr("sg-1")}},
+			Groups:              []ec2types.SecurityGroupIdentifier{{GroupId: new("sg-1")}},
 			NetworkInterfaceIds: []string{"eni-1"},
 			RouteTableIds:       []string{},
 		},
@@ -56,8 +56,8 @@ func vpceSrcGatewayResource() resource.Resource {
 			"type":   "Gateway",
 		},
 		RawStruct: ec2types.VpcEndpoint{
-			VpcEndpointId: strPtr("vpce-gw123"),
-			VpcId:         strPtr("vpc-abc123"),
+			VpcEndpointId: new("vpce-gw123"),
+			VpcId:         new("vpc-abc123"),
 			RouteTableIds: []string{"rtb-1", "rtb-2"},
 		},
 	}
@@ -213,4 +213,3 @@ func TestNavigableFields_VPCE(t *testing.T) {
 		t.Errorf("VpcId TargetType = %q, want %q", nav.TargetType, "vpc")
 	}
 }
-

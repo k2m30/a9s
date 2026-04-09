@@ -31,7 +31,7 @@ type testEC2State struct {
 // TestExtractFieldList_ScalarField verifies that a scalar pointer field is
 // resolved correctly and returned as a single non-header FieldItem.
 func TestExtractFieldList_ScalarField(t *testing.T) {
-	obj := testEC2Instance{VpcId: strPtr("vpc-abc")}
+	obj := testEC2Instance{VpcId: new("vpc-abc")}
 	paths := []string{"VpcId"}
 
 	items := fieldpath.ExtractFieldList(obj, nil, paths, nil)
@@ -60,7 +60,7 @@ func TestExtractFieldList_ScalarField(t *testing.T) {
 // TestExtractFieldList_NavigableScalar verifies that a scalar field listed in
 // the navigable map is annotated with IsNavigable=true and the correct TargetType.
 func TestExtractFieldList_NavigableScalar(t *testing.T) {
-	obj := testEC2Instance{VpcId: strPtr("vpc-abc")}
+	obj := testEC2Instance{VpcId: new("vpc-abc")}
 	paths := []string{"VpcId"}
 	navigable := map[string]string{"VpcId": "vpc"}
 
@@ -153,7 +153,7 @@ func TestExtractFieldList_UnknownPath(t *testing.T) {
 // TestExtractFieldList_EmptyPaths verifies that an empty paths slice returns a
 // non-nil empty slice (never nil).
 func TestExtractFieldList_EmptyPaths(t *testing.T) {
-	obj := testEC2Instance{VpcId: strPtr("vpc-abc")}
+	obj := testEC2Instance{VpcId: new("vpc-abc")}
 
 	items := fieldpath.ExtractFieldList(obj, nil, []string{}, nil)
 
@@ -168,7 +168,7 @@ func TestExtractFieldList_EmptyPaths(t *testing.T) {
 // TestExtractFieldList_FieldsMapPrecedence verifies that the pre-formatted
 // fields map takes precedence over reflection on the obj struct.
 func TestExtractFieldList_FieldsMapPrecedence(t *testing.T) {
-	obj := testEC2Instance{VpcId: strPtr("vpc-from-struct")}
+	obj := testEC2Instance{VpcId: new("vpc-from-struct")}
 	fields := map[string]string{"VpcId": "vpc-from-map"}
 	paths := []string{"VpcId"}
 
@@ -186,7 +186,7 @@ func TestExtractFieldList_FieldsMapPrecedence(t *testing.T) {
 // FieldItems in the same order as the paths slice.
 func TestExtractFieldList_MultiplePaths(t *testing.T) {
 	obj := testEC2Instance{
-		VpcId:        strPtr("vpc-abc"),
+		VpcId:        new("vpc-abc"),
 		InstanceType: "t3.medium",
 	}
 	paths := []string{"VpcId", "InstanceType"}

@@ -9,9 +9,9 @@ import (
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	codepipelinetypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
@@ -36,30 +36,30 @@ import (
 
 func realisticCFDistribution() cloudfronttypes.DistributionSummary {
 	return cloudfronttypes.DistributionSummary{
-		Id:         ptrString("E1A2B3C4D5E6F7"),
-		DomainName: ptrString("d1234abcdef.cloudfront.net"),
-		Status:     ptrString("Deployed"),
-		Enabled:    ptrBool(true),
-		Comment:    ptrString("Production CDN"),
-		ARN:        ptrString("arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7"),
+		Id:         new("E1A2B3C4D5E6F7"),
+		DomainName: new("d1234abcdef.cloudfront.net"),
+		Status:     new("Deployed"),
+		Enabled:    new(true),
+		Comment:    new("Production CDN"),
+		ARN:        new("arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7"),
 		Aliases: &cloudfronttypes.Aliases{
-			Quantity: ptrInt32(1),
+			Quantity: new(int32(1)),
 			Items:    []string{"cdn.example.com"},
 		},
 		PriceClass:       cloudfronttypes.PriceClassPriceClassAll,
 		HttpVersion:      cloudfronttypes.HttpVersionHttp2,
-		LastModifiedTime: ptrTime(testTime),
+		LastModifiedTime: new(testTime),
 		Origins: &cloudfronttypes.Origins{
-			Quantity: ptrInt32(1),
+			Quantity: new(int32(1)),
 			Items: []cloudfronttypes.Origin{
 				{
-					Id:         ptrString("S3-origin"),
-					DomainName: ptrString("my-bucket.s3.amazonaws.com"),
+					Id:         new("S3-origin"),
+					DomainName: new("my-bucket.s3.amazonaws.com"),
 				},
 			},
 		},
 		DefaultCacheBehavior: &cloudfronttypes.DefaultCacheBehavior{
-			TargetOriginId:       ptrString("S3-origin"),
+			TargetOriginId:       new("S3-origin"),
 			ViewerProtocolPolicy: cloudfronttypes.ViewerProtocolPolicyRedirectToHttps,
 		},
 	}
@@ -67,35 +67,35 @@ func realisticCFDistribution() cloudfronttypes.DistributionSummary {
 
 func realisticR53Zone() route53types.HostedZone {
 	return route53types.HostedZone{
-		Id:                     ptrString("/hostedzone/Z1234567890ABC"),
-		Name:                   ptrString("example.com."),
-		CallerReference:        ptrString("unique-ref-20250615"),
-		ResourceRecordSetCount: ptrInt64(42),
+		Id:                     new("/hostedzone/Z1234567890ABC"),
+		Name:                   new("example.com."),
+		CallerReference:        new("unique-ref-20250615"),
+		ResourceRecordSetCount: new(int64(42)),
 		Config: &route53types.HostedZoneConfig{
 			PrivateZone: false,
-			Comment:     ptrString("Production hosted zone"),
+			Comment:     new("Production hosted zone"),
 		},
 	}
 }
 
 func realisticAPIGW() apigatewayv2types.Api {
 	return apigatewayv2types.Api{
-		ApiId:        ptrString("abc123def4"),
-		Name:         ptrString("prod-api"),
+		ApiId:        new("abc123def4"),
+		Name:         new("prod-api"),
 		ProtocolType: apigatewayv2types.ProtocolTypeHttp,
-		ApiEndpoint:  ptrString("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
-		Description:  ptrString("Production REST API"),
-		CreatedDate:  ptrTime(testTime),
+		ApiEndpoint:  new("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
+		Description:  new("Production REST API"),
+		CreatedDate:  new(testTime),
 		Tags:         map[string]string{"env": "production"},
 	}
 }
 
 func realisticECR() ecrtypes.Repository {
 	return ecrtypes.Repository{
-		RepositoryName: ptrString("my-app"),
-		RepositoryUri:  ptrString("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"),
-		RepositoryArn:  ptrString("arn:aws:ecr:us-east-1:123456789012:repository/my-app"),
-		RegistryId:     ptrString("123456789012"),
+		RepositoryName:     new("my-app"),
+		RepositoryUri:      new("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"),
+		RepositoryArn:      new("arn:aws:ecr:us-east-1:123456789012:repository/my-app"),
+		RegistryId:         new("123456789012"),
 		ImageTagMutability: ecrtypes.ImageTagMutabilityImmutable,
 		ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 			ScanOnPush: true,
@@ -103,69 +103,69 @@ func realisticECR() ecrtypes.Repository {
 		EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
 			EncryptionType: ecrtypes.EncryptionTypeAes256,
 		},
-		CreatedAt: ptrTime(testTime),
+		CreatedAt: new(testTime),
 	}
 }
 
 func realisticEFS() efstypes.FileSystemDescription {
 	return efstypes.FileSystemDescription{
-		FileSystemId:         ptrString("fs-0abc1234def56789a"),
-		Name:                 ptrString("prod-efs"),
+		FileSystemId:         new("fs-0abc1234def56789a"),
+		Name:                 new("prod-efs"),
 		LifeCycleState:       efstypes.LifeCycleStateAvailable,
 		PerformanceMode:      efstypes.PerformanceModeGeneralPurpose,
 		ThroughputMode:       efstypes.ThroughputModeBursting,
-		Encrypted:            ptrBool(true),
+		Encrypted:            new(true),
 		NumberOfMountTargets: 3,
-		FileSystemArn:        ptrString("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc1234def56789a"),
-		OwnerId:              ptrString("123456789012"),
+		FileSystemArn:        new("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc1234def56789a"),
+		OwnerId:              new("123456789012"),
 		SizeInBytes: &efstypes.FileSystemSize{
 			Value: 1073741824,
 		},
-		CreationTime: ptrTime(testTime),
+		CreationTime: new(testTime),
 		Tags: []efstypes.Tag{
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("env"), Value: new("production")},
 		},
 	}
 }
 
 func realisticEBRule() eventbridgetypes.Rule {
 	return eventbridgetypes.Rule{
-		Name:               ptrString("daily-backup-rule"),
-		Arn:                ptrString("arn:aws:events:us-east-1:123456789012:rule/daily-backup-rule"),
+		Name:               new("daily-backup-rule"),
+		Arn:                new("arn:aws:events:us-east-1:123456789012:rule/daily-backup-rule"),
 		State:              eventbridgetypes.RuleStateEnabled,
-		Description:        ptrString("Daily backup trigger"),
-		EventBusName:       ptrString("default"),
-		ScheduleExpression: ptrString("cron(0 2 * * ? *)"),
-		RoleArn:            ptrString("arn:aws:iam::123456789012:role/backup-role"),
+		Description:        new("Daily backup trigger"),
+		EventBusName:       new("default"),
+		ScheduleExpression: new("cron(0 2 * * ? *)"),
+		RoleArn:            new("arn:aws:iam::123456789012:role/backup-role"),
 	}
 }
 
 func realisticSFN() sfntypes.StateMachineListItem {
 	return sfntypes.StateMachineListItem{
-		Name:            ptrString("order-processing"),
-		StateMachineArn: ptrString("arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"),
+		Name:            new("order-processing"),
+		StateMachineArn: new("arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"),
 		Type:            sfntypes.StateMachineTypeStandard,
-		CreationDate:    ptrTime(testTime),
+		CreationDate:    new(testTime),
 	}
 }
 
 func realisticPipeline() codepipelinetypes.PipelineSummary {
 	return codepipelinetypes.PipelineSummary{
-		Name:          ptrString("deploy-pipeline"),
+		Name:          new("deploy-pipeline"),
 		PipelineType:  codepipelinetypes.PipelineTypeV2,
-		Version:       ptrInt32(3),
-		Created:       ptrTime(testTime),
-		Updated:       ptrTime(testTime),
+		Version:       new(int32(3)),
+		Created:       new(testTime),
+		Updated:       new(testTime),
 		ExecutionMode: codepipelinetypes.ExecutionModeQueued,
 	}
 }
 
 func realisticKinesis() kinesistypes.StreamSummary {
 	return kinesistypes.StreamSummary{
-		StreamName:              ptrString("events-stream"),
-		StreamARN:               ptrString("arn:aws:kinesis:us-east-1:123456789012:stream/events-stream"),
+		StreamName:              new("events-stream"),
+		StreamARN:               new("arn:aws:kinesis:us-east-1:123456789012:stream/events-stream"),
 		StreamStatus:            kinesistypes.StreamStatusActive,
-		StreamCreationTimestamp: ptrTime(testTime),
+		StreamCreationTimestamp: new(testTime),
 		StreamModeDetails: &kinesistypes.StreamModeDetails{
 			StreamMode: kinesistypes.StreamModeOnDemand,
 		},
@@ -174,184 +174,184 @@ func realisticKinesis() kinesistypes.StreamSummary {
 
 func realisticWAF() wafv2types.WebACLSummary {
 	return wafv2types.WebACLSummary{
-		Name:        ptrString("prod-waf-acl"),
-		Id:          ptrString("a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"),
-		ARN:         ptrString("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/prod-waf-acl/a1b2c3d4"),
-		Description: ptrString("Production WAF rules"),
-		LockToken:   ptrString("abcdef12-3456-7890-abcd-ef1234567890"),
+		Name:        new("prod-waf-acl"),
+		Id:          new("a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"),
+		ARN:         new("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/prod-waf-acl/a1b2c3d4"),
+		Description: new("Production WAF rules"),
+		LockToken:   new("abcdef12-3456-7890-abcd-ef1234567890"),
 	}
 }
 
 func realisticGlueJob() gluetypes.Job {
 	return gluetypes.Job{
-		Name:            ptrString("etl-daily-job"),
-		Role:            ptrString("arn:aws:iam::123456789012:role/glue-role"),
-		GlueVersion:     ptrString("4.0"),
+		Name:            new("etl-daily-job"),
+		Role:            new("arn:aws:iam::123456789012:role/glue-role"),
+		GlueVersion:     new("4.0"),
 		WorkerType:      gluetypes.WorkerTypeG2x,
-		NumberOfWorkers: ptrInt32(10),
+		NumberOfWorkers: new(int32(10)),
 		MaxRetries:      3,
 		Command: &gluetypes.JobCommand{
-			Name: ptrString("glueetl"),
+			Name: new("glueetl"),
 		},
-		CreatedOn:      ptrTime(testTime),
-		LastModifiedOn: ptrTime(testTime),
+		CreatedOn:      new(testTime),
+		LastModifiedOn: new(testTime),
 	}
 }
 
 func realisticEB() ebtypes.EnvironmentDescription {
 	return ebtypes.EnvironmentDescription{
-		EnvironmentName:   ptrString("prod-api-env"),
-		EnvironmentId:     ptrString("e-abc1234def"),
-		ApplicationName:   ptrString("my-web-app"),
+		EnvironmentName:   new("prod-api-env"),
+		EnvironmentId:     new("e-abc1234def"),
+		ApplicationName:   new("my-web-app"),
 		Status:            ebtypes.EnvironmentStatusReady,
 		Health:            ebtypes.EnvironmentHealthGreen,
 		HealthStatus:      ebtypes.EnvironmentHealthStatusOk,
-		VersionLabel:      ptrString("v1.2.3"),
-		SolutionStackName: ptrString("64bit Amazon Linux 2023 v4.3.0 running Docker"),
-		PlatformArn:       ptrString("arn:aws:elasticbeanstalk:us-east-1::platform/Docker running on 64bit Amazon Linux 2023/4.3.0"),
-		EndpointURL:       ptrString("awseb-e-abc1234def.us-east-1.elb.amazonaws.com"),
-		CNAME:             ptrString("prod-api-env.us-east-1.elasticbeanstalk.com"),
-		DateCreated:       ptrTime(testTime),
-		DateUpdated:       ptrTime(testTime),
-		EnvironmentArn:    ptrString("arn:aws:elasticbeanstalk:us-east-1:123456789012:environment/my-web-app/prod-api-env"),
+		VersionLabel:      new("v1.2.3"),
+		SolutionStackName: new("64bit Amazon Linux 2023 v4.3.0 running Docker"),
+		PlatformArn:       new("arn:aws:elasticbeanstalk:us-east-1::platform/Docker running on 64bit Amazon Linux 2023/4.3.0"),
+		EndpointURL:       new("awseb-e-abc1234def.us-east-1.elb.amazonaws.com"),
+		CNAME:             new("prod-api-env.us-east-1.elasticbeanstalk.com"),
+		DateCreated:       new(testTime),
+		DateUpdated:       new(testTime),
+		EnvironmentArn:    new("arn:aws:elasticbeanstalk:us-east-1:123456789012:environment/my-web-app/prod-api-env"),
 	}
 }
 
 func realisticRedshift() redshifttypes.Cluster {
 	return redshifttypes.Cluster{
-		ClusterIdentifier:   ptrString("analytics-cluster"),
-		ClusterStatus:       ptrString("available"),
-		NodeType:            ptrString("dc2.large"),
-		NumberOfNodes:       ptrInt32(4),
-		DBName:              ptrString("analytics_db"),
-		MasterUsername:      ptrString("admin"),
-		ClusterCreateTime:   ptrTime(testTime),
-		ClusterNamespaceArn: ptrString("arn:aws:redshift:us-east-1:123456789012:namespace:abc-123"),
-		AvailabilityZone:    ptrString("us-east-1a"),
+		ClusterIdentifier:   new("analytics-cluster"),
+		ClusterStatus:       new("available"),
+		NodeType:            new("dc2.large"),
+		NumberOfNodes:       new(int32(4)),
+		DBName:              new("analytics_db"),
+		MasterUsername:      new("admin"),
+		ClusterCreateTime:   new(testTime),
+		ClusterNamespaceArn: new("arn:aws:redshift:us-east-1:123456789012:namespace:abc-123"),
+		AvailabilityZone:    new("us-east-1a"),
 		Endpoint: &redshifttypes.Endpoint{
-			Address: ptrString("analytics-cluster.abc123.us-east-1.redshift.amazonaws.com"),
-			Port:    ptrInt32(5439),
+			Address: new("analytics-cluster.abc123.us-east-1.redshift.amazonaws.com"),
+			Port:    new(int32(5439)),
 		},
 	}
 }
 
 func realisticTrail() cloudtrailtypes.Trail {
 	return cloudtrailtypes.Trail{
-		Name:                       ptrString("org-trail"),
-		TrailARN:                   ptrString("arn:aws:cloudtrail:us-east-1:123456789012:trail/org-trail"),
-		S3BucketName:               ptrString("cloudtrail-logs-bucket"),
-		HomeRegion:                 ptrString("us-east-1"),
-		IsMultiRegionTrail:         ptrBool(true),
-		IsOrganizationTrail:        ptrBool(true),
-		LogFileValidationEnabled:   ptrBool(true),
-		IncludeGlobalServiceEvents: ptrBool(true),
-		KmsKeyId:                   ptrString("arn:aws:kms:us-east-1:123456789012:key/12345678"),
-		CloudWatchLogsLogGroupArn:  ptrString("arn:aws:logs:us-east-1:123456789012:log-group:cloudtrail-logs"),
+		Name:                       new("org-trail"),
+		TrailARN:                   new("arn:aws:cloudtrail:us-east-1:123456789012:trail/org-trail"),
+		S3BucketName:               new("cloudtrail-logs-bucket"),
+		HomeRegion:                 new("us-east-1"),
+		IsMultiRegionTrail:         new(true),
+		IsOrganizationTrail:        new(true),
+		LogFileValidationEnabled:   new(true),
+		IncludeGlobalServiceEvents: new(true),
+		KmsKeyId:                   new("arn:aws:kms:us-east-1:123456789012:key/12345678"),
+		CloudWatchLogsLogGroupArn:  new("arn:aws:logs:us-east-1:123456789012:log-group:cloudtrail-logs"),
 	}
 }
 
 func realisticAthena() athenatypes.WorkGroupSummary {
 	return athenatypes.WorkGroupSummary{
-		Name:         ptrString("analytics-wg"),
+		Name:         new("analytics-wg"),
 		State:        athenatypes.WorkGroupStateEnabled,
-		Description:  ptrString("Analytics workgroup"),
-		CreationTime: ptrTime(testTime),
+		Description:  new("Analytics workgroup"),
+		CreationTime: new(testTime),
 		EngineVersion: &athenatypes.EngineVersion{
-			EffectiveEngineVersion: ptrString("Athena engine version 3"),
+			EffectiveEngineVersion: new("Athena engine version 3"),
 		},
 	}
 }
 
 func realisticCodeArtifact() codeartifacttypes.RepositorySummary {
 	return codeartifacttypes.RepositorySummary{
-		Name:                 ptrString("shared-libs"),
-		DomainName:           ptrString("my-domain"),
-		DomainOwner:          ptrString("123456789012"),
-		Arn:                  ptrString("arn:aws:codeartifact:us-east-1:123456789012:repository/my-domain/shared-libs"),
-		Description:          ptrString("Shared libraries repository"),
-		AdministratorAccount: ptrString("123456789012"),
-		CreatedTime:          ptrTime(testTime),
+		Name:                 new("shared-libs"),
+		DomainName:           new("my-domain"),
+		DomainOwner:          new("123456789012"),
+		Arn:                  new("arn:aws:codeartifact:us-east-1:123456789012:repository/my-domain/shared-libs"),
+		Description:          new("Shared libraries repository"),
+		AdministratorAccount: new("123456789012"),
+		CreatedTime:          new(testTime),
 	}
 }
 
 func realisticCodeBuild() codebuildtypes.Project {
 	return codebuildtypes.Project{
-		Name:        ptrString("build-project"),
-		Description: ptrString("CI build project"),
-		Arn:         ptrString("arn:aws:codebuild:us-east-1:123456789012:project/build-project"),
+		Name:        new("build-project"),
+		Description: new("CI build project"),
+		Arn:         new("arn:aws:codebuild:us-east-1:123456789012:project/build-project"),
 		Source: &codebuildtypes.ProjectSource{
 			Type: codebuildtypes.SourceTypeCodecommit,
 		},
 		Environment: &codebuildtypes.ProjectEnvironment{
 			Type:  codebuildtypes.EnvironmentTypeLinuxContainer,
-			Image: ptrString("aws/codebuild/standard:7.0"),
+			Image: new("aws/codebuild/standard:7.0"),
 		},
-		ServiceRole:  ptrString("arn:aws:iam::123456789012:role/codebuild-role"),
-		Created:      ptrTime(testTime),
-		LastModified: ptrTime(testTime),
+		ServiceRole:  new("arn:aws:iam::123456789012:role/codebuild-role"),
+		Created:      new(testTime),
+		LastModified: new(testTime),
 		Tags: []codebuildtypes.Tag{
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("env"), Value: new("production")},
 		},
 	}
 }
 
 func realisticOpenSearch() opensearchtypes.DomainStatus {
 	return opensearchtypes.DomainStatus{
-		DomainName:    ptrString("search-prod"),
-		DomainId:      ptrString("123456789012/search-prod"),
-		ARN:           ptrString("arn:aws:es:us-east-1:123456789012:domain/search-prod"),
-		EngineVersion: ptrString("OpenSearch_2.11"),
-		Endpoint:      ptrString("search-prod-abc123.us-east-1.es.amazonaws.com"),
+		DomainName:    new("search-prod"),
+		DomainId:      new("123456789012/search-prod"),
+		ARN:           new("arn:aws:es:us-east-1:123456789012:domain/search-prod"),
+		EngineVersion: new("OpenSearch_2.11"),
+		Endpoint:      new("search-prod-abc123.us-east-1.es.amazonaws.com"),
 		ClusterConfig: &opensearchtypes.ClusterConfig{
 			InstanceType:  opensearchtypes.OpenSearchPartitionInstanceTypeR6gLargeSearch,
-			InstanceCount: ptrInt32(3),
+			InstanceCount: new(int32(3)),
 		},
 		EBSOptions: &opensearchtypes.EBSOptions{
-			EBSEnabled: ptrBool(true),
+			EBSEnabled: new(true),
 			VolumeType: opensearchtypes.VolumeTypeGp3,
-			VolumeSize: ptrInt32(100),
+			VolumeSize: new(int32(100)),
 		},
-		Created: ptrBool(true),
-		Deleted: ptrBool(false),
+		Created: new(true),
+		Deleted: new(false),
 	}
 }
 
 func realisticKMS() *kmstypes.KeyMetadata {
 	return &kmstypes.KeyMetadata{
-		KeyId:        ptrString("12345678-1234-1234-1234-123456789012"),
-		Arn:          ptrString("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
-		Description:  ptrString("Production encryption key"),
+		KeyId:        new("12345678-1234-1234-1234-123456789012"),
+		Arn:          new("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
+		Description:  new("Production encryption key"),
 		KeyState:     kmstypes.KeyStateEnabled,
 		KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
 		KeySpec:      kmstypes.KeySpecSymmetricDefault,
 		KeyManager:   kmstypes.KeyManagerTypeCustomer,
 		Enabled:      true,
-		CreationDate: ptrTime(testTime),
+		CreationDate: new(testTime),
 		Origin:       kmstypes.OriginTypeAwsKms,
-		MultiRegion:  ptrBool(false),
+		MultiRegion:  new(false),
 	}
 }
 
 func realisticMSK() kafkatypes.Cluster {
 	return kafkatypes.Cluster{
-		ClusterName:    ptrString("events-kafka"),
-		ClusterArn:     ptrString("arn:aws:kafka:us-east-1:123456789012:cluster/events-kafka/abc-123"),
+		ClusterName:    new("events-kafka"),
+		ClusterArn:     new("arn:aws:kafka:us-east-1:123456789012:cluster/events-kafka/abc-123"),
 		ClusterType:    kafkatypes.ClusterTypeProvisioned,
 		State:          kafkatypes.ClusterStateActive,
-		CurrentVersion: ptrString("K3AEGXETSR30VB"),
-		CreationTime:   ptrTime(testTime),
+		CurrentVersion: new("K3AEGXETSR30VB"),
+		CreationTime:   new(testTime),
 		Tags:           map[string]string{"env": "production"},
 	}
 }
 
 func realisticBackup() backuptypes.BackupPlansListMember {
 	return backuptypes.BackupPlansListMember{
-		BackupPlanName:    ptrString("daily-backup-plan"),
-		BackupPlanId:      ptrString("abc12345-1234-1234-1234-123456789012"),
-		BackupPlanArn:     ptrString("arn:aws:backup:us-east-1:123456789012:backup-plan:abc12345"),
-		CreationDate:      ptrTime(testTime),
-		LastExecutionDate: ptrTime(testTime),
-		VersionId:         ptrString("MjEyYzUyNzUtNWU0MC00NTBjLThjNDktOGQ1YzkyZGIwODlh"),
+		BackupPlanName:    new("daily-backup-plan"),
+		BackupPlanId:      new("abc12345-1234-1234-1234-123456789012"),
+		BackupPlanArn:     new("arn:aws:backup:us-east-1:123456789012:backup-plan:abc12345"),
+		CreationDate:      new(testTime),
+		LastExecutionDate: new(testTime),
+		VersionId:         new("MjEyYzUyNzUtNWU0MC00NTBjLThjNDktOGQ1YzkyZGIwODlh"),
 	}
 }
 
@@ -1433,23 +1433,23 @@ var _ = time.Now
 func realisticVolume() ec2types.Volume {
 	createTime := time.Date(2025, 3, 10, 14, 0, 0, 0, time.UTC)
 	return ec2types.Volume{
-		VolumeId:         ptrString("vol-111aabbcc"),
+		VolumeId:         new("vol-111aabbcc"),
 		State:            ec2types.VolumeStateInUse,
-		Size:             ptrInt32(100),
+		Size:             new(int32(100)),
 		VolumeType:       ec2types.VolumeTypeGp3,
-		Iops:             ptrInt32(3000),
-		Encrypted:        ptrBool(true),
-		AvailabilityZone: ptrString("us-east-1a"),
+		Iops:             new(int32(3000)),
+		Encrypted:        new(true),
+		AvailabilityZone: new("us-east-1a"),
 		CreateTime:       &createTime,
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-data-vol")},
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("Name"), Value: new("prod-data-vol")},
+			{Key: new("env"), Value: new("production")},
 		},
 		Attachments: []ec2types.VolumeAttachment{
 			{
-				InstanceId: ptrString("i-0abc123456def789"),
+				InstanceId: new("i-0abc123456def789"),
 				State:      ec2types.VolumeAttachmentStateAttached,
-				Device:     ptrString("/dev/xvdf"),
+				Device:     new("/dev/xvdf"),
 			},
 		},
 	}
@@ -1458,50 +1458,50 @@ func realisticVolume() ec2types.Volume {
 func realisticSnapshot() ec2types.Snapshot {
 	startTime := time.Date(2025, 2, 20, 9, 15, 0, 0, time.UTC)
 	return ec2types.Snapshot{
-		SnapshotId:  ptrString("snap-0aabb11cc"),
+		SnapshotId:  new("snap-0aabb11cc"),
 		State:       ec2types.SnapshotStateCompleted,
-		VolumeId:    ptrString("vol-111aabbcc"),
-		VolumeSize:  ptrInt32(100),
-		Encrypted:   ptrBool(true),
-		Description: ptrString("Daily backup snapshot"),
+		VolumeId:    new("vol-111aabbcc"),
+		VolumeSize:  new(int32(100)),
+		Encrypted:   new(true),
+		Description: new("Daily backup snapshot"),
 		StartTime:   &startTime,
-		Progress:    ptrString("100%"),
-		OwnerId:     ptrString("123456789012"),
+		Progress:    new("100%"),
+		OwnerId:     new("123456789012"),
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("prod-snap-daily")},
+			{Key: new("Name"), Value: new("prod-snap-daily")},
 		},
 	}
 }
 
 func realisticImage() ec2types.Image {
 	return ec2types.Image{
-		ImageId:         ptrString("ami-0abc111222333444a"),
-		Name:            ptrString("my-web-server-ami"),
+		ImageId:         new("ami-0abc111222333444a"),
+		Name:            new("my-web-server-ami"),
 		State:           ec2types.ImageStateAvailable,
 		Architecture:    ec2types.ArchitectureValuesX8664,
-		PlatformDetails: ptrString("Linux/UNIX"),
+		PlatformDetails: new("Linux/UNIX"),
 		RootDeviceType:  ec2types.DeviceTypeEbs,
-		CreationDate:    ptrString("2025-01-15T10:30:00.000Z"),
-		Public:          ptrBool(false),
-		OwnerId:         ptrString("123456789012"),
-		Description:     ptrString("Web server base image"),
+		CreationDate:    new("2025-01-15T10:30:00.000Z"),
+		Public:          new(false),
+		OwnerId:         new("123456789012"),
+		Description:     new("Web server base image"),
 	}
 }
 
 func realisticCloudTrailEvent() cloudtrailtypes.Event {
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 	return cloudtrailtypes.Event{
-		EventId:         ptrString("evt-0001-abcd-1234-5678-abcdef012345"),
-		EventName:       ptrString("RunInstances"),
+		EventId:         new("evt-0001-abcd-1234-5678-abcdef012345"),
+		EventName:       new("RunInstances"),
 		EventTime:       &eventTime,
-		EventSource:     ptrString("ec2.amazonaws.com"),
-		Username:        ptrString("admin"),
-		ReadOnly:        ptrString("false"),
-		CloudTrailEvent: ptrString(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE123","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2025-03-15T12:00:00Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instanceType":"t3.micro","instancesSet":{"items":[{"imageId":"ami-0abc123456def789"}]}},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0abc123456def789"}]}},"requestID":"req-0001-abcd-1234","eventID":"evt-0001-abcd-1234-5678-abcdef012345","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
+		EventSource:     new("ec2.amazonaws.com"),
+		Username:        new("admin"),
+		ReadOnly:        new("false"),
+		CloudTrailEvent: new(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE123","arn":"arn:aws:sts::123456789012:assumed-role/test-role/session","accountId":"123456789012"},"eventTime":"2025-03-15T12:00:00Z","eventSource":"ec2.amazonaws.com","eventName":"RunInstances","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.1","userAgent":"console.ec2.amazonaws.com","requestParameters":{"instanceType":"t3.micro","instancesSet":{"items":[{"imageId":"ami-0abc123456def789"}]}},"responseElements":{"instancesSet":{"items":[{"instanceId":"i-0abc123456def789"}]}},"requestID":"req-0001-abcd-1234","eventID":"evt-0001-abcd-1234-5678-abcdef012345","readOnly":false,"eventType":"AwsApiCall","managementEvent":true}`),
 		Resources: []cloudtrailtypes.Resource{
 			{
-				ResourceType: ptrString("AWS::EC2::Instance"),
-				ResourceName: ptrString("i-0abc123456def789"),
+				ResourceType: new("AWS::EC2::Instance"),
+				ResourceName: new("i-0abc123456def789"),
 			},
 		},
 	}
@@ -1702,12 +1702,12 @@ func TestQA_Detail_CloudTrailEvent_JSONFieldRenderedStructured(t *testing.T) {
 
 	eventTime := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
 	event := cloudtrailtypes.Event{
-		EventId:          ptrString("evt-json-0001"),
-		EventName:        ptrString("RunInstances"),
-		EventTime:        &eventTime,
-		EventSource:      ptrString("ec2.amazonaws.com"),
-		Username:         ptrString("test-user"),
-		CloudTrailEvent:  ptrString(cloudTrailEventJSON),
+		EventId:         new("evt-json-0001"),
+		EventName:       new("RunInstances"),
+		EventTime:       &eventTime,
+		EventSource:     new("ec2.amazonaws.com"),
+		Username:        new("test-user"),
+		CloudTrailEvent: new(cloudTrailEventJSON),
 	}
 
 	res := buildResource("evt-json-0001", "RunInstances", event)
@@ -1739,11 +1739,11 @@ func TestQA_Detail_CloudTrailEvent_NilCloudTrailEventField(t *testing.T) {
 
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 	event := cloudtrailtypes.Event{
-		EventId:         ptrString("evt-nil-ct-field"),
-		EventName:       ptrString("GetObject"),
+		EventId:         new("evt-nil-ct-field"),
+		EventName:       new("GetObject"),
 		EventTime:       &eventTime,
-		EventSource:     ptrString("s3.amazonaws.com"),
-		Username:        ptrString("readonly-user"),
+		EventSource:     new("s3.amazonaws.com"),
+		Username:        new("readonly-user"),
 		CloudTrailEvent: nil,
 	}
 

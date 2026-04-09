@@ -37,7 +37,7 @@ func vpcSrcResource() resource.Resource {
 			"vpc_id": vpcTestID,
 		},
 		RawStruct: ec2types.Vpc{
-			VpcId: strPtr(vpcTestID),
+			VpcId: new(vpcTestID),
 		},
 	}
 }
@@ -285,11 +285,11 @@ func TestRelated_VPC_NilClients(t *testing.T) {
 // tag produces Count=1 with the stack name in ResourceIDs.
 func TestRelated_VPC_CFN_HasTag(t *testing.T) {
 	res := resource.Resource{
-		ID:   vpcTestID,
+		ID:     vpcTestID,
 		Fields: map[string]string{"vpc_id": vpcTestID},
 		RawStruct: ec2types.Vpc{
 			Tags: []ec2types.Tag{
-				{Key: strPtr("aws:cloudformation:stack-name"), Value: strPtr("vpc-stack")},
+				{Key: new("aws:cloudformation:stack-name"), Value: new("vpc-stack")},
 			},
 		},
 	}
@@ -321,4 +321,3 @@ func TestRelated_VPC_CFN_NoTag(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (VPC has no CFN tag)", result.Count)
 	}
 }
-

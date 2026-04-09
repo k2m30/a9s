@@ -89,9 +89,10 @@ func buildSortModel(
 // the P3 coder's WithSort setter; until that ships we simulate via key presses.
 //
 // Key bindings (keys.go):
-//   SortByName = "N"
-//   SortByID   = "I"
-//   SortByAge  = "A"
+//
+//	SortByName = "N"
+//	SortByID   = "I"
+//	SortByAge  = "A"
 //
 // If the current sort already matches the target field, the direction may be
 // toggled by a second key press; we handle that case explicitly.
@@ -141,13 +142,13 @@ func syntheticResourceForType(shortName string) resource.Resource {
 			// Use ct-info (dim) so the sort test is purely about header decoration.
 			Status: "ct-info",
 			Fields: map[string]string{
-				"time":         "Apr 07 17:00:00",
-				"event_time":   "2026-04-07T17:00:00Z",
-				"_ct.verb":     "R",
-				"_ct.actor":    "test-user",
-				"_ct.origin":   "CLI",
-				"_ct.target":   "i-0test001",
-				"_ct.outcome":  "OK",
+				"time":        "Apr 07 17:00:00",
+				"event_time":  "2026-04-07T17:00:00Z",
+				"_ct.verb":    "R",
+				"_ct.actor":   "test-user",
+				"_ct.origin":  "CLI",
+				"_ct.target":  "i-0test001",
+				"_ct.outcome": "OK",
 			},
 		}
 	case "ec2":
@@ -209,38 +210,38 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 		// ct-events + SortAge: BUG CASE — should be 1 glyph on TIME, not 2 (TIME+EVENT).
 		// This test FAILS against HEAD until the P3 coder ships the sortColKey fix.
 		{
-			name: "ct-events_Age_desc",
-			typeName: "ct-events",
-			sort:     views.SortAge,
-			sortAsc:  false,
+			name:         "ct-events_Age_desc",
+			typeName:     "ct-events",
+			sort:         views.SortAge,
+			sortAsc:      false,
 			wantCount:    1,
 			wantOnColumn: "TIME",
 		},
 		// ct-events + SortAge ascending: same fix, different glyph direction.
 		{
-			name: "ct-events_Age_asc",
-			typeName: "ct-events",
-			sort:     views.SortAge,
-			sortAsc:  true,
+			name:         "ct-events_Age_asc",
+			typeName:     "ct-events",
+			sort:         views.SortAge,
+			sortAsc:      true,
 			wantCount:    1,
 			wantOnColumn: "TIME",
 		},
 		// ec2 + SortAge: verify no regression on a non-ct resource.
 		{
-			name: "ec2_Age",
-			typeName: "ec2",
-			sort:     views.SortAge,
-			sortAsc:  false,
+			name:         "ec2_Age",
+			typeName:     "ec2",
+			sort:         views.SortAge,
+			sortAsc:      false,
 			wantCount:    1,
 			wantOnColumn: "", // ec2 has no standard "age" column in defaults; check count only
 		},
 		// rds + SortAge: dbi has no age-like column in defaults, so no glyph renders.
 		// This proves the sortColKey=="" branch produces zero glyphs (not a fallback).
 		{
-			name: "rds_Age",
-			typeName: "dbi",
-			sort:     views.SortAge,
-			sortAsc:  false,
+			name:         "rds_Age",
+			typeName:     "dbi",
+			sort:         views.SortAge,
+			sortAsc:      false,
 			wantCount:    0,
 			wantOnColumn: "",
 		},
@@ -248,26 +249,25 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 		// isAgeKey does not match name-related columns, so SortName → 0 glyphs.
 		// (After the fix this becomes an exact-key match; no column has key="name".)
 		{
-			name: "ct-events_Name",
-			typeName: "ct-events",
-			sort:     views.SortName,
-			sortAsc:  true,
+			name:         "ct-events_Name",
+			typeName:     "ct-events",
+			sort:         views.SortName,
+			sortAsc:      true,
 			wantCount:    0,
 			wantOnColumn: "",
 		},
 		// ec2 + SortID: verify exactly one glyph on the ID-related column.
 		{
-			name: "ec2_ID",
-			typeName: "ec2",
-			sort:     views.SortID,
-			sortAsc:  true,
+			name:         "ec2_ID",
+			typeName:     "ec2",
+			sort:         views.SortID,
+			sortAsc:      true,
 			wantCount:    1,
 			wantOnColumn: "",
 		},
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := buildSortModel(t, tc.typeName, tc.sort, tc.sortAsc)
 
@@ -323,7 +323,6 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 
 func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 	for _, shortName := range []string{"ec2", "dbi"} {
-		shortName := shortName
 		t.Run(shortName, func(t *testing.T) {
 			os.Unsetenv("NO_COLOR")
 			styles.Reinit()

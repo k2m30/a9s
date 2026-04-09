@@ -226,7 +226,7 @@ func TestQA26_B02_BackspaceRemovesLastChar(t *testing.T) {
 	}
 
 	// Six more Backspaces: "runnin" → "".
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		m = qa26PressBackspace(m)
 	}
 	plain = qa26PlainView(m)

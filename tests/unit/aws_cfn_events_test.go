@@ -728,7 +728,7 @@ func TestFetchCfnEvents_MaxCap(t *testing.T) {
 
 	// Build one page of 50 events with a NextToken indicating more pages exist.
 	var events []cfntypes.StackEvent
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		events = append(events, cfntypes.StackEvent{
 			EventId:           aws.String(fmt.Sprintf("evt-p0-%d", i)),
 			StackName:         aws.String("big-stack"),

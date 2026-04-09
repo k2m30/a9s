@@ -82,10 +82,7 @@ func FetchEcsSvcTasks(
 	const descBatchSize = 100
 	var allTasks []ecstypes.Task
 	for i := 0; i < len(allTaskArns); i += descBatchSize {
-		end := i + descBatchSize
-		if end > len(allTaskArns) {
-			end = len(allTaskArns)
-		}
+		end := min(i+descBatchSize, len(allTaskArns))
 		descOutput, err := describeAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 			Cluster: aws.String(cluster),
 			Tasks:   allTaskArns[i:end],

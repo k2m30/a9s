@@ -72,8 +72,8 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -211,8 +211,8 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"web-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -259,8 +259,8 @@ func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"empty-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -283,8 +283,8 @@ func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -315,8 +315,8 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
 		"err-service",
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -359,8 +359,8 @@ func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster",
 		"my-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -414,8 +414,8 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/nil-cluster",
 		"nil-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -491,8 +491,8 @@ func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 		describeTasksMock,
 		"arn:aws:ecs:us-east-1:123456789012:cluster/raw-cluster",
 		"web-service",
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -616,10 +616,7 @@ func (m *mockBatchingDescribeTasksClient) DescribeTasks(ctx context.Context, par
 	for _, prev := range m.batchSizes[:len(m.batchSizes)-1] {
 		start += prev
 	}
-	end := start + len(params.Tasks)
-	if end > len(m.allTasks) {
-		end = len(m.allTasks)
-	}
+	end := min(start+len(params.Tasks), len(m.allTasks))
 	return &ecs.DescribeTasksOutput{
 		Tasks: m.allTasks[start:end],
 	}, nil
@@ -659,8 +656,7 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 
 	describeMock := &mockBatchingDescribeTasksClient{allTasks: allTasks}
 
-	results, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service", "",
-)
+	results, err := awsclient.FetchEcsSvcTasks(context.Background(), listMock, describeMock, "arn:aws:ecs:us-east-1:123456789012:cluster/cluster", "my-service", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

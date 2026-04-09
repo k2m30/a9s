@@ -206,7 +206,7 @@ func buildECSServices() []ecstypes.Service {
 	}
 
 	// Generate 17 more services to reach 22 total.
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		name := ecsServiceNamePool[i]
 		clusterIdx := i % len(clusterArns)
 		clusterArn := clusterArns[clusterIdx]

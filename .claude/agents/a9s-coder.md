@@ -79,10 +79,11 @@ internal/tui/
 1. **Receive scoped task** from architect (exact files, functions, behavior)
 2. **Read only the files specified** in the scope
 3. **Write implementation** to make existing tests pass (QA writes tests separately)
-4. **Run ALL tests** — `go test ./tests/unit/ -count=1 -timeout 120s`
-5. **Run lint** — `golangci-lint run ./...` — must be 0 issues
-6. **Run vulncheck** — `govulncheck ./...` — must be 0 vulnerabilities
-7. **Verify compilation** — `go build ./internal/tui/...`
+4. **Run ALL tests** — `make test`
+5. **Run lint** — `make lint` — must be 0 issues
+6. **Run vulncheck** — `make security` — must be 0 vulnerabilities
+7. **Run gofix** — `make gofix` — must pass
+8. **Verify compilation** — `make build`
 
 Steps 4-7 MUST pass locally before reporting completion.
 

@@ -301,7 +301,7 @@ func TestSearch_E02_NWrapsFromLastToFirst(t *testing.T) {
 	m = rootActivateSearch(m, "running")
 
 	// Navigate to the last match (4/4): press n 3 times.
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		m, _ = rootApplyMsg(m, rootKeyPress("n"))
 	}
 
@@ -494,7 +494,7 @@ func TestSearch_J01_SearchOnVisibleTextNotANSI(t *testing.T) {
 	styled := blueOpen + "InstanceType" + reset + ": " + greenOpen + "t3.medium" + reset
 
 	s := views.NewSearch()
-	s.SetContent(plain)  // SetContent takes ANSI-stripped plain text
+	s.SetContent(plain) // SetContent takes ANSI-stripped plain text
 	s.SetQuery("t3.medium")
 
 	if s.MatchCount() != 1 {
@@ -734,7 +734,7 @@ func TestSearch_M05_SearchSingleCharColon(t *testing.T) {
 	}
 
 	// Navigate forward through all matches.
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		s.NextMatch()
 	}
 	if s.CurrentMatch() != 4 {
@@ -765,7 +765,7 @@ func TestSearch_M05_SearchSingleCharColon(t *testing.T) {
 func TestSearch_M06_RapidNavigation(t *testing.T) {
 	// Build content with 150 colons across 150 lines (one "key: val" per line).
 	var linesBuf strings.Builder
-	for i := 0; i < 150; i++ {
+	for range 150 {
 		linesBuf.WriteString("key: value\n")
 	}
 	plain := strings.TrimRight(linesBuf.String(), "\n")
@@ -780,7 +780,7 @@ func TestSearch_M06_RapidNavigation(t *testing.T) {
 	}
 
 	// Press n 150 times in a rapid loop.
-	for i := 0; i < 150; i++ {
+	for range 150 {
 		s.NextMatch()
 	}
 

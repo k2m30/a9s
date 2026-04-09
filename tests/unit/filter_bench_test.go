@@ -10,7 +10,7 @@ import (
 
 func generateResources(n int) []resource.Resource {
 	resources := make([]resource.Resource, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		resources[i] = resource.Resource{
 			ID:     fmt.Sprintf("i-%010d", i),
 			Name:   fmt.Sprintf("instance-%d", i),

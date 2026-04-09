@@ -21,28 +21,28 @@ import (
 func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 	t.Run("EC2 Instance", func(t *testing.T) {
 		inst := ec2types.Instance{
-			InstanceId:       strPtr("i-12345"),
+			InstanceId:       new("i-12345"),
 			InstanceType:     ec2types.InstanceTypeT2Micro,
-			PrivateIpAddress: strPtr("10.0.0.1"),
-			PublicIpAddress:  strPtr("54.1.2.3"),
+			PrivateIpAddress: new("10.0.0.1"),
+			PublicIpAddress:  new("54.1.2.3"),
 			State: &ec2types.InstanceState{
 				Name: ec2types.InstanceStateNameRunning,
-				Code: int32Ptr(16),
+				Code: new(int32(16)),
 			},
 			Placement: &ec2types.Placement{
-				AvailabilityZone: strPtr("eu-central-1a"),
+				AvailabilityZone: new("eu-central-1a"),
 				Tenancy:          ec2types.TenancyDefault,
 			},
 			SecurityGroups: []ec2types.GroupIdentifier{
-				{GroupId: strPtr("sg-111"), GroupName: strPtr("web")},
-				{GroupId: strPtr("sg-222"), GroupName: strPtr("db")},
+				{GroupId: new("sg-111"), GroupName: new("web")},
+				{GroupId: new("sg-222"), GroupName: new("db")},
 			},
 			Tags: []ec2types.Tag{
-				{Key: strPtr("Name"), Value: strPtr("my-instance")},
-				{Key: strPtr("Env"), Value: strPtr("prod")},
+				{Key: new("Name"), Value: new("my-instance")},
+				{Key: new("Env"), Value: new("prod")},
 			},
 			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
-				{DeviceName: strPtr("/dev/sda1")},
+				{DeviceName: new("/dev/sda1")},
 			},
 		}
 
@@ -59,8 +59,8 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("S3 Bucket", func(t *testing.T) {
 		bucket := s3types.Bucket{
-			Name:      strPtr("my-bucket"),
-			BucketArn: strPtr("arn:aws:s3:::my-bucket"),
+			Name:      new("my-bucket"),
+			BucketArn: new("arn:aws:s3:::my-bucket"),
 		}
 
 		assertNoSubtreePanic(t, bucket, "Name", "my-bucket")
@@ -69,8 +69,8 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("S3 Object", func(t *testing.T) {
 		obj := s3types.Object{
-			Key:          strPtr("path/to/file.txt"),
-			Size:         int64Ptr(1024),
+			Key:          new("path/to/file.txt"),
+			Size:         new(int64(1024)),
 			StorageClass: s3types.ObjectStorageClassStandard,
 		}
 
@@ -81,22 +81,22 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("RDS Instance", func(t *testing.T) {
 		db := rdstypes.DBInstance{
-			DBInstanceIdentifier: strPtr("mydb"),
-			Engine:               strPtr("postgres"),
-			EngineVersion:        strPtr("14.9"),
-			DBInstanceStatus:     strPtr("available"),
-			DBInstanceClass:      strPtr("db.t3.micro"),
-			MultiAZ:              boolPtr(true),
-			AllocatedStorage:     int32Ptr(20),
+			DBInstanceIdentifier: new("mydb"),
+			Engine:               new("postgres"),
+			EngineVersion:        new("14.9"),
+			DBInstanceStatus:     new("available"),
+			DBInstanceClass:      new("db.t3.micro"),
+			MultiAZ:              new(true),
+			AllocatedStorage:     new(int32(20)),
 			Endpoint: &rdstypes.Endpoint{
-				Address: strPtr("mydb.abc.rds.amazonaws.com"),
-				Port:    int32Ptr(5432),
+				Address: new("mydb.abc.rds.amazonaws.com"),
+				Port:    new(int32(5432)),
 			},
 			DBSubnetGroup: &rdstypes.DBSubnetGroup{
-				DBSubnetGroupName: strPtr("default"),
+				DBSubnetGroupName: new("default"),
 			},
 			VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
-				{VpcSecurityGroupId: strPtr("sg-rds-1"), Status: strPtr("active")},
+				{VpcSecurityGroupId: new("sg-rds-1"), Status: new("active")},
 			},
 		}
 
@@ -111,21 +111,21 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("ElastiCache Redis", func(t *testing.T) {
 		cluster := elasticachetypes.CacheCluster{
-			CacheClusterId:     strPtr("redis-001"),
-			Engine:             strPtr("redis"),
-			EngineVersion:      strPtr("7.0"),
-			CacheClusterStatus: strPtr("available"),
-			CacheNodeType:      strPtr("cache.t3.micro"),
-			NumCacheNodes:      int32Ptr(1),
+			CacheClusterId:     new("redis-001"),
+			Engine:             new("redis"),
+			EngineVersion:      new("7.0"),
+			CacheClusterStatus: new("available"),
+			CacheNodeType:      new("cache.t3.micro"),
+			NumCacheNodes:      new(int32(1)),
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{
-				Address: strPtr("redis-001.abc.cache.amazonaws.com"),
-				Port:    int32Ptr(6379),
+				Address: new("redis-001.abc.cache.amazonaws.com"),
+				Port:    new(int32(6379)),
 			},
 			CacheNodes: []elasticachetypes.CacheNode{
-				{CacheNodeId: strPtr("0001")},
+				{CacheNodeId: new("0001")},
 			},
 			SecurityGroups: []elasticachetypes.SecurityGroupMembership{
-				{SecurityGroupId: strPtr("sg-redis-1"), Status: strPtr("active")},
+				{SecurityGroupId: new("sg-redis-1"), Status: new("active")},
 			},
 		}
 
@@ -139,19 +139,19 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("DocumentDB Cluster", func(t *testing.T) {
 		cluster := docdbtypes.DBCluster{
-			DBClusterIdentifier: strPtr("docdb-001"),
-			Engine:              strPtr("dbc"),
-			EngineVersion:       strPtr("5.0"),
-			Status:              strPtr("available"),
-			Endpoint:            strPtr("docdb-001.abc.docdb.amazonaws.com"),
-			ReaderEndpoint:      strPtr("docdb-001-ro.abc.docdb.amazonaws.com"),
-			Port:                int32Ptr(27017),
-			StorageEncrypted:    boolPtr(true),
+			DBClusterIdentifier: new("docdb-001"),
+			Engine:              new("dbc"),
+			EngineVersion:       new("5.0"),
+			Status:              new("available"),
+			Endpoint:            new("docdb-001.abc.docdb.amazonaws.com"),
+			ReaderEndpoint:      new("docdb-001-ro.abc.docdb.amazonaws.com"),
+			Port:                new(int32(27017)),
+			StorageEncrypted:    new(true),
 			DBClusterMembers: []docdbtypes.DBClusterMember{
-				{DBInstanceIdentifier: strPtr("docdb-001-instance-1"), IsClusterWriter: boolPtr(true)},
+				{DBInstanceIdentifier: new("docdb-001-instance-1"), IsClusterWriter: new(true)},
 			},
 			AssociatedRoles: []docdbtypes.DBClusterRole{
-				{RoleArn: strPtr("arn:aws:iam::123:role/docdb-role")},
+				{RoleArn: new("arn:aws:iam::123:role/docdb-role")},
 			},
 		}
 
@@ -165,16 +165,16 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("EKS Cluster", func(t *testing.T) {
 		cluster := ekstypes.Cluster{
-			Name:            strPtr("eks-001"),
-			Version:         strPtr("1.28"),
+			Name:            new("eks-001"),
+			Version:         new("1.28"),
 			Status:          ekstypes.ClusterStatusActive,
-			Endpoint:        strPtr("https://abc.eks.amazonaws.com"),
-			Arn:             strPtr("arn:aws:eks:eu-central-1:123:cluster/eks-001"),
-			PlatformVersion: strPtr("eks.5"),
-			RoleArn:         strPtr("arn:aws:iam::123:role/eks-role"),
+			Endpoint:        new("https://abc.eks.amazonaws.com"),
+			Arn:             new("arn:aws:eks:eu-central-1:123:cluster/eks-001"),
+			PlatformVersion: new("eks.5"),
+			RoleArn:         new("arn:aws:iam::123:role/eks-role"),
 			KubernetesNetworkConfig: &ekstypes.KubernetesNetworkConfigResponse{
 				IpFamily:        ekstypes.IpFamilyIpv4,
-				ServiceIpv4Cidr: strPtr("10.100.0.0/16"),
+				ServiceIpv4Cidr: new("10.100.0.0/16"),
 			},
 			EncryptionConfig: []ekstypes.EncryptionConfig{
 				{Resources: []string{"secrets"}},
@@ -191,16 +191,16 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 
 	t.Run("Secrets Manager", func(t *testing.T) {
 		secret := smtypes.SecretListEntry{
-			Name:            strPtr("my-secret"),
-			ARN:             strPtr("arn:aws:secretsmanager:eu-central-1:123:secret:my-secret"),
-			Description:     strPtr("A test secret"),
-			KmsKeyId:        strPtr("alias/aws/secretsmanager"),
-			RotationEnabled: boolPtr(false),
+			Name:            new("my-secret"),
+			ARN:             new("arn:aws:secretsmanager:eu-central-1:123:secret:my-secret"),
+			Description:     new("A test secret"),
+			KmsKeyId:        new("alias/aws/secretsmanager"),
+			RotationEnabled: new(false),
 			Tags: []smtypes.Tag{
-				{Key: strPtr("Env"), Value: strPtr("prod")},
+				{Key: new("Env"), Value: new("prod")},
 			},
 			RotationRules: &smtypes.RotationRulesType{
-				AutomaticallyAfterDays: int64Ptr(30),
+				AutomaticallyAfterDays: new(int64(30)),
 			},
 		}
 
@@ -214,7 +214,7 @@ func TestExtractSubtree_AllAWSResourceTypes(t *testing.T) {
 }
 
 // assertNoSubtreePanic calls ExtractSubtree and fails if it panics or result doesn't contain expected.
-func assertNoSubtreePanic(t *testing.T, obj interface{}, path, expectedContains string) {
+func assertNoSubtreePanic(t *testing.T, obj any, path, expectedContains string) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
@@ -228,7 +228,7 @@ func assertNoSubtreePanic(t *testing.T, obj interface{}, path, expectedContains 
 }
 
 // assertNoScalarPanic calls ExtractScalar and fails if it panics or result doesn't contain expected.
-func assertNoScalarPanic(t *testing.T, obj interface{}, path, expectedContains string) {
+func assertNoScalarPanic(t *testing.T, obj any, path, expectedContains string) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
@@ -241,4 +241,5 @@ func assertNoScalarPanic(t *testing.T, obj interface{}, path, expectedContains s
 	}
 }
 
-func int64Ptr(i int64) *int64 { return &i }
+//go:fix inline
+func int64Ptr(i int64) *int64 { return new(i) }

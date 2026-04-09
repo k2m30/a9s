@@ -22,18 +22,18 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 			LogGroups: []cwlogstypes.LogGroup{
 				{
 					LogGroupName:         aws.String("/aws/lambda/prod-processor"),
-					StoredBytes:          int64Ptr(1048576),
+					StoredBytes:          new(int64(1048576)),
 					RetentionInDays:      aws.Int32(30),
-					CreationTime:         int64Ptr(1700000000000),
+					CreationTime:         new(int64(1700000000000)),
 					Arn:                  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/prod-processor:*"),
 					KmsKeyId:             aws.String("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
 					DataProtectionStatus: cwlogstypes.DataProtectionStatusActivated,
 				},
 				{
 					LogGroupName:         aws.String("/aws/ecs/staging-service"),
-					StoredBytes:          int64Ptr(524288),
+					StoredBytes:          new(int64(524288)),
 					RetentionInDays:      aws.Int32(7),
-					CreationTime:         int64Ptr(1710000000000),
+					CreationTime:         new(int64(1710000000000)),
 					Arn:                  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/ecs/staging-service:*"),
 					DataProtectionStatus: cwlogstypes.DataProtectionStatusDisabled,
 				},

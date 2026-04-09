@@ -21,11 +21,20 @@ import (
 // Helpers
 // ===========================================================================
 
-func ptrString(s string) *string    { return &s }
-func ptrBool(b bool) *bool          { return &b }
-func ptrInt32(i int32) *int32       { return &i }
-func ptrInt64(i int64) *int64       { return &i }
-func ptrTime(t time.Time) *time.Time { return &t }
+//go:fix inline
+func ptrString(s string) *string { return new(s) }
+
+//go:fix inline
+func ptrBool(b bool) *bool { return new(b) }
+
+//go:fix inline
+func ptrInt32(i int32) *int32 { return new(i) }
+
+//go:fix inline
+func ptrInt64(i int64) *int64 { return new(i) }
+
+//go:fix inline
+func ptrTime(t time.Time) *time.Time { return new(t) }
 
 var testTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 
@@ -35,77 +44,77 @@ var testTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 
 func realisticS3Bucket() s3types.Bucket {
 	return s3types.Bucket{
-		Name:         ptrString("my-production-bucket"),
-		CreationDate: ptrTime(testTime),
-		BucketArn:    ptrString("arn:aws:s3:::my-production-bucket"),
-		BucketRegion: ptrString("us-east-1"),
+		Name:         new("my-production-bucket"),
+		CreationDate: new(testTime),
+		BucketArn:    new("arn:aws:s3:::my-production-bucket"),
+		BucketRegion: new("us-east-1"),
 	}
 }
 
 func realisticS3ObjectFile() s3types.Object {
 	return s3types.Object{
-		Key:          ptrString("data/report-2025.csv"),
-		Size:         ptrInt64(1048576),
-		LastModified: ptrTime(testTime),
+		Key:          new("data/report-2025.csv"),
+		Size:         new(int64(1048576)),
+		LastModified: new(testTime),
 		StorageClass: s3types.ObjectStorageClassStandard,
-		ETag:         ptrString("\"d41d8cd98f00b204e9800998ecf8427e\""),
+		ETag:         new("\"d41d8cd98f00b204e9800998ecf8427e\""),
 	}
 }
 
 func realisticS3ObjectFolder() s3types.CommonPrefix {
 	return s3types.CommonPrefix{
-		Prefix: ptrString("data/reports/"),
+		Prefix: new("data/reports/"),
 	}
 }
 
 func realisticEC2Instance() ec2types.Instance {
 	return ec2types.Instance{
-		InstanceId:       ptrString("i-0abcdef1234567890"),
+		InstanceId:       new("i-0abcdef1234567890"),
 		InstanceType:     ec2types.InstanceTypeT3Medium,
-		PrivateIpAddress: ptrString("10.0.1.42"),
-		PublicIpAddress:  ptrString("54.123.45.67"),
-		LaunchTime:       ptrTime(testTime),
-		ImageId:          ptrString("ami-0abcdef1234567890"),
-		VpcId:            ptrString("vpc-0abc1234"),
-		SubnetId:         ptrString("subnet-0abc5678"),
+		PrivateIpAddress: new("10.0.1.42"),
+		PublicIpAddress:  new("54.123.45.67"),
+		LaunchTime:       new(testTime),
+		ImageId:          new("ami-0abcdef1234567890"),
+		VpcId:            new("vpc-0abc1234"),
+		SubnetId:         new("subnet-0abc5678"),
 		Architecture:     ec2types.ArchitectureValuesX8664,
-		KeyName:          ptrString("prod-keypair"),
-		PrivateDnsName:   ptrString("ip-10-0-1-42.ec2.internal"),
-		EbsOptimized:     ptrBool(true),
+		KeyName:          new("prod-keypair"),
+		PrivateDnsName:   new("ip-10-0-1-42.ec2.internal"),
+		EbsOptimized:     new(true),
 		Placement: &ec2types.Placement{
-			AvailabilityZone: ptrString("us-east-1a"),
+			AvailabilityZone: new("us-east-1a"),
 			Tenancy:          ec2types.TenancyDefault,
 		},
 		IamInstanceProfile: &ec2types.IamInstanceProfile{
-			Arn: ptrString("arn:aws:iam::123456789012:instance-profile/web-server-role"),
-			Id:  ptrString("AIPAXYZ1234567890ABCD"),
+			Arn: new("arn:aws:iam::123456789012:instance-profile/web-server-role"),
+			Id:  new("AIPAXYZ1234567890ABCD"),
 		},
 		MetadataOptions: &ec2types.InstanceMetadataOptionsResponse{
 			HttpEndpoint:            ec2types.InstanceMetadataEndpointStateEnabled,
 			HttpTokens:              ec2types.HttpTokensStateRequired,
-			HttpPutResponseHopLimit: ptrInt32(2),
+			HttpPutResponseHopLimit: new(int32(2)),
 		},
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
-			Code: ptrInt32(16),
+			Code: new(int32(16)),
 		},
 		Tags: []ec2types.Tag{
-			{Key: ptrString("Name"), Value: ptrString("web-server-prod")},
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("Name"), Value: new("web-server-prod")},
+			{Key: new("env"), Value: new("production")},
 		},
 		SecurityGroups: []ec2types.GroupIdentifier{
-			{GroupId: ptrString("sg-0abc1234"), GroupName: ptrString("web-sg")},
+			{GroupId: new("sg-0abc1234"), GroupName: new("web-sg")},
 		},
 		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
 			{
-				DeviceName: ptrString("/dev/sda1"),
+				DeviceName: new("/dev/sda1"),
 				Ebs: &ec2types.EbsInstanceBlockDevice{
-					VolumeId: ptrString("vol-0abc1234567890def"),
+					VolumeId: new("vol-0abc1234567890def"),
 					Status:   ec2types.AttachmentStatusAttached,
 				},
 			},
 		},
-		PlatformDetails:   ptrString("Linux/UNIX"),
+		PlatformDetails:   new("Linux/UNIX"),
 		Platform:          ec2types.PlatformValuesWindows,
 		InstanceLifecycle: ec2types.InstanceLifecycleTypeSpot,
 	}
@@ -113,139 +122,139 @@ func realisticEC2Instance() ec2types.Instance {
 
 func realisticRDSInstance() rdstypes.DBInstance {
 	return rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("prod-db-01"),
-		DBInstanceArn:        ptrString("arn:aws:rds:us-east-1:123456789012:db:prod-db-01"),
-		Engine:               ptrString("mysql"),
-		EngineVersion:        ptrString("8.0.35"),
-		DBInstanceStatus:     ptrString("available"),
-		DBInstanceClass:      ptrString("db.r5.large"),
-		MultiAZ:              ptrBool(true),
-		AllocatedStorage:     ptrInt32(100),
-		StorageType:          ptrString("gp3"),
-		Iops:                 ptrInt32(3000),
-		StorageEncrypted:     ptrBool(true),
-		KmsKeyId:             ptrString("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
-		AvailabilityZone:     ptrString("us-east-1a"),
-		PubliclyAccessible:   ptrBool(false),
+		DBInstanceIdentifier: new("prod-db-01"),
+		DBInstanceArn:        new("arn:aws:rds:us-east-1:123456789012:db:prod-db-01"),
+		Engine:               new("mysql"),
+		EngineVersion:        new("8.0.35"),
+		DBInstanceStatus:     new("available"),
+		DBInstanceClass:      new("db.r5.large"),
+		MultiAZ:              new(true),
+		AllocatedStorage:     new(int32(100)),
+		StorageType:          new("gp3"),
+		Iops:                 new(int32(3000)),
+		StorageEncrypted:     new(true),
+		KmsKeyId:             new("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
+		AvailabilityZone:     new("us-east-1a"),
+		PubliclyAccessible:   new(false),
 		DBSubnetGroup: &rdstypes.DBSubnetGroup{
-			DBSubnetGroupName:        ptrString("prod-db-subnet-group"),
-			DBSubnetGroupDescription: ptrString("Production DB subnet group"),
+			DBSubnetGroupName:        new("prod-db-subnet-group"),
+			DBSubnetGroupDescription: new("Production DB subnet group"),
 		},
 		VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
-			{VpcSecurityGroupId: ptrString("sg-0abc1234"), Status: ptrString("active")},
+			{VpcSecurityGroupId: new("sg-0abc1234"), Status: new("active")},
 		},
-		BackupRetentionPeriod:      ptrInt32(7),
-		PreferredMaintenanceWindow: ptrString("sun:03:00-sun:04:00"),
-		PreferredBackupWindow:      ptrString("02:00-03:00"),
-		DeletionProtection:         ptrBool(true),
-		MasterUsername:             ptrString("admin"),
-		PerformanceInsightsEnabled: ptrBool(true),
+		BackupRetentionPeriod:      new(int32(7)),
+		PreferredMaintenanceWindow: new("sun:03:00-sun:04:00"),
+		PreferredBackupWindow:      new("02:00-03:00"),
+		DeletionProtection:         new(true),
+		MasterUsername:             new("admin"),
+		PerformanceInsightsEnabled: new(true),
 		TagList: []rdstypes.Tag{
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("env"), Value: new("production")},
 		},
 		Endpoint: &rdstypes.Endpoint{
-			Address: ptrString("prod-db-01.abc123.us-east-1.rds.amazonaws.com"),
-			Port:    ptrInt32(3306),
+			Address: new("prod-db-01.abc123.us-east-1.rds.amazonaws.com"),
+			Port:    new(int32(3306)),
 		},
 	}
 }
 
 func realisticRedisCacheCluster() elasticachetypes.CacheCluster {
 	return elasticachetypes.CacheCluster{
-		CacheClusterId:     ptrString("redis-prod-001"),
-		ARN:                ptrString("arn:aws:elasticache:us-east-1:123456789012:cluster:redis-prod-001"),
-		Engine:             ptrString("redis"),
-		EngineVersion:      ptrString("7.0.12"),
-		CacheNodeType:      ptrString("cache.r6g.large"),
-		CacheClusterStatus: ptrString("available"),
-		NumCacheNodes:      ptrInt32(3),
+		CacheClusterId:     new("redis-prod-001"),
+		ARN:                new("arn:aws:elasticache:us-east-1:123456789012:cluster:redis-prod-001"),
+		Engine:             new("redis"),
+		EngineVersion:      new("7.0.12"),
+		CacheNodeType:      new("cache.r6g.large"),
+		CacheClusterStatus: new("available"),
+		NumCacheNodes:      new(int32(3)),
 		ConfigurationEndpoint: &elasticachetypes.Endpoint{
-			Address: ptrString("redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com"),
-			Port:    ptrInt32(6379),
+			Address: new("redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com"),
+			Port:    new(int32(6379)),
 		},
-		PreferredAvailabilityZone: ptrString("us-east-1a"),
+		PreferredAvailabilityZone: new("us-east-1a"),
 		CacheNodes: []elasticachetypes.CacheNode{
 			{
-				CacheNodeId:              ptrString("0001"),
-				CacheNodeStatus:          ptrString("available"),
-				CustomerAvailabilityZone: ptrString("us-east-1a"),
+				CacheNodeId:              new("0001"),
+				CacheNodeStatus:          new("available"),
+				CustomerAvailabilityZone: new("us-east-1a"),
 			},
 		},
-		ReplicationGroupId:      ptrString("redis-prod-repl"),
-		CacheSubnetGroupName:    ptrString("redis-prod-subnet-group"),
+		ReplicationGroupId:   new("redis-prod-repl"),
+		CacheSubnetGroupName: new("redis-prod-subnet-group"),
 		SecurityGroups: []elasticachetypes.SecurityGroupMembership{
-			{SecurityGroupId: ptrString("sg-0abc1234"), Status: ptrString("active")},
+			{SecurityGroupId: new("sg-0abc1234"), Status: new("active")},
 		},
-		AtRestEncryptionEnabled:    ptrBool(true),
-		TransitEncryptionEnabled:   ptrBool(true),
-		AuthTokenEnabled:           ptrBool(false),
-		SnapshotRetentionLimit:     ptrInt32(7),
-		PreferredMaintenanceWindow: ptrString("sun:05:00-sun:06:00"),
+		AtRestEncryptionEnabled:    new(true),
+		TransitEncryptionEnabled:   new(true),
+		AuthTokenEnabled:           new(false),
+		SnapshotRetentionLimit:     new(int32(7)),
+		PreferredMaintenanceWindow: new("sun:05:00-sun:06:00"),
 	}
 }
 
 func realisticDocDBCluster() docdbtypes.DBCluster {
 	return docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("docdb-prod-cluster"),
-		DBClusterArn:        ptrString("arn:aws:rds:us-east-1:123456789012:cluster:docdb-prod-cluster"),
-		Engine:              ptrString("dbc"),
-		EngineVersion:       ptrString("5.0.0"),
-		Status:              ptrString("available"),
-		Endpoint:            ptrString("docdb-prod.cluster-abc123.us-east-1.docdb.amazonaws.com"),
-		ReaderEndpoint:      ptrString("docdb-prod.cluster-ro-abc123.us-east-1.docdb.amazonaws.com"),
-		Port:                ptrInt32(27017),
-		StorageEncrypted:    ptrBool(true),
-		KmsKeyId:            ptrString("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
-		DeletionProtection:  ptrBool(true),
-		DBSubnetGroup:       ptrString("docdb-prod-subnet-group"),
+		DBClusterIdentifier: new("docdb-prod-cluster"),
+		DBClusterArn:        new("arn:aws:rds:us-east-1:123456789012:cluster:docdb-prod-cluster"),
+		Engine:              new("dbc"),
+		EngineVersion:       new("5.0.0"),
+		Status:              new("available"),
+		Endpoint:            new("docdb-prod.cluster-abc123.us-east-1.docdb.amazonaws.com"),
+		ReaderEndpoint:      new("docdb-prod.cluster-ro-abc123.us-east-1.docdb.amazonaws.com"),
+		Port:                new(int32(27017)),
+		StorageEncrypted:    new(true),
+		KmsKeyId:            new("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
+		DeletionProtection:  new(true),
+		DBSubnetGroup:       new("docdb-prod-subnet-group"),
 		VpcSecurityGroups: []docdbtypes.VpcSecurityGroupMembership{
-			{VpcSecurityGroupId: ptrString("sg-0abc5678"), Status: ptrString("active")},
+			{VpcSecurityGroupId: new("sg-0abc5678"), Status: new("active")},
 		},
-		BackupRetentionPeriod:      ptrInt32(7),
-		PreferredMaintenanceWindow: ptrString("sun:04:00-sun:05:00"),
-		MasterUsername:             ptrString("docdbadmin"),
+		BackupRetentionPeriod:      new(int32(7)),
+		PreferredMaintenanceWindow: new("sun:04:00-sun:05:00"),
+		MasterUsername:             new("docdbadmin"),
 		DBClusterMembers: []docdbtypes.DBClusterMember{
-			{DBInstanceIdentifier: ptrString("docdb-prod-instance-1"), IsClusterWriter: ptrBool(true)},
-			{DBInstanceIdentifier: ptrString("docdb-prod-instance-2"), IsClusterWriter: ptrBool(false)},
+			{DBInstanceIdentifier: new("docdb-prod-instance-1"), IsClusterWriter: new(true)},
+			{DBInstanceIdentifier: new("docdb-prod-instance-2"), IsClusterWriter: new(false)},
 		},
 	}
 }
 
 func realisticEKSCluster() *ekstypes.Cluster {
 	return &ekstypes.Cluster{
-		Name:            ptrString("prod-cluster"),
-		Version:         ptrString("1.28"),
+		Name:            new("prod-cluster"),
+		Version:         new("1.28"),
 		Status:          ekstypes.ClusterStatusActive,
-		Endpoint:        ptrString("https://ABCDEF1234567890.gr7.us-east-1.eks.amazonaws.com"),
-		PlatformVersion: ptrString("eks.5"),
-		Arn:             ptrString("arn:aws:eks:us-east-1:123456789012:cluster/prod-cluster"),
-		RoleArn:         ptrString("arn:aws:iam::123456789012:role/eks-cluster-role"),
-		CreatedAt:       ptrTime(testTime),
+		Endpoint:        new("https://ABCDEF1234567890.gr7.us-east-1.eks.amazonaws.com"),
+		PlatformVersion: new("eks.5"),
+		Arn:             new("arn:aws:eks:us-east-1:123456789012:cluster/prod-cluster"),
+		RoleArn:         new("arn:aws:iam::123456789012:role/eks-cluster-role"),
+		CreatedAt:       new(testTime),
 		KubernetesNetworkConfig: &ekstypes.KubernetesNetworkConfigResponse{
-			ServiceIpv4Cidr: ptrString("172.20.0.0/16"),
+			ServiceIpv4Cidr: new("172.20.0.0/16"),
 		},
 		ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
-			ClusterSecurityGroupId: ptrString("sg-0abc9999"),
+			ClusterSecurityGroupId: new("sg-0abc9999"),
 			EndpointPrivateAccess:  true,
 			EndpointPublicAccess:   true,
-			VpcId:                  ptrString("vpc-0abc1234"),
+			VpcId:                  new("vpc-0abc1234"),
 		},
 		Logging: &ekstypes.Logging{
 			ClusterLogging: []ekstypes.LogSetup{
 				{
-					Enabled: ptrBool(true),
+					Enabled: new(true),
 					Types:   []ekstypes.LogType{ekstypes.LogTypeApi, ekstypes.LogTypeAudit},
 				},
 			},
 		},
 		Identity: &ekstypes.Identity{
 			Oidc: &ekstypes.OIDC{
-				Issuer: ptrString("https://oidc.eks.us-east-1.amazonaws.com/id/ABCDEF1234567890"),
+				Issuer: new("https://oidc.eks.us-east-1.amazonaws.com/id/ABCDEF1234567890"),
 			},
 		},
 		Tags: map[string]string{
-			"env":     "production",
-			"team":    "platform",
+			"env":  "production",
+			"team": "platform",
 		},
 	}
 }
@@ -253,22 +262,22 @@ func realisticEKSCluster() *ekstypes.Cluster {
 func realisticSecretListEntry() smtypes.SecretListEntry {
 	rotatedTime := testTime.Add(-24 * time.Hour)
 	return smtypes.SecretListEntry{
-		Name:              ptrString("prod/database/password"),
-		Description:       ptrString("Production database password"),
-		LastAccessedDate:  ptrTime(testTime),
-		LastChangedDate:   ptrTime(testTime),
-		RotationEnabled:   ptrBool(true),
-		ARN:               ptrString("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/password-AbCdEf"),
-		KmsKeyId:          ptrString("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
-		CreatedDate:       ptrTime(testTime.Add(-90 * 24 * time.Hour)),
-		LastRotatedDate:   ptrTime(rotatedTime),
-		RotationLambdaARN: ptrString("arn:aws:lambda:us-east-1:123456789012:function:SecretsManagerRotation"),
+		Name:              new("prod/database/password"),
+		Description:       new("Production database password"),
+		LastAccessedDate:  new(testTime),
+		LastChangedDate:   new(testTime),
+		RotationEnabled:   new(true),
+		ARN:               new("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/password-AbCdEf"),
+		KmsKeyId:          new("arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"),
+		CreatedDate:       new(testTime.Add(-90 * 24 * time.Hour)),
+		LastRotatedDate:   new(rotatedTime),
+		RotationLambdaARN: new("arn:aws:lambda:us-east-1:123456789012:function:SecretsManagerRotation"),
 		RotationRules: &smtypes.RotationRulesType{
-			AutomaticallyAfterDays: ptrInt64(30),
+			AutomaticallyAfterDays: new(int64(30)),
 		},
-		PrimaryRegion: ptrString("us-east-1"),
+		PrimaryRegion: new("us-east-1"),
 		Tags: []smtypes.Tag{
-			{Key: ptrString("env"), Value: ptrString("production")},
+			{Key: new("env"), Value: new("production")},
 		},
 	}
 }
@@ -629,8 +638,8 @@ func TestQA_DetailViewPaths_RDS(t *testing.T) {
 func TestQA_NilFields_RDS(t *testing.T) {
 	// Minimal RDS instance — creating state, no endpoint
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("test-db"),
-		DBInstanceStatus:     ptrString("creating"),
+		DBInstanceIdentifier: new("test-db"),
+		DBInstanceStatus:     new("creating"),
 	}
 	vd := config.DefaultViewDef("dbi")
 
@@ -703,8 +712,8 @@ func TestQA_DetailViewPaths_Redis(t *testing.T) {
 func TestQA_NilFields_Redis(t *testing.T) {
 	// Minimal Redis cluster — no endpoint, no nodes
 	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     ptrString("redis-test"),
-		CacheClusterStatus: ptrString("creating"),
+		CacheClusterId:     new("redis-test"),
+		CacheClusterStatus: new("creating"),
 	}
 	vd := config.DefaultViewDef("redis")
 
@@ -787,8 +796,8 @@ func TestQA_DetailViewPaths_DocDB(t *testing.T) {
 func TestQA_NilFields_DocDB(t *testing.T) {
 	// Minimal DocDB cluster — no members, no endpoints
 	cluster := docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("docdb-test"),
-		Status:              ptrString("creating"),
+		DBClusterIdentifier: new("docdb-test"),
+		Status:              new("creating"),
 	}
 	vd := config.DefaultViewDef("dbc")
 
@@ -859,7 +868,7 @@ func TestQA_DetailViewPaths_EKS(t *testing.T) {
 func TestQA_NilFields_EKS(t *testing.T) {
 	// Minimal EKS cluster — no endpoint, no network config
 	cluster := &ekstypes.Cluster{
-		Name:   ptrString("test-cluster"),
+		Name:   new("test-cluster"),
 		Status: ekstypes.ClusterStatusCreating,
 	}
 	vd := config.DefaultViewDef("eks")
@@ -931,7 +940,7 @@ func TestQA_DetailViewPaths_Secrets(t *testing.T) {
 func TestQA_NilFields_Secrets(t *testing.T) {
 	// Minimal secret — only name
 	secret := smtypes.SecretListEntry{
-		Name: ptrString("test-secret"),
+		Name: new("test-secret"),
 	}
 	vd := config.DefaultViewDef("secrets")
 
@@ -1019,9 +1028,9 @@ func TestQA_EC2_InstanceType_EnumExtraction(t *testing.T) {
 
 func TestQA_EC2_NilPublicIP(t *testing.T) {
 	inst := ec2types.Instance{
-		InstanceId:       ptrString("i-private"),
+		InstanceId:       new("i-private"),
 		InstanceType:     ec2types.InstanceTypeT3Micro,
-		PrivateIpAddress: ptrString("10.0.0.1"),
+		PrivateIpAddress: new("10.0.0.1"),
 		// PublicIpAddress is nil
 		State: &ec2types.InstanceState{
 			Name: ec2types.InstanceStateNameRunning,
@@ -1043,8 +1052,8 @@ func TestQA_EC2_NilPublicIP(t *testing.T) {
 
 func TestQA_RDS_NilEndpoint(t *testing.T) {
 	db := rdstypes.DBInstance{
-		DBInstanceIdentifier: ptrString("creating-db"),
-		DBInstanceStatus:     ptrString("creating"),
+		DBInstanceIdentifier: new("creating-db"),
+		DBInstanceStatus:     new("creating"),
 		// Endpoint is nil during creation
 	}
 
@@ -1065,8 +1074,8 @@ func TestQA_RDS_NilEndpoint(t *testing.T) {
 
 func TestQA_Redis_NilConfigurationEndpoint(t *testing.T) {
 	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     ptrString("redis-no-endpoint"),
-		CacheClusterStatus: ptrString("available"),
+		CacheClusterId:     new("redis-no-endpoint"),
+		CacheClusterStatus: new("available"),
 		// ConfigurationEndpoint is nil (single-node clusters)
 	}
 
@@ -1085,8 +1094,8 @@ func TestQA_Redis_NilConfigurationEndpoint(t *testing.T) {
 
 func TestQA_DocDB_EmptyMembers(t *testing.T) {
 	cluster := docdbtypes.DBCluster{
-		DBClusterIdentifier: ptrString("docdb-empty"),
-		Status:              ptrString("creating"),
+		DBClusterIdentifier: new("docdb-empty"),
+		Status:              new("creating"),
 		// DBClusterMembers is nil/empty
 	}
 
@@ -1108,7 +1117,7 @@ func TestQA_DocDB_EmptyMembers(t *testing.T) {
 
 func TestQA_EKS_NilNetworkConfig(t *testing.T) {
 	cluster := &ekstypes.Cluster{
-		Name:   ptrString("cluster-no-net"),
+		Name:   new("cluster-no-net"),
 		Status: ekstypes.ClusterStatusActive,
 		// KubernetesNetworkConfig is nil
 	}
@@ -1124,7 +1133,7 @@ func TestQA_EKS_NilNetworkConfig(t *testing.T) {
 
 func TestQA_Secrets_MinimalFields(t *testing.T) {
 	secret := smtypes.SecretListEntry{
-		Name: ptrString("minimal-secret"),
+		Name: new("minimal-secret"),
 		// No description, no dates, no rotation, no tags
 	}
 

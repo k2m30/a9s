@@ -44,12 +44,12 @@ func makeDetailForToggleTest(t *testing.T, width int) views.DetailModel {
 
 // pressToggleRelated sends the ToggleRelated ('r') key to d and returns both
 // the updated model and the cmd.
-func pressToggleRelated(d views.DetailModel) (views.DetailModel, func() interface{}) {
+func pressToggleRelated(d views.DetailModel) (views.DetailModel, func() any) {
 	updated, cmd := d.Update(detailKeyPress("r"))
 	if cmd == nil {
 		return updated, nil
 	}
-	return updated, func() interface{} { return cmd() }
+	return updated, func() any { return cmd() }
 }
 
 // ---------------------------------------------------------------------------

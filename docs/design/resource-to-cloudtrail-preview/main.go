@@ -2,14 +2,14 @@
 // Run with: go run ./docs/design/resource-to-cloudtrail-preview/
 //
 // Renders the key states of the T-key CloudTrail navigation flow:
-//   1. EC2 Instance list (before pressing T) -- shows selected row
-//   2. ct-search results (after pressing T on EC2) -- ARN-filtered results
-//   3. IAM Role list (before pressing T) -- shows selected row
-//   4. ct-search results (after pressing T on IAM Role) -- Username-filtered results
-//   5. S3 Bucket detail (before pressing T) -- resource detail view
-//   6. ct-search results (after pressing T on S3) -- ARN-filtered results
-//   7. ct-search form (after pressing f from results) -- pre-filled filters visible
-//   8. Security Group ct-search results -- change audit scenario
+//  1. EC2 Instance list (before pressing T) -- shows selected row
+//  2. ct-search results (after pressing T on EC2) -- ARN-filtered results
+//  3. IAM Role list (before pressing T) -- shows selected row
+//  4. ct-search results (after pressing T on IAM Role) -- Username-filtered results
+//  5. S3 Bucket detail (before pressing T) -- resource detail view
+//  6. ct-search results (after pressing T on S3) -- ARN-filtered results
+//  7. ct-search form (after pressing f from results) -- pre-filled filters visible
+//  8. Security Group ct-search results -- change audit scenario
 package main
 
 import (
@@ -80,10 +80,7 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 	rightW := lipgloss.Width(rightContent)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -132,10 +129,7 @@ func renderFramedBox(lines []string, title string, w int) string {
 		titleRendered := lipgloss.NewStyle().Foreground(colHeaderFg).Bold(true).Render(title)
 		titleVis := lipgloss.Width(titleRendered)
 
-		totalDashes := w - 2 - titleVis - 2
-		if totalDashes < 2 {
-			totalDashes = 2
-		}
+		totalDashes := max(w-2-titleVis-2, 2)
 		leftDashes := totalDashes / 2
 		rightDashes := totalDashes - leftDashes
 
@@ -328,7 +322,7 @@ func renderCTSearchEC2Results() string {
 	}
 
 	// Fill remaining lines to show full frame
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		lines = append(lines, "")
 	}
 
@@ -627,7 +621,7 @@ func renderCTSearchS3Results() string {
 	}
 
 	// Fill remaining space
-	for i := 0; i < 7; i++ {
+	for range 7 {
 		lines = append(lines, "")
 	}
 
@@ -676,10 +670,7 @@ func renderCTSearchPreFilledForm() string {
 		if value == "" {
 			valRendered = dimStyle.Render(strings.Repeat("_", fw))
 		} else {
-			padding := fw - len(value)
-			if padding < 0 {
-				padding = 0
-			}
+			padding := max(fw-len(value), 0)
 			valRendered = valueStyle.Render(value) + dimStyle.Render(strings.Repeat("_", padding))
 		}
 		var badgeRendered string
@@ -813,7 +804,7 @@ func renderCTSearchSGResults() string {
 		}
 	}
 
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		lines = append(lines, "")
 	}
 

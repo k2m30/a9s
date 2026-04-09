@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"maps"
 	"strings"
 )
 
@@ -82,9 +83,7 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 		return fields
 	}
 	out := make(map[string]string, len(fields)+len(aliases))
-	for k, v := range fields {
-		out[k] = v
-	}
+	maps.Copy(out, fields)
 	for from, to := range aliases {
 		if v, ok := fields[from]; ok && strings.TrimSpace(v) != "" {
 			if _, exists := out[to]; !exists {
@@ -139,10 +138,10 @@ func UnregisterChildType(shortName string) {
 }
 
 // PaginatedFetcher returns a single page of resources.
-type PaginatedFetcher func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)
+type PaginatedFetcher func(ctx context.Context, clients any, continuationToken string) (FetchResult, error)
 
 // PaginatedChildFetcher returns a single page of child resources.
-type PaginatedChildFetcher func(ctx context.Context, clients interface{}, parentCtx ParentContext, continuationToken string) (FetchResult, error)
+type PaginatedChildFetcher func(ctx context.Context, clients any, parentCtx ParentContext, continuationToken string) (FetchResult, error)
 
 // paginatedRegistry maps resource short names to their paginated fetcher functions.
 var paginatedRegistry = map[string]PaginatedFetcher{}
@@ -209,7 +208,7 @@ func UnregisterFilteredPaginated(shortName string) {
 // RevealFetcher is the function signature for reveal value fetchers.
 // Each resource type that supports reveal (x key) registers a fetcher
 // that takes a context, clients, and resource ID, returning the value string.
-type RevealFetcher func(ctx context.Context, clients interface{}, resourceID string) (string, error)
+type RevealFetcher func(ctx context.Context, clients any, resourceID string) (string, error)
 
 // revealRegistry maps resource short names to their reveal fetcher functions.
 var revealRegistry = map[string]RevealFetcher{}

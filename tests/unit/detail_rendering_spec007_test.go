@@ -370,11 +370,11 @@ func TestDetail_007_CursorHighlight_AbsentWhenRightFocused(t *testing.T) {
 	// After Bug1 fix, each line has │ as the boundary. Check left-column content only.
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
-		sepIdx := strings.Index(line, "│")
-		if sepIdx < 0 {
+		before, _, ok := strings.Cut(line, "│")
+		if !ok {
 			continue
 		}
-		leftPart := line[:sepIdx]
+		leftPart := before
 		// Left column field lines must not carry background highlight when right is focused.
 		if strings.Contains(stripAnsi(leftPart), "vpc-spec007") || strings.Contains(stripAnsi(leftPart), "t3.small") {
 			hasLeftBg := strings.Contains(leftPart, "\x1b[48;") || strings.Contains(leftPart, "\x1b[7m")

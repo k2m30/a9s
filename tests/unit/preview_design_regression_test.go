@@ -132,7 +132,7 @@ func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 
 	// Focus right column and move cursor deep into the list.
 	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
-	for i := 0; i < 14; i++ {
+	for range 14 {
 		m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 

@@ -47,11 +47,12 @@ specs/           # feature specifications
 
 ## Commands
 
-- `go build -o a9s ./cmd/a9s/` — build the binary
-- `go test ./tests/unit/ -count=1 -timeout 120s` — run all unit tests
+- `make build` — build the binary
+- `make test` — run all unit tests (with `-race`)
 - `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
-- `golangci-lint ./...` — run linter (MUST pass locally before any push). Note: do NOT include the `run` subcommand — rtk treats it as a package path, causing a spurious `/run: directory not found` error.
-- `govulncheck ./...` — check for known vulnerabilities (MUST pass locally before any push)
+- `make lint` — run golangci-lint (MUST pass locally before any push). Note: do NOT include the `run` subcommand when calling golangci-lint directly — rtk treats it as a package path, causing a spurious `/run: directory not found` error.
+- `make security` — check for known vulnerabilities via govulncheck (MUST pass locally before any push)
+- `make gofix` — check for unfixed `//go:fix inline` directives (e.g. `reflect.Ptr` → `reflect.Pointer`). If it fails, run `go fix -inline ./...` to apply fixes.
 - `go run ./cmd/readmegen/ > README.md` — regenerate README.md from template + shared docs (run after any changes to docs/shared/ or docs/README.tmpl.md)
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
@@ -233,11 +234,11 @@ Agents MUST use targeted file access — never broad globs on large directories.
 
 ## Rules
 
-- ALWAYS rebuild binary (`go build -o a9s ./cmd/a9s/`) after ANY code change — version is resolved at build time via `internal/buildinfo`
+- ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `internal/buildinfo`
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
-- ALWAYS run `go test`, `golangci-lint ./...`, and `govulncheck ./...` locally BEFORE pushing. CI is not a debugging tool.
+- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment

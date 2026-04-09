@@ -137,7 +137,6 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 	cache := buildFakeResourceCache(t)
 
 	for _, fixture := range fixtures {
-		fixture := fixture
 		t.Run(fixture.ID, func(t *testing.T) {
 			// Get all real checker results for this fixture.
 			allResults := ctEventsRealCheckerResults(fixture, cache)
@@ -148,7 +147,6 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 			}
 
 			for _, def := range defs {
-				def := def
 				t.Run(def.TargetType, func(t *testing.T) {
 					label := fmt.Sprintf("event=%s group=%s", fixture.ID, def.TargetType)
 

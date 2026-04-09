@@ -167,19 +167,19 @@ func arnTargetType(arn string) string {
 //   - arn:aws:iam::*:root                          → "" (not navigable by name)
 //   - anything else                                → "" (falls back to Value)
 func arnNavID(arn string) string {
-	if idx := strings.Index(arn, ":assumed-role/"); idx >= 0 {
-		rest := arn[idx+len(":assumed-role/"):]
+	if _, after, ok := strings.Cut(arn, ":assumed-role/"); ok {
+		rest := after
 		// rest is "<role>/<session>" — take only the role part
-		if slash := strings.Index(rest, "/"); slash >= 0 {
-			return rest[:slash]
+		if before, _, ok := strings.Cut(rest, "/"); ok {
+			return before
 		}
 		return rest
 	}
-	if idx := strings.Index(arn, ":role/"); idx >= 0 {
-		return arn[idx+len(":role/"):]
+	if _, after, ok := strings.Cut(arn, ":role/"); ok {
+		return after
 	}
-	if idx := strings.Index(arn, ":user/"); idx >= 0 {
-		return arn[idx+len(":user/"):]
+	if _, after, ok := strings.Cut(arn, ":user/"); ok {
+		return after
 	}
 	return ""
 }

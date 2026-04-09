@@ -127,7 +127,7 @@ func TestEC2_008_NavChain_JMovesFieldCursor(t *testing.T) {
 	detailM.SetSize(120, 30)
 
 	// Press j 3 times
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		detailM, _ = detailM.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 

@@ -64,7 +64,7 @@ func TestRelatedCacheLRU_LRUEviction(t *testing.T) {
 func TestRelatedCacheLRU_Clear(t *testing.T) {
 	c := newRelatedCacheLRU(10)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.set(fmt.Sprintf("k%d", i), testResults(i))
 	}
 

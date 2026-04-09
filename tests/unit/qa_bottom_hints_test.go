@@ -132,7 +132,7 @@ func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
 }
 
 func TestBottomHints_ResourceList_WithReveal(t *testing.T) {
-	resource.RegisterRevealFetcher("secrets_test_hints", func(_ context.Context, _ interface{}, _ string) (string, error) {
+	resource.RegisterRevealFetcher("secrets_test_hints", func(_ context.Context, _ any, _ string) (string, error) {
 		return "", nil
 	})
 	t.Cleanup(func() { resource.UnregisterRevealFetcher("secrets_test_hints") })
@@ -286,7 +286,7 @@ func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
 		{
 			TargetType:  "vpc",
 			DisplayName: "VPC",
-			Checker:     func(_ context.Context, _ interface{}, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				return resource.RelatedCheckResult{}
 			},
 		},
@@ -374,7 +374,7 @@ func TestBottomHints_Detail_RightColVisible_NoTabWhenAutoShow(t *testing.T) {
 		{
 			TargetType:  "vpc",
 			DisplayName: "VPC",
-			Checker:     func(_ context.Context, _ interface{}, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				return resource.RelatedCheckResult{}
 			},
 		},

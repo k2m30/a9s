@@ -54,10 +54,10 @@ The TUI rewrite from `internal/app/` to `internal/tui/` is **complete**. The old
 grep -r "// TODO" internal/tui/
 
 # Check compilation
-go build ./internal/tui/...
+make build
 
 # Check tests
-go test ./tests/unit/ -count=1 -timeout 120s
+make test
 
 # Count resource types
 grep -c "ShortName:" internal/resource/types.go

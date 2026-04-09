@@ -67,7 +67,6 @@ func padOrTrunc(s string, w int) string {
 	return s + strings.Repeat(" ", w-vis)
 }
 
-
 // ── Header ────────────────────────────────────────────────────────────────────
 // One unframed line:
 //   LEFT:  "a9s v0.x.x  profile:region"
@@ -94,10 +93,7 @@ func renderHeader(profile, region, version string, w int, rightContent string) s
 
 	// padding: 1 char on each side
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -183,10 +179,7 @@ func renderFramedBox(lines []string, title string, w int) string {
 		// Total dashes available = (w - 2) - titleVis - 2 spaces around title
 		// "┌" + leftDashes + " " + title + " " + rightDashes + "┐"
 		// leftDashes + rightDashes = w - 2 - titleVis - 2
-		totalDashes := w - 2 - titleVis - 2
-		if totalDashes < 2 {
-			totalDashes = 2
-		}
+		totalDashes := max(w-2-titleVis-2, 2)
 		leftDashes := totalDashes / 2
 		rightDashes := totalDashes - leftDashes
 
@@ -855,10 +848,7 @@ func renderHeaderWithBadge(profile, region, version, badge string, w int, rightC
 	rightW := lipgloss.Width(rightContent)
 
 	innerW := w - 2
-	gap := innerW - leftW - rightW
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(innerW-leftW-rightW, 1)
 
 	content := left + strings.Repeat(" ", gap) + rightContent
 	return lipgloss.NewStyle().
@@ -877,9 +867,9 @@ func renderHeaderBadgeExpiry(profile, region, version, badge, expiryText string,
 	var expiryRendered string
 	switch expiryLevel {
 	case "warning":
-		expiryRendered = lipgloss.NewStyle().Foreground(colPending).Render(expiryText+" ")
+		expiryRendered = lipgloss.NewStyle().Foreground(colPending).Render(expiryText + " ")
 	case "critical":
-		expiryRendered = lipgloss.NewStyle().Foreground(colError).Bold(true).Render(expiryText+" ")
+		expiryRendered = lipgloss.NewStyle().Foreground(colError).Bold(true).Render(expiryText + " ")
 	}
 	helpHint := lipgloss.NewStyle().Foreground(colDim).Render("? for help")
 	right := expiryRendered + helpHint
@@ -904,7 +894,7 @@ func renderEC2StatusChecksMixed() string {
 
 	type ec2row struct {
 		name, state, lifecycle, itype, ip, id string
-		checkStatus                            string // "ok", "impaired", "initializing", ""
+		checkStatus                           string // "ok", "impaired", "initializing", ""
 	}
 	rows := []ec2row{
 		{"api-prod-01", "running", "on-demand", "t3.medium", "10.0.1.42", "i-0abc123def456789a", "ok"},

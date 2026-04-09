@@ -13,7 +13,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
-func int64Ptr(v int64) *int64 { return &v }
+//go:fix inline
+func int64Ptr(v int64) *int64 { return new(v) }
 
 // ---------------------------------------------------------------------------
 // DynamoDB - Test FetchDynamoDBTables response parsing (Pattern C: list+describe)
@@ -34,8 +35,8 @@ func TestFetchDynamoDBTables_ParsesMultipleTables(t *testing.T) {
 				Table: &ddbtypes.TableDescription{
 					TableName:      aws.String("orders-prod"),
 					TableStatus:    ddbtypes.TableStatusActive,
-					ItemCount:      int64Ptr(15000),
-					TableSizeBytes: int64Ptr(5242880),
+					ItemCount:      new(int64(15000)),
+					TableSizeBytes: new(int64(5242880)),
 					BillingModeSummary: &ddbtypes.BillingModeSummary{
 						BillingMode: ddbtypes.BillingModePayPerRequest,
 					},
@@ -48,8 +49,8 @@ func TestFetchDynamoDBTables_ParsesMultipleTables(t *testing.T) {
 				Table: &ddbtypes.TableDescription{
 					TableName:      aws.String("users-prod"),
 					TableStatus:    ddbtypes.TableStatusActive,
-					ItemCount:      int64Ptr(3200),
-					TableSizeBytes: int64Ptr(1048576),
+					ItemCount:      new(int64(3200)),
+					TableSizeBytes: new(int64(1048576)),
 					BillingModeSummary: &ddbtypes.BillingModeSummary{
 						BillingMode: ddbtypes.BillingModeProvisioned,
 					},

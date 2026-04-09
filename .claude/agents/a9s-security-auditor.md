@@ -49,7 +49,7 @@ Check for `fmt.Print`, `log.Print`, `fmt.Fprintf(os.Stderr` calls that might lea
 
 ### 4. Dependency Vulnerabilities
 
-Run: `govulncheck ./...` (if available)
+Run: `make security` (or `govulncheck ./...` directly)
 Check go.sum for known vulnerable versions.
 
 ### 5. Input Injection

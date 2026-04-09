@@ -90,7 +90,7 @@ func NewSSMFixtures() *SSMFixtures {
 		},
 	}
 
-	for i := 0; i < 18; i++ {
+	for i := range 18 {
 		name := ssmNamePool[i]
 		paramType := ssmTypePool[i]
 		version := int64(1 + (i * 3 % 20))
@@ -110,7 +110,7 @@ func NewSSMFixtures() *SSMFixtures {
 	return &SSMFixtures{
 		Parameters: params,
 		ParameterValues: map[string]string{
-			"/acme/prod/app/config":          "app_env=production,log_level=info",
+			"/acme/prod/app/config":           "app_env=production,log_level=info",
 			"/acme/prod/db/connection-string": "[REDACTED]",
 			"/acme/prod/feature-flags":        "feature-a,feature-b,feature-c",
 			"/acme/staging/ami-id":            "ami-0123456789abcdef0",

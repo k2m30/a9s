@@ -54,7 +54,7 @@ func TestRelated_Subnet_EC2_Match(t *testing.T) {
 				Fields: map[string]string{
 					"subnet_id": "subnet-abc123",
 				},
-				RawStruct: ec2types.Instance{SubnetId: strPtr("subnet-abc123")},
+				RawStruct: ec2types.Instance{SubnetId: new("subnet-abc123")},
 			},
 		}},
 	}
@@ -76,7 +76,7 @@ func TestRelated_Subnet_EC2_NoMatch(t *testing.T) {
 				Fields: map[string]string{
 					"subnet_id": "subnet-other999",
 				},
-				RawStruct: ec2types.Instance{SubnetId: strPtr("subnet-other999")},
+				RawStruct: ec2types.Instance{SubnetId: new("subnet-other999")},
 			},
 		}},
 	}
@@ -145,7 +145,7 @@ func TestRelated_Subnet_ELB_Match(t *testing.T) {
 				ID: "my-alb",
 				RawStruct: elbv2types.LoadBalancer{
 					AvailabilityZones: []elbv2types.AvailabilityZone{
-						{SubnetId: strPtr("subnet-abc123")},
+						{SubnetId: new("subnet-abc123")},
 					},
 				},
 			},
@@ -168,7 +168,7 @@ func TestRelated_Subnet_ELB_NoMatch(t *testing.T) {
 				ID: "other-alb",
 				RawStruct: elbv2types.LoadBalancer{
 					AvailabilityZones: []elbv2types.AvailabilityZone{
-						{SubnetId: strPtr("subnet-other999")},
+						{SubnetId: new("subnet-other999")},
 					},
 				},
 			},
@@ -272,11 +272,11 @@ func TestRelated_Subnet_RTB_NoMatch(t *testing.T) {
 
 func TestRelated_Subnet_CFN_HasTag(t *testing.T) {
 	res := resource.Resource{
-		ID: "subnet-abc123",
+		ID:     "subnet-abc123",
 		Fields: map[string]string{"vpc_id": "vpc-11111111"},
 		RawStruct: ec2types.Subnet{
 			Tags: []ec2types.Tag{
-				{Key: strPtr("aws:cloudformation:stack-name"), Value: strPtr("my-stack")},
+				{Key: new("aws:cloudformation:stack-name"), Value: new("my-stack")},
 			},
 		},
 	}

@@ -60,7 +60,7 @@ func buildDetailFieldsOnly(t *testing.T, fields map[string]string) views.DetailM
 }
 
 // buildDetailWithRawStruct creates a DetailModel with a RawStruct and a config.
-func buildDetailWithRawStruct(t *testing.T, rawStruct interface{}, detailPaths []string) views.DetailModel {
+func buildDetailWithRawStruct(t *testing.T, rawStruct any, detailPaths []string) views.DetailModel {
 	t.Helper()
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{

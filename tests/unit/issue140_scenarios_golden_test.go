@@ -143,7 +143,7 @@ func scenarioEC2019RelatedLoading(t *testing.T) string {
 func scenarioEC2017VpcIDSelected(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 35)
 	m = issue140NavigateToEC2Detail(t, m)
-	for i := 0; i < 7; i++ {
+	for range 7 {
 		m = issue140ApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 	return m.View().Content

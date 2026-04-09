@@ -98,8 +98,10 @@ func (m *mockFastListBucketsClient) ListBuckets(
 }
 
 // strPtr returns a pointer to the given string.
+//
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 // ---------------------------------------------------------------------------

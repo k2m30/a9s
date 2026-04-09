@@ -37,11 +37,11 @@ func trailSrcResource() resource.Resource {
 			"s3_bucket":  "my-audit-bucket",
 		},
 		RawStruct: cloudtrailtypes.Trail{
-			Name:                      strPtr("my-trail"),
-			S3BucketName:              strPtr("my-audit-bucket"),
-			CloudWatchLogsLogGroupArn: strPtr("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail/my-trail:*"),
-			SnsTopicARN:               strPtr("arn:aws:sns:us-east-1:123456789012:cloudtrail-notifications"),
-			KmsKeyId:                  strPtr("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
+			Name:                      new("my-trail"),
+			S3BucketName:              new("my-audit-bucket"),
+			CloudWatchLogsLogGroupArn: new("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail/my-trail:*"),
+			SnsTopicARN:               new("arn:aws:sns:us-east-1:123456789012:cloudtrail-notifications"),
+			KmsKeyId:                  new("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
 		},
 	}
 }
@@ -119,8 +119,8 @@ func TestRelated_Trail_Logs_NilArn(t *testing.T) {
 			"trail_name": "no-logs-trail",
 		},
 		RawStruct: cloudtrailtypes.Trail{
-			Name:         strPtr("no-logs-trail"),
-			S3BucketName: strPtr("some-bucket"),
+			Name:         new("no-logs-trail"),
+			S3BucketName: new("some-bucket"),
 			// CloudWatchLogsLogGroupArn intentionally nil
 		},
 	}
@@ -153,7 +153,7 @@ func TestRelated_Trail_SNS_Match(t *testing.T) {
 			"topic_arn": topicARN,
 		},
 		RawStruct: snstypes.Topic{
-			TopicArn: strPtr(topicARN),
+			TopicArn: new(topicARN),
 		},
 	}
 	cache := resource.ResourceCache{
@@ -178,8 +178,8 @@ func TestRelated_Trail_SNS_NilArn(t *testing.T) {
 			"trail_name": "no-sns-trail",
 		},
 		RawStruct: cloudtrailtypes.Trail{
-			Name:         strPtr("no-sns-trail"),
-			S3BucketName: strPtr("some-bucket"),
+			Name:         new("no-sns-trail"),
+			S3BucketName: new("some-bucket"),
 			// SnsTopicARN intentionally nil
 		},
 	}
@@ -264,4 +264,3 @@ func TestNavigableFields_Trail(t *testing.T) {
 		t.Error("navigable field S3BucketName→s3 not found for trail")
 	}
 }
-

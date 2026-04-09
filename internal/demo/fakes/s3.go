@@ -68,7 +68,7 @@ func (f *S3Fake) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, 
 		Prefix:         input.Prefix,
 		Contents:       objs,
 		CommonPrefixes: prefixes,
-		KeyCount:       int32ptr(int32(len(objs) + len(prefixes))),
+		KeyCount:       new(int32(len(objs) + len(prefixes))),
 	}, nil
 }
 
@@ -89,5 +89,3 @@ func (f *S3Fake) GetBucketLocation(_ context.Context, input *s3.GetBucketLocatio
 	// All demo buckets are in us-east-1; S3 uses empty string for us-east-1.
 	return &s3.GetBucketLocationOutput{}, nil
 }
-
-func int32ptr(v int32) *int32 { return &v }

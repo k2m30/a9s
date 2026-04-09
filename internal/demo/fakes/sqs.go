@@ -2,6 +2,7 @@ package fakes
 
 import (
 	"context"
+	"maps"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
@@ -34,9 +35,7 @@ func (f *SQSFake) GetQueueAttributes(_ context.Context, input *sqs.GetQueueAttri
 	for _, q := range f.fix.Queues {
 		if q.QueueURL == queueURL {
 			attrs := make(map[string]string, len(q.Attributes))
-			for k, v := range q.Attributes {
-				attrs[k] = v
-			}
+			maps.Copy(attrs, q.Attributes)
 			return &sqs.GetQueueAttributesOutput{Attributes: attrs}, nil
 		}
 	}
