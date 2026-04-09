@@ -74,6 +74,8 @@ func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.Service
 	}
 
 	loaded := fullIntegrationOpenResourceList(t, &m, rt.ShortName)
+	frameDisplayed, _ := fullIntegrationFindFrameDisplayCount(fullIntegrationStripANSI(fullIntegrationViewContent(m)), rt.ShortName)
+	t.Logf("list %s: displayed=%s loaded=%d expected=%s", rt.ShortName, frameDisplayed, len(loaded.Resources), fullIntegrationExpectedDisplay(expected))
 	if got := len(loaded.Resources); got != expected.count {
 		t.Fatalf("%s list loaded %d resources, expected %d from fetcher", rt.ShortName, got, expected.count)
 	}
@@ -107,6 +109,8 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	}
 
 	sourceLoaded := fullIntegrationOpenResourceList(t, m, scenario.sourceType)
+	sourceDisplayed, _ := fullIntegrationFindFrameDisplayCount(fullIntegrationStripANSI(fullIntegrationViewContent(*m)), scenario.sourceType)
+	t.Logf("%s source list %s: displayed=%s loaded=%d expected=%s", scenario.name, scenario.sourceType, sourceDisplayed, len(sourceLoaded.Resources), fullIntegrationExpectedDisplay(sourceExpected))
 	if got := len(sourceLoaded.Resources); got != sourceExpected.count {
 		t.Fatalf("%s: %s list loaded %d resources, expected %d from fetcher", scenario.name, scenario.sourceType, got, sourceExpected.count)
 	}
@@ -127,6 +131,8 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 		t.Fatalf("%s: related %s has %s count %d; test needs a navigable return row", scenario.name, scenario.firstTargetType, scenario.returnDisplayName, returnCount)
 	}
 	fullIntegrationEnterRelatedList(t, m, scenario.returnTargetType, scenario.returnDisplayName)
+	returnDisplayed, _ := fullIntegrationFindFrameDisplayCount(fullIntegrationStripANSI(fullIntegrationViewContent(*m)), scenario.returnTargetType)
+	t.Logf("%s return list %s: displayed=%s expected=%d", scenario.name, scenario.returnTargetType, returnDisplayed, returnCount)
 	fullIntegrationAssertFrameContains(t, *m, fmt.Sprintf("%s(%d)", scenario.returnTargetType, returnCount))
 
 	if returnCount > 1 {
@@ -159,6 +165,12 @@ func fullIntegrationAssertMainMenuCounts(t *testing.T, m tui.Model, expected map
 		suffix := fmt.Sprintf("%s (%d)", rt.Name, exp.count)
 		if exp.truncated {
 			suffix = fmt.Sprintf("%s (%d+)", rt.Name, exp.count)
+		}
+		displayed, ok := fullIntegrationFindMainMenuDisplayCount(plain, rt)
+		if ok {
+			t.Logf("main menu %s: displayed=%s expected=%s", rt.ShortName, displayed, fullIntegrationExpectedDisplay(exp))
+		} else {
+			t.Logf("main menu %s: displayed=<missing> expected=%s", rt.ShortName, fullIntegrationExpectedDisplay(exp))
 		}
 		if !strings.Contains(plain, suffix) {
 			missing = append(missing, suffix)
@@ -383,8 +395,11 @@ func fullIntegrationAssertRelatedResults(t *testing.T, expected map[string]int, 
 	for name, want := range expected {
 		if gotCount, ok := gotByName[name]; !ok {
 			t.Fatalf("%s: missing related result %q; got %v", context, name, gotByName)
-		} else if gotCount != want {
-			t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, gotCount, want, gotByName)
+		} else {
+			t.Logf("%s related result %s: actual=%d expected=%d", context, name, gotCount, want)
+			if gotCount != want {
+				t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, gotCount, want, gotByName)
+			}
 		}
 	}
 }
@@ -397,11 +412,18 @@ func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceT
 	}
 	for name, count := range expected {
 		if fullIntegrationIsHiddenSelfPivotZero(sourceType, name, count) {
+			t.Logf("%s related view %s: displayed=<hidden self-pivot zero> expected=%d", context, name, count)
 			continue
 		}
 		want := name
 		if count >= 0 {
 			want = fmt.Sprintf("%s (%d)", name, count)
+		}
+		displayed, ok := fullIntegrationFindRelatedDisplayCount(plain, name)
+		if ok {
+			t.Logf("%s related view %s: displayed=%s expected=%d", context, name, displayed, count)
+		} else {
+			t.Logf("%s related view %s: displayed=<missing> expected=%d", context, name, count)
 		}
 		if !strings.Contains(plain, want) {
 			t.Fatalf("%s: view missing related count %q:\n%s", context, want, plain)
@@ -437,6 +459,47 @@ func fullIntegrationFrameCount(name string, exp fullIntegrationCountExpectation)
 		return fmt.Sprintf("%s(%d+)", name, exp.count)
 	}
 	return fmt.Sprintf("%s(%d)", name, exp.count)
+}
+
+func fullIntegrationExpectedDisplay(exp fullIntegrationCountExpectation) string {
+	if exp.truncated {
+		return fmt.Sprintf("%d+", exp.count)
+	}
+	return fmt.Sprintf("%d", exp.count)
+}
+
+func fullIntegrationFindMainMenuDisplayCount(plain string, rt resource.ResourceTypeDef) (string, bool) {
+	re := regexp.MustCompile(regexp.QuoteMeta(rt.Name) + ` \((\d+\+?)\)`)
+	m := re.FindStringSubmatch(plain)
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
+}
+
+func fullIntegrationFindFrameDisplayCount(plain, resourceType string) (string, bool) {
+	title := resourceType
+	if rt := resource.FindResourceType(resourceType); rt != nil && rt.ListTitle != "" {
+		title = rt.ListTitle
+	}
+	re := regexp.MustCompile(regexp.QuoteMeta(title) + `\((\d+\+?)\)`)
+	m := re.FindStringSubmatch(plain)
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
+}
+
+func fullIntegrationFindRelatedDisplayCount(plain, displayName string) (string, bool) {
+	re := regexp.MustCompile(regexp.QuoteMeta(displayName) + `(?: \((\d+)\))?`)
+	m := re.FindStringSubmatch(plain)
+	if len(m) == 0 {
+		return "", false
+	}
+	if len(m) >= 2 && m[1] != "" {
+		return m[1], true
+	}
+	return "<unknown>", true
 }
 
 func fullIntegrationExtractMsg(t *testing.T, cmd tea.Cmd, pred func(tea.Msg) bool) tea.Msg {
