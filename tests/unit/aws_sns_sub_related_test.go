@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -248,34 +247,6 @@ func TestNavigableFields_SNSSub(t *testing.T) {
 		}
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
-		}
-	}
-}
-
-// --- Demo Checker Test ---
-
-func TestRelatedDemo_SNSSub_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("sns-sub")
-	if checker == nil {
-		t.Fatal("no demo checker registered for sns-sub")
-	}
-
-	src := resource.Resource{
-		ID: "arn:aws:sns:us-east-1:123456789012:alarm-notifications:b2c3d4e5-f6a7-8901-bcde-f12345678901",
-		Fields: map[string]string{
-			"topic_arn": "arn:aws:sns:us-east-1:123456789012:alarm-notifications",
-			"protocol":  "lambda",
-			"endpoint":  "arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier",
-		},
-	}
-	results := checker(src)
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
 		}
 	}
 }

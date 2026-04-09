@@ -544,4 +544,32 @@ func TestLambdaInvocationLogColumns(t *testing.T) {
 	})
 }
 
+// TestFetchLambdaInvocationLogs_ContinuationTokenForwarded verifies that a
+// non-empty continuationToken is forwarded to FilterLogEventsInput.NextToken.
+func TestFetchLambdaInvocationLogs_ContinuationTokenForwarded(t *testing.T) {
+	mock := &mockCWLogsFilterLogEventsClient{
+		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+			{Events: []cwlogstypes.FilteredLogEvent{}},
+		},
+	}
+
+	_, err := awsclient.FetchLambdaInvocationLogs(
+		context.Background(),
+		mock,
+		"/aws/lambda/my-function",
+		"abc123requestid",
+		"cont-token-page2",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if mock.lastInput == nil {
+		t.Fatal("mock was not called")
+	}
+	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "cont-token-page2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "cont-token-page2")
+	}
+}
+
 // ============================================================================

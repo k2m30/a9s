@@ -38,6 +38,7 @@ import (
 
 type mockCFNPaginatedClient struct {
 	outputs []*cloudformation.DescribeStacksOutput
+	inputs  []*cloudformation.DescribeStacksInput
 	err     error
 	callIdx int
 }
@@ -47,6 +48,7 @@ func (m *mockCFNPaginatedClient) DescribeStacks(
 	params *cloudformation.DescribeStacksInput,
 	optFns ...func(*cloudformation.Options),
 ) (*cloudformation.DescribeStacksOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -110,6 +112,15 @@ func TestFetchCloudFormationStacks_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -118,6 +129,7 @@ func TestFetchCloudFormationStacks_Pagination(t *testing.T) {
 
 type mockCWAlarmPaginatedClient struct {
 	outputs []*cloudwatch.DescribeAlarmsOutput
+	inputs  []*cloudwatch.DescribeAlarmsInput
 	err     error
 	callIdx int
 }
@@ -127,6 +139,7 @@ func (m *mockCWAlarmPaginatedClient) DescribeAlarms(
 	params *cloudwatch.DescribeAlarmsInput,
 	optFns ...func(*cloudwatch.Options),
 ) (*cloudwatch.DescribeAlarmsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -190,6 +203,15 @@ func TestFetchCloudWatchAlarms_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -198,6 +220,7 @@ func TestFetchCloudWatchAlarms_Pagination(t *testing.T) {
 
 type mockASGPaginatedClient struct {
 	outputs []*autoscaling.DescribeAutoScalingGroupsOutput
+	inputs  []*autoscaling.DescribeAutoScalingGroupsInput
 	err     error
 	callIdx int
 }
@@ -207,6 +230,7 @@ func (m *mockASGPaginatedClient) DescribeAutoScalingGroups(
 	params *autoscaling.DescribeAutoScalingGroupsInput,
 	optFns ...func(*autoscaling.Options),
 ) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -270,6 +294,15 @@ func TestFetchAutoScalingGroups_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -278,6 +311,7 @@ func TestFetchAutoScalingGroups_Pagination(t *testing.T) {
 
 type mockACMPaginatedClient struct {
 	outputs []*acm.ListCertificatesOutput
+	inputs  []*acm.ListCertificatesInput
 	err     error
 	callIdx int
 }
@@ -287,6 +321,7 @@ func (m *mockACMPaginatedClient) ListCertificates(
 	params *acm.ListCertificatesInput,
 	optFns ...func(*acm.Options),
 ) (*acm.ListCertificatesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -350,6 +385,15 @@ func TestFetchACMCertificates_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -358,6 +402,7 @@ func TestFetchACMCertificates_Pagination(t *testing.T) {
 
 type mockECRPaginatedClient struct {
 	outputs []*ecr.DescribeRepositoriesOutput
+	inputs  []*ecr.DescribeRepositoriesInput
 	err     error
 	callIdx int
 }
@@ -367,6 +412,7 @@ func (m *mockECRPaginatedClient) DescribeRepositories(
 	params *ecr.DescribeRepositoriesInput,
 	optFns ...func(*ecr.Options),
 ) (*ecr.DescribeRepositoriesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -430,6 +476,15 @@ func TestFetchECRRepositories_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -438,6 +493,7 @@ func TestFetchECRRepositories_Pagination(t *testing.T) {
 
 type mockEBRulePaginatedClient struct {
 	outputs []*eventbridge.ListRulesOutput
+	inputs  []*eventbridge.ListRulesInput
 	err     error
 	callIdx int
 }
@@ -447,6 +503,7 @@ func (m *mockEBRulePaginatedClient) ListRules(
 	params *eventbridge.ListRulesInput,
 	optFns ...func(*eventbridge.Options),
 ) (*eventbridge.ListRulesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -510,6 +567,15 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -518,6 +584,7 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 
 type mockSecretsPaginatedClient struct {
 	outputs []*secretsmanager.ListSecretsOutput
+	inputs  []*secretsmanager.ListSecretsInput
 	err     error
 	callIdx int
 }
@@ -527,6 +594,7 @@ func (m *mockSecretsPaginatedClient) ListSecrets(
 	params *secretsmanager.ListSecretsInput,
 	optFns ...func(*secretsmanager.Options),
 ) (*secretsmanager.ListSecretsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -590,6 +658,15 @@ func TestFetchSecrets_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -598,6 +675,7 @@ func TestFetchSecrets_Pagination(t *testing.T) {
 
 type mockSFNPaginatedClient struct {
 	outputs []*sfn.ListStateMachinesOutput
+	inputs  []*sfn.ListStateMachinesInput
 	err     error
 	callIdx int
 }
@@ -607,6 +685,7 @@ func (m *mockSFNPaginatedClient) ListStateMachines(
 	params *sfn.ListStateMachinesInput,
 	optFns ...func(*sfn.Options),
 ) (*sfn.ListStateMachinesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -670,6 +749,15 @@ func TestFetchStepFunctions_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -678,6 +766,7 @@ func TestFetchStepFunctions_Pagination(t *testing.T) {
 
 type mockSSMPaginatedClient struct {
 	outputs []*ssm.DescribeParametersOutput
+	inputs  []*ssm.DescribeParametersInput
 	err     error
 	callIdx int
 }
@@ -687,6 +776,7 @@ func (m *mockSSMPaginatedClient) DescribeParameters(
 	params *ssm.DescribeParametersInput,
 	optFns ...func(*ssm.Options),
 ) (*ssm.DescribeParametersOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -750,6 +840,15 @@ func TestFetchSSMParameters_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_token", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		}
+	})
 }
 
 // ===========================================================================
@@ -758,6 +857,7 @@ func TestFetchSSMParameters_Pagination(t *testing.T) {
 
 type mockR53PaginatedClient struct {
 	outputs []*route53.ListHostedZonesOutput
+	inputs  []*route53.ListHostedZonesInput
 	err     error
 	callIdx int
 }
@@ -767,6 +867,7 @@ func (m *mockR53PaginatedClient) ListHostedZones(
 	params *route53.ListHostedZonesInput,
 	optFns ...func(*route53.Options),
 ) (*route53.ListHostedZonesOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -847,6 +948,15 @@ func TestFetchHostedZones_Pagination(t *testing.T) {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 		}
 	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		}
+	})
 }
 
 // ===========================================================================
@@ -855,6 +965,7 @@ func TestFetchHostedZones_Pagination(t *testing.T) {
 
 type mockCloudFrontPaginatedClient struct {
 	outputs []*cloudfront.ListDistributionsOutput
+	inputs  []*cloudfront.ListDistributionsInput
 	err     error
 	callIdx int
 }
@@ -864,6 +975,7 @@ func (m *mockCloudFrontPaginatedClient) ListDistributions(
 	params *cloudfront.ListDistributionsInput,
 	optFns ...func(*cloudfront.Options),
 ) (*cloudfront.ListDistributionsOutput, error) {
+	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -952,6 +1064,15 @@ func TestFetchCloudFrontDistributions_Pagination(t *testing.T) {
 	t.Run("api_called_twice", func(t *testing.T) {
 		if mock.callIdx != 2 {
 			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		}
+	})
+
+	t.Run("page2_received_marker", func(t *testing.T) {
+		if len(mock.inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		}
+		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
 		}
 	})
 }

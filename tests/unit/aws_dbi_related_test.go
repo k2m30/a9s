@@ -9,7 +9,6 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -294,37 +293,261 @@ func TestRelated_DBI_RDSSnap_NilCache(t *testing.T) {
 	}
 }
 
-// --- dbi→secrets: undeterminable from cache, returns Count: 0 ---
+// --- checkDbiKMS tests (Pattern F — reads KmsKeyId from RawStruct) ---
 
-func TestRelated_DBI_Secrets_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "my-db-instance",
-		Name: "my-db-instance",
+func TestRelated_DBI_KMS_ExtractsKeyIDFromARN(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			KmsKeyId: aws.String("arn:aws:kms:us-east-1:111122223333:key/mrk-abc12345-1234-1234-1234-abc123456789"),
+		},
 	}
-	checker := dbiCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if result.TargetType != "secrets" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "secrets")
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-abc12345-1234-1234-1234-abc123456789" {
+		t.Errorf("ResourceIDs = %v, want [mrk-abc12345-1234-1234-1234-abc123456789]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
 	}
 }
 
-func TestRelatedDemo_DBI_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("dbi")
-	if checker == nil {
-		t.Fatal("no demo checker registered for dbi")
+func TestRelated_DBI_KMS_ReturnsZeroWhenNoKey(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: rdstypes.DBInstance{KmsKeyId: nil},
 	}
 
-	results := checker(resource.Resource{ID: "demo-db"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
 	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+}
+
+func TestRelated_DBI_KMS_ReturnsZeroWhenEmptyARN(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: rdstypes.DBInstance{KmsKeyId: aws.String("")},
+	}
+
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count)
+	}
+}
+
+func TestRelated_DBI_KMS_ReturnsZeroWhenARNHasNoSlash(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: rdstypes.DBInstance{KmsKeyId: aws.String("not-an-arn-with-slash")},
+	}
+
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (ARN without slash yields empty key ID)", result.Count)
+	}
+}
+
+func TestRelated_DBI_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: "not-a-db-instance",
+	}
+
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	}
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+}
+
+func TestRelated_DBI_KMS_KeyIDOnlyARN(t *testing.T) {
+	// ARN where the part after "/" is a plain UUID (not multi-region key).
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			KmsKeyId: aws.String("arn:aws:kms:us-west-2:123456789012:key/plain-uuid-1234"),
+		},
+	}
+
+	checker := dbiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "plain-uuid-1234" {
+		t.Errorf("ResourceIDs = %v, want [plain-uuid-1234]", result.ResourceIDs)
+	}
+}
+
+// --- checkDbiSubnets tests (Pattern F — reads DBSubnetGroup from RawStruct) ---
+
+func TestRelated_DBI_Subnets_ReturnsSubnetIDs(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBSubnetGroup: &rdstypes.DBSubnetGroup{
+				Subnets: []rdstypes.Subnet{
+					{SubnetIdentifier: aws.String("subnet-aaa111")},
+					{SubnetIdentifier: aws.String("subnet-bbb222")},
+				},
+			},
+		},
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+	if result.TargetType != "subnet" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "subnet")
+	}
+	wantIDs := map[string]bool{"subnet-aaa111": false, "subnet-bbb222": false}
+	for _, id := range result.ResourceIDs {
+		wantIDs[id] = true
+	}
+	for id, found := range wantIDs {
+		if !found {
+			t.Errorf("ResourceIDs missing %q; got %v", id, result.ResourceIDs)
 		}
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+func TestRelated_DBI_Subnets_ReturnsZeroWhenNoSubnetGroup(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: rdstypes.DBInstance{DBSubnetGroup: nil},
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no subnet group)", result.Count)
+	}
+	if result.TargetType != "subnet" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "subnet")
+	}
+}
+
+func TestRelated_DBI_Subnets_ReturnsZeroWhenEmptySubnets(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBSubnetGroup: &rdstypes.DBSubnetGroup{
+				Subnets: []rdstypes.Subnet{},
+			},
+		},
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty subnets slice)", result.Count)
+	}
+}
+
+func TestRelated_DBI_Subnets_SkipsNilSubnetIdentifier(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBSubnetGroup: &rdstypes.DBSubnetGroup{
+				Subnets: []rdstypes.Subnet{
+					{SubnetIdentifier: nil},
+					{SubnetIdentifier: aws.String("")},
+					{SubnetIdentifier: aws.String("subnet-valid")},
+				},
+			},
+		},
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (only non-empty subnet IDs counted)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "subnet-valid" {
+		t.Errorf("ResourceIDs = %v, want [subnet-valid]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_DBI_Subnets_ReturnsNegOneOnBadRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-db-instance",
+		Fields:    map[string]string{},
+		RawStruct: "not-a-db-instance",
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
+	}
+	if result.TargetType != "subnet" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "subnet")
+	}
+}
+
+func TestRelated_DBI_Subnets_SingleSubnet(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-db-instance",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBSubnetGroup: &rdstypes.DBSubnetGroup{
+				Subnets: []rdstypes.Subnet{
+					{SubnetIdentifier: aws.String("subnet-only-one")},
+				},
+			},
+		},
+	}
+
+	checker := dbiCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "subnet-only-one" {
+		t.Errorf("ResourceIDs = %v, want [subnet-only-one]", result.ResourceIDs)
 	}
 }

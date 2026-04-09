@@ -11,6 +11,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3 (012-ct-events-list-redesign)
 - N/A (in-memory `Resource.Fields` map; YAML view config on disk) (012-ct-events-list-redesign)
+- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib) (013-ct-event-detail-v2)
+- N/A (in-memory parsed event held only for the duration of one detail-view open) (013-ct-event-detail-v2)
+- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services) (014-demo-transport-mock)
+- In-process fixture store (per resource type, loaded at startup) (014-demo-transport-mock)
 
 ## Project Structure
 
@@ -158,30 +162,67 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
 - `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
 - `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
-- `Grep("RegisterChildDemo.*{child_type}", "internal/demo/")` — find a specific fixture
+- `Glob("internal/demo/fixtures/*.go")` — find a per-service fixture file
+- `Glob("internal/demo/fakes/*.go")` — find a typed-fake implementation
 - `Grep("func Test.*{Resource}", "tests/unit/qa_detail_child_views_test.go")` — find append point
 
 ### DON'T
 - `Glob("tests/unit/*.go")` — returns 148 files, most irrelevant
 - `Glob("internal/aws/*.go")` — returns 77 files, most irrelevant
-- `Glob("internal/demo/*.go")` — read only the category file you need
+- `Glob("internal/demo/*.go")` — only 3 files remain (client.go, handlers.go, transport.go)
 - Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
 
-### Demo fixture file map (`internal/demo/`)
-| File | Resource types |
-|------|---------------|
-| `fixtures_compute.go` | EC2, ECS, Lambda, ASG, EB + ECS child views |
-| `fixtures_databases.go` | RDS, Redis, DynamoDB, DocDB |
-| `fixtures_networking.go` | ELB, TG, VPC, SG, Subnets, NAT, IGW, EIP, ENI |
-| `fixtures_security.go` | IAM Roles, Policies, Users, Groups, WAF |
-| `fixtures_secrets.go` | Secrets Manager, SSM, KMS |
-| `fixtures_dns_cdn.go` | R53, CloudFront, ACM, API GW |
-| `fixtures_cicd.go` | CFN, CodeBuild, CodePipeline, ECR, CodeArtifact |
-| `fixtures_monitoring.go` | CW Alarms, Log Groups, CloudTrail + Log child views |
-| `fixtures_messaging.go` | SQS, SNS, EventBridge, Kinesis, SFN, MSK |
-| `fixtures_data.go` | Glue, Athena, OpenSearch, Redshift |
-| `fixtures_containers.go` | EKS, Node Groups |
-| `fixtures_backup.go` | Backup, SES, EFS |
+### Demo fixture patterns (`internal/demo/`)
+
+**Typed fakes (014-demo-transport-mock):** All services use strongly-typed Go fake implementations that bypass the HTTP roundtrip. Each fake lives in `internal/demo/fakes/<service>.go` and satisfies the corresponding aggregate interface from `internal/aws/interfaces.go`. Per-service fixture data lives in `internal/demo/fixtures/<service>.go`, owned by the matching fake. The only remaining HTTP transport handler is STS (`handlers.go`), used for `GetCallerIdentity` probes.
+
+`demo.NewServiceClients()` in `internal/demo/client.go` wires all 42 typed fakes into a `*awsclient.ServiceClients`. There is no legacy fixture store (`demoData`, `childDemoData`, `GetRelatedDemo` are all deleted).
+
+#### Per-service fixture file map (`internal/demo/fixtures/`)
+| File | Service |
+|------|---------|
+| `ec2.go` | EC2 (instances, VPCs, SGs, subnets, ENIs, NAT, IGW, EIP, volumes, snapshots, images) |
+| `s3.go` | S3 (buckets + objects) |
+| `cloudtrail.go` | CloudTrail (trails + events) |
+| `rds.go` | RDS (instances, snapshots, events) |
+| `elasticache.go` | ElastiCache (Redis clusters) |
+| `dynamodb.go` | DynamoDB (tables) |
+| `docdb.go` | DocumentDB (clusters, snapshots) |
+| `lambda.go` | Lambda (functions, event source mappings) |
+| `ecs.go` | ECS (clusters, services, tasks, task definitions) |
+| `eks.go` | EKS (clusters, node groups) |
+| `asg.go` | Auto Scaling (groups, activities) |
+| `eb.go` | Elastic Beanstalk (environments) |
+| `elb.go` | ELBv2 (load balancers, target groups, target health, listeners, rules) |
+| `iam.go` | IAM (roles, policies, users, groups + all attached/inline policy maps) |
+| `waf.go` | WAFv2 (web ACLs, resources) |
+| `secretsmanager.go` | Secrets Manager (secrets, values) |
+| `ssm.go` | SSM (parameters, values) |
+| `kms.go` | KMS (keys, aliases) |
+| `route53.go` | Route53 (hosted zones, records) |
+| `cloudfront.go` | CloudFront (distributions) |
+| `acm.go` | ACM (certificates) |
+| `apigw.go` | API Gateway v2 (APIs) |
+| `cfn.go` | CloudFormation (stacks, events, resources) |
+| `codebuild.go` | CodeBuild (projects, builds) |
+| `codepipeline.go` | CodePipeline (pipelines, states) |
+| `ecr.go` | ECR (repositories, images) |
+| `codeartifact.go` | CodeArtifact (repositories) |
+| `cloudwatch.go` | CloudWatch (alarms, alarm history) |
+| `cwlogs.go` | CloudWatch Logs (log groups, streams, events) |
+| `sqs.go` | SQS (queues, attributes) |
+| `sns.go` | SNS (topics, subscriptions) |
+| `eventbridge.go` | EventBridge (rules, targets) |
+| `kinesis.go` | Kinesis (streams) |
+| `sfn.go` | Step Functions (state machines, executions, history) |
+| `msk.go` | MSK (clusters) |
+| `glue.go` | Glue (jobs, job runs) |
+| `athena.go` | Athena (workgroups) |
+| `opensearch.go` | OpenSearch (domains) |
+| `redshift.go` | Redshift (clusters) |
+| `backup.go` | AWS Backup (backup plans) |
+| `ses.go` | SES v2 (email identities) |
+| `efs.go` | EFS (file systems) |
 
 ## Bash Command Rules
 
@@ -234,4 +275,6 @@ When code changes affect any of the following, update the shared source and rege
 
 
 ## Recent Changes
-- 012-ct-events-list-redesign: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3
+- 014-demo-transport-mock: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services)
+- 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)
+- 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)

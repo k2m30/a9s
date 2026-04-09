@@ -13,14 +13,15 @@ package unit
 // TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck — FAILS with current code.
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -39,9 +40,10 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
@@ -137,9 +139,10 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 	// Esc back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client2 := fakes.NewEC2()
+	ec2Res, err2 := awsclient.FetchEC2Instances(context.Background(), ec2Client2)
+	if err2 != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err2, len(ec2Res))
 	}
 
 	// Navigate again to the same resource via RelatedNavigateMsg (cache-hit branch).

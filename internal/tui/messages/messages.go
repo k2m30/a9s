@@ -136,6 +136,7 @@ type RelatedCheckStartedMsg struct {
 type RelatedCheckResultMsg struct {
 	ResourceType     string
 	SourceResourceID string // ID of the source resource (for cache keying)
+	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
 	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
 	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
@@ -169,6 +170,15 @@ type AvailabilityCacheLoadedMsg struct {
 	Entries   map[string]int  // shortName -> resource count
 	Truncated map[string]bool // shortName -> true if truncated
 	Expired   bool            // true if cache was beyond TTL
+}
+
+// AvailabilityPrefetchedMsg is returned by the synchronous prefetch path in
+// no-cache mode (e.g. demo with pre-supplied clients). Unlike
+// AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
+// are already populated.
+type AvailabilityPrefetchedMsg struct {
+	Entries   map[string]int  // shortName -> resource count
+	Truncated map[string]bool // shortName -> true if truncated
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.

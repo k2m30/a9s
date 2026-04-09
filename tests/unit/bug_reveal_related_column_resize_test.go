@@ -1,12 +1,13 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -27,9 +28,10 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 	m2, _ := rootApplyMsg(m, tea.WindowSizeMsg{Width: 59, Height: 36})
 	m = m2
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	clients := demo.NewServiceClients()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 	}
 	m2, _ = rootApplyMsg(m, messages.NavigateMsg{
 		Target:       messages.TargetDetail,
@@ -66,14 +68,15 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 	m2, _ := rootApplyMsg(m, tea.WindowSizeMsg{Width: 140, Height: 36})
 	m = m2
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	clients2 := demo.NewServiceClients()
+	ec2b, err := awsclient.FetchEC2Instances(context.Background(), clients2.EC2)
+	if err != nil || len(ec2b) == 0 {
+		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2b))
 	}
 	m2, _ = rootApplyMsg(m, messages.NavigateMsg{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
-		Resource:     &ec2[0],
+		Resource:     &ec2b[0],
 	})
 	m = m2
 

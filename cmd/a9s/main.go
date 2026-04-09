@@ -81,6 +81,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
+	var extraOpts []tui.Option
 	if demoMode {
 		if profile == "" {
 			profile = demo.DemoProfile
@@ -88,11 +89,14 @@ func main() {
 		if region == "" {
 			region = demo.DemoRegion
 		}
+		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
+	} else if noCache {
+		extraOpts = append(extraOpts, tui.WithNoCache(true))
 	}
 
 	tui.Version = version
 
-	model := tui.New(profile, region, tui.WithDemo(demoMode), tui.WithNoCache(noCache))
+	model := tui.New(profile, region, extraOpts...)
 
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
