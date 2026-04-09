@@ -27,7 +27,7 @@ import (
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -39,12 +39,18 @@ import (
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-// loadAllCTFixtures returns all 12 (or however many) demo ct-events fixtures.
+// loadAllCTFixtures returns all demo ct-events fixtures via the real fetcher
+// backed by the typed CloudTrail fake.
 func loadAllCTFixtures(t *testing.T) []resource.Resource {
 	t.Helper()
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	clients := demo.NewServiceClients()
+	ctx := context.Background()
+	fixtures, err := awsclient.FetchCloudTrailEvents(ctx, clients.CloudTrail)
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEvents: %v", err)
+	}
+	if len(fixtures) == 0 {
+		t.Fatal("FetchCloudTrailEvents returned no fixtures")
 	}
 	return fixtures
 }
@@ -68,44 +74,78 @@ func parseCTEventForFixture(t *testing.T, res resource.Resource) *ctdetail.Event
 	return parsed
 }
 
-// buildDemoResourceCache returns a ResourceCache built from demo.GetResources
-// for all resource types registered as related to ct-events.
-func buildDemoResourceCache(t *testing.T) resource.ResourceCache {
+// buildFakeResourceCache builds a ResourceCache for all ct-events related types
+// using demo.NewServiceClients() and real fetcher functions. No demo.GetResources
+// calls — every entry is populated via the typed fakes.
+func buildFakeResourceCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
-	defs := resource.GetRelated("ct-events")
-	if len(defs) == 0 {
-		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — RegisterRelated not called?")
-	}
-	seen := make(map[string]bool)
+	clients := demo.NewServiceClients()
+	ctx := context.Background()
 	cache := make(resource.ResourceCache)
-	for _, def := range defs {
-		tt := def.TargetType
-		if seen[tt] {
-			continue
+
+	fetch := func(targetType string, resources []resource.Resource, err error) {
+		t.Helper()
+		if err != nil {
+			t.Logf("buildFakeResourceCache: skipping %q: fetch error: %v", targetType, err)
+			return
 		}
-		seen[tt] = true
-		resources, ok := demo.GetResources(tt)
-		if !ok {
-			continue // some types have no demo data; that's fine
-		}
-		cache[tt] = resource.ResourceCacheEntry{
-			Resources:   resources,
-			IsTruncated: false,
+		if len(resources) > 0 {
+			cache[targetType] = resource.ResourceCacheEntry{Resources: resources, IsTruncated: false}
 		}
 	}
+
+	roles, err := awsclient.FetchIAMRoles(ctx, clients.IAM)
+	fetch("role", roles, err)
+
+	users, err := awsclient.FetchIAMUsers(ctx, clients.IAM)
+	fetch("iam-user", users, err)
+
+	instances, err := awsclient.FetchEC2Instances(ctx, clients.EC2)
+	fetch("ec2", instances, err)
+
+	buckets, err := awsclient.FetchS3Buckets(ctx, clients.S3)
+	fetch("s3", buckets, err)
+
+	lambdas, err := awsclient.FetchLambdaFunctions(ctx, clients.Lambda)
+	fetch("lambda", lambdas, err)
+
+	rdsInstances, err := awsclient.FetchRDSInstances(ctx, clients.RDS)
+	fetch("rds", rdsInstances, err)
+
+	kmsKeys, err := awsclient.FetchKMSKeys(ctx, clients.KMS, clients.KMS, clients.KMS)
+	fetch("kms", kmsKeys, err)
+
+	secrets, err := awsclient.FetchSecrets(ctx, clients.SecretsManager)
+	fetch("secrets", secrets, err)
+
+	vpce, err := awsclient.FetchVPCEndpoints(ctx, clients.EC2)
+	fetch("vpce", vpce, err)
+
+	sgs, err := awsclient.FetchSecurityGroups(ctx, clients.EC2)
+	fetch("sg", sgs, err)
+
+	ddbTables, err := awsclient.FetchDynamoDBTables(ctx, clients.DynamoDB, clients.DynamoDB)
+	fetch("ddb", ddbTables, err)
+
+	stacks, err := awsclient.FetchCloudFormationStacks(ctx, clients.CloudFormation)
+	fetch("cfn", stacks, err)
+
+	// Also populate ct-events itself for self-pivot lookups.
+	ctEvents, err := awsclient.FetchCloudTrailEvents(ctx, clients.CloudTrail)
+	fetch("ct-events", ctEvents, err)
+
 	return cache
 }
 
-// fixtureIDsForType returns a set of IDs from demo.GetResources(targetType).
-// Returns an empty map (not nil) when no demo data exists for that type.
-func fixtureIDsForType(t *testing.T, targetType string) map[string]bool {
-	t.Helper()
-	resources, ok := demo.GetResources(targetType)
+// fixtureIDsForType returns a set of IDs from the given ResourceCache entry.
+// Returns an empty map (not nil) when no data exists for that type.
+func fixtureIDsForType(cache resource.ResourceCache, targetType string) map[string]bool {
+	entry, ok := cache[targetType]
 	if !ok {
 		return map[string]bool{}
 	}
-	ids := make(map[string]bool, len(resources))
-	for _, r := range resources {
+	ids := make(map[string]bool, len(entry.Resources))
+	for _, r := range entry.Resources {
 		ids[r.ID] = true
 	}
 	return ids
@@ -143,6 +183,8 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 	if len(fixtures) == 0 {
 		t.Fatal("no ct-events fixtures available")
 	}
+
+	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
 		res := res
@@ -197,7 +239,7 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 						navID = navID[:idx]
 					}
 
-					fixtureIDs := fixtureIDsForType(t, row.TargetType)
+					fixtureIDs := fixtureIDsForType(cache, row.TargetType)
 					if len(fixtureIDs) == 0 {
 						// No demo data for this type — can't validate L3.
 						continue
@@ -218,9 +260,9 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 					// Check by ID or by Name (role names are IDs in demo).
 					found = fixtureIDs[navID]
 					if !found {
-						// Try matching by Name in the fixture list.
-						resources, _ := demo.GetResources(row.TargetType)
-						for _, r := range resources {
+						// Try matching by Name in the cache.
+						entry := cache[row.TargetType]
+						for _, r := range entry.Resources {
 							if r.Name == navID {
 								found = true
 								break
@@ -228,7 +270,7 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 						}
 					}
 					if !found {
-						t.Errorf("L3 FAIL: navID %q not found in demo.GetResources(%q) — %s",
+						t.Errorf("L3 FAIL: navID %q not found in fake cache for %q — %s",
 							navID, row.TargetType, rowLabel)
 					}
 				}
@@ -258,6 +300,7 @@ func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
 	}
 
 	fixtures := loadAllCTFixtures(t)
+	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
 		res := res
@@ -293,14 +336,14 @@ func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
 				}
 
 				// R1: If demo data exists for TargetType, value must be a known ID or Name.
-				fixtureIDs := fixtureIDsForType(t, nf.TargetType)
+				fixtureIDs := fixtureIDsForType(cache, nf.TargetType)
 				if len(fixtureIDs) == 0 {
 					continue
 				}
 				found = fixtureIDs[fieldVal]
 				if !found {
-					resources, _ := demo.GetResources(nf.TargetType)
-					for _, r := range resources {
+					entry := cache[nf.TargetType]
+					for _, r := range entry.Resources {
 						if r.Name == fieldVal {
 							found = true
 							break
@@ -308,7 +351,7 @@ func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("R1 FAIL: field value %q not found in demo.GetResources(%q) — %s",
+					t.Errorf("R1 FAIL: field value %q not found in fake cache for %q — %s",
 						fieldVal, nf.TargetType, rowLabel)
 				}
 			}
@@ -332,7 +375,7 @@ func isAWSServiceFixture(res resource.Resource) bool {
 // TestCtEventsDemoRightColumnCheckers iterates all 12 demo fixtures × the demo
 // checker results (17 groups: 13 typed + 4 self-pivots) and asserts:
 //
-//	G1: Count>0 IDs must each exist in demo.GetResources(TargetType).
+//	G1: Count>0 IDs must each exist in the fake resource cache for TargetType.
 //	G2 (Bug C): Count=-1 + non-empty FetchFilter must route via ResolveRelatedNavigate
 //	    to KindFilteredList or KindEnterChildView.
 //	G3 (Bug A): Root-identity events must return Count=0 for the role checker.
@@ -340,7 +383,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 	ensureNoColor(t)
 
 	fixtures := loadAllCTFixtures(t)
-	cache := buildDemoResourceCache(t)
+	cache := buildFakeResourceCache(t)
 
 	for _, res := range fixtures {
 		res := res
@@ -365,9 +408,9 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 						result.Count, rowLabel)
 				}
 
-				// G1: Count>0 resource IDs must each exist in demo.GetResources(TargetType).
+				// G1: Count>0 resource IDs must each exist in the fake cache for TargetType.
 				if result.Count > 0 {
-					fixtureIDs := fixtureIDsForType(t, result.TargetType)
+					fixtureIDs := fixtureIDsForType(cache, result.TargetType)
 					for _, rid := range result.ResourceIDs {
 						// Strip compound key to first segment for child types.
 						lookupID := rid
@@ -376,16 +419,16 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 						}
 						if len(fixtureIDs) > 0 && !fixtureIDs[rid] {
 							// Try the stripped ID (for s3_objects composite keys).
-							resources, _ := demo.GetResources(result.TargetType)
+							entry := cache[result.TargetType]
 							foundInFixtures := false
-							for _, r := range resources {
+							for _, r := range entry.Resources {
 								if r.ID == rid || r.ID == lookupID || r.Name == lookupID {
 									foundInFixtures = true
 									break
 								}
 							}
 							if !foundInFixtures {
-								t.Errorf("G1 FAIL: ResourceID %q not found in demo.GetResources(%q) — %s",
+								t.Errorf("G1 FAIL: ResourceID %q not found in fake cache for %q — %s",
 									rid, result.TargetType, rowLabel)
 							}
 						}
@@ -444,7 +487,7 @@ func TestCtEventsDemoRightColumnCheckers_RealCheckers(t *testing.T) {
 	}
 
 	fixtures := loadAllCTFixtures(t)
-	cache := buildDemoResourceCache(t)
+	cache := buildFakeResourceCache(t)
 	ctx := context.Background()
 
 	for _, res := range fixtures {

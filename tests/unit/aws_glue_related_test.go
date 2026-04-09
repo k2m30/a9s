@@ -9,7 +9,6 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -36,22 +35,6 @@ func TestNavigableFields_Glue_Registered(t *testing.T) {
 	}
 	if nav.TargetType != "role" {
 		t.Errorf("Role TargetType = %q, want %q", nav.TargetType, "role")
-	}
-}
-
-func TestNavigableFields_Glue_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("glue")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no glue demo fixtures available")
-	}
-
-	// Verify that the first fixture has a non-empty Role in its RawStruct.
-	raw, ok := resources[0].RawStruct.(gluetypes.Job)
-	if !ok {
-		t.Fatalf("RawStruct is not gluetypes.Job, got %T", resources[0].RawStruct)
-	}
-	if raw.Role == nil || *raw.Role == "" {
-		t.Error("fixture RawStruct.Role is nil or empty — Role field path cannot resolve")
 	}
 }
 
@@ -284,50 +267,5 @@ func TestRelated_Glue_CFN_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_Glue_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("glue")
-	if checker == nil {
-		t.Fatal("no demo checker registered for glue")
-	}
-
-	results := checker(resource.Resource{ID: "acme-etl-orders"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"role": false, "alarm": false, "cfn": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// At least one result must have Count > 0 (role).
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
 	}
 }

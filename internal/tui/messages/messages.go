@@ -172,6 +172,15 @@ type AvailabilityCacheLoadedMsg struct {
 	Expired   bool            // true if cache was beyond TTL
 }
 
+// AvailabilityPrefetchedMsg is returned by the synchronous prefetch path in
+// no-cache mode (e.g. demo with pre-supplied clients). Unlike
+// AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
+// are already populated.
+type AvailabilityPrefetchedMsg struct {
+	Entries   map[string]int  // shortName -> resource count
+	Truncated map[string]bool // shortName -> true if truncated
+}
+
 // AvailabilityCheckedMsg reports one resource type's background probe result.
 type AvailabilityCheckedMsg struct {
 	ResourceType string

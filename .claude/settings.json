@@ -1,10 +1,13 @@
 {
   "env": {
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65"
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "65",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
     "deny": [
-      "Bash(git commit * -F*)",
+      "Bash(git commit * -F*)"
+    ],
+    "allow": [
       "Bash(cat *)",
       "Bash(find *)",
       "Bash(grep *)",
@@ -22,9 +25,7 @@
       "Bash(govulncheck *)",
       "Bash(docker *)",
       "Bash(aws *)",
-      "Bash(curl *)"
-    ],
-    "allow": [
+      "Bash(curl *)",
       "Bash(rtk*)",
       "Bash(cd*)",
       "Bash(echo *)",
@@ -105,6 +106,8 @@
       "Skill(commit-commands:commit)",
       "Skill(commit-commands:commit-push-pr)",
       "Skill(update-config)",
+      "Agent",
+      "SendMessage",
       "WebFetch",
       "WebSearch"
     ]

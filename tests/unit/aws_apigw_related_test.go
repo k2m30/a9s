@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -159,24 +158,5 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
-	}
-}
-
-// TestRelatedDemo_APIGW_Registered verifies the demo checker is registered and returns valid results.
-func TestRelatedDemo_APIGW_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is loaded
-	checker := resource.GetRelatedDemo("apigw")
-	if checker == nil {
-		t.Fatal("no demo checker registered for apigw")
-	}
-
-	results := checker(resource.Resource{ID: "demo-api-id"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

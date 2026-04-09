@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -41,25 +40,6 @@ func TestNavigableFields_IGW_Registered(t *testing.T) {
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
 		}
-	}
-}
-
-func TestNavigableFields_IGW_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("igw")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no igw demo fixtures available")
-	}
-
-	// The first fixture should be an attached IGW with a non-empty VpcId in Attachments.
-	raw, ok := resources[0].RawStruct.(ec2types.InternetGateway)
-	if !ok {
-		t.Fatalf("RawStruct is not ec2types.InternetGateway, got %T", resources[0].RawStruct)
-	}
-	if len(raw.Attachments) == 0 {
-		t.Error("fixture RawStruct.Attachments is empty — Attachments.VpcId field path cannot resolve")
-	}
-	if raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
-		t.Error("fixture RawStruct.Attachments[0].VpcId is nil or empty — navigable field path cannot resolve")
 	}
 }
 
@@ -307,50 +287,5 @@ func TestRelated_IGW_RTB_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_IGW_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("igw")
-	if checker == nil {
-		t.Fatal("no demo checker registered for igw")
-	}
-
-	results := checker(resource.Resource{ID: "igw-0aaa111111111111a"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify both expected target types are present.
-	wantTargets := map[string]bool{"vpc": false, "rtb": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// At least one result must have Count > 0.
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
 	}
 }
