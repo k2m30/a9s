@@ -17,6 +17,11 @@ tools:
   - Skill
   - mcp__context7__resolve-library-id
   - mcp__context7__get-library-docs
+  - mcp__plugin_github_github__issue_read
+  - mcp__plugin_github_github__pull_request_read
+  - mcp__plugin_github_github__get_file_contents
+  - mcp__plugin_github_github__search_issues
+  - mcp__plugin_github_github__list_issues
 skills:
   - a9s-common
 ---

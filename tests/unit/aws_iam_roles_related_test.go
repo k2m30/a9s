@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -368,50 +368,169 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 	}
 }
 
-// --- Demo checker ---
+// --- EC2 checker (Pattern C: scan EC2 cache for matching IamInstanceProfile ARN) ---
 
-func TestRelatedDemo_Role_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("role")
-	if checker == nil {
-		t.Fatal("no demo checker registered for role")
-	}
-
-	results := checker(resource.Resource{ID: "acme-lambda-execution"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-
-	// Verify all 4 expected target types are present.
-	wantTargets := map[string]bool{
-		"lambda": false,
-		"glue":   false,
-		"ng":     false,
-		"policy": false,
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
+// TestRelated_Role_EC2_Found verifies that an EC2 instance whose
+// IamInstanceProfile ARN contains "/"+roleName is counted.
+// Uses constructed test data — not demo fixture alignment — because the
+// demo EC2 fixture profile ARN ("acme-ec2-instance-profile") does not match
+// any IAM role name in the IAM fixtures.
+func TestRelated_Role_EC2_Found(t *testing.T) {
+	const roleName = "my-app-role"
+	source := resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+			Arn:      aws.String("arn:aws:iam::123456789012:role/" + roleName),
+		},
 	}
 
-	// Verify at least one result has Count > 0 (lambda should have Count >= 1).
-	hasPositiveCount := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositiveCount = true
-			break
-		}
+	ec2Res := resource.Resource{
+		ID:   "i-0abc1234def56789a",
+		Name: "i-0abc1234def56789a",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc1234def56789a"),
+			IamInstanceProfile: &ec2types.IamInstanceProfile{
+				Arn: aws.String("arn:aws:iam::123456789012:instance-profile/" + roleName),
+			},
+		},
 	}
-	if !hasPositiveCount {
-		t.Error("expected at least one demo result with Count > 0 (lambda should match)")
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+
+	checker := roleCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if result.TargetType != "ec2" {
+		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
 	}
 }
+
+// TestRelated_Role_EC2_NoMatch verifies that EC2 instances whose profile ARN
+// does not contain the role name produce count=0.
+func TestRelated_Role_EC2_NoMatch(t *testing.T) {
+	const roleName = "my-app-role"
+	source := resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+			Arn:      aws.String("arn:aws:iam::123456789012:role/" + roleName),
+		},
+	}
+
+	ec2Res := resource.Resource{
+		ID: "i-0abc1234def56789a",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc1234def56789a"),
+			IamInstanceProfile: &ec2types.IamInstanceProfile{
+				Arn: aws.String("arn:aws:iam::123456789012:instance-profile/other-role"),
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+
+	checker := roleCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no matching profile)", result.Count)
+	}
+}
+
+// TestRelated_Role_EC2_EmptyRoleName verifies that an empty role name
+// produces count=0 immediately without scanning the cache.
+func TestRelated_Role_EC2_EmptyRoleName(t *testing.T) {
+	source := resource.Resource{
+		ID:   "",
+		Name: "",
+		// RawStruct with nil RoleName
+		RawStruct: iamtypes.Role{RoleName: nil},
+	}
+
+	ec2Res := resource.Resource{
+		ID: "i-0abc1234def56789a",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc1234def56789a"),
+			IamInstanceProfile: &ec2types.IamInstanceProfile{
+				Arn: aws.String("arn:aws:iam::123456789012:instance-profile/some-role"),
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+
+	checker := roleCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 for empty role name", result.Count)
+	}
+}
+
+// TestRelated_Role_EC2_CacheMiss verifies that a missing EC2 cache entry
+// (nil list) produces count=-1 (unknown).
+func TestRelated_Role_EC2_CacheMiss(t *testing.T) {
+	source := resource.Resource{
+		ID:   "my-app-role",
+		Name: "my-app-role",
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String("my-app-role"),
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "ec2")
+	// Empty cache — no "ec2" entry at all.
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
+	}
+	if result.TargetType != "ec2" {
+		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
+	}
+}
+
+// TestRelated_Role_EC2_InstanceNoProfile verifies that EC2 instances with no
+// IamInstanceProfile set are skipped without panicking.
+func TestRelated_Role_EC2_InstanceNoProfile(t *testing.T) {
+	const roleName = "my-app-role"
+	source := resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+		},
+	}
+
+	ec2Res := resource.Resource{
+		ID: "i-noProfile",
+		RawStruct: ec2types.Instance{
+			InstanceId:         aws.String("i-noProfile"),
+			IamInstanceProfile: nil, // no profile attached
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+
+	checker := roleCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no profile on instance)", result.Count)
+	}
+}
+
+// --- Demo checker ---

@@ -8,7 +8,6 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -150,8 +149,10 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	// Nil clients + empty cache is the demo/test scenario: the target list is
+	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
 	}
 }
 
@@ -241,28 +242,13 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	// Nil clients + empty cache is the demo/test scenario: the target list is
+	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
 	}
 }
 
-func TestRelatedDemo_CtEvents_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ct-events")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ct-events")
-	}
-
-	results := checker(resource.Resource{ID: "evt-0a1b2c3d4e5f60001"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-}
 
 // ---------------------------------------------------------------------------
 // FetchFilter propagation: checkIAMUserCtEvents (iam-user → ct-events)
@@ -599,6 +585,133 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (role not in cache)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// §7b.10 completeness: all 13 typed RelatedDef entries must be registered
+// ---------------------------------------------------------------------------
+
+// TestCtEventsRelatedGroups_AllTypedRegistered asserts that the "ct-events" related
+// registry contains entries for every resource type listed in §7b.10 of
+// docs/design/ct-event-detail.md. The test is intentionally expected to FAIL until
+// all 11 missing registrations are added to ct_events.go.
+func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
+	expected := []string{
+		"role", "iam-user", "ec2", "s3", "s3_objects", "lambda",
+		"rds", "kms", "secrets", "vpce", "sg", "ddb", "cfn",
+	}
+
+	defs := resource.GetRelated("ct-events")
+
+	registered := make(map[string]bool, len(defs))
+	for _, def := range defs {
+		registered[def.TargetType] = true
+	}
+
+	var missing []string
+	for _, target := range expected {
+		if !registered[target] {
+			missing = append(missing, target)
+		}
+	}
+
+	var unexpected []string
+	for _, def := range defs {
+		if def.TargetType == "ct-events" {
+			continue // skip self-pivots — covered by TestCtEventsRelatedGroups_PivotsRegistered
+		}
+		found := false
+		for _, e := range expected {
+			if def.TargetType == e {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unexpected = append(unexpected, def.TargetType)
+		}
+	}
+
+	current := make([]string, 0, len(defs))
+	for _, def := range defs {
+		current = append(current, def.TargetType)
+	}
+
+	if len(missing) > 0 || len(unexpected) > 0 {
+		t.Errorf(
+			"ct-events related registry mismatch:\n  missing (%d):    %v\n  unexpected (%d): %v\n  current set:     %v",
+			len(missing), missing,
+			len(unexpected), unexpected,
+			current,
+		)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// §7b.10 self-pivot rows: ct-events → ct-events (4 pivot RelatedDefs)
+// ---------------------------------------------------------------------------
+
+// TestCtEventsRelatedGroups_PivotsRegistered asserts that the "ct-events" related
+// registry contains exactly 4 self-pivot entries (TargetType == "ct-events") with
+// the DisplayNames specified in §7b.10 of docs/design/ct-event-detail.md.
+// The test is expected to FAIL until all 4 pivot registrations are added.
+func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
+	expectedPivots := []string{
+		"CT events by AccessKeyId",
+		"CT events by Username",
+		"CT events by EventName",
+		"CT events by SharedEventId",
+	}
+
+	defs := resource.GetRelated("ct-events")
+
+	// Collect only self-pivot entries.
+	var pivots []resource.RelatedDef
+	for _, def := range defs {
+		if def.TargetType == "ct-events" {
+			pivots = append(pivots, def)
+		}
+	}
+
+	// Index pivots by DisplayName for O(1) lookup.
+	pivotByName := make(map[string]bool, len(pivots))
+	for _, p := range pivots {
+		pivotByName[p.DisplayName] = true
+	}
+
+	// Build expected set for reverse lookup.
+	expectedSet := make(map[string]bool, len(expectedPivots))
+	for _, name := range expectedPivots {
+		expectedSet[name] = true
+	}
+
+	var missing []string
+	for _, name := range expectedPivots {
+		if !pivotByName[name] {
+			missing = append(missing, name)
+		}
+	}
+
+	var unexpected []string
+	for _, p := range pivots {
+		if !expectedSet[p.DisplayName] {
+			unexpected = append(unexpected, p.DisplayName)
+		}
+	}
+
+	currentNames := make([]string, 0, len(pivots))
+	for _, p := range pivots {
+		currentNames = append(currentNames, p.DisplayName)
+	}
+
+	if len(missing) > 0 || len(unexpected) > 0 {
+		t.Errorf(
+			"ct-events self-pivot registry mismatch:\n  missing (%d):    %v\n  unexpected (%d): %v\n  current set:     %v",
+			len(missing), missing,
+			len(unexpected), unexpected,
+			currentNames,
+		)
 	}
 }
 

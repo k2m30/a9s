@@ -8,7 +8,6 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -325,20 +324,3 @@ func TestNavigableFields_Subnet(t *testing.T) {
 }
 
 // --- Demo checker test ---
-
-func TestRelatedDemo_Subnet_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("subnet")
-	if checker == nil {
-		t.Fatal("no demo checker registered for subnet")
-	}
-	results := checker(subnetSrcResource())
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-}

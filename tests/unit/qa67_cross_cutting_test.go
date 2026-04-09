@@ -148,8 +148,8 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// Should be on the EC2 list — the resource should be visible
-	if !strings.Contains(plain, "stack-test") && !strings.Contains(plain, "ec2") {
-		t.Logf("K.2: after Esc from detail (post-error), view: %s", plain[:min(200, len(plain))])
+	if !strings.Contains(plain, "stack-test") {
+		t.Errorf("K.2: after Esc from detail (post-error), EC2 list should show 'stack-test', got: %s", plain[:min(200, len(plain))])
 	}
 	if out == "" {
 		t.Error("K.2: View() should not be empty after Esc from detail following API error")
@@ -165,7 +165,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
 		Target:       messages.TargetResourceList,
-		ResourceType: "ecs_svc",
+		ResourceType: "ecs-svc",
 	})
 	services := []resource.Resource{
 		{ID: "my-cluster/my-service", Name: "my-service", Status: "ACTIVE", Fields: map[string]string{
@@ -179,10 +179,16 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 			"launch_type":   "FARGATE",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ecs_svc", Resources: services})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ecs-svc", Resources: services})
 
-	// Open Events child view (key 'e') and get an error
-	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
+	// Open Events child view (key 'e') — execute the returned cmd to actually push the child view
+	var cmd tea.Cmd
+	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
 	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
 		ResourceType: "ecs_svc_events",
 		Err:          errAccessDenied("ecs:DescribeServices"),
@@ -198,7 +204,9 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 
 	// The service should still be visible
 	plain := stripANSI(out)
-	_ = plain // soft check — sibling child view should still be accessible
+	if !strings.Contains(plain, "my-service") {
+		t.Errorf("K.3: after returning from errored child view, ECS service 'my-service' should be visible, got: %s", plain[:min(200, len(plain))])
+	}
 }
 
 // K.4 — Rapid ctrl+r does not cause data corruption or crash.
@@ -295,10 +303,12 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 		Err:          errAccessDenied("ec2:DescribeInstances"),
 	})
 
-	// Error state: the list should have 0 resources
+	// Error state: the list should have 0 resources and show an error
 	out := rootViewContent(m)
 	plain := stripANSI(out)
-	_ = plain // soft check
+	if !strings.Contains(plain, "AccessDenied") && !strings.Contains(plain, "access denied") && !strings.Contains(plain, "error") && !strings.Contains(plain, "Error") {
+		t.Errorf("K.7: after APIErrorMsg, view should show error indication, got: %s", plain[:min(200, len(plain))])
+	}
 
 	// User presses ctrl+r — then resources arrive
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -327,8 +337,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 	plain = stripANSI(out)
 	// Frame title should show count (42)
 	if !strings.Contains(plain, "42") {
-		t.Logf("K.7: expected count 42 in frame title, got: %s", plain[:min(300, len(plain))])
-		// Soft check: title format may vary
+		t.Errorf("K.7: expected count 42 in frame title after refresh, got: %s", plain[:min(300, len(plain))])
 	}
 	if out == "" {
 		t.Error("K.7: View() should not be empty after error then successful refresh")

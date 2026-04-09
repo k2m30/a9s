@@ -13,12 +13,13 @@ package unit
 // TestRelatedNavigate_PartialCache_NotTruncated_ShowsFiltered — PASSES (correct behavior).
 
 import (
+	"context"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -38,9 +39,10 @@ func setupEC2ListWithTruncatedCache(t *testing.T) (tui.Model, []resource.Resourc
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) < 2 {
-		t.Fatal("demo ec2 fixtures need at least 2 resources for partial-cache test")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) < 2 {
+		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	// Load only the FIRST resource with truncated pagination.
@@ -66,9 +68,10 @@ func setupEC2ListWithCompleteCache(t *testing.T) (tui.Model, []resource.Resource
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) < 2 {
-		t.Fatal("demo ec2 fixtures need at least 2 resources for partial-cache test")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) < 2 {
+		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	// Load ALL resources with no truncation.

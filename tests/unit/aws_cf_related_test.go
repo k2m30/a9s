@@ -8,7 +8,6 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -410,23 +409,5 @@ func TestRelated_CF_ACM_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
-	}
-}
-
-func TestRelatedDemo_CF_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("cf")
-	if checker == nil {
-		t.Fatal("no demo checker registered for cf")
-	}
-
-	results := checker(resource.Resource{ID: "E1A2B3C4D5E6F7"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

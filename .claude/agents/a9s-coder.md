@@ -4,6 +4,7 @@ description: "Writes Go implementation code ONLY — no tests. Receives exact fi
 model: sonnet
 color: yellow
 memory: project
+background: true
 tools:
   - Read
   - Glob

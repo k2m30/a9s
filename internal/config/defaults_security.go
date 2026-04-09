@@ -19,11 +19,11 @@ func securityDefaultViews() map[string]ViewDef {
 		},
 		"policy": {
 			List: []ListColumn{
-				{Title: "Policy Name", Path: "PolicyName", Width: 36},
-				{Title: "Policy ID", Path: "PolicyId", Width: 22},
-				{Title: "Attached", Path: "AttachmentCount", Width: 10},
-				{Title: "Path", Path: "Path", Width: 20},
-				{Title: "Created", Path: "CreateDate", Width: 22},
+				{Title: "Policy Name", Key: "policy_name", Width: 36},
+				{Title: "Type", Key: "policy_type", Width: 10},
+				{Title: "Attached", Key: "attachment_count", Width: 10},
+				{Title: "Path", Key: "path", Width: 20},
+				{Title: "Created", Key: "create_date", Width: 22},
 			},
 			Detail: []string{
 				"PolicyName", "PolicyId", "Arn", "Path",

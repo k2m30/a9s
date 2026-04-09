@@ -1,0 +1,40 @@
+ ACTOR                                                                                                                                             │            RELATED
+ Principal:            arn:aws:sts::222222222222:assumed-role/AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d/alice@corp                               │  IAM Roles
+ MFA:                  yes                                                                                                                         │  IAM Users
+ Access key:           ASIAZK7L9PQRSSOXEXMP                                                                                                        │  EC2 Instances
+ User agent:           console.amazonaws.com                                                                                                       │  S3 Buckets
+ ACTION                                                                                                                                            │  S3 Objects
+ Event:                ec2:TerminateInstances                                                                                                      │  Lambda Functions
+ TARGET                                                                                                                                            │  RDS Instances
+ Instance:             i-0a1b2c3d4e5f60001                                                                                                         │  KMS Keys
+ Instance:             i-0a1b2c3d4e5f60002                                                                                                         │  Secrets
+ CONTEXT                                                                                                                                           │  VPC Endpoints
+ Region:               eu-west-1                                                                                                                   │  Security Groups
+ Source IP:            AWS Internal                                                                                                                │  DynamoDB Tables
+ Time:                 2026-04-07T14:07:42Z                                                                                                        │  CloudFormation Stacks
+ RESPONSE                                                                                                                                          │  CT events by AccessKeyId
+ instancesSet:         map[items:[map[currentState:map[code:32 name:shutting-down] instanceId:i-0a1b2c3d4e5f60001 previousState:map[code:16 name:ru│  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │

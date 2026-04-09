@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -57,9 +59,10 @@ func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn(t *testing.T) {
 	m = applyWithCmd(m, rootSpecialKey(tea.KeyEnter))
 
 	// Stabilize list data deterministically for this journey test.
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	clients := demo.NewServiceClients()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 	}
 	m = applyWithCmd(m, messages.ResourcesLoadedMsg{
 		ResourceType: "ec2",
@@ -102,9 +105,10 @@ func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn_ProfileFlagInDemo(t
 	m = applyWithCmd(m, rootSpecialKey(tea.KeyEnter))
 	m = applyWithCmd(m, rootSpecialKey(tea.KeyEnter))
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	clients2 := demo.NewServiceClients()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), clients2.EC2)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 	}
 	m = applyWithCmd(m, messages.ResourcesLoadedMsg{
 		ResourceType: "ec2",

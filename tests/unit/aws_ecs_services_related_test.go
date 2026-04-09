@@ -11,7 +11,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -331,25 +330,5 @@ func TestRelated_ECSSvc_CFN_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_ECSSvc_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ecs-svc")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ecs-svc")
-	}
-
-	results := checker(resource.Resource{ID: "api-service"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

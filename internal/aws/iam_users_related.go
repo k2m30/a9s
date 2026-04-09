@@ -4,8 +4,8 @@ package aws
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -53,12 +53,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
 	}
-	var ids []string
-	for _, p := range out.AttachedPolicies {
-		if p.PolicyName != nil {
-			ids = append(ids, *p.PolicyName)
-		}
-	}
+	ids := customerManagedAttachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
 }
 

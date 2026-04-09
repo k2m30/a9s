@@ -1,14 +1,15 @@
 package unit_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -19,9 +20,10 @@ import (
 
 func makePreviewEC2Detail(t *testing.T, w, h int) views.DetailModel {
 	t.Helper()
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo.GetResources(\"ec2\") returned no fixtures")
+	ec2Client := fakes.NewEC2()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
 	k := keys.Default()
 	cfg := config.DefaultConfig()
@@ -96,9 +98,10 @@ func TestPreviewLeft_DetailTitleIncludesDetailContextAndResourceID(t *testing.T)
 
 func mustDemoEC2(t *testing.T) []resource.Resource {
 	t.Helper()
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo.GetResources(\"ec2\") returned no fixtures")
+	ec2Client := fakes.NewEC2()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
 	return ec2
 }

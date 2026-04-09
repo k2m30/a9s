@@ -1,0 +1,40 @@
+ ACTOR                                                                                                                                             │            RELATED
+ Principal:            arn:aws:sts::666666666666:assumed-role/eks-checkout-svc-sa/1717156821993453824                                              │  IAM Roles
+ User agent:           aws-sdk-go-v2/1.30.3                                                                                                        │  IAM Users
+ ACTION                                                                                                                                            │  EC2 Instances
+ Event:                s3:GetObject                                                                                                                │  S3 Buckets
+ TARGET                                                                                                                                            │  S3 Objects
+ Bucket:               checkout-config                                                                                                             │  Lambda Functions
+ CONTEXT                                                                                                                                           │  RDS Instances
+ Region:               eu-west-1                                                                                                                   │  KMS Keys
+ Source IP:            10.42.3.18                                                                                                                  │  Secrets
+ Time:                 2026-04-07T14:20:21Z                                                                                                        │  VPC Endpoints
+ REQUEST                                                                                                                                           │  Security Groups
+ bucketName:           checkout-config                                                                                                             │  DynamoDB Tables
+ key:                  prod/config.json                                                                                                            │  CloudFormation Stacks
+                                                                                                                                                   │  CT events by AccessKeyId
+                                                                                                                                                   │  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │

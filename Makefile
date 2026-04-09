@@ -42,6 +42,9 @@ coverage:
 
 cover: coverage
 
+# False-positive exclusions (line 56+):
+#   CreateDate/CreateTime/StartRecord/StartTime/StopTime/StopDate — timestamp field names, not API calls
+#   ExecuteCommandConfiguration — ECS cluster struct field read via NavigableField, not an API call
 verify-readonly:
 	@echo "Checking for write API calls in internal/aws/..."
 	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z]' internal/aws/*.go \
@@ -53,7 +56,8 @@ verify-readonly:
 		| grep -v 'regions.go' \
 		| grep -v '\/\/' \
 		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
-		| grep -v 'CreateDate\|CreateTime\|StartRecord\|StartTime\|StopTime\|StopDate' ; then \
+		| grep -v 'CreateDate\|CreateTime\|StartRecord\|StartTime\|StopTime\|StopDate' \
+		| grep -v 'ExecuteCommandConfiguration' ; then \
 		echo "FAIL: Write API calls detected!"; exit 1; \
 	else \
 		echo "PASS: All API calls are read-only"; \

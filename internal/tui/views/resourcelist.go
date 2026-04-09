@@ -530,6 +530,11 @@ func (m *ResourceListModel) SetFetchFilter(filter map[string]string) {
 	m.fetchFilter = filter
 }
 
+// FetchFilter returns the server-side filter parameters used for initial fetch and load-more.
+func (m ResourceListModel) FetchFilter() map[string]string {
+	return m.fetchFilter
+}
+
 // SetRelatedIDFilter constrains the list to an exact set of resource IDs.
 // Used by related-resource navigation flows to preserve checker result IDs
 // even when the destination type must be fetched first.
@@ -922,14 +927,3 @@ func FilterResources(query string, resources []resource.Resource) []resource.Res
 	}
 	return result
 }
-
-
-
-
-
-
-
-
-
-
-

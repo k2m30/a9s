@@ -13,8 +13,8 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -379,9 +379,10 @@ func TestNavigableFields_EC2_Registered(t *testing.T) {
 }
 
 func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("ec2")
-	if !ok {
-		t.Fatal("no demo fixture registered for ec2 — fixtures_compute.go must register it")
+	ec2Client := fakes.NewEC2()
+	resources, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil {
+		t.Fatalf("FetchEC2Instances via EC2 fake: %v", err)
 	}
 	if len(resources) == 0 {
 		t.Fatal("demo fixture returned no resources for ec2")
@@ -411,23 +412,6 @@ func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Demo Checker
 // ---------------------------------------------------------------------------
-
-func TestRelatedDemo_EC2_Registered(t *testing.T) {
-	checker := resource.GetRelatedDemo("ec2")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ec2")
-	}
-
-	results := checker(resource.Resource{ID: "i-demo-test"})
-	if len(results) != 9 {
-		t.Fatalf("demo checker returned %d results, want 9", len(results))
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Per-checker: tg

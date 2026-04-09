@@ -44,17 +44,11 @@ type ResourceCache map[string]ResourceCacheEntry
 // RelatedChecker returns a count of related resources of a specific type.
 type RelatedChecker func(ctx context.Context, clients interface{}, res Resource, cache ResourceCache) RelatedCheckResult
 
-// RelatedDemoChecker returns hardcoded results for demo mode.
-type RelatedDemoChecker func(res Resource) []RelatedCheckResult
-
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
 
 // navigableFieldRegistry maps resource short names to their navigable field definitions.
 var navigableFieldRegistry = map[string][]NavigableField{}
-
-// relatedDemoRegistry maps resource short names to their demo checker functions.
-var relatedDemoRegistry = map[string]RelatedDemoChecker{}
 
 // RegisterRelated stores related definitions for the given resource short name.
 // Replaces any existing entry.
@@ -102,20 +96,3 @@ func UnregisterNavigableFields(shortName string) {
 	delete(navigableFieldRegistry, shortName)
 }
 
-// RegisterRelatedDemo stores a demo checker for the given resource short name.
-// Replaces any existing entry.
-func RegisterRelatedDemo(shortName string, f RelatedDemoChecker) {
-	relatedDemoRegistry[shortName] = f
-}
-
-// GetRelatedDemo returns the demo checker for the given resource short name,
-// or nil if none are registered.
-func GetRelatedDemo(shortName string) RelatedDemoChecker {
-	return relatedDemoRegistry[shortName]
-}
-
-// UnregisterRelatedDemo removes the demo checker for the given short name.
-// Used only in tests for cleanup.
-func UnregisterRelatedDemo(shortName string) {
-	delete(relatedDemoRegistry, shortName)
-}

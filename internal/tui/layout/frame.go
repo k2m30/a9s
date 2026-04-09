@@ -9,6 +9,26 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
+// Layout policy constants shared between the root model (terminal-width
+// guards) and view models (inner content-width gating). Keeping them in one
+// place prevents drift between the "too narrow" guard and the right-column
+// rendering threshold.
+const (
+	// MinTerminalWidth is the smallest terminal width the app supports.
+	// Below this, the root renders a "too narrow" message instead of any view.
+	MinTerminalWidth = 60
+
+	// FrameChromeWidth is the horizontal cost of the frame border (left + right
+	// border characters). Views receive innerWidth = terminalWidth - FrameChromeWidth.
+	FrameChromeWidth = 2
+
+	// MinInnerContentWidth is the smallest inner width a view will ever be
+	// given. Views that gate optional sub-panes (e.g. the detail view's
+	// RELATED column) on a width threshold should compare against this, not
+	// against MinTerminalWidth, because they only see inner dimensions.
+	MinInnerContentWidth = MinTerminalWidth - FrameChromeWidth
+)
+
 // CenterTitle returns the top border line with title centered between corners.
 //
 //	┌─── title ───┐

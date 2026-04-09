@@ -196,7 +196,9 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if m.clients != nil {
 			m.identityFetching = true
 			cmds = append(cmds, m.fetchIdentity())
-			if !m.noCache {
+			if m.noCache {
+				cmds = append(cmds, m.demoPrefetchCounts())
+			} else {
 				cmds = append(cmds, m.loadAvailabilityCache())
 			}
 		}
@@ -204,14 +206,17 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	}
 	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
+	} else if m.clients == nil && m.preSuppliedClients != nil {
+		// Fall back to pre-supplied clients (demo path) when msg carries no clients.
+		m.clients = m.preSuppliedClients
 	}
 	m.hasPrevState = false
 	m.prevProfile = ""
 	m.prevRegion = ""
-	if m.profile == "" && !m.demoMode {
+	if m.profile == "" {
 		m.profile = "default"
 	}
-	if m.region == "" && !m.demoMode {
+	if m.region == "" {
 		if msg.Region != "" {
 			m.region = msg.Region
 		} else {
@@ -219,22 +224,34 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 			m.region = awsclient.GetDefaultRegion(configPath, m.profile)
 		}
 	}
+	// In demo/no-cache mode, prefetch all counts synchronously in one cmd so the
+	// main menu shows counts immediately without the async probe pipeline.
+	// Skip identity fetch in demo mode — the profile/region are synthetic.
+	if m.noCache {
+		availCmd := m.demoPrefetchCounts()
+		if m.pendingRefresh {
+			m.pendingRefresh = false
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				m.flash = flashState{text: "Connected. Refreshing...", active: true}
+				cmd := m.refreshResourceList(*rl)
+				return m, tea.Batch(cmd, availCmd)
+			}
+		}
+		return m, availCmd
+	}
+
 	// Fetch identity on every clients-ready event
 	m.identityFetching = true
 	identityCmd := m.fetchIdentity()
 
-	// Start availability probes (unless disabled)
-	var availCmd tea.Cmd
-	if !m.noCache {
-		availCmd = m.loadAvailabilityCache()
-	}
+	// Load disk cache which then fires background probes for expired/missing entries.
+	availCmd := m.loadAvailabilityCache()
 
 	if m.pendingRefresh {
 		m.pendingRefresh = false
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			rt := rl.ResourceType()
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
-			cmd := m.fetchResources(rt)
+			cmd := m.refreshResourceList(*rl)
 			return m, tea.Batch(cmd, identityCmd, availCmd)
 		}
 	}
@@ -246,9 +263,6 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on profile switch
 	m.relatedGen++
-	if m.demoMode {
-		return m, nil
-	}
 	m.connectGen++
 	// Only save prev on first switch; rapid A→B→C keeps A as rollback target
 	if !m.hasPrevState {
@@ -279,9 +293,6 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on region switch
 	m.relatedGen++
-	if m.demoMode {
-		return m, nil
-	}
 	m.connectGen++
 	// Only save prev on first switch; rapid switches keep original as rollback target
 	if !m.hasPrevState {
@@ -447,18 +458,24 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case messages.TargetProfile:
-		if m.demoMode {
+		if m.preSuppliedClients != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Profile switching disabled in demo mode", IsError: true}
+				return messages.FlashMsg{
+					Text:    "context switching is disabled in demo mode",
+					IsError: true,
+				}
 			}
 		}
 		cmd := m.fetchProfiles()
 		return m, cmd
 
 	case messages.TargetRegion:
-		if m.demoMode {
+		if m.preSuppliedClients != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Region switching disabled in demo mode", IsError: true}
+				return messages.FlashMsg{
+					Text:    "region switching is disabled in demo mode",
+					IsError: true,
+				}
 			}
 		}
 		regions := awsclient.AllRegions()
@@ -501,7 +518,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 // or restarts availability checks when on the main menu.
 // For detail views, re-triggers related resource checks.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
-	// Main menu: restart availability checks
+	// Main menu: restart availability checks (no-op in no-cache mode)
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
 		if m.noCache {
 			return m, nil
@@ -536,16 +553,24 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rt := rl.ResourceType()
 	delete(m.resourceCache, rt) // clear cache for refreshed type only
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+	return m, m.refreshResourceList(*rl)
+}
 
-	// If the view has a parent context, it's a child view — use child fetch path.
-	if pc := rl.ParentContext(); pc != nil {
-		cmd := m.fetchChildResources(rt, pc)
-		return m, cmd
+func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
+	rt := rl.ResourceType()
+
+	// Filtered lists must refresh through the same filtered fetcher so their
+	// pagination token remains valid for subsequent load-more requests.
+	if ff := rl.FetchFilter(); len(ff) > 0 {
+		return m.fetchResourcesFiltered(rt, ff)
 	}
 
-	// Top-level resource list — fetch via registry.
-	cmd := m.fetchResources(rt)
-	return m, cmd
+	// Child lists refresh through the child fetcher using their parent context.
+	if pc := rl.ParentContext(); pc != nil {
+		return m.fetchChildResources(rt, pc)
+	}
+
+	return m.fetchResources(rt)
 }
 
 // handleReveal fetches a revealed value using the resource type's registered reveal fetcher.
@@ -624,6 +649,22 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	return m, tea.Batch(cmds...)
 }
 
+// handleAvailabilityPrefetched applies synchronously-prefetched counts to the
+// main menu. Used in no-cache + pre-supplied-clients mode so counts appear
+// immediately without background probes.
+func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedMsg) (tea.Model, tea.Cmd) {
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		for shortName, count := range msg.Entries {
+			menu.SetAvailability(shortName, count)
+		}
+		for shortName, trunc := range msg.Truncated {
+			menu.SetTruncated(shortName, trunc)
+		}
+		menu.SetCheckProgress(0, 0) // signal "done"
+	}
+	return m, nil
+}
+
 // handleAvailabilityChecked processes a single resource type's probe result.
 func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (tea.Model, tea.Cmd) {
 	// Ignore stale results from a previous generation (profile/region switch)
@@ -680,4 +721,3 @@ func copyToClipboard(content, successLabel string) tea.Cmd {
 		return messages.FlashMsg{Text: successLabel, IsError: false}
 	}
 }
-

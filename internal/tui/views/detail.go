@@ -276,7 +276,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.ToggleRelated):
 			m.rightColUserToggled = true
-			if m.width < 60 {
+			if m.width < layout.MinInnerContentWidth {
 				return m, nil // silently ignore on narrow terminals
 			}
 			if m.rightColAutoShown {
@@ -291,7 +291,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			m.rightColVisible = !m.rightColVisible
 			if m.rightColVisible {
 				defs := resource.GetRelated(m.resourceType)
-				m.rightCol = newRightColumn(defs, m.res)
+				m.rightCol = newRightColumn(defs, m.res, m.resourceType)
 				m.rightCol.keys = m.keys
 				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 				m.recalcViewportWidth()
@@ -314,12 +314,16 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
 				item := m.fieldList[m.fieldCursor]
 				if item.IsNavigable {
+					targetID := item.Value
+					if item.NavID != "" {
+						targetID = item.NavID
+					}
 					return m, func() tea.Msg {
 						return messages.RelatedNavigateMsg{
 							TargetType:     item.TargetType,
 							SourceResource: m.res,
 							SourceType:     m.resourceType,
-							TargetID:       item.Value,
+							TargetID:       targetID,
 						}
 					}
 				}
@@ -356,6 +360,10 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Down):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
 				m.fieldCursor++
+				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
+				for m.fieldCursor < len(m.fieldList)-1 && m.fieldList[m.fieldCursor].IsSection {
+					m.fieldCursor++
+				}
 				m.syncViewportToCursor()
 				m.refreshViewportContent()
 				return m, nil
@@ -364,6 +372,10 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Up):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
 				m.fieldCursor--
+				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
+				for m.fieldCursor > 0 && m.fieldList[m.fieldCursor].IsSection {
+					m.fieldCursor--
+				}
 				m.syncViewportToCursor()
 				m.refreshViewportContent()
 				return m, nil
@@ -388,7 +400,7 @@ func (m DetailModel) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
-	if m.rightColShowing() && m.width >= 60 {
+	if m.rightColShowing() && m.width >= layout.MinInnerContentWidth {
 		// Keep RELATED visible at medium widths by using side-by-side layout.
 		rightW := m.currentRightColWidth()
 		sep := styles.ColSepDim.Render("│")
@@ -443,22 +455,22 @@ func (m *DetailModel) SetSize(w, h int) {
 	// Auto-show right column when wide enough and related defs exist:
 	// - on first SetSize call, and
 	// - on later resizes only if user hasn't explicitly toggled visibility.
-	if w >= 60 && len(resource.GetRelated(m.resourceType)) > 0 &&
+	if w >= layout.MinInnerContentWidth && len(resource.GetRelated(m.resourceType)) > 0 &&
 		(!m.ready || (!m.rightColShowing() && !m.rightColUserToggled)) {
 		m.rightColAutoShown = true
-		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res)
+		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res, m.resourceType)
 		m.rightCol.keys = m.keys
 		if m.ready { // resize case — first paint is handled via Init/first Update
 			m.pendingRelatedDispatch = true
 		}
-	} else if w < 60 && wasShowing {
+	} else if w < layout.MinInnerContentWidth && wasShowing {
 		m.rightColAutoShown = false
 		m.rightColVisible = false
 		m.rightCol.SetFocused(false)
 	}
 
 	viewportW := w
-	if m.rightColShowing() && w >= 60 {
+	if m.rightColShowing() && w >= layout.MinInnerContentWidth {
 		rightW := m.currentRightColWidth()
 		viewportW = w - rightW - 1 // -1 for separator character
 		m.rightCol.SetSize(rightW, h)
@@ -482,7 +494,7 @@ func (m DetailModel) rightColShowing() bool {
 
 // recalcViewportWidth adjusts the viewport width based on the right column visibility.
 func (m *DetailModel) recalcViewportWidth() {
-	if m.rightColShowing() && m.width >= 60 {
+	if m.rightColShowing() && m.width >= layout.MinInnerContentWidth {
 		leftW := m.width - m.currentRightColWidth() - 1 // -1 for separator
 		if m.ready {
 			m.viewport.SetWidth(leftW)
@@ -707,7 +719,7 @@ func (m *DetailModel) ResetRightColumn() {
 		return
 	}
 	defs := resource.GetRelated(m.resourceType)
-	m.rightCol = newRightColumn(defs, m.res)
+	m.rightCol = newRightColumn(defs, m.res, m.resourceType)
 	m.rightCol.keys = m.keys
 	m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 }

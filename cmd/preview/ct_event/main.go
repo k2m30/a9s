@@ -1,17 +1,19 @@
 // Standalone preview for the redesigned CloudTrail event detail view.
 // Run with: go run ./cmd/preview/ct_event/
 //
-// Renders every canonical wireframe case from docs/design/ct-event-detail.md §4:
+// Design source: docs/design/ct-event-detail-v2.md §3 (v2.1 wireframes)
 //
-//	A — AssumedRole service role, read, success   (Karpenter DescribeInstances)
-//	B — SSO AssumedRole console write, MFA         (TerminateInstances)
-//	C — IAMUser long-lived key, AccessDenied       (S3 PutObject)
-//	D — AWSService event                           (KMS RotateKey)
-//	E — Root user action                           (PutBucketPolicy)
-//	F — WebIdentityUser / IRSA                     (S3 GetObject)
-//	G — Cross-account (recipient != caller)        (S3 PutObject)
-//	H — Insight event                              (ApiCallRateInsight)
-//	I — NetworkActivity VPCE deny                  (PutObject VpceAccessDenied)
+// Renders every canonical wireframe case from §3:
+//
+//	A — Karpenter ec2:DescribeInstances (R, no flags)                (ct-info, dim)
+//	B — SSO Console ec2:TerminateInstances (D verb, MFA)             (ct-danger, red)
+//	C — IAMUser s3:PutObject AccessDenied (errorCode)                (ct-danger, red)
+//	D — KMS kms:RotateKey (AwsServiceEvent)                          (ct-attention, yellow)
+//	E — Root s3:PutBucketPolicy (Root + W)                           (ct-attention, yellow)
+//	F — IRSA s3:GetObject (WebIdentityUser, R)                       (ct-info, dim)
+//	G — Cross-account s3:PutObject (W + cross-account)               (ct-attention, yellow)
+//	H — Insight ApiCallRateInsight (no ACTOR)                        (ct-info, dim)
+//	I — NetworkActivity VPCE deny s3:PutObject (errorCode)           (ct-danger, red)
 //
 // No interactivity, no AWS calls. All account IDs are synthetic
 // (111111111111, 222222222222, ...).
@@ -32,12 +34,9 @@ var (
 	colDim       = lipgloss.Color("#565f89")
 	colHeaderFg  = lipgloss.Color("#c0caf5")
 	colDetailVal = lipgloss.Color("#c0caf5")
-	colSuccess   = lipgloss.Color("#9ece6a")
-	colError     = lipgloss.Color("#f7768e")
-	colWarning   = lipgloss.Color("#e0af68")
-	colOrange    = lipgloss.Color("#ff9e64")
-	colPurple    = lipgloss.Color("#bb9af7")
 	colRowAlt    = lipgloss.Color("#1e2030")
+	colWarning   = lipgloss.Color("#e0af68") // ct-attention (ColPending)
+	colError     = lipgloss.Color("#f7768e") // ct-danger    (ColStopped)
 )
 
 // ── Style primitives ──────────────────────────────────────────────────────────
@@ -48,144 +47,77 @@ var (
 		BorderForeground(colBorder).
 		Padding(0, 1)
 
-	stSection    = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
-	stSectionAlt = lipgloss.NewStyle().Foreground(colPurple).Bold(true)
-	stSectionErr = lipgloss.NewStyle().Foreground(colError).Bold(true)
+	// stSectionV2: bold-only, no color — per design §1.2.
+	// No new token in styles/; constructed inline as specified.
+	stSectionV2 = lipgloss.NewStyle().Bold(true)
 
 	stLabel = lipgloss.NewStyle().Foreground(colDim)
 	stVal   = lipgloss.NewStyle().Foreground(colDetailVal)
 	stDim   = lipgloss.NewStyle().Foreground(colDim)
 
-	stActor   = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
-	stOK      = lipgloss.NewStyle().Foreground(colSuccess)
-	stFailed  = lipgloss.NewStyle().Foreground(colError).Bold(true)
-	stErrBody = lipgloss.NewStyle().Foreground(colDetailVal).Background(colRowAlt)
-
-	// Verb glyphs + eventName coloring
-	stVerbRead    = lipgloss.NewStyle().Foreground(colDim)
-	stVerbWrite   = lipgloss.NewStyle().Foreground(colOrange).Bold(true)
-	stVerbDelete  = lipgloss.NewStyle().Foreground(colError).Bold(true)
-	stVerbService = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
-	stVerbInsight = lipgloss.NewStyle().Foreground(colPurple).Bold(true)
-
-	// Badges
-	stBadgeGood = lipgloss.NewStyle().Foreground(colSuccess)                          // [MFA] [CONSOLE]
-	stBadgeInfo = lipgloss.NewStyle().Foreground(colAccent)                           // [SERVICE] [IMDSv2] [IRSA] [VPCE]
-	stBadgeWarn = lipgloss.NewStyle().Foreground(colWarning)                          // [X-ACCT] [LONG-LIVED-KEY]
-	stBadgeDim  = lipgloss.NewStyle().Foreground(colDim)                              // [AWS-INTERNAL]
-	stBadgeRoot = lipgloss.NewStyle().Foreground(colError).Bold(true)                 // [ROOT]
-	stRootBar   = lipgloss.NewStyle().Foreground(colHeaderFg).Background(colError).Bold(true)
-
-	// Navigable value: accent-colored + underlined. No trailing glyph —
-	// matches styles.NavigableField in internal/tui/styles/styles.go:195.
+	// Navigable value: accent-colored + underlined. Unchanged from v1 —
+	// matches styles.NavigableField in internal/tui/styles/styles.go (FR-015).
 	stNavValue = lipgloss.NewStyle().Foreground(colAccent).Underline(true)
+
+	// Severity styles for the Event: row value (FR-002 / design §1.2 / §5).
+	stEventInfo      = lipgloss.NewStyle().Foreground(colDim)     // ct-info
+	stEventAttention = lipgloss.NewStyle().Foreground(colWarning) // ct-attention
+	stEventDanger    = lipgloss.NewStyle().Foreground(colError)   // ct-danger
+
+	// Right column styles — chrome, unchanged (design §1.1 / §4).
+	stRColHdr  = lipgloss.NewStyle().Foreground(colDim)
+	stRColRow  = lipgloss.NewStyle().Foreground(colHeaderFg)
+	stRColZero = lipgloss.NewStyle().Foreground(colDim)
+	stRColSel  = lipgloss.NewStyle().Foreground(colHeaderFg).Background(colRowAlt).Bold(true)
+	stRColCard = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(colBorder).
+			Padding(0, 1)
+
+	// Section label printer for main() case headers.
+	stCaseLabel = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
 )
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
-type verb int
-
-const (
-	verbRead verb = iota
-	verbWrite
-	verbDelete
-	verbService
-	verbInsight
-)
-
+// kv holds a single label/value row. When eventStyle is non-nil it overrides
+// the default stVal for the value (used exclusively on the Event: row — FR-002).
 type kv struct {
-	label string
-	value string // may contain inline ANSI (badges)
+	label      string
+	value      string
+	eventStyle *lipgloss.Style
 	// multi-line values: \n separated; subsequent lines pad to label column.
 	// When label is prefixed with navMarker, the row is rendered navigable:
-	// value underlined in accent, trailing " →" glyph appended.
+	// value underlined in accent.
 }
 
 // navMarker prefixes kv.label to mark the row as navigable at render time.
-// Kept in the label (not the value) so multi-line values render uniformly.
-// Navigable rows render their value underlined+accent, no trailing arrow.
 const navMarker = "\x00NAV\x00"
 
 // navKV builds a navigable row using the label prefix sentinel.
 func navKV(label, value string) kv { return kv{label: navMarker + label, value: value} }
 
+// colorKV builds an Event: row whose value renders in the given severity style.
+func colorKV(label, value string, style lipgloss.Style) kv {
+	return kv{label: label, value: value, eventStyle: &style}
+}
+
 type section struct {
 	title string
-	alt   bool // purple header
-	err   bool // red header
 	rows  []kv
-	// freeform extra lines appended after rows (e.g. ERROR body)
-	extra []string
 }
 
 type event struct {
 	id       string
-	verb     verb
-	name     string // eventName
-	actor    string
-	badges   []string // pre-rendered badge strings (with brackets)
-	target   string   // short target, shown on header line 2
-	ok       bool
-	errCode  string
-	time     string
-	region   string
-	rootBar  bool // draw big red banner above header
 	sections []section
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-func badge(name, kind string) string {
-	s := "[" + name + "]"
-	switch kind {
-	case "good":
-		return stBadgeGood.Render(s)
-	case "info":
-		return stBadgeInfo.Render(s)
-	case "warn":
-		return stBadgeWarn.Render(s)
-	case "dim":
-		return stBadgeDim.Render(s)
-	case "root":
-		return stBadgeRoot.Render(s)
-	}
-	return s
-}
-
-func verbGlyph(v verb) string {
-	switch v {
-	case verbRead:
-		return stVerbRead.Render("R")
-	case verbWrite:
-		return stVerbWrite.Render("W")
-	case verbDelete:
-		return stVerbDelete.Render("D")
-	case verbService:
-		return stVerbService.Render("S")
-	case verbInsight:
-		return stVerbInsight.Render("I")
-	}
-	return "?"
-}
-
-func verbName(v verb, name string) string {
-	switch v {
-	case verbRead:
-		return stVerbRead.Render(name)
-	case verbWrite:
-		return stVerbWrite.Render(name)
-	case verbDelete:
-		return stVerbDelete.Render(name)
-	case verbService:
-		return stVerbService.Render(name)
-	case verbInsight:
-		return stVerbInsight.Render(name)
-	}
-	return name
-}
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const labelWidth = 14
 const contentWidth = 82
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 // padRight pads s (measured by lipgloss.Width) on the right to n cols.
 func padRight(s string, n int) string {
@@ -204,7 +136,7 @@ func renderRow(k kv) []string {
 	}
 	lines := strings.Split(k.value, "\n")
 	out := make([]string, 0, len(lines))
-	labelCol := stLabel.Render(padRight(label, labelWidth))
+	labelCol := stLabel.Render(padRight(label+":", labelWidth))
 	blank := strings.Repeat(" ", labelWidth)
 	for i, ln := range lines {
 		var styled string
@@ -215,18 +147,18 @@ func renderRow(k kv) []string {
 			} else {
 				styled = stNavValue.Render(ln)
 			}
+		case k.eventStyle != nil:
+			styled = k.eventStyle.Render(ln)
 		default:
 			styled = stVal.Render(ln)
 		}
 		if i == 0 {
-			out = append(out, "  "+labelCol+styled)
+			out = append(out, " "+labelCol+" "+styled)
 		} else {
 			if nav {
-				out = append(out, "  "+blank+styled)
+				out = append(out, " "+blank+" "+styled)
 			} else {
-				// continuation lines: pass through unchanged so embedded
-				// badge spans remain intact.
-				out = append(out, "  "+blank+ln)
+				out = append(out, " "+blank+" "+ln)
 			}
 		}
 	}
@@ -235,21 +167,10 @@ func renderRow(k kv) []string {
 
 func renderSection(s section) []string {
 	var lines []string
-	var head string
-	switch {
-	case s.err:
-		head = stSectionErr.Render(s.title)
-	case s.alt:
-		head = stSectionAlt.Render(s.title)
-	default:
-		head = stSection.Render(s.title)
-	}
+	head := " " + stSectionV2.Render(strings.ToUpper(s.title))
 	lines = append(lines, head)
 	for _, r := range s.rows {
 		lines = append(lines, renderRow(r)...)
-	}
-	for _, e := range s.extra {
-		lines = append(lines, "  "+e)
 	}
 	return lines
 }
@@ -257,64 +178,25 @@ func renderSection(s section) []string {
 func renderEvent(e event) string {
 	var body []string
 
-	if e.rootBar {
-		// Card outer width = contentWidth; inner = -2 border -2 padding.
-		bw := contentWidth - 4
-		bar := strings.Repeat("█", bw)
-		body = append(body, stRootBar.Render(bar))
-		body = append(body, stRootBar.Render(padRight("█ ROOT USER ACTION — account 555555555555", bw-1)+"█"))
-		body = append(body, stRootBar.Render(padRight("█ "+e.name+"   "+e.target+"   OK", bw-1)+"█"))
-		body = append(body, stRootBar.Render(bar))
-		body = append(body, "")
-	}
-
-	// Header lines
-	badges := strings.Join(e.badges, " ")
-	header1 := verbGlyph(e.verb) + "  " + verbName(e.verb, e.name) + "   " + stActor.Render(e.actor)
-	if badges != "" {
-		header1 += " " + badges
-	}
-	body = append(body, header1)
-
-	outcome := stOK.Render("OK")
-	if !e.ok {
-		outcome = stFailed.Render("FAILED (" + e.errCode + ")")
-	}
-	tgt := stDim.Render("(no resource)")
-	if e.target != "" {
-		tgt = stVal.Render(e.target)
-	}
-	header2 := "   → " + tgt + "   " + outcome + "   " + stDim.Render(e.time+"  "+e.region)
-	body = append(body, header2)
-	body = append(body, "")
-
-	for i, s := range e.sections {
-		if i > 0 {
-			body = append(body, "")
-		}
+	for _, s := range e.sections {
 		body = append(body, renderSection(s)...)
 	}
 
-	// Box with fixed content width for deterministic rendering.
 	card := stCard.Width(contentWidth).Render(strings.Join(body, "\n"))
 	title := stDim.Render("╴ ct-events/" + e.id + " ╶")
-	// Bottom hint bar mirrors layout/frame.go BottomBorderWithHints:
-	// "key desc" pairs separated by ── inside the closing border line.
 	hints := renderHintBorder(contentWidth)
-	// The card already includes its own bottom border; we replace it
-	// by trimming the last line of the card and appending the hint border.
 	cardLines := strings.Split(card, "\n")
 	cardLines[len(cardLines)-1] = hints
 	return title + "\n" + strings.Join(cardLines, "\n") + "\n"
 }
 
-// renderHintBorder builds a closing border line "└──...──key desc──key desc──┘"
-// matching internal/tui/layout/frame.go BottomBorderWithHints (line 149).
+// renderHintBorder builds a closing border line matching layout/frame.go
+// BottomBorderWithHints. v2 hint set: y yaml / search / tab cols / esc back.
+// The `R raw` hint is removed per design §1.5.
 func renderHintBorder(w int) string {
 	type hint struct{ key, desc string }
 	hints := []hint{
-		{"R", "raw"},
-		{"y", "copy"},
+		{"y", "yaml"},
 		{"/", "search"},
 		{"tab", "cols"},
 		{"esc", "back"},
@@ -338,11 +220,7 @@ func renderHintBorder(w int) string {
 		}
 		parts = append(parts, rendered)
 	}
-	// Layout: └ + leadingDashes + parts + ──┘   total = w
-	leadingDashes := w - 1 - used - 3
-	if leadingDashes < 0 {
-		leadingDashes = 0
-	}
+	leadingDashes := max(w-1-used-3, 0)
 	var sb strings.Builder
 	sb.WriteString(borderStyle.Render("╰" + strings.Repeat("─", leadingDashes)))
 	for _, p := range parts {
@@ -365,45 +243,15 @@ type relatedRow struct {
 
 const rightColWidth = 32 // outer width including border + 1-col padding
 
-// Styles mirror rightColumnModel.View() in internal/tui/views/rightcolumn.go:
-//   - header "RELATED" centered, DimText
-//   - normal row: stRColRow
-//   - zero/loading/error row: DimText
-//   - selected row: RowSelected, full-width background
-//
-// The frame around the column is added externally — we replicate it here
-// with stRColCard so the preview shows the complete visual.
-var (
-	stRColHdr  = lipgloss.NewStyle().Foreground(colDim)
-	stRColRow  = lipgloss.NewStyle().Foreground(colHeaderFg)
-	stRColZero = lipgloss.NewStyle().Foreground(colDim)
-	stRColSel  = lipgloss.NewStyle().Foreground(colHeaderFg).Background(colRowAlt).Bold(true)
-	stRColCard = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colBorder).
-			Padding(0, 1)
-)
-
 func renderRightColumn(rows []relatedRow) string {
-	// Card width = outer; inner content width = outer - 2 (border) - 2 (padding).
 	innerW := rightColWidth - 4
 	var lines []string
 
-	// Centered "RELATED" header — exact match to rightColumnModel.View()
-	// lines 172-176.
 	header := "RELATED"
-	pad := (innerW - lipgloss.Width(header)) / 2
-	if pad < 0 {
-		pad = 0
-	}
+	pad := max((innerW-lipgloss.Width(header))/2, 0)
 	lines = append(lines, stRColHdr.Render(strings.Repeat(" ", pad)+header))
 
 	for _, r := range rows {
-		// Row text identical to rightColumnModel.View() switch (lines 195-214):
-		//   loading/err          -> "  name"  (dim)
-		//   count == -1 + filter -> "  name"  (normal — actionable pivot)
-		//   count == 0           -> "  name (0)" (dim)
-		//   default              -> "  name (N)" (normal)
 		var text string
 		var style lipgloss.Style
 		switch r.count {
@@ -427,7 +275,7 @@ func renderRightColumn(rows []relatedRow) string {
 }
 
 // renderEventWithRight renders an event card with a related right column
-// joined horizontally. Used for the composite cases that mirror §4b.
+// joined horizontally. Used for the composite cases that mirror §4.
 func renderEventWithRight(e event, related []relatedRow) string {
 	left := renderEvent(e)
 	right := renderRightColumn(related)
@@ -436,412 +284,277 @@ func renderEventWithRight(e event, related []relatedRow) string {
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
+// Case A — Karpenter ec2:DescribeInstances (read, success → ct-info dim)
+// Design §3 Case A. Section order: ACTOR → ACTION → TARGET → CONTEXT → REQUEST.
 func caseA() event {
 	return event{
-		id:     "e-a1b2c3d4",
-		verb:   verbRead,
-		name:   "DescribeInstances",
-		actor:  "KarpenterNodeRole → karpenter-1759",
-		badges: []string{badge("SERVICE", "info"), badge("IMDSv2", "info")},
-		target: "",
-		ok:     true,
-		time:   "14:02:11Z",
-		region: "us-east-1",
+		id: "e-a1b2c3d4",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "KarpenterNodeRole → karpenter-1759  " + badge("SERVICE", "info") + " " + badge("IMDSv2", "info")},
-				{"Account", "111111111111"},
-				navKV("Principal", "arn:aws:iam::111111111111:role/KarpenterNodeRole"),
-				navKV("Issuer role", "KarpenterNodeRole"),
-				{"Session", "karpenter-1759  (started 13:44:02Z, 18m ago)"},
-				{"MFA", "no"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:sts::111111111111:assumed-role/KarpenterNodeRole/\nkarpenter-1759"),
 				navKV("Access key", "ASIAY44QH8DCKARPEXMP"),
-				{"User agent", "Go SDK v2  (aws-sdk-go-v2/1.30.3)"},
-				navKV("— 47 more events from this principal", ""),
+				{"User agent", "aws-sdk-go-v2/1.30.3", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "DescribeInstances"},
-				{"Source", "ec2.amazonaws.com"},
-				{"Category", "Management      Type   AwsApiCall"},
-				{"Read only", "true"},
-				{"Resources", stDim.Render("(no resource)")},
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "ec2:DescribeInstances", stEventInfo),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "us-east-1"},
-				{"Source IP", "10.0.14.221"},
-				{"TLS", "TLSv1.3  TLS_AES_128_GCM_SHA256"},
+			{title: "TARGET", rows: []kv{
+				{"Instances", "(all)", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:02:11Z"},
-				{"Session age", "00:18:09"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-1", nil},
+				{"Source IP", "10.0.14.221", nil},
+				{"Time", "2026-04-07T14:02:11Z", nil},
 			}},
 			{title: "REQUEST", rows: []kv{
-				{"filters", `[ { Name: "instance-state-name", Values: ["running"] } ]`},
-				{"maxResults", "1000"},
+				{"filters", "[{Name: instance-state-name, Values: [running]}]", nil},
+				{"maxResults", "1000", nil},
 			}},
 		},
 	}
 }
 
+// Case B — SSO Console ec2:TerminateInstances (D verb, MFA → ct-danger red)
+// instancesSet extracted into TARGET → REQUEST omitted. SSO opaque ARN → As: row.
+// Design §3 Case B.
 func caseB() event {
 	return event{
-		id:     "e-b2c3d4e5",
-		verb:   verbDelete,
-		name:   "TerminateInstances",
-		actor:  "sso:alice@corp (via AdminAccess)",
-		badges: []string{badge("CONSOLE", "good"), badge("MFA", "good")},
-		target: "AWS::EC2::Instance i-0f1e2d3c4b5a69788",
-		ok:     true,
-		time:   "14:07:42Z",
-		region: "eu-west-1",
+		id: "e-b2c3d4e5",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "sso:alice@corp (via AdminAccess)  " + badge("CONSOLE", "good") + " " + badge("MFA", "good")},
-				{"Account", "222222222222"},
-				navKV("Principal", "arn:aws:iam::222222222222:role/aws-reserved/sso.amazonaws.com/\nAWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d"),
-				{"Session", "alice@corp  (started 13:58:00Z, 9m ago)"},
-				{"MFA", "yes"},
-				{"Access key", "ASIAZK7L9PQRSSOXEXMP"},
-				{"Source ident", "alice@corp"},
-				{"User agent", "Console  (AWS Internal)"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:sts::222222222222:assumed-role/\nAWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d/alice@corp"),
+				{"As", "alice@corp via AWSReservedSSO_AdminAccess", nil},
+				{"MFA", "yes", nil},
+				navKV("Access key", "ASIAZK7L9PQRSSOXEXMP"),
+				{"User agent", "Console (AWS Internal)", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "TerminateInstances"},
-				{"Source", "ec2.amazonaws.com"},
-				{"Category", "Management      Type   AwsApiCall"},
-				{"Read only", "false"},
-				navKV("Resources", "AWS::EC2::Instance  arn:aws:ec2:eu-west-1:222222222222:\ninstance/i-0f1e2d3c4b5a69788"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "ec2:TerminateInstances", stEventDanger),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "eu-west-1"},
-				{"Source IP", "AWS Internal  " + badge("AWS-INTERNAL", "dim")},
-				{"TLS", "TLSv1.3  TLS_AES_128_GCM_SHA256"},
+			{title: "TARGET", rows: []kv{
+				{"Instance", "instance/i-0f1e2d3c4b5a69788", nil},
+				{"Instance", "instance/i-0f1e2d3c4b5a69789", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:07:42Z"},
-				{"Session age", "00:09:42"},
-			}},
-			{title: "REQUEST", rows: []kv{
-				{"instancesSet", ""},
-				navKV("  [0]", "i-0f1e2d3c4b5a69788"),
-				navKV("  [1]", "i-0f1e2d3c4b5a69789"),
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "eu-west-1", nil},
+				{"Source IP", "AWS Internal", nil},
+				{"Time", "2026-04-07T14:07:42Z", nil},
 			}},
 			{title: "RESPONSE", rows: []kv{
-				navKV("terminating", "[ i-0f1e2d3c4b5a69788: shutting-down ← running ]"),
+				{"terminating", "[{i-0f1e2d3c4b5a69788: shutting-down ← running},\n {i-0f1e2d3c4b5a69789: shutting-down ← running}]", nil},
 			}},
 		},
 	}
 }
 
+// Case C — s3:PutObject AccessDenied (errorCode → ct-danger red, ERROR hoisted)
+// bucketName + key extracted into TARGET → REQUEST omitted.
+// ERROR sits between CONTEXT and (omitted) REQUEST. Design §3 Case C.
 func caseC() event {
 	return event{
-		id:      "e-c3d4e5f6",
-		verb:    verbWrite,
-		name:    "PutObject",
-		actor:   "bob",
-		badges:  []string{badge("LONG-LIVED-KEY", "warn")},
-		target:  "AWS::S3::Object arn:aws:s3:::prod-logs/2026/04/07/app.log",
-		ok:      false,
-		errCode: "AccessDenied",
-		time:    "14:11:03Z",
-		region:  "us-east-1",
+		id: "e-c3d4e5f6",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "bob  " + badge("LONG-LIVED-KEY", "warn")},
-				{"Account", "333333333333"},
+			{title: "ACTOR", rows: []kv{
 				navKV("Principal", "arn:aws:iam::333333333333:user/bob"),
-				{"MFA", "no"},
-				{"Access key", "AKIAIOSFODNN7BOB1XMP"},
-				{"User agent", "AWS CLI v2  (aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0)"},
+				navKV("Access key", "AKIAIOSFODNN7BOB1XMP"),
+				{"User agent", "aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "PutObject"},
-				{"Source", "s3.amazonaws.com"},
-				{"Category", "Data            Type   AwsApiCall"},
-				{"Read only", "false"},
-				{"Resources", ""},
-				navKV("  Bucket", "arn:aws:s3:::prod-logs"),
-				navKV("  Object", "arn:aws:s3:::prod-logs/2026/04/07/app.log"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "s3:PutObject", stEventDanger),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "us-east-1"},
-				{"Source IP", "198.51.100.42"},
-				{"TLS", "TLSv1.3"},
+			{title: "TARGET", rows: []kv{
+				{"Bucket", "prod-logs", nil},
+				{"Object", "prod-logs/2026/04/07/app.log", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:11:03Z"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-1", nil},
+				{"Source IP", "198.51.100.42", nil},
+				{"Time", "2026-04-07T14:11:03Z", nil},
 			}},
-			{title: "REQUEST", rows: []kv{
-				navKV("bucketName", "prod-logs"),
-				navKV("key", "2026/04/07/app.log"),
+			// ERROR hoisted directly after CONTEXT — per design §1.1 / §3 Case C.
+			{title: "ERROR", rows: []kv{
+				{"errorCode", "AccessDenied", nil},
+				{"errorMessage", "User: arn:aws:iam::333333333333:user/bob is not authorized to\nperform: s3:PutObject on resource:\narn:aws:s3:::prod-logs/2026/04/07/app.log because no identity-\nbased policy allows the s3:PutObject action", nil},
 			}},
-			{
-				title: "ERROR",
-				err:   true,
-				extra: []string{
-					stErrBody.Render("AccessDenied"),
-					stErrBody.Render("User: arn:aws:iam::333333333333:user/bob is not authorized to perform:"),
-					stErrBody.Render("s3:PutObject on resource: arn:aws:s3:::prod-logs/2026/04/07/app.log"),
-					stErrBody.Render("because no identity-based policy allows the s3:PutObject action"),
-				},
-			},
 		},
 	}
 }
 
+// Case D — KMS kms:RotateKey (AwsServiceEvent → ct-attention yellow)
+// No userIdentity ARN → Service: row. Category: row (≠ default). keyId → TARGET.
+// Design §3 Case D.
 func caseD() event {
 	return event{
-		id:     "e-d4e5f6a7",
-		verb:   verbService,
-		name:   "RotateKey",
-		actor:  "kms.amazonaws.com",
-		badges: []string{badge("SERVICE", "info")},
-		target: "AWS::KMS::Key (2f7e9a5b-…)",
-		ok:     true,
-		time:   "02:00:07Z",
-		region: "us-east-1",
+		id: "e-d4e5f6a7",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "kms.amazonaws.com  " + badge("SERVICE", "info")},
-				{"Account", "444444444444"},
-				{"Invoked by", "kms.amazonaws.com"},
+			{title: "ACTOR", rows: []kv{
+				{"Service", "kms.amazonaws.com", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "RotateKey"},
-				{"Source", "kms.amazonaws.com"},
-				{"Category", "Management      Type   AwsServiceEvent"},
-				navKV("Resources", "AWS::KMS::Key  arn:aws:kms:us-east-1:444444444444:key/\n               2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "kms:RotateKey", stEventAttention),
+				{"Category", "Management / AwsServiceEvent", nil},
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "us-east-1"},
-				{"Source IP", "AWS Internal  " + badge("AWS-INTERNAL", "dim")},
+			{title: "TARGET", rows: []kv{
+				{"Key", "key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T02:00:07Z"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-1", nil},
+				{"Source IP", "AWS Internal", nil},
+				{"Time", "2026-04-07T02:00:07Z", nil},
 			}},
-			{title: "SERVICE EVENT DETAILS", alt: true, rows: []kv{
-				navKV("keyId", "2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
-				{"rotationType", "AUTOMATIC"},
-				{"backingKey", "true"},
+			{title: "REQUEST", rows: []kv{
+				{"rotationType", "AUTOMATIC", nil},
+				{"backingKey", "true", nil},
 			}},
 		},
 	}
 }
 
+// Case E — Root s3:PutBucketPolicy (Root + W → ct-attention yellow)
+// Root principal ARN. bucketName extracted into TARGET; policy JSON stays in REQUEST.
+// Design §3 Case E.
 func caseE() event {
 	return event{
-		id:      "e-e5f6a7b8",
-		verb:    verbWrite,
-		name:    "PutBucketPolicy",
-		actor:   "ROOT (account 555555555555)",
-		badges:  []string{badge("ROOT", "root")},
-		target:  "AWS::S3::Bucket arn:aws:s3:::prod-artifacts",
-		ok:      true,
-		time:    "03:42:18Z",
-		region:  "us-east-1",
-		rootBar: true,
+		id: "e-e5f6a7b8",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "ROOT (account 555555555555)  " + badge("ROOT", "root")},
-				{"Account", "555555555555"},
-				{"Principal", "arn:aws:iam::555555555555:root"},
-				{"MFA", "no"},
-				{"Access key", stDim.Render("(signed with root credentials)")},
-				{"User agent", "Console  (Mozilla/5.0 ... Safari/605.1.15)"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:iam::555555555555:root"),
+				{"User agent", "Console (Mozilla/5.0 ... Safari/605.1.15)", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "PutBucketPolicy"},
-				{"Source", "s3.amazonaws.com"},
-				{"Category", "Management      Type   AwsApiCall"},
-				{"Read only", "false"},
-				navKV("Resources", "AWS::S3::Bucket  arn:aws:s3:::prod-artifacts"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "s3:PutBucketPolicy", stEventAttention),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "us-east-1"},
-				{"Source IP", "203.0.113.17"},
+			{title: "TARGET", rows: []kv{
+				{"Bucket", "prod-artifacts", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T03:42:18Z"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-1", nil},
+				{"Source IP", "203.0.113.17", nil},
+				{"Time", "2026-04-07T03:42:18Z", nil},
 			}},
 			{title: "REQUEST", rows: []kv{
-				navKV("bucketName", "prod-artifacts"),
-				{"policy", `{ "Version": "2012-10-17", "Statement": [ ... ] }`},
+				{"policy", `{"Version": "2012-10-17", "Statement": [...]}`, nil},
 			}},
 		},
 	}
 }
 
+// Case F — IRSA s3:GetObject (WebIdentityUser, R → ct-info dim)
+// Federation: row for IRSA. VPC endpoint in CONTEXT.
+// bucketName + key extracted into TARGET → REQUEST omitted. Design §3 Case F.
 func caseF() event {
 	return event{
-		id:     "e-f6a7b8c9",
-		verb:   verbRead,
-		name:   "GetObject",
-		actor:  "checkout-svc-sa → 1717156821...",
-		badges: []string{badge("SERVICE", "info"), badge("IRSA", "info")},
-		target: "AWS::S3::Object arn:aws:s3:::checkout-config/prod/config.json",
-		ok:     true,
-		time:   "14:20:21Z",
-		region: "eu-west-1",
+		id: "e-f6a7b8c9",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "checkout-svc-sa → 1717156821...  " + badge("SERVICE", "info") + " " + badge("IRSA", "info")},
-				{"Account", "666666666666"},
-				navKV("Principal", "arn:aws:iam::666666666666:role/eks-checkout-svc-sa"),
-				{"Session", "1717156821993453824"},
-				{"MFA", "no"},
-				{"Web federation", "arn:aws:iam::666666666666:oidc-provider/\noidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE0D8C\n" + stDim.Render("(not navigable — OIDC providers not in a9s)")},
-				{"User agent", "aws-sdk-go-v2/1.30.3"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:sts::666666666666:assumed-role/eks-checkout-svc-sa/\n1717156821993453824"),
+				{"Federation", "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE0D8C", nil},
+				{"User agent", "aws-sdk-go-v2/1.30.3", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "GetObject"},
-				{"Source", "s3.amazonaws.com"},
-				{"Category", "Data            Type   AwsApiCall"},
-				{"Read only", "true"},
-				navKV("Resources", "AWS::S3::Object  arn:aws:s3:::checkout-config/prod/config.json"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "s3:GetObject", stEventInfo),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "eu-west-1"},
-				{"Source IP", "10.42.3.18"},
-				{"VPC endpoint", "vpce-0abc123def456 (acct 666666666666)  " + badge("VPCE", "info")},
+			{title: "TARGET", rows: []kv{
+				{"Bucket", "checkout-config", nil},
+				{"Object", "checkout-config/prod/config.json", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:20:21Z"},
-			}},
-			{title: "REQUEST", rows: []kv{
-				navKV("bucketName", "checkout-config"),
-				navKV("key", "prod/config.json"),
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "eu-west-1", nil},
+				{"Source IP", "10.42.3.18", nil},
+				{"VPC endpoint", "vpce-0abc123def456", nil},
+				{"Time", "2026-04-07T14:20:21Z", nil},
 			}},
 		},
 	}
 }
 
+// Case G — Cross-account s3:PutObject (W + cross-account → ct-attention yellow)
+// Caller in 888888888888, recipient 777777777777 → Recipient: row in CONTEXT.
+// bucketName + key extracted into TARGET → REQUEST omitted. Design §3 Case G.
 func caseG() event {
 	return event{
-		id:     "e-a7b8c9d0",
-		verb:   verbWrite,
-		name:   "PutObject",
-		actor:  "CiBuildRole → build-4821 (from 888888888888)",
-		badges: []string{badge("X-ACCT", "warn")},
-		target: "AWS::S3::Object arn:aws:s3:::shared-artifacts/build-4821.tar.gz",
-		ok:     true,
-		time:   "14:31:55Z",
-		region: "us-east-2",
+		id: "e-a7b8c9d0",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "CiBuildRole → build-4821  " + badge("X-ACCT", "warn")},
-				{"Account", "888888888888  (caller)"},
-				{"Recipient", "777777777777"},
-				{"Principal", stDim.Render("arn:aws:iam::777777777777:role/CiBuildRole   (cross-acct, §8 q10)")},
-				{"Session", "build-4821  (started 14:28:10Z, 3m ago)"},
-				{"MFA", "no"},
-				{"Access key", "ASIAQF3M2N8KCIB1XMPL"},
-				{"User agent", "aws-cli/2.17.9"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:sts::888888888888:assumed-role/CiBuildRole/build-4821"),
+				navKV("Access key", "ASIAQF3M2N8KCIB1XMPL"),
+				{"User agent", "aws-cli/2.17.9", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "PutObject"},
-				{"Source", "s3.amazonaws.com"},
-				{"Category", "Data            Type   AwsApiCall"},
-				{"Resources", ""},
-				navKV("  Bucket", "arn:aws:s3:::shared-artifacts"),
-				navKV("  Object", "arn:aws:s3:::shared-artifacts/build-4821.tar.gz"),
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "s3:PutObject", stEventAttention),
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "us-east-2"},
-				{"Source IP", "52.14.88.201"},
-				{"Recipient", "777777777777  " + badge("X-ACCT", "warn")},
-				{"Shared event", "f1e2d3c4-b5a6-7890-1234-567890abcdef"},
+			{title: "TARGET", rows: []kv{
+				{"Bucket", "shared-artifacts", nil},
+				{"Object", "shared-artifacts/build-4821.tar.gz", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:31:55Z"},
-			}},
-			{title: "REQUEST", rows: []kv{
-				navKV("bucketName", "shared-artifacts"),
-				navKV("key", "build-4821.tar.gz"),
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-2", nil},
+				{"Source IP", "52.14.88.201", nil},
+				{"Recipient", "777777777777 (cross-account)", nil},
+				{"Time", "2026-04-07T14:31:55Z", nil},
 			}},
 		},
 	}
 }
 
+// Case H — Insight ApiCallRateInsight (no ACTOR → starts at ACTION)
+// No userIdentity → ACTOR omitted. Insight metadata folds into ACTION.
+// Frame title: standard ╴ ct-events/<eventId> ╶ form. Design §3 Case H.
 func caseH() event {
 	return event{
-		id:     "e-b8c9d0e1",
-		verb:   verbInsight,
-		name:   "RunInstances",
-		actor:  "INSIGHT  ApiCallRateInsight  Start",
-		target: stDim.Render("(statistical)"),
-		ok:     true,
-		time:   "09:14:00Z",
-		region: "us-east-1",
+		id: "e-b8c9d0e1",
 		sections: []section{
-			{title: "INSIGHT", alt: true, rows: []kv{
-				{"Type", "ApiCallRateInsight"},
-				{"State", "Start"},
-				{"Event source", "ec2.amazonaws.com"},
-				{"Event name", "RunInstances"},
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "ec2:RunInstances", stEventInfo),
+				{"Category", "Insight / AwsApiCall", nil},
+				{"Insight type", "ApiCallRateInsight", nil},
+				{"State", "Start", nil},
 			}},
-			{title: "STATISTICS", alt: true, rows: []kv{
-				{"Baseline", "average  0.24 calls/min  (7d window)"},
-				{"Insight", "average 18.70 calls/min  (during anomaly)"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "us-east-1", nil},
+				{"Time", "2026-04-07T09:14:00Z", nil},
 			}},
-			{title: "ATTRIBUTIONS", alt: true, rows: []kv{
-				{"userIdentityArn", ""},
-				navKV("  insight", "arn:aws:sts::999999999999:assumed-role/DeployRole/ci-41"),
-				navKV("  baseline", "arn:aws:sts::999999999999:assumed-role/DeployRole/ci-*"),
-				{"userAgent", "insight   aws-sdk-go-v2/1.30.3\nbaseline  Terraform/1.8.5"},
-				{"errorCode", "insight   (none)\nbaseline  (none)"},
-			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T09:14:00Z"},
+			{title: "REQUEST", rows: []kv{
+				{"baseline", "0.24 calls/min  (7d window)", nil},
+				{"insight", "18.70 calls/min (during anomaly)", nil},
+				{"insight prin", "arn:aws:sts::999999999999:assumed-role/DeployRole/ci-41", nil},
+				{"baseline prin", "arn:aws:sts::999999999999:assumed-role/DeployRole/ci-*", nil},
 			}},
 		},
 	}
 }
 
+// Case I — NetworkActivity VPCE deny s3:PutObject (errorCode → ct-danger red)
+// Category: NetworkActivity / AwsVpceEvent in ACTION. VPC endpoint in CONTEXT.
+// bucketName + key extracted into TARGET → REQUEST omitted.
+// ERROR hoisted after CONTEXT. Design §3 Case I.
 func caseI() event {
 	return event{
-		id:      "e-c9d0e1f2",
-		verb:    verbWrite,
-		name:    "PutObject",
-		actor:   "DataPipelineRole → dp-0719",
-		badges:  []string{badge("VPCE", "info")},
-		target:  "AWS::S3::Object arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet",
-		ok:      false,
-		errCode: "VpceAccessDenied",
-		time:    "14:44:17Z",
-		region:  "eu-central-1",
+		id: "e-c9d0e1f2",
 		sections: []section{
-			{title: "WHO", rows: []kv{
-				{"Actor", "DataPipelineRole → dp-0719"},
-				{"Account", "111111111111"},
-				navKV("Principal", "arn:aws:iam::111111111111:role/DataPipelineRole"),
-				{"User agent", "aws-sdk-java/2.25.11"},
+			{title: "ACTOR", rows: []kv{
+				navKV("Principal", "arn:aws:sts::111111111111:assumed-role/DataPipelineRole/dp-0719"),
+				{"User agent", "aws-sdk-java/2.25.11", nil},
 			}},
-			{title: "WHAT", rows: []kv{
-				{"Event", "PutObject"},
-				{"Source", "s3.amazonaws.com"},
-				{"Category", "NetworkActivity  Type   AwsVpceEvent"},
+			{title: "ACTION", rows: []kv{
+				colorKV("Event", "s3:PutObject", stEventDanger),
+				{"Category", "NetworkActivity / AwsVpceEvent", nil},
 			}},
-			{title: "WHERE", rows: []kv{
-				{"Region", "eu-central-1"},
-				{"Source IP", "10.12.4.77"},
-				navKV("VPC endpoint", "vpce-0ff11223344556677 (acct 111111111111)  "+badge("VPCE", "info")),
+			{title: "TARGET", rows: []kv{
+				{"Bucket", "prod-lake", nil},
+				{"Object", "prod-lake/landing/2026/04/07/batch-0719.parquet", nil},
 			}},
-			{title: "WHEN", rows: []kv{
-				{"Event time", "2026-04-07T14:44:17Z"},
+			{title: "CONTEXT", rows: []kv{
+				{"Region", "eu-central-1", nil},
+				{"Source IP", "10.12.4.77", nil},
+				{"VPC endpoint", "vpce-0ff11223344556677", nil},
+				{"Time", "2026-04-07T14:44:17Z", nil},
 			}},
-			{title: "REQUEST", rows: []kv{
-				navKV("bucketName", "prod-lake"),
-				navKV("key", "landing/2026/04/07/batch-0719.parquet"),
+			// ERROR hoisted directly after CONTEXT — per design §1.1 / §3 Case I.
+			{title: "ERROR", rows: []kv{
+				{"errorCode", "VpceAccessDenied", nil},
+				{"errorMessage", "The VPC endpoint policy denies the s3:PutObject action on\narn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet", nil},
 			}},
-			{
-				title: "ERROR",
-				err:   true,
-				extra: []string{
-					stErrBody.Render("VpceAccessDenied"),
-					stErrBody.Render("The VPC endpoint policy denies the s3:PutObject action on"),
-					stErrBody.Render("arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet"),
-				},
-			},
 		},
 	}
 }
@@ -853,26 +566,26 @@ func main() {
 		label string
 		ev    event
 	}{
-		{"A — AssumedRole service role, read, success      (Karpenter DescribeInstances)", caseA()},
-		{"B — SSO AssumedRole console write, MFA           (TerminateInstances)", caseB()},
-		{"C — IAMUser long-lived key, AccessDenied         (S3 PutObject)", caseC()},
-		{"D — AWSService event                             (KMS RotateKey)", caseD()},
-		{"E — Root user action                             (PutBucketPolicy)", caseE()},
-		{"F — WebIdentityUser / IRSA                       (S3 GetObject)", caseF()},
-		{"G — Cross-account (recipient != caller)          (S3 PutObject)", caseG()},
-		{"H — Insight event                                (ApiCallRateInsight)", caseH()},
-		{"I — NetworkActivity VPCE deny                    (PutObject VpceAccessDenied)", caseI()},
+		{"A — Karpenter ec2:DescribeInstances (R, no flags)               (ct-info, dim)", caseA()},
+		{"B — SSO Console ec2:TerminateInstances (D verb, MFA)            (ct-danger, red)", caseB()},
+		{"C — IAMUser s3:PutObject AccessDenied (errorCode)               (ct-danger, red)", caseC()},
+		{"D — KMS kms:RotateKey (AwsServiceEvent)                         (ct-attention, yellow)", caseD()},
+		{"E — Root s3:PutBucketPolicy (Root + W)                          (ct-attention, yellow)", caseE()},
+		{"F — IRSA s3:GetObject (WebIdentityUser, R)                      (ct-info, dim)", caseF()},
+		{"G — Cross-account s3:PutObject (W + cross-account)              (ct-attention, yellow)", caseG()},
+		{"H — Insight ApiCallRateInsight (no ACTOR)                       (ct-info, dim)", caseH()},
+		{"I — NetworkActivity VPCE deny s3:PutObject (errorCode)          (ct-danger, red)", caseI()},
 	}
 	for _, c := range cases {
 		fmt.Println()
-		fmt.Println(stSection.Render("▌ " + c.label))
+		fmt.Println(stCaseLabel.Render("▌ " + c.label))
 		fmt.Println()
 		fmt.Print(renderEvent(c.ev))
 	}
 
-	// Composite layouts with right column (mirrors design.md §4b).
+	// Composite layouts with right column (mirrors design.md §4).
 	fmt.Println()
-	fmt.Println(stSection.Render("▌ §4b — Composite layouts (left card + RELATED right column)"))
+	fmt.Println(stCaseLabel.Render("▌ §4 — Composite layouts (left card + RELATED right column)"))
 
 	composites := []struct {
 		label   string
@@ -919,7 +632,7 @@ func main() {
 	}
 	for _, c := range composites {
 		fmt.Println()
-		fmt.Println(stSection.Render("▌ " + c.label))
+		fmt.Println(stCaseLabel.Render("▌ " + c.label))
 		fmt.Println()
 		fmt.Print(renderEventWithRight(c.ev, c.related))
 	}

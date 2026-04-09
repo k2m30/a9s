@@ -32,7 +32,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	demo "github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 )
 
 // ===========================================================================
@@ -819,16 +819,7 @@ func TestExtractCTTarget_NilInput_ReturnsNoneNeverPanic(t *testing.T) {
 // T024Q — Demo fixture coverage
 // ===========================================================================
 
-// loadCTEventsFixtures returns the ct-events demo resources and fails the test
-// if none are found.
-func loadCTEventsFixtures(t *testing.T) []interface{ getRawEvent() (cloudtrailtypes.Event, bool) } {
-	t.Helper()
-	// This signature is a documentation stub. The tests below use demo.GetResources
-	// and resource.Resource directly (no wrapper interface).
-	return nil
-}
-
-// The actual T024Q tests call demo.GetResources("ct-events") directly.
+// The actual T024Q tests call FetchCloudTrailEvents via fakes.NewCloudTrail().
 
 func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 	// The demo fixture for ct-events must contain at least one event for each
@@ -839,9 +830,10 @@ func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 	// embedded in the CloudTrailEvent JSON.
 	// Post-T025C: we read _ct.verb directly.
 
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 
 	verbBuckets := map[string]bool{
@@ -884,9 +876,10 @@ func TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent(t *testing.T
 	//   - AwsServiceEvent (eventType == AwsServiceEvent)
 	//   - management (none) (Management + no resources[])
 
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 
 	hasResources := false
@@ -934,9 +927,10 @@ func TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent(t *testing.T
 }
 
 func TestCTEventsFixtureCoverage_AtLeastOneRootEvent(t *testing.T) {
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
 		// Post-T025C path.
@@ -956,9 +950,10 @@ func TestCTEventsFixtureCoverage_AtLeastOneRootEvent(t *testing.T) {
 }
 
 func TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent(t *testing.T) {
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
 		// Post-T025C path.
@@ -978,9 +973,10 @@ func TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent(t *testing.T) {
 }
 
 func TestCTEventsFixtureCoverage_AtLeastOneCrossAccountEvent(t *testing.T) {
-	resources, ok := demo.GetResources("ct-events")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(resources) == 0 {
+		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
 		// Post-T025C path.
@@ -1085,6 +1081,3 @@ func strContains(s, substr string) bool {
 	}
 	return false
 }
-
-// Ensure demo import is used (drives init() to register demo fixtures).
-var _ = demo.GetResources

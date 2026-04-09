@@ -43,12 +43,11 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	// The active view should still be the resource list
 	content = rootViewContent(m)
 	plain := stripANSI(content)
-	// Should show some indication of refresh (flash or loading state)
-	if !strings.Contains(plain, "Refreshing") && !strings.Contains(plain, "Loading") && !strings.Contains(plain, "Connected") {
-		t.Logf("After profile switch + reconnect, expected refresh indication, got:\n%s", plain[:min(300, len(plain))])
-		// The key check: cmd should be non-nil (a fetch command)
+	// After ClientsReadyMsg the flash transitions to "Connected. Refreshing..." state
+	if !strings.Contains(plain, "Refreshing") {
+		t.Errorf("After profile switch + ClientsReadyMsg, expected 'Refreshing' flash, got:\n%s", plain[:min(300, len(plain))])
 	}
-	// Most importantly: a fetch command should have been returned to reload data
+	// A fetch command should have been returned to reload data
 	if cmd == nil {
 		t.Error("After ClientsReadyMsg following profile switch, should return a fetch command to refresh")
 	}
@@ -283,7 +282,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 	content := rootViewContent(m)
 	plain := stripANSI(content)
 	if !strings.Contains(plain, "Refreshing") {
-		t.Logf("Expected 'Refreshing' flash before resources loaded, got:\n%s", plain[:min(300, len(plain))])
+		t.Errorf("Expected 'Refreshing' flash before resources loaded, got:\n%s", plain[:min(300, len(plain))])
 	}
 
 	// Now resources arrive — flash should be cleared

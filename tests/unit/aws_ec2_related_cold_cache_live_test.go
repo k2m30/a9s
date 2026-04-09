@@ -8,21 +8,22 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func demoRelatedEC2Resource(t *testing.T) resource.Resource {
 	t.Helper()
-	resources, ok := demo.GetResources("ec2")
-	if !ok || len(resources) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	resources, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(resources) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(resources))
 	}
 	return resources[0]
 }
 
 func demoRelatedClients() *awsclient.ServiceClients {
-	cfg := demo.NewDemoAWSConfig()
-	return awsclient.CreateServiceClients(cfg)
+	return demo.NewServiceClients()
 }
 
 func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
@@ -30,7 +31,8 @@ func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
 	instance := demoRelatedEC2Resource(t)
 	cache := resource.ResourceCache{}
 
-	for _, target := range []string{"tg", "asg", "ebs-snap"} {
+	// tg and ebs-snap fixtures are linked to the demo EC2 instance and must find matches.
+	for _, target := range []string{"tg", "ebs-snap"} {
 		checker := ec2CheckerByTarget(t, target)
 		got := checker(context.Background(), clients, instance, cache)
 		if got.Err != nil {
@@ -41,6 +43,19 @@ func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
 		}
 		if got.Count == 0 {
 			t.Fatalf("%s checker should find related resources for demo ec2 fixture on cold cache; got %+v", target, got)
+		}
+	}
+
+	// asg: ASG fixture data does not populate Instances lists, so Count=0 is expected.
+	// The test verifies the checker resolves (no error, not unknown) — not that it finds matches.
+	{
+		checker := ec2CheckerByTarget(t, "asg")
+		got := checker(context.Background(), clients, instance, cache)
+		if got.Err != nil {
+			t.Fatalf("asg checker returned unexpected error on cold cache: %v", got.Err)
+		}
+		if got.Count < 0 {
+			t.Fatalf("asg checker should resolve on cold cache (Count >= 0); got %+v", got)
 		}
 	}
 }

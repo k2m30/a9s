@@ -2,6 +2,13 @@
 name: a9s-architect
 description: "Architecture owner for a9s. Produces scoped task specs for coder and QA agents. Use for design decisions, component interface reviews, message contract changes, dependency boundaries, AND specifying new resource types for scaling.\n\nExamples:\n\n- user: \"should the filter state live on the root model or the resource list?\"\n  assistant: \"Let me use the a9s-architect agent to evaluate the ownership.\"\n\n- user: \"spec out Lambda, CloudWatch, and IAM as new resource types\"\n  assistant: \"Let me use the a9s-architect agent to produce the handoff specs.\"\n\n- user: \"the coder wants to import layout from a view — is that ok?\"\n  assistant: \"Let me use the a9s-architect agent to check the dependency rules.\""
 model: opus
+agents:
+  - a9s-coder
+  - a9s-qa
+  - a9s-devops
+  - a9s-fixtures
+  - a9s-qa-stories
+  - tui-designer
 color: green
 memory: project
 tools:
@@ -21,32 +28,10 @@ tools:
   - Agent
   - SendMessage
   - AskUserQuestion
-  - mcp__context7__resolve-library-id
-  - mcp__context7__get-library-docs
-  - mcp__aws-api__call_aws
-  - mcp__aws-api__suggest_aws_commands
-  - mcp__plugin_github_github__issue_read
-  - mcp__plugin_github_github__issue_write
-  - mcp__plugin_github_github__list_issues
-  - mcp__plugin_github_github__search_issues
-  - mcp__plugin_github_github__add_issue_comment
-  - mcp__plugin_github_github__sub_issue_write
-  - mcp__plugin_github_github__list_issue_types
-  - mcp__plugin_github_github__get_label
-  - mcp__plugin_github_github__pull_request_read
-  - mcp__plugin_github_github__list_pull_requests
-  - mcp__plugin_github_github__search_pull_requests
-  - mcp__plugin_github_github__get_commit
-  - mcp__plugin_github_github__list_commits
-  - mcp__plugin_github_github__list_branches
-  - mcp__plugin_github_github__get_file_contents
-  - mcp__plugin_github_github__search_code
-  - mcp__plugin_github_github__list_releases
-  - mcp__plugin_github_github__get_latest_release
-  - mcp__plugin_github_github__get_release_by_tag
-  - mcp__plugin_github_github__list_tags
-  - mcp__plugin_github_github__get_tag
-  - mcp__plugin_github_github__get_me
+  - mcp__context7__*
+  - mcp__aws-api__*
+  - mcp__plugin_github_github_*
+  - *
 skills:
   - a9s-common
   - a9s-bt-v2

@@ -61,7 +61,7 @@ func pressToggleRelated(d views.DetailModel) (views.DetailModel, func() interfac
 
 func TestDetail_ToggleRelated_FirstPressHidesAutoShown(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -89,7 +89,7 @@ func TestDetail_ToggleRelated_FirstPressHidesAutoShown(t *testing.T) {
 
 func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -126,7 +126,7 @@ func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
 
 func TestDetail_ToggleRelated_NarrowTerminal(t *testing.T) {
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 
@@ -150,7 +150,7 @@ func TestDetail_RelatedCheckResult_UpdatesRightCol(t *testing.T) {
 	ensureNoColor(t)
 
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 	defer resource.UnregisterRelated("ec2")
 

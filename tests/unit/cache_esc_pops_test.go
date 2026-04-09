@@ -15,13 +15,14 @@ package unit
 // This test FAILS with current code (guard missing) and must pass after fix.
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -53,9 +54,10 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) < 2 {
-		t.Fatal("demo ec2 fixtures need at least 2 resources for cache-poisoning test")
+	clients := demo.NewServiceClients()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	if err != nil || len(ec2Res) < 2 {
+		t.Fatalf("demo ec2 fixtures need at least 2 resources for cache-poisoning test: err=%v len=%d", err, len(ec2Res))
 	}
 	fullCount := len(ec2Res)
 

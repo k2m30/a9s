@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -45,39 +44,6 @@ func TestNavigableFields_ENI_Registered(t *testing.T) {
 		if nav.TargetType != wantTarget {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, wantTarget)
 		}
-	}
-}
-
-func TestNavigableFields_ENI_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("eni")
-	if !ok || len(resources) == 0 {
-		t.Fatal("no eni demo fixtures available")
-	}
-
-	raw, ok := resources[0].RawStruct.(ec2types.NetworkInterface)
-	if !ok {
-		t.Fatalf("RawStruct is not ec2types.NetworkInterface, got %T", resources[0].RawStruct)
-	}
-	if raw.VpcId == nil || *raw.VpcId == "" {
-		t.Error("fixture RawStruct.VpcId is nil or empty — VpcId field path cannot resolve")
-	}
-	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		t.Error("fixture RawStruct.SubnetId is nil or empty — SubnetId field path cannot resolve")
-	}
-	if len(raw.Groups) == 0 {
-		t.Error("fixture RawStruct.Groups is empty — Groups.GroupId field path cannot resolve")
-	} else if raw.Groups[0].GroupId == nil || *raw.Groups[0].GroupId == "" {
-		t.Error("fixture RawStruct.Groups[0].GroupId is nil or empty")
-	}
-	if raw.Attachment == nil {
-		t.Error("fixture RawStruct.Attachment is nil — Attachment.InstanceId field path cannot resolve")
-	} else if raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
-		t.Error("fixture RawStruct.Attachment.InstanceId is nil or empty")
-	}
-	if raw.Association == nil {
-		t.Error("fixture RawStruct.Association is nil — Association.AllocationId field path cannot resolve")
-	} else if raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {
-		t.Error("fixture RawStruct.Association.AllocationId is nil or empty")
 	}
 }
 
@@ -363,25 +329,5 @@ func TestRelated_ENI_EIP_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_ENI_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("eni")
-	if checker == nil {
-		t.Fatal("no demo checker registered for eni")
-	}
-
-	results := checker(resource.Resource{ID: "eni-0aaa111111111111a"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

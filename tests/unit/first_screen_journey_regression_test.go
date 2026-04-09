@@ -1,13 +1,14 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -34,9 +35,10 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	ec2, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
 	m = applyRootAndCmd(t, m, messages.ResourcesLoadedMsg{
 		ResourceType: "ec2",
@@ -59,13 +61,14 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client2 := fakes.NewEC2()
+	ec2, err2 := awsclient.FetchEC2Instances(context.Background(), ec2Client2)
+	if err2 != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err2, len(ec2))
 	}
-	amis, ok := demo.GetResources("ami")
-	if !ok || len(amis) == 0 {
-		t.Fatal("demo ami fixtures missing")
+	amis, err3 := awsclient.FetchAMIs(context.Background(), ec2Client2)
+	if err3 != nil || len(amis) == 0 {
+		t.Fatalf("demo ami fixtures missing (err=%v, len=%d)", err3, len(amis))
 	}
 
 	m = applyRootAndCmd(t, m, messages.NavigateMsg{
@@ -104,9 +107,10 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	ec2, ok := demo.GetResources("ec2")
-	if !ok || len(ec2) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client3 := fakes.NewEC2()
+	ec2, err4 := awsclient.FetchEC2Instances(context.Background(), ec2Client3)
+	if err4 != nil || len(ec2) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err4, len(ec2))
 	}
 	ec2Res := ec2[0]
 	m = applyRootAndCmd(t, m, messages.NavigateMsg{

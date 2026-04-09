@@ -5,18 +5,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
-// demoClientsReadyMsg creates a ClientsReadyMsg backed by the demo transport.
-// Used in tests that need real demo clients after Init() wiring change.
+// demoClientsReadyMsg creates a ClientsReadyMsg backed by all typed fakes.
 func demoClientsReadyMsg() messages.ClientsReadyMsg {
-	cfg := demo.NewDemoAWSConfig()
-	clients := awsclient.CreateServiceClients(cfg)
-	return messages.ClientsReadyMsg{Clients: clients}
+	return messages.ClientsReadyMsg{Clients: demo.NewServiceClients()}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

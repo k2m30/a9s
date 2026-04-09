@@ -126,21 +126,6 @@ var relatedSmokeTable = []smokeTestCase{
 			if asgDef.Checker == nil {
 				t.Fatal("AMI-S06: asg Checker must not be nil — implementation missing?")
 			}
-			checker := resource.GetRelatedDemo("ami")
-			if checker == nil {
-				t.Fatal("AMI-S06: no demo checker registered for ami")
-			}
-			results := checker(resource.Resource{ID: "ami-demo"})
-			var asgResult *resource.RelatedCheckResult
-			for i := range results {
-				if results[i].TargetType == "asg" {
-					asgResult = &results[i]
-					break
-				}
-			}
-			if asgResult == nil {
-				t.Fatal("AMI-S06: demo checker did not return a result for asg target type")
-			}
 		},
 	},
 
@@ -189,21 +174,6 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("EB-S06: related def for target %q not registered", target)
 				}
 			}
-			checker := resource.GetRelatedDemo("eb")
-			if checker == nil {
-				t.Fatal("EB-S06: no demo checker registered for eb")
-			}
-			results := checker(resource.Resource{ID: "e-acmeprodapi"})
-			var cfnResult *resource.RelatedCheckResult
-			for i := range results {
-				if results[i].TargetType == "cfn" {
-					cfnResult = &results[i]
-					break
-				}
-			}
-			if cfnResult == nil {
-				t.Fatal("EB-S06: demo checker did not return a result for cfn target type")
-			}
 		},
 	},
 
@@ -245,27 +215,6 @@ var relatedSmokeTable = []smokeTestCase{
 			if roleDef.Checker == nil {
 				t.Fatal("EbRule-S06: role Checker must not be nil; got nil — implementation missing?")
 			}
-			checker := resource.GetRelatedDemo("eb-rule")
-			if checker == nil {
-				t.Fatal("EbRule-S06: no demo checker registered for eb-rule")
-			}
-			results := checker(resource.Resource{ID: "nightly-db-backup"})
-			var roleResult *resource.RelatedCheckResult
-			for i := range results {
-				if results[i].TargetType == "role" {
-					roleResult = &results[i]
-					break
-				}
-			}
-			if roleResult == nil {
-				t.Fatal("EbRule-S06: demo checker did not return a result for role target type")
-			}
-			if roleResult.Count != 1 {
-				t.Errorf("EbRule-S06: demo role result Count = %d, want 1", roleResult.Count)
-			}
-			if len(roleResult.ResourceIDs) == 0 || roleResult.ResourceIDs[0] != "acme-ci-deploy-role" {
-				t.Errorf("EbRule-S06: demo role result ResourceIDs = %v, want [\"acme-ci-deploy-role\"]", roleResult.ResourceIDs)
-			}
 		},
 	},
 
@@ -306,19 +255,6 @@ var relatedSmokeTable = []smokeTestCase{
 			for _, def := range defs {
 				if def.Checker == nil {
 					t.Errorf("EBS-S06: checker for target %q is nil (stub); all ebs checkers should be non-nil", def.TargetType)
-				}
-			}
-			checker := resource.GetRelatedDemo("ebs")
-			if checker == nil {
-				t.Fatal("EBS-S06: no demo checker registered for ebs")
-			}
-			results := checker(resource.Resource{ID: "vol-demo"})
-			if len(results) == 0 {
-				t.Fatal("EBS-S06: demo checker returned no results")
-			}
-			for _, r := range results {
-				if r.TargetType == "" {
-					t.Error("EBS-S06: demo result has empty TargetType")
 				}
 			}
 		},
@@ -372,20 +308,6 @@ var relatedSmokeTable = []smokeTestCase{
 			if cfnDef.Checker == nil {
 				t.Fatal("ECSSvc-S06: cfn Checker must not be nil")
 			}
-			checker := resource.GetRelatedDemo("ecs-svc")
-			if checker == nil {
-				t.Fatal("ECSSvc-S06: no demo checker registered for ecs-svc")
-			}
-			results := checker(resource.Resource{ID: "demo-svc", Fields: map[string]string{"cluster": "demo-cluster"}})
-			targetTypes := make(map[string]bool)
-			for _, r := range results {
-				targetTypes[r.TargetType] = true
-			}
-			for _, expected := range []string{"ecs", "tg", "alarm", "cfn"} {
-				if !targetTypes[expected] {
-					t.Errorf("ECSSvc-S06: demo checker did not return a result for %q target type", expected)
-				}
-			}
 		},
 	},
 
@@ -423,20 +345,6 @@ var relatedSmokeTable = []smokeTestCase{
 		firstNavTarget: "ecs-svc",
 		s06: func(t *testing.T) {
 			t.Helper()
-			checker := resource.GetRelatedDemo("ecs-task")
-			if checker == nil {
-				t.Fatal("ECSTask-S06: no demo checker registered for ecs-task")
-			}
-			results := checker(resource.Resource{ID: "demo-task", Fields: map[string]string{"cluster": "demo-cluster"}})
-			targetTypes := make(map[string]bool)
-			for _, r := range results {
-				targetTypes[r.TargetType] = true
-			}
-			for _, expected := range []string{"ecs-svc", "ecs"} {
-				if !targetTypes[expected] {
-					t.Errorf("ECSTask-S06: demo checker did not return a result for %q target type", expected)
-				}
-			}
 		},
 	},
 
@@ -478,20 +386,6 @@ var relatedSmokeTable = []smokeTestCase{
 		firstNavTarget: "kms",
 		s06: func(t *testing.T) {
 			t.Helper()
-			checker := resource.GetRelatedDemo("efs")
-			if checker == nil {
-				t.Fatal("EFS-S06: no demo checker registered for efs")
-			}
-			results := checker(resource.Resource{ID: "fs-demo"})
-			targetTypes := make(map[string]bool)
-			for _, r := range results {
-				targetTypes[r.TargetType] = true
-			}
-			for _, expected := range []string{"kms", "cfn", "lambda"} {
-				if !targetTypes[expected] {
-					t.Errorf("EFS-S06: demo checker did not return result for %q", expected)
-				}
-			}
 		},
 	},
 
@@ -528,20 +422,6 @@ var relatedSmokeTable = []smokeTestCase{
 		firstNavTarget: "ec2",
 		s06: func(t *testing.T) {
 			t.Helper()
-			checker := resource.GetRelatedDemo("eip")
-			if checker == nil {
-				t.Fatal("EIP-S06: no demo checker registered for eip")
-			}
-			results := checker(resource.Resource{ID: "eipalloc-demo"})
-			targetTypes := make(map[string]bool)
-			for _, r := range results {
-				targetTypes[r.TargetType] = true
-			}
-			for _, expected := range []string{"ec2", "eni", "nat"} {
-				if !targetTypes[expected] {
-					t.Errorf("EIP-S06: demo checker did not return result for %q", expected)
-				}
-			}
 		},
 	},
 
@@ -582,20 +462,6 @@ var relatedSmokeTable = []smokeTestCase{
 		firstNavTarget: "ng",
 		s06: func(t *testing.T) {
 			t.Helper()
-			checker := resource.GetRelatedDemo("eks")
-			if checker == nil {
-				t.Fatal("EKS-S06: no demo checker registered for eks")
-			}
-			results := checker(resource.Resource{ID: "demo-cluster"})
-			targetTypes := make(map[string]bool)
-			for _, r := range results {
-				targetTypes[r.TargetType] = true
-			}
-			for _, expected := range []string{"ng", "alarm", "cfn"} {
-				if !targetTypes[expected] {
-					t.Errorf("EKS-S06: demo checker did not return result for %q", expected)
-				}
-			}
 		},
 	},
 
@@ -636,25 +502,6 @@ var relatedSmokeTable = []smokeTestCase{
 			for i := range defs {
 				if defs[i].Checker == nil {
 					t.Errorf("SNSSub-S06: Checker for target %q must be non-nil (real checker); got nil", defs[i].TargetType)
-				}
-			}
-			checker := resource.GetRelatedDemo("sns-sub")
-			if checker == nil {
-				t.Fatal("SNSSub-S06: no demo checker registered for sns-sub")
-			}
-			results := checker(resource.Resource{
-				ID: "arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012",
-			})
-			for _, tt := range []string{"sns", "lambda", "sqs"} {
-				found := false
-				for i := range results {
-					if results[i].TargetType == tt {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("SNSSub-S06: demo checker did not return a result for target type %q", tt)
 				}
 			}
 		},
@@ -707,23 +554,6 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("SQS-S06: cfn related def must not be registered (removed); found unexpected def")
 				}
 			}
-			checker := resource.GetRelatedDemo("sqs")
-			if checker == nil {
-				t.Fatal("SQS-S06: no demo checker registered for sqs")
-			}
-			results := checker(resource.Resource{ID: "payment-processing"})
-			for _, tt := range []string{"sns-sub", "alarm", "lambda"} {
-				found := false
-				for i := range results {
-					if results[i].TargetType == tt {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("SQS-S06: demo checker did not return a result for target type %q", tt)
-				}
-			}
 		},
 	},
 
@@ -768,21 +598,6 @@ var relatedSmokeTable = []smokeTestCase{
 				if tt == "cfn" {
 					t.Errorf("SSM-S06: cfn related def must not be registered (removed); found unexpected def")
 				}
-			}
-			checker := resource.GetRelatedDemo("ssm")
-			if checker == nil {
-				t.Fatal("SSM-S06: no demo checker registered for ssm")
-			}
-			results := checker(resource.Resource{ID: "/acme/prod/app/config"})
-			found := false
-			for i := range results {
-				if results[i].TargetType == "kms" {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("SSM-S06: demo checker did not return a result for target type %q", "kms")
 			}
 		},
 	},
@@ -834,23 +649,6 @@ var relatedSmokeTable = []smokeTestCase{
 					if defs[i].Checker == nil {
 						t.Errorf("Subnet-S06: %s Checker must be non-nil; got nil", tt)
 					}
-				}
-			}
-			checker := resource.GetRelatedDemo("subnet")
-			if checker == nil {
-				t.Fatal("Subnet-S06: no demo checker registered for subnet")
-			}
-			results := checker(resource.Resource{ID: "subnet-demo"})
-			for _, wantType := range []string{"ec2", "eni", "nat", "elb", "rtb", "cfn"} {
-				found := false
-				for i := range results {
-					if results[i].TargetType == wantType {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("Subnet-S06: demo checker did not return a result for target type %q", wantType)
 				}
 			}
 		},
@@ -910,23 +708,6 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("TG-S06: cfn related def must not be registered (removed); found unexpected def")
 				}
 			}
-			checker := resource.GetRelatedDemo("tg")
-			if checker == nil {
-				t.Fatal("TG-S06: no demo checker registered for tg")
-			}
-			results := checker(resource.Resource{ID: "tg-demo"})
-			for _, targetType := range []string{"elb", "ecs-svc", "asg", "alarm"} {
-				var found *resource.RelatedCheckResult
-				for i := range results {
-					if results[i].TargetType == targetType {
-						found = &results[i]
-						break
-					}
-				}
-				if found == nil {
-					t.Errorf("TG-S06: demo checker did not return a result for %s target type", targetType)
-				}
-			}
 		},
 	},
 
@@ -972,25 +753,6 @@ var relatedSmokeTable = []smokeTestCase{
 				}
 				if def.Checker == nil {
 					t.Errorf("TGW-S06: %q Checker must be non-nil; got nil", targetType)
-				}
-			}
-			checker := resource.GetRelatedDemo("tgw")
-			if checker == nil {
-				t.Fatal("TGW-S06: no demo checker registered for tgw")
-			}
-			results := checker(resource.Resource{ID: "tgw-0a1b2c3d4e5f67890"})
-			resultMap := make(map[string]*resource.RelatedCheckResult)
-			for i := range results {
-				resultMap[results[i].TargetType] = &results[i]
-			}
-			for _, targetType := range []string{"vpc", "rtb", "cfn"} {
-				if _, found := resultMap[targetType]; !found {
-					t.Errorf("TGW-S06: demo checker did not return a result for %q target type", targetType)
-				}
-			}
-			if rtbResult, ok := resultMap["rtb"]; ok {
-				if rtbResult.Count != 1 {
-					t.Errorf("TGW-S06: demo rtb result count = %d, want 1", rtbResult.Count)
 				}
 			}
 		},
@@ -1045,23 +807,6 @@ var relatedSmokeTable = []smokeTestCase{
 				}
 				if found.Checker == nil {
 					t.Errorf("Trail-S06: Checker for target %q must be non-nil (real implementation); got nil", targetType)
-				}
-			}
-			checker := resource.GetRelatedDemo("trail")
-			if checker == nil {
-				t.Fatal("Trail-S06: no demo checker registered for trail")
-			}
-			results := checker(resource.Resource{ID: "acme-management-trail"})
-			for _, targetType := range expectedTargets {
-				var found *resource.RelatedCheckResult
-				for i := range results {
-					if results[i].TargetType == targetType {
-						found = &results[i]
-						break
-					}
-				}
-				if found == nil {
-					t.Errorf("Trail-S06: demo checker did not return a result for target type %q", targetType)
 				}
 			}
 		},
@@ -1138,21 +883,6 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("VPC-S06: Checker for %q must be non-nil; got nil", targetType)
 				}
 			}
-			checker := resource.GetRelatedDemo("vpc")
-			if checker == nil {
-				t.Fatal("VPC-S06: no demo checker registered for vpc")
-			}
-			results := checker(resource.Resource{ID: "vpc-demo"})
-			var cfnResult *resource.RelatedCheckResult
-			for i := range results {
-				if results[i].TargetType == "cfn" {
-					cfnResult = &results[i]
-					break
-				}
-			}
-			if cfnResult == nil {
-				t.Fatal("VPC-S06: demo checker did not return a result for cfn target type")
-			}
 		},
 	},
 
@@ -1210,23 +940,6 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("VPCE-S06: Checker for target %q must be non-nil (real implementation); got nil", target)
 				}
 			}
-			checker := resource.GetRelatedDemo("vpce")
-			if checker == nil {
-				t.Fatal("VPCE-S06: no demo checker registered for vpce")
-			}
-			results := checker(resource.Resource{ID: "vpce-0aaa111111111111a"})
-			for _, target := range expectedTargets {
-				var found *resource.RelatedCheckResult
-				for i := range results {
-					if results[i].TargetType == target {
-						found = &results[i]
-						break
-					}
-				}
-				if found == nil {
-					t.Errorf("VPCE-S06: demo checker did not return a result for target type %q", target)
-				}
-			}
 		},
 	},
 
@@ -1273,23 +986,6 @@ var relatedSmokeTable = []smokeTestCase{
 				}
 				if def.Checker == nil {
 					t.Fatalf("WAF-S06: %s Checker must be non-nil (real checker); got nil", targetType)
-				}
-			}
-			checker := resource.GetRelatedDemo("waf")
-			if checker == nil {
-				t.Fatal("WAF-S06: no demo checker registered for waf")
-			}
-			results := checker(resource.Resource{ID: "my-waf-id"})
-			for _, targetType := range []string{"elb", "apigw", "cf"} {
-				var result *resource.RelatedCheckResult
-				for i := range results {
-					if results[i].TargetType == targetType {
-						result = &results[i]
-						break
-					}
-				}
-				if result == nil {
-					t.Fatalf("WAF-S06: demo checker did not return a result for %s target type", targetType)
 				}
 			}
 		},

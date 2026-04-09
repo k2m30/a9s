@@ -1,0 +1,40 @@
+ ACTOR                                                                                                                                             │            RELATED
+ Principal:            arn:aws:iam::333333333333:user/bob                                                                                          │  IAM Roles
+ Access key:           AKIAIOSFODNN7BOB1XMP                                                                                                        │  IAM Users
+ User agent:           aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0                                                                                  │  EC2 Instances
+ ACTION                                                                                                                                            │  S3 Buckets
+ Event:                s3:PutObject                                                                                                                │  S3 Objects
+ TARGET                                                                                                                                            │  Lambda Functions
+ Bucket:               webapp-assets-prod                                                                                                          │  RDS Instances
+ Object:               2026/04/07/app.log                                                                                                          │  KMS Keys
+ CONTEXT                                                                                                                                           │  Secrets
+ Region:               us-east-1                                                                                                                   │  VPC Endpoints
+ Source IP:            198.51.100.42                                                                                                               │  Security Groups
+ Time:                 2026-04-07T14:11:03Z                                                                                                        │  DynamoDB Tables
+ ERROR                                                                                                                                             │  CloudFormation Stacks
+ errorCode:            AccessDenied                                                                                                                │  CT events by AccessKeyId
+ errorMessage:         User: arn:aws:iam::333333333333:user/bob is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::webapp-assets-│  CT events by Username
+                                                                                                                                                   │  CT events by EventName
+                                                                                                                                                   │  CT events by SharedEventId
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │
+                                                                                                                                                   │

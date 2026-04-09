@@ -67,6 +67,12 @@ type ResourceTypeDef struct {
 	// target ID is known (e.g., AMI navigation from EC2 detail before AMIs are loaded).
 	// When nil, no stub navigation occurs — the list just shows empty with a spinner.
 	StubCreator func(id string) Resource
+	// RelatedContextFromIDs extracts the ParentContext for a child-view navigation
+	// triggered from the related panel. Called when this type is the target of a
+	// RelatedNavigateMsg and the type is a registered child type (isChild=true).
+	// The first non-empty ID in relatedIDs is typically the encoded parent+child key.
+	// When nil, an empty parent context is used (bucket/prefix shown as empty).
+	RelatedContextFromIDs func(relatedIDs []string) map[string]string
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.

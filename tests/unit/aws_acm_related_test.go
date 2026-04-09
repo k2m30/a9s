@@ -8,7 +8,6 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -221,24 +220,5 @@ func TestRelated_ACM_R53_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "r53" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
-	}
-}
-
-// TestRelatedDemo_ACM_Registered verifies the demo checker is registered and returns valid results.
-func TestRelatedDemo_ACM_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is loaded
-	checker := resource.GetRelatedDemo("acm")
-	if checker == nil {
-		t.Fatal("no demo checker registered for acm")
-	}
-
-	results := checker(resource.Resource{ID: "demo-cert.example.com"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

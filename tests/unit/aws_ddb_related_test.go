@@ -8,7 +8,6 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -197,23 +196,5 @@ func TestRelated_DDB_Lambda_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
-	}
-}
-
-func TestRelatedDemo_DDB_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ddb")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ddb")
-	}
-
-	results := checker(resource.Resource{ID: "acme-orders-prod"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

@@ -186,7 +186,7 @@ Then immediately begin Step 1 for the next issue in the table.
 ## Shared Files — Append Order Rule
 
 These files accumulate one block per resource type:
-- `internal/demo/fixtures_related.go` — append `RegisterRelatedDemo` call
+- `internal/demo/fixtures/<service>.go` — ensure target fixtures contain matching IDs for related navigation
 - `tests/unit/related_registry_test.go` — append `TestRelated_{Source}_Registered`
 
 Because agents write to them sequentially (one issue at a time), there are no conflicts. Each agent appends at the last occurrence of the pattern in the file.

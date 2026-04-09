@@ -308,21 +308,37 @@ func TestQA_MainMenu_CommandTabAutocompleteCompletesUniquePrefix(t *testing.T) {
 	}
 }
 
-func TestQA_MainMenu_CommandTabAutocompleteLeavesAmbiguousPrefixUnchanged(t *testing.T) {
+func TestQA_MainMenu_CommandTabAutocompleteCyclesAmbiguousPrefix(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
+	// Type ":e" then press Tab: should jump to the first matching candidate
+	// (a concrete command, not the bare prefix). A second Tab should rotate
+	// to a different candidate. Cycle resets when the user types a non-Tab key.
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("e"))
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyTab))
 
 	plain := stripANSI(rootViewContent(m))
 	header := strings.SplitN(plain, "\n", 2)[0]
-	if !strings.Contains(header, ":e") {
-		t.Fatalf("ambiguous prefix should remain ':e', got header:\n%s", header)
+	if header == "" || !strings.Contains(header, ":") {
+		t.Fatalf("expected command-mode header, got:\n%s", header)
 	}
-	if strings.Contains(header, ":ec2") || strings.Contains(header, ":eks") || strings.Contains(header, ":ebs") {
-		t.Fatalf("ambiguous prefix should not autocomplete to a specific command, got header:\n%s", header)
+
+	// Extract whatever command-mode token is in the header (":<word>").
+	colonIdx := strings.Index(header, ":")
+	first := strings.TrimSpace(header[colonIdx:])
+	if first == ":" || first == ":e" {
+		t.Fatalf("first Tab on ambiguous prefix should advance to a concrete match, got %q", first)
+	}
+
+	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyTab))
+	plain = stripANSI(rootViewContent(m))
+	header = strings.SplitN(plain, "\n", 2)[0]
+	colonIdx = strings.Index(header, ":")
+	second := strings.TrimSpace(header[colonIdx:])
+	if second == first {
+		t.Fatalf("second Tab should rotate to a different candidate; both showed %q", first)
 	}
 }
 

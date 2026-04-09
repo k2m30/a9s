@@ -88,13 +88,15 @@ func (m *mockCFNDescribeStackEventsClient) DescribeStackEvents(ctx context.Conte
 // It supports pagination via the outputs slice with callIdx counter.
 // For backward compatibility, if outputs is nil it falls back to the single output field.
 type mockCFNListStackResourcesClient struct {
-	output  *cloudformation.ListStackResourcesOutput
-	outputs []*cloudformation.ListStackResourcesOutput
-	err     error
-	callIdx int
+	output    *cloudformation.ListStackResourcesOutput
+	outputs   []*cloudformation.ListStackResourcesOutput
+	err       error
+	callIdx   int
+	lastInput *cloudformation.ListStackResourcesInput
 }
 
 func (m *mockCFNListStackResourcesClient) ListStackResources(ctx context.Context, params *cloudformation.ListStackResourcesInput, optFns ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error) {
+	m.lastInput = params
 	if m.err != nil {
 		return nil, m.err
 	}
