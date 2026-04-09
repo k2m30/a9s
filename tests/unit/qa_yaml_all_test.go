@@ -11,6 +11,7 @@ package unit
 // in their original files. CT event JSON uniqueness lives in qa_yaml_unique_test.go.
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -31,14 +32,21 @@ import (
 func TestQA_YAML_AllTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}
 
+	clients := demo.NewServiceClients()
+	ctx := context.Background()
+
 	for _, rt := range resource.AllResourceTypes() {
 		rt := rt
 		t.Run(rt.ShortName, func(t *testing.T) {
-			fixtures, ok := demo.GetResources(rt.ShortName)
-			if !ok || len(fixtures) == 0 {
-				t.Skipf("no demo fixtures for %s — skipping", rt.ShortName)
+			fetcher := resource.GetPaginatedFetcher(rt.ShortName)
+			if fetcher == nil {
+				t.Skipf("no paginated fetcher for %s — skipping", rt.ShortName)
 			}
-			res := fixtures[0]
+			result, fetchErr := fetcher(ctx, clients, "")
+			if fetchErr != nil || len(result.Resources) == 0 {
+				t.Skipf("no demo fixtures for %s (err=%v, len=%d) — skipping", rt.ShortName, fetchErr, len(result.Resources))
+			}
+			res := result.Resources[0]
 
 			// (a) non-empty view
 			out := yamlView(t, res, 120, 40)

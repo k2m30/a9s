@@ -17,13 +17,14 @@ package unit_test
 //  2. Tab key does NOT transfer focus to right column.
 
 import (
+	"context"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -110,9 +111,10 @@ func pressScrollRight(d views.DetailModel) views.DetailModel {
 func TestRightColumnNoActionableRowsBlocksFocus(t *testing.T) {
 	ensureNoColor(t)
 
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(fixtures) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
 	defs := resource.GetRelated("ct-events")
@@ -235,9 +237,10 @@ func TestRightColumnNoActionableRowsBlocksFocus(t *testing.T) {
 func TestRightColumnNoActionableRowsBlocksFocus_AllFixtures(t *testing.T) {
 	ensureNoColor(t)
 
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(fixtures) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
 	defs := resource.GetRelated("ct-events")

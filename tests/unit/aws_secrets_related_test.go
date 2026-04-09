@@ -8,7 +8,6 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -326,42 +325,5 @@ func TestRelated_Secrets_CFN_CacheMiss(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_Secrets_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("secrets")
-	if checker == nil {
-		t.Fatal("no demo checker registered for secrets")
-	}
-
-	results := checker(resource.Resource{ID: "prod/docdb/acme-docdb-prod"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify exactly 4 target types are present.
-	if len(results) != 4 {
-		t.Errorf("demo checker returned %d results, want 4", len(results))
-	}
-
-	// At least one result must have Count > 0 (kms or lambda).
-	hasPositive := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositive = true
-			break
-		}
-	}
-	if !hasPositive {
-		t.Error("demo checker returned no result with Count > 0")
 	}
 }

@@ -8,7 +8,7 @@
 │        VolumeId: vol-0a1b2c3d4e5f60002                                                                               │
 │EbsOptimized: "Yes"                                                                                                   │
 │IamInstanceProfile:                                                                                                   │
-│    Arn: arn:aws:iam::123456789012:instance-profile/acme-rds-monitoring                                               │
+│    Arn: arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile                                         │
 │ImageId: ami-0a1b2c3d4e5f60001                                                                                        │
 │InstanceId: i-0a1b2c3d4e5f60001                                                                                       │
 │InstanceType: t3.large                                                                                                │

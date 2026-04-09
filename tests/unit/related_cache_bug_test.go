@@ -11,14 +11,15 @@ package unit
 // Tests 3, 4, and 5 PASS with current code (they verify correct existing behavior).
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -59,9 +60,10 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{

@@ -29,8 +29,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -50,9 +50,10 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -266,9 +267,10 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 //
 // This test PASSES with current code.
 func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) == 0 {
-		t.Fatal("demo ec2 fixtures missing")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) == 0 {
+		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 	instance := ec2Res[0]
 	checker := ec2CheckerByTarget(t, "tg")

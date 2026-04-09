@@ -9,7 +9,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -41,74 +40,24 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 		// Capture per-closure copies so concurrent goroutines cannot race on the
 		// shared outer variables.
 		localCache := cache
-		cmds = append(cmds, func() tea.Msg {
+		cmds = append(cmds, func() (out tea.Msg) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-
-			if m.demoMode {
-				demoFn := resource.GetRelatedDemo(msg.ResourceType)
-				if demoFn != nil {
-					// Build an ordered index of results keyed by TargetType so that
-					// multiple defs sharing the same TargetType (e.g., the 4 ct-events
-					// self-pivots) each receive the correct positional result rather than
-					// all collapsing onto the first match.
-					// typeCounts tracks how many times we have already matched a given
-					// TargetType in *this* def's closure. Because each closure captures
-					// a distinct def, we pre-compute the def's ordinal among same-type
-					// defs once and use it as the index into the demo slice.
-					allResults := demoFn(msg.SourceResource)
-					// Count this def's ordinal position among defs with the same TargetType.
-					ordinal := 0
-					for _, earlier := range defs {
-						if earlier.TargetType == def.TargetType {
-							if earlier.DisplayName == def.DisplayName {
-								break
-							}
-							ordinal++
-						}
-					}
-					// Pick the ordinal-th result with the matching TargetType.
-					matched := 0
-					for _, r := range allResults {
-						if r.TargetType == def.TargetType {
-							if matched == ordinal {
-								return messages.RelatedCheckResultMsg{
-									ResourceType:     msg.ResourceType,
-									SourceResourceID: msg.SourceResource.ID,
-									DefDisplayName:   def.DisplayName,
-									Result:           r,
-									Generation:       gen,
-								}
-							}
-							matched++
-						}
-					}
-				}
-				// The demo override did not emit a result for this def (e.g. the
-				// 4 ct-events pivot defs whose checkers are pure field-readers with
-				// no AWS calls). Fall through to the real checker so that FetchFilter
-				// is populated and the pivot is actionable.
-				if def.Checker != nil {
-					ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
-					defer cancel()
-					result := def.Checker(ctx, nil, msg.SourceResource, localCache)
-					result.TargetType = def.TargetType
-					return messages.RelatedCheckResultMsg{
+			// Defense in depth: a panic inside a checker or paginated fetcher (e.g.
+			// from a buggy fake, an SDK regression, or a nil-typed concrete client
+			// during partial migrations) must not kill the entire TUI. Surface as a
+			// Count=-1 error sentinel so the related panel renders an error state.
+			defer func() {
+				if r := recover(); r != nil {
+					out = messages.RelatedCheckResultMsg{
 						ResourceType:     msg.ResourceType,
 						SourceResourceID: msg.SourceResource.ID,
 						DefDisplayName:   def.DisplayName,
-						Result:           result,
+						Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
 						Generation:       gen,
 					}
 				}
-				return messages.RelatedCheckResultMsg{
-					ResourceType:     msg.ResourceType,
-					SourceResourceID: msg.SourceResource.ID,
-					DefDisplayName:   def.DisplayName,
-					Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
-					Generation:       gen,
-				}
-			}
+			}()
 
 			if def.Checker == nil {
 				return messages.RelatedCheckResultMsg{
@@ -208,11 +157,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 
 		// TargetID-based filtered list (cache miss).
 		if result.TargetID != "" {
-			// Exact AMI navigation should fetch by image ID in live mode instead of
+			// Exact AMI navigation should fetch by image ID instead of
 			// falling back to the owned-AMI list, which misses public and third-party images.
-			// In demo/tests, preserve the list-load flow so synthetic ResourcesLoadedMsg
-			// can still auto-open the exact target without requiring AWS clients.
-			if msg.TargetType == "ami" && m.clients != nil && !m.demoMode {
+			if msg.TargetType == "ami" && m.clients != nil {
 				cmd := m.fetchAMIDetail(result.TargetID)
 				return m, cmd
 			}
@@ -447,22 +394,6 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 		snap[shortName] = resource.ResourceCacheEntry{
 			Resources:   entry.resources,
 			IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
-		}
-	}
-	// Demo mode: pre-populate from fixtures for any registered resource type
-	// missing from the live cache, so cross-type related checkers can resolve
-	// targets without needing the user to visit those list views first.
-	if m.demoMode {
-		for _, def := range resource.AllResourceTypes() {
-			if _, ok := snap[def.ShortName]; ok {
-				continue
-			}
-			if fixtures, fxOk := demo.GetResources(def.ShortName); fxOk {
-				snap[def.ShortName] = resource.ResourceCacheEntry{
-					Resources:   fixtures,
-					IsTruncated: false,
-				}
-			}
 		}
 	}
 	return snap

@@ -16,12 +16,13 @@ package unit
 // The test primarily verifies that a fetch IS initiated (cmd != nil).
 
 import (
+	"context"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -45,9 +46,10 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) < 2 {
-		t.Fatal("demo ec2 fixtures need at least 2 resources")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) < 2 {
+		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 
 	// Load ONLY the first EC2 resource with truncated pagination.
@@ -100,9 +102,10 @@ func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	ec2Res, ok := demo.GetResources("ec2")
-	if !ok || len(ec2Res) < 2 {
-		t.Fatal("demo ec2 fixtures need at least 2 resources")
+	ec2Client := fakes.NewEC2()
+	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	if err != nil || len(ec2Res) < 2 {
+		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 	// Load ALL resources, non-truncated.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{

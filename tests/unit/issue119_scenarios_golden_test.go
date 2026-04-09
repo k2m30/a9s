@@ -349,15 +349,15 @@ func withIssue119EC2Defs(t *testing.T, fn func() string) string {
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 	oldNav := append([]resource.NavigableField(nil), resource.GetNavigableFields("ec2")...)
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: nil},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: nil},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: nil},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: nil},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: nil},
-		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: nil},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: nil},
-		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: nil},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: nil},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: noopChecker},
+		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: noopChecker},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: noopChecker},
+		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: noopChecker},
+		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: noopChecker},
+		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: noopChecker},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: noopChecker},
 	})
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},

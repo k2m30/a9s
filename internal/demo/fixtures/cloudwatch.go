@@ -1,0 +1,111 @@
+package fixtures
+
+import (
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+)
+
+// CloudWatchFixtures holds typed fixture data for CloudWatch.
+type CloudWatchFixtures struct {
+	Alarms []cwtypes.MetricAlarm
+}
+
+const relatedAlarmSNSARN = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+
+// NewCloudWatchFixtures constructs CloudWatchFixtures from the canonical demo data.
+func NewCloudWatchFixtures() *CloudWatchFixtures {
+	return &CloudWatchFixtures{
+		Alarms: []cwtypes.MetricAlarm{
+			{
+				AlarmName:                  aws.String("api-high-error-rate"),
+				AlarmArn:                   aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-error-rate"),
+				AlarmDescription:           aws.String("Triggers when API 5XX error rate exceeds 5%"),
+				StateValue:                 cwtypes.StateValueOk,
+				StateReason:                aws.String("Threshold Crossed: 3 datapoints were less than or equal to the threshold (5.0)."),
+				StateUpdatedTimestamp:      aws.Time(time.Date(2026, 3, 22, 10, 5, 0, 0, time.UTC)),
+				StateTransitionedTimestamp: aws.Time(time.Date(2026, 3, 21, 10, 30, 0, 0, time.UTC)),
+				MetricName:                 aws.String("5XXError"),
+				Namespace:                  aws.String("AWS/ApiGateway"),
+				Threshold:                  aws.Float64(5.0),
+				ComparisonOperator:         cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:          aws.Int32(3),
+				DatapointsToAlarm:          aws.Int32(2),
+				Period:                     aws.Int32(300),
+				Statistic:                  cwtypes.StatisticAverage,
+				TreatMissingData:           aws.String("breaching"),
+				ActionsEnabled:             aws.Bool(true),
+				AlarmActions:               []string{relatedAlarmSNSARN},
+				OKActions:                  []string{relatedAlarmSNSARN},
+				InsufficientDataActions:    []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d4e5f60001")},
+				},
+			},
+			{
+				AlarmName:             aws.String("rds-cpu-utilization"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:rds-cpu-utilization"),
+				AlarmDescription:      aws.String("Triggers when RDS CPU exceeds 80%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (80.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 3, 20, 8, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/RDS"),
+				Threshold:             aws.Float64(80.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-api-primary")},
+				},
+			},
+			{
+				AlarmName:          aws.String("lambda-errors-critical"),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:lambda-errors-critical"),
+				AlarmDescription:   aws.String("Critical: Lambda error count exceeds 10"),
+				StateValue:         cwtypes.StateValueAlarm,
+				MetricName:         aws.String("Errors"),
+				Namespace:          aws.String("AWS/Lambda"),
+				Threshold:          aws.Float64(10.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:  aws.Int32(1),
+				Period:             aws.Int32(300),
+				Statistic:          cwtypes.StatisticSum,
+				ActionsEnabled:     aws.Bool(true),
+				AlarmActions:       []string{"arn:aws:sns:us-east-1:123456789012:ops-critical"},
+			},
+			{
+				AlarmName:          aws.String("elb-unhealthy-hosts"),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:elb-unhealthy-hosts"),
+				AlarmDescription:   aws.String("Triggers when any target group has unhealthy hosts"),
+				StateValue:         cwtypes.StateValueInsufficientData,
+				MetricName:         aws.String("UnHealthyHostCount"),
+				Namespace:          aws.String("AWS/ApplicationELB"),
+				Threshold:          aws.Float64(1.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:  aws.Int32(2),
+				Period:             aws.Int32(60),
+				Statistic:          cwtypes.StatisticMaximum,
+				ActionsEnabled:     aws.Bool(true),
+			},
+			{
+				AlarmName:          aws.String("disk-space-warning"),
+				AlarmArn:           aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:disk-space-warning"),
+				AlarmDescription:   aws.String("Warning when disk space exceeds 85%"),
+				StateValue:         cwtypes.StateValueOk,
+				MetricName:         aws.String("DiskSpaceUtilization"),
+				Namespace:          aws.String("CWAgent"),
+				Threshold:          aws.Float64(85.0),
+				ComparisonOperator: cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:  aws.Int32(3),
+				Period:             aws.Int32(300),
+				Statistic:          cwtypes.StatisticAverage,
+				ActionsEnabled:     aws.Bool(true),
+			},
+		},
+	}
+}

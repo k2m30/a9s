@@ -99,7 +99,7 @@ type Model struct {
 	headerCache    string
 	headerCacheKey string
 
-	demoMode bool
+	preSuppliedClients *awsclient.ServiceClients
 
 	noCache         bool
 	availabilityGen int      // incremented on profile/region switch to cancel stale probes
@@ -187,15 +187,19 @@ func (c *relatedCacheLRU) len() int {
 // Option configures the root Model.
 type Option func(*Model)
 
-// WithDemo enables demo mode with synthetic fixture data.
-// Overrides profile and region to demo values regardless of CLI flags.
+// WithDemo is a compatibility shim for tests written before the 014-demo-transport-mock
+// refactor. New code should use WithClients(demo.NewServiceClients()) + WithNoCache(true).
+// Will be removed after test files are migrated in T045–T049.
+//
+//nolint:gocritic // intentional compat shim; removal tracked in T045–T049
 func WithDemo(enabled bool) Option {
 	return func(m *Model) {
-		m.demoMode = enabled
-		if enabled {
-			m.profile = demo.DemoProfile
-			m.region = demo.DemoRegion
+		if !enabled {
+			return
 		}
+		m.preSuppliedClients = demo.NewServiceClients()
+		m.profile = demo.DemoProfile
+		m.region = demo.DemoRegion
 	}
 }
 
@@ -203,6 +207,14 @@ func WithDemo(enabled bool) Option {
 func WithNoCache(disabled bool) Option {
 	return func(m *Model) {
 		m.noCache = disabled
+	}
+}
+
+// WithClients pre-supplies a set of service clients so that Init() emits a
+// synthetic ClientsReadyMsg instead of initiating a live AWS connection.
+func WithClients(clients *awsclient.ServiceClients) Option {
+	return func(m *Model) {
+		m.preSuppliedClients = clients
 	}
 }
 
@@ -249,22 +261,22 @@ func (m Model) AppContext() context.Context {
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
+// When pre-supplied clients are present (demo mode or tests), emits a synthetic
+// ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
-	if m.demoMode {
-		demoCmd := func() tea.Msg {
-			cfg := demo.NewDemoAWSConfig()
-			clients := awsclient.CreateServiceClients(cfg)
-			return messages.ClientsReadyMsg{Clients: clients}
+	if m.preSuppliedClients != nil {
+		preCmd := func() tea.Msg {
+			return messages.ClientsReadyMsg{Clients: m.preSuppliedClients}
 		}
 		if m.configErr != nil {
-			return tea.Batch(demoCmd, func() tea.Msg {
+			return tea.Batch(preCmd, func() tea.Msg {
 				return messages.FlashMsg{
 					Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
 					IsError: true,
 				}
 			})
 		}
-		return demoCmd
+		return preCmd
 	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
@@ -396,6 +408,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleIdentityError(msg)
 	case messages.AvailabilityCacheLoadedMsg:
 		return m.handleAvailabilityCacheLoaded(msg)
+	case messages.AvailabilityPrefetchedMsg:
+		return m.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
 	case messages.RelatedCheckStartedMsg:

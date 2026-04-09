@@ -11,8 +11,6 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -49,60 +47,6 @@ func TestNavigableFields_ECR_Registered(t *testing.T) {
 		}
 		if nav.TargetType != targetType {
 			t.Errorf("field %q: TargetType = %q, want %q", path, nav.TargetType, targetType)
-		}
-	}
-}
-
-func TestNavigableFields_ECR_FieldPathsResolve(t *testing.T) {
-	resources, ok := demo.GetResources("ecr")
-	if !ok {
-		t.Fatal("no demo fixture registered for ecr — fixtures_cicd.go must register it")
-	}
-	if len(resources) == 0 {
-		t.Fatal("demo fixture returned no resources for ecr")
-	}
-
-	fields := resource.GetNavigableFields("ecr")
-	if len(fields) == 0 {
-		t.Fatal("no navigable fields registered for ecr")
-	}
-
-	for _, nav := range fields {
-		found := false
-		for _, r := range resources {
-			items := fieldpath.ExtractFieldList(r.RawStruct, r.Fields, []string{nav.FieldPath}, nil)
-			for _, item := range items {
-				if item.Value != "" && item.Value != "-" {
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			t.Skipf("NavigableField.FieldPath %q resolved to empty/missing value in all demo fixtures — no demo ECR repo with KMS encryption configured", nav.FieldPath)
-		}
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_ECR_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("ecr")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ecr")
-	}
-
-	results := checker(resource.Resource{ID: "acme/api-service"})
-	if len(results) != 3 {
-		t.Fatalf("demo checker returned %d results, want 3", len(results))
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
 		}
 	}
 }

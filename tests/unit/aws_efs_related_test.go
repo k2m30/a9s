@@ -8,7 +8,6 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -176,25 +175,5 @@ func TestRelated_EFS_Lambda_ReturnsZero(t *testing.T) {
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_EFS_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("efs")
-	if checker == nil {
-		t.Fatal("no demo checker registered for efs")
-	}
-
-	results := checker(resource.Resource{ID: "fs-0a1b2c3d4e5f60001"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

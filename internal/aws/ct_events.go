@@ -192,11 +192,6 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		user = *event.Username
 	}
 
-	roleName := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
-	if user == "" && roleName != "" {
-		user = roleName
-	}
-
 	source := ""
 	if event.EventSource != nil {
 		source = *event.EventSource
@@ -237,6 +232,24 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	if accountID != "" && recipientAccount != "" && accountID != recipientAccount {
 		crossAccount = "true"
 	}
+
+	// Only extract roleName for actual role-based identities (not AWSService).
+	// AWSService invokedBy values are service principals, not IAM roles.
+	roleName := ""
+	if uiType == "AssumedRole" || uiType == "Role" {
+		roleName = extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+	}
+
+	// Fields["user"] navigates to iam-user — only set it for actual IAM users.
+	// For AssumedRole/Root/AWSService/Role events, event.Username is a role/session
+	// name, not an IAM username. Use a separate variable so computeCTActor still
+	// receives the original SDK username for display purposes.
+	// When uiType is empty (no CloudTrailEvent JSON blob), trust event.Username.
+	iamUserName := ""
+	if uiType == "IAMUser" || uiType == "" {
+		iamUserName = user
+	}
+
 	actor := computeCTActor(parsed, user, crossAccount == "true", accountID)
 	origin := computeCTOrigin(parsed)
 	target := ExtractCTTarget(parsed)
@@ -275,7 +288,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"time":          eventTimeDisplay,
 			"event_time":    eventTimeRaw,
 			"event_time_raw": eventTimeRaw,
-			"user":          user,
+			"user":          iamUserName,
 			"source":        source,
 			"resource_type": resourceType,
 			"resource_name": resourceName,
@@ -850,8 +863,6 @@ func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) string {
 	switch parsed.UserIdentity.Type {
 	case "AssumedRole", "Role":
 		return parsed.UserIdentity.SessionContext.SessionIssuer.UserName
-	case "AWSService":
-		return parsed.UserIdentity.InvokedBy
 	}
 	return ""
 }

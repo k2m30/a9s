@@ -155,20 +155,10 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	case "q", "quit":
 		return m, tea.Quit
 	case "ctx", "profile":
-		if m.demoMode {
-			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Profile switching disabled in demo mode", IsError: true}
-			}
-		}
 		return m, func() tea.Msg {
 			return messages.NavigateMsg{Target: messages.TargetProfile}
 		}
 	case "region":
-		if m.demoMode {
-			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Region switching disabled in demo mode", IsError: true}
-			}
-		}
 		return m, func() tea.Msg {
 			return messages.NavigateMsg{Target: messages.TargetRegion}
 		}

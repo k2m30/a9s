@@ -7,7 +7,6 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -203,24 +202,5 @@ func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
 	result := checker(context.Background(), nil, res, nil)
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
-
-// --- Demo Checker Test ---
-
-func TestRelatedDemo_SQS_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("sqs")
-	if checker == nil {
-		t.Fatal("no demo checker registered for sqs")
-	}
-	results := checker(sqsPaymentRes())
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

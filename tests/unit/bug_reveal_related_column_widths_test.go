@@ -1,13 +1,14 @@
 package unit
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -34,9 +35,10 @@ func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 			m2, _ := rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: 36})
 			m = m2
 
-			ec2, ok := demo.GetResources("ec2")
-			if !ok || len(ec2) == 0 {
-				t.Fatal("demo ec2 fixtures missing")
+			clients := demo.NewServiceClients()
+			ec2, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+			if err != nil || len(ec2) == 0 {
+				t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 			}
 			m2, _ = rootApplyMsg(m, messages.NavigateMsg{
 				Target:       messages.TargetDetail,

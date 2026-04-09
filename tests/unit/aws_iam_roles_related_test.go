@@ -11,7 +11,6 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -369,49 +368,3 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 }
 
 // --- Demo checker ---
-
-func TestRelatedDemo_Role_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("role")
-	if checker == nil {
-		t.Fatal("no demo checker registered for role")
-	}
-
-	results := checker(resource.Resource{ID: "acme-lambda-execution"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-
-	// Verify all 4 expected target types are present.
-	wantTargets := map[string]bool{
-		"lambda": false,
-		"glue":   false,
-		"ng":     false,
-		"policy": false,
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// Verify at least one result has Count > 0 (lambda should have Count >= 1).
-	hasPositiveCount := false
-	for _, r := range results {
-		if r.Count > 0 {
-			hasPositiveCount = true
-			break
-		}
-	}
-	if !hasPositiveCount {
-		t.Error("expected at least one demo result with Count > 0 (lambda should match)")
-	}
-}

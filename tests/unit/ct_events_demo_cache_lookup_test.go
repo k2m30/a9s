@@ -32,10 +32,11 @@ package unit_test
 //     NOT return Count=-1.
 
 import (
+	"context"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -55,9 +56,10 @@ import (
 // not Count=-1, so the right column does not show the "unknown" state for a row
 // that should have resolved.
 func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(fixtures) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
 	defs := resource.GetRelated("ct-events")
@@ -122,9 +124,10 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 // Bug E: the short-circuit in ctEventsRelatedResources returns nil resourceList
 // when clients is not *ServiceClients and FetchRelatedTarget errored.
 func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(fixtures) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
 	var caseK resource.Resource
@@ -186,9 +189,10 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 // Bug E: same short-circuit as checkCtEventsUser — nil-client fetcher error causes
 // ctEventsRelatedResources to return nil, making checkCtEventsRole return Count=-1.
 func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *testing.T) {
-	fixtures, ok := demo.GetResources("ct-events")
-	if !ok || len(fixtures) == 0 {
-		t.Fatal("demo.GetResources(\"ct-events\") returned no fixtures")
+	ctClient := fakes.NewCloudTrail()
+	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	if fetchErr != nil || len(fixtures) == 0 {
+		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
 	// Empty cache — triggers the bug path.

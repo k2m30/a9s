@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -1381,14 +1382,21 @@ func TestQA_YAML_GlueRuns_RawContentUncolored(t *testing.T) {
 func TestQA_YAML_AllChildTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}
 
+	clients := demo.NewServiceClients()
+	ctx := context.Background()
+
 	for _, ct := range resource.AllChildTypes() {
 		ct := ct
 		t.Run(ct.ShortName, func(t *testing.T) {
-			fixtures, ok := demo.GetChildResources(ct.ShortName, map[string]string{})
-			if !ok || len(fixtures) == 0 {
-				t.Skipf("no demo fixtures for child type %s — skipping", ct.ShortName)
+			fetcher := resource.GetPaginatedChildFetcher(ct.ShortName)
+			if fetcher == nil {
+				t.Skipf("no paginated child fetcher for %s — skipping", ct.ShortName)
 			}
-			res := fixtures[0]
+			result, fetchErr := fetcher(ctx, clients, resource.ParentContext{}, "")
+			if fetchErr != nil || len(result.Resources) == 0 {
+				t.Skipf("no demo fixtures for child type %s (err=%v, len=%d) — skipping", ct.ShortName, fetchErr, len(result.Resources))
+			}
+			res := result.Resources[0]
 
 			// (a) non-empty view
 			out := yamlView(t, res, 120, 40)

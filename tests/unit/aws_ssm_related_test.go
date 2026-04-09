@@ -8,7 +8,6 @@ import (
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -172,20 +171,3 @@ func TestRelated_SSM_EmptyCache(t *testing.T) {
 }
 
 // --- Demo checker test ---
-
-func TestRelatedDemo_SSM_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("ssm")
-	if checker == nil {
-		t.Fatal("no demo checker registered for ssm")
-	}
-	results := checker(ssmSecureRes())
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-}

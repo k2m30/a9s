@@ -8,7 +8,6 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -194,56 +193,5 @@ func TestRelated_Logs_Alarms_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_Logs_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("logs")
-	if checker == nil {
-		t.Fatal("no demo checker registered for logs")
-	}
-
-	// Test with a lambda-prefixed log group (should produce lambda Count=1).
-	lambdaLogGroup := resource.Resource{ID: "/aws/lambda/api-gateway-authorizer"}
-	results := checker(lambdaLogGroup)
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results for lambda log group")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"lambda": false, "alarm": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
-
-	// Lambda log group should have lambda Count > 0.
-	for _, r := range results {
-		if r.TargetType == "lambda" && r.Count < 1 {
-			t.Errorf("demo checker lambda Count = %d for lambda log group, want >= 1", r.Count)
-		}
-	}
-
-	// Test with a non-lambda log group (lambda Count should be 0).
-	nonLambdaLogGroup := resource.Resource{ID: "/aws/rds/instance/prod-api-primary/postgresql"}
-	nonLambdaResults := checker(nonLambdaLogGroup)
-	for _, r := range nonLambdaResults {
-		if r.TargetType == "lambda" && r.Count != 0 {
-			t.Errorf("demo checker lambda Count = %d for non-lambda log group, want 0", r.Count)
-		}
 	}
 }

@@ -42,7 +42,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.EC2 == nil {
+	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
 	}
 	resourceType := "vpc"

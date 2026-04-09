@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -105,38 +104,5 @@ func TestRelated_IAMUser_Policy_EmptyUsername(t *testing.T) {
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error for empty username: %v", result.Err)
-	}
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_IAMUser_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("iam-user")
-	if checker == nil {
-		t.Fatal("no demo checker registered for iam-user")
-	}
-
-	results := checker(resource.Resource{ID: "alice"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"iam-group": false, "policy": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
 	}
 }

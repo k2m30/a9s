@@ -8,7 +8,6 @@ import (
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -275,24 +274,5 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
-	}
-}
-
-// TestRelatedDemo_CB_Registered verifies the demo checker is registered and returns valid results.
-func TestRelatedDemo_CB_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is loaded
-	checker := resource.GetRelatedDemo("cb")
-	if checker == nil {
-		t.Fatal("no demo checker registered for cb")
-	}
-
-	results := checker(resource.Resource{ID: "acme-api-build"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
 	}
 }

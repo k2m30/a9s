@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -33,24 +32,6 @@ func TestRelated_Codeartifact_Registered(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("expected related def for target %q not found", target)
-		}
-	}
-}
-
-func TestRelatedDemo_Codeartifact_Registered(t *testing.T) {
-	_ = demo.GetResources
-	checker := resource.GetRelatedDemo("codeartifact")
-	if checker == nil {
-		t.Fatal("no demo checker registered for codeartifact")
-	}
-
-	results := checker(resource.Resource{ID: "acme-npm"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
 		}
 	}
 }

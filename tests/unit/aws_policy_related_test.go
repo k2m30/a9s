@@ -11,7 +11,6 @@ import (
 
 	internalaws "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -320,37 +319,4 @@ type mockIAMListEntitiesAPICounter struct {
 func (m *mockIAMListEntitiesAPICounter) ListEntitiesForPolicy(_ context.Context, _ *iam.ListEntitiesForPolicyInput, _ ...func(*iam.Options)) (*iam.ListEntitiesForPolicyOutput, error) {
 	*m.counter++
 	return m.out, nil
-}
-
-// --- Demo Checker ---
-
-func TestRelatedDemo_Policy_Registered(t *testing.T) {
-	_ = demo.GetResources // ensure demo package is initialized
-	checker := resource.GetRelatedDemo("policy")
-	if checker == nil {
-		t.Fatal("no demo checker registered for policy")
-	}
-
-	results := checker(resource.Resource{ID: "arn:aws:iam::aws:policy/ReadOnlyAccess"})
-	if len(results) == 0 {
-		t.Fatal("demo checker returned no results")
-	}
-	for _, r := range results {
-		if r.TargetType == "" {
-			t.Error("demo result has empty TargetType")
-		}
-	}
-
-	// Verify all expected target types are present.
-	wantTargets := map[string]bool{"role": false, "iam-user": false, "iam-group": false}
-	for _, r := range results {
-		if _, ok := wantTargets[r.TargetType]; ok {
-			wantTargets[r.TargetType] = true
-		}
-	}
-	for target, found := range wantTargets {
-		if !found {
-			t.Errorf("demo checker missing result for target %q", target)
-		}
-	}
 }
