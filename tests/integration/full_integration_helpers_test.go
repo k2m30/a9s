@@ -25,6 +25,15 @@ type fullIntegrationCountExpectation struct {
 	truncated bool
 }
 
+type fullIntegrationRelatedHopScenario struct {
+	name              string
+	sourceType        string
+	firstTargetType   string
+	firstDisplayName  string
+	returnTargetType  string
+	returnDisplayName string
+}
+
 func fullIntegrationExpectedFirstPageCounts(t *testing.T, clients *awsclient.ServiceClients) map[string]fullIntegrationCountExpectation {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -44,6 +53,97 @@ func fullIntegrationExpectedFirstPageCounts(t *testing.T, clients *awsclient.Ser
 		expected[rt.ShortName] = fullIntegrationCountExpectation{count: len(result.Resources), truncated: truncated}
 	}
 	return expected
+}
+
+func fullIntegrationRunAllResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, newModel func() tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation) {
+	t.Helper()
+	for _, rt := range resource.AllResourceTypes() {
+		rt := rt
+		t.Run(rt.ShortName, func(t *testing.T) {
+			m := newModel()
+			fullIntegrationRunResourceBaseline(t, clients, m, expectedTopLevel, rt)
+		})
+	}
+}
+
+func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.ServiceClients, m tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, rt resource.ResourceTypeDef) {
+	t.Helper()
+	expected, ok := expectedTopLevel[rt.ShortName]
+	if !ok {
+		t.Fatalf("missing first-page expectation for %s", rt.ShortName)
+	}
+
+	loaded := fullIntegrationOpenResourceList(t, &m, rt.ShortName)
+	if got := len(loaded.Resources); got != expected.count {
+		t.Fatalf("%s list loaded %d resources, expected %d from fetcher", rt.ShortName, got, expected.count)
+	}
+	fullIntegrationAssertFrameContains(t, m, fullIntegrationFrameCount(rt.ShortName, expected))
+
+	if expected.count == 0 {
+		return
+	}
+	defs := resource.GetRelated(rt.ShortName)
+	if len(defs) == 0 {
+		return
+	}
+
+	selected, relatedResults, ok := fullIntegrationDescribeSelectedResourceMaybeRelated(t, &m, rt.ShortName)
+	if !ok {
+		return
+	}
+	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, rt.ShortName, selected)
+	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, rt.ShortName+" baseline detail")
+	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, rt.ShortName+" baseline detail")
+}
+
+func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.ServiceClients, m *tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, scenario fullIntegrationRelatedHopScenario) {
+	t.Helper()
+	sourceExpected, ok := expectedTopLevel[scenario.sourceType]
+	if !ok {
+		t.Fatalf("%s: missing first-page expectation for %s", scenario.name, scenario.sourceType)
+	}
+	if sourceExpected.count == 0 {
+		t.Skipf("%s: %s has zero resources; cannot run related-hop scenario", scenario.name, scenario.sourceType)
+	}
+
+	sourceLoaded := fullIntegrationOpenResourceList(t, m, scenario.sourceType)
+	if got := len(sourceLoaded.Resources); got != sourceExpected.count {
+		t.Fatalf("%s: %s list loaded %d resources, expected %d from fetcher", scenario.name, scenario.sourceType, got, sourceExpected.count)
+	}
+	fullIntegrationAssertFrameContains(t, *m, fullIntegrationFrameCount(scenario.sourceType, sourceExpected))
+
+	firstResource, firstResults := fullIntegrationDescribeSelectedResource(t, m, scenario.sourceType)
+	expectedFirst := fullIntegrationExpectedRelatedCounts(t, clients, scenario.sourceType, firstResource)
+	fullIntegrationAssertRelatedResults(t, expectedFirst, firstResults, scenario.name+" source detail")
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, scenario.name+" source detail")
+
+	relatedResource, relatedResults := fullIntegrationEnterRelatedSingleDetail(t, m, scenario.firstTargetType, scenario.firstDisplayName)
+	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, scenario.firstTargetType, relatedResource)
+	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, scenario.name+" first related detail")
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, scenario.name+" first related detail")
+
+	returnCount := expectedRelated[scenario.returnDisplayName]
+	if returnCount <= 0 {
+		t.Fatalf("%s: related %s has %s count %d; test needs a navigable return row", scenario.name, scenario.firstTargetType, scenario.returnDisplayName, returnCount)
+	}
+	fullIntegrationEnterRelatedList(t, m, scenario.returnTargetType, scenario.returnDisplayName)
+	fullIntegrationAssertFrameContains(t, *m, fmt.Sprintf("%s(%d)", scenario.returnTargetType, returnCount))
+
+	if returnCount > 1 {
+		*m, _ = fullIntegrationApplyMsg(*m, fullIntegrationKeyPress("j"))
+	}
+	returnResource, returnResults := fullIntegrationDescribeSelectedResource(t, m, scenario.returnTargetType)
+	expectedReturn := fullIntegrationExpectedRelatedCounts(t, clients, scenario.returnTargetType, returnResource)
+	fullIntegrationAssertRelatedResults(t, expectedReturn, returnResults, scenario.name+" return detail")
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, scenario.name+" return detail")
+}
+
+func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients) tui.Model {
+	t.Helper()
+	m := tui.New(profile, region, tui.WithClients(clients), tui.WithNoCache(true))
+	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReadyMsg{Clients: clients, Region: region})
+	return m
 }
 
 func fullIntegrationAssertMainMenuCounts(t *testing.T, m tui.Model, expected map[string]fullIntegrationCountExpectation) {
@@ -133,6 +233,15 @@ func fullIntegrationOpenResourceList(t *testing.T, m *tui.Model, resourceType st
 
 func fullIntegrationDescribeSelectedResource(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResultMsg) {
 	t.Helper()
+	res, results, ok := fullIntegrationDescribeSelectedResourceMaybeRelated(t, m, resourceType)
+	if !ok {
+		t.Fatalf("describe selected %s returned no related check command", resourceType)
+	}
+	return res, results
+}
+
+func fullIntegrationDescribeSelectedResourceMaybeRelated(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResultMsg, bool) {
+	t.Helper()
 	var cmd tea.Cmd
 	*m, cmd = fullIntegrationApplyMsg(*m, fullIntegrationKeyPress("d"))
 	raw := fullIntegrationRequireCmdMsg(t, cmd, "describe selected "+resourceType)
@@ -147,7 +256,10 @@ func fullIntegrationDescribeSelectedResource(t *testing.T, m *tui.Model, resourc
 
 	var relatedCmd tea.Cmd
 	*m, relatedCmd = fullIntegrationApplyMsg(*m, nav)
-	return res, fullIntegrationRunRelatedChecksFromStartCmd(t, m, relatedCmd, resourceType)
+	if relatedCmd == nil {
+		return res, nil, false
+	}
+	return res, fullIntegrationRunRelatedChecksFromStartCmd(t, m, relatedCmd, resourceType), true
 }
 
 func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetType, displayName string) (resource.Resource, []messages.RelatedCheckResultMsg) {
@@ -277,13 +389,16 @@ func fullIntegrationAssertRelatedResults(t *testing.T, expected map[string]int, 
 	}
 }
 
-func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, expected map[string]int, context string) {
+func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceType string, expected map[string]int, context string) {
 	t.Helper()
 	plain := fullIntegrationStripANSI(fullIntegrationViewContent(m))
 	if !strings.Contains(plain, "RELATED") {
 		t.Fatalf("%s: view does not contain RELATED panel:\n%s", context, plain)
 	}
 	for name, count := range expected {
+		if fullIntegrationIsHiddenSelfPivotZero(sourceType, name, count) {
+			continue
+		}
 		want := name
 		if count >= 0 {
 			want = fmt.Sprintf("%s (%d)", name, count)
@@ -292,6 +407,18 @@ func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, expecte
 			t.Fatalf("%s: view missing related count %q:\n%s", context, want, plain)
 		}
 	}
+}
+
+func fullIntegrationIsHiddenSelfPivotZero(sourceType, displayName string, count int) bool {
+	if sourceType == "" || count != 0 {
+		return false
+	}
+	for _, def := range resource.GetRelated(sourceType) {
+		if def.DisplayName == displayName && def.TargetType == sourceType {
+			return true
+		}
+	}
+	return false
 }
 
 func fullIntegrationAssertFrameContains(t *testing.T, m tui.Model, want string) {
@@ -303,6 +430,9 @@ func fullIntegrationAssertFrameContains(t *testing.T, m tui.Model, want string) 
 }
 
 func fullIntegrationFrameCount(name string, exp fullIntegrationCountExpectation) string {
+	if rt := resource.FindResourceType(name); rt != nil && rt.ListTitle != "" {
+		name = rt.ListTitle
+	}
 	if exp.truncated {
 		return fmt.Sprintf("%s(%d+)", name, exp.count)
 	}
