@@ -17,11 +17,19 @@ package unit
 //  4. Populates inline policies for "readonly" group in buildIAMRelations
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
@@ -241,6 +249,210 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 			t.Errorf("inline policy %q not found in policy list; got inline names: %v",
 				want, inlineNames)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// fetchInlineGroupPolicies error-path tests
+//
+// fetchInlineGroupPolicies is unexported. We drive it via the registered
+// paginated fetcher for "policy", which calls FetchIAMPoliciesPage then
+// fetchInlineGroupPolicies. We construct a *awsclient.ServiceClients with a
+// controlled IAM stub that exercises the three defensive branches:
+//   - ListGroups error → function returns nil
+//   - group with nil GroupName → skipped, no resource emitted
+//   - ListGroupPolicies error → continue to next group
+// ---------------------------------------------------------------------------
+
+// stubGroupPolicyIAM satisfies awsclient.IAMAPI. Only ListGroups,
+// ListGroupPolicies, ListPolicies, and ListAttachedGroupPolicies are called by
+// the policy fetcher path; all other methods panic (they must never be called).
+type stubGroupPolicyIAM struct {
+	listGroupsOut *iam.ListGroupsOutput
+	listGroupsErr error
+
+	listGroupPoliciesErr error
+
+	// ListPolicies must succeed (returns empty) so FetchIAMPoliciesPage doesn't
+	// short-circuit with an error before fetchInlineGroupPolicies is called.
+	listPoliciesOut *iam.ListPoliciesOutput
+}
+
+func (s *stubGroupPolicyIAM) ListGroups(_ context.Context, _ *iam.ListGroupsInput, _ ...func(*iam.Options)) (*iam.ListGroupsOutput, error) {
+	if s.listGroupsErr != nil {
+		return nil, s.listGroupsErr
+	}
+	if s.listGroupsOut != nil {
+		return s.listGroupsOut, nil
+	}
+	return &iam.ListGroupsOutput{}, nil
+}
+
+func (s *stubGroupPolicyIAM) ListGroupPolicies(_ context.Context, _ *iam.ListGroupPoliciesInput, _ ...func(*iam.Options)) (*iam.ListGroupPoliciesOutput, error) {
+	if s.listGroupPoliciesErr != nil {
+		return nil, s.listGroupPoliciesErr
+	}
+	return &iam.ListGroupPoliciesOutput{PolicyNames: []string{"inline-pol"}}, nil
+}
+
+func (s *stubGroupPolicyIAM) ListPolicies(_ context.Context, _ *iam.ListPoliciesInput, _ ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
+	if s.listPoliciesOut != nil {
+		return s.listPoliciesOut, nil
+	}
+	return &iam.ListPoliciesOutput{}, nil
+}
+
+func (s *stubGroupPolicyIAM) ListAttachedGroupPolicies(_ context.Context, _ *iam.ListAttachedGroupPoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedGroupPoliciesOutput, error) {
+	return &iam.ListAttachedGroupPoliciesOutput{}, nil
+}
+
+// Stub methods that are part of IAMAPI but never called by the policy fetcher.
+func (s *stubGroupPolicyIAM) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+	panic("stubGroupPolicyIAM.ListRoles called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListUsers(_ context.Context, _ *iam.ListUsersInput, _ ...func(*iam.Options)) (*iam.ListUsersOutput, error) {
+	panic("stubGroupPolicyIAM.ListUsers called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListAttachedRolePolicies(_ context.Context, _ *iam.ListAttachedRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error) {
+	panic("stubGroupPolicyIAM.ListAttachedRolePolicies called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListRolePolicies(_ context.Context, _ *iam.ListRolePoliciesInput, _ ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
+	panic("stubGroupPolicyIAM.ListRolePolicies called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListAttachedUserPolicies(_ context.Context, _ *iam.ListAttachedUserPoliciesInput, _ ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error) {
+	panic("stubGroupPolicyIAM.ListAttachedUserPolicies called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListGroupsForUser(_ context.Context, _ *iam.ListGroupsForUserInput, _ ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error) {
+	panic("stubGroupPolicyIAM.ListGroupsForUser called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListEntitiesForPolicy(_ context.Context, _ *iam.ListEntitiesForPolicyInput, _ ...func(*iam.Options)) (*iam.ListEntitiesForPolicyOutput, error) {
+	panic("stubGroupPolicyIAM.ListEntitiesForPolicy called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) ListAccountAliases(_ context.Context, _ *iam.ListAccountAliasesInput, _ ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error) {
+	panic("stubGroupPolicyIAM.ListAccountAliases called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) GetGroup(_ context.Context, _ *iam.GetGroupInput, _ ...func(*iam.Options)) (*iam.GetGroupOutput, error) {
+	panic("stubGroupPolicyIAM.GetGroup called unexpectedly")
+}
+
+// compile-time check
+var _ awsclient.IAMAPI = (*stubGroupPolicyIAM)(nil)
+
+// callPolicyFetcher invokes the registered "policy" paginated fetcher with the
+// given IAM stub wired into ServiceClients.
+func callPolicyFetcher(t *testing.T, stub *stubGroupPolicyIAM) ([]resource.Resource, error) {
+	t.Helper()
+	fetcher := resource.GetPaginatedFetcher("policy")
+	if fetcher == nil {
+		t.Fatal("no paginated fetcher registered for 'policy' — internal/aws not imported?")
+	}
+	clients := &awsclient.ServiceClients{IAM: stub}
+	result, err := fetcher(context.Background(), clients, "")
+	return result.Resources, err
+}
+
+// TestFetchInlineGroupPolicies_ListGroupsError verifies that when ListGroups
+// returns an error, fetchInlineGroupPolicies returns nil (no inline resources).
+// The overall policy fetch still succeeds (ListPolicies returned empty), so
+// the function returns an empty list rather than an error.
+func TestFetchInlineGroupPolicies_ListGroupsError(t *testing.T) {
+	stub := &stubGroupPolicyIAM{
+		listGroupsErr: fmt.Errorf("iam: ListGroups access denied"),
+	}
+	resources, err := callPolicyFetcher(t, stub)
+	if err != nil {
+		t.Errorf("unexpected error from fetcher: %v", err)
+	}
+	// ListGroups failed → fetchInlineGroupPolicies returns nil → no inline resources
+	for _, r := range resources {
+		if r.Fields["policy_type"] == "inline" {
+			t.Errorf("expected no inline resources when ListGroups fails, got: %v", r.Name)
+		}
+	}
+}
+
+// TestFetchInlineGroupPolicies_NilGroupName verifies that groups with a nil
+// GroupName are skipped and produce no inline policy resources.
+func TestFetchInlineGroupPolicies_NilGroupName(t *testing.T) {
+	stub := &stubGroupPolicyIAM{
+		listGroupsOut: &iam.ListGroupsOutput{
+			Groups: []iamtypes.Group{
+				{GroupName: nil, GroupId: aws.String("AGPA123"), Arn: aws.String("arn:aws:iam::123:group/nil-name"), Path: aws.String("/")},
+			},
+		},
+	}
+	resources, err := callPolicyFetcher(t, stub)
+	if err != nil {
+		t.Errorf("unexpected error from fetcher: %v", err)
+	}
+	// nil GroupName group is skipped → ListGroupPolicies never called → no inline resources
+	for _, r := range resources {
+		if r.Fields["policy_type"] == "inline" {
+			t.Errorf("expected no inline resources for nil-GroupName group, got: %v", r.Name)
+		}
+	}
+}
+
+// TestFetchInlineGroupPolicies_ListGroupPoliciesError verifies that when
+// ListGroupPolicies returns an error for a group, the function continues to
+// the next group rather than returning nil for everything.
+func TestFetchInlineGroupPolicies_ListGroupPoliciesError(t *testing.T) {
+	stub := &stubGroupPolicyIAM{
+		listGroupsOut: &iam.ListGroupsOutput{
+			Groups: []iamtypes.Group{
+				// Two groups: first will hit ListGroupPolicies error, second will succeed.
+				// Since our stub returns the same error for all calls, we verify that
+				// neither group panics and the function returns nil (all fail → continue).
+				{GroupName: aws.String("group-a"), GroupId: aws.String("AGPA001"), Arn: aws.String("arn:aws:iam::123:group/group-a"), Path: aws.String("/")},
+				{GroupName: aws.String("group-b"), GroupId: aws.String("AGPA002"), Arn: aws.String("arn:aws:iam::123:group/group-b"), Path: aws.String("/")},
+			},
+		},
+		listGroupPoliciesErr: fmt.Errorf("iam: ListGroupPolicies throttled"),
+	}
+	resources, err := callPolicyFetcher(t, stub)
+	if err != nil {
+		t.Errorf("unexpected error from fetcher: %v", err)
+	}
+	// ListGroupPolicies errors → continue for both groups → no inline resources emitted
+	for _, r := range resources {
+		if r.Fields["policy_type"] == "inline" {
+			t.Errorf("expected no inline resources when ListGroupPolicies errors, got: %v", r.Name)
+		}
+	}
+}
+
+// TestFetchInlineGroupPolicies_HappyPath verifies the success path: a group
+// with a valid GroupName and successful ListGroupPolicies produces inline
+// policy resources with correct field values.
+func TestFetchInlineGroupPolicies_HappyPath(t *testing.T) {
+	stub := &stubGroupPolicyIAM{
+		listGroupsOut: &iam.ListGroupsOutput{
+			Groups: []iamtypes.Group{
+				{GroupName: aws.String("dev-group"), GroupId: aws.String("AGPA999"), Arn: aws.String("arn:aws:iam::123:group/dev-group"), Path: aws.String("/")},
+			},
+		},
+		// listGroupPoliciesErr is nil → stub returns ["inline-pol"]
+	}
+	resources, err := callPolicyFetcher(t, stub)
+	if err != nil {
+		t.Errorf("unexpected error from fetcher: %v", err)
+	}
+
+	var found *resource.Resource
+	for i := range resources {
+		if resources[i].Name == "inline-pol" && resources[i].Fields["policy_type"] == "inline" {
+			found = &resources[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("expected inline policy 'inline-pol' in results, not found")
+	}
+	if found.Fields["path"] != "inline/dev-group" {
+		t.Errorf("Fields[\"path\"] = %q, want \"inline/dev-group\"", found.Fields["path"])
+	}
+	if found.Fields["attachment_count"] != "" {
+		t.Errorf("Fields[\"attachment_count\"] = %q, want \"\" (inline policies have no count)", found.Fields["attachment_count"])
 	}
 }
 
