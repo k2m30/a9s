@@ -70,7 +70,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"acm":          len(NewACMFixtures().Certificates),
 		"apigw":        len(NewAPIGWFixtures().APIs),
 		"role":         len(iam.Roles),
-		"policy":       len(iam.Policies),
+		"policy":       countCustomerManagedIAMPolicies(iam),
 		"iam-user":     len(iam.Users),
 		"iam-group":    len(iam.Groups),
 		"waf":          len(NewWAFFixtures().WebACLSummaries),
@@ -106,6 +106,16 @@ func countCustomerManagedKMSKeys(f *KMSFixtures) int {
 	total := 0
 	for _, meta := range f.Keys {
 		if meta != nil && meta.KeyManager == kmstypes.KeyManagerTypeCustomer {
+			total++
+		}
+	}
+	return total
+}
+
+func countCustomerManagedIAMPolicies(f *IAMFixtures) int {
+	total := 0
+	for _, policy := range f.Policies {
+		if policy.Arn != nil && IsCustomerManagedPolicyARN(*policy.Arn) {
 			total++
 		}
 	}
