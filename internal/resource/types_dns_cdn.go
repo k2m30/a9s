@@ -3,10 +3,11 @@ package resource
 func dnsCdnResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "Route 53 Hosted Zones",
-			ShortName: "r53",
-			Aliases:   []string{"r53", "route53", "dns", "hosted-zones"},
-			Category:  "DNS & CDN",
+			Name:          "Route 53 Hosted Zones",
+			ShortName:     "r53",
+			Aliases:       []string{"r53", "route53", "dns", "hosted-zones"},
+			Category:      "DNS & CDN",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 36, Sortable: true},
 				{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
@@ -22,10 +23,11 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "CloudFront Distributions",
-			ShortName: "cf",
-			Aliases:   []string{"cf", "cloudfront", "cdn"},
-			Category:  "DNS & CDN",
+			Name:          "CloudFront Distributions",
+			ShortName:     "cf",
+			Aliases:       []string{"cf", "cloudfront", "cdn"},
+			Category:      "DNS & CDN",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 				{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
@@ -36,10 +38,11 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "ACM Certificates",
-			ShortName: "acm",
-			Aliases:   []string{"acm", "certificates", "certs"},
-			Category:  "DNS & CDN",
+			Name:          "ACM Certificates",
+			ShortName:     "acm",
+			Aliases:       []string{"acm", "certificates", "certs"},
+			Category:      "DNS & CDN",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
@@ -49,10 +52,11 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "API Gateways",
-			ShortName: "apigw",
-			Aliases:   []string{"apigw", "apigateway", "api-gateway"},
-			Category:  "DNS & CDN",
+			Name:          "API Gateways",
+			ShortName:     "apigw",
+			Aliases:       []string{"apigw", "apigateway", "api-gateway"},
+			Category:      "DNS & CDN",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "api_id", Title: "API ID", Width: 14, Sortable: true},

@@ -184,7 +184,7 @@ func TestContentYAML_ViewWithFields(t *testing.T) {
 			"InstanceType": "t3.medium",
 		},
 	}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(80, 20)
 	out := m.View()
 	if out == "" || out == "Initializing..." {
@@ -203,7 +203,7 @@ func TestContentYAML_ViewContainsYAMLKeys(t *testing.T) {
 			"InstanceType": "t3.medium",
 		},
 	}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(80, 20)
 	out := m.View()
 	if !strings.Contains(out, "InstanceId") {
@@ -225,7 +225,7 @@ func TestContentYAML_ViewContainsYAMLValues(t *testing.T) {
 			"InstanceType": "t3.medium",
 		},
 	}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(80, 20)
 	out := m.View()
 	if !strings.Contains(out, "i-abc123") {
@@ -253,7 +253,7 @@ func TestContentYAML_ViewWithRawStruct(t *testing.T) {
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(80, 20)
 	out := m.View()
 	if !strings.Contains(out, "i-struct456") {
