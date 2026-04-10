@@ -4,12 +4,12 @@
 │                                                                                                                                          │
 │ j/k      up/down                 enter/d  detail                  N        sort name               ctrl+r   refresh                      │
 │ g/G      top/bottom              y        yaml                    I        sort id                 esc      back                         │
-│ pgup     page up                 c        copy id                 A        sort date               q        quit                         │
-│ pgdn     page down               /        filter                                                   i        identity                     │
-│ h/l      scroll cols             :        command                                                  ?        help                         │
+│ pgup     page up                 t        cloudtrail events       A        sort date               q        quit                         │
+│ pgdn     page down               c        copy id                                                  i        identity                     │
+│ h/l      scroll cols             /        filter                                                   ?        help                         │
+│                                  :        command                                                                                        │
 │                                                                                                                                          │
 │                                                          Press any key to close                                                          │
-│                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │

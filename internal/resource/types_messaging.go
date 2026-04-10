@@ -3,10 +3,11 @@ package resource
 func messagingResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "SQS Queues",
-			ShortName: "sqs",
-			Aliases:   []string{"sqs", "queues"},
-			Category:  "MESSAGING",
+			Name:          "SQS Queues",
+			ShortName:     "sqs",
+			Aliases:       []string{"sqs", "queues"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:Fields.arn",
 			Columns: []Column{
 				{Key: "queue_name", Title: "Queue Name", Width: 36, Sortable: true},
 				{Key: "approx_messages", Title: "Messages", Width: 10, Sortable: true},
@@ -16,10 +17,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "SNS Topics",
-			ShortName: "sns",
-			Aliases:   []string{"sns", "topics"},
-			Category:  "MESSAGING",
+			Name:          "SNS Topics",
+			ShortName:     "sns",
+			Aliases:       []string{"sns", "topics"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
@@ -32,10 +34,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "SNS Subscriptions",
-			ShortName: "sns-sub",
-			Aliases:   []string{"sns-sub", "sns-subscriptions", "subscriptions"},
-			Category:  "MESSAGING",
+			Name:          "SNS Subscriptions",
+			ShortName:     "sns-sub",
+			Aliases:       []string{"sns-sub", "sns-subscriptions", "subscriptions"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "topic_arn", Title: "Topic ARN", Width: 48, Sortable: true},
 				{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
@@ -44,10 +47,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "EventBridge Rules",
-			ShortName: "eb-rule",
-			Aliases:   []string{"eb-rule", "eventbridge", "events"},
-			Category:  "MESSAGING",
+			Name:          "EventBridge Rules",
+			ShortName:     "eb-rule",
+			Aliases:       []string{"eb-rule", "eventbridge", "events"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Rule Name", Width: 28, Sortable: true},
 				{Key: "state", Title: "State", Width: 10, Sortable: true},
@@ -63,10 +67,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "Kinesis Streams",
-			ShortName: "kinesis",
-			Aliases:   []string{"kinesis", "streams"},
-			Category:  "MESSAGING",
+			Name:          "Kinesis Streams",
+			ShortName:     "kinesis",
+			Aliases:       []string{"kinesis", "streams"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "stream_name", Title: "Stream Name", Width: 36, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -75,10 +80,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "MSK Clusters",
-			ShortName: "msk",
-			Aliases:   []string{"msk", "kafka"},
-			Category:  "MESSAGING",
+			Name:          "MSK Clusters",
+			ShortName:     "msk",
+			Aliases:       []string{"msk", "kafka"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "cluster_name", Title: "Cluster Name", Width: 28, Sortable: true},
 				{Key: "cluster_type", Title: "Type", Width: 14, Sortable: true},
@@ -87,10 +93,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Step Functions",
-			ShortName: "sfn",
-			Aliases:   []string{"sfn", "stepfunctions", "state-machines"},
-			Category:  "MESSAGING",
+			Name:          "Step Functions",
+			ShortName:     "sfn",
+			Aliases:       []string{"sfn", "stepfunctions", "state-machines"},
+			Category:      "MESSAGING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 36, Sortable: true},
 				{Key: "type", Title: "Type", Width: 10, Sortable: true},

@@ -73,6 +73,12 @@ type ResourceTypeDef struct {
 	// The first non-empty ID in relatedIDs is typically the encoded parent+child key.
 	// When nil, an empty parent context is used (bucket/prefix shown as empty).
 	RelatedContextFromIDs func(relatedIDs []string) map[string]string
+	// CloudTrailKey specifies how to build the CloudTrail LookupEvents filter.
+	// Format: "LookupAttr:ValueSource" where:
+	//   LookupAttr  = "ResourceName" or "Username"
+	//   ValueSource = "ID" (res.ID), "Name" (res.Name), or "Fields.xxx" (res.Fields["xxx"])
+	// Empty string means no CloudTrail support (t key suppressed).
+	CloudTrailKey string
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.

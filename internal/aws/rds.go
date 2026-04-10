@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn"})
 
 	resource.RegisterRelated("dbi", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
@@ -115,6 +115,7 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 				"class":          class,
 				"endpoint":       endpoint,
 				"multi_az":       multiAZ,
+				"arn":            aws.ToString(db.DBInstanceArn),
 			},
 			RawStruct: db,
 		}
