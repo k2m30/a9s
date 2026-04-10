@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version"})
+	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version", "arn"})
 
 	resource.RegisterPaginated("eks", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -95,6 +95,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 			"status":           status,
 			"endpoint":         endpoint,
 			"platform_version": platformVersion,
+			"arn":              aws.ToString(cluster.Arn),
 		},
 		RawStruct: cluster,
 	}

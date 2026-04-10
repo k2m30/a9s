@@ -160,3 +160,53 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkApigwLambda tests (stub — Count=0, data not available from GetApis)
+// ---------------------------------------------------------------------------
+
+// TestRelated_APIGW_Lambda_AlwaysZero verifies that checkApigwLambda returns
+// Count=0 regardless of input. Lambda integration targets are not available
+// in the GetApis list response.
+func TestRelated_APIGW_Lambda_AlwaysZero(t *testing.T) {
+	res := resource.Resource{
+		ID:     "api-abc123",
+		Name:   "my-api",
+		Fields: map[string]string{},
+	}
+
+	checker := apigwCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (stub: Lambda integration not available from list API)", result.Count)
+	}
+	if result.TargetType != "lambda" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkApigwWAF tests (stub — Count=0, data not available from GetApis)
+// ---------------------------------------------------------------------------
+
+// TestRelated_APIGW_WAF_AlwaysZero verifies that checkApigwWAF returns
+// Count=0 regardless of input. WAF Web ACL associations are not available
+// in the GetApis list response.
+func TestRelated_APIGW_WAF_AlwaysZero(t *testing.T) {
+	res := resource.Resource{
+		ID:     "api-abc123",
+		Name:   "my-api",
+		Fields: map[string]string{},
+	}
+
+	checker := apigwCheckerByTarget(t, "waf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (stub: WAF association not available from list API)", result.Count)
+	}
+	if result.TargetType != "waf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "waf")
+	}
+}

@@ -260,7 +260,7 @@ func TestSearch_DetailView_EscExitsSearch(t *testing.T) {
 func TestSearch_YAMLView_SlashActivatesSearch(t *testing.T) {
 	k := keys.Default()
 	res := searchTestEC2Resource()
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 40)
 
 	slashKey := tea.KeyPressMsg{Code: '/', Text: "/"}
@@ -280,7 +280,7 @@ func TestSearch_YAMLView_SlashActivatesSearch(t *testing.T) {
 func TestSearch_YAMLView_EscExitsSearch(t *testing.T) {
 	k := keys.Default()
 	res := searchTestEC2Resource()
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 40)
 
 	// Activate search.
@@ -529,7 +529,7 @@ var _ = func() {
 	_ = d.View()
 
 	// YAMLModel — existing API compiles cleanly.
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 40)
 	_ = y.View()
 

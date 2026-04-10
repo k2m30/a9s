@@ -211,7 +211,7 @@ func TestQA_Coverage_ColorizeValue_Null(t *testing.T) {
 		ID:     "test-null",
 		Fields: map[string]string{"nullable_field": "null"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -233,7 +233,7 @@ func TestQA_Coverage_ColorizeValue_Tilde(t *testing.T) {
 		ID:     "test-tilde",
 		Fields: map[string]string{"tilde_field": "~"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -249,7 +249,7 @@ func TestQA_Coverage_ColorizeValue_BoolTrue(t *testing.T) {
 		ID:     "test-bool",
 		Fields: map[string]string{"enabled": "true"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -265,7 +265,7 @@ func TestQA_Coverage_ColorizeValue_BoolFalse(t *testing.T) {
 		ID:     "test-bool-false",
 		Fields: map[string]string{"enabled": "false"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -281,7 +281,7 @@ func TestQA_Coverage_ColorizeValue_NumericInt(t *testing.T) {
 		ID:     "test-num-int",
 		Fields: map[string]string{"count": "42"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -297,7 +297,7 @@ func TestQA_Coverage_ColorizeValue_NumericFloat(t *testing.T) {
 		ID:     "test-num-float",
 		Fields: map[string]string{"ratio": "3.14"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -313,7 +313,7 @@ func TestQA_Coverage_ColorizeValue_String(t *testing.T) {
 		ID:     "test-string",
 		Fields: map[string]string{"greeting": "hello"},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
@@ -336,7 +336,7 @@ func TestQA_Coverage_ColorizeValue_AllBranches(t *testing.T) {
 			"d_string": "hello",
 		},
 	}
-	y := views.NewYAML(res, k)
+	y := views.NewYAML(res, "", k)
 	y.SetSize(80, 24)
 	output := y.View()
 
