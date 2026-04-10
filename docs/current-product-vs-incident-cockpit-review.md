@@ -5,17 +5,17 @@ Related issue: [#196](https://github.com/k2m30/a9s/issues/196)
 ## Scope
 
 This review compares the current `a9s` product against
-[`docs/aws-incident-cockpit-spec.md`](/Users/k2m30/projects/a9s/docs/aws-incident-cockpit-spec.md).
+[`docs/aws-incident-cockpit-spec.md`](~/projects/a9s/docs/aws-incident-cockpit-spec.md).
 
 The comparison is based on the current repository state as of 2026-04-01,
 primarily:
 
-- [`README.md`](/Users/k2m30/projects/a9s/README.md)
-- [`ROADMAP.md`](/Users/k2m30/projects/a9s/ROADMAP.md)
-- [`internal/tui/keys/keys.go`](/Users/k2m30/projects/a9s/internal/tui/keys/keys.go)
-- [`internal/tui/app_input.go`](/Users/k2m30/projects/a9s/internal/tui/app_input.go)
-- [`internal/tui/views/detail.go`](/Users/k2m30/projects/a9s/internal/tui/views/detail.go)
-- design specs under [`docs/design/`](/Users/k2m30/projects/a9s/docs/design)
+- [`README.md`](~/projects/a9s/README.md)
+- [`ROADMAP.md`](~/projects/a9s/ROADMAP.md)
+- [`internal/tui/keys/keys.go`](~/projects/a9s/internal/tui/keys/keys.go)
+- [`internal/tui/app_input.go`](~/projects/a9s/internal/tui/app_input.go)
+- [`internal/tui/views/detail.go`](~/projects/a9s/internal/tui/views/detail.go)
+- design specs under [`docs/design/`](~/projects/a9s/docs/design)
 
 ## Executive Summary
 

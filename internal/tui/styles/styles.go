@@ -31,12 +31,26 @@ var (
 	StatusCheckFailed lipgloss.Style // "!" glyph — RED bold (impaired)
 	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
 	StatusCheckOk     lipgloss.Style // GREEN (ok values in detail view)
+
+	HelpCatStyle         lipgloss.Style
+	HelpKeyStyle         lipgloss.Style
+	HelpDescStyle        lipgloss.Style
+	IdentitySectionStyle lipgloss.Style
+	IdentityLabelStyle   lipgloss.Style
+	IdentityValueStyle   lipgloss.Style
+	YAMLKeyStyle         lipgloss.Style
+	YAMLStrStyle         lipgloss.Style
+	YAMLNumStyle         lipgloss.Style
+	YAMLBoolStyle        lipgloss.Style
+	YAMLNullStyle        lipgloss.Style
+	SearchCurrentStyle   lipgloss.Style
+	SearchOtherStyle     lipgloss.Style
 )
 
 // NoColorActive reports whether NO_COLOR is set in the environment.
 func NoColorActive() bool {
-	val, ok := os.LookupEnv("NO_COLOR")
-	return ok && val != ""
+	_, ok := os.LookupEnv("NO_COLOR")
+	return ok
 }
 
 // rowColorCache maps lowercase status strings to pre-built styles.
@@ -96,11 +110,13 @@ func IsDimRowColor(status string) bool {
 }
 
 func init() {
+	applyPalette(DefaultTheme())
 	initStyles()
 }
 
 // Reinit re-initializes all composed styles. Useful for tests that toggle NO_COLOR.
 func Reinit() {
+	applyPalette(ActiveTheme())
 	initStyles()
 }
 
@@ -127,7 +143,37 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.Style{}
 	StatusCheckWarn = lipgloss.Style{}
 	StatusCheckOk = lipgloss.Style{}
+	HelpCatStyle = lipgloss.Style{}
+	HelpKeyStyle = lipgloss.Style{}
+	HelpDescStyle = lipgloss.Style{}
+	IdentitySectionStyle = lipgloss.Style{}
+	IdentityLabelStyle = lipgloss.Style{}
+	IdentityValueStyle = lipgloss.Style{}
+	YAMLKeyStyle = lipgloss.Style{}
+	YAMLStrStyle = lipgloss.Style{}
+	YAMLNumStyle = lipgloss.Style{}
+	YAMLBoolStyle = lipgloss.Style{}
+	YAMLNullStyle = lipgloss.Style{}
+	SearchCurrentStyle = lipgloss.Style{}
+	SearchOtherStyle = lipgloss.Style{}
 	rowColorCache = nil
+
+	// These 13 styles were previously package-level vars in view files,
+	// initialized once at load time and unaffected by NO_COLOR / Reinit().
+	// They are always initialized regardless of NO_COLOR to preserve that behavior.
+	HelpCatStyle = lipgloss.NewStyle().Foreground(ColHelpCat).Bold(true)
+	HelpKeyStyle = lipgloss.NewStyle().Foreground(ColHelpKey).Bold(true)
+	HelpDescStyle = lipgloss.NewStyle().Foreground(ColDetailVal)
+	IdentitySectionStyle = lipgloss.NewStyle().Foreground(ColDetailSec).Bold(true)
+	IdentityLabelStyle = lipgloss.NewStyle().Foreground(ColDim)
+	IdentityValueStyle = lipgloss.NewStyle().Foreground(ColDetailVal)
+	YAMLKeyStyle = lipgloss.NewStyle().Foreground(ColYAMLKey)
+	YAMLStrStyle = lipgloss.NewStyle().Foreground(ColYAMLStr)
+	YAMLNumStyle = lipgloss.NewStyle().Foreground(ColYAMLNum)
+	YAMLBoolStyle = lipgloss.NewStyle().Foreground(ColYAMLBool)
+	YAMLNullStyle = lipgloss.NewStyle().Foreground(ColYAMLNull)
+	SearchCurrentStyle = lipgloss.NewStyle().Foreground(ActiveTheme().SearchHighlightFg).Background(ActiveTheme().SearchHighlightBg)
+	SearchOtherStyle = lipgloss.NewStyle().Underline(true).Foreground(ActiveTheme().SearchHighlightBg)
 
 	if NoColorActive() {
 		RowSelected = lipgloss.NewStyle().Reverse(true)

@@ -4,10 +4,10 @@ Issue: [#196](https://github.com/k2m30/a9s/issues/196)
 Version: 1.0
 Target: a9s vNext
 Status: Design
-Source taxonomy: [`docs/design/resources-groupping.md`](/Users/k2m30/projects/a9s/docs/design/resources-groupping.md)
+Source taxonomy: [`docs/design/resources-groupping.md`](~/projects/a9s/docs/design/resources-groupping.md)
 Tracking issue: [#196](https://github.com/k2m30/a9s/issues/196)
-Local issue draft: [`docs/issues/resource-issues-overlay-issue.md`](/Users/k2m30/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
-Signal catalog: [`docs/design/deterministic-issue-signals.md`](/Users/k2m30/projects/a9s/docs/design/deterministic-issue-signals.md)
+Local issue draft: [`docs/issues/resource-issues-overlay-issue.md`](~/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
+Signal catalog: [`docs/design/deterministic-issue-signals.md`](~/projects/a9s/docs/design/deterministic-issue-signals.md)
 
 ---
 
@@ -121,7 +121,7 @@ It should not:
 - show issue counts based on expensive account-wide graph traversal
 
 The broader inventory of deterministic signal types is tracked separately in
-[`docs/design/deterministic-issue-signals.md`](/Users/k2m30/projects/a9s/docs/design/deterministic-issue-signals.md).
+[`docs/design/deterministic-issue-signals.md`](~/projects/a9s/docs/design/deterministic-issue-signals.md).
 This doc focuses on product behavior and rollout, not on exhaustively listing
 every possible signal family.
 

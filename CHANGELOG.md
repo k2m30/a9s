@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.36.0] - 2026-04-10
+
+### Added
+- Configurable color themes: 11 built-in themes (Tokyo Night Dark/Light, Catppuccin Mocha/Latte, Dracula, Nord/Nord Light, Gruvbox Dark/Light, Solarized Dark/Light) shipped as embedded YAML files, auto-extracted to `~/.a9s/themes/` on first run.
+- `:theme` command opens a selector overlay (same UX as `:region`) for runtime theme switching with immediate re-render and config persistence.
+- `~/.a9s/config.yaml` configuration file for app-level settings, starting with `theme:` key.
+- Custom themes: copy any built-in YAML file, edit colors, point config at it. Partial themes inherit missing colors from the Tokyo Night Dark default.
+- Active theme name displayed in help view (`?`).
+- Path traversal protection on theme filename validation (rejects `../`, absolute paths, path separators).
+
+### Changed
+- Extracted 33 hardcoded Tokyo Night Dark palette colors into a `Theme` struct with `DefaultTheme()`, `ApplyTheme()`, `ThemeFromYAML()`, and `ActiveTheme()` API.
+- Migrated 13 package-level style captures from 4 view files (help, identity, yaml, search) into centralized `styles.go` composed styles, rebuilt on every `ApplyTheme()` call.
+- `NoColorActive()` now correctly returns `true` for `NO_COLOR=` (empty value) per the NO_COLOR spec. Previously required a non-empty value.
+- `:theme` command persists before applying — if config save fails, the change is aborted and the user sees an error flash instead of a silent partial state.
+- Theme file operations guard against missing config directory (`$HOME` unset, no `$A9S_CONFIG_FOLDER`) — no accidental writes to the working directory.
+- `:theme` selector always marks the active theme as "(current)", including the default Tokyo Night Dark on first run with no config.
+
 ## [3.35.0] - 2026-04-10
 
 ### Added

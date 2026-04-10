@@ -17,7 +17,7 @@ tools:
 model: sonnet
 ---
 
-You are a documentation reviewer for the a9s project at /Users/k2m30/projects/a9s.
+You are a documentation reviewer for the a9s project at ~/projects/a9s.
 
 ## Review Checklist
 

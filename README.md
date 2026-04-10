@@ -32,7 +32,7 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 - Filter/search within resource lists
 - Horizontal scrolling for wide tables
 - Clipboard support (copy resource IDs and YAML)
-- Tokyo Night Dark color theme
+- 11 built-in color themes (Tokyo Night Dark default, Dracula, Nord, Catppuccin, and more) with custom theme support
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
 - 4,500+ unit tests
@@ -140,6 +140,7 @@ Press `:` to enter command mode, then type a command:
 | `:q` / `:quit` | Exit a9s |
 | `:ctx` / `:profile` | Switch AWS profile |
 | `:region` | Switch AWS region |
+| `:theme` | Switch color theme |
 | `:help` | Show help |
 | `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
 
@@ -148,6 +149,21 @@ All resource short names work as commands.
 ## Configuration
 
 a9s stores view configuration in `~/.a9s/views/` as per-resource YAML files (e.g., `ec2.yaml`, `s3.yaml`) — optional, sensible defaults are built-in. AWS profiles and regions are read from `~/.aws/config`. a9s never reads `~/.aws/credentials` — authentication is delegated to the AWS SDK credential chain.
+
+## Color Themes
+
+a9s ships with 11 built-in color themes, extracted to `~/.a9s/themes/` on first run. Set a theme in `~/.a9s/config.yaml`:
+
+```yaml
+theme: "dracula.yaml"
+```
+
+Built-in dark themes: `tokyo-night` (default), `catppuccin-mocha`, `dracula`, `nord`, `gruvbox-dark`, `solarized-dark`.
+Built-in light themes: `tokyo-night-light`, `catppuccin-latte`, `nord-light`, `gruvbox-light`, `solarized-light`.
+
+> **Note:** Dark themes are designed for dark terminal backgrounds; light themes for light terminal backgrounds. Match your theme to your terminal for best results.
+
+To switch themes at runtime, press `:` and type `theme`. Custom themes: copy any built-in file, edit the colors, and point your config at it. Partial themes inherit missing colors from the default (Tokyo Night Dark). The `NO_COLOR` environment variable always forces monochrome, regardless of theme.
 
 ## AWS Permissions
 

@@ -17,7 +17,7 @@ tools:
 model: sonnet
 ---
 
-You are a security auditor for the a9s project, a Terminal UI AWS Resource Manager at /Users/k2m30/projects/a9s.
+You are a security auditor for the a9s project, a Terminal UI AWS Resource Manager at ~/projects/a9s.
 
 ## Audit Checklist
 
