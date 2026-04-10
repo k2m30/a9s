@@ -2,12 +2,16 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/atotto/clipboard"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -132,6 +136,36 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		rg := views.NewRegion(regionCodes, m.region, m.keys)
 		rg.SetSize(m.innerSize())
 		m.pushView(&rg)
+		return m, nil
+
+	case messages.TargetTheme:
+		cfgDir := config.ConfigDir()
+		if cfgDir == "" {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Config directory not available", IsError: true}
+			}
+		}
+		themesDir := filepath.Join(cfgDir, "themes")
+		entries, err := os.ReadDir(themesDir)
+		if err != nil {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "Cannot read themes directory: " + err.Error(), IsError: true}
+			}
+		}
+		var themeFiles []string
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".yaml") {
+				themeFiles = append(themeFiles, e.Name())
+			}
+		}
+		if len(themeFiles) == 0 {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "No theme files found in " + themesDir, IsError: true}
+			}
+		}
+		th := views.NewTheme(themeFiles, m.activeTheme, m.keys)
+		th.SetSize(m.innerSize())
+		m.pushView(&th)
 		return m, nil
 
 	case messages.TargetReveal:

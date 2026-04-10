@@ -8,8 +8,8 @@
 │ pgup     page up                     q        quit                                                                   │
 │ pgdn     page down                   ctrl+c   force quit                                                             │
 │                                                                                                                      │
+│                                               Theme: Tokyo Night Dark                                                │
 │                                                Press any key to close                                                │
-│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │

@@ -54,6 +54,13 @@ func NewRegion(regions []string, activeRegion string, k keys.Map) SelectorModel 
 	}, k)
 }
 
+// NewTheme returns a SelectorModel configured for theme selection.
+func NewTheme(themeFiles []string, activeTheme string, k keys.Map) SelectorModel {
+	return NewSelector(themeFiles, activeTheme, "themes", func(s string) tea.Msg {
+		return messages.ThemeSelectedMsg{Theme: s}
+	}, k)
+}
+
 // Init implements the view initialization pattern.
 func (m SelectorModel) Init() (SelectorModel, tea.Cmd) {
 	return m, nil
