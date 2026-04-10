@@ -38,6 +38,9 @@ type Map struct {
 	Resources key.Binding
 	Source    key.Binding
 
+	// CloudTrail shortcut
+	CloudTrail key.Binding
+
 	// Sort
 	SortByName key.Binding
 	SortByID   key.Binding
@@ -96,6 +99,8 @@ func Default() Map {
 		Logs:      key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "logs")),
 		Resources: key.NewBinding(key.WithKeys("r", "R"), key.WithHelp("r/R", "resources")),
 		Source:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "source")),
+
+		CloudTrail: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "cloudtrail")),
 
 		SortByName: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
 		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),

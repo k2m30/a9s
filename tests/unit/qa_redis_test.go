@@ -450,7 +450,7 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(80, 30)
 	out := m.View()
 
@@ -478,7 +478,7 @@ func TestQA_Redis_YAMLFrameTitle(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	title := m.FrameTitle()
 
 	expected := res.Name + " yaml"
@@ -498,7 +498,7 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	raw := m.RawContent()
 
 	if raw == "" {
