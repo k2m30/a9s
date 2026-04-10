@@ -158,7 +158,10 @@ a9s ships with 11 built-in color themes, extracted to `~/.a9s/themes/` on first 
 theme: "dracula.yaml"
 ```
 
-Built-in themes: `tokyo-night` (default), `tokyo-night-light`, `catppuccin-mocha`, `catppuccin-latte`, `dracula`, `nord`, `nord-light`, `gruvbox-dark`, `gruvbox-light`, `solarized-dark`, `solarized-light`.
+Built-in dark themes: `tokyo-night` (default), `catppuccin-mocha`, `dracula`, `nord`, `gruvbox-dark`, `solarized-dark`.
+Built-in light themes: `tokyo-night-light`, `catppuccin-latte`, `nord-light`, `gruvbox-light`, `solarized-light`.
+
+> **Note:** Dark themes are designed for dark terminal backgrounds; light themes for light terminal backgrounds. Match your theme to your terminal for best results.
 
 To switch themes at runtime, press `:` and type `theme`. Custom themes: copy any built-in file, edit the colors, and point your config at it. Partial themes inherit missing colors from the default (Tokyo Night Dark). The `NO_COLOR` environment variable always forces monochrome, regardless of theme.
 

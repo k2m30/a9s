@@ -37,7 +37,7 @@ Primary focus:
 
 ## Required Inputs
 
-- Repo root: `/Users/k2m30/projects/a9s`
+- Repo root: `~/projects/a9s`
 - AWS profile: **ask the user** for their profile name before starting
 - Region: **ask the user** for their target region before starting
 
