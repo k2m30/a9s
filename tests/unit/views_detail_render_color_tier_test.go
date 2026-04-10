@@ -41,6 +41,7 @@ package unit
 //   the neutral DetailVal style (same as the baseline with NO_COLOR).
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -213,7 +214,7 @@ func TestDetailRenderColorTier_CTInfo(t *testing.T) {
 	}
 
 	// Colored output (colors enabled)
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 	mColored := newCTDetailForTier(t, res)
@@ -263,7 +264,7 @@ func TestDetailRenderColorTier_CTAttention(t *testing.T) {
 	res := buildCTResourceForTier(eventName, "s3.amazonaws.com", "AssumedRole", "ct-attention")
 
 	// Colored output
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 	m := newCTDetailForTier(t, res)
@@ -299,7 +300,7 @@ func TestDetailRenderColorTier_CTDanger(t *testing.T) {
 	const eventName = "DescribeInstances"
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-danger")
 
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 	m := newCTDetailForTier(t, res)
@@ -398,7 +399,7 @@ func TestDetailRenderColorTier_IsNavigableWinsOverColorTier(t *testing.T) {
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-info")
 
 	// Colors on so we can detect underline escapes.
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 
@@ -452,7 +453,7 @@ func TestDetailRenderColorTier_LabelIsAlwaysNeutral(t *testing.T) {
 	const eventName = "DescribeInstances"
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-info")
 
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 

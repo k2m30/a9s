@@ -2,14 +2,17 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -313,6 +316,59 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 		return messages.FlashMsg{Text: "Switching to " + msg.Region + "..."}
 	}
 	return m, tea.Batch(flashCmd, m.connectAWS(m.profile, msg.Region, m.connectGen))
+}
+
+// handleThemeSelected applies the selected theme, invalidates style caches,
+// pops the selector, and persists the choice to config.yaml.
+func (m Model) handleThemeSelected(msg messages.ThemeSelectedMsg) (tea.Model, tea.Cmd) {
+	path, err := config.ThemePath(msg.Theme)
+	if err != nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Invalid theme: " + err.Error(), IsError: true}
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Cannot read theme: " + err.Error(), IsError: true}
+		}
+	}
+	t, err := styles.ThemeFromYAML(data)
+	if err != nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Bad theme YAML: " + err.Error(), IsError: true}
+		}
+	}
+
+	// Persist BEFORE applying — if save fails, abort the change entirely.
+	if saveErr := config.SaveTheme(msg.Theme); saveErr != nil {
+		return m, func() tea.Msg {
+			return messages.FlashMsg{Text: "Cannot save theme config: " + saveErr.Error(), IsError: true}
+		}
+	}
+
+	// Save succeeded — now apply the theme.
+	styles.ApplyTheme(t)
+	m.activeTheme = msg.Theme
+
+	// Invalidate header cache.
+	m.headerCacheKey = ""
+
+	// Invalidate styledRowCache on all ResourceListModel views in the stack.
+	for _, v := range m.stack {
+		if rl, ok := v.(*views.ResourceListModel); ok {
+			rl.InvalidateStyleCache()
+		}
+	}
+
+	// Pop the selector view.
+	if _, ok := m.activeView().(*views.SelectorModel); ok {
+		m.popView()
+	}
+
+	return m, func() tea.Msg {
+		return messages.FlashMsg{Text: "Theme: " + msg.Theme}
+	}
 }
 
 // handleProfilesLoaded pushes the profile selector view onto the stack.

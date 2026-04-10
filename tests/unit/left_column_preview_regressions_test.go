@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ func makePreviewEC2Detail(t *testing.T, w, h int) views.DetailModel {
 }
 
 func TestPreviewLeft_FirstSelectedRowShowsInstanceIDLabel(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 

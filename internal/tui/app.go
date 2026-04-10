@@ -90,6 +90,7 @@ type Model struct {
 	prevProfile    string // last stable profile before any in-flight switch, restored on failure
 	prevRegion     string // last stable region before any in-flight switch, restored on failure
 	configErr      error  // non-nil if views config was found but corrupt
+	activeTheme    string // current theme filename (for selector "(current)" indicator)
 
 	identity         *awsclient.CallerIdentity
 	identityFetching bool
@@ -218,6 +219,12 @@ func WithClients(clients *awsclient.ServiceClients) Option {
 	}
 }
 
+// WithActiveTheme sets the initial active theme filename for the selector's
+// "(current)" indicator. main.go passes the validated theme after loading it.
+func WithActiveTheme(name string) Option {
+	return func(m *Model) { m.activeTheme = name }
+}
+
 // New constructs the initial Model.
 func New(profile, region string, opts ...Option) Model {
 	ti := textinput.New()
@@ -243,6 +250,7 @@ func New(profile, region string, opts ...Option) Model {
 		cmdInput:      ti,
 		viewConfig:    cfg,
 		configErr:     cfgErr,
+		activeTheme:   "tokyo-night.yaml",
 		resourceCache: make(map[string]*resourceCacheEntry),
 		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
@@ -348,6 +356,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleProfileSelected(msg)
 	case messages.RegionSelectedMsg:
 		return m.handleRegionSelected(msg)
+	case messages.ThemeSelectedMsg:
+		return m.handleThemeSelected(msg)
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
 	case messages.ValueRevealedMsg:
