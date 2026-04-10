@@ -7,6 +7,7 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -92,6 +93,7 @@ func TestBottomHints_ResourceList_NoEnterChild(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
+	// "hints_test_ec2_no_child" has no CloudTrailKey — t hint suppressed
 	wantKeys := []string{"y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
@@ -117,6 +119,7 @@ func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
+	// "s3_test_hints" has no CloudTrailKey — t hint suppressed
 	wantKeys := []string{"enter", "d", "y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
@@ -146,6 +149,7 @@ func TestBottomHints_ResourceList_WithReveal(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
+	// "secrets_test_hints" has no CloudTrailKey — t hint suppressed
 	wantKeys := []string{"x", "y", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
@@ -203,6 +207,7 @@ func TestBottomHints_ResourceList_MultipleChildKeys(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 
 	hints := m.BottomHints()
+	// "ecs_test_hints" has no CloudTrailKey — t hint suppressed
 	wantKeys := []string{"enter", "d", "y", "e", "L", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
@@ -271,6 +276,7 @@ func TestBottomHints_Detail_PlainField_NoRelated(t *testing.T) {
 	m := views.NewDetail(res, "hints_test_no_related", nil, keys.Default())
 
 	hints := m.BottomHints()
+	// Unknown resource type "hints_test_no_related" has no CloudTrailKey — no t hint
 	want := []layout.KeyHint{
 		{Key: "y", Desc: "YAML"},
 		{Key: "ctrl+r", Desc: "Refresh"},
@@ -300,6 +306,7 @@ func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
 	m := views.NewDetail(res, "hints_test_with_related", nil, keys.Default())
 
 	hints := m.BottomHints()
+	// Unknown resource type "hints_test_with_related" has no CloudTrailKey — no t hint
 	want := []layout.KeyHint{
 		{Key: "y", Desc: "YAML"},
 		{Key: "r", Desc: "Related"},
@@ -409,7 +416,8 @@ func TestBottomHints_YAML(t *testing.T) {
 		ID:   "yaml-test-id",
 		Name: "yaml-test-resource",
 	}
-	m := views.NewYAML(res, keys.Default())
+	// No resource type → no CloudTrailKey → t hint suppressed
+	m := views.NewYAML(res, "", keys.Default())
 
 	hints := m.BottomHints()
 	want := []layout.KeyHint{
@@ -418,6 +426,114 @@ func TestBottomHints_YAML(t *testing.T) {
 	}
 	if !hintsEqual(hints, want) {
 		t.Errorf("YAML BottomHints = %v, want %v", hints, want)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// E. CloudTrail "t" key hint tests (#247)
+// ---------------------------------------------------------------------------
+
+func TestBottomHints_ResourceList_ShowsCloudTrail(t *testing.T) {
+	td := resource.FindResourceType("ec2")
+	if td == nil {
+		t.Fatal("resource type 'ec2' not registered")
+	}
+	k := keys.Default()
+	m := views.NewResourceList(*td, nil, k)
+	m.SetSize(80, 24)
+
+	hints := m.BottomHints()
+	found := false
+	for _, h := range hints {
+		if h.Key == "t" && h.Desc == "CloudTrail" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("ResourceList BottomHints missing {t, CloudTrail}; got %v", hints)
+	}
+}
+
+func TestBottomHints_Detail_ShowsCloudTrail(t *testing.T) {
+	res := resource.Resource{
+		ID:   "i-test",
+		Name: "test-resource",
+		Fields: map[string]string{
+			"arn": "arn:aws:ec2:us-east-1:000000000000:instance/i-test",
+		},
+	}
+	m := views.NewDetail(res, "ec2", nil, keys.Default())
+	m.SetSize(80, 24)
+
+	hints := m.BottomHints()
+	found := false
+	for _, h := range hints {
+		if h.Key == "t" && h.Desc == "CloudTrail" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Detail BottomHints missing {t, CloudTrail}; got %v", hints)
+	}
+}
+
+func TestBottomHints_YAML_ShowsCloudTrail(t *testing.T) {
+	res := resource.Resource{
+		ID:   "yaml-test-id",
+		Name: "yaml-test-resource",
+		Fields: map[string]string{
+			"arn": "arn:aws:ec2:us-east-1:000000000000:instance/i-test",
+		},
+	}
+	m := views.NewYAML(res, "ec2", keys.Default())
+	m.SetSize(80, 24)
+
+	hints := m.BottomHints()
+	found := false
+	for _, h := range hints {
+		if h.Key == "t" && h.Desc == "CloudTrail" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("YAML BottomHints missing {t, CloudTrail}; got %v", hints)
+	}
+}
+
+// TestBottomHints_Detail_RightColFocused_ShowsCloudTrail verifies that the "t"
+// (CloudTrail) hint is present in BottomHints() even when the right column is
+// focused. Regression: right-col focus must not suppress the t hint.
+func TestBottomHints_Detail_RightColFocused_ShowsCloudTrail(t *testing.T) {
+	res := resource.Resource{
+		ID:   "i-rhs-focus",
+		Name: "rhs-focus-instance",
+		Fields: map[string]string{
+			"arn": "arn:aws:ec2:us-east-1:000000000000:instance/i-rhs-focus",
+		},
+	}
+	m := views.NewDetail(res, "ec2", nil, keys.Default())
+	m.SetSize(120, 40)
+
+	if !strings.Contains(m.View(), "RELATED") {
+		t.Skip("right column not auto-shown at width=120; skipping right-col focus hint test")
+	}
+
+	// r → r → Tab: explicit-visible transition then focus right column.
+	m = focusRightColumn(m)
+
+	hints := m.BottomHints()
+	found := false
+	for _, h := range hints {
+		if h.Key == "t" && h.Desc == "CloudTrail" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Detail BottomHints missing {t, CloudTrail} when right col focused; got %v", hints)
 	}
 }
 

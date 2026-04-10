@@ -1,6 +1,9 @@
 package resource
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // RelatedDef defines one related resource class for a given resource type.
 type RelatedDef struct {
@@ -94,4 +97,52 @@ func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
 // Used only in tests for cleanup.
 func UnregisterNavigableFields(shortName string) {
 	delete(navigableFieldRegistry, shortName)
+}
+
+// AppendRelated adds a single RelatedDef to the existing registration for shortName.
+// If the target type is already present, it is a no-op (prevents duplicates).
+// If no registration exists yet, it creates a new one.
+func AppendRelated(shortName string, def RelatedDef) {
+	existing := relatedRegistry[shortName]
+	for _, d := range existing {
+		if d.TargetType == def.TargetType {
+			return // already registered, skip duplicate
+		}
+	}
+	relatedRegistry[shortName] = append(existing, def)
+}
+
+// BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
+// The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
+// Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
+func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string {
+	rt := FindResourceType(resourceType)
+	if rt == nil || rt.CloudTrailKey == "" {
+		return nil
+	}
+	return buildFilterFromKey(res, rt.CloudTrailKey)
+}
+
+func buildFilterFromKey(res Resource, ctKey string) map[string]string {
+	parts := strings.SplitN(ctKey, ":", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	attr, source := parts[0], parts[1]
+
+	var val string
+	switch source {
+	case "ID":
+		val = res.ID
+	case "Name":
+		val = res.Name
+	default:
+		if key, ok := strings.CutPrefix(source, "Fields."); ok {
+			val = res.Fields[key]
+		}
+	}
+	if val == "" {
+		return nil
+	}
+	return map[string]string{attr: val}
 }

@@ -1069,7 +1069,7 @@ func TestQA_RDS_Detail_SwitchToYAML(t *testing.T) {
 func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 
 	out := m.View()
@@ -1088,7 +1088,7 @@ func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 
 	out := m.View()
@@ -1105,7 +1105,7 @@ func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 func TestQA_RDS_YAML_FrameTitle(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 
 	title := m.FrameTitle()
 	expected := "test-docdb-1 yaml"
@@ -1117,7 +1117,7 @@ func TestQA_RDS_YAML_FrameTitle(t *testing.T) {
 func TestQA_RDS_YAML_RawContentNonEmpty(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 
 	raw := m.RawContent()
 	if raw == "" {
@@ -1160,7 +1160,7 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 50)
 
 	out := m.View()
@@ -1207,7 +1207,7 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 
 	// Should not panic.
@@ -1225,7 +1225,7 @@ func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
 
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 
 	out := m.View()

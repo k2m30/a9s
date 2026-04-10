@@ -3,10 +3,11 @@ package resource
 func backupResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "Backup Plans",
-			ShortName: "backup",
-			Aliases:   []string{"backup", "backup-plans"},
-			Category:  "BACKUP",
+			Name:          "Backup Plans",
+			ShortName:     "backup",
+			Aliases:       []string{"backup", "backup-plans"},
+			Category:      "BACKUP",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "plan_name", Title: "Plan Name", Width: 32, Sortable: true},
 				{Key: "plan_id", Title: "Plan ID", Width: 38, Sortable: true},
@@ -15,10 +16,11 @@ func backupResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "SES Identities",
-			ShortName: "ses",
-			Aliases:   []string{"ses", "email", "ses-identities"},
-			Category:  "BACKUP",
+			Name:          "SES Identities",
+			ShortName:     "ses",
+			Aliases:       []string{"ses", "email", "ses-identities"},
+			Category:      "BACKUP",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "identity_name", Title: "Identity", Width: 36, Sortable: true},
 				{Key: "identity_type", Title: "Type", Width: 16, Sortable: true},

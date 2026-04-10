@@ -22,6 +22,7 @@ func init() {
 		"log_group",
 		"package_type",
 		"event_source_arn",
+		"arn",
 	})
 
 	resource.RegisterPaginated("lambda", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -154,6 +155,7 @@ func FetchLambdaFunctionsPageWithEventSources(
 				"log_group":        logGroup,
 				"package_type":     packageType,
 				"event_source_arn": eventSourceARN,
+				"arn":              aws.ToString(fn.FunctionArn),
 			},
 			RawStruct: fn,
 		}

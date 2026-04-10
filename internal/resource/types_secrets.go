@@ -3,10 +3,11 @@ package resource
 func secretsResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "Secrets Manager",
-			ShortName: "secrets",
-			Aliases:   []string{"secrets", "secretsmanager", "sm"},
-			Category:  "SECRETS & CONFIG",
+			Name:          "Secrets Manager",
+			ShortName:     "secrets",
+			Aliases:       []string{"secrets", "secretsmanager", "sm"},
+			Category:      "SECRETS & CONFIG",
+			CloudTrailKey: "ResourceName:Fields.arn",
 			Columns: []Column{
 				{Key: "secret_name", Title: "Secret Name", Width: 36, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
@@ -16,10 +17,11 @@ func secretsResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "SSM Parameters",
-			ShortName: "ssm",
-			Aliases:   []string{"ssm", "parameters", "parameter-store"},
-			Category:  "SECRETS & CONFIG",
+			Name:          "SSM Parameters",
+			ShortName:     "ssm",
+			Aliases:       []string{"ssm", "parameters", "parameter-store"},
+			Category:      "SECRETS & CONFIG",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 40, Sortable: true},
 				{Key: "type", Title: "Type", Width: 14, Sortable: true},
@@ -29,10 +31,11 @@ func secretsResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "KMS Keys",
-			ShortName: "kms",
-			Aliases:   []string{"kms", "keys"},
-			Category:  "SECRETS & CONFIG",
+			Name:          "KMS Keys",
+			ShortName:     "kms",
+			Aliases:       []string{"kms", "keys"},
+			Category:      "SECRETS & CONFIG",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "alias", Title: "Alias", Width: 32, Sortable: true},
 				{Key: "key_id", Title: "Key ID", Width: 38, Sortable: true},

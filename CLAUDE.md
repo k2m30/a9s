@@ -15,6 +15,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - N/A (in-memory parsed event held only for the duration of one detail-view open) (013-ct-event-detail-v2)
 - Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services) (014-demo-transport-mock)
 - In-process fixture store (per resource type, loaded at startup) (014-demo-transport-mock)
+- Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services) (015-ct-events-all-types)
+- N/A (in-memory resource cache) (015-ct-events-all-types)
 
 ## Project Structure
 
@@ -244,6 +246,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
 - BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
 - BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
+- BEFORE any push, run the full validation integration test against a REAL AWS profile (ask user for the profile name): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s`. If region is not set, the profile's default region is used. No push without this passing.
 - BEFORE any release, update `CHANGELOG.md` with a new version entry (follow [Keep a Changelog](https://keepachangelog.com/) format) and create a matching `releases/vX.Y.Z.md` file with user-facing release notes. Every tagged version MUST have both a changelog entry and a release notes file.
 - **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require the pre-push checklist.
 
@@ -276,6 +279,6 @@ When code changes affect any of the following, update the shared source and rege
 
 
 ## Recent Changes
+- 015-ct-events-all-types: Added Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services)
 - 014-demo-transport-mock: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services)
-- 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)
 - 013-ct-event-detail-v2: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib)

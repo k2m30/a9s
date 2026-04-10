@@ -3,10 +3,11 @@ package resource
 func cicdResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "CloudFormation Stacks",
-			ShortName: "cfn",
-			Aliases:   []string{"cfn", "cloudformation", "stacks"},
-			Category:  "CI/CD",
+			Name:          "CloudFormation Stacks",
+			ShortName:     "cfn",
+			Aliases:       []string{"cfn", "cloudformation", "stacks"},
+			Category:      "CI/CD",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "stack_name", Title: "Stack Name", Width: 36, Sortable: true},
 				{Key: "status", Title: "Status", Width: 24, Sortable: true},
@@ -20,10 +21,11 @@ func cicdResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "CodePipelines",
-			ShortName: "pipeline",
-			Aliases:   []string{"pipeline", "codepipeline", "pipelines"},
-			Category:  "CI/CD",
+			Name:          "CodePipelines",
+			ShortName:     "pipeline",
+			Aliases:       []string{"pipeline", "codepipeline", "pipelines"},
+			Category:      "CI/CD",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Pipeline Name", Width: 30, Sortable: true},
 				{Key: "pipeline_type", Title: "Type", Width: 6, Sortable: true},
@@ -39,10 +41,11 @@ func cicdResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "CodeBuild Projects",
-			ShortName: "cb",
-			Aliases:   []string{"cb", "codebuild"},
-			Category:  "CI/CD",
+			Name:          "CodeBuild Projects",
+			ShortName:     "cb",
+			Aliases:       []string{"cb", "codebuild"},
+			Category:      "CI/CD",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Project Name", Width: 32, Sortable: true},
 				{Key: "source_type", Title: "Source Type", Width: 14, Sortable: true},
@@ -57,10 +60,11 @@ func cicdResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "ECR Repositories",
-			ShortName: "ecr",
-			Aliases:   []string{"ecr", "container-registry"},
-			Category:  "CI/CD",
+			Name:          "ECR Repositories",
+			ShortName:     "ecr",
+			Aliases:       []string{"ecr", "container-registry"},
+			Category:      "CI/CD",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "repository_name", Title: "Repository", Width: 36, Sortable: true},
 				{Key: "uri", Title: "URI", Width: 60, Sortable: false},
@@ -76,10 +80,11 @@ func cicdResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "CodeArtifact Repos",
-			ShortName: "codeartifact",
-			Aliases:   []string{"codeartifact", "artifact", "ca"},
-			Category:  "CI/CD",
+			Name:          "CodeArtifact Repos",
+			ShortName:     "codeartifact",
+			Aliases:       []string{"codeartifact", "artifact", "ca"},
+			Category:      "CI/CD",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "repo_name", Title: "Repository", Width: 28, Sortable: true},
 				{Key: "domain_name", Title: "Domain", Width: 24, Sortable: true},

@@ -17,6 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 
 	"gopkg.in/yaml.v3"
@@ -24,21 +25,23 @@ import (
 
 // YAMLModel renders YAML with syntax coloring using bubbles/viewport for scroll.
 type YAMLModel struct {
-	res      resource.Resource
-	viewport viewport.Model
-	ready    bool
-	wrap     bool
-	width    int
-	height   int
-	keys     keys.Map
-	search   SearchModel
+	res          resource.Resource
+	resourceType string
+	viewport     viewport.Model
+	ready        bool
+	wrap         bool
+	width        int
+	height       int
+	keys         keys.Map
+	search       SearchModel
 }
 
 // NewYAML creates a YAMLModel for the given resource.
-func NewYAML(res resource.Resource, k keys.Map) YAMLModel {
+func NewYAML(res resource.Resource, resourceType string, k keys.Map) YAMLModel {
 	return YAMLModel{
-		res:  res,
-		keys: k,
+		res:          res,
+		resourceType: resourceType,
+		keys:         k,
 	}
 }
 
@@ -98,6 +101,19 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 			m.wrap = !m.wrap
 			m.viewport.SoftWrap = m.wrap
 			m.refreshViewportContent()
+			return m, nil
+		case key.Matches(msg, m.keys.CloudTrail):
+			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
+				res := m.res
+				return m, func() tea.Msg {
+					return messages.RelatedNavigateMsg{
+						TargetType:     "ct-events",
+						SourceResource: res,
+						SourceType:     m.resourceType,
+						FetchFilter:    ff,
+					}
+				}
+			}
 			return m, nil
 		}
 	}
@@ -178,10 +194,14 @@ func (m YAMLModel) FrameTitle() string {
 
 // BottomHints implements Hintable for YAMLModel.
 func (m YAMLModel) BottomHints() []layout.KeyHint {
-	return []layout.KeyHint{
+	hints := []layout.KeyHint{
 		{Key: "w", Desc: "Wrap"},
 		{Key: "c", Desc: "Copy"},
 	}
+	if resource.BuildCloudTrailFilter(m.res, m.resourceType) != nil {
+		hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
+	}
+	return hints
 }
 
 // CopyContent returns the raw YAML text for clipboard copy.

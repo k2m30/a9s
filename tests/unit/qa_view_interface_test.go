@@ -61,7 +61,7 @@ func TestViewInterface_DetailSatisfiesView(t *testing.T) {
 func TestViewInterface_YAMLSatisfiesView(t *testing.T) {
 	k := keys.Default()
 	res := resource.Resource{ID: "test-id", Name: "test-name"}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	var v views.View = &m
 	if v.FrameTitle() == "" {
 		t.Error("YAMLModel.FrameTitle() should return non-empty string")
@@ -150,7 +150,7 @@ func TestNonFilterable_DetailDoesNotSatisfyFilterable(t *testing.T) {
 func TestNonFilterable_YAMLDoesNotSatisfyFilterable(t *testing.T) {
 	k := keys.Default()
 	res := resource.Resource{ID: "test-id"}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	var v any = &m
 	if _, ok := v.(views.Filterable); ok {
 		t.Error("YAMLModel should NOT satisfy Filterable interface")

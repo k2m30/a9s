@@ -3,11 +3,12 @@ package resource
 func monitoringResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "CloudWatch Alarms",
-			ShortName: "alarm",
-			ListTitle: "alarms",
-			Aliases:   []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
-			Category:  "MONITORING",
+			Name:          "CloudWatch Alarms",
+			ShortName:     "alarm",
+			ListTitle:     "alarms",
+			Aliases:       []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
+			Category:      "MONITORING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "alarm_name", Title: "Alarm Name", Width: 36, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
@@ -23,10 +24,11 @@ func monitoringResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "CloudWatch Log Groups",
-			ShortName: "logs",
-			Aliases:   []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
-			Category:  "MONITORING",
+			Name:          "CloudWatch Log Groups",
+			ShortName:     "logs",
+			Aliases:       []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
+			Category:      "MONITORING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "log_group_name", Title: "Log Group Name", Width: 48, Sortable: true},
 				{Key: "stored_bytes", Title: "Size", Width: 14, Sortable: true},
@@ -41,10 +43,11 @@ func monitoringResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "CloudTrail Trails",
-			ShortName: "trail",
-			Aliases:   []string{"trail", "cloudtrail", "trails"},
-			Category:  "MONITORING",
+			Name:          "CloudTrail Trails",
+			ShortName:     "trail",
+			Aliases:       []string{"trail", "cloudtrail", "trails"},
+			Category:      "MONITORING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "trail_name", Title: "Trail Name", Width: 28, Sortable: true},
 				{Key: "s3_bucket", Title: "S3 Bucket", Width: 28, Sortable: true},

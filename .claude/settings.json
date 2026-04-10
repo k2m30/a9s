@@ -72,6 +72,7 @@
       "Edit(~/.claude/**)",
       "Write(~/.claude/**)",
       "Read(~/.a9s/**)",
+      "Write(~/.a9s/**)",
       "Grep(~/.a9s/**)",
       "Glob(~/.a9s/**)",
       "Read(.claude/**)",
@@ -109,7 +110,19 @@
       "Agent",
       "SendMessage",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "Glob",
+      "Grep",
+      "KillShell",
+      "LSP",
+      "NotebookEdit",
+      "TaskCreate",
+      "TaskGet",
+      "TaskList",
+      "TaskOutput",
+      "TaskStop",
+      "TaskUpdate",
+      "ToolSearch"
     ]
   }
 }

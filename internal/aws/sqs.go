@@ -21,7 +21,7 @@ type SQSQueueAttributesRow struct {
 }
 
 func init() {
-	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"})
+	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"})
 
 	resource.RegisterPaginated("sqs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -90,6 +90,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		approxMessages := attrs["ApproximateNumberOfMessages"]
 		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
 		delaySeconds := attrs["DelaySeconds"]
+		queueArn := attrs["QueueArn"]
 
 		r := resource.Resource{
 			ID:     queueName,
@@ -98,6 +99,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 			Fields: map[string]string{
 				"queue_name":         queueName,
 				"queue_url":          queueURL,
+				"arn":                queueArn,
 				"approx_messages":    approxMessages,
 				"approx_not_visible": approxNotVisible,
 				"delay_seconds":      delaySeconds,
