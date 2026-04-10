@@ -743,3 +743,205 @@ func TestRelated_CtEvents_Role_AssumedRole_NotRoleType(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (IAMUser type should not extract role from JSON)", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkCtEventsSG tests (ct-events → sg checker)
+// ---------------------------------------------------------------------------
+
+// TestRelated_CtEvents_SG_MatchByResourcesSlice verifies that the SG checker
+// returns Count=1 when the event's Resources slice contains an
+// AWS::EC2::SecurityGroup entry matching a security group in the cache.
+func TestRelated_CtEvents_SG_MatchByResourcesSlice(t *testing.T) {
+	sgRes := resource.Resource{
+		ID:   "sg-0a1b2c3d4e5f60001",
+		Name: "web-sg",
+	}
+	cache := resource.ResourceCache{
+		"sg": resource.ResourceCacheEntry{Resources: []resource.Resource{sgRes}},
+	}
+
+	res := resource.Resource{
+		ID:     "evt-sg-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId: aws.String("evt-sg-001"),
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceName: aws.String("sg-0a1b2c3d4e5f60001"),
+					ResourceType: aws.String("AWS::EC2::SecurityGroup"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (SG matched via Resources slice)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_CtEvents_SG_MatchByGroupIdFallback verifies that the SG checker
+// falls back to extracting groupId from requestParameters JSON when no
+// AWS::EC2::SecurityGroup entry exists in the Resources slice.
+func TestRelated_CtEvents_SG_MatchByGroupIdFallback(t *testing.T) {
+	sgRes := resource.Resource{
+		ID:   "sg-0abcdef1234567890",
+		Name: "internal-sg",
+	}
+	cache := resource.ResourceCache{
+		"sg": resource.ResourceCacheEntry{Resources: []resource.Resource{sgRes}},
+	}
+
+	ctEventJSON := `{"requestParameters":{"groupId":"sg-0abcdef1234567890"}}`
+	res := resource.Resource{
+		ID:     "evt-sg-002",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId:         aws.String("evt-sg-002"),
+			Resources:       []cloudtrailtypes.Resource{},
+			CloudTrailEvent: aws.String(ctEventJSON),
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (SG matched via groupId JSON fallback)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_CtEvents_SG_NoSGReference verifies that the SG checker returns
+// Count=0 when the event references no security groups.
+func TestRelated_CtEvents_SG_NoSGReference(t *testing.T) {
+	sgRes := resource.Resource{
+		ID:   "sg-0a1b2c3d4e5f60001",
+		Name: "web-sg",
+	}
+	cache := resource.ResourceCache{
+		"sg": resource.ResourceCacheEntry{Resources: []resource.Resource{sgRes}},
+	}
+
+	// Event with an EC2 instance resource — no SG reference.
+	res := resource.Resource{
+		ID:     "evt-sg-003",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId: aws.String("evt-sg-003"),
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceName: aws.String("i-0abcdef1234567890"),
+					ResourceType: aws.String("AWS::EC2::Instance"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no SG referenced in event)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ctJSONStringSlice coverage via checkCtEventsEC2
+// The function is unexported; exercised through checkCtEventsEC2 which calls
+// ctJSONStringSlice(req, "instanceId", "instancesSet", "items").
+// ---------------------------------------------------------------------------
+
+// TestCtJSONStringSlice_ValidNestedPath verifies that ctJSONStringSlice correctly
+// walks nested keys and collects string values from the target slice. Exercised
+// through checkCtEventsEC2 with requestParameters.instancesSet.items.
+func TestCtJSONStringSlice_ValidNestedPath(t *testing.T) {
+	ec2Res := resource.Resource{
+		ID:   "i-0abc123def456",
+		Name: "web-server",
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+
+	// No Resources slice entry — forces fallback to ctJSONStringSlice path.
+	ctEventJSON := `{"requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0abc123def456"}]}}}`
+	res := resource.Resource{
+		ID:     "evt-ec2-slicepath-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId:         aws.String("evt-ec2-slicepath-001"),
+			Resources:       []cloudtrailtypes.Resource{},
+			CloudTrailEvent: aws.String(ctEventJSON),
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (instance ID extracted via ctJSONStringSlice)", result.Count)
+	}
+}
+
+// TestCtJSONStringSlice_MissingKey verifies that ctJSONStringSlice returns nil
+// (no results) when the intermediate key does not exist in the map. The EC2
+// checker then finds no IDs and returns Count=0.
+func TestCtJSONStringSlice_MissingKey(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
+	}
+
+	// requestParameters has no instancesSet key.
+	ctEventJSON := `{"requestParameters":{"filters":[{"name":"instance-id","values":["i-0abc"]}]}}`
+	res := resource.Resource{
+		ID:     "evt-ec2-slicepath-002",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId:         aws.String("evt-ec2-slicepath-002"),
+			Resources:       []cloudtrailtypes.Resource{},
+			CloudTrailEvent: aws.String(ctEventJSON),
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (missing instancesSet key → no IDs extracted)", result.Count)
+	}
+}
+
+// TestCtJSONStringSlice_NonSliceLeaf verifies that ctJSONStringSlice returns nil
+// when the leaf value is not a []any. The EC2 checker finds no IDs → Count=0.
+func TestCtJSONStringSlice_NonSliceLeaf(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
+	}
+
+	// instancesSet is a string, not an object with items.
+	ctEventJSON := `{"requestParameters":{"instancesSet":"not-a-slice"}}`
+	res := resource.Resource{
+		ID:     "evt-ec2-slicepath-003",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			EventId:         aws.String("evt-ec2-slicepath-003"),
+			Resources:       []cloudtrailtypes.Resource{},
+			CloudTrailEvent: aws.String(ctEventJSON),
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (non-slice leaf → nil from ctJSONStringSlice → no IDs)", result.Count)
+	}
+}

@@ -27,6 +27,7 @@
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |
+| `t` | Jump to CloudTrail Events for the selected resource (all resource types) |
 | `e` | Open Service Events (ECS Services) |
 | `L` | Open Container Logs (ECS Services) |
 | `m` | Load more (paginated lists, also in demo mode) |

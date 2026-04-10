@@ -107,6 +107,14 @@ func buildCTEvents() []cloudtrailtypes.Event {
 	tJ := time.Date(2026, 4, 7, 15, 10, 5, 0, time.UTC)
 	tK := time.Date(2026, 4, 7, 15, 12, 33, 0, time.UTC)
 	tL := time.Date(2026, 4, 7, 15, 14, 58, 0, time.UTC)
+	tM := time.Date(2026, 4, 9, 9, 12, 0, 0, time.UTC)
+	tN := time.Date(2026, 4, 9, 8, 47, 30, 0, time.UTC)
+	tO := time.Date(2026, 4, 9, 8, 32, 15, 0, time.UTC)
+	tP := time.Date(2026, 4, 9, 7, 58, 0, 0, time.UTC)
+	tQ := time.Date(2026, 4, 9, 7, 27, 45, 0, time.UTC)
+	tR := time.Date(2026, 4, 9, 7, 44, 20, 0, time.UTC)
+	tS := time.Date(2026, 4, 9, 7, 17, 10, 0, time.UTC)
+	tT := time.Date(2026, 4, 9, 6, 37, 55, 0, time.UTC)
 
 	return []cloudtrailtypes.Event{
 		{
@@ -315,6 +323,109 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("bob")},
 			},
+		},
+		// Lambda events
+		{
+			EventId:     aws.String("evt-lambda-invoke-001"),
+			EventName:   aws.String("Invoke"),
+			EventSource: aws.String("lambda.amazonaws.com"),
+			EventTime:   aws.Time(tM),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::Lambda::Function"), ResourceName: aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","accessKeyId":"AKIAEXAMPLE002","userName":"ci-service-account"},"eventSource":"lambda.amazonaws.com","eventName":"Invoke","requestParameters":{"functionName":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}}`),
+		},
+		{
+			EventId:     aws.String("evt-lambda-update-001"),
+			EventName:   aws.String("UpdateFunctionCode20150331v2"),
+			EventSource: aws.String("lambda.amazonaws.com"),
+			EventTime:   aws.Time(tN),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::Lambda::Function"), ResourceName: aws.String("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","accessKeyId":"AKIAEXAMPLE002","userName":"ci-service-account"},"eventSource":"lambda.amazonaws.com","eventName":"UpdateFunctionCode20150331v2","requestParameters":{"functionName":"arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform"}}`),
+		},
+		// RDS event
+		{
+			EventId:     aws.String("evt-rds-modify-001"),
+			EventName:   aws.String("ModifyDBInstance"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(tO),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String("arn:aws:rds:us-east-1:123456789012:db:prod-api-primary")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","requestParameters":{"dBInstanceIdentifier":"prod-api-primary"}}`),
+		},
+		// ECS event
+		{
+			EventId:     aws.String("evt-ecs-update-001"),
+			EventName:   aws.String("UpdateService"),
+			EventSource: aws.String("ecs.amazonaws.com"),
+			EventTime:   aws.Time(tP),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECS::Cluster"), ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-services")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","eventName":"UpdateService","requestParameters":{"cluster":"acme-services"}}`),
+		},
+		// DynamoDB event
+		{
+			EventId:     aws.String("evt-ddb-update-001"),
+			EventName:   aws.String("UpdateTable"),
+			EventSource: aws.String("dynamodb.amazonaws.com"),
+			EventTime:   aws.Time(tQ),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::DynamoDB::Table"), ResourceName: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"dynamodb.amazonaws.com","eventName":"UpdateTable","requestParameters":{"tableName":"acme-orders"}}`),
+		},
+		// Secrets Manager event
+		{
+			EventId:     aws.String("evt-secrets-get-001"),
+			EventName:   aws.String("GetSecretValue"),
+			EventSource: aws.String("secretsmanager.amazonaws.com"),
+			EventTime:   aws.Time(tR),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("true"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"secretsmanager.amazonaws.com","eventName":"GetSecretValue","requestParameters":{"secretId":"prod/database/primary"}}`),
+		},
+		// EKS event
+		{
+			EventId:     aws.String("evt-eks-describe-001"),
+			EventName:   aws.String("DescribeCluster"),
+			EventSource: aws.String("eks.amazonaws.com"),
+			EventTime:   aws.Time(tS),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("true"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::EKS::Cluster"), ResourceName: aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-prod")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"eks.amazonaws.com","eventName":"DescribeCluster","requestParameters":{"name":"acme-prod"}}`),
+		},
+		// CloudFormation event
+		{
+			EventId:     aws.String("evt-cfn-update-001"),
+			EventName:   aws.String("UpdateStack"),
+			EventSource: aws.String("cloudformation.amazonaws.com"),
+			EventTime:   aws.Time(tT),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::CloudFormation::Stack"), ResourceName: aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"cloudformation.amazonaws.com","eventName":"UpdateStack","requestParameters":{"stackName":"acme-vpc-stack"}}`),
 		},
 	}
 }
