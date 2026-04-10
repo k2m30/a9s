@@ -8,7 +8,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	tea "charm.land/bubbletea/v2"
-	lipgloss "charm.land/lipgloss/v2"
+
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // matchPos records the position of a single query match in plain-text content.
@@ -43,15 +44,6 @@ type SearchModel struct {
 	content    string // cached plain text (ANSI-stripped)
 }
 
-// highlight styles — created once at package init time.
-var (
-	searchCurrentStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#1a1b26")).
-				Background(lipgloss.Color("#e0af68"))
-	searchOtherStyle = lipgloss.NewStyle().
-				Underline(true).
-				Foreground(lipgloss.Color("#e0af68"))
-)
 
 // searchPasteMsg carries clipboard text pasted into a search query.
 type searchPasteMsg string
@@ -271,9 +263,9 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 					matchText := string(plainRunes[visPos:endRune])
 					var rendered string
 					if ev.matchIdx == currentIdx {
-						rendered = searchCurrentStyle.Render(matchText)
+						rendered = styles.SearchCurrentStyle.Render(matchText)
 					} else {
-						rendered = searchOtherStyle.Render(matchText)
+						rendered = styles.SearchOtherStyle.Render(matchText)
 					}
 					out.WriteString(rendered)
 					// Skip past the visible characters in the styled bytes.

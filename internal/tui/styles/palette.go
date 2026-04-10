@@ -1,49 +1,85 @@
 package styles
 
-import lipgloss "charm.land/lipgloss/v2"
+import "image/color"
 
 // Tokyo Night Dark palette.
 var (
-	ColHeaderFg = lipgloss.Color("#c0caf5")
-	ColAccent   = lipgloss.Color("#7aa2f7")
-	ColDim      = lipgloss.Color("#565f89")
-	ColBorder   = lipgloss.Color("#414868")
+	ColHeaderFg color.Color
+	ColAccent   color.Color
+	ColDim      color.Color
+	ColBorder   color.Color
 
-	ColRowSelectedBg = lipgloss.Color("#7aa2f7")
-	ColRowSelectedFg = lipgloss.Color("#1a1b26")
-	ColRowAltBg      = lipgloss.Color("#1e2030")
+	ColRowSelectedBg color.Color
+	ColRowSelectedFg color.Color
+	ColRowAltBg      color.Color
 
-	ColRunning    = lipgloss.Color("#9ece6a")
-	ColStopped    = lipgloss.Color("#f7768e")
-	ColPending    = lipgloss.Color("#e0af68")
-	ColTerminated = lipgloss.Color("#565f89")
+	ColRunning    color.Color
+	ColStopped    color.Color
+	ColPending    color.Color
+	ColTerminated color.Color
 
-	ColDetailKey = lipgloss.Color("#7aa2f7")
-	ColDetailVal = lipgloss.Color("#c0caf5")
-	ColDetailSec = lipgloss.Color("#e0af68")
+	ColDetailKey color.Color
+	ColDetailVal color.Color
+	ColDetailSec color.Color
 
-	ColYAMLKey  = lipgloss.Color("#7aa2f7")
-	ColYAMLStr  = lipgloss.Color("#9ece6a")
-	ColYAMLNum  = lipgloss.Color("#ff9e64")
-	ColYAMLBool = lipgloss.Color("#bb9af7")
-	ColYAMLNull = lipgloss.Color("#565f89")
-	ColYAMLTree = lipgloss.Color("#414868")
+	ColYAMLKey  color.Color
+	ColYAMLStr  color.Color
+	ColYAMLNum  color.Color
+	ColYAMLBool color.Color
+	ColYAMLNull color.Color
+	ColYAMLTree color.Color
 
-	ColHelpKey = lipgloss.Color("#9ece6a")
-	ColHelpCat = lipgloss.Color("#e0af68")
+	ColHelpKey color.Color
+	ColHelpCat color.Color
 
-	ColFilter  = lipgloss.Color("#e0af68")
-	ColSuccess = lipgloss.Color("#9ece6a")
-	ColError   = lipgloss.Color("#f7768e")
+	ColFilter  color.Color
+	ColSuccess color.Color
+	ColError   color.Color
 
-	ColSpinner = lipgloss.Color("#7aa2f7")
-	ColScroll  = lipgloss.Color("#414868")
+	ColSpinner color.Color
+	ColScroll  color.Color
 
-	ColKeyHintKey = lipgloss.Color("#7aa2f7")
-	ColKeyHintBg  = lipgloss.Color("#24283b")
-	ColKeyHintFg  = lipgloss.Color("#565f89")
+	ColKeyHintKey color.Color
+	ColKeyHintBg  color.Color
+	ColKeyHintFg  color.Color
 
-	ColWarning       = lipgloss.Color("#e0af68")
-	ColOverlayBg     = lipgloss.Color("#1a1b26")
-	ColOverlayBorder = lipgloss.Color("#7aa2f7")
+	ColWarning       color.Color
+	ColOverlayBg     color.Color
+	ColOverlayBorder color.Color
 )
+
+func applyPalette(t Theme) {
+	ColHeaderFg = t.HeaderFg
+	ColAccent = t.Accent
+	ColDim = t.Dim
+	ColBorder = t.Border
+	ColRowSelectedBg = t.RowSelectedBg
+	ColRowSelectedFg = t.RowSelectedFg
+	ColRowAltBg = t.RowAltBg
+	ColRunning = t.Running
+	ColStopped = t.Stopped
+	ColPending = t.Pending
+	ColTerminated = t.Terminated
+	ColDetailKey = t.DetailKey
+	ColDetailVal = t.DetailVal
+	ColDetailSec = t.DetailSec
+	ColYAMLKey = t.YAMLKey
+	ColYAMLStr = t.YAMLStr
+	ColYAMLNum = t.YAMLNum
+	ColYAMLBool = t.YAMLBool
+	ColYAMLNull = t.YAMLNull
+	ColYAMLTree = t.YAMLTree
+	ColHelpKey = t.HelpKey
+	ColHelpCat = t.HelpCat
+	ColFilter = t.Filter
+	ColSuccess = t.Success
+	ColError = t.Error
+	ColSpinner = t.Spinner
+	ColScroll = t.Scroll
+	ColKeyHintKey = t.KeyHintKey
+	ColKeyHintBg = t.KeyHintBg
+	ColKeyHintFg = t.KeyHintFg
+	ColWarning = t.Warning
+	ColOverlayBg = t.OverlayBg
+	ColOverlayBorder = t.OverlayBorder
+}

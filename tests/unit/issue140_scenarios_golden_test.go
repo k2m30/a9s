@@ -95,7 +95,7 @@ func collectIssue140ScenarioViews(t *testing.T, noColor bool) map[string]string 
 	if noColor {
 		t.Setenv("NO_COLOR", "1")
 	} else {
-		t.Setenv("NO_COLOR", "")
+		os.Unsetenv("NO_COLOR")
 	}
 	styles.Reinit()
 

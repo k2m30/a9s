@@ -215,8 +215,8 @@ func TestNoColorActive_WithEnvSet(t *testing.T) {
 
 func TestNoColorActive_WithEnvEmpty(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
-	if styles.NoColorActive() {
-		t.Error("NoColorActive() should return false when NO_COLOR is empty")
+	if !styles.NoColorActive() {
+		t.Error("NoColorActive() should return true when NO_COLOR is set (even empty) per NO_COLOR spec")
 	}
 }
 

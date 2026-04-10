@@ -27,6 +27,6 @@ description: Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns for TUI-touch
 ## Go Module Cache
 
 Read BT/Lipgloss/Bubbles source directly from:
-- `/Users/k2m30/go/pkg/mod/charm.land/bubbletea/v2@v2.0.2/`
-- `/Users/k2m30/go/pkg/mod/charm.land/lipgloss/v2@v2.0.2/`
-- `/Users/k2m30/go/pkg/mod/charm.land/bubbles/v2@v2.0.0/`
+- `~/go/pkg/mod/charm.land/bubbletea/v2@v2.0.2/`
+- `~/go/pkg/mod/charm.land/lipgloss/v2@v2.0.2/`
+- `~/go/pkg/mod/charm.land/bubbles/v2@v2.0.0/`

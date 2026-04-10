@@ -14,8 +14,8 @@ import (
 // per design doc §8a. Called only when context is HelpFromResourceList* and
 // resourceShortName is "ct-events".
 func (m HelpModel) ctEventsLegend() string {
-	catStyle := helpCatStyle
-	descStyle := helpDescStyle
+	catStyle := styles.HelpCatStyle
+	descStyle := styles.HelpDescStyle
 
 	verbStyle := func(col gocolor.Color, bold bool) lipgloss.Style {
 		s := lipgloss.NewStyle().Foreground(col)

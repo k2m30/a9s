@@ -77,7 +77,7 @@ views → app (communicate via messages only)
 messages → anything in tui/
 ```
 
-### 5. Task Orchestration
+### 5. Task for QA and Coder
 
 You are the ONLY agent that dispatches work to coder and QA. Every task you produce MUST include exact scope (see Scoped Handoff Protocol below). Coder and QA will reject tasks without scope.
 

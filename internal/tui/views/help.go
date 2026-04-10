@@ -70,12 +70,6 @@ func (m HelpModel) Update(msg tea.Msg) (HelpModel, tea.Cmd) {
 	return m, nil
 }
 
-// Help view styles — created once, not per frame.
-var (
-	helpCatStyle  = lipgloss.NewStyle().Foreground(styles.ColHelpCat).Bold(true)
-	helpKeyStyle  = lipgloss.NewStyle().Foreground(styles.ColHelpKey).Bold(true)
-	helpDescStyle = lipgloss.NewStyle().Foreground(styles.ColDetailVal)
-)
 
 // helpBinding is a single key-description pair for rendering.
 type helpBinding struct {
@@ -85,9 +79,9 @@ type helpBinding struct {
 
 // View renders context-sensitive keybinding layout.
 func (m HelpModel) View() string {
-	catStyle := helpCatStyle
-	hkStyle := helpKeyStyle
-	descStyle := helpDescStyle
+	catStyle := styles.HelpCatStyle
+	hkStyle := styles.HelpKeyStyle
+	descStyle := styles.HelpDescStyle
 
 	bind := func(k, d string) string {
 		// Keep descriptors intact; truncation of ANSI-styled cells can clip
@@ -160,6 +154,9 @@ func (m HelpModel) View() string {
 	}
 
 	sb.WriteString("\n\n")
+	themeLine := styles.DimText.Render("Theme: " + styles.ActiveTheme().Name)
+	sb.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, themeLine))
+	sb.WriteString("\n")
 	closeHint := styles.DimText.Render("Press any key to close")
 	sb.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, closeHint))
 

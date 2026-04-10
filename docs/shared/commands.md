@@ -5,6 +5,7 @@ Press `:` to enter command mode, then type a command:
 | `:q` / `:quit` | Exit a9s |
 | `:ctx` / `:profile` | Switch AWS profile |
 | `:region` | Switch AWS region |
+| `:theme` | Switch color theme |
 | `:help` | Show help |
 | `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
 

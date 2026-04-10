@@ -9,8 +9,8 @@
 │ h/l      scroll cols             /        filter                                                   ?        help                         │
 │                                  :        command                                                                                        │
 │                                                                                                                                          │
+│                                                         Theme: Tokyo Night Dark                                                          │
 │                                                          Press any key to close                                                          │
-│                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │

@@ -9,6 +9,7 @@ package unit_test
 // messages.RelatedNavigateMsg.
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -79,7 +80,7 @@ func makeNavDetail(width, height int) views.DetailModel {
 func TestDetail_NavigableField_HighlightedInView(t *testing.T) {
 	// Colours must be ON so the underline escape is emitted.
 	// Explicitly unset NO_COLOR and reinitialize styles.
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 

@@ -17,7 +17,7 @@ tools:
 model: sonnet
 ---
 
-You are a consistency auditor for the **a9s** project at /Users/k2m30/projects/a9s. Your job is to find drift between code, tests, README, website, and config files.
+You are a consistency auditor for the **a9s** project at ~/projects/a9s. Your job is to find drift between code, tests, README, website, and config files.
 
 You produce a structured report. You do NOT fix anything — only report findings.
 
@@ -90,19 +90,13 @@ Verify:
 ### 8. Feature Claims (README → code)
 
 Verify factual claims in README:
-- "Read-only by design" → `make verify-readonly` passes
-- "No telemetry" → grep for telemetry/analytics/tracking in code (should find nothing)
-- "62 AWS resource types" → count matches `internal/resource/types.go`
-- "12 service categories" → count unique categories in `types.go`
-- "1,045+ unit tests" → `go test ./tests/unit/ -count=1 -v 2>&1 | grep -c '^--- PASS'` gives actual count
+- "1,045+ unit tests":
+```
+go test ./tests/unit/ -count=1 -timeout 120s -v > /tmp/a9s-verbose.txt 2>&1
+grep -e "--- PASS" -c /tmp/a9s-verbose.txt
+```
+Round down to the nearest hundred for the public-facing number (e.g., 4,497 → "4,400+").
 
-### 9. License Consistency
-
-Verify:
-- `LICENSE` file exists and is GPL-3.0
-- `.goreleaser.yaml` `nfpms.license` says `GPL-3.0-or-later`
-- README badge says GPL v3
-- Website footer says GPL-3.0-or-later
 
 ### 10. CI Workflow Consistency
 
@@ -130,3 +124,6 @@ Verify:
 - [test-count] README says "1,045+" but actual count is 1,089 — consider updating
 ...
 ```
+
+
+

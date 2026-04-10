@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
 )
 
 var (
@@ -81,6 +84,30 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
+	// Load and apply user theme from config.yaml.
+	// This runs before the TUI starts — synchronous, no race with rendering.
+	activeTheme := "tokyo-night.yaml"
+	if cfgDir := config.ConfigDir(); cfgDir != "" {
+		if err := themes.EnsureThemesDir(filepath.Join(cfgDir, "themes")); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: themes directory: %v\n", err)
+		}
+		if appCfg, appErr := config.LoadAppConfig(); appErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: config.yaml: %v\n", appErr)
+		} else if appCfg.Theme != "" {
+			themePath, pathErr := config.ThemePath(appCfg.Theme)
+			if pathErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: theme %q: %v\n", appCfg.Theme, pathErr)
+			} else if data, readErr := os.ReadFile(themePath); readErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: theme %q: %v\n", appCfg.Theme, readErr)
+			} else if t, parseErr := styles.ThemeFromYAML(data); parseErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: theme %q: %v\n", appCfg.Theme, parseErr)
+			} else {
+				styles.ApplyTheme(t)
+				activeTheme = appCfg.Theme
+			}
+		}
+	}
+
 	var extraOpts []tui.Option
 	if demoMode {
 		if profile == "" {
@@ -96,7 +123,7 @@ func main() {
 
 	tui.Version = version
 
-	model := tui.New(profile, region, extraOpts...)
+	model := tui.New(profile, region, append(extraOpts, tui.WithActiveTheme(activeTheme))...)
 
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {

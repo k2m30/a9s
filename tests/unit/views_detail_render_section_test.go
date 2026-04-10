@@ -20,6 +20,7 @@ package unit
 //   path, so no IsSection items appear and the assertions below fail.
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -157,7 +158,7 @@ func TestDetailRenderSection_BoldUppercase(t *testing.T) {
 func TestDetailRenderSection_NoColorOnHeader(t *testing.T) {
 	// We need colors ON to verify that no color appears on the section header.
 	// But we must reset after the test to avoid polluting other tests.
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 
 	res := buildCTResource("DescribeInstances", "ec2.amazonaws.com", "AssumedRole")
 	m := newCTDetailModel(t, res)

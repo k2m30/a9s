@@ -7,9 +7,9 @@ interpretation
 Related docs:
 
 - [#196](https://github.com/k2m30/a9s/issues/196)
-- [`docs/design/resource-issues-overlay.md`](/Users/k2m30/projects/a9s/docs/design/resource-issues-overlay.md)
-- [`docs/design/resources-groupping.md`](/Users/k2m30/projects/a9s/docs/design/resources-groupping.md)
-- [`docs/issues/resource-issues-overlay-issue.md`](/Users/k2m30/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
+- [`docs/design/resource-issues-overlay.md`](~/projects/a9s/docs/design/resource-issues-overlay.md)
+- [`docs/design/resources-groupping.md`](~/projects/a9s/docs/design/resources-groupping.md)
+- [`docs/issues/resource-issues-overlay-issue.md`](~/projects/a9s/docs/issues/resource-issues-overlay-issue.md)
 
 ---
 

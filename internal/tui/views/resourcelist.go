@@ -462,3 +462,9 @@ func (m *ResourceListModel) View() string {
 
 	return sb.String()
 }
+
+// InvalidateStyleCache clears the styled row cache, forcing re-render
+// with current styles. Called after theme changes.
+func (m *ResourceListModel) InvalidateStyleCache() {
+	m.styledRowCache = nil
+}

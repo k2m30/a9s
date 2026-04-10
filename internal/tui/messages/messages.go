@@ -15,6 +15,7 @@ const (
 	TargetReveal
 	TargetProfile
 	TargetRegion
+	TargetTheme
 	TargetHelp
 )
 
@@ -70,6 +71,11 @@ type ProfileSelectedMsg struct {
 // RegionSelectedMsg is sent when the user confirms a region selection.
 type RegionSelectedMsg struct {
 	Region string
+}
+
+// ThemeSelectedMsg is sent when the user confirms a theme selection.
+type ThemeSelectedMsg struct {
+	Theme string
 }
 
 // ValueRevealedMsg is sent when a resource value has been fetched via reveal (x key).

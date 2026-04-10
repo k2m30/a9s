@@ -17,6 +17,7 @@ package unit_test
 //   Bug5: No stacked layout for width 80-99 with right column registered
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -68,7 +69,7 @@ func twoFieldNavConfig() *config.ViewsConfig {
 // defer styles.Reinit().
 func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailModel {
 	t.Helper()
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 
@@ -181,7 +182,7 @@ func TestDetail_007_SeparatorAbsent_NoRightCol(t *testing.T) {
 // FAILS NOW: sub-field lines have only DetailVal ANSI, not DetailKey.
 // PASSES AFTER FIX: sub-field lines contain both DetailKey and DetailVal ANSI sequences.
 func TestDetail_007_SubField_RendersKeyAndValue(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 	resource.UnregisterNavigableFields("ec2")
@@ -346,7 +347,7 @@ func TestDetail_007_CursorHighlight_MovesAfterJ(t *testing.T) {
 // when the right column takes focus.
 func TestDetail_007_CursorHighlight_AbsentWhenRightFocused(t *testing.T) {
 	register007EC2Defs(t)
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 

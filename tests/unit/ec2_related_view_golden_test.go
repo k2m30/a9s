@@ -56,7 +56,7 @@ func TestGolden_EC2RelatedView_Text(t *testing.T) {
 
 func TestGolden_EC2RelatedView_ANSI(t *testing.T) {
 	// Explicitly force color-enabled style init for ANSI snapshot.
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 

@@ -1,6 +1,6 @@
 # Themes — Implementation Plan
 
-**Status:** Roadmap
+**Status:** Implemented
 **Priority:** Medium
 **Depends on:** None (standalone feature)
 

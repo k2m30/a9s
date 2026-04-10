@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestIssue140_Story_EC2_001_InitialDetailRenderContract(t *testing.T) {
 }
 
 func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 	withIssue140EC2RelatedDefs(t)
