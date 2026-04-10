@@ -268,22 +268,14 @@ var (
 	yamlNullRe = regexp.MustCompile(`^(null|~)$`)
 )
 
-// YAML syntax color styles — created once, not per call.
-var (
-	yamlKeyStyle  = lipgloss.NewStyle().Foreground(styles.ColYAMLKey)
-	yamlStrStyle  = lipgloss.NewStyle().Foreground(styles.ColYAMLStr)
-	yamlNumStyle  = lipgloss.NewStyle().Foreground(styles.ColYAMLNum)
-	yamlBoolStyle = lipgloss.NewStyle().Foreground(styles.ColYAMLBool)
-	yamlNullStyle = lipgloss.NewStyle().Foreground(styles.ColYAMLNull)
-)
 
 // colorizeYAML applies Tokyo Night syntax colors to YAML text line by line.
 func colorizeYAML(raw string) string {
-	keyStyle := yamlKeyStyle
-	strStyle := yamlStrStyle
-	numStyle := yamlNumStyle
-	boolStyle := yamlBoolStyle
-	nullStyle := yamlNullStyle
+	keyStyle := styles.YAMLKeyStyle
+	strStyle := styles.YAMLStrStyle
+	numStyle := styles.YAMLNumStyle
+	boolStyle := styles.YAMLBoolStyle
+	nullStyle := styles.YAMLNullStyle
 
 	lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
 	result := make([]string, len(lines))

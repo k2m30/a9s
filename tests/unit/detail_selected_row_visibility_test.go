@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 // Regression guard: selected rows must keep labels readable and avoid carrying
 // navigable underline into the selected state.
 func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 
@@ -32,7 +33,7 @@ func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
 }
 
 func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 	withIssue140EC2RelatedDefs(t)
@@ -59,7 +60,7 @@ func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
 }
 
 func TestDetail_SelectedRow_FillsViewportWidth(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
+	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(styles.Reinit)
 

@@ -95,12 +95,6 @@ func (m *IdentityModel) SetError(msg string) {
 	m.state = identityError
 }
 
-// Identity view styles.
-var (
-	identitySectionStyle = lipgloss.NewStyle().Foreground(styles.ColDetailSec).Bold(true)
-	identityLabelStyle   = lipgloss.NewStyle().Foreground(styles.ColDim)
-	identityValueStyle   = lipgloss.NewStyle().Foreground(styles.ColDetailVal)
-)
 
 // View renders the identity information.
 func (m IdentityModel) View() string {
@@ -136,9 +130,9 @@ func (m IdentityModel) renderError() string {
 }
 
 func (m IdentityModel) renderLoaded() string {
-	secStyle := identitySectionStyle
-	lblStyle := identityLabelStyle
-	valStyle := identityValueStyle
+	secStyle := styles.IdentitySectionStyle
+	lblStyle := styles.IdentityLabelStyle
+	valStyle := styles.IdentityValueStyle
 
 	labelW := 14 // width for label column
 

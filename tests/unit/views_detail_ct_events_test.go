@@ -11,6 +11,7 @@ package unit_test
 // the rendered View() output because the legacy flat path runs instead.
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -803,7 +804,7 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 			}
 
 			// Enable colors and build a fresh model so styles are applied at render time.
-			t.Setenv("NO_COLOR", "")
+			os.Unsetenv("NO_COLOR")
 			styles.Reinit()
 			t.Cleanup(func() { styles.Reinit() })
 			coloredModel := newDetailModel(res, "ct-events", cfg)
