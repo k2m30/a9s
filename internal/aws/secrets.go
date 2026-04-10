@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"})
+	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn"})
 	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients any, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
@@ -98,6 +98,7 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 				"last_accessed":    lastAccessed,
 				"last_changed":     lastChanged,
 				"rotation_enabled": rotationEnabled,
+				"arn":              aws.ToString(secret.ARN),
 			},
 			RawStruct: secret,
 		}

@@ -99,7 +99,7 @@ func TestCopyContent_YAML_ReturnsRawContent(t *testing.T) {
 			"state":       "running",
 		},
 	}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 	var v views.View = &m
 	content, label := v.CopyContent()
@@ -213,7 +213,7 @@ func TestGetHelpContext_Detail(t *testing.T) {
 func TestGetHelpContext_YAML(t *testing.T) {
 	k := keys.Default()
 	res := resource.Resource{ID: "test-id", Name: "test-name"}
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	var v views.View = &m
 	ctx := v.GetHelpContext()
 	if ctx != views.HelpFromYAML {
