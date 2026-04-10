@@ -21,7 +21,7 @@ func yamlKeyPress(char string) tea.KeyPressMsg {
 func yamlView(t *testing.T, res resource.Resource, w, h int) string {
 	t.Helper()
 	k := keys.Default()
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(w, h)
 	out := m.View()
 	if out == "" || out == "Initializing..." {
@@ -32,7 +32,7 @@ func yamlView(t *testing.T, res resource.Resource, w, h int) string {
 
 func yamlModel(res resource.Resource, w, h int) views.YAMLModel {
 	k := keys.Default()
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(w, h)
 	return m
 }
@@ -465,7 +465,7 @@ func TestQA_YAML_Scroll_AllTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			k := keys.Default()
-			m := views.NewYAML(tc.res, k)
+			m := views.NewYAML(tc.res, "", k)
 			// Use a small viewport so content overflows for scroll testing
 			m.SetSize(60, 3)
 
@@ -538,7 +538,7 @@ func TestQA_YAML_WrapToggle_AllTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			k := keys.Default()
-			m := views.NewYAML(tc.res, k)
+			m := views.NewYAML(tc.res, "", k)
 			// Use narrow viewport so long values would be clipped
 			m.SetSize(40, 20)
 
@@ -580,7 +580,7 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(40, 30) // narrow: 40 cols, the 200-char value must wrap
 
 	viewNoWrap := m.View()
@@ -750,7 +750,7 @@ func TestQA_YAML_EmptyResource(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 	out := m.View()
 
@@ -767,7 +767,7 @@ func TestQA_YAML_NilFieldsResource(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, k)
+	m := views.NewYAML(res, "", k)
 	m.SetSize(120, 40)
 	out := m.View()
 

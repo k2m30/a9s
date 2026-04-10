@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.35.0] - 2026-04-10
+
+### Added
+- CloudTrail Events related view extended to all 66 resource types. Every resource now shows "CloudTrail Events" in the right-column related panel with correct per-service filters.
+- `t` keyboard shortcut for direct CloudTrail Events navigation from resource list, detail, and YAML views.
+- Deterministic `CloudTrailKey` per-type configuration on `ResourceTypeDef` — no heuristics, no reflection. Each resource type explicitly declares its CloudTrail lookup attribute and value source.
+- ARN-based CloudTrail filters for Lambda, RDS, EKS, Secrets Manager, DocumentDB, and SQS (types where CloudTrail indexes by ARN, not name).
+- SQS resources now expose `Fields["arn"]` extracted from queue attributes.
+- 9 new demo CloudTrail fixture events covering Lambda, RDS, ECS, DynamoDB, Secrets Manager, EKS, and CloudFormation.
+- Demo CloudTrail fake now supports suffix matching on ResourceName (bare name matches ARN-prefixed events).
+- `t` / `cloudtrail` added to help overlay (`?`) for resource list, detail, and YAML views.
+- `TestFullRelatedViewValidation` comprehensive integration test: validates all related-resource entries and navigable fields across all resource types in both demo and live AWS modes (1,133 demo subtests, 610 live subtests).
+- 15 live integration scenario tests for CloudTrail `t` key against real AWS.
+- 40+ new unit tests covering filter logic, key handlers, hints, help overlay, coverage gaps.
+
+### Changed
+- File splits: `resourcelist.go`, `detail.go`, `app_handlers.go`, `help.go` each split into two files to stay under 500 lines per the codebase checklist.
+- YAML view (`NewYAML`) now accepts `resourceType` parameter for child-type detection.
+- `t` hint and key suppressed on ct-events lists (no self-reference), child resource lists, child detail/YAML views, and types with no CloudTrail support.
+- Pre-push rules now require `TestFullRelatedViewValidation` against a real AWS profile before any push.
+- Test count updated from 4,400+ to 4,500+ in README and website.
+- `website/content/resources.md`: CloudTrail Events short name corrected to `ct-events`.
+
+### Removed
+- Reflection-based ARN extraction (`extractARNFromRawStruct`) replaced by deterministic `CloudTrailKey` config.
+
 ## [3.34.0] - 2026-04-10
 
 ### Changed

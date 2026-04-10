@@ -3,10 +3,11 @@ package resource
 func dataResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "Glue Jobs",
-			ShortName: "glue",
-			Aliases:   []string{"glue", "glue-jobs"},
-			Category:  "DATA & ANALYTICS",
+			Name:          "Glue Jobs",
+			ShortName:     "glue",
+			Aliases:       []string{"glue", "glue-jobs"},
+			Category:      "DATA & ANALYTICS",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "job_name", Title: "Job Name", Width: 32, Sortable: true},
 				{Key: "glue_version", Title: "Version", Width: 10, Sortable: true},
@@ -22,10 +23,11 @@ func dataResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "Athena Workgroups",
-			ShortName: "athena",
-			Aliases:   []string{"athena", "workgroups"},
-			Category:  "DATA & ANALYTICS",
+			Name:          "Athena Workgroups",
+			ShortName:     "athena",
+			Aliases:       []string{"athena", "workgroups"},
+			Category:      "DATA & ANALYTICS",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "workgroup_name", Title: "Workgroup", Width: 28, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},

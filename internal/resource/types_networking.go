@@ -3,10 +3,11 @@ package resource
 func networkingResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "Load Balancers",
-			ShortName: "elb",
-			Aliases:   []string{"elb", "alb", "nlb", "loadbalancers", "load-balancers"},
-			Category:  "NETWORKING",
+			Name:          "Load Balancers",
+			ShortName:     "elb",
+			Aliases:       []string{"elb", "alb", "nlb", "loadbalancers", "load-balancers"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 32, Sortable: true},
 				{Key: "dns_name", Title: "DNS Name", Width: 48, Sortable: false},
@@ -23,10 +24,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "Target Groups",
-			ShortName: "tg",
-			Aliases:   []string{"tg", "targetgroups", "target-groups"},
-			Category:  "NETWORKING",
+			Name:          "Target Groups",
+			ShortName:     "tg",
+			Aliases:       []string{"tg", "targetgroups", "target-groups"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "target_group_name", Title: "Target Group", Width: 32, Sortable: true},
 				{Key: "port", Title: "Port", Width: 8, Sortable: true},
@@ -43,10 +45,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "Security Groups",
-			ShortName: "sg",
-			Aliases:   []string{"sg", "securitygroups", "security-groups"},
-			Category:  "NETWORKING",
+			Name:          "Security Groups",
+			ShortName:     "sg",
+			Aliases:       []string{"sg", "securitygroups", "security-groups"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "group_name", Title: "Group Name", Width: 28, Sortable: true},
 				{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
@@ -55,10 +58,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "VPCs",
-			ShortName: "vpc",
-			Aliases:   []string{"vpc", "vpcs"},
-			Category:  "NETWORKING",
+			Name:          "VPCs",
+			ShortName:     "vpc",
+			Aliases:       []string{"vpc", "vpcs"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
@@ -68,10 +72,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Subnets",
-			ShortName: "subnet",
-			Aliases:   []string{"subnet", "subnets"},
-			Category:  "NETWORKING",
+			Name:          "Subnets",
+			ShortName:     "subnet",
+			Aliases:       []string{"subnet", "subnets"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "subnet_id", Title: "Subnet ID", Width: 26, Sortable: true},
@@ -83,10 +88,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Route Tables",
-			ShortName: "rtb",
-			Aliases:   []string{"rtb", "routetables", "route-tables"},
-			Category:  "NETWORKING",
+			Name:          "Route Tables",
+			ShortName:     "rtb",
+			Aliases:       []string{"rtb", "routetables", "route-tables"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "route_table_id", Title: "Route Table ID", Width: 26, Sortable: true},
@@ -96,10 +102,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "NAT Gateways",
-			ShortName: "nat",
-			Aliases:   []string{"nat", "natgateways", "nat-gateways"},
-			Category:  "NETWORKING",
+			Name:          "NAT Gateways",
+			ShortName:     "nat",
+			Aliases:       []string{"nat", "natgateways", "nat-gateways"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "nat_gateway_id", Title: "NAT Gateway ID", Width: 26, Sortable: true},
@@ -110,10 +117,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Internet Gateways",
-			ShortName: "igw",
-			Aliases:   []string{"igw", "internetgateways", "internet-gateways"},
-			Category:  "NETWORKING",
+			Name:          "Internet Gateways",
+			ShortName:     "igw",
+			Aliases:       []string{"igw", "internetgateways", "internet-gateways"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "igw_id", Title: "IGW ID", Width: 26, Sortable: true},
@@ -122,10 +130,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Elastic IPs",
-			ShortName: "eip",
-			Aliases:   []string{"eip", "elastic-ips", "elasticips"},
-			Category:  "NETWORKING",
+			Name:          "Elastic IPs",
+			ShortName:     "eip",
+			Aliases:       []string{"eip", "elastic-ips", "elasticips"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "allocation_id", Title: "Allocation ID", Width: 26, Sortable: true},
@@ -136,10 +145,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "VPC Endpoints",
-			ShortName: "vpce",
-			Aliases:   []string{"vpce", "vpc-endpoints", "vpcendpoints"},
-			Category:  "NETWORKING",
+			Name:          "VPC Endpoints",
+			ShortName:     "vpce",
+			Aliases:       []string{"vpce", "vpc-endpoints", "vpcendpoints"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "service_name", Title: "Service Name", Width: 40, Sortable: true},
 				{Key: "vpce_id", Title: "Endpoint ID", Width: 26, Sortable: true},
@@ -149,10 +159,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Transit Gateways",
-			ShortName: "tgw",
-			Aliases:   []string{"tgw", "transit-gateways", "transitgateways"},
-			Category:  "NETWORKING",
+			Name:          "Transit Gateways",
+			ShortName:     "tgw",
+			Aliases:       []string{"tgw", "transit-gateways", "transitgateways"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "tgw_id", Title: "TGW ID", Width: 26, Sortable: true},
@@ -162,10 +173,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Network Interfaces",
-			ShortName: "eni",
-			Aliases:   []string{"eni", "network-interfaces", "nis"},
-			Category:  "NETWORKING",
+			Name:          "Network Interfaces",
+			ShortName:     "eni",
+			Aliases:       []string{"eni", "network-interfaces", "nis"},
+			Category:      "NETWORKING",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "eni_id", Title: "ENI ID", Width: 26, Sortable: true},

@@ -3,10 +3,11 @@ package resource
 func computeResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "EC2 Instances",
-			ShortName: "ec2",
-			Aliases:   []string{"ec2", "instances"},
-			Category:  "COMPUTE",
+			Name:          "EC2 Instances",
+			ShortName:     "ec2",
+			Aliases:       []string{"ec2", "instances"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
@@ -19,10 +20,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "ECS Services",
-			ShortName: "ecs-svc",
-			Aliases:   []string{"ecs-svc", "ecs-services"},
-			Category:  "COMPUTE",
+			Name:          "ECS Services",
+			ShortName:     "ecs-svc",
+			Aliases:       []string{"ecs-svc", "ecs-services"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "service_name", Title: "Service Name", Width: 32, Sortable: true},
 				{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -53,10 +55,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "ECS Clusters",
-			ShortName: "ecs",
-			Aliases:   []string{"ecs", "ecs-clusters"},
-			Category:  "COMPUTE",
+			Name:          "ECS Clusters",
+			ShortName:     "ecs",
+			Aliases:       []string{"ecs", "ecs-clusters"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "cluster_name", Title: "Cluster Name", Width: 32, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -66,10 +69,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "ECS Tasks",
-			ShortName: "ecs-task",
-			Aliases:   []string{"ecs-task", "ecs-tasks", "tasks"},
-			Category:  "COMPUTE",
+			Name:          "ECS Tasks",
+			ShortName:     "ecs-task",
+			Aliases:       []string{"ecs-task", "ecs-tasks", "tasks"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "task_id", Title: "Task ID", Width: 38, Sortable: true},
 				{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -81,10 +85,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Lambda Functions",
-			ShortName: "lambda",
-			Aliases:   []string{"lambda", "functions"},
-			Category:  "COMPUTE",
+			Name:          "Lambda Functions",
+			ShortName:     "lambda",
+			Aliases:       []string{"lambda", "functions"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:Fields.arn",
 			Columns: []Column{
 				{Key: "function_name", Title: "Function Name", Width: 36, Sortable: true},
 				{Key: "runtime", Title: "Runtime", Width: 16, Sortable: true},
@@ -103,10 +108,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Auto Scaling Groups",
-			ShortName: "asg",
-			Aliases:   []string{"asg", "autoscaling", "auto-scaling"},
-			Category:  "COMPUTE",
+			Name:          "Auto Scaling Groups",
+			ShortName:     "asg",
+			Aliases:       []string{"asg", "autoscaling", "auto-scaling"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "asg_name", Title: "ASG Name", Width: 36, Sortable: true},
 				{Key: "min_size", Title: "Min", Width: 6, Sortable: true},
@@ -120,10 +126,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Elastic Beanstalk",
-			ShortName: "eb",
-			Aliases:   []string{"eb", "beanstalk", "elastic-beanstalk"},
-			Category:  "COMPUTE",
+			Name:          "Elastic Beanstalk",
+			ShortName:     "eb",
+			Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "environment_name", Title: "Environment", Width: 28, Sortable: true},
 				{Key: "application_name", Title: "Application", Width: 24, Sortable: true},
@@ -133,10 +140,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "EBS Volumes",
-			ShortName: "ebs",
-			Aliases:   []string{"ebs", "volumes", "ebs-vol"},
-			Category:  "COMPUTE",
+			Name:          "EBS Volumes",
+			ShortName:     "ebs",
+			Aliases:       []string{"ebs", "volumes", "ebs-vol"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "volume_id", Title: "Volume ID", Width: 22, Sortable: true},
@@ -151,10 +159,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "EBS Snapshots",
-			ShortName: "ebs-snap",
-			Aliases:   []string{"ebs-snap", "snapshots", "snap"},
-			Category:  "COMPUTE",
+			Name:          "EBS Snapshots",
+			ShortName:     "ebs-snap",
+			Aliases:       []string{"ebs-snap", "snapshots", "snap"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 24, Sortable: true},
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 24, Sortable: true},
@@ -168,10 +177,11 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "AMIs",
-			ShortName: "ami",
-			Aliases:   []string{"ami", "amis", "images"},
-			Category:  "COMPUTE",
+			Name:          "AMIs",
+			ShortName:     "ami",
+			Aliases:       []string{"ami", "amis", "images"},
+			Category:      "COMPUTE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 32, Sortable: true},
 				{Key: "image_id", Title: "Image ID", Width: 22, Sortable: true},

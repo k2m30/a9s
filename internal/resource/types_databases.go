@@ -3,10 +3,11 @@ package resource
 func databasesResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
-			Name:      "DB Instances",
-			ShortName: "dbi",
-			Aliases:   []string{"dbi", "rds", "databases", "db-instances"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "DB Instances",
+			ShortName:     "dbi",
+			Aliases:       []string{"dbi", "rds", "databases", "db-instances"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:Fields.arn",
 			Columns: []Column{
 				{Key: "db_identifier", Title: "DB Identifier", Width: 28, Sortable: true},
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
@@ -24,10 +25,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "S3 Buckets",
-			ShortName: "s3",
-			Aliases:   []string{"s3", "buckets"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "S3 Buckets",
+			ShortName:     "s3",
+			Aliases:       []string{"s3", "buckets"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 				{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
@@ -40,10 +42,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			}},
 		},
 		{
-			Name:      "ElastiCache Redis",
-			ShortName: "redis",
-			Aliases:   []string{"redis", "elasticache"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "ElastiCache Redis",
+			ShortName:     "redis",
+			Aliases:       []string{"redis", "elasticache"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
@@ -54,10 +57,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "DB Clusters",
-			ShortName: "dbc",
-			Aliases:   []string{"dbc", "docdb", "clusters", "db-clusters"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "DB Clusters",
+			ShortName:     "dbc",
+			Aliases:       []string{"dbc", "docdb", "clusters", "db-clusters"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:Fields.arn",
 			Columns: []Column{
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
@@ -67,10 +71,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "DynamoDB Tables",
-			ShortName: "ddb",
-			Aliases:   []string{"ddb", "dynamodb", "dynamo"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "DynamoDB Tables",
+			ShortName:     "ddb",
+			Aliases:       []string{"ddb", "dynamodb", "dynamo"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "table_name", Title: "Table Name", Width: 36, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -80,10 +85,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "OpenSearch Domains",
-			ShortName: "opensearch",
-			Aliases:   []string{"opensearch", "os", "elasticsearch"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "OpenSearch Domains",
+			ShortName:     "opensearch",
+			Aliases:       []string{"opensearch", "os", "elasticsearch"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "domain_name", Title: "Domain Name", Width: 28, Sortable: true},
 				{Key: "engine_version", Title: "Engine Version", Width: 16, Sortable: true},
@@ -93,10 +99,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "Redshift Clusters",
-			ShortName: "redshift",
-			Aliases:   []string{"redshift", "redshift-clusters"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "Redshift Clusters",
+			ShortName:     "redshift",
+			Aliases:       []string{"redshift", "redshift-clusters"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
@@ -107,10 +114,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "EFS File Systems",
-			ShortName: "efs",
-			Aliases:   []string{"efs", "file-systems"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "EFS File Systems",
+			ShortName:     "efs",
+			Aliases:       []string{"efs", "file-systems"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
@@ -121,10 +129,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "RDS Snapshots",
-			ShortName: "rds-snap",
-			Aliases:   []string{"rds-snap", "rds-snapshots", "db-snapshots"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "RDS Snapshots",
+			ShortName:     "rds-snap",
+			Aliases:       []string{"rds-snap", "rds-snapshots", "db-snapshots"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 				{Key: "db_instance", Title: "DB Instance", Width: 28, Sortable: true},
@@ -135,10 +144,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:      "DocDB Snapshots",
-			ShortName: "docdb-snap",
-			Aliases:   []string{"docdb-snap", "docdb-snapshots", "cluster-snapshots"},
-			Category:  "DATABASES & STORAGE",
+			Name:          "DocDB Snapshots",
+			ShortName:     "docdb-snap",
+			Aliases:       []string{"docdb-snap", "docdb-snapshots", "cluster-snapshots"},
+			Category:      "DATABASES & STORAGE",
+			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},

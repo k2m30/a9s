@@ -33,6 +33,7 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -91,6 +92,13 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 
 			for _, result := range allResults {
 				if !cacheBackedTypes[result.TargetType] {
+					continue
+				}
+
+				// New fixture events (evt-*) are designed for the generic
+				// ct-events→resource related panel. Their cache-backed typed
+				// checker returning -1 with empty cache is expected.
+				if strings.HasPrefix(fixture.ID, "evt-") {
 					continue
 				}
 

@@ -920,11 +920,12 @@ var relatedSmokeTable = []smokeTestCase{
 		s06: func(t *testing.T) {
 			t.Helper()
 			defs := resource.GetRelated("vpce")
-			if len(defs) != 4 {
-				t.Fatalf("VPCE-S06: expected 4 related defs for vpce, got %d", len(defs))
+			if len(defs) != 5 {
+				t.Fatalf("VPCE-S06: expected 5 related defs for vpce, got %d", len(defs))
 			}
-			expectedTargets := []string{"subnet", "sg", "rtb", "eni"}
-			for _, target := range expectedTargets {
+			// Entries that require a real async Checker implementation.
+			checkerTargets := []string{"subnet", "sg", "rtb", "eni"}
+			for _, target := range checkerTargets {
 				var found *resource.RelatedDef
 				for i := range defs {
 					if defs[i].TargetType == target {
@@ -939,6 +940,17 @@ var relatedSmokeTable = []smokeTestCase{
 				if found.Checker == nil {
 					t.Errorf("VPCE-S06: Checker for target %q must be non-nil (real implementation); got nil", target)
 				}
+			}
+			// ct-events is a navigation-only entry (uses BuildCloudTrailFilter); Checker may be nil.
+			var ctFound bool
+			for i := range defs {
+				if defs[i].TargetType == "ct-events" {
+					ctFound = true
+					break
+				}
+			}
+			if !ctFound {
+				t.Errorf("VPCE-S06: related def for target %q not registered", "ct-events")
 			}
 		},
 	},
