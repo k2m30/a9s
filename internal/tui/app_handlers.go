@@ -205,11 +205,18 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		}
 		return m, tea.Batch(cmds...)
 	}
-	if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
+	if msg.Clients == nil {
+		if m.clients == nil && m.preSuppliedClients != nil {
+			// Fall back to pre-supplied clients (demo path) when msg carries no clients.
+			m.clients = m.preSuppliedClients
+		}
+	} else if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		m.clients = clients
-	} else if m.clients == nil && m.preSuppliedClients != nil {
-		// Fall back to pre-supplied clients (demo path) when msg carries no clients.
-		m.clients = m.preSuppliedClients
+	} else {
+		wrongTypeErr := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", msg.Clients)
+		return m, func() tea.Msg {
+			return messages.APIErrorMsg{Err: wrongTypeErr}
+		}
 	}
 	m.hasPrevState = false
 	m.prevProfile = ""
