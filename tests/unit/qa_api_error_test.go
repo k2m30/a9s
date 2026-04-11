@@ -614,3 +614,110 @@ func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 		t.Errorf("A.10: S3 should load independently after EC2 error, got: %s", plain[:min(300, len(plain))])
 	}
 }
+
+// navigateToEC2Detail is a shared helper that drives the model from initial
+// state into the DetailModel for a single EC2 instance.
+// It returns the updated tui.Model after: navigate → load → Enter.
+func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
+	t.Helper()
+
+	// Navigate to the EC2 resource list (triggers loading state).
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ec2",
+	})
+
+	// Deliver a single EC2 resource so the list is non-empty.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		ResourceType: "ec2",
+		Resources: []resource.Resource{
+			{
+				ID:   "i-0abc123def456",
+				Name: "i-0abc123def456",
+				Fields: map[string]string{
+					"instance_id": "i-0abc123def456",
+					"state":       "running",
+					"type":        "t3.micro",
+					"name":        "web-server-01",
+				},
+			},
+		},
+	})
+
+	// Press Enter to open the detail view.
+	var cmd tea.Cmd
+	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	// Execute any cmd returned by Enter so the detail model transitions fully
+	// (matches pattern used in TestBug_S3Refresh_InsideBucket).
+	if cmd != nil {
+		msg := cmd()
+		if msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
+
+	return m
+}
+
+// TestQA_APIError_DetailView_FlashStillShown verifies that when an APIErrorMsg
+// arrives while the active view is a DetailModel, the flash error is still
+// displayed in the header (regression: error must not be silently swallowed).
+func TestQA_APIError_DetailView_FlashStillShown(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	m = navigateToEC2Detail(t, m)
+
+	// Send APIErrorMsg while in detail view.
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2",
+		Err:          fmt.Errorf("access denied"),
+	})
+
+	plain := stripANSI(rootViewContent(m))
+
+	// The flash error must be visible in the rendered output.
+	if !strings.Contains(plain, "access denied") && !strings.Contains(plain, "error") && !strings.Contains(plain, "Error") {
+		t.Errorf("after APIErrorMsg while in DetailView, flash error must be shown in header, got:\n%s", plain[:min(400, len(plain))])
+	}
+}
+
+// TestQA_APIError_ResourceListPath_StillWorks is a regression guard ensuring
+// that the existing ResourceListModel branch of handleAPIError (ClearLoading)
+// is not broken when the coder adds the DetailModel branch.
+func TestQA_APIError_ResourceListPath_StillWorks(t *testing.T) {
+	tui.Version = "test"
+
+	resourceTypes := []string{"ec2", "dbi", "s3", "redis", "docdb", "eks", "sm", "vpc", "sg", "ng", "eip", "ebs", "ami", "subnet", "tg", "asg", "alarm", "cfn"}
+
+	for _, rt := range resourceTypes {
+		t.Run(rt, func(t *testing.T) {
+			m := newRootSizedModel()
+
+			// Navigate to list — enters loading state.
+			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				Target:       messages.TargetResourceList,
+				ResourceType: rt,
+			})
+
+			// Confirm list shows "Loading" before the error.
+			plain := stripANSI(rootViewContent(m))
+			if !strings.Contains(plain, "Loading") {
+				t.Skipf("[%s] list does not show Loading — skipping loading-clear assertion", rt)
+			}
+
+			// Send APIErrorMsg while active view is ResourceListModel.
+			m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+				ResourceType: rt,
+				Err:          fmt.Errorf("regression-test error for %s", rt),
+			})
+
+			// Loading spinner must be gone.
+			plain = stripANSI(rootViewContent(m))
+			if strings.Contains(plain, "Loading") {
+				t.Errorf("[%s] after APIErrorMsg on ResourceListModel, Loading must be cleared, got:\n%s", rt, plain[:min(300, len(plain))])
+			}
+		})
+	}
+}
