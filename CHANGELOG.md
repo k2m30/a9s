@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.36.1] - 2026-04-11
+
+### Fixed
+- `cache.Save` is now crash-atomic and concurrent-safe. Previously wrote directly to the target path with `os.WriteFile`, which truncated the file mid-write — concurrent readers could observe a zero-length cache, and two a9s processes sharing the same `~/.a9s/cache/<profile>--<region>.yaml` raced on a deterministic `.tmp` name and silently lost updates. Save now uses `os.CreateTemp` for a unique per-invocation temp file, followed by `os.Rename`.
+- `cache.Path` now sanitizes backslash in addition to `/` and space. On Windows, profile names containing `\` could previously create unintended subdirectories.
+- App context cancellation now fires reliably on exit. `defer model.Cancel()` was added around `tea.Program.Run` via a `main` → `runProgram` refactor, so in-flight AWS fetcher goroutines are cancelled on normal return, error path, and panic — previously only normal `QuitMsg` dispatched the cancel.
+- `ClientsReadyMsg` with an unexpected `Clients` type now surfaces an internal error via `APIErrorMsg` instead of silently falling back. The demo-mode `nil` path still correctly routes to pre-supplied clients.
+
 ## [3.36.0] - 2026-04-10
 
 ### Added

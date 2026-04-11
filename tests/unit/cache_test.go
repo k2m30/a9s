@@ -3,6 +3,8 @@ package unit
 import (
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -73,6 +75,17 @@ func TestCache_Path_SanitizesSpaces(t *testing.T) {
 	want := filepath.Join(tmpDir, "cache", "my_profile--us_west_2.yaml")
 	if got != want {
 		t.Errorf("Path() with spaces = %q, want %q", got, want)
+	}
+}
+
+func TestCache_Path_SanitizesBackslash(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	got := cache.Path("corp\\admin", "us-east-1")
+	want := filepath.Join(tmpDir, "cache", "corp_admin--us-east-1.yaml")
+	if got != want {
+		t.Errorf("Path() with backslash = %q, want %q", got, want)
 	}
 }
 
@@ -697,4 +710,189 @@ func TestCache_SaveLoad_RoundTrip_Count(t *testing.T) {
 			t.Errorf("Resources[%q].HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Save() atomicity tests
+// ---------------------------------------------------------------------------
+
+// TestCache_Save_NoTempFileLingers verifies that after Save returns, no .tmp
+// file remains in the cache directory. With the current os.WriteFile
+// implementation this passes trivially (no temp file is ever created). After
+// the temp+rename fix lands it continues to pass — the rename removes the
+// temp file as part of the atomic swap.
+func TestCache_Save_NoTempFileLingers(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	f := &cache.File{
+		Profile:   "p",
+		Region:    "r",
+		CheckedAt: time.Now().UTC(),
+		Resources: map[string]cache.Entry{
+			"ec2": {HasResources: true, Count: 3},
+		},
+	}
+
+	if err := cache.Save(f); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	cacheDir := filepath.Join(tmpDir, "cache")
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s) error: %v", cacheDir, err)
+	}
+
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".tmp") {
+			t.Errorf("stale temp file found after Save: %s", entry.Name())
+		}
+	}
+}
+
+// TestCache_Save_ConcurrentWrites_NoCorruption spawns N goroutines that each
+// call Save concurrently. After all goroutines complete, Load must succeed and
+// return a well-formed *File. With os.WriteFile (truncate then write) two
+// goroutines can interleave their writes, producing a partial YAML that
+// Load cannot parse. This test surfaces that corruption.
+func TestCache_Save_ConcurrentWrites_NoCorruption(t *testing.T) {
+	const N = 20
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	// Write a baseline so the file exists before the race begins.
+	baseline := &cache.File{
+		Profile:   "race-profile",
+		Region:    "us-east-1",
+		CheckedAt: time.Now().UTC(),
+		Resources: map[string]cache.Entry{
+			"ec2": {HasResources: true, Count: 0},
+		},
+	}
+	if err := cache.Save(baseline); err != nil {
+		t.Fatalf("Save() baseline error: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := range N {
+		go func(idx int) {
+			defer wg.Done()
+			f := &cache.File{
+				Profile:   "race-profile",
+				Region:    "us-east-1",
+				CheckedAt: time.Date(2026, 1, idx+1, 0, 0, 0, 0, time.UTC),
+				Resources: map[string]cache.Entry{
+					"ec2": {HasResources: true, Count: idx + 1},
+				},
+			}
+			//nolint:errcheck // best-effort concurrent write; we check result via Load below
+			_ = cache.Save(f)
+		}(i)
+	}
+	wg.Wait()
+
+	// After all writers have finished, the file must be parseable.
+	loaded, err := cache.Load("race-profile", "us-east-1")
+	if err != nil {
+		t.Fatalf("Load() after concurrent Save() returned parse error (file corrupted): %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("Load() after concurrent Save() returned nil (file missing or empty)")
+	}
+	// The file must have a non-zero CheckedAt — a zero value indicates a
+	// partial write that produced an otherwise valid but empty struct.
+	if loaded.CheckedAt.IsZero() {
+		t.Error("Load() returned a File with zero CheckedAt — indicates partial write corruption")
+	}
+}
+
+// TestCache_Save_AtomicVisibility is the strongest atomicity test. A writer
+// goroutine repeatedly calls Save in a tight loop. The main goroutine
+// concurrently calls Load and asserts that every successful (non-nil-error)
+// Load returns a well-formed *File. A half-written file will cause Load to
+// return a YAML parse error — that error IS the failure signal. The test runs
+// for ~500 ms. With os.WriteFile this test is expected to fail intermittently;
+// after the temp+rename fix it must not fail.
+func TestCache_Save_AtomicVisibility(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	// Seed a valid file so readers always have something to observe.
+	seed := &cache.File{
+		Profile:   "atomic-profile",
+		Region:    "eu-central-1",
+		CheckedAt: time.Now().UTC(),
+		Resources: map[string]cache.Entry{
+			"ec2": {HasResources: true, Count: 1},
+			"rds": {HasResources: false, Count: 0},
+			"eks": {HasResources: true, Count: 2},
+		},
+	}
+	if err := cache.Save(seed); err != nil {
+		t.Fatalf("Save() seed error: %v", err)
+	}
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+
+	// Writer goroutine: alternate between two distinct payloads so the file
+	// content actually changes on each iteration.
+	stopWriter := make(chan struct{})
+	writerDone := make(chan struct{})
+	go func() {
+		defer close(writerDone)
+		alt := false
+		for {
+			select {
+			case <-stopWriter:
+				return
+			default:
+			}
+			count := 1
+			if alt {
+				count = 9999
+			}
+			alt = !alt
+			f := &cache.File{
+				Profile:   "atomic-profile",
+				Region:    "eu-central-1",
+				CheckedAt: time.Now().UTC(),
+				Resources: map[string]cache.Entry{
+					"ec2": {HasResources: true, Count: count},
+					"rds": {HasResources: false, Count: 0},
+					"eks": {HasResources: true, Count: 2},
+				},
+			}
+			//nolint:errcheck // writer races are expected; we observe via reader
+			_ = cache.Save(f)
+		}
+	}()
+
+	// Reader loop: every successful Load must be well-formed.
+	corruptReads := 0
+	for time.Now().Before(deadline) {
+		loaded, err := cache.Load("atomic-profile", "eu-central-1")
+		if err != nil {
+			// A parse error means the reader observed a half-written file —
+			// the atomicity guarantee was violated.
+			corruptReads++
+			t.Errorf("Load() returned parse error during concurrent Save() (atomicity violation): %v", err)
+			if corruptReads >= 3 {
+				// Bail early after 3 violations to avoid flooding the log.
+				break
+			}
+		}
+		// nil + nil means file disappeared between writes — also a violation.
+		if err == nil && loaded == nil {
+			corruptReads++
+			t.Errorf("Load() returned (nil, nil) during concurrent Save() — file vanished mid-write")
+			if corruptReads >= 3 {
+				break
+			}
+		}
+	}
+
+	close(stopWriter)
+	<-writerDone
 }

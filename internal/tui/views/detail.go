@@ -402,3 +402,4 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	}
 	return m, nil
 }
+

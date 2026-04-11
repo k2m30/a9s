@@ -123,11 +123,21 @@ func main() {
 
 	tui.Version = version
 
-	model := tui.New(profile, region, append(extraOpts, tui.WithActiveTheme(activeTheme))...)
-
-	p := tea.NewProgram(model)
-	if _, err := p.Run(); err != nil {
+	if err := runProgram(profile, region, extraOpts, activeTheme); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runProgram constructs the model, starts the Bubble Tea program, and guarantees
+// the app context is cancelled on any exit path (normal return, error, panic).
+// Separated from main() so that `defer model.Cancel()` runs before os.Exit —
+// deferred functions don't fire on os.Exit, so that call must live above it.
+func runProgram(profile, region string, extraOpts []tui.Option, activeTheme string) error {
+	model := tui.New(profile, region, append(extraOpts, tui.WithActiveTheme(activeTheme))...)
+	defer model.Cancel()
+
+	p := tea.NewProgram(model)
+	_, err := p.Run()
+	return err
 }

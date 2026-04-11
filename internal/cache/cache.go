@@ -55,6 +55,7 @@ func Path(profile, region string) string {
 	// Sanitize profile/region for filenames (replace / and spaces)
 	safe := func(s string) string {
 		s = strings.ReplaceAll(s, "/", "_")
+		s = strings.ReplaceAll(s, "\\", "_")
 		s = strings.ReplaceAll(s, " ", "_")
 		return s
 	}
@@ -121,8 +122,25 @@ func Save(f *File) error {
 	if err != nil {
 		return fmt.Errorf("marshaling cache: %w", err)
 	}
-	if err := os.WriteFile(p, data, 0600); err != nil {
-		return fmt.Errorf("writing cache %s: %w", p, err)
+	// Use CreateTemp so concurrent Save calls (two a9s processes, or two goroutines
+	// targeting the same profile/region) don't race on a shared temp path.
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(p)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("creating cache temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmpFile.Name()
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("writing cache %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("closing cache %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, p); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("renaming cache %s: %w", p, err)
 	}
 	return nil
 }
