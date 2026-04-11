@@ -268,6 +268,14 @@ func (m Model) AppContext() context.Context {
 	return m.appCtx
 }
 
+// Cancel invokes the app context cancel function to signal in-flight goroutines
+// to abort. Safe to call multiple times and on a zero-value Model.
+func (m Model) Cancel() {
+	if m.appCancel != nil {
+		m.appCancel()
+	}
+}
+
 // Init implements tea.Model. Fires a command to establish the AWS session.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
@@ -569,7 +577,12 @@ func (m *Model) popView() bool {
 	if len(m.stack) <= 1 {
 		return false
 	}
-	// Sync list count back to main menu when navigating directly from list → menu.
+	// Sync list count back to main menu when popping directly from list → menu.
+	// Only depth 2 (menu → list) triggers this. Related lists (pushed from a detail
+	// view at depth 3+) are marked escPops=true because they show filtered subsets
+	// of a resource type, not the global population — syncing their count back to
+	// the menu badge would overwrite the real global count with a filter result.
+	// See app_related.go for related-list construction.
 	if len(m.stack) == 2 {
 		if rl, ok := m.stack[1].(*views.ResourceListModel); ok {
 			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {

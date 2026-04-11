@@ -359,3 +359,45 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupPolicy(t *testing.T) {
 		t.Errorf("iam-group→policy with nil clients: Count=%d, want -1", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// TestModel_Cancel_ZeroValue_DoesNotPanic
+// Given: a zero-value tui.Model{} (appCancel is nil)
+// When:  Cancel() is called
+// Then:  no panic occurs
+// ---------------------------------------------------------------------------
+
+func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Cancel() on zero-value Model panicked: %v", r)
+		}
+	}()
+	var m tui.Model
+	m.Cancel()
+}
+
+// ---------------------------------------------------------------------------
+// TestModel_Cancel_CancelsAppContext
+// Given: a Model constructed via tui.New with a live appCtx
+// When:  Cancel() is called
+// Then:  AppContext().Done() is closed (context is cancelled)
+// ---------------------------------------------------------------------------
+
+func TestModel_Cancel_CancelsAppContext(t *testing.T) {
+	m := tui.New("", "")
+
+	ctx := m.AppContext()
+	if ctx == nil {
+		t.Fatal("AppContext() returned nil before Cancel()")
+	}
+
+	m.Cancel()
+
+	select {
+	case <-ctx.Done():
+		// expected — context was cancelled
+	default:
+		t.Error("AppContext().Done() not closed after Cancel() — appCancel was not invoked")
+	}
+}
