@@ -11,11 +11,13 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Multi-account** -- works out of the box via assume-role in `~/.aws/config`
 - **Demo mode** -- `--demo` flag runs the full UI with synthetic data, no AWS needed
 - **Child views** -- drill-down screens for resources that contain sub-entities (e.g., Lambda → invocations, CloudWatch Log Groups → log streams, ECS clusters → services/tasks, IAM groups → users). Design docs in `docs/design/child-views/`.
-
-## Short-Term
-- **Issues shown in UI** -- highlith potential issues to narrow down incident candidates
+candidates
 - **Resource relationships** -- navigate from EC2 to its VPC, Security Groups, EBS volumes
 - **Themes** -- additional color themes beyond Tokyo Night Dark
+
+## Short-Term
+
+- **Issues shown in UI** -- highlith potential issues to narrow down incident 
 
 ## Medium-Term
 
