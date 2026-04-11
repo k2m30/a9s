@@ -151,6 +151,10 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - `Glob("internal/demo/*.go")` — only 3 files remain (client.go, handlers.go, transport.go)
 - Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
 
+### Delegate to Explore for broad investigations
+
+When a single task would require reading 5+ files totaling >500 lines, OR when you need to trace a feature across multiple packages (fetcher → view → related → test), dispatch an `Explore` agent and ask for a summarized report rather than reading everything into main context. Direct Grep/Glob/Read remain correct for targeted lookups (known file, specific symbol, < 3 queries). This protects the main context window for synthesis and decision-making.
+
 #### Per-service fixture files are here (`internal/demo/fixtures/`)
 
 ## Bash Command Rules
