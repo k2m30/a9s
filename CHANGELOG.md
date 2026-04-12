@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.39.0] - 2026-04-12
+
+### Added
+- Auto-create default view config files (`~/.a9s/views/*.yaml`) on first launch — no source checkout needed to customize views
+- Auto-create and auto-refresh `~/.a9s/views_reference.yaml` field reference on each launch — always up-to-date with the binary version
+- `--reset-views` flag to delete all view configs and regenerate defaults on next launch (with confirmation prompt)
+- `--reset-themes` flag to delete all theme files and regenerate defaults on next launch (with confirmation prompt)
+- Synthetic child view entries (`lambda_invocations`, `lambda_invocation_logs`, `pipeline_stages`) in `views_reference.yaml`
+- View Customization and Color Themes wiki pages
+
 ## [3.38.0] - 2026-04-12
 
 ### Added
