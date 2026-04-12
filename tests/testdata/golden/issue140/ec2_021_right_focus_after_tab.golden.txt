@@ -32,4 +32,4 @@
 │     HttpTokens:  required                                                           │                                │
 │     State:  applied                                                                 │                                │
 │ LaunchTime:           2025-11-15 08:30                                              │                                │
-└─────────────────────────────────────────enter Auto Scaling Groups──tab Fields──y YAML──t CloudTrail──ctrl+r Refresh──┘
+└─────────────────────────────────enter Auto Scaling Groups──tab Fields──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──┘

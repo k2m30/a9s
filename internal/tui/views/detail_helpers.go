@@ -207,6 +207,7 @@ func (m DetailModel) BottomHints() []layout.KeyHint {
 		}
 		hints = append(hints, layout.KeyHint{Key: "tab", Desc: "Fields"})
 		hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+		hints = append(hints, layout.KeyHint{Key: "J", Desc: "JSON"})
 		if resource.BuildCloudTrailFilter(m.res, m.resourceType) != nil {
 			hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
 		}
@@ -229,6 +230,7 @@ func (m DetailModel) BottomHints() []layout.KeyHint {
 	}
 
 	hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+	hints = append(hints, layout.KeyHint{Key: "J", Desc: "JSON"})
 	if resource.BuildCloudTrailFilter(m.res, m.resourceType) != nil {
 		hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
 	}

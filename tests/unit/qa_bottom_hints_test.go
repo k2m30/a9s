@@ -94,7 +94,7 @@ func TestBottomHints_ResourceList_NoEnterChild(t *testing.T) {
 
 	hints := m.BottomHints()
 	// "hints_test_ec2_no_child" has no CloudTrailKey — t hint suppressed
-	wantKeys := []string{"y", "ctrl+r", "ctrl+z"}
+	wantKeys := []string{"y", "J", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -120,7 +120,7 @@ func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
 
 	hints := m.BottomHints()
 	// "s3_test_hints" has no CloudTrailKey — t hint suppressed
-	wantKeys := []string{"enter", "d", "y", "ctrl+r", "ctrl+z"}
+	wantKeys := []string{"enter", "d", "y", "J", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -150,7 +150,7 @@ func TestBottomHints_ResourceList_WithReveal(t *testing.T) {
 
 	hints := m.BottomHints()
 	// "secrets_test_hints" has no CloudTrailKey — t hint suppressed
-	wantKeys := []string{"x", "y", "ctrl+r", "ctrl+z"}
+	wantKeys := []string{"x", "y", "J", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -208,7 +208,7 @@ func TestBottomHints_ResourceList_MultipleChildKeys(t *testing.T) {
 
 	hints := m.BottomHints()
 	// "ecs_test_hints" has no CloudTrailKey — t hint suppressed
-	wantKeys := []string{"enter", "d", "y", "e", "L", "ctrl+r", "ctrl+z"}
+	wantKeys := []string{"enter", "d", "y", "J", "e", "L", "ctrl+r", "ctrl+z"}
 	if got := hintKeys(hints); !stringSliceEqual(got, wantKeys) {
 		t.Errorf("BottomHints keys = %v, want %v", got, wantKeys)
 	}
@@ -279,6 +279,7 @@ func TestBottomHints_Detail_PlainField_NoRelated(t *testing.T) {
 	// Unknown resource type "hints_test_no_related" has no CloudTrailKey — no t hint
 	want := []layout.KeyHint{
 		{Key: "y", Desc: "YAML"},
+		{Key: "J", Desc: "JSON"},
 		{Key: "ctrl+r", Desc: "Refresh"},
 		{Key: "w", Desc: "Wrap"},
 	}
@@ -309,6 +310,7 @@ func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
 	// Unknown resource type "hints_test_with_related" has no CloudTrailKey — no t hint
 	want := []layout.KeyHint{
 		{Key: "y", Desc: "YAML"},
+		{Key: "J", Desc: "JSON"},
 		{Key: "r", Desc: "Related"},
 		{Key: "ctrl+r", Desc: "Refresh"},
 		{Key: "w", Desc: "Wrap"},

@@ -96,6 +96,24 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&y)
 		return m, nil
 
+	case messages.TargetJSON:
+		if msg.Resource == nil {
+			return m, nil
+		}
+		resType := msg.ResourceType
+		if resType == "" {
+			switch av := m.activeView().(type) {
+			case *views.ResourceListModel:
+				resType = av.ResourceType()
+			case *views.DetailModel:
+				resType = av.ResourceType()
+			}
+		}
+		j := views.NewJSON(*msg.Resource, resType, m.keys)
+		j.SetSize(m.innerSize())
+		m.pushView(&j)
+		return m, nil
+
 	case messages.TargetHelp:
 		ctx := m.helpContext()
 		activeShortName := ""
