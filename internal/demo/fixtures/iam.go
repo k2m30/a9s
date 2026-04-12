@@ -3,6 +3,7 @@ package fixtures
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -34,6 +35,10 @@ type IAMFixtures struct {
 	EntitiesForPolicy map[string]*PolicyEntities
 	// AccountAliases
 	AccountAliases []string
+	// PolicyDocuments keyed by policy ARN — URL-encoded JSON document strings
+	PolicyDocuments map[string]string
+	// InlinePolicyDocuments keyed by "roleName/policyName" — URL-encoded JSON document strings
+	InlinePolicyDocuments map[string]string
 }
 
 // PolicyEntities holds the entities (roles, users, groups) attached to a policy.
@@ -62,6 +67,8 @@ func NewIAMFixtures() *IAMFixtures {
 		GroupUsers:            make(map[string][]iamtypes.User),
 		GroupsForUser:         make(map[string][]iamtypes.Group),
 		EntitiesForPolicy:     make(map[string]*PolicyEntities),
+		PolicyDocuments:       make(map[string]string),
+		InlinePolicyDocuments: make(map[string]string),
 	}
 	f.Roles = buildIAMRoles()
 	f.Policies = buildIAMPolicies()
@@ -222,37 +229,41 @@ func buildIAMPolicies() []iamtypes.Policy {
 			Description:      aws.String("Allows EC2 and S3 read access"),
 		},
 		{
-			PolicyName:      aws.String("acme-deploy-policy"),
-			PolicyId:        aws.String("ANPAEXAMPLE222222222"),
-			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy"),
-			AttachmentCount: aws.Int32(3),
-			Path:            aws.String("/"),
-			CreateDate:      aws.Time(time.Date(2025, 1, 15, 11, 30, 0, 0, time.UTC)),
+			PolicyName:       aws.String("acme-deploy-policy"),
+			PolicyId:         aws.String("ANPAEXAMPLE222222222"),
+			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-deploy-policy"),
+			AttachmentCount:  aws.Int32(3),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2025, 1, 15, 11, 30, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
 		},
 		{
-			PolicyName:      aws.String("acme-secrets-access"),
-			PolicyId:        aws.String("ANPAEXAMPLE333333333"),
-			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-secrets-access"),
-			AttachmentCount: aws.Int32(2),
-			Path:            aws.String("/"),
-			CreateDate:      aws.Time(time.Date(2025, 5, 20, 13, 15, 0, 0, time.UTC)),
+			PolicyName:       aws.String("acme-secrets-access"),
+			PolicyId:         aws.String("ANPAEXAMPLE333333333"),
+			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-secrets-access"),
+			AttachmentCount:  aws.Int32(2),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2025, 5, 20, 13, 15, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
 		},
 		{
-			PolicyName:      aws.String("acme-cloudwatch-logs"),
-			PolicyId:        aws.String("ANPAEXAMPLE444444444"),
-			Arn:             aws.String("arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"),
-			AttachmentCount: aws.Int32(8),
-			Path:            aws.String("/"),
-			CreateDate:      aws.Time(time.Date(2024, 11, 1, 7, 45, 0, 0, time.UTC)),
+			PolicyName:       aws.String("acme-cloudwatch-logs"),
+			PolicyId:         aws.String("ANPAEXAMPLE444444444"),
+			Arn:              aws.String("arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"),
+			AttachmentCount:  aws.Int32(8),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2024, 11, 1, 7, 45, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
 		},
 		// AWS-managed AdministratorAccess policy (ct-events Case K cross-reference)
 		{
-			PolicyName:      aws.String("AdministratorAccess"),
-			PolicyId:        aws.String("ANPAEXAMPLE000000001"),
-			Arn:             aws.String("arn:aws:iam::aws:policy/AdministratorAccess"),
-			AttachmentCount: aws.Int32(12),
-			Path:            aws.String("/"),
-			CreateDate:      aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
+			PolicyName:       aws.String("AdministratorAccess"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000001"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/AdministratorAccess"),
+			AttachmentCount:  aws.Int32(12),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
 		},
 	}
 
@@ -409,4 +420,25 @@ func buildIAMRelations(f *IAMFixtures) {
 			{GroupName: aws.String("admins"), GroupId: aws.String("AGPAEXAMPLE111111111")},
 		},
 	}
+
+	// Policy documents (URL-encoded JSON)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:*:123456789012:*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::acme-data-*","arn:aws:s3:::acme-data-*/*"]}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:*","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-secrets-access"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AdministratorAccess"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}`)
+
+	// AWS-managed policies used in role_policies
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ec2:DescribeInstances","ec2:DescribeRouteTables","ec2:DescribeSecurityGroups","ec2:DescribeSubnets","ec2:DescribeVolumes","ec2:DescribeVpcs","eks:DescribeCluster"],"Resource":"*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:BatchGetImage"],"Resource":"*"}]}`)
+
+	// Inline policy documents
+	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
+
+	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
 }

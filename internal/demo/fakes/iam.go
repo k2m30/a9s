@@ -159,7 +159,20 @@ func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersio
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicyVersion: policy ARN is required")
 	}
-	return &iam.GetPolicyVersionOutput{}, nil
+	doc, ok := f.fix.PolicyDocuments[*input.PolicyArn]
+	if !ok {
+		return &iam.GetPolicyVersionOutput{
+			PolicyVersion: &iamtypes.PolicyVersion{
+				VersionId: input.VersionId,
+			},
+		}, nil
+	}
+	return &iam.GetPolicyVersionOutput{
+		PolicyVersion: &iamtypes.PolicyVersion{
+			Document:  aws.String(doc),
+			VersionId: input.VersionId,
+		},
+	}, nil
 }
 
 func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
@@ -169,5 +182,11 @@ func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput
 	if input.PolicyName == nil {
 		return nil, fmt.Errorf("GetRolePolicy: policy name is required")
 	}
-	return &iam.GetRolePolicyOutput{}, nil
+	key := *input.RoleName + "/" + *input.PolicyName
+	doc := f.fix.InlinePolicyDocuments[key]
+	return &iam.GetRolePolicyOutput{
+		PolicyName:     input.PolicyName,
+		RoleName:       input.RoleName,
+		PolicyDocument: aws.String(doc),
+	}, nil
 }
