@@ -654,6 +654,10 @@ func (m Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated
 		return m, cmd
+	case *views.JSONModel:
+		updated, cmd := v.Update(msg)
+		m.stack[len(m.stack)-1] = &updated
+		return m, cmd
 	case *views.RevealModel:
 		updated, cmd := v.Update(msg)
 		m.stack[len(m.stack)-1] = &updated

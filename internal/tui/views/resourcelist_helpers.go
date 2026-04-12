@@ -384,6 +384,7 @@ func (m ResourceListModel) BottomHints() []layout.KeyHint {
 	}
 
 	hints = append(hints, layout.KeyHint{Key: "y", Desc: "YAML"})
+	hints = append(hints, layout.KeyHint{Key: "J", Desc: "JSON"})
 
 	// Non-enter child keys (e, L, R, etc.)
 	for _, child := range m.typeDef.Children {

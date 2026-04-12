@@ -12,6 +12,7 @@ const (
 	TargetResourceList
 	TargetDetail
 	TargetYAML
+	TargetJSON
 	TargetReveal
 	TargetProfile
 	TargetRegion
