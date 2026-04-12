@@ -34,13 +34,8 @@ func GenerateViewYAML(v ViewDef) []byte {
 			b.WriteString("\n")
 		}
 		b.WriteString("detail:\n")
-		joined := strings.Join(v.Detail, ", ")
-		if len(joined) < 80 {
-			fmt.Fprintf(&b, "  [%s]\n", joined)
-		} else {
-			for _, d := range v.Detail {
-				fmt.Fprintf(&b, "  - %s\n", d)
-			}
+		for _, d := range v.Detail {
+			fmt.Fprintf(&b, "  - %s\n", d)
 		}
 	}
 

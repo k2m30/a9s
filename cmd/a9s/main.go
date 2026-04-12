@@ -58,8 +58,8 @@ func main() {
 	flag.BoolVar(&noCache, "no-cache", false, "Disable resource availability cache")
 	flag.StringVar(&command, "command", "", "Resource type to open directly (e.g. ec2, s3, events)")
 	flag.StringVar(&command, "c", "", "Resource type to open directly (shorthand)")
-	flag.BoolVar(&resetViews, "reset-views", false, "Delete all view configs and regenerate defaults")
-	flag.BoolVar(&resetThemes, "reset-themes", false, "Delete all theme files and regenerate defaults")
+	flag.BoolVar(&resetViews, "reset-views", false, "Delete all view configs; defaults recreated on next launch")
+	flag.BoolVar(&resetThemes, "reset-themes", false, "Delete all theme files; defaults recreated on next launch")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -70,8 +70,8 @@ func main() {
 		fmt.Println("  -d, --demo         Run with synthetic demo data (no AWS credentials needed)")
 		fmt.Println("      --no-cache     Disable resource availability cache")
 		fmt.Println("  -c, --command      Open directly to a resource list (e.g. ec2, s3, events)")
-		fmt.Println("      --reset-views  Delete all view configs and regenerate defaults")
-		fmt.Println("      --reset-themes Delete all theme files and regenerate defaults")
+		fmt.Println("      --reset-views  Delete view configs; defaults recreated on next launch")
+		fmt.Println("      --reset-themes Delete theme files; defaults recreated on next launch")
 		fmt.Println("  -v, --version      Print version and exit")
 		fmt.Println("  -h, --help         Print this help")
 	}
@@ -98,11 +98,19 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error: cannot determine config directory")
 			os.Exit(1)
 		}
+		var hadErrors bool
 		if resetViews {
-			resetYAMLDir("view config", filepath.Join(cfgDir, "views"))
+			if !resetYAMLDir("view config", filepath.Join(cfgDir, "views")) {
+				hadErrors = true
+			}
 		}
 		if resetThemes {
-			resetYAMLDir("theme", filepath.Join(cfgDir, "themes"))
+			if !resetYAMLDir("theme", filepath.Join(cfgDir, "themes")) {
+				hadErrors = true
+			}
+		}
+		if hadErrors {
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
@@ -181,15 +189,16 @@ func main() {
 
 // resetYAMLDir deletes all .yaml files in dir after user confirmation.
 // label describes what kind of files (e.g. "view config", "theme") for the prompt.
-func resetYAMLDir(label, dir string) {
+// Returns true if all files were removed (or nothing to do), false on errors.
+func resetYAMLDir(label, dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		fmt.Printf("No %s files found — nothing to reset.\n", label)
-		return
+		return true
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: cannot read %s: %v\n", dir, err)
-		os.Exit(1)
+		return false
 	}
 	var yamlFiles []string
 	for _, e := range entries {
@@ -199,7 +208,7 @@ func resetYAMLDir(label, dir string) {
 	}
 	if len(yamlFiles) == 0 {
 		fmt.Printf("No %s files found — nothing to reset.\n", label)
-		return
+		return true
 	}
 
 	fmt.Printf("This will delete %d %s files in %s/\n", len(yamlFiles), label, dir)
@@ -211,19 +220,21 @@ func resetYAMLDir(label, dir string) {
 	answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 	if answer != "y" && answer != "yes" {
 		fmt.Println("Aborted.")
-		return
+		return true
 	}
 
-	var removed int
+	var removed, failed int
 	for _, name := range yamlFiles {
 		path := filepath.Join(dir, name)
 		if err := os.Remove(path); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: could not remove %s: %v\n", path, err)
+			failed++
 		} else {
 			removed++
 		}
 	}
 	fmt.Printf("Removed %d files. Run a9s to recreate defaults.\n", removed)
+	return failed == 0
 }
 
 // runProgram constructs the model, starts the Bubble Tea program, and guarantees

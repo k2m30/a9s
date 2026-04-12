@@ -16,4 +16,9 @@ list:
     width: 30
 
 detail:
-  [Id, Name, CallerReference, ResourceRecordSetCount, Config, LinkedService]
+  - Id
+  - Name
+  - CallerReference
+  - ResourceRecordSetCount
+  - Config
+  - LinkedService
