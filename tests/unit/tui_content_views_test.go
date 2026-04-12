@@ -302,6 +302,26 @@ func TestContentHelp_ViewContainsKeyBindings(t *testing.T) {
 	}
 }
 
+func TestContentHelp_ResourceListIncludesJSONBinding(t *testing.T) {
+	k := keys.Default()
+	m := views.NewHelp(k, views.HelpFromResourceList)
+	m.SetSize(84, 20)
+	out := stripANSI(m.View())
+	if !strings.Contains(out, "J") || !strings.Contains(out, "json") {
+		t.Errorf("resource-list help should include the J/json binding, got: %s", out)
+	}
+}
+
+func TestContentHelp_DetailIncludesJSONBinding(t *testing.T) {
+	k := keys.Default()
+	m := views.NewHelp(k, views.HelpFromDetail)
+	m.SetSize(84, 20)
+	out := stripANSI(m.View())
+	if !strings.Contains(out, "J") || !strings.Contains(out, "json") {
+		t.Errorf("detail help should include the J/json binding, got: %s", out)
+	}
+}
+
 func TestContentHelp_ViewContainsCloseHint(t *testing.T) {
 	k := keys.Default()
 	m := views.NewHelp(k, views.HelpFromMainMenu)

@@ -183,6 +183,38 @@ func TestRootHandleNavigate_YAML(t *testing.T) {
 	}
 }
 
+func TestRootHandleNavigate_JSON_QQuits(t *testing.T) {
+	tui.Version = "0.6.0"
+	m := newRootSizedModel()
+
+	res := &resource.Resource{
+		ID:   "i-abc123",
+		Name: "my-instance",
+		Fields: map[string]string{
+			"State": "running",
+		},
+	}
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		Resource:     res,
+		ResourceType: "ec2",
+	})
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetJSON,
+		Resource:     res,
+		ResourceType: "ec2",
+	})
+
+	m, cmd := rootApplyMsg(m, rootKeyPress("q"))
+	if cmd == nil {
+		t.Fatal("q on JSON view should return a quit command")
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Fatalf("q on JSON view should emit tea.QuitMsg, got %T", msg)
+	}
+}
+
 func TestRootHandleNavigate_Help(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
