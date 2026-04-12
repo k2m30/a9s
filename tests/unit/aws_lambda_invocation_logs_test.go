@@ -572,4 +572,98 @@ func TestFetchLambdaInvocationLogs_ContinuationTokenForwarded(t *testing.T) {
 	}
 }
 
+// TestFetchLambdaInvocationLogs_EmptyFirstPage verifies that when
+// FilterLogEvents returns an empty first page with a NextToken (CloudWatch Logs
+// does this when scanning across log streams that don't match), the fetcher
+// follows the pagination token and returns the events from subsequent pages.
+func TestFetchLambdaInvocationLogs_EmptyFirstPage(t *testing.T) {
+	mock := &mockCWLogsFilterLogEventsClient{
+		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+			{
+				// Page 1: empty events, but NextToken signals more data
+				Events:    []cwlogstypes.FilteredLogEvent{},
+				NextToken: aws.String("page2-token"),
+			},
+			{
+				// Page 2: the actual log lines
+				Events: []cwlogstypes.FilteredLogEvent{
+					{
+						Timestamp: aws.Int64(1711065600000),
+						Message:   aws.String("START RequestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee Version: $LATEST\n"),
+						EventId:   aws.String("log-001"),
+					},
+					{
+						Timestamp: aws.Int64(1711065601000),
+						Message:   aws.String("INFO doing work\n"),
+						EventId:   aws.String("log-002"),
+					},
+					{
+						Timestamp: aws.Int64(1711065602000),
+						Message:   aws.String("END RequestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n"),
+						EventId:   aws.String("log-003"),
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLambdaInvocationLogs(
+		context.Background(),
+		mock,
+		"/aws/lambda/my-scale-down",
+		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 log lines, got %d", len(result.Resources))
+	}
+	if mock.callIdx != 2 {
+		t.Errorf("expected 2 API calls (paginated), got %d", mock.callIdx)
+	}
+}
+
+// TestFetchLambdaInvocationLogs_MultipleEmptyPages verifies that the fetcher
+// follows multiple empty pages before finding events — CloudWatch Logs can
+// return several empty pages when a log group has many log streams.
+func TestFetchLambdaInvocationLogs_MultipleEmptyPages(t *testing.T) {
+	mock := &mockCWLogsFilterLogEventsClient{
+		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+			{Events: []cwlogstypes.FilteredLogEvent{}, NextToken: aws.String("tok-2")},
+			{Events: []cwlogstypes.FilteredLogEvent{}, NextToken: aws.String("tok-3")},
+			{Events: []cwlogstypes.FilteredLogEvent{}, NextToken: aws.String("tok-4")},
+			{
+				Events: []cwlogstypes.FilteredLogEvent{
+					{
+						Timestamp: aws.Int64(1711065600000),
+						Message:   aws.String("REPORT RequestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\tDuration: 100 ms\n"),
+						EventId:   aws.String("log-final"),
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLambdaInvocationLogs(
+		context.Background(),
+		mock,
+		"/aws/lambda/my-func",
+		"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 log line after paginating through empty pages, got %d", len(result.Resources))
+	}
+	if mock.callIdx != 4 {
+		t.Errorf("expected 4 API calls to exhaust pagination, got %d", mock.callIdx)
+	}
+}
+
 // ============================================================================
