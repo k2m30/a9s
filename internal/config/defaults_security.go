@@ -76,7 +76,7 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Type", Key: "policy_type", Width: 10},
 			},
 			Detail: []string{
-				"PolicyName", "PolicyArn", "PolicyType",
+				"PolicyName", "PolicyArn", "PolicyType", "Document",
 			},
 		},
 		"iam_group_members": {
