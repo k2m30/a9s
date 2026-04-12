@@ -12,7 +12,7 @@ type View interface {
 	SetSize(w, h int)
 	FrameTitle() string
 	CopyContent() (content string, label string) // for clipboard copy
-	GetHelpContext() HelpContext                  // for context-sensitive help
+	GetHelpContext() HelpContext                 // for context-sensitive help
 }
 
 // Filterable is an optional interface for views that support filtering.
@@ -24,7 +24,7 @@ type Filterable interface {
 }
 
 // Searchable is an optional interface for views that support text search.
-// Text-content views (detail, YAML) implement this.
+// Text-content views (detail, YAML, JSON) implement this.
 type Searchable interface {
 	IsSearchActive() bool
 	IsSearchInputMode() bool

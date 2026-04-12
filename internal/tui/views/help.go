@@ -21,6 +21,7 @@ const (
 	HelpFromSecretsList                              // secrets resource list (includes reveal)
 	HelpFromDetail                                   // detail view
 	HelpFromYAML                                     // yaml view
+	HelpFromJSON                                     // json view
 	HelpFromSelector                                 // profile or region selector
 	HelpFromReveal                                   // reveal view
 	HelpFromResourceListPaginated                    // paginated resource list (includes M)
@@ -186,6 +187,8 @@ func (m HelpModel) buildGroups() []helpGroup {
 		return m.detailGroups()
 	case HelpFromYAML:
 		return m.yamlGroups()
+	case HelpFromJSON:
+		return m.jsonGroups()
 	case HelpFromSelector:
 		return m.selectorGroups()
 	case HelpFromReveal:
@@ -245,6 +248,7 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 		bindings: []helpBinding{
 			{"enter/d", "detail"},
 			{"y", "yaml"},
+			{"J", "json"},
 			{"t", "cloudtrail events"},
 			{"c", "copy id"},
 			{"/", "filter"},
@@ -295,6 +299,7 @@ func (m HelpModel) detailGroups() []helpGroup {
 			title: "ACTIONS",
 			bindings: []helpBinding{
 				{"y", "yaml"},
+				{"J", "json"},
 				{"t", "cloudtrail events"},
 				{"c", "copy value"},
 				{"w", "wrap toggle"},
@@ -346,6 +351,43 @@ func (m HelpModel) yamlGroups() []helpGroup {
 			title: "ACTIONS",
 			bindings: []helpBinding{
 				{"c", "copy yaml"},
+				{"t", "cloudtrail events"},
+				{"w", "wrap toggle"},
+			},
+		},
+		{
+			title: "SEARCH",
+			bindings: []helpBinding{
+				{"/", "search"},
+				{"n", "next match"},
+				{"N", "prev match"},
+			},
+		},
+		{
+			title: "OTHER",
+			bindings: []helpBinding{
+				{"esc", "back"},
+				{"i", "identity"},
+				{"?", "help"},
+			},
+		},
+	}
+}
+
+func (m HelpModel) jsonGroups() []helpGroup {
+	return []helpGroup{
+		{
+			title: "SCROLL",
+			bindings: []helpBinding{
+				{"j/k", "up/down"},
+				{"g", "top"},
+				{"G", "bottom"},
+			},
+		},
+		{
+			title: "ACTIONS",
+			bindings: []helpBinding{
+				{"c", "copy json"},
 				{"t", "cloudtrail events"},
 				{"w", "wrap toggle"},
 			},

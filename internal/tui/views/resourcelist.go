@@ -278,6 +278,15 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 					}
 				}
 			}
+		case key.Matches(msg, m.keys.JSON):
+			if r := m.SelectedResource(); r != nil {
+				return m, func() tea.Msg {
+					return messages.NavigateMsg{
+						Target:   messages.TargetJSON,
+						Resource: r,
+					}
+				}
+			}
 		case key.Matches(msg, m.keys.ToggleAttentionOnly):
 			m.attentionOnly = !m.attentionOnly
 			m.applySortAndFilter()
