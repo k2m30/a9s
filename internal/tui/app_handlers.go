@@ -221,6 +221,27 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	m.hasPrevState = false
 	m.prevProfile = ""
 	m.prevRegion = ""
+
+	// Emit a one-shot NavigateMsg if the -c flag set an initial command. Only
+	// fire while the app is still at the main menu (stack depth 1). If the
+	// initial connection was slow and the user already navigated elsewhere,
+	// skip the auto-navigation to avoid pushing a view on top of whatever
+	// the user is doing. Cleared after first use so that subsequent
+	// ClientsReadyMsg (profile/region switch) don't re-navigate.
+	var navigateCmd tea.Cmd
+	if m.command != "" {
+		if len(m.stack) == 1 {
+			target := m.command
+			navigateCmd = func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:       messages.TargetResourceList,
+					ResourceType: target,
+				}
+			}
+		}
+		m.command = "" // always clear, even if skipped, to prevent stale re-navigation
+	}
+
 	if m.profile == "" {
 		m.profile = "default"
 	}
@@ -242,10 +263,10 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 				m.flash = flashState{text: "Connected. Refreshing...", active: true}
 				cmd := m.refreshResourceList(*rl)
-				return m, tea.Batch(cmd, availCmd)
+				return m, tea.Batch(cmd, availCmd, navigateCmd)
 			}
 		}
-		return m, availCmd
+		return m, tea.Batch(availCmd, navigateCmd)
 	}
 
 	// Fetch identity on every clients-ready event
@@ -260,10 +281,10 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			m.flash = flashState{text: "Connected. Refreshing...", active: true}
 			cmd := m.refreshResourceList(*rl)
-			return m, tea.Batch(cmd, identityCmd, availCmd)
+			return m, tea.Batch(cmd, identityCmd, availCmd, navigateCmd)
 		}
 	}
-	return m, tea.Batch(identityCmd, availCmd)
+	return m, tea.Batch(identityCmd, availCmd, navigateCmd)
 }
 
 // handleProfileSelected switches the AWS profile, pops the profile selector,
