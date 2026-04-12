@@ -3,6 +3,7 @@ package unit
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -816,6 +817,9 @@ func TestCache_Save_ConcurrentWrites_NoCorruption(t *testing.T) {
 // for ~500 ms. With os.WriteFile this test is expected to fail intermittently;
 // after the temp+rename fix it must not fail.
 func TestCache_Save_AtomicVisibility(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows file locking prevents concurrent read during rename")
+	}
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 

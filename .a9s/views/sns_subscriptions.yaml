@@ -13,4 +13,8 @@ list:
     width: 14
 
 detail:
-  [SubscriptionArn, TopicArn, Protocol, Endpoint, Owner]
+  - SubscriptionArn
+  - TopicArn
+  - Protocol
+  - Endpoint
+  - Owner
