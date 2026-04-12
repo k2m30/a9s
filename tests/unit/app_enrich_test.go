@@ -1,11 +1,17 @@
 package unit
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -455,6 +461,54 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "2012-10-17") {
 		t.Error("YAML view should NOT show document from wrong resource type")
+	}
+}
+
+func TestProfileSwitch_ClearsPolicyDocumentCache(t *testing.T) {
+	// Populate the cache with a document
+	awsclient.ClearPolicyDocumentCache()
+	t.Cleanup(func() { awsclient.ClearPolicyDocumentCache() })
+
+	docJSON := `{"Version":"2012-10-17","Statement":[]}`
+	encoded := url.QueryEscape(docJSON)
+
+	getPolicyMock := &enrichGetPolicyClient{
+		output: &iam.GetPolicyOutput{
+			Policy: &iamtypes.Policy{DefaultVersionId: aws.String("v1")},
+		},
+	}
+
+	callCount := 0
+	getVersionMock := &countingEnrichGetPolicyVersionClient{
+		output: &iam.GetPolicyVersionOutput{
+			PolicyVersion: &iamtypes.PolicyVersion{Document: aws.String(encoded)},
+		},
+		count: &callCount,
+	}
+
+	// First fetch populates the cache
+	_, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::111111111111:policy/shared-name")
+	if err != nil {
+		t.Fatalf("first fetch error: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 API call, got %d", callCount)
+	}
+
+	// Simulate profile switch via the app — this should clear the cache
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other-account"})
+	_ = m // profile switch triggers cache clear in handleProfileSelected
+
+	// After profile switch, the cache should be empty.
+	// A second fetch with the same ARN should hit the API again.
+	_, err = awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::111111111111:policy/shared-name")
+	if err != nil {
+		t.Fatalf("second fetch error: %v", err)
+	}
+	if callCount != 2 {
+		t.Fatalf("expected 2 API calls after profile switch cleared cache, got %d", callCount)
 	}
 }
 
