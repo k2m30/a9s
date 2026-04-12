@@ -91,6 +91,7 @@ type Model struct {
 	prevRegion     string // last stable region before any in-flight switch, restored on failure
 	configErr      error  // non-nil if views config was found but corrupt
 	activeTheme    string // current theme filename (for selector "(current)" indicator)
+	command        string // initial resource short name to navigate to on first ClientsReadyMsg (from -c flag)
 
 	identity         *awsclient.CallerIdentity
 	identityFetching bool
@@ -223,6 +224,14 @@ func WithClients(clients *awsclient.ServiceClients) Option {
 // "(current)" indicator. main.go passes the validated theme after loading it.
 func WithActiveTheme(name string) Option {
 	return func(m *Model) { m.activeTheme = name }
+}
+
+// WithCommand sets the initial resource short name to navigate to on the first
+// ClientsReadyMsg. Used by the -c/--command CLI flag to open a resource list
+// directly on startup instead of the main menu. The caller is responsible for
+// resolving the input via resource.FindResourceType.
+func WithCommand(name string) Option {
+	return func(m *Model) { m.command = name }
 }
 
 // New constructs the initial Model.
