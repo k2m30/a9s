@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.39.0] - 2026-04-12
 
 ### Added
+
 - Auto-create default view config files (`~/.a9s/views/*.yaml`) on first launch — no source checkout needed to customize views
 - Auto-create and auto-refresh `~/.a9s/views_reference.yaml` field reference on each launch — always up-to-date with the binary version
 - `--reset-views` flag to delete all view configs and regenerate defaults on next launch (with confirmation prompt)
