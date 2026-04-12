@@ -10,4 +10,9 @@ list:
     width: 60
 
 detail:
-  [Timestamp, HistoryItemType, HistorySummary, HistoryData, AlarmName, AlarmType]
+  - Timestamp
+  - HistoryItemType
+  - HistorySummary
+  - HistoryData
+  - AlarmName
+  - AlarmType

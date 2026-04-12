@@ -46,8 +46,9 @@ specs/
 .claude/skills/speckit*
 release-local.sh
 
-# Generated reference (dev-time only)
+# Generated reference (dev-time only, ignore in .a9s/ but track embedded copy)
 views_reference.yaml
+!internal/config/views_reference.yaml
 
 # GoReleaser
 dist/

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.39.0] - 2026-04-12
+
+### Added
+
+- Auto-create default view config files (`~/.a9s/views/*.yaml`) on first launch — no source checkout needed to customize views
+- Auto-create and auto-refresh `~/.a9s/views_reference.yaml` field reference on each launch — always up-to-date with the binary version
+- `--reset-views` flag to delete all view configs and regenerate defaults on next launch (with confirmation prompt)
+- `--reset-themes` flag to delete all theme files and regenerate defaults on next launch (with confirmation prompt)
+- Synthetic child view entries (`lambda_invocations`, `lambda_invocation_logs`, `pipeline_stages`) in `views_reference.yaml`
+- View Customization and Color Themes wiki pages
+
 ## [3.38.0] - 2026-04-12
 
 ### Added
@@ -148,7 +159,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Pre-existing lint warning in `cmd/preview/main.go` (if-else chain → switch)
 
-[Unreleased]: https://github.com/k2m30/a9s/compare/v3.34.0...HEAD
+[Unreleased]: https://github.com/k2m30/a9s/compare/v3.39.0...HEAD
+[3.39.0]: https://github.com/k2m30/a9s/compare/v3.38.0...v3.39.0
+[3.38.0]: https://github.com/k2m30/a9s/compare/v3.37.0...v3.38.0
+[3.37.0]: https://github.com/k2m30/a9s/compare/v3.36.1...v3.37.0
+[3.36.1]: https://github.com/k2m30/a9s/compare/v3.36.0...v3.36.1
+[3.36.0]: https://github.com/k2m30/a9s/compare/v3.35.0...v3.36.0
+[3.35.0]: https://github.com/k2m30/a9s/compare/v3.34.0...v3.35.0
 [3.34.0]: https://github.com/k2m30/a9s/compare/v3.33.0...v3.34.0
 [3.33.0]: https://github.com/k2m30/a9s/compare/v3.32.3...v3.33.0
 [3.32.3]: https://github.com/k2m30/a9s/compare/v3.32.2...v3.32.3

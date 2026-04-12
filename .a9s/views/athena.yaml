@@ -13,4 +13,8 @@ list:
     width: 28
 
 detail:
-  [Name, State, Description, EngineVersion, CreationTime]
+  - Name
+  - State
+  - Description
+  - EngineVersion
+  - CreationTime

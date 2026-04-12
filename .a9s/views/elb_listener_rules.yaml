@@ -13,4 +13,8 @@ list:
     width: 32
 
 detail:
-  [RuleArn, Priority, Conditions, Actions, IsDefault]
+  - RuleArn
+  - Priority
+  - Conditions
+  - Actions
+  - IsDefault

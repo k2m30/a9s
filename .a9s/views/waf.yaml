@@ -10,4 +10,8 @@ list:
     width: 36
 
 detail:
-  [Name, Id, ARN, Description, LockToken]
+  - Name
+  - Id
+  - ARN
+  - Description
+  - LockToken

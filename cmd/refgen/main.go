@@ -192,4 +192,32 @@ func main() {
 		}
 		fmt.Println()
 	}
+
+	// Synthetic child views — not backed by SDK structs, use computed field keys.
+	synthetic := []struct {
+		name    string
+		comment string
+		fields  []string
+	}{
+		{"lambda_invocations", "synthetic (parsed from CloudWatch Logs)", []string{
+			"request_id", "timestamp", "status", "duration_ms",
+			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
+			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
+		}},
+		{"lambda_invocation_logs", "synthetic (CloudWatch log lines)", []string{
+			"timestamp", "message",
+		}},
+		{"pipeline_stages", "synthetic (CodePipeline stage/action state)", []string{
+			"stage_name", "stage_status", "action_name", "action_status",
+			"last_change_time", "external_url", "action_token",
+			"action_error_details", "revision_id", "revision_summary",
+		}},
+	}
+	for _, s := range synthetic {
+		fmt.Printf("%s:  # %s\n", s.name, s.comment)
+		for _, f := range s.fields {
+			fmt.Printf("  - %s\n", f)
+		}
+		fmt.Println()
+	}
 }

@@ -16,4 +16,8 @@ list:
     width: 60
 
 detail:
-  [GroupName, GroupId, Arn, Path, CreateDate]
+  - GroupName
+  - GroupId
+  - Arn
+  - Path
+  - CreateDate

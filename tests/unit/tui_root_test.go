@@ -205,7 +205,7 @@ func TestRootHandleNavigate_JSON_QQuits(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	m, cmd := rootApplyMsg(m, rootKeyPress("q"))
+	_, cmd := rootApplyMsg(m, rootKeyPress("q"))
 	if cmd == nil {
 		t.Fatal("q on JSON view should return a quit command")
 	}

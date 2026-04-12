@@ -78,6 +78,8 @@ See the **[Child Views](https://github.com/k2m30/a9s/wiki/Child-Views)** wiki pa
 
 <!-- INCLUDE: config.md -->
 
+See the **[View Customization](https://github.com/k2m30/a9s/wiki/View-Customization)** wiki page for the full customization guide, and **[Color Themes](https://github.com/k2m30/a9s/wiki/Color-Themes)** for the complete color key reference and custom theme creation.
+
 ## AWS Permissions
 
 a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 66 resource types, CLI setup steps, and a Terraform module.

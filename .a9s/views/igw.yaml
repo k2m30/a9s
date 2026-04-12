@@ -12,4 +12,7 @@ list:
     width: 12
 
 detail:
-  [InternetGatewayId, Attachments, OwnerId, Tags]
+  - InternetGatewayId
+  - Attachments
+  - OwnerId
+  - Tags

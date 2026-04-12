@@ -7,4 +7,7 @@ list:
     width: 120
 
 detail:
-  [Timestamp, Message, IngestionTime, EventId]
+  - Timestamp
+  - Message
+  - IngestionTime
+  - EventId

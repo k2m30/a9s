@@ -13,4 +13,7 @@ list:
     width: 10
 
 detail:
-  [IdentityName, IdentityType, SendingEnabled, VerificationStatus]
+  - IdentityName
+  - IdentityType
+  - SendingEnabled
+  - VerificationStatus

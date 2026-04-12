@@ -10,4 +10,9 @@ list:
     width: 60
 
 detail:
-  [Date, SourceIdentifier, SourceType, EventCategories, SourceArn, Message]
+  - Date
+  - SourceIdentifier
+  - SourceType
+  - EventCategories
+  - SourceArn
+  - Message

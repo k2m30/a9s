@@ -16,4 +16,9 @@ list:
     width: 22
 
 detail:
-  [Name, PipelineType, Version, Created, Updated, ExecutionMode]
+  - Name
+  - PipelineType
+  - Version
+  - Created
+  - Updated
+  - ExecutionMode
