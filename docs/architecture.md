@@ -38,7 +38,7 @@ Key messages:
 | Message | Purpose |
 |---------|---------|
 | `NavigateMsg` | Push a new view (detail, YAML, JSON, etc.) |
-| `PopViewMsg` | Pop the top view (Esc) |
+| `PopViewMsg` | Request current view dismissal (emitted by HelpModel, IdentityModel on keypress) |
 | `ResourcesLoadedMsg` | Deliver fetched resources to a list view |
 | `EnterChildViewMsg` | Open a child resource list (e.g., S3 objects) |
 | `RelatedCheckStartedMsg` | Start async related-resource checks |
@@ -211,27 +211,27 @@ Key highlights:
 - `r` — toggle related panel
 - `x` — reveal secret value
 - `Ctrl+R` — refresh (re-fetch resources, re-run related checks + enrichment)
-- `/` — filter (list) or search (detail/YAML/JSON)
+- `/` — context-dependent: starts filter on list views, starts search on detail/YAML/JSON, view-dependent elsewhere
 - `Esc` — back / cancel / pop view
-- `q` — quit the application (always, regardless of current view)
+- `q` — quit the application (in normal mode; swallowed when filter, command, or search input is active)
 - `?` — help
 - `i` — identity (STS caller identity)
 
 ### Global vs View-Local Key Resolution
 
-The root model's `handleKeyMsg` (`app_handlers.go`) resolves keys in a specific order before delegating to views:
+The root model's `handleKeyMsg` (`app_handlers.go`) resolves keys in a specific order. Input modes take priority over global keys, which means `q`, `?`, etc. are swallowed during typing:
 
 1. **`Ctrl+C`** — force quit (always global, never delegated)
-2. **Input modes** — if filter or command input is active, all keys route there
-3. **Search mode** — if the active view is in search-input mode, all keys route to `updateActiveView`
-4. **`?`** — help (global, pushes HelpModel)
-5. **`i`** — identity (global, pushes IdentityModel)
-6. **`q`** — quit (`tea.Quit`, always)
-7. **`Esc`** — complex: delegates to view first (search cancel, right-column defocus), then pops
-8. **`:`** / **`/`** — enter command/filter mode
+2. **Input modes** — if filter, command, or search input is active, **all keys route to that input handler** (including `q`, `/`, `?`). This is why `q` doesn't quit while typing a filter.
+3. **`?`** — help (global, pushes HelpModel)
+4. **`i`** — identity (global, pushes IdentityModel)
+5. **`q`** — quit (`tea.Quit`)
+6. **`Esc`** — complex: delegates to view first (search cancel, right-column defocus), then pops
+7. **`:`** — enter command mode
+8. **`/`** — routed to `updateActiveView`, which handles it per-view (filter on lists, search on detail/YAML/JSON, ignored elsewhere)
 9. **Everything else** — falls through to `updateActiveView` (view-local handling)
 
-This order means `q` always quits the app — it never "goes back." Esc is the back key.
+The critical insight: steps 2-3 mean `q` only quits in normal mode. During filter/command/search input, all keys are captured by the input handler. `/` is not globally handled — it's always delegated to the active view.
 
 ---
 
@@ -360,8 +360,10 @@ detail:
 ```
 
 **Loading chain** (`config.Load()`):
-1. `~/.a9s/views/{shortname}.yaml` (user global config)
+1. `<configDir>/views/{shortname}.yaml` (user global config)
 2. `.a9s/views/{shortname}.yaml` (per-project CWD overrides)
+
+The base config directory defaults to `~/.a9s/` but can be overridden via the `A9S_CONFIG_FOLDER` environment variable (`internal/config/config.go:ConfigDir()`).
 
 Missing configs fall back to built-in defaults in `internal/config/defaults_*.go` (one file per service category).
 
@@ -371,7 +373,7 @@ Missing configs fall back to built-in defaults in `internal/config/defaults_*.go
 
 ### Theming
 
-Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Themes are YAML-configurable via `~/.a9s/themes/*.yaml`. `ApplyTheme()` replaces the active theme and reinitializes all `lipgloss.Style` vars. `NO_COLOR` env var disables all colors.
+Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Themes are YAML-configurable via `<configDir>/themes/*.yaml` (same `A9S_CONFIG_FOLDER` override as views). `ApplyTheme()` replaces the active theme and reinitializes all `lipgloss.Style` vars. `NO_COLOR` env var disables all colors.
 
 ---
 
@@ -411,8 +413,8 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 **`ClientsReadyMsg` handler:**
 - Stores `m.clients` on the model
 - If `-c` flag was set (e.g., `--command ec2`), emits `NavigateMsg` to auto-open that resource type
-- Fires `fetchIdentity()` for the status bar
-- Starts availability probes (normal) or `demoPrefetchCounts` (demo/noCache)
+- Normal (cached) path: fires `fetchIdentity()` for the status bar, then `loadAvailabilityCache()`
+- noCache/demo path: skips identity fetch, runs `demoPrefetchCounts()` instead
 
 **Options:**
 - `WithClients(c)` — pre-supply AWS clients (used by demo mode and tests)
