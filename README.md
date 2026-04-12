@@ -101,6 +101,8 @@ a9s uses the standard [AWS credential chain](https://docs.aws.amazon.com/cli/lat
 a9s                       # use default profile
 a9s -p production         # use a specific profile
 a9s -r eu-west-1          # override region
+a9s -c ec2                # open directly to EC2 instances, skipping the menu
+a9s -p prod -c events     # open CloudTrail events list in a specific profile
 a9s --version             # print version
 a9s --demo                # run with synthetic demo data (no AWS credentials needed)
 a9s --no-cache            # disable resource availability cache

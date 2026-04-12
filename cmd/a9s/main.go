@@ -12,6 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/buildinfo"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
@@ -37,6 +38,7 @@ func main() {
 		showHelp    bool
 		demoMode    bool
 		noCache     bool
+		command     string
 	)
 
 	flag.StringVar(&profile, "profile", "", "AWS profile to use")
@@ -50,6 +52,8 @@ func main() {
 	flag.BoolVar(&demoMode, "demo", false, "Run with synthetic demo data (no AWS credentials needed)")
 	flag.BoolVar(&demoMode, "d", false, "Run with synthetic demo data (shorthand)")
 	flag.BoolVar(&noCache, "no-cache", false, "Disable resource availability cache")
+	flag.StringVar(&command, "command", "", "Resource type to open directly (e.g. ec2, s3, events)")
+	flag.StringVar(&command, "c", "", "Resource type to open directly (shorthand)")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -59,6 +63,7 @@ func main() {
 		fmt.Println("  -r, --region   AWS region override")
 		fmt.Println("  -d, --demo     Run with synthetic demo data (no AWS credentials needed)")
 		fmt.Println("      --no-cache Disable resource availability cache")
+		fmt.Println("  -c, --command  Open directly to a resource list (e.g. ec2, s3, events)")
 		fmt.Println("  -v, --version  Print version and exit")
 		fmt.Println("  -h, --help     Print this help")
 	}
@@ -77,6 +82,18 @@ func main() {
 			fmt.Printf("a9s %s\n", version)
 		}
 		os.Exit(0)
+	}
+
+	// Validate -c/--command flag: resolve to a canonical resource short name early
+	// so invalid input fails fast before the TUI starts.
+	var resolvedCommand string
+	if command != "" {
+		rt := resource.FindResourceType(command)
+		if rt == nil {
+			fmt.Fprintf(os.Stderr, "Error: unknown resource type: %s\n", command)
+			os.Exit(1)
+		}
+		resolvedCommand = rt.ShortName
 	}
 
 	// Ensure config dir exists (non-fatal on failure)
@@ -119,6 +136,10 @@ func main() {
 		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
 	} else if noCache {
 		extraOpts = append(extraOpts, tui.WithNoCache(true))
+	}
+
+	if resolvedCommand != "" {
+		extraOpts = append(extraOpts, tui.WithCommand(resolvedCommand))
 	}
 
 	tui.Version = version
