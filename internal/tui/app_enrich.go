@@ -12,12 +12,14 @@ import (
 )
 
 // handleEnrichDetail dispatches the enricher for the given resource type.
+// Stamps the current enrichGen so stale results are discarded.
 func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.Cmd) {
 	enricher := resource.GetEnricher(msg.ResourceType)
 	if enricher == nil {
 		return m, nil
 	}
 
+	gen := m.enrichGen
 	return m, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
 		defer cancel()
@@ -28,6 +30,7 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.
 			ResourceID:   msg.Resource.ID,
 			EnrichedRes:  enriched,
 			Err:          err,
+			Generation:   gen,
 		}
 	}
 }

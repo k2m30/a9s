@@ -244,20 +244,32 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Detail view: re-trigger related resource checks
+	// Detail view: re-trigger related resource checks and enrichment
 	if d, ok := m.activeView().(*views.DetailModel); ok {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
 		m.relatedGen++ // cancel in-flight results from previous batch
+		m.enrichGen++  // cancel in-flight enrichment from previous batch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-		return m, func() tea.Msg {
+
+		var cmds []tea.Cmd
+		cmds = append(cmds, func() tea.Msg {
 			return messages.RelatedCheckStartedMsg{
 				ResourceType:   rt,
 				SourceResource: srcRes,
 			}
+		})
+		if resource.HasEnricher(rt) {
+			cmds = append(cmds, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: rt,
+					Resource:     srcRes,
+				}
+			})
 		}
+		return m, tea.Batch(cmds...)
 	}
 
 	rl, ok := m.activeView().(*views.ResourceListModel)

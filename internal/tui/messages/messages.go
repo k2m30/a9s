@@ -219,9 +219,12 @@ type EnrichDetailMsg struct {
 
 // EnrichDetailResultMsg delivers an enriched resource back to the detail view.
 // On success, the detail view replaces its resource and rebuilds the field list.
+// Generation is stamped by the dispatcher and validated in app.go to discard
+// stale results after Ctrl+R or navigation away.
 type EnrichDetailResultMsg struct {
 	ResourceType string
 	ResourceID   string
 	EnrichedRes  resource.Resource
 	Err          error
+	Generation   uint64
 }

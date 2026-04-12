@@ -106,7 +106,8 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
 	case messages.EnrichDetailResultMsg:
-		if msg.Err != nil || msg.ResourceID != m.res.ID {
+		// Guard: ignore results for a different resource type or resource ID.
+		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
 			return m, nil
 		}
 		m.res = msg.EnrichedRes

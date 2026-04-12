@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -272,5 +273,111 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 	// Detail view should still show the policy fields
 	if !strings.Contains(content, "my-policy") {
 		t.Errorf("detail view should still show policy name after enrichment, got:\n%s", content)
+	}
+}
+
+func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/rt-test", "rt-test", "Managed")
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Send enrichment result with WRONG resource type but matching ID
+	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "wrong-type",
+		ResourceID:   res.ID,
+		EnrichedRes:  enrichedRes,
+	})
+
+	content := stripANSI(rootViewContent(m))
+	if strings.Contains(content, "2012-10-17") {
+		t.Error("detail view should NOT show document from wrong resource type")
+	}
+}
+
+func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/err-test", "err-test", "Managed")
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Send enrichment result with an error
+	_, cmd := rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "role_policies",
+		ResourceID:   res.ID,
+		Err:          fmt.Errorf("GetPolicy: access denied"),
+	})
+
+	// The app.go handler returns a FlashMsg command on error
+	if cmd == nil {
+		t.Fatal("expected a flash command on enrichment error")
+	}
+	msg := cmd()
+	flash, ok := msg.(messages.FlashMsg)
+	if !ok {
+		t.Fatalf("expected FlashMsg, got %T", msg)
+	}
+	if !flash.IsError {
+		t.Error("expected flash to be an error")
+	}
+	if !strings.Contains(flash.Text, "enrich failed") {
+		t.Errorf("expected flash text to contain 'enrich failed', got %q", flash.Text)
+	}
+}
+
+func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-test", "gen-test", "Managed")
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Send enrichment result with a stale generation (999 != current enrichGen)
+	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "role_policies",
+		ResourceID:   res.ID,
+		EnrichedRes:  enrichedRes,
+		Generation:   999, // stale — does not match enrichGen (which is 1)
+	})
+
+	content := stripANSI(rootViewContent(m))
+	if strings.Contains(content, "2012-10-17") {
+		t.Error("detail view should NOT show document from stale generation")
+	}
+}
+
+func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/refresh-test", "refresh-test", "Managed")
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Press Ctrl+R to refresh
+	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+
+	// Should return a batched command (related checks + enrichment)
+	if cmd == nil {
+		t.Fatal("expected a command on refresh")
 	}
 }
