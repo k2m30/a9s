@@ -7,4 +7,6 @@ list:
     width: 120
 
 detail:
-  [Id, CreatedAt, Message]
+  - Id
+  - CreatedAt
+  - Message

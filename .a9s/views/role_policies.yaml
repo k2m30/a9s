@@ -10,4 +10,6 @@ list:
     width: 10
 
 detail:
-  [PolicyName, PolicyArn, PolicyType]
+  - PolicyName
+  - PolicyArn
+  - PolicyType

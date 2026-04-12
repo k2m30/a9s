@@ -16,4 +16,5 @@ list:
     width: 50
 
 detail:
-  [QueueUrl, Attributes]
+  - QueueUrl
+  - Attributes
