@@ -264,6 +264,75 @@ func TestEnricherRegistry_RolePolices_EnricherIsNonNil(t *testing.T) {
 	}
 }
 
+func TestDecodePolicyDocument_PlusSignPreserved(t *testing.T) {
+	// IAM uses RFC 3986 percent-encoding, not query-string encoding.
+	// A literal + in a policy value (e.g., external ID) must be preserved,
+	// not converted to a space.
+	docJSON := `{"Version":"2012-10-17","Statement":[{"Condition":{"StringEquals":{"sts:ExternalId":"abc+def"}}}]}`
+	// Percent-encode the + as %2B (as IAM would)
+	encoded := url.QueryEscape(docJSON) // QueryEscape encodes + as %2B
+
+	getPolicyMock := &enrichGetPolicyClient{
+		output: &iam.GetPolicyOutput{
+			Policy: &iamtypes.Policy{DefaultVersionId: aws.String("v1")},
+		},
+	}
+	getVersionMock := &enrichGetPolicyVersionClient{
+		output: &iam.GetPolicyVersionOutput{
+			PolicyVersion: &iamtypes.PolicyVersion{Document: aws.String(encoded)},
+		},
+	}
+
+	doc, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::123456789012:policy/plus-test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := doc.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any, got %T", doc)
+	}
+	stmt := m["Statement"].([]any)[0].(map[string]any)
+	cond := stmt["Condition"].(map[string]any)
+	se := cond["StringEquals"].(map[string]any)
+	extID, ok := se["sts:ExternalId"].(string)
+	if !ok {
+		t.Fatal("expected sts:ExternalId to be a string")
+	}
+	if extID != "abc+def" {
+		t.Errorf("expected plus sign preserved as 'abc+def', got %q", extID)
+	}
+}
+
+func TestDecodePolicyDocument_LiteralPlusInDocument_NotConvertedToSpace(t *testing.T) {
+	// When IAM returns a document where the original JSON contains a literal +,
+	// the + in the encoded string should be treated as a literal + (not space).
+	// This tests the case where the encoded document contains a raw + character.
+	encoded := `%7B%22key%22%3A%22a+b%22%7D` // {"key":"a+b"} with literal +
+	getPolicyMock := &enrichGetPolicyClient{
+		output: &iam.GetPolicyOutput{
+			Policy: &iamtypes.Policy{DefaultVersionId: aws.String("v1")},
+		},
+	}
+	getVersionMock := &enrichGetPolicyVersionClient{
+		output: &iam.GetPolicyVersionOutput{
+			PolicyVersion: &iamtypes.PolicyVersion{Document: aws.String(encoded)},
+		},
+	}
+
+	doc, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::123456789012:policy/literal-plus-test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := doc.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any, got %T", doc)
+	}
+	val := m["key"].(string)
+	if val != "a+b" {
+		t.Errorf("expected literal plus preserved as 'a+b', got %q (space would mean QueryUnescape was used)", val)
+	}
+}
+
 // errFake is a simple error type used to construct errors in tests.
 type errFake string
 

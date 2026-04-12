@@ -362,6 +362,102 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 	}
 }
 
+func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-direct", "yaml-direct", "Managed")
+
+	// Open YAML view directly (as if pressing y from resource list)
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetYAML,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Simulate enrichment result arriving
+	enrichedRes := withDocument(res, map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []any{
+			map[string]any{"Effect": "Allow", "Action": "s3:*", "Resource": "*"},
+		},
+	})
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "role_policies",
+		ResourceID:   res.ID,
+		EnrichedRes:  enrichedRes,
+	})
+
+	content := stripANSI(rootViewContent(m))
+	if !strings.Contains(content, "Document") {
+		t.Error("expected YAML view to show Document after enrichment")
+	}
+	if !strings.Contains(content, "Statement") {
+		t.Error("expected YAML view to show Statement after enrichment")
+	}
+}
+
+func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-direct", "json-direct", "Managed")
+
+	// Open JSON view directly
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetJSON,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Simulate enrichment result
+	enrichedRes := withDocument(res, map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []any{
+			map[string]any{"Effect": "Deny", "Action": "*", "Resource": "*"},
+		},
+	})
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "role_policies",
+		ResourceID:   res.ID,
+		EnrichedRes:  enrichedRes,
+	})
+
+	content := stripANSI(rootViewContent(m))
+	if !strings.Contains(content, "Document") {
+		t.Error("expected JSON view to show Document after enrichment")
+	}
+	if !strings.Contains(content, "Deny") {
+		t.Error("expected JSON view to show Deny effect after enrichment")
+	}
+}
+
+func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
+	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-guard", "yaml-guard", "Managed")
+
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetYAML,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	// Send enrichment with wrong resource type
+	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: "wrong-type",
+		ResourceID:   res.ID,
+		EnrichedRes:  enrichedRes,
+	})
+
+	content := stripANSI(rootViewContent(m))
+	if strings.Contains(content, "2012-10-17") {
+		t.Error("YAML view should NOT show document from wrong resource type")
+	}
+}
+
 func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})

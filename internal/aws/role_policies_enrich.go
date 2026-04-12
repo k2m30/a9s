@@ -132,7 +132,9 @@ func FetchInlinePolicyDocument(ctx context.Context, api IAMGetRolePolicyAPI, rol
 }
 
 func decodePolicyDocument(encoded string) (any, error) {
-	decoded, err := url.QueryUnescape(encoded)
+	// IAM returns percent-encoded documents per RFC 3986.
+	// Use PathUnescape (not QueryUnescape) to avoid treating + as space.
+	decoded, err := url.PathUnescape(encoded)
 	if err != nil {
 		return nil, fmt.Errorf("URL decode: %w", err)
 	}

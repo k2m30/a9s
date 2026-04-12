@@ -64,8 +64,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&d)
 		var cmds []tea.Cmd
 
-		// Dispatch enrichment if registered for this resource type
+		// Dispatch enrichment if registered for this resource type.
+		// Increment enrichGen so in-flight results from a previous detail view
+		// (e.g., same inline policy name under a different role) are discarded.
 		if resource.HasEnricher(resType) {
+			m.enrichGen++
 			cmds = append(cmds, func() tea.Msg {
 				return messages.EnrichDetailMsg{
 					ResourceType: resType,
@@ -110,6 +113,16 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		y := views.NewYAML(*msg.Resource, resType, m.keys)
 		y.SetSize(m.innerSize())
 		m.pushView(&y)
+		// Dispatch enrichment so YAML view updates when result arrives.
+		if resource.HasEnricher(resType) {
+			m.enrichGen++
+			return m, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetJSON:
@@ -128,6 +141,16 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		j := views.NewJSON(*msg.Resource, resType, m.keys)
 		j.SetSize(m.innerSize())
 		m.pushView(&j)
+		// Dispatch enrichment so JSON view updates when result arrives.
+		if resource.HasEnricher(resType) {
+			m.enrichGen++
+			return m, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetHelp:
