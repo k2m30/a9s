@@ -15,4 +15,9 @@ list:
     width: 8
 
 detail:
-  [RouteTableId, VpcId, Routes, Associations, OwnerId, Tags]
+  - RouteTableId
+  - VpcId
+  - Routes
+  - Associations
+  - OwnerId
+  - Tags

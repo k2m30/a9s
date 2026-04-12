@@ -13,4 +13,8 @@ list:
     width: 22
 
 detail:
-  [StreamName, StreamARN, StreamStatus, StreamModeDetails, StreamCreationTimestamp]
+  - StreamName
+  - StreamARN
+  - StreamStatus
+  - StreamModeDetails
+  - StreamCreationTimestamp

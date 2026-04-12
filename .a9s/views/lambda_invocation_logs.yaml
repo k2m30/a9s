@@ -7,4 +7,5 @@ list:
     width: 120
 
 detail:
-  [timestamp, message]
+  - timestamp
+  - message

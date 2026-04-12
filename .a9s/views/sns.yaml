@@ -7,4 +7,4 @@ list:
     width: 60
 
 detail:
-  [TopicArn]
+  - TopicArn

@@ -13,4 +13,7 @@ list:
     width: 22
 
 detail:
-  [Name, StateMachineArn, Type, CreationDate]
+  - Name
+  - StateMachineArn
+  - Type
+  - CreationDate

@@ -10,4 +10,7 @@ list:
     width: 22
 
 detail:
-  [Name, BucketArn, BucketRegion, CreationDate]
+  - Name
+  - BucketArn
+  - BucketRegion
+  - CreationDate

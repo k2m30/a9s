@@ -157,13 +157,9 @@ func TestSaveTheme_WritesAndOverwritesConfig(t *testing.T) {
 
 func TestThemePath_ErrorWhenConfigDirEmpty(t *testing.T) {
 	// Force ConfigDir() to return "" by unsetting both HOME and A9S_CONFIG_FOLDER.
-	origHome, homeSet := os.LookupEnv("HOME")
-	os.Unsetenv("HOME")
-	defer func() {
-		if homeSet {
-			os.Setenv("HOME", origHome)
-		}
-	}()
+	// On Windows, os.UserHomeDir() uses USERPROFILE, not HOME.
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
 	t.Setenv("A9S_CONFIG_FOLDER", "")
 
 	_, err := config.ThemePath("dracula.yaml")
@@ -178,13 +174,9 @@ func TestThemePath_ErrorWhenConfigDirEmpty(t *testing.T) {
 
 func TestSaveTheme_ErrorWhenConfigDirEmpty(t *testing.T) {
 	// Force ConfigDir() to return "" by unsetting both HOME and A9S_CONFIG_FOLDER.
-	origHome, homeSet := os.LookupEnv("HOME")
-	os.Unsetenv("HOME")
-	defer func() {
-		if homeSet {
-			os.Setenv("HOME", origHome)
-		}
-	}()
+	// On Windows, os.UserHomeDir() uses USERPROFILE, not HOME.
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
 	t.Setenv("A9S_CONFIG_FOLDER", "")
 
 	err := config.SaveTheme("dracula.yaml")
