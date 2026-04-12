@@ -27,6 +27,7 @@ type Map struct {
 	// Resource list actions
 	Describe    key.Binding
 	YAML        key.Binding
+	JSON        key.Binding
 	Reveal      key.Binding
 	Copy        key.Binding
 	ScrollLeft  key.Binding
@@ -90,6 +91,7 @@ func Default() Map {
 
 		Describe:    key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "detail")),
 		YAML:        key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yaml")),
+		JSON:        key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "json")),
 		Reveal:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal")),
 		Copy:        key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy id")),
 		ScrollLeft:  key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "scroll left")),

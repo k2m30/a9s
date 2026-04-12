@@ -332,6 +332,13 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 					Resource: &m.res,
 				}
 			}
+		case key.Matches(msg, m.keys.JSON):
+			return m, func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:   messages.TargetJSON,
+					Resource: &m.res,
+				}
+			}
 		case key.Matches(msg, m.keys.ToggleWrap):
 			m.wrap = !m.wrap
 			m.viewport.SoftWrap = m.wrap

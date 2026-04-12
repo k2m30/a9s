@@ -19,6 +19,7 @@
 |-----|--------|
 | `d` | Detail view |
 | `y` | YAML view |
+| `J` | JSON view |
 | `x` | Reveal (expand) |
 | `c` | Copy resource ID to clipboard |
 | `i` | IAM identity view |
@@ -33,7 +34,7 @@
 | `m` | Load more (paginated lists, also in demo mode) |
 | `R` | Open Stack Resources (CFN Stacks) |
 | `s` | Open source view (reserved for future child views) |
-| `w` | Toggle line wrap (in YAML, detail, and reveal views) |
+| `w` | Toggle line wrap (in YAML, JSON, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
 
 ### Related Resources (Detail View)
@@ -44,7 +45,7 @@
 | `Tab` | Switch focus between detail content and related panel |
 | `Enter` | Navigate to related resource (on navigable field or panel row) |
 
-### Search (Detail and YAML Views)
+### Search (Detail, YAML, and JSON Views)
 
 | Key | Action |
 |-----|--------|
