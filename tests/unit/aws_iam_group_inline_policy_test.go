@@ -334,6 +334,15 @@ func (s *stubGroupPolicyIAM) ListAccountAliases(_ context.Context, _ *iam.ListAc
 func (s *stubGroupPolicyIAM) GetGroup(_ context.Context, _ *iam.GetGroupInput, _ ...func(*iam.Options)) (*iam.GetGroupOutput, error) {
 	panic("stubGroupPolicyIAM.GetGroup called unexpectedly")
 }
+func (s *stubGroupPolicyIAM) GetPolicy(_ context.Context, _ *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
+	panic("stubGroupPolicyIAM.GetPolicy called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) GetPolicyVersion(_ context.Context, _ *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
+	panic("stubGroupPolicyIAM.GetPolicyVersion called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) GetRolePolicy(_ context.Context, _ *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
+	panic("stubGroupPolicyIAM.GetRolePolicy called unexpectedly")
+}
 
 // compile-time check
 var _ awsclient.IAMAPI = (*stubGroupPolicyIAM)(nil)

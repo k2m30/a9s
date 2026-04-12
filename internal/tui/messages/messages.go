@@ -209,3 +209,19 @@ type IdentityLoadedMsg struct {
 type IdentityErrorMsg struct {
 	Err string
 }
+
+// EnrichDetailMsg signals that the active detail view's resource should be
+// enriched with additional data (e.g., policy document fetched on demand).
+type EnrichDetailMsg struct {
+	ResourceType string
+	Resource     resource.Resource
+}
+
+// EnrichDetailResultMsg delivers an enriched resource back to the detail view.
+// On success, the detail view replaces its resource and rebuilds the field list.
+type EnrichDetailResultMsg struct {
+	ResourceType string
+	ResourceID   string
+	EnrichedRes  resource.Resource
+	Err          error
+}
