@@ -29,82 +29,105 @@ func init() {
 	})
 }
 
+// maxInvocationLogLines caps the result set for a single invocation's logs.
+const maxInvocationLogLines = 500
+
 // FetchLambdaInvocationLogs calls the CloudWatchLogs FilterLogEvents API with
 // a filter pattern containing the request ID, returning individual log lines
-// for a specific Lambda invocation as a FetchResult.
+// for a specific Lambda invocation as a FetchResult. It paginates through
+// empty pages (CloudWatch Logs returns these when scanning across log streams
+// that don't match) until events are found or the API signals no more pages.
 func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, requestID string, continuationToken string) (resource.FetchResult, error) {
 	filterPattern := fmt.Sprintf("%q", requestID)
 	startTime := time.Now().Add(-24 * time.Hour).UnixMilli()
 
-	input := &cloudwatchlogs.FilterLogEventsInput{
-		LogGroupName:  &logGroup,
-		FilterPattern: &filterPattern,
-		StartTime:     &startTime,
-	}
+	var nextToken *string
 	if continuationToken != "" {
-		input.NextToken = &continuationToken
-	}
-
-	output, err := api.FilterLogEvents(ctx, input)
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
+		nextToken = &continuationToken
 	}
 
 	var resources []resource.Resource
 
-	for _, event := range output.Events {
-		message := ""
-		if event.Message != nil {
-			message = strings.TrimRight(*event.Message, "\n\r")
+	for {
+		input := &cloudwatchlogs.FilterLogEventsInput{
+			LogGroupName:  &logGroup,
+			FilterPattern: &filterPattern,
+			StartTime:     &startTime,
+			NextToken:     nextToken,
 		}
 
-		ts := ""
-		if event.Timestamp != nil {
-			ts = formatEpochMillis(*event.Timestamp)
+		output, err := api.FilterLogEvents(ctx, input)
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
 		}
 
-		// ID: use EventId if available, otherwise generate
-		id := ""
-		if event.EventId != nil {
-			id = *event.EventId
-		} else if event.Timestamp != nil {
-			id = fmt.Sprintf("evt-%d", *event.Timestamp)
+		for _, event := range output.Events {
+			message := ""
+			if event.Message != nil {
+				message = strings.TrimRight(*event.Message, "\n\r")
+			}
+
+			ts := ""
+			if event.Timestamp != nil {
+				ts = formatEpochMillis(*event.Timestamp)
+			}
+
+			// ID: use EventId if available, otherwise generate
+			id := ""
+			if event.EventId != nil {
+				id = *event.EventId
+			} else if event.Timestamp != nil {
+				id = fmt.Sprintf("evt-%d", *event.Timestamp)
+			}
+
+			// Name: message (truncated to 80 chars)
+			name := message
+			if len(name) > 80 {
+				name = name[:80]
+			}
+
+			// Status classification using shared function from log_events.go
+			status := classifyLogEventStatus(message)
+
+			resources = append(resources, resource.Resource{
+				ID:     id,
+				Name:   name,
+				Status: status,
+				Fields: map[string]string{
+					"timestamp": ts,
+					"message":   message,
+				},
+				RawStruct: event,
+			})
 		}
 
-		// Name: message (truncated to 80 chars)
-		name := message
-		if len(name) > 80 {
-			name = name[:80]
+		if len(resources) >= maxInvocationLogLines {
+			apiNextToken := ""
+			if output.NextToken != nil {
+				apiNextToken = *output.NextToken
+			}
+			return resource.FetchResult{
+				Resources: resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: true,
+					NextToken:   apiNextToken,
+					PageSize:    len(resources),
+				},
+			}, nil
 		}
 
-		// Status classification using shared function from log_events.go
-		status := classifyLogEventStatus(message)
-
-		r := resource.Resource{
-			ID:     id,
-			Name:   name,
-			Status: status,
-			Fields: map[string]string{
-				"timestamp": ts,
-				"message":   message,
-			},
-			RawStruct: event,
+		if output.NextToken == nil {
+			break
 		}
-
-		resources = append(resources, r)
+		nextToken = output.NextToken
 	}
 
-	pagination := &resource.PaginationMeta{
-		IsTruncated: false,
-		TotalHint:   len(resources),
-		PageSize:    len(resources),
-	}
-	if output.NextToken != nil && *output.NextToken != "" {
-		pagination.IsTruncated = true
-		pagination.NextToken = *output.NextToken
-	}
 	return resource.FetchResult{
-		Resources:  resources,
-		Pagination: pagination,
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			TotalHint:   len(resources),
+			PageSize:    len(resources),
+		},
 	}, nil
 }
