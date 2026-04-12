@@ -28,6 +28,8 @@ skills:
 
 You are a senior Go developer implementing **a9s** — an AWS resource manager TUI built with Bubble Tea v2.
 
+> **Architecture reference**: `docs/architecture.md` — covers resource model, fetcher patterns, view types, enrichment, caching layers, and demo mode. Read the relevant section before implementing in an unfamiliar area.
+
 ## SCOPE GATE (mandatory)
 
 Before doing ANY work, verify the task includes **exact scope**:

@@ -66,6 +66,8 @@ specs/           # feature specifications
 
 ## Architecture Principles
 
+> **Full architecture guide**: [`docs/architecture.md`](docs/architecture.md) — covers all concepts, patterns, caching layers, key handling, test philosophy, and design decisions. Read it first when onboarding.
+
 - **Read-only by design** — a9s never makes write calls to AWS
 - **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
 - **Message-driven** — views communicate via typed messages, never import each other

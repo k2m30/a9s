@@ -1,6 +1,6 @@
 # a9s Architecture Guide
 
-This document is the first thing you should read when joining the project. It covers every concept, pattern, and design decision you need to understand before touching code.
+This document is the first thing you should read when joining the project. It covers every concept, pattern, interconnection, and design decision you need to understand before touching code.
 
 ## What is a9s?
 
@@ -38,13 +38,13 @@ Key messages:
 | Message | Purpose |
 |---------|---------|
 | `NavigateMsg` | Push a new view (detail, YAML, JSON, etc.) |
-| `PopViewMsg` | Pop the top view (Esc/q) |
+| `PopViewMsg` | Pop the top view (Esc) |
 | `ResourcesLoadedMsg` | Deliver fetched resources to a list view |
 | `EnterChildViewMsg` | Open a child resource list (e.g., S3 objects) |
 | `RelatedCheckStartedMsg` | Start async related-resource checks |
 | `RelatedCheckResultMsg` | Deliver one related-check result to detail view |
 | `EnrichDetailMsg` | Start async detail enrichment (e.g., policy doc fetch) |
-| `EnrichDetailResultMsg` | Deliver enriched resource back to detail view |
+| `EnrichDetailResultMsg` | Deliver enriched resource back to detail/YAML/JSON view |
 | `FlashMsg` | Show a temporary status/error message |
 | `ClientsReadyMsg` | AWS clients connected and ready |
 
@@ -58,8 +58,8 @@ The app maintains a stack of views (`stack []views.View`):
 ```
 
 - `pushView(v)` — append to stack
-- `popView()` — remove top (Esc/q)
-- `activeView()` — `stack[len(stack)-1]`, receives all messages
+- `popView()` — remove top (Esc pops; `q` quits the app)
+- `activeView()` — `stack[len(stack)-1]`, receives all messages via `updateActiveView()`
 
 Views are created in `handleNavigate()` and pushed immediately. Async data arrives later via messages.
 
@@ -69,15 +69,19 @@ Views are created in `handleNavigate()` and pushed immediately. Async data arriv
 
 ```
 cmd/
-  a9s/           # main binary — CLI flags, tea.NewProgram
-  readmegen/     # generates README.md from docs/README.tmpl.md
-  viewsgen/      # generates ~/.a9s/views/*.yaml from built-in defaults
-  refgen/        # generates views_reference.yaml from AWS SDK struct reflection
-  preview/       # renders static TUI design mockups (no AWS)
+  a9s/              # main binary — CLI flags, tea.NewProgram
+  readmegen/        # generates README.md from docs/README.tmpl.md
+  viewsgen/         # generates ~/.a9s/views/*.yaml from built-in defaults
+  refgen/           # generates views_reference.yaml from AWS SDK struct reflection
+  preview/          # renders static TUI design mockups (no AWS)
+  preview-pagination/  # pagination preview
+  preview-policy-doc/  # policy document preview
+  preview_detail/      # detail view preview
 
 internal/
-  aws/           # AWS service clients, resource fetchers, related checkers
+  aws/           # AWS service clients, resource fetchers, related checkers, enrichers
   buildinfo/     # version resolution (ldflags at build time)
+  cache/         # on-disk availability cache with TTL (see Caching Layers)
   config/        # YAML config loading, built-in defaults per service
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
@@ -89,11 +93,12 @@ internal/
     layout/      #   frame rendering (borders, title, status line)
     messages/    #   inter-view message types
     styles/      #   Tokyo Night Dark palette, theming system
+    text/        #   text utilities (PadOrTrunc for column rendering)
     views/       #   all view models (see View Types below)
 
 tests/
-  unit/          # ~416 files — all unit tests
-  integration/   # 14 files — gated by //go:build integration
+  unit/          # all unit tests (run via `make test` with -race)
+  integration/   # gated by //go:build integration
   testdata/      # hand-crafted JSON fixtures
 ```
 
@@ -189,7 +194,44 @@ type View interface {
 }
 ```
 
-`Update` is deliberately excluded from the interface because each view returns its own concrete type. The root model's `updateActiveView()` type-switches on each concrete type to dispatch.
+`Update` is deliberately excluded from the interface because each view returns its own concrete type. The root model's `updateActiveView()` type-switches on each concrete type to dispatch and write back.
+
+---
+
+## Key Handling
+
+### Bindings
+
+All bindings are defined in one file: `internal/tui/keys/keys.go`. Single `Map` struct, single `Default()` constructor. Views receive `keys.Map` at construction and use `key.Matches(msg, m.keys.XYZ)`. No runtime rebinding.
+
+Key highlights:
+- `Enter` — drill into detail/child view
+- `y` — YAML view, `J` (uppercase) — JSON view
+- `p` — role policies (and other child views via `ChildViewDef.Key`)
+- `r` — toggle related panel
+- `x` — reveal secret value
+- `Ctrl+R` — refresh (re-fetch resources, re-run related checks + enrichment)
+- `/` — filter (list) or search (detail/YAML/JSON)
+- `Esc` — back / cancel / pop view
+- `q` — quit the application (always, regardless of current view)
+- `?` — help
+- `i` — identity (STS caller identity)
+
+### Global vs View-Local Key Resolution
+
+The root model's `handleKeyMsg` (`app_handlers.go`) resolves keys in a specific order before delegating to views:
+
+1. **`Ctrl+C`** — force quit (always global, never delegated)
+2. **Input modes** — if filter or command input is active, all keys route there
+3. **Search mode** — if the active view is in search-input mode, all keys route to `updateActiveView`
+4. **`?`** — help (global, pushes HelpModel)
+5. **`i`** — identity (global, pushes IdentityModel)
+6. **`q`** — quit (`tea.Quit`, always)
+7. **`Esc`** — complex: delegates to view first (search cancel, right-column defocus), then pops
+8. **`:`** / **`/`** — enter command/filter mode
+9. **Everything else** — falls through to `updateActiveView` (view-local handling)
+
+This order means `q` always quits the app — it never "goes back." Esc is the back key.
 
 ---
 
@@ -228,25 +270,26 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 
 ## Enrichment (On-Demand Detail Enhancement)
 
-When a detail view opens for a resource type with a registered enricher, the app async-fetches additional data and merges it into the resource.
+When a detail, YAML, or JSON view opens for a resource type with a registered enricher, the app async-fetches additional data and merges it into the resource.
 
 **Flow:**
 ```
-Detail view opens
+View opens (detail, YAML, or JSON)
   → resource.HasEnricher(resType)?
+    → increment enrichGen (invalidate prior in-flight results)
     → emit EnrichDetailMsg
       → handleEnrichDetail runs enricher in goroutine (10s timeout)
         → EnrichDetailResultMsg arrives
           → app.go: generation guard + error flash
-            → detail.go: ResourceType + ResourceID guard
-              → m.res = enriched, rebuild field list
+            → view: ResourceType + ResourceID guard
+              → m.res = enriched, re-render content
 ```
 
-**Generation guard**: `enrichGen uint64` is incremented on Ctrl+R, profile switch, and region switch. Stale results (wrong generation) are silently discarded. Generation=0 (test injection) is always accepted.
+**Generation guard**: `enrichGen uint64` is incremented on every new enrichable view open, Ctrl+R, profile switch, and region switch. Stale results (wrong generation) are silently discarded. Generation=0 (test injection) is always accepted.
 
-**Error handling**: Enrichment errors produce a `FlashMsg` with `IsError: true`. The detail view is not updated on error.
+**Error handling**: Enrichment errors produce a `FlashMsg` with `IsError: true`. The view is not updated on error.
 
-**Cache**: The enricher manages its own per-resource cache (e.g., `policyDocCache` keyed by ARN). Cache is session-scoped — no invalidation, no TTL.
+**Cache**: The enricher manages its own per-resource cache (e.g., `policyDocCache` keyed by ARN for managed policies, `roleName/policyName` for inline). Cache is session-scoped with explicit invalidation on profile switch (different AWS accounts may share the same role/policy names).
 
 ---
 
@@ -271,6 +314,27 @@ type ChildViewDef struct {
 - anything else → `Resource.Fields[key]`
 
 When triggered, `EnterChildViewMsg` is emitted. `handleEnterChildView` constructs a `NewChildResourceList` and calls the registered `PaginatedChildFetcher` with the resolved parent context.
+
+---
+
+## Caching Layers
+
+The app has four distinct caches, each serving a different purpose:
+
+| Cache | Location | Scope | Invalidation |
+|-------|----------|-------|-------------|
+| **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
+| **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
+| **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
+| **Enricher caches** | Per-enricher (e.g., `policyDocCache` in `role_policies_enrich.go`) | In-memory, package-level | Cleared on profile switch; generation guards discard stale results |
+
+**Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources and their counts. Loaded on startup to instantly grey-out empty types in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count}`.
+
+**Resource cache**: Stores the full view state of previously-viewed resource lists (resources, pagination, filter, sort, cursor position). Enables instant back-navigation without re-fetching.
+
+**Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
+
+**Enricher caches**: Each enricher manages its own cache. The policy document enricher caches decoded documents by ARN (managed) or `roleName/policyName` (inline). Session-scoped but explicitly cleared on profile switch to prevent cross-account stale data.
 
 ---
 
@@ -319,26 +383,10 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 - `internal/demo/fixtures/` — per-service Go files returning hardcoded SDK response objects
 - `internal/demo/fakes/` — per-service fake API implementations backed by fixtures
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
-- `tui.WithDemo(true)` injects the fake clients and disables cache probes
+
+**API note**: `tui.WithDemo(true)` is a compatibility shim that calls `WithClients(demo.NewServiceClients())` internally. New code should use the explicit form: `tui.WithClients(demo.NewServiceClients())` + `tui.WithNoCache(true)`.
 
 Demo mode is the primary way to develop and test the TUI without AWS access.
-
----
-
-## Key Bindings
-
-All bindings in one file: `internal/tui/keys/keys.go`. Single `Map` struct, single `Default()` constructor. Views receive `keys.Map` at construction and use `key.Matches(msg, m.keys.XYZ)`. No runtime rebinding.
-
-Key highlights:
-- `Enter` — drill into detail/child view
-- `y` — YAML view, `j` — JSON view
-- `p` — role policies (and other child views via `ChildViewDef.Key`)
-- `r` — toggle related panel
-- `x` — reveal secret value
-- `Ctrl+R` — refresh (re-fetch resources, re-run related checks + enrichment)
-- `/` — filter (list) or search (detail/YAML/JSON)
-- `Esc` — back / cancel
-- `q` — quit (from menu) or back (from views)
 
 ---
 
@@ -346,36 +394,52 @@ Key highlights:
 
 ```
 main.go → parseFlags → tui.New(profile, region, opts...)
-  → Init():
-      if preSuppliedClients (demo/test):
-        emit ClientsReadyMsg immediately
-      else:
-        emit InitConnectMsg → async AWS connection
-  → ClientsReadyMsg → store clients, push initial view
-  → User interaction loop (Update/View cycle)
 ```
 
+**`New()` (synchronous constructor):**
+- Builds the root `Model` with profile, region, key bindings
+- Seeds the main menu as `stack[0]` (the menu is always present)
+- Loads `ViewsConfig` from disk
+- Creates `appCtx`/`appCancel` for graceful shutdown
+- Initialises `resourceCache`, `relatedCache`, generation counters
+- Applies all options (`WithClients`, `WithNoCache`, etc.)
+
+**`Init()` (first Bubble Tea message):**
+- If `preSuppliedClients != nil` (demo/test): emits synthetic `ClientsReadyMsg` immediately
+- Otherwise: emits `InitConnectMsg{Profile, Region}` to start async AWS connection
+
+**`ClientsReadyMsg` handler:**
+- Stores `m.clients` on the model
+- If `-c` flag was set (e.g., `--command ec2`), emits `NavigateMsg` to auto-open that resource type
+- Fires `fetchIdentity()` for the status bar
+- Starts availability probes (normal) or `demoPrefetchCounts` (demo/noCache)
+
 **Options:**
-- `WithDemo(true)` — inject fake clients, disable cache
-- `WithClients(c)` — pre-supply clients (used by tests)
-- `WithCommand("ec2")` — open directly to a resource type
+- `WithClients(c)` — pre-supply AWS clients (used by demo mode and tests)
 - `WithNoCache(true)` — disable background availability probes
+- `WithCommand("ec2")` — open directly to a resource type on startup
+- `WithDemo(true)` — compatibility shim (see Demo Mode above)
 
 ---
 
 ## Test Architecture
 
+### Philosophy
+
+Tests verify **behavior**, not implementation. A test should assert on what the user sees (rendered output, message flow) or what the function returns, never on internal state.
+
 ### Directory Layout
 
-- `tests/unit/` — ~416 files, all unit tests. Run via `make test` (with `-race`).
-- `tests/integration/` — 14 files, gated by `//go:build integration`. Run manually with specific flags.
+- `tests/unit/` — all unit tests. Run via `make test` (with `-race`).
+- `tests/integration/` — gated by `//go:build integration`. Run manually with specific flags.
 
 ### Test Categories
 
 **Fetcher tests** (`aws_*_test.go`):
-Each test creates a lightweight interface mock implementing a single AWS API method, calls the real fetcher function directly, and asserts on returned `[]resource.Resource`.
+Test the data transformation layer. Given a specific AWS API response, verify the fetcher returns the correct `[]resource.Resource` with expected fields.
 
 ```go
+// Pattern: narrow interface mock → call real fetcher → assert on output
 type mockEC2Client struct {
     output *ec2.DescribeInstancesOutput
     err    error
@@ -383,45 +447,77 @@ type mockEC2Client struct {
 func (m *mockEC2Client) DescribeInstances(...) (*ec2.DescribeInstancesOutput, error) {
     return m.output, m.err
 }
+
+func TestFetchEC2_ParsesFields(t *testing.T) {
+    mock := &mockEC2Client{output: ...}
+    result, err := awsclient.FetchEC2Instances(ctx, mock, "")
+    // Assert on result.Resources[0].Fields["instance_id"], .Status, etc.
+}
 ```
 
 **View behavior tests** (`app_enrich_test.go`, `child_view_*_test.go`):
-Construct a real `tui.Model` via `tui.New("demo", "us-east-1", tui.WithDemo(true))`, drive with `model.Update(tea.Msg)`, assert on `m.View()` output after `stripANSI()`.
+Test the full message-driven flow. Construct a real `tui.Model`, drive it with messages, assert on rendered output.
+
+```go
+// Pattern: create app → send messages → assert on View() output
+app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+m, _ = rootApplyMsg(m, messages.NavigateMsg{...})
+content := stripANSI(rootViewContent(m))
+if !strings.Contains(content, "expected text") {
+    t.Error("...")
+}
+```
 
 **QA story tests** (`qa_*_test.go`):
-The most numerous category. Follow a helper-then-story pattern: `newXxxListModel(t)` navigates to the relevant view, then individual tests assert on rendered content (columns, colors, navigation).
+The most numerous category. Follow a helper-then-story pattern: `newXxxListModel(t)` navigates the demo app to the relevant view and loads fixture data, then individual test functions assert on specific rendered content (column headers, row data, ANSI color presence, key navigation effects).
 
 **Design contract tests** (`*_design_contract_test.go`):
 Build a demo app, inject a hand-crafted resource, assert rendered output matches known golden content.
 
 **Config round-trip tests**:
-Load `ViewsConfig`, render a detail model, assert field paths and column definitions survive the round-trip.
+Load `ViewsConfig`, render a detail model, assert field paths and column definitions survive the round-trip through rendering.
 
 ### Mock Patterns
 
 Two mock layers serve different purposes:
 
-| Layer | Location | Used For |
-|-------|----------|----------|
-| **Interface mocks** | `tests/unit/mocks_test.go` | Fetcher-layer tests — one struct per AWS API method |
-| **Demo fakes** | `internal/demo/fakes/*.go` | TUI-level tests — full fake implementations backed by fixtures |
+| Layer | Location | When to Use |
+|-------|----------|-------------|
+| **Interface mocks** | `tests/unit/mocks_test.go` | Testing a single fetcher function in isolation |
+| **Demo fakes** | `internal/demo/fakes/*.go` | Testing TUI behavior — full app wired together |
 
-**Interface mocks** are minimal: single-method structs with `output` + `err` fields. Used when testing a fetcher function in isolation.
+**Interface mocks** are minimal: single-method structs with `output` + `err` fields. Each implements one narrow AWS API interface (e.g., `EC2DescribeInstancesAPI`). Use when testing data transformation in a fetcher.
 
-**Demo fakes** are rich: they simulate pagination, relationships, and multi-method API surfaces. Used when you need the whole app wired together (e.g., testing view navigation, enrichment flow).
+**Demo fakes** are rich: they simulate pagination, relationships, multi-method API surfaces, and are backed by realistic fixture data. Use when you need the whole app wired together (e.g., testing view navigation, enrichment flow, related checks).
 
 ### Test Helpers
 
-- `stripANSI(s)` — remove ANSI escape codes for plain-text assertions
-- `rootApplyMsg(m, msg)` — apply a message to the root model, return updated model + cmd
-- `rootViewContent(m)` — render the root model's view
-- `newDemoColdCacheApp(t)` — create a demo app with cold cache for integration-style unit tests
+| Helper | File | Purpose |
+|--------|------|---------|
+| `stripANSI(s)` | `helpers_test.go` | Remove ANSI escape codes for plain-text assertions |
+| `rootApplyMsg(m, msg)` | `tui_root_test.go` | Apply a message to the root model, return (model, cmd) |
+| `rootViewContent(m)` | `tui_root_test.go` | Render the root model's view |
+| `newDemoColdCacheApp(t)` | `testhelpers_demo_harness.go` | Create a demo app with cold cache |
+| `buildResource(...)` | `helpers_external_test.go` | Construct a `resource.Resource` for tests |
+| `configForType(name)` | `helpers_external_test.go` | Load ViewsConfig for a specific type |
+
+### Writing New Tests
+
+1. **Test behavior, not implementation** — assert on what the user sees or what the function returns
+2. **Use demo fakes for TUI tests** — `tui.New("demo", "us-east-1", tui.WithDemo(true))`
+3. **Use narrow interface mocks for fetcher tests** — one mock per AWS API method
+4. **Always `stripANSI` before string assertions** — rendered output contains escape codes
+5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterEnricher(...) })` for temporary registrations
+6. **Clean up caches** — call `awsclient.ClearPolicyDocumentCache()` in `t.Cleanup` if your test exercises the enricher
 
 ### Integration Tests
 
 Gated by `//go:build integration`. Two modes:
-- **Demo integration** — uses `demo.NewServiceClients()`, no real AWS. Tests full boot sequence.
-- **Live AWS integration** — requires `-args -a9s.profile <profile>`. Tests real API calls.
+- **Demo integration** — uses `demo.NewServiceClients()`, no real AWS. Tests full boot sequence including `Init()` and message propagation.
+- **Live AWS integration** — requires `A9S_CT_PROFILE=<profile>`. Tests real API calls against a live AWS account.
+
+Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestName -count=1 -v -timeout 600s`
 
 ---
 
@@ -437,10 +533,13 @@ Fetchers return `any` for clients because each AWS service has a different clien
 `Fields` is fast and sufficient for table columns. `RawStruct` enables deep field extraction via reflection for detail/YAML/JSON views without pre-extracting every possible field.
 
 ### Why view stack instead of a router?
-The stack model maps naturally to drill-down navigation (list → detail → YAML). Each view preserves its state when covered. Esc/q always pops back to the previous state.
+The stack model maps naturally to drill-down navigation (list → detail → YAML). Each view preserves its state when covered. Esc always pops back to the previous state.
 
 ### Why generation counters?
-Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`) are incremented on refresh/profile/region switch, causing stale in-flight results to be silently discarded.
+Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`) are incremented on refresh/profile/region switch and on new view opens, causing stale in-flight results to be silently discarded.
 
 ### Why a separate enricher pattern?
-Detail views render from pre-fetched `Fields`/`RawStruct`. Some data (like policy documents) requires additional API calls that are too expensive to make at list-fetch time. The enricher pattern fetches this data on demand when the user actually opens the detail view.
+Detail views render from pre-fetched `Fields`/`RawStruct`. Some data (like policy documents) requires additional API calls that are too expensive to make at list-fetch time. The enricher pattern fetches this data on demand when the user actually opens the detail, YAML, or JSON view.
+
+### Why four separate caches?
+Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; resource cache enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate TTL/invalidation/eviction policies.
