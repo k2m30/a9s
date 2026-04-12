@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.38.0] - 2026-04-12
+
+### Added
+- JSON view for raw resource data (`J` key). Opens from resource list and detail views, complementing the existing YAML view (`y`). Marshals the AWS SDK response struct directly via `json.MarshalIndent` with 2-space indentation, preserving native JSON types (booleans, numbers, nulls) for direct use in AWS CLI `--cli-input-json`, jq, and other tooling. Supports search (`/`), scroll, line wrap (`w`), copy (`c`), and CloudTrail jump (`t`). Help screen (`?`) lists the new binding.
+
+### Fixed
+- Lambda invocation logs fetcher now paginates through empty CloudWatch `FilterLogEvents` pages. Previously made a single API call, returning zero results whenever matching events lived in a later log stream page.
+
 ## [3.37.0] - 2026-04-12
 
 ### Added
