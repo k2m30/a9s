@@ -62,21 +62,37 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
 		d.SetSize(m.innerSize())
 		m.pushView(&d)
-		// Use cached related results when available; skip re-dispatch.
+		var cmds []tea.Cmd
+
+		// Dispatch enrichment if registered for this resource type
+		if resource.HasEnricher(resType) {
+			cmds = append(cmds, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			})
+		}
+
+		// Dispatch related checks (existing logic)
 		if d.NeedsRelatedCheck() {
 			ck := relatedCacheKey(resType, msg.Resource.ID)
 			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
 				d.ApplyRelatedResults(cached)
-				return m, nil
-			}
-			return m, func() tea.Msg {
-				return messages.RelatedCheckStartedMsg{
-					ResourceType:   resType,
-					SourceResource: *msg.Resource,
-				}
+			} else {
+				cmds = append(cmds, func() tea.Msg {
+					return messages.RelatedCheckStartedMsg{
+						ResourceType:   resType,
+						SourceResource: *msg.Resource,
+					}
+				})
 			}
 		}
-		return m, nil
+
+		if len(cmds) == 0 {
+			return m, nil
+		}
+		return m, tea.Batch(cmds...)
 
 	case messages.TargetYAML:
 		if msg.Resource == nil {

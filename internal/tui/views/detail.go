@@ -105,6 +105,14 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		}
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
+	case messages.EnrichDetailResultMsg:
+		if msg.Err != nil || msg.ResourceID != m.res.ID {
+			return m, nil
+		}
+		m.res = msg.EnrichedRes
+		m.fieldList = nil // force rebuild on next render
+		m.refreshViewportContent()
+		return m, nil
 	case tea.PasteMsg:
 		// Route bracketed paste to search when in search input mode.
 		if m.search.IsInputMode() {

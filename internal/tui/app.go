@@ -439,6 +439,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.EnrichDetailMsg:
+		return m.handleEnrichDetail(msg)
+	case messages.EnrichDetailResultMsg:
+		return m.updateActiveView(msg)
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResultMsg:
