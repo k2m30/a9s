@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.37.0] - 2026-04-12
+
+### Added
+- `-c` / `--command` CLI flag to open a resource list directly on startup, skipping the main menu (k9s-style). Accepts any resource short name or alias (e.g. `a9s -c ec2`, `a9s -c events`). Combinable with `-p`, `-r`, `--demo`, `--no-cache`. Resolves via `resource.FindResourceType`; unknown names fail fast with exit 1 before the TUI starts.
+
+### Fixed
+- Auto-navigation from `-c` is guarded to startup-only: if the initial AWS connection is slow and the user navigates away from the main menu before `ClientsReadyMsg` arrives, the flag is silently consumed without pushing a view on top of the user's current screen.
+
 ## [3.36.1] - 2026-04-11
 
 ### Fixed
