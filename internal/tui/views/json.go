@@ -120,6 +120,28 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case key.Matches(msg, m.keys.Describe):
+			res := m.res
+			return m, func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:         messages.TargetDetail,
+					Resource:       &res,
+					ResourceType:   m.resourceType,
+					ReplaceCurrent: true,
+				}
+			}
+		case key.Matches(msg, m.keys.YAML):
+			res := m.res
+			return m, func() tea.Msg {
+				return messages.NavigateMsg{
+					Target:         messages.TargetYAML,
+					Resource:       &res,
+					ResourceType:   m.resourceType,
+					ReplaceCurrent: true,
+				}
+			}
+		case key.Matches(msg, m.keys.JSON):
+			return m, nil
 		}
 	}
 

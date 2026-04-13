@@ -337,15 +337,17 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.YAML):
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
-					Target:   messages.TargetYAML,
-					Resource: &m.res,
+					Target:       messages.TargetYAML,
+					Resource:     &m.res,
+					ResourceType: m.resourceType,
 				}
 			}
 		case key.Matches(msg, m.keys.JSON):
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
-					Target:   messages.TargetJSON,
-					Resource: &m.res,
+					Target:       messages.TargetJSON,
+					Resource:     &m.res,
+					ResourceType: m.resourceType,
 				}
 			}
 		case key.Matches(msg, m.keys.ToggleWrap):

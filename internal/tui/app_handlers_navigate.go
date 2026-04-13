@@ -111,6 +111,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if msg.Resource == nil {
 			return m, nil
 		}
+		if msg.ReplaceCurrent {
+			m.popView()
+		}
 		resType := msg.ResourceType
 		if resType == "" {
 			switch av := m.activeView().(type) {
@@ -142,6 +145,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	case messages.TargetJSON:
 		if msg.Resource == nil {
 			return m, nil
+		}
+		if msg.ReplaceCurrent {
+			m.popView()
 		}
 		resType := msg.ResourceType
 		if resType == "" {
