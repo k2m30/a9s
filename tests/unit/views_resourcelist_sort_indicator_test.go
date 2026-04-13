@@ -8,11 +8,11 @@ package unit
 // match isAgeKey → both get the ↓/↑ glyph.
 //
 // Contract (§6): exactly ONE column carries the sort glyph for any active sort.
-// The fix is to bind the indicator to one explicit column via sortColKey on
+// The fix is to bind the indicator to one explicit column via sortColIdx on
 // ResourceListModel instead of substring matching in colHeaderTitle.
 //
-// These tests compile against HEAD but the ct-events SortAge test WILL FAIL
-// until the P3 coder ships the sortColKey field fix.
+// Column headers now carry number prefixes: "1:TIME", "2:EVENT", etc.
+// The sort glyph appears after the prefix+title: "2:TIME↓" (descending).
 
 import (
 	"os"
@@ -42,14 +42,14 @@ func headerLine(view string) string {
 
 // buildSortModel creates a ResourceListModel for the given resource type with
 // a config-driven view, loads one synthetic resource, and applies the given
-// sort field. Uses SortAsc=false (descending) to match ct-events default.
+// sort column index. Uses sortAsc=false (descending) to match ct-events default.
 //
-// For ct-events the model must receive viewConfig so the default SortAge
+// For ct-events the model must receive viewConfig so the default sort
 // initialisation in NewResourceList kicks in (§6 requirement).
 func buildSortModel(
 	t *testing.T,
 	shortName string,
-	sort views.SortField,
+	sortColIdx int,
 	sortAsc bool,
 ) views.ResourceListModel {
 	t.Helper()
@@ -75,53 +75,47 @@ func buildSortModel(
 		Resources:    []resource.Resource{res},
 	})
 
-	// Override sort to the requested field and direction.
-	// We do this via the WithSort setter; if that is not exposed, we simulate
-	// the key press that activates it. Use the WithSort method (added by P3
-	// coder) when available; fall back to key-press simulation.
-	m = applySort(t, m, sort, sortAsc)
+	// Apply the requested sort column and direction via key presses.
+	m = applySort(t, m, sortColIdx, sortAsc)
 
 	return m
 }
 
-// applySort sets the sort field on the model. Uses the public SortState()
-// accessor to verify the sort was applied. The model's sort is set by
-// the P3 coder's WithSort setter; until that ships we simulate via key presses.
+// applySort sets the sort column on the model by simulating key presses.
+// sortColIdx is 0-based; key "1" activates column 0, key "2" activates column 1, etc.
+// Key "0" activates column 9 (10th column).
 //
-// Key bindings (keys.go):
+// If sortColIdx == views.SortColNone, no key press is sent and the model is
+// returned unchanged.
 //
-//	SortByName = "N"
-//	SortByID   = "I"
-//	SortByAge  = "A"
-//
-// If the current sort already matches the target field, the direction may be
-// toggled by a second key press; we handle that case explicitly.
-func applySort(t *testing.T, m views.ResourceListModel, sort views.SortField, wantAsc bool) views.ResourceListModel {
+// A second key press on the same column toggles ascending/descending.
+// If the direction after the first press does not match wantAsc, a second
+// press is sent.
+func applySort(t *testing.T, m views.ResourceListModel, sortColIdx int, wantAsc bool) views.ResourceListModel {
 	t.Helper()
 
-	if sort == views.SortNone {
+	if sortColIdx == views.SortColNone {
 		return m
 	}
 
-	// Map sort field to the key character.
+	// Map 0-based column index to the digit key character.
+	// Columns 0-8 → "1"-"9"; column 9 → "0".
 	var keyChar string
-	switch sort {
-	case views.SortName:
-		keyChar = "N"
-	case views.SortID:
-		keyChar = "I"
-	case views.SortAge:
-		keyChar = "A"
+	switch {
+	case sortColIdx >= 0 && sortColIdx <= 8:
+		keyChar = string(rune('1' + sortColIdx))
+	case sortColIdx == 9:
+		keyChar = "0"
 	default:
-		t.Fatalf("applySort: unhandled SortField %v", sort)
+		t.Fatalf("applySort: column index %d out of range (0-9)", sortColIdx)
 	}
 
 	msg := rlKeyPress(keyChar)
 
-	// Press the sort key once to activate the sort field.
+	// Press the sort key once to activate the sort column.
 	m, _ = m.Update(msg)
 
-	// Check direction — a second press toggles ascending/descending.
+	// Check direction — a second press on the same column toggles ascending/descending.
 	_, gotAsc := m.SortState()
 	if gotAsc != wantAsc {
 		m, _ = m.Update(msg)
@@ -188,79 +182,83 @@ func syntheticResourceForType(shortName string) resource.Resource {
 // ===========================================================================
 // TestSortIndicator_ExactlyOnePerSort
 //
-// For each (resource-type, sort-field) pair: assert the rendered header
+// For each (resource-type, sort-column-index) pair: assert the rendered header
 // contains exactly the expected number of sort glyphs (↑ or ↓), and when
 // wantOnColumn is non-empty, assert that the glyph is attached to that column
 // title specifically — not any other.
 //
-// ct-events + SortAge is the regression case for the §6 double-glyph bug:
+// ct-events + column 1 (TIME) is the regression case for the §6 double-glyph bug:
 // with the bug both TIME and EVENT carry the glyph (count=2).
-// After the fix, count=1 and the glyph is on TIME only.
+// After the fix, count=1 and the glyph is on 2:TIME only.
+//
+// Column headers use number prefixes: "1:V", "2:TIME", "3:ACTOR", etc.
+// The sort glyph appears after the full prefix+title: "2:TIME↓".
 // ===========================================================================
 
 func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 	cases := []struct {
 		name         string
 		typeName     string
-		sort         views.SortField
+		sortColIdx   int // 0-based column index; views.SortColNone (-1) = no sort
 		sortAsc      bool
 		wantCount    int
 		wantOnColumn string // non-empty: assert the glyph appears immediately after this text
 	}{
-		// ct-events + SortAge: BUG CASE — should be 1 glyph on TIME, not 2 (TIME+EVENT).
-		// This test FAILS against HEAD until the P3 coder ships the sortColKey fix.
+		// ct-events + col 1 (TIME) descending: BUG CASE — should be 1 glyph on 2:TIME, not 2.
+		// The config-driven ct-events column order is: V[0], TIME[1], ACTOR[2], ORIGIN[3],
+		// EVENT[4], TARGET[5], OUTCOME[6]. Key "2" selects column 1 (TIME).
+		// This test FAILS against HEAD until the P3 coder ships the sortColIdx fix.
 		{
-			name:         "ct-events_Age_desc",
+			name:         "ct-events_TIME_col1_desc",
 			typeName:     "ct-events",
-			sort:         views.SortAge,
+			sortColIdx:   1, // TIME column (0-based index 1, key "2")
 			sortAsc:      false,
 			wantCount:    1,
-			wantOnColumn: "TIME",
+			wantOnColumn: "2:TIME", // header prefix + title; glyph appended → "2:TIME↓"
 		},
-		// ct-events + SortAge ascending: same fix, different glyph direction.
+		// ct-events + col 1 (TIME) ascending: same fix, different glyph direction.
 		{
-			name:         "ct-events_Age_asc",
+			name:         "ct-events_TIME_col1_asc",
 			typeName:     "ct-events",
-			sort:         views.SortAge,
+			sortColIdx:   1,
 			sortAsc:      true,
 			wantCount:    1,
-			wantOnColumn: "TIME",
+			wantOnColumn: "2:TIME",
 		},
-		// ec2 + SortAge: verify no regression on a non-ct resource.
+		// ec2 + sort by column — verify no regression on a non-ct resource.
+		// ec2 default config columns include a launch_time-like column; check count only.
 		{
-			name:         "ec2_Age",
+			name:         "ec2_col0",
 			typeName:     "ec2",
-			sort:         views.SortAge,
+			sortColIdx:   0,
 			sortAsc:      false,
 			wantCount:    1,
-			wantOnColumn: "", // ec2 has no standard "age" column in defaults; check count only
+			wantOnColumn: "", // check count only; ec2 col 0 varies by config
 		},
-		// rds + SortAge: dbi has no age-like column in defaults, so no glyph renders.
-		// This proves the sortColKey=="" branch produces zero glyphs (not a fallback).
+		// dbi + sort by col 0: exactly one glyph.
 		{
-			name:         "rds_Age",
+			name:         "dbi_col0",
 			typeName:     "dbi",
-			sort:         views.SortAge,
+			sortColIdx:   0,
 			sortAsc:      false,
-			wantCount:    0,
+			wantCount:    1,
 			wantOnColumn: "",
 		},
-		// ct-events + SortName: ct-events has no "name" column in its layout (§8).
-		// isAgeKey does not match name-related columns, so SortName → 0 glyphs.
-		// (After the fix this becomes an exact-key match; no column has key="name".)
+		// ct-events + col 4 (EVENT): the old SortAge bug case.
+		// Sorting by the EVENT column should put the glyph on 5:EVENT, not TIME.
 		{
-			name:         "ct-events_Name",
+			name:         "ct-events_EVENT_col4",
 			typeName:     "ct-events",
-			sort:         views.SortName,
+			sortColIdx:   4, // EVENT column (0-based index 4, key "5")
 			sortAsc:      true,
-			wantCount:    0,
-			wantOnColumn: "",
+			wantCount:    1,
+			wantOnColumn: "5:EVENT",
 		},
-		// ec2 + SortID: verify exactly one glyph on the ID-related column.
+		// ec2 + col 1: verify exactly one glyph on the second column.
 		{
-			name:         "ec2_ID",
+			name:         "ec2_col1",
 			typeName:     "ec2",
-			sort:         views.SortID,
+			sortColIdx:   1,
 			sortAsc:      true,
 			wantCount:    1,
 			wantOnColumn: "",
@@ -269,7 +267,7 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := buildSortModel(t, tc.typeName, tc.sort, tc.sortAsc)
+			m := buildSortModel(t, tc.typeName, tc.sortColIdx, tc.sortAsc)
 
 			view := m.View()
 			if view == "No resources found" || strings.HasPrefix(view, "Loading") {
@@ -286,16 +284,16 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 				t.Errorf(
 					"sort glyph count = %d, want %d\n"+
 						"  header (plain): %q\n"+
-						"  sort=%v asc=%v type=%s\n"+
+						"  sortColIdx=%d asc=%v type=%s\n"+
 						"  bug: colHeaderTitle substring-matches isAgeKey against column title,\n"+
 						"  causing both TIME and EVENT columns to get the glyph on ct-events",
-					got, tc.wantCount, plainHdr, tc.sort, tc.sortAsc, tc.typeName,
+					got, tc.wantCount, plainHdr, tc.sortColIdx, tc.sortAsc, tc.typeName,
 				)
 			}
 
 			// If we expect a specific column to carry the glyph, verify it.
 			if tc.wantCount == 1 && tc.wantOnColumn != "" {
-				// The glyph should appear immediately after the column title text.
+				// The glyph should appear immediately after the column prefix+title text.
 				wantSubstr := tc.wantOnColumn + "\u2193"
 				if tc.sortAsc {
 					wantSubstr = tc.wantOnColumn + "\u2191"
@@ -305,9 +303,9 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 						"sort glyph not on expected column\n"+
 							"  want glyph immediately after %q (i.e., substring %q)\n"+
 							"  header (plain): %q\n"+
-							"  sort=%v asc=%v type=%s\n"+
+							"  sortColIdx=%d asc=%v type=%s\n"+
 							"  bug: glyph may be on wrong column (e.g. EVENT instead of TIME)",
-						tc.wantOnColumn, wantSubstr, plainHdr, tc.sort, tc.sortAsc, tc.typeName,
+						tc.wantOnColumn, wantSubstr, plainHdr, tc.sortColIdx, tc.sortAsc, tc.typeName,
 					)
 				}
 			}
@@ -318,7 +316,8 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 // ===========================================================================
 // TestSortIndicator_NoGlyphWhenSortNone
 //
-// When sort is SortNone (default for most resource types), no glyph appears.
+// When no sort key has been pressed (default for most resource types), no
+// glyph appears. views.SortColNone (-1) is the initial sortColIdx value.
 // ===========================================================================
 
 func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
@@ -343,10 +342,10 @@ func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 				Resources:    []resource.Resource{res},
 			})
 
-			// Do NOT apply any sort — defaults to SortNone for ec2/dbi.
-			sf, _ := m.SortState()
-			if sf != views.SortNone {
-				t.Skipf("resource type %q initialises with non-None sort (%v), skipping SortNone test", shortName, sf)
+			// Do NOT apply any sort — defaults to SortColNone for ec2/dbi.
+			colIdx, _ := m.SortState()
+			if colIdx != views.SortColNone {
+				t.Skipf("resource type %q initialises with non-None sort (col %d), skipping SortNone test", shortName, colIdx)
 			}
 
 			view := m.View()
@@ -355,7 +354,7 @@ func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 
 			if got := countSortGlyphs(plainHdr); got != 0 {
 				t.Errorf(
-					"expected 0 sort glyphs when sort=SortNone, got %d; header: %q",
+					"expected 0 sort glyphs when sortColIdx=SortColNone, got %d; header: %q",
 					got, plainHdr,
 				)
 			}
@@ -367,14 +366,20 @@ func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 // TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn
 //
 // Explicit regression test: after the P3 fix, the ↓ glyph must NOT appear
-// anywhere near the word "EVENT" in the ct-events header when sorting by age.
+// anywhere near the word "EVENT" in the ct-events header when sorting by the
+// TIME column (column index 1, key "2").
+//
+// With the new positional sort API, "sort by time" means pressing "2" to
+// activate column 1 (TIME). The header renders as "2:TIME↓".
 //
 // This test is the most precise catch for the §6 double-glyph bug.
 // It will FAIL against HEAD (current code decorates both TIME and EVENT).
 // ===========================================================================
 
 func TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn(t *testing.T) {
-	m := buildSortModel(t, "ct-events", views.SortAge, false)
+	// ct-events config column order: V[0], TIME[1], ACTOR[2], ORIGIN[3], EVENT[4], ...
+	// Sort by column 1 (TIME) descending.
+	m := buildSortModel(t, "ct-events", 1, false)
 
 	view := m.View()
 	if strings.HasPrefix(view, "Loading") || view == "No resources found" {
@@ -384,24 +389,24 @@ func TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn(t *testing.T) {
 	hdr := headerLine(view)
 	plainHdr := stripANSI(hdr)
 
-	// The EVENT column title must NOT carry a sort glyph.
+	// The EVENT column (rendered as "5:EVENT") must NOT carry a sort glyph.
 	if strings.Contains(plainHdr, "EVENT\u2193") || strings.Contains(plainHdr, "EVENT\u2191") {
 		t.Errorf(
 			"sort glyph incorrectly appears on EVENT column\n"+
 				"  header: %q\n"+
-				"  bug: isAgeKey(\"EVENT\") returns true because \"event\" is in its substring list;\n"+
-				"  colHeaderTitle decorates both TIME and EVENT when sorting by age.\n"+
-				"  fix: use exact sortColKey comparison instead of isAgeKey(c.title).",
+				"  bug: old isAgeKey(\"EVENT\") matched because \"event\" is in its substring list;\n"+
+				"  colHeaderTitle decorated both TIME and EVENT when sorting by the time column.\n"+
+				"  fix: use exact sortColIdx comparison instead of isAgeKey(c.title).",
 			plainHdr,
 		)
 	}
 
-	// The TIME column title MUST carry the ↓ glyph (descending = newest first).
-	if !strings.Contains(plainHdr, "TIME\u2193") {
+	// The TIME column (rendered as "2:TIME") MUST carry the ↓ glyph (descending = newest first).
+	if !strings.Contains(plainHdr, "2:TIME\u2193") {
 		t.Errorf(
 			"sort glyph missing from TIME column\n"+
 				"  header: %q\n"+
-				"  want: TIME column to carry ↓ glyph when SortAge descending",
+				"  want: 2:TIME column to carry ↓ glyph when sorting column 1 descending",
 			plainHdr,
 		)
 	}

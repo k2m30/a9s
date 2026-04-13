@@ -71,7 +71,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Table Name", Path: "TableName", Width: 36},
 				{Title: "Status", Path: "TableStatus", Width: 12},
 				{Title: "Items", Path: "ItemCount", Width: 12},
-				{Title: "Size", Path: "", Key: "size_bytes", Width: 14},
+				{Title: "Size", Key: "size_bytes", SortPath: "TableSizeBytes", Width: 14},
 				{Title: "Billing", Path: "BillingModeSummary.BillingMode", Width: 16},
 			},
 			Detail: []string{
@@ -182,7 +182,7 @@ func databasesDefaultViews() map[string]ViewDef {
 		"s3_objects": {
 			List: []ListColumn{
 				{Title: "Key", Path: "Key", Width: 36},
-				{Title: "Size", Key: "size", Width: 12},
+				{Title: "Size", Key: "size", SortPath: "Size", Width: 12},
 				{Title: "Storage Class", Path: "StorageClass", Width: 16},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},

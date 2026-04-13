@@ -49,7 +49,7 @@ type resourceCacheEntry struct {
 	pagination    *resource.PaginationMeta
 	filterText    string
 	attentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
-	sortField     views.SortField
+	sortColIdx    int
 	sortAsc       bool
 	cursorPos     int
 	hScrollOffset int
@@ -406,13 +406,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Only cache top-level resource lists, not child views.
 				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
-					sortField, sortAsc := rl.SortState()
+					sortColIdx, sortAsc := rl.SortState()
 					updatedModel.resourceCache[rt] = &resourceCacheEntry{
 						resources:     rl.AllResources(),
 						pagination:    rl.PaginationState(),
 						filterText:    rl.FilterText(),
 						attentionOnly: rl.AttentionOnly(),
-						sortField:     sortField,
+						sortColIdx:    sortColIdx,
 						sortAsc:       sortAsc,
 						cursorPos:     rl.CursorPosition(),
 						hScrollOffset: rl.HScrollOffset(),
@@ -700,13 +700,13 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 		return
 	}
 	rt := rl.ResourceType()
-	sortField, sortAsc := rl.SortState()
+	sortColIdx, sortAsc := rl.SortState()
 	m.resourceCache[rt] = &resourceCacheEntry{
 		resources:     rl.AllResources(),
 		pagination:    rl.PaginationState(),
 		filterText:    rl.FilterText(),
 		attentionOnly: rl.AttentionOnly(),
-		sortField:     sortField,
+		sortColIdx:    sortColIdx,
 		sortAsc:       sortAsc,
 		cursorPos:     rl.CursorPosition(),
 		hScrollOffset: rl.HScrollOffset(),

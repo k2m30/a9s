@@ -23,10 +23,12 @@ type ViewDef struct {
 
 // ListColumn is a named column with its configuration, preserving YAML map order.
 type ListColumn struct {
-	Title string `yaml:"-"`
-	Path  string `yaml:"path"`
-	Key   string `yaml:"key"`
-	Width int    `yaml:"width"`
+	Title    string `yaml:"-"`
+	Path     string `yaml:"path"`
+	Key      string `yaml:"key"`
+	Width    int    `yaml:"width"`
+	SortKey  string `yaml:"sort_key"`  // optional: Fields key for sorting (when display value differs from sort value)
+	SortPath string `yaml:"sort_path"` // optional: RawStruct path for raw numeric/time sort comparison
 }
 
 // UnmarshalYAML implements custom unmarshaling for ViewDef to preserve
