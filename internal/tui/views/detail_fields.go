@@ -201,17 +201,18 @@ func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
 	return items
 }
 
-// statusCheckStyle returns a lipgloss.Style appropriate for the given EC2 status check value.
-func statusCheckStyle(status string) lipgloss.Style {
+// statusCheckTier maps an EC2 status check value to a ColorTier string
+// for deferred styling via RowColorStyle in the render path.
+func statusCheckTier(status string) string {
 	switch status {
 	case "ok":
-		return styles.StatusCheckOk
+		return "ok"
 	case "impaired":
-		return styles.StatusCheckFailed
+		return "impaired"
 	case "initializing":
-		return styles.StatusCheckWarn
+		return "initializing"
 	default:
-		return styles.DimText
+		return ""
 	}
 }
 
@@ -249,8 +250,8 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	}
 	inject := []fieldpath.FieldItem{
 		{Key: "Status Checks", IsHeader: true, Path: "StatusChecks"},
-		{Key: "System", Value: statusCheckStyle(sysStatus).Render(sysVal), IsSubField: true, Path: "StatusChecks", IndentLevel: 1},
-		{Key: "Instance", Value: statusCheckStyle(instStatus).Render(instVal), IsSubField: true, Path: "StatusChecks", IndentLevel: 1},
+		{Key: "System", Value: sysVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(sysStatus)},
+		{Key: "Instance", Value: instVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(instStatus)},
 	}
 
 	// Find the insertion point: after the "State" section header and its sub-fields.
@@ -375,7 +376,11 @@ func (m DetailModel) renderFromFieldList() string {
 				}
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
 				if item.Key != item.Value {
-					line = indent + styles.DetailKey.Render(item.Key+":") + " " + item.Value
+					val := item.Value
+					if item.ColorTier != "" {
+						val = styles.RowColorStyle(item.ColorTier).Render(val)
+					}
+					line = indent + styles.DetailKey.Render(item.Key+":") + " " + val
 					break
 				}
 				// General sub-field: YAML-style colorization preserving hierarchy.
