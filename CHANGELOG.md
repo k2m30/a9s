@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.40.0] - 2026-04-13
+
+### Fixed
+- Detail view nested structures (arrays, maps, sub-objects) now render with proper YAML hierarchy instead of flat 5-space indentation (#265)
+- Bare YAML list items like `- '*'` no longer misrendered as key:value pairs in detail view
+- Fields-map and RawStruct data sources now produce identical YAML list format for array sections (e.g., SecurityGroups)
+- Detail search matches are cursor-position-independent — canonical `": "` spacing on all sub-field types
+- EC2 status-check sub-fields store raw values; cursor row no longer leaks ANSI color escapes
+
+### Changed
+- `make test` runs without `-race` for fast local iteration (4s); `make test-race` added for pre-push race detection
+- Unit test suite optimized: removed real timer waits, replaced full-app journeys with direct model setup, sampled representative resource types in exhaustive sweeps (86.3% coverage maintained)
+
+### Added
+- Shared YAML line tokenizer (`yaml_line.go`) ensuring markers and spacing stay identical across cursor states and views
+- `"impaired"` and `"initializing"` status colors in row color cache for EC2 status checks
+
 ## [3.39.0] - 2026-04-12
 
 ### Added
