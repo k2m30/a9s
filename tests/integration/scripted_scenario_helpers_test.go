@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -316,19 +317,30 @@ func (s *fullIntegrationScenario) SearchPrev() {
 	s.Press("N")
 }
 
+func (s *fullIntegrationScenario) SortByColumn(col int) {
+	s.t.Helper()
+	k := strconv.Itoa(col)
+	if col == 10 {
+		k = "0"
+	}
+	s.Press(k)
+}
+
 func (s *fullIntegrationScenario) SortByName() {
 	s.t.Helper()
-	s.Press("N")
+	s.SortByColumn(1) // Name is typically column 1
 }
 
 func (s *fullIntegrationScenario) SortByID() {
 	s.t.Helper()
-	s.Press("I")
+	s.SortByColumn(2) // ID is typically column 2
 }
 
 func (s *fullIntegrationScenario) SortByAge() {
+	// Age column position varies by resource type — caller should use SortByColumn directly
+	// Default to column 3 as a reasonable fallback
 	s.t.Helper()
-	s.Press("A")
+	s.SortByColumn(3)
 }
 
 func (s *fullIntegrationScenario) OpenYAML() {

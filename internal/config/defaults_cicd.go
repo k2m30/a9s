@@ -115,7 +115,7 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Tag(s)", Key: "image_tags", Width: 24},
 				{Title: "Digest", Key: "digest_short", Width: 16},
 				{Title: "Pushed At", Key: "pushed_at", Width: 22},
-				{Title: "Size", Key: "image_size", Width: 12},
+				{Title: "Size", Key: "image_size", SortPath: "ImageSizeInBytes", Width: 12},
 				{Title: "Scan Status", Key: "scan_status", Width: 14},
 				{Title: "Findings", Key: "finding_counts", Width: 20},
 			},

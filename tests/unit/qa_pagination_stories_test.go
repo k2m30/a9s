@@ -958,8 +958,8 @@ func TestStoryI4_LoadMoreAfterSort_PreservesSortOrder(t *testing.T) {
 		NextToken:   "tok-p2",
 	}, false)
 
-	// Sort by name ascending (press N key)
-	m, _ = m.Update(pgKeyPress("N"))
+	// Sort by name ascending (press 2 key — column 1 = name, 1-indexed key "2")
+	m, _ = m.Update(pgKeyPress("2"))
 
 	// Verify sort is active: first visible resource should be the one with
 	// the alphabetically first name
@@ -1861,8 +1861,8 @@ func TestStoryN3_SortToggle_AfterLoadMore(t *testing.T) {
 		t.Fatalf("N.3: precondition: expected %q, got %q", "ec2(400)", m.FrameTitle())
 	}
 
-	// Sort by name ascending (N key)
-	m, _ = m.Update(pgKeyPress("N"))
+	// Sort by name ascending (key "2" = column 1 = name)
+	m, _ = m.Update(pgKeyPress("2"))
 
 	// First item should be "a-item-00000" (alphabetically first)
 	first := m.SelectedResource()
@@ -1873,8 +1873,8 @@ func TestStoryN3_SortToggle_AfterLoadMore(t *testing.T) {
 		t.Errorf("N.3: after sort asc, first should be %q, got %q", "a-item-00000", first.Name)
 	}
 
-	// Sort by name descending (N key again toggles direction)
-	m, _ = m.Update(pgKeyPress("N"))
+	// Sort by name descending (key "2" again toggles direction)
+	m, _ = m.Update(pgKeyPress("2"))
 
 	// First item should now be "z-item-00199" (alphabetically last)
 	firstDesc := m.SelectedResource()
@@ -1886,8 +1886,8 @@ func TestStoryN3_SortToggle_AfterLoadMore(t *testing.T) {
 			"z-item-00199", firstDesc.Name)
 	}
 
-	// Sort by ID ascending (I key)
-	m, _ = m.Update(pgKeyPress("I"))
+	// Sort by instance_id ascending (key "1" = column 0 = instance_id)
+	m, _ = m.Update(pgKeyPress("1"))
 	firstByID := m.SelectedResource()
 	if firstByID == nil {
 		t.Fatal("N.3: no selected resource after sort by ID")
@@ -2065,8 +2065,8 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 				t.Error("CopyContent returned empty for appended item")
 			}
 
-			// Sort should work on combined list
-			m, _ = m.Update(pgKeyPress("N"))
+			// Sort should work on combined list (key "2" = column 1 = name)
+			m, _ = m.Update(pgKeyPress("2"))
 			firstSorted := m.SelectedResource()
 			if firstSorted == nil {
 				t.Error("no selected resource after sort on combined list")

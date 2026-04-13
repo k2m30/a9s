@@ -197,7 +197,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 						*rt, m.viewConfig, m.keys,
 						filtered, entry.pagination,
 						"",
-						entry.sortField, entry.sortAsc,
+						entry.sortColIdx, entry.sortAsc,
 						0, 0,
 						false,
 					)
@@ -216,7 +216,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					*rt, m.viewConfig, m.keys,
 					filtered, entry.pagination,
 					"", // no text filter needed, already filtered by ID
-					entry.sortField, entry.sortAsc,
+					entry.sortColIdx, entry.sortAsc,
 					0, 0,
 					false,
 				)

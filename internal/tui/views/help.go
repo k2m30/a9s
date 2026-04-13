@@ -283,9 +283,7 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 	sortGroup := helpGroup{
 		title: "SORT",
 		bindings: []helpBinding{
-			{"N", "sort name"},
-			{"I", "sort id"},
-			{"A", "sort date"},
+			{"1-0", "sort col 1-10"},
 		},
 	}
 

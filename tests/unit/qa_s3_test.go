@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -342,7 +344,8 @@ func TestQA_S3_A5_4_Navigation_GShiftJumpsToBottom(t *testing.T) {
 
 func TestQA_S3_A6_1_Sort_ByNameAscending(t *testing.T) {
 	m := s3RLBucketModel()
-	m, _ = m.Update(s3KeyPress("N"))
+	// Press 1 to sort by Bucket Name (column 0, 1-indexed key "1")
+	m, _ = m.Update(s3KeyPress("1"))
 
 	out := m.View()
 	// Should show sort indicator (up arrow)
@@ -359,40 +362,42 @@ func TestQA_S3_A6_1_Sort_ByNameAscending(t *testing.T) {
 
 func TestQA_S3_A6_2_Sort_ByNameToggle(t *testing.T) {
 	m := s3RLBucketModel()
-	// First press: ascending
-	m, _ = m.Update(s3KeyPress("N"))
+	// First press: ascending (column 0 = Bucket Name, key "1")
+	m, _ = m.Update(s3KeyPress("1"))
 	out := m.View()
 	if !strings.Contains(out, "\u2191") {
-		t.Error("first N press should show ascending indicator")
+		t.Error("first '1' press should show ascending indicator")
 	}
 
 	// Second press: descending
-	m, _ = m.Update(s3KeyPress("N"))
+	m, _ = m.Update(s3KeyPress("1"))
 	out = m.View()
 	if !strings.Contains(out, "\u2193") {
-		t.Error("second N press should toggle to descending indicator")
+		t.Error("second '1' press should toggle to descending indicator")
 	}
 }
 
 func TestQA_S3_A6_3_Sort_ByAge(t *testing.T) {
 	m := s3RLBucketModel()
-	m, _ = m.Update(s3KeyPress("A"))
+	// Press 3 to sort by Creation Date (column 2, 1-indexed key "3")
+	m, _ = m.Update(s3KeyPress("3"))
 
 	out := m.View()
 	// Sort indicator should be on Creation Date column
 	if !strings.Contains(out, "\u2191") {
-		t.Error("sort by age should show sort indicator")
+		t.Error("sort by age (column 3) should show sort indicator")
 	}
 }
 
 func TestQA_S3_A6_4_Sort_ByAgeToggle(t *testing.T) {
 	m := s3RLBucketModel()
-	m, _ = m.Update(s3KeyPress("A"))
-	m, _ = m.Update(s3KeyPress("A"))
+	// Press 3 twice: ascending then descending (column 2 = Creation Date)
+	m, _ = m.Update(s3KeyPress("3"))
+	m, _ = m.Update(s3KeyPress("3"))
 
 	out := m.View()
 	if !strings.Contains(out, "\u2193") {
-		t.Error("pressing A twice should toggle to descending sort indicator")
+		t.Error("pressing '3' twice should toggle to descending sort indicator")
 	}
 }
 
@@ -743,8 +748,8 @@ func TestQA_S3_B10_1_ObjectList_SortByName(t *testing.T) {
 		t.Fatalf("before sort, first item should be zebra.txt, got: %v", sel)
 	}
 
-	// Press N to sort by name ascending
-	m, _ = m.Update(s3KeyPress("N"))
+	// Press 1 to sort by name/key ascending (column 0 = key, 1-indexed key "1")
+	m, _ = m.Update(s3KeyPress("1"))
 
 	// After sort, first item should be "alpha.txt" (alphabetical)
 	sel = m.SelectedResource()
@@ -765,8 +770,8 @@ func TestQA_S3_B10_2_ObjectList_SortByAge(t *testing.T) {
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
 
-	// Press A to sort by age ascending
-	m, _ = m.Update(s3KeyPress("A"))
+	// Press 3 to sort by age ascending (column 2 = last_modified, 1-indexed key "3")
+	m, _ = m.Update(s3KeyPress("3"))
 
 	// After sort by age, first item should be the one with earliest last_modified
 	sel := m.SelectedResource()
@@ -779,6 +784,53 @@ func TestQA_S3_B10_2_ObjectList_SortByAge(t *testing.T) {
 	// We just verify the sort doesn't crash and produces a valid selected resource.
 	if sel.Name == "" {
 		t.Error("sort by age should still produce a valid selected resource")
+	}
+}
+
+func TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder(t *testing.T) {
+	multipleObjects := []resource.Resource{
+		{ID: "medium.bin", Name: "medium.bin", Fields: map[string]string{"key": "medium.bin", "size": "1 KB", "last_modified": "2025-01-02"}, RawStruct: s3types.Object{Key: aws.String("medium.bin"), Size: aws.Int64(1024)}},
+		{ID: "small.bin", Name: "small.bin", Fields: map[string]string{"key": "small.bin", "size": "900 B", "last_modified": "2025-01-01"}, RawStruct: s3types.Object{Key: aws.String("small.bin"), Size: aws.Int64(900)}},
+		{ID: "large.bin", Name: "large.bin", Fields: map[string]string{"key": "large.bin", "size": "2 KB", "last_modified": "2025-01-03"}, RawStruct: s3types.Object{Key: aws.String("large.bin"), Size: aws.Int64(2048)}},
+	}
+	k := keys.Default()
+	m := newS3ObjectsList("test-bucket", config.DefaultConfig(), k)
+	m.SetSize(120, 20)
+	m, _ = m.Init()
+	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+
+	// Press 2 to sort by size ascending (column 1 = size, 1-indexed key "2").
+	m, _ = m.Update(s3KeyPress("2"))
+
+	plainAsc := stripANSI(m.View())
+	idxSmallAsc := strings.Index(plainAsc, "small.bin")
+	idxMediumAsc := strings.Index(plainAsc, "medium.bin")
+	idxLargeAsc := strings.Index(plainAsc, "large.bin")
+	if idxSmallAsc < 0 || idxMediumAsc < 0 || idxLargeAsc < 0 {
+		t.Fatalf("could not find all object names in ascending output:\n%s", plainAsc)
+	}
+	if idxSmallAsc > idxMediumAsc || idxMediumAsc > idxLargeAsc {
+		t.Errorf(
+			"size ascending sort must use numeric byte order, got small@%d medium@%d large@%d\nview:\n%s",
+			idxSmallAsc, idxMediumAsc, idxLargeAsc, plainAsc,
+		)
+	}
+
+	// Press 2 again to toggle descending.
+	m, _ = m.Update(s3KeyPress("2"))
+
+	plainDesc := stripANSI(m.View())
+	idxLargeDesc := strings.Index(plainDesc, "large.bin")
+	idxMediumDesc := strings.Index(plainDesc, "medium.bin")
+	idxSmallDesc := strings.Index(plainDesc, "small.bin")
+	if idxLargeDesc < 0 || idxMediumDesc < 0 || idxSmallDesc < 0 {
+		t.Fatalf("could not find all object names in descending output:\n%s", plainDesc)
+	}
+	if idxLargeDesc > idxMediumDesc || idxMediumDesc > idxSmallDesc {
+		t.Errorf(
+			"size descending sort must use numeric byte order, got large@%d medium@%d small@%d\nview:\n%s",
+			idxLargeDesc, idxMediumDesc, idxSmallDesc, plainDesc,
+		)
 	}
 }
 

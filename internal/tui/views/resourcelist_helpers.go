@@ -3,6 +3,7 @@ package views
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -18,38 +19,43 @@ func (m *ResourceListModel) applySortAndFilter() {
 	m.styledRowCache = nil
 }
 
-// updateSortColKey sets m.sortColKey to the canonical column key for the current
-// sort mode on the current resource type. This is the single source of truth for
-// which column header receives the sort glyph (§6).
-//
-// Matching is exact against resolved column keys:
-//   - SortName → first column whose key/title is "name" or contains "Name"
-//   - SortID   → first column whose key contains "id" or title contains "ID"
-//   - SortAge  → first column whose key or path matches isAgeKey
-//
-// If no column matches, sortColKey is set to "" (no glyph rendered).
+// updateSortColKey sets m.sortColKey to the column sort key for the current
+// sort column index. This is the single source of truth for which column
+// header receives the sort glyph (§6).
 func (m *ResourceListModel) updateSortColKey() {
+	if m.sortColIdx == SortColNone {
+		m.sortColKey = ""
+		return
+	}
 	cols := m.resolveColumns()
-	for _, c := range cols {
-		switch m.sort {
-		case SortName:
-			if strings.EqualFold(c.key, "name") || strings.Contains(strings.ToLower(c.title), "name") {
-				m.sortColKey = colSortKey(c)
-				return
+	if m.sortColIdx >= len(cols) {
+		m.sortColKey = ""
+		return
+	}
+	m.sortColKey = colSortKey(cols[m.sortColIdx])
+}
+
+// handleSortByCol checks all 10 positional sort bindings against msg.
+// Returns true if a sort binding was matched (key consumed).
+func (m *ResourceListModel) handleSortByCol(msg tea.KeyMsg) bool {
+	for colIdx, kb := range m.keys.SortByCol {
+		if key.Matches(msg, kb) {
+			cols := m.resolveColumns()
+			if colIdx >= len(cols) {
+				return true // key pressed but no such column — absorb it
 			}
-		case SortID:
-			if strings.Contains(strings.ToLower(c.key), "id") || strings.Contains(c.title, "ID") {
-				m.sortColKey = colSortKey(c)
-				return
+			if m.sortColIdx == colIdx {
+				m.sortAsc = !m.sortAsc
+			} else {
+				m.sortColIdx = colIdx
+				m.sortAsc = true
 			}
-		case SortAge:
-			if isAgeKey(c.key) || isAgeKey(c.path) {
-				m.sortColKey = colSortKey(c)
-				return
-			}
+			m.updateSortColKey()
+			m.applySortAndFilter()
+			return true
 		}
 	}
-	m.sortColKey = ""
+	return false
 }
 
 func (m ResourceListModel) exactRelatedTargetID() (string, bool) {
@@ -205,9 +211,9 @@ func (m ResourceListModel) CursorPosition() int {
 	return m.scroll.Cursor()
 }
 
-// SortState returns the current sort field and direction.
-func (m ResourceListModel) SortState() (SortField, bool) {
-	return m.sort, m.sortAsc
+// SortState returns the current sort column index and direction.
+func (m ResourceListModel) SortState() (int, bool) {
+	return m.sortColIdx, m.sortAsc
 }
 
 // HScrollOffset returns the current horizontal scroll offset.

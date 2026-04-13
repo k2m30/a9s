@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
@@ -14,10 +15,12 @@ import (
 
 // listCol is a resolved column definition for rendering.
 type listCol struct {
-	title string
-	width int
-	key   string // resource.Fields key (fallback)
-	path  string // config-driven path for ExtractScalar
+	title    string
+	width    int
+	key      string // resource.Fields key (fallback)
+	path     string // config-driven path for ExtractScalar
+	sortKey  string // optional: Fields key to use for sorting instead of display value
+	sortPath string // optional: RawStruct path for raw numeric/time sort comparison
 }
 
 // colSortKey returns the stable identifier for a column used to match against
@@ -34,17 +37,47 @@ func colSortKey(c listCol) string {
 
 // resolveColumns determines the column definitions to use.
 func (m ResourceListModel) resolveColumns() []listCol {
-	// Check config-driven columns first.
+	// When viewConfig is explicitly set, use it (merged with defaults via GetViewDef).
 	if m.viewConfig != nil {
 		vd := config.GetViewDef(m.viewConfig, m.typeDef.ShortName)
 		if len(vd.List) > 0 {
 			cols := make([]listCol, len(vd.List))
 			for i, lc := range vd.List {
 				cols[i] = listCol{
-					title: lc.Title,
-					width: lc.Width,
-					path:  lc.Path,
-					key:   lc.Key,
+					title:    lc.Title,
+					width:    lc.Width,
+					path:     lc.Path,
+					key:      lc.Key,
+					sortKey:  lc.SortKey,
+					sortPath: lc.SortPath,
+				}
+			}
+			return cols
+		}
+	}
+
+	// When viewConfig is nil, fall back to built-in defaults for this resource
+	// type when the defaults are a superset of the typeDef columns. This ensures
+	// that resource types whose typeDef.Columns is a subset of the defaults (e.g.
+	// S3 which adds a Region column in defaults) render the full column set even
+	// in contexts where no config file is loaded (tests, demo mode). The superset
+	// check uses first-column title equality so that custom test typeDefs that
+	// share a ShortName but define different column layouts (e.g. ec2 sort tests)
+	// are not accidentally switched to defaults.
+	defaultVD := config.GetViewDef(nil, m.typeDef.ShortName)
+	if len(defaultVD.List) > len(m.typeDef.Columns) {
+		firstMatch := len(m.typeDef.Columns) == 0 ||
+			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == m.typeDef.Columns[0].Title)
+		if firstMatch {
+			cols := make([]listCol, len(defaultVD.List))
+			for i, lc := range defaultVD.List {
+				cols[i] = listCol{
+					title:    lc.Title,
+					width:    lc.Width,
+					path:     lc.Path,
+					key:      lc.Key,
+					sortKey:  lc.SortKey,
+					sortPath: lc.SortPath,
 				}
 			}
 			return cols
@@ -92,28 +125,43 @@ func (m ResourceListModel) fitColumns(cols []listCol) []listCol {
 }
 
 // renderHeaderRow renders the column header line with sort indicators.
+// Uses m.hScrollOffset to compute the absolute column index for position numbering.
 func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 	parts := make([]string, len(cols))
 	for i, c := range cols {
-		title := m.colHeaderTitle(c, i)
+		absIdx := i + m.hScrollOffset
+		title := m.colHeaderTitle(c, absIdx)
 		parts[i] = text.PadOrTrunc(title, c.width)
 	}
 	headerText := " " + strings.Join(parts, "  ")
 	return styles.TableHeader.Render(headerText)
 }
 
-// colHeaderTitle returns the column title with a sort indicator if this column
-// is the active sort column. Per §6, the indicator is bound to exactly one
-// column via ResourceListModel.sortColKey — set when the sort mode changes.
-// Substring matching is intentionally removed to prevent double-glyph bugs
-// (e.g. ct-events: both TIME and EVENT previously matched SortAge via isAgeKey).
-func (m ResourceListModel) colHeaderTitle(c listCol, _ int) string {
+// colHeaderTitle returns the column title with a position number prefix and
+// sort indicator. absIdx is the 0-based absolute column index (before hScrollOffset).
+// Position numbers 1-9 correspond to keys "1"-"9"; position 10 shows as "0".
+// The prefix is only shown when len("N:"+title) <= c.width so that narrow
+// columns remain legible (fall back to plain title when there is no room).
+func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	title := c.title
+	// Append sort glyph if this is the active sort column.
 	if m.sortColKey != "" && colSortKey(c) == m.sortColKey {
 		if m.sortAsc {
 			title += "\u2191"
 		} else {
 			title += "\u2193"
+		}
+	}
+	// Add position number prefix (1-based, max 10 columns for sort),
+	// only when the prefixed title fits within the column width.
+	if absIdx < 10 {
+		displayNum := absIdx + 1 // 0-based → 1-based
+		if displayNum == 10 {
+			displayNum = 0 // key "0" = column 10
+		}
+		prefixed := fmt.Sprintf("%d:%s", displayNum, title)
+		if len([]rune(prefixed)) <= c.width {
+			return prefixed
 		}
 	}
 	return title
@@ -173,9 +221,12 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 		}
 	}
 	// Try matching column title (lowercased) against Fields keys.
+	// Also try with spaces replaced by underscores (e.g. "Instance ID" → "instance_id").
 	titleLower := strings.ToLower(c.title)
+	titleUnder := strings.ReplaceAll(titleLower, " ", "_")
 	for k, v := range r.Fields {
-		if strings.ToLower(k) == titleLower {
+		kl := strings.ToLower(k)
+		if kl == titleLower || kl == titleUnder {
 			return v
 		}
 	}
