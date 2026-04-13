@@ -140,6 +140,9 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 			}
 			return m, nil
 		case key.Matches(msg, m.keys.Describe):
+			if m.rawText != "" {
+				return m, nil
+			}
 			res := m.res
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
@@ -150,6 +153,9 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.JSON):
+			if m.rawText != "" {
+				return m, nil
+			}
 			res := m.res
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
