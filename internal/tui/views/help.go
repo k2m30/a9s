@@ -241,6 +241,7 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 				{"esc", "back"},
 			},
@@ -294,6 +295,7 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 			{"esc", "back"},
 			{"q", "quit"},
 			{"i", "identity"},
+			{"!", "error log"},
 			{"?", "help"},
 		},
 	}
@@ -347,6 +349,7 @@ func (m HelpModel) detailGroups() []helpGroup {
 			bindings: []helpBinding{
 				{"esc", "back"},
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 			},
 		},
@@ -385,6 +388,7 @@ func (m HelpModel) yamlGroups() []helpGroup {
 			bindings: []helpBinding{
 				{"esc", "back"},
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 			},
 		},
@@ -423,6 +427,7 @@ func (m HelpModel) jsonGroups() []helpGroup {
 			bindings: []helpBinding{
 				{"esc", "back"},
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 			},
 		},
@@ -452,6 +457,7 @@ func (m HelpModel) selectorGroups() []helpGroup {
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 			},
 		},
@@ -473,6 +479,7 @@ func (m HelpModel) revealGroups() []helpGroup {
 			title: "OTHER",
 			bindings: []helpBinding{
 				{"i", "identity"},
+				{"!", "error log"},
 				{"?", "help"},
 			},
 		},
