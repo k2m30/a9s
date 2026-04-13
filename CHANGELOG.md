@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.0] - 2026-04-14
+
+### Added
+- Inter-navigation between detail, JSON, and YAML views — press `d`/`y`/`J` to switch freely between them without going back first (#269)
+- Sort by column position with `1`–`0` keys — pressing the same key toggles sort direction (#267)
+- Error log view with `!` key — shows session errors with timestamps (#268)
+
+### Fixed
+- View-switch keys (`d`/`J`) are blocked in raw-text viewer mode (error log) to prevent navigation with empty resource context (#269)
+
+### Changed
+- Architecture guide updated with all recent features: full message catalog, ReplaceCurrent navigation pattern, sorting, error log, resource type categories
+
 ## [3.41.0] - 2026-04-13
 
 ### Added
