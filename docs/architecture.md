@@ -313,7 +313,7 @@ View opens (detail, YAML, or JSON)
 
 **Error handling**: Enrichment errors produce a `FlashMsg` with `IsError: true`. The view is not updated on error.
 
-**Cache**: The enricher manages its own per-resource cache (e.g., `policyDocCache` keyed by ARN for managed policies, `roleName/policyName` for inline). Cache is session-scoped with explicit invalidation on profile switch (different AWS accounts may share the same role/policy names).
+**Cache**: Enrichers use the session-scoped `PolicyDocCache` on `ServiceClients`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. When `ServiceClients` is replaced on profile/region switch, the old cache is garbage collected — no explicit invalidation hooks needed.
 
 ---
 
@@ -350,7 +350,7 @@ The app has four distinct caches, each serving a different purpose:
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
 | **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
 | **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
-| **Enricher caches** | Per-enricher (e.g., `policyDocCache` in `role_policies_enrich.go`) | In-memory, package-level | Cleared on profile switch; generation guards discard stale results |
+| **Enricher caches** | `PolicyDocCache` field on `ServiceClients` | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources and their counts. Loaded on startup to instantly grey-out empty types in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count}`.
 
@@ -567,7 +567,7 @@ Two mock layers serve different purposes:
 3. **Use narrow interface mocks for fetcher tests** — one mock per AWS API method
 4. **Always `stripANSI` before string assertions** — rendered output contains escape codes
 5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterEnricher(...) })` for temporary registrations
-6. **Clean up caches** — call `awsclient.ClearPolicyDocumentCache()` in `t.Cleanup` if your test exercises the enricher
+6. **Cache is session-scoped** — each `ServiceClients` instance has its own `PolicyDocCache`. Tests using different `ServiceClients` instances get independent caches automatically.
 
 ### Integration Tests
 
@@ -583,7 +583,7 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 - `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)`.
 - The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
-- Some enricher caches are package-global and rely on explicit invalidation rather than fully context-qualified cache keys.
+- Enricher caches are session-scoped on `ServiceClients`. This is correct for lifetime management but means the cache type is a feature-specific field on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
 ---

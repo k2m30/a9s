@@ -234,9 +234,6 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 		count: &callCount,
 	}
 
-	awsclient.ClearPolicyDocumentCache()
-	t.Cleanup(func() { awsclient.ClearPolicyDocumentCache() })
-
 	// First call
 	_, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::123456789012:policy/no-cache-test")
 	if err != nil {

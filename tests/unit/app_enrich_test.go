@@ -1,17 +1,11 @@
 package unit
 
 import (
-	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -464,51 +458,66 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 	}
 }
 
-func TestProfileSwitch_ClearsPolicyDocumentCache(t *testing.T) {
-	// Populate the cache with a document
-	awsclient.ClearPolicyDocumentCache()
-	t.Cleanup(func() { awsclient.ClearPolicyDocumentCache() })
+func TestPolicyDocCache_SessionScoped_SameClientUsesCache(t *testing.T) {
+	// Same ServiceClients instance, same policy opened twice — second uses cache.
+	var cache awsclient.PolicyDocumentCache
 
-	docJSON := `{"Version":"2012-10-17","Statement":[]}`
-	encoded := url.QueryEscape(docJSON)
+	cache.Set(awsclient.ManagedKey("arn:aws:iam::123456789012:policy/test"), map[string]any{"cached": true})
 
-	getPolicyMock := &enrichGetPolicyClient{
-		output: &iam.GetPolicyOutput{
-			Policy: &iamtypes.Policy{DefaultVersionId: aws.String("v1")},
-		},
+	got := cache.Get(awsclient.ManagedKey("arn:aws:iam::123456789012:policy/test"))
+	if got == nil {
+		t.Fatal("expected cache hit for same key on same cache instance")
+	}
+	doc := got.(map[string]any)
+	if doc["cached"] != true {
+		t.Error("expected cached document")
+	}
+}
+
+func TestPolicyDocCache_DifferentInstances_DoNotShareCache(t *testing.T) {
+	// Two ServiceClients instances (simulating profile switch) have independent caches.
+	var cache1, cache2 awsclient.PolicyDocumentCache
+
+	cache1.Set(awsclient.InlineKey("my-role", "trust-policy"), map[string]any{"from": "account-1"})
+
+	// cache2 should have nothing — different instance, different session
+	got := cache2.Get(awsclient.InlineKey("my-role", "trust-policy"))
+	if got != nil {
+		t.Fatal("different PolicyDocumentCache instances must not share data")
+	}
+}
+
+func TestPolicyDocCache_InlineKeysDistinctPerRole(t *testing.T) {
+	// Same policy name on different roles must not collide.
+	var cache awsclient.PolicyDocumentCache
+
+	cache.Set(awsclient.InlineKey("role-a", "trust-policy"), map[string]any{"role": "a"})
+	cache.Set(awsclient.InlineKey("role-b", "trust-policy"), map[string]any{"role": "b"})
+
+	gotA := cache.Get(awsclient.InlineKey("role-a", "trust-policy")).(map[string]any)
+	gotB := cache.Get(awsclient.InlineKey("role-b", "trust-policy")).(map[string]any)
+
+	if gotA["role"] != "a" {
+		t.Errorf("expected role-a document, got %v", gotA["role"])
+	}
+	if gotB["role"] != "b" {
+		t.Errorf("expected role-b document, got %v", gotB["role"])
+	}
+}
+
+func TestPolicyDocCache_ZeroValueSafe(t *testing.T) {
+	// Zero-value cache must work without initialization.
+	var cache awsclient.PolicyDocumentCache
+
+	got := cache.Get("nonexistent")
+	if got != nil {
+		t.Fatal("expected nil from zero-value cache")
 	}
 
-	callCount := 0
-	getVersionMock := &countingEnrichGetPolicyVersionClient{
-		output: &iam.GetPolicyVersionOutput{
-			PolicyVersion: &iamtypes.PolicyVersion{Document: aws.String(encoded)},
-		},
-		count: &callCount,
-	}
-
-	// First fetch populates the cache
-	_, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::111111111111:policy/shared-name")
-	if err != nil {
-		t.Fatalf("first fetch error: %v", err)
-	}
-	if callCount != 1 {
-		t.Fatalf("expected 1 API call, got %d", callCount)
-	}
-
-	// Simulate profile switch via the app — this should clear the cache
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
-	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other-account"})
-	_ = m // profile switch triggers cache clear in handleProfileSelected
-
-	// After profile switch, the cache should be empty.
-	// A second fetch with the same ARN should hit the API again.
-	_, err = awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::111111111111:policy/shared-name")
-	if err != nil {
-		t.Fatalf("second fetch error: %v", err)
-	}
-	if callCount != 2 {
-		t.Fatalf("expected 2 API calls after profile switch cleared cache, got %d", callCount)
+	// Set should not panic on zero-value cache
+	cache.Set("key", "value")
+	if cache.Get("key") != "value" {
+		t.Fatal("expected value after Set on zero-value cache")
 	}
 }
 

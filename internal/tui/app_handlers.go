@@ -291,7 +291,6 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on profile switch
-	awsclient.ClearPolicyDocumentCache() // clear enricher cache — different account may have same role/policy names
 	m.relatedGen++
 	m.enrichGen++
 	m.connectGen++

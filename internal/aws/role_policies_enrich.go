@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -13,22 +12,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-var (
-	policyDocCache   = map[string]any{}
-	policyDocCacheMu sync.RWMutex
-)
-
-// ClearPolicyDocumentCache resets the cache. Used only in tests.
-func ClearPolicyDocumentCache() {
-	policyDocCacheMu.Lock()
-	policyDocCache = map[string]any{}
-	policyDocCacheMu.Unlock()
-}
-
 func init() {
 	resource.RegisterEnricher("role_policies", enrichRolePolicy)
 }
 
+// enrichRolePolicy fetches the policy document for a role_policies resource
+// and returns an enriched copy with Document set on RawStruct.
+// Uses the session-scoped PolicyDocCache on ServiceClients.
 func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -50,9 +40,9 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 		if roleName == "" {
 			return res, fmt.Errorf("missing role_name for inline policy")
 		}
-		cacheKey := roleName + "/" + row.PolicyName
+		cacheKey := InlineKey(roleName, row.PolicyName)
 
-		if cached := getCachedDoc(cacheKey); cached != nil {
+		if cached := c.PolicyDocCache.Get(cacheKey); cached != nil {
 			doc = cached
 		} else {
 			getRolePolicyAPI, ok := c.IAM.(IAMGetRolePolicyAPI)
@@ -63,13 +53,15 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 			if err != nil {
 				return res, err
 			}
-			putCachedDoc(cacheKey, doc)
+			c.PolicyDocCache.Set(cacheKey, doc)
 		}
 	} else {
 		if row.PolicyArn == "" {
 			return res, fmt.Errorf("missing policy ARN for managed policy")
 		}
-		if cached := getCachedDoc(row.PolicyArn); cached != nil {
+		cacheKey := ManagedKey(row.PolicyArn)
+
+		if cached := c.PolicyDocCache.Get(cacheKey); cached != nil {
 			doc = cached
 		} else {
 			getPolicyAPI, ok1 := c.IAM.(IAMGetPolicyAPI)
@@ -81,7 +73,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 			if err != nil {
 				return res, err
 			}
-			putCachedDoc(row.PolicyArn, doc)
+			c.PolicyDocCache.Set(cacheKey, doc)
 		}
 	}
 
@@ -91,6 +83,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 }
 
 // FetchManagedPolicyDocument fetches and decodes a managed policy document.
+// Two API calls: GetPolicy (for DefaultVersionId) then GetPolicyVersion.
 func FetchManagedPolicyDocument(ctx context.Context, getPolAPI IAMGetPolicyAPI, getVerAPI IAMGetPolicyVersionAPI, policyArn string) (any, error) {
 	polOut, err := getPolAPI.GetPolicy(ctx, &iam.GetPolicyInput{
 		PolicyArn: aws.String(policyArn),
@@ -143,16 +136,4 @@ func decodePolicyDocument(encoded string) (any, error) {
 		return nil, fmt.Errorf("JSON parse: %w", err)
 	}
 	return doc, nil
-}
-
-func getCachedDoc(key string) any {
-	policyDocCacheMu.RLock()
-	defer policyDocCacheMu.RUnlock()
-	return policyDocCache[key]
-}
-
-func putCachedDoc(key string, doc any) {
-	policyDocCacheMu.Lock()
-	policyDocCache[key] = doc
-	policyDocCacheMu.Unlock()
 }

@@ -74,7 +74,9 @@ reviews:
         - URL-encoded IAM documents use RFC 3986 percent-encoding — must use
           url.PathUnescape, NOT url.QueryUnescape (+ must stay literal)
         - All fetcher registration happens in init() functions
-        - Enricher caches must be cleared on profile switch (cross-account safety)
+        - Enricher caches are session-scoped on ServiceClients (PolicyDocCache field),
+          NOT package-global. Cache lifetime is tied to the session — no explicit
+          invalidation hooks needed.
 
     - path: "internal/resource/**"
       instructions: |
@@ -103,7 +105,8 @@ reviews:
           demo fakes (tui.WithDemo(true)) for full TUI behavior tests
         - Use stripANSI() before string assertions on rendered output
         - Clean up registries with t.Cleanup() for temporary registrations
-        - Clean up caches (ClearPolicyDocumentCache) if tests exercise enrichers
+        - Enricher cache is session-scoped on ServiceClients — different instances
+          get independent caches automatically, no global cleanup needed
         - Never use real AWS account IDs or profile names in test data
 
     - path: "internal/config/**"
