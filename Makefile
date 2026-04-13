@@ -1,4 +1,4 @@
-.PHONY: build install test lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme
+.PHONY: build install test lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint
 
 BINARY   = a9s
 CMD      = ./cmd/a9s

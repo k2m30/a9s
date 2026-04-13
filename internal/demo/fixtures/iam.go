@@ -265,6 +265,25 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
+		// AWS-managed policies referenced by role_policies fixtures
+		{
+			PolicyName:       aws.String("AmazonEKSWorkerNodePolicy"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000002"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"),
+			AttachmentCount:  aws.Int32(6),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2018, 5, 27, 0, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+		},
+		{
+			PolicyName:       aws.String("AmazonEC2ContainerRegistryReadOnly"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000003"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"),
+			AttachmentCount:  aws.Int32(6),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2015, 12, 21, 0, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+		},
 	}
 
 	// Generate 18 more policies
