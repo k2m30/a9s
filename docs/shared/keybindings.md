@@ -65,5 +65,6 @@
 
 | Key | Action |
 |-----|--------|
+| `!` | Error log (session errors with timestamps) |
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
