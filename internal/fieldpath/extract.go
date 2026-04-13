@@ -117,8 +117,9 @@ func ExtractSubtree(obj any, dotPath string) string {
 		return ""
 	}
 
-	// Dereference pointer
-	for val.Kind() == reflect.Pointer {
+	// Dereference pointer and interface wrappers (e.g., fields of type `any`
+	// containing a map[string]any from JSON unmarshal).
+	for val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface {
 		if val.IsNil() {
 			return ""
 		}
@@ -412,7 +413,7 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 			val = ExtractSubtree(obj, path)
 			if val != "" {
 				if rv, err := ExtractValue(obj, path); err == nil {
-					for rv.Kind() == reflect.Pointer {
+					for rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {
 						if rv.IsNil() {
 							break
 						}

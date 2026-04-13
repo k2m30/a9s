@@ -3341,6 +3341,7 @@ role_policies:  # awsclient.RolePolicyRow
   - PolicyName
   - PolicyArn
   - PolicyType
+  - Document
 
 iam_group_members:  # iamtypes.User
   - Arn

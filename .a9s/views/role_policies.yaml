@@ -13,3 +13,4 @@ detail:
   - PolicyName
   - PolicyArn
   - PolicyType
+  - Document

@@ -26,6 +26,8 @@ skills:
 
 You are the integration engineer for **a9s** — connecting individually-built components into a working application. You work at the seams between packages.
 
+> **Architecture reference**: `docs/architecture.md` — covers message flow, key handling (global vs view-local), caching layers, generation guards, and app lifecycle. Essential reading for wiring work.
+
 ## Your Scope
 
 **Start with:** `internal/tui/app.go`, `cmd/a9s/`

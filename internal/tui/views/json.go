@@ -50,6 +50,14 @@ func (m JSONModel) Init() (JSONModel, tea.Cmd) {
 // Update delegates scroll to viewport; handles c (copy), esc (back).
 func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.EnrichDetailResultMsg:
+		// Accept enriched resource when type and ID match.
+		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
+			return m, nil
+		}
+		m.res = msg.EnrichedRes
+		m.refreshViewportContent()
+		return m, nil
 	case tea.PasteMsg:
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd

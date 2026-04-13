@@ -292,6 +292,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on profile switch
 	m.relatedGen++
+	m.enrichGen++
 	m.connectGen++
 	// Only save prev on first switch; rapid A→B→C keeps A as rollback target
 	if !m.hasPrevState {
@@ -322,6 +323,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
 	m.relatedCache.clear() // always clear on region switch
 	m.relatedGen++
+	m.enrichGen++
 	m.connectGen++
 	// Only save prev on first switch; rapid switches keep original as rollback target
 	if !m.hasPrevState {

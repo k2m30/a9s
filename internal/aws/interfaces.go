@@ -586,6 +586,21 @@ type IAMListGroupPoliciesAPI interface {
 	ListGroupPolicies(ctx context.Context, params *iam.ListGroupPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListGroupPoliciesOutput, error)
 }
 
+// IAMGetPolicyAPI defines the interface for the IAM GetPolicy operation.
+type IAMGetPolicyAPI interface {
+	GetPolicy(ctx context.Context, params *iam.GetPolicyInput, optFns ...func(*iam.Options)) (*iam.GetPolicyOutput, error)
+}
+
+// IAMGetPolicyVersionAPI defines the interface for the IAM GetPolicyVersion operation.
+type IAMGetPolicyVersionAPI interface {
+	GetPolicyVersion(ctx context.Context, params *iam.GetPolicyVersionInput, optFns ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error)
+}
+
+// IAMGetRolePolicyAPI defines the interface for the IAM GetRolePolicy operation.
+type IAMGetRolePolicyAPI interface {
+	GetRolePolicy(ctx context.Context, params *iam.GetRolePolicyInput, optFns ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error)
+}
+
 // ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
 type ELBv2DescribeRulesAPI interface {
 	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)
@@ -786,6 +801,9 @@ type IAMAPI interface {
 	IAMListAccountAliasesAPI
 	IAMGetGroupAPI
 	IAMListGroupPoliciesAPI
+	IAMGetPolicyAPI
+	IAMGetPolicyVersionAPI
+	IAMGetRolePolicyAPI
 }
 
 // WAFv2API is the aggregate interface covering all WAFv2 operations used by a9s fetchers.

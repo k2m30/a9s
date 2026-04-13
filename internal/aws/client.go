@@ -95,6 +95,11 @@ type ServiceClients struct {
 	MSK              MSKAPI
 	Backup           BackupAPI
 	STS              *sts.Client
+
+	// PolicyDocCache is a session-scoped cache for decoded IAM policy documents.
+	// Automatically invalidated when ServiceClients is replaced on profile/region switch.
+	// Zero-value safe — no initialization needed.
+	PolicyDocCache PolicyDocumentCache
 }
 
 // NewAWSSessionContext creates a new AWS config using the given context, profile,

@@ -15,6 +15,7 @@ type RolePolicyRow struct {
 	PolicyName string
 	PolicyArn  string
 	PolicyType string
+	Document   any `json:"Document,omitempty" yaml:"Document,omitempty"`
 }
 
 func init() {
@@ -81,6 +82,7 @@ func FetchRolePolicies(
 				"policy_name": policyName,
 				"policy_arn":  policyArn,
 				"policy_type": "Managed",
+				"role_name":   roleName,
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: policyName,
@@ -108,6 +110,7 @@ func FetchRolePolicies(
 				"policy_name": name,
 				"policy_arn":  "",
 				"policy_type": "Inline",
+				"role_name":   roleName,
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: name,

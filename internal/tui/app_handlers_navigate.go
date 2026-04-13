@@ -62,21 +62,45 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
 		d.SetSize(m.innerSize())
 		m.pushView(&d)
-		// Use cached related results when available; skip re-dispatch.
+		var cmds []tea.Cmd
+
+		// Dispatch enrichment if registered for this resource type.
+		// Only bump enrichGen when the resource identity changes, so
+		// switching to YAML/JSON for the same resource doesn't invalidate
+		// an in-flight enrichment from the detail view open.
+		if resource.HasEnricher(resType) {
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
+			cmds = append(cmds, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			})
+		}
+
+		// Dispatch related checks (existing logic)
 		if d.NeedsRelatedCheck() {
 			ck := relatedCacheKey(resType, msg.Resource.ID)
 			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
 				d.ApplyRelatedResults(cached)
-				return m, nil
-			}
-			return m, func() tea.Msg {
-				return messages.RelatedCheckStartedMsg{
-					ResourceType:   resType,
-					SourceResource: *msg.Resource,
-				}
+			} else {
+				cmds = append(cmds, func() tea.Msg {
+					return messages.RelatedCheckStartedMsg{
+						ResourceType:   resType,
+						SourceResource: *msg.Resource,
+					}
+				})
 			}
 		}
-		return m, nil
+
+		if len(cmds) == 0 {
+			return m, nil
+		}
+		return m, tea.Batch(cmds...)
 
 	case messages.TargetYAML:
 		if msg.Resource == nil {
@@ -94,6 +118,20 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		y := views.NewYAML(*msg.Resource, resType, m.keys)
 		y.SetSize(m.innerSize())
 		m.pushView(&y)
+		// Dispatch enrichment so YAML view updates when result arrives.
+		if resource.HasEnricher(resType) {
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
+			return m, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetJSON:
@@ -112,6 +150,20 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		j := views.NewJSON(*msg.Resource, resType, m.keys)
 		j.SetSize(m.innerSize())
 		m.pushView(&j)
+		// Dispatch enrichment so JSON view updates when result arrives.
+		if resource.HasEnricher(resType) {
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
+			return m, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: resType,
+					Resource:     *msg.Resource,
+				}
+			}
+		}
 		return m, nil
 
 	case messages.TargetHelp:
@@ -228,20 +280,33 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Detail view: re-trigger related resource checks
+	// Detail view: re-trigger related resource checks and enrichment
 	if d, ok := m.activeView().(*views.DetailModel); ok {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
-		m.relatedGen++ // cancel in-flight results from previous batch
+		m.relatedGen++   // cancel in-flight results from previous batch
+		m.enrichGen++    // cancel in-flight enrichment from previous batch
+		m.enrichResKey = "" // force gen bump on next enrichment dispatch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-		return m, func() tea.Msg {
+
+		var cmds []tea.Cmd
+		cmds = append(cmds, func() tea.Msg {
 			return messages.RelatedCheckStartedMsg{
 				ResourceType:   rt,
 				SourceResource: srcRes,
 			}
+		})
+		if resource.HasEnricher(rt) {
+			cmds = append(cmds, func() tea.Msg {
+				return messages.EnrichDetailMsg{
+					ResourceType: rt,
+					Resource:     srcRes,
+				}
+			})
 		}
+		return m, tea.Batch(cmds...)
 	}
 
 	rl, ok := m.activeView().(*views.ResourceListModel)
