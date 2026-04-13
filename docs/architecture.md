@@ -61,16 +61,39 @@ Key messages:
 
 | Message | Purpose |
 |---------|---------|
-| `NavigateMsg` | Push a new view (detail, YAML, JSON, etc.) |
+| **Navigation** | |
+| `NavigateMsg` | Push (or replace) a view — detail, YAML, JSON, etc. `ReplaceCurrent` swaps instead of stacking |
 | `PopViewMsg` | Request current view dismissal (emitted by HelpModel, IdentityModel on keypress) |
-| `ResourcesLoadedMsg` | Deliver fetched resources to a list view |
 | `EnterChildViewMsg` | Open a child resource list (e.g., S3 objects) |
-| `RelatedCheckStartedMsg` | Start async related-resource checks |
-| `RelatedCheckResultMsg` | Deliver one related-check result to detail view |
+| `RelatedNavigateMsg` | Navigate to a related resource type (from navigable field or CloudTrail pivot) |
+| **Resource loading** | |
+| `ResourcesLoadedMsg` | Deliver fetched resources to a list view |
+| `LoadResourcesMsg` | Trigger async resource fetch |
+| `LoadMoreMsg` | Trigger next-page fetch (pagination) |
+| `RefreshMsg` | Trigger re-fetch of current list (Ctrl+R) |
+| **Session & identity** | |
+| `InitConnectMsg` | Trigger AWS session setup |
+| `ClientsReadyMsg` | AWS clients connected and ready |
+| `IdentityLoadedMsg` | Caller identity result for status bar |
+| `IdentityErrorMsg` | Caller identity fetch failure |
+| `ProfileSelectedMsg` | User confirmed profile selection |
+| `RegionSelectedMsg` | User confirmed region selection |
+| `ThemeSelectedMsg` | User confirmed theme selection |
+| **Enrichment & related** | |
 | `EnrichDetailMsg` | Start async detail enrichment (e.g., policy doc fetch) |
 | `EnrichDetailResultMsg` | Deliver enriched resource back to detail/YAML/JSON view |
+| `RelatedCheckStartedMsg` | Start async related-resource checks |
+| `RelatedCheckResultMsg` | Deliver one related-check result to detail view |
+| **Availability** | |
+| `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability data |
+| `AvailabilityPrefetchedMsg` | No-cache-mode availability counts |
+| `AvailabilityCheckedMsg` | One resource type's background probe result |
+| **UI feedback** | |
 | `FlashMsg` | Show a temporary status/error message |
-| `ClientsReadyMsg` | AWS clients connected and ready |
+| `ClearFlashMsg` | Auto-clear flash after timer |
+| `APIErrorMsg` | AWS API call failure |
+| `CopiedMsg` | Clipboard copy success |
+| `ValueRevealedMsg` | Deliver revealed secret/parameter value |
 
 ### View Stack
 
@@ -84,6 +107,8 @@ The app maintains a stack of views (`stack []views.View`):
 - `pushView(v)` — append to stack
 - `popView()` — remove top (Esc pops; `q` quits the app)
 - `activeView()` — `stack[len(stack)-1]`, receives all messages via `updateActiveView()`
+
+**View replacement** (`ReplaceCurrent`): `NavigateMsg` has a `ReplaceCurrent bool` field. When true, `handleNavigate` calls `popView()` before `pushView()`, effectively swapping the current view. This is used for inter-view navigation between Detail, YAML, and JSON — switching from YAML to JSON replaces in-place (`list → detail → JSON`) rather than stacking (`list → detail → YAML → JSON`). Esc always returns to the view underneath (detail), not to the previous sibling view.
 
 Views are created in `handleNavigate()` and pushed immediately. Async data arrives later via messages.
 
@@ -171,7 +196,22 @@ type ResourceTypeDef struct {
 }
 ```
 
-Types are built once at package init by `buildResourceTypes()`. Categories map to `types_compute.go`, `types_networking.go`, etc.
+Types are built once at package init by `buildResourceTypes()`. Categories map to type definition files:
+
+| File | Category |
+|------|----------|
+| `types_compute.go` | Compute (EC2, Lambda, EKS, ASG, Elastic Beanstalk, EBS) |
+| `types_containers.go` | Containers (ECS Clusters, ECS Services) |
+| `types_networking.go` | Networking (VPC, Subnet, SG, ELB, TG, IGW, NAT, Route Tables, Node Groups, ACM, API Gateway, WAF) |
+| `types_databases.go` | Databases & Storage (RDS, S3, Redis, OpenSearch, DynamoDB, Redshift, MSK, EFS, Kinesis) |
+| `types_security.go` | Security & IAM (IAM Roles, Users, Policies, Groups, KMS) |
+| `types_secrets.go` | Secrets & Config (Secrets Manager, SSM Parameter Store) |
+| `types_monitoring.go` | Monitoring (CloudWatch Alarms, Log Groups, CloudTrail) |
+| `types_messaging.go` | Messaging (SNS, SQS, EventBridge Rules, Step Functions, SES) |
+| `types_cicd.go` | CI/CD (CloudFormation, CodePipeline, CodeBuild, ECR) |
+| `types_dns_cdn.go` | DNS & CDN (Route 53, CloudFront) |
+| `types_data.go` | Data & Analytics (Athena, Glue) |
+| `types_backup.go` | Backup (AWS Backup) |
 
 ---
 
@@ -200,7 +240,7 @@ All in `internal/tui/views/`:
 | **MainMenuModel** | `mainmenu.go` | Category-grouped resource list with availability badges |
 | **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down |
 | **DetailModel** | `detail.go`, `detail_fields.go`, `detail_helpers.go` | Two-column: field list (left) + related panel (right) |
-| **YAMLModel** | `yaml.go` | YAML dump of RawStruct with syntax highlighting + search |
+| **YAMLModel** | `yaml.go` | YAML dump of RawStruct with syntax highlighting + search. Also doubles as a raw-text viewer via `NewTextViewer()` (used for the `!` error log) |
 | **JSONModel** | `json.go` | JSON dump of RawStruct with syntax highlighting + search |
 | **RevealModel** | `reveal.go` | Displays revealed secret/parameter value |
 | **HelpModel** | `help.go` | Context-sensitive key binding reference |
@@ -231,12 +271,22 @@ All bindings are defined in one file: `internal/tui/keys/keys.go`. Single `Map` 
 
 Key highlights:
 - `Enter` — drill into detail/child view
-- `y` — YAML view, `J` (uppercase) — JSON view
+- `d` — detail view, `y` — YAML view, `J` (uppercase) — JSON view. These three are inter-navigable: pressing any of them from another replaces the current view in-place.
+- `1`–`9`, `0` — sort by column position (1=first column, 0=tenth). Pressing the same key toggles sort direction.
+- `t` — jump to CloudTrail Events for the selected resource (all resource types)
+- `!` — error log (session errors with timestamps, rendered via `YAMLModel.NewTextViewer`)
+- `Ctrl+Z` — toggle attention-only filter (hide dim/routine rows)
+- `c` — copy resource ID to clipboard
 - `p` — role policies (and other child views via `ChildViewDef.Key`)
+- `e`, `L`, `R`, `s` — child view triggers (Events, Logs, Resources, Source)
 - `r` — toggle related panel
 - `x` — reveal secret value
+- `w` — toggle line wrap (in YAML, JSON, detail, and reveal views)
+- `m` — load more (next page for paginated lists)
 - `Ctrl+R` — refresh (re-fetch resources, re-run related checks + enrichment)
 - `/` — context-dependent: starts filter on list views, starts search on detail/YAML/JSON, view-dependent elsewhere
+- `n`/`N` — next/previous search match (in detail/YAML/JSON)
+- `g`/`G` — go to top/bottom
 - `Esc` — back / cancel / pop view
 - `q` — quit the application (in normal mode; swallowed when filter, command, or search input is active)
 - `?` — help
@@ -250,13 +300,25 @@ The root model's `handleKeyMsg` (`app_handlers.go`) resolves keys in a specific 
 2. **Input modes** — if filter, command, or search input is active, **all keys route to that input handler** (including `q`, `/`, `?`). This is why `q` doesn't quit while typing a filter.
 3. **`?`** — help (global, pushes HelpModel)
 4. **`i`** — identity (global, pushes IdentityModel)
-5. **`q`** — quit (`tea.Quit`)
-6. **`Esc`** — complex: delegates to view first (search cancel, right-column defocus), then pops
-7. **`:`** — enter command mode
-8. **`/`** — routed to `updateActiveView`, which handles it per-view (filter on lists, search on detail/YAML/JSON, ignored elsewhere)
-9. **Everything else** — falls through to `updateActiveView` (view-local handling)
+5. **`!`** — error log (global, pushes a `YAMLModel` in raw-text viewer mode via `NewTextViewer`)
+6. **`q`** — quit (`tea.Quit`)
+7. **`Esc`** — complex: delegates to view first (search cancel, right-column defocus), then pops
+8. **`:`** — enter command mode
+9. **`/`** — routed to `updateActiveView`, which handles it per-view (filter on lists, search on detail/YAML/JSON, ignored elsewhere)
+10. **Everything else** — falls through to `updateActiveView` (view-local handling)
 
 The critical insight: steps 2-3 mean `q` only quits in normal mode. During filter/command/search input, all keys are captured by the input handler. `/` is not globally handled — it's always delegated to the active view.
+
+### Sorting
+
+Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth column). Implementation lives in `internal/tui/views/sort.go`:
+
+- `sortColIdx int` tracks the active sort column index
+- `SortByCol [10]key.Binding` in `keys.Map` maps digit keys to column indices
+- Pressing a sort key sorts ascending; pressing the same key again toggles to descending
+- Sort indicator (▲/▼) appears in the column header
+
+The old named sort sentinels (`SortName`, `SortID`, `SortAge`) are deprecated and map to column indices 0, 1, 2 respectively. New code should use column-position sorting exclusively.
 
 ---
 
@@ -415,6 +477,7 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 **Architecture:**
 - `internal/demo/fixtures/` — per-service Go files returning hardcoded SDK response objects
 - `internal/demo/fakes/` — per-service fake API implementations backed by fixtures
+- `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
 **API note**: `tui.WithDemo(true)` is a compatibility shim that calls `WithClients(demo.NewServiceClients())` internally. New code should use the explicit form: `tui.WithClients(demo.NewServiceClients())` + `tui.WithNoCache(true)`.
