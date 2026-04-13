@@ -1,6 +1,9 @@
 package views
 
 import (
+	"encoding/json"
+	"strings"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -42,7 +45,7 @@ func (m RevealModel) Update(msg tea.Msg) (RevealModel, tea.Cmd) {
 		if key.Matches(msg, m.keys.ToggleWrap) {
 			m.wrap = !m.wrap
 			m.viewport.SoftWrap = m.wrap
-			m.viewport.SetContent(m.value)
+			m.viewport.SetContent(m.displayValue())
 			return m, nil
 		}
 	}
@@ -74,7 +77,7 @@ func (m *RevealModel) SetSize(w, h int) {
 		m.viewport.SetWidth(w)
 		m.viewport.SetHeight(h)
 	}
-	m.viewport.SetContent(m.value)
+	m.viewport.SetContent(m.displayValue())
 }
 
 // FrameTitle returns the secret name.
@@ -95,6 +98,26 @@ func (m RevealModel) GetHelpContext() HelpContext {
 // SecretValue returns the raw secret value for clipboard copy.
 func (m RevealModel) SecretValue() string {
 	return m.value
+}
+
+// displayValue returns a formatted version of the secret for display.
+// JSON values are pretty-printed with indentation; non-JSON values are returned as-is.
+// Uses JSON (not YAML) because secret keys often contain colons, which are
+// visually ambiguous in YAML's key: value syntax.
+func (m RevealModel) displayValue() string {
+	s := strings.TrimSpace(m.value)
+	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
+		return m.value
+	}
+	var parsed any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return m.value
+	}
+	pretty, err := json.MarshalIndent(parsed, "", "  ")
+	if err != nil {
+		return m.value
+	}
+	return colorizeJSON(string(pretty))
 }
 
 // HeaderWarning returns the persistent red warning for the header right side.

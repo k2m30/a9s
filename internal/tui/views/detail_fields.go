@@ -138,6 +138,91 @@ func flattenTagItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 	return result
 }
 
+// expandJSONItems post-processes field items to detect JSON strings in values
+// and expand them as YAML-formatted sub-fields. Handles both:
+//   - top-level scalar items (not IsHeader, not IsSubField, not IsSection) whose Value is JSON
+//   - sub-field items whose value portion is JSON
+//
+// Called after flattenTagItems() but before navigable post-processing.
+func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
+	if len(items) == 0 {
+		return items
+	}
+	result := make([]fieldpath.FieldItem, 0, len(items))
+	for _, item := range items {
+		// Pass through unchanged: headers, sections, navigable items.
+		if item.IsHeader || item.IsSection || item.IsNavigable {
+			result = append(result, item)
+			continue
+		}
+		if item.IsSubField {
+			// Extract value portion after the first ":" separator.
+			rawLine := item.Value
+			trimmed := strings.TrimSpace(rawLine)
+			trimmed = strings.TrimPrefix(trimmed, "- ")
+			_, valuePart, hasSep := strings.Cut(trimmed, ":")
+			if !hasSep {
+				result = append(result, item)
+				continue
+			}
+			valuePart = strings.TrimSpace(valuePart)
+			lines := text.TryJSONToYAMLLines(valuePart)
+			if lines == nil {
+				result = append(result, item)
+				continue
+			}
+			// Emit the key line as a sub-field header (key with empty value).
+			// Format as "key:" so parseYAMLLine recognizes it.
+			keyPart, _, _ := strings.Cut(trimmed, ":")
+			keyLine := keyPart + ":"
+			result = append(result, fieldpath.FieldItem{
+				Path:        item.Path,
+				Key:         keyLine,
+				Value:       keyLine,
+				IsSubField:  true,
+				IndentLevel: item.IndentLevel,
+			})
+			// Emit expanded YAML lines at IndentLevel + 1.
+			for _, line := range lines {
+				leading := len(line) - len(strings.TrimLeft(line, " "))
+				level := leading/2 + item.IndentLevel + 1
+				result = append(result, fieldpath.FieldItem{
+					Path:        item.Path,
+					Key:         line,
+					Value:       line,
+					IsSubField:  true,
+					IndentLevel: level,
+				})
+			}
+			continue
+		}
+		// Top-level scalar item: check if Value is JSON.
+		lines := text.TryJSONToYAMLLines(item.Value)
+		if lines == nil {
+			result = append(result, item)
+			continue
+		}
+		// Replace scalar with a header + sub-field lines.
+		result = append(result, fieldpath.FieldItem{
+			Path:     item.Path,
+			Key:      item.Key,
+			IsHeader: true,
+		})
+		for _, line := range lines {
+			leading := len(line) - len(strings.TrimLeft(line, " "))
+			level := leading/2 + 1
+			result = append(result, fieldpath.FieldItem{
+				Path:        item.Path,
+				Key:         line,
+				Value:       line,
+				IsSubField:  true,
+				IndentLevel: level,
+			})
+		}
+	}
+	return result
+}
+
 // buildFieldList computes m.fieldList from the view config and navigable field registry.
 // Sets m.fieldList to nil when no config or detail paths are available (falls through to renderFromConfig).
 // After calling ExtractFieldList, post-processes sub-fields to mark navigable ones:
@@ -202,13 +287,13 @@ func (m *DetailModel) buildFieldList() {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		m.fieldList = flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil))
+		m.fieldList = expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil)))
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
 		return
 	}
-	items := flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap))
+	items := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
 	// Post-process: annotate sub-fields that match a navigable path.
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
 	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId
