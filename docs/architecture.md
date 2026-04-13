@@ -313,7 +313,12 @@ View opens (detail, YAML, or JSON)
 
 **Error handling**: Enrichment errors produce a `FlashMsg` with `IsError: true`. The view is not updated on error.
 
-**Cache**: Enrichers use the session-scoped `PolicyDocCache` on `ServiceClients`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. When `ServiceClients` is replaced on profile/region switch, the old cache is garbage collected — no explicit invalidation hooks needed.
+**Caching policy**:
+- **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session.
+- **If caching is justified**: use a session-scoped, feature-specific cache owned by session context (`ServiceClients` today). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
+- **Never**: use package-global cache state for enrichers.
+
+**Current example**: IAM policy document enrichment uses the session-scoped `PolicyDocCache` on `ServiceClients`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. When `ServiceClients` is replaced on profile/region switch, the old cache is garbage collected — no explicit invalidation hooks needed.
 
 ---
 
@@ -350,7 +355,7 @@ The app has four distinct caches, each serving a different purpose:
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
 | **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
 | **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
-| **Enricher caches** | `PolicyDocCache` field on `ServiceClients` | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
+| **Enricher caches** | Feature-specific cache on `ServiceClients` (current example: `PolicyDocCache`) | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources and their counts. Loaded on startup to instantly grey-out empty types in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count}`.
 
@@ -358,7 +363,7 @@ The app has four distinct caches, each serving a different purpose:
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
-**Enricher caches**: Each enricher manages its own cache. The policy document enricher caches decoded documents by ARN (managed) or `roleName/policyName` (inline). Session-scoped but explicitly cleared on profile switch to prevent cross-account stale data.
+**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `ServiceClients`, so cache lifetime matches session lifetime. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
 
 ---
 
@@ -567,7 +572,7 @@ Two mock layers serve different purposes:
 3. **Use narrow interface mocks for fetcher tests** — one mock per AWS API method
 4. **Always `stripANSI` before string assertions** — rendered output contains escape codes
 5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterEnricher(...) })` for temporary registrations
-6. **Cache is session-scoped** — each `ServiceClients` instance has its own `PolicyDocCache`. Tests using different `ServiceClients` instances get independent caches automatically.
+6. **If an enricher caches, test session scoping** — different `ServiceClients` instances must get independent caches automatically. If an enricher does not cache, no cache cleanup should be required.
 
 ### Integration Tests
 
@@ -583,7 +588,7 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 - `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)`.
 - The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
-- Enricher caches are session-scoped on `ServiceClients`. This is correct for lifetime management but means the cache type is a feature-specific field on a general-purpose struct.
+- When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
 ---
