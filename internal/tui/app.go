@@ -112,6 +112,8 @@ type Model struct {
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
 	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
+	enrichGen     uint64 // incremented on refresh/profile/region switch to discard stale enrichment results
+	enrichResKey  string // "resourceType:resourceID" of last enrichment dispatch; gen only bumps on change
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.
@@ -263,6 +265,7 @@ func New(profile, region string, opts ...Option) Model {
 		resourceCache: make(map[string]*resourceCacheEntry),
 		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
+		enrichGen:     1, // same convention as relatedGen
 		appCtx:        ctx,
 		appCancel:     cancel,
 	}
@@ -439,6 +442,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.EnrichDetailMsg:
+		return m.handleEnrichDetail(msg)
+	case messages.EnrichDetailResultMsg:
+		// Discard stale enrichment results (same convention as relatedGen).
+		if msg.Generation != 0 && msg.Generation != m.enrichGen {
+			return m, nil
+		}
+		// Surface enrichment errors as a flash message.
+		if msg.Err != nil {
+			return m, func() tea.Msg {
+				return messages.FlashMsg{Text: "enrich failed: " + msg.Err.Error(), IsError: true}
+			}
+		}
+		return m.updateActiveView(msg)
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResultMsg:
