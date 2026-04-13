@@ -101,12 +101,8 @@ func TestJSONView_PressJ_ReturnsNilCmd(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "J"})
 	if cmd != nil {
-		msg := execCmd(cmd)
-		if _, isNav := msg.(messages.NavigateMsg); isNav {
-			t.Errorf("pressing 'J' in JSON view: expected nil cmd (already on JSON), got NavigateMsg")
-		}
+		t.Fatalf("pressing 'J' in JSON view: expected nil cmd (already on JSON), got non-nil cmd")
 	}
-	// nil cmd is the expected outcome — no further assertion needed
 }
 
 // ── YAML view ────────────────────────────────────────────────────────────────
@@ -173,10 +169,6 @@ func TestYAMLView_PressY_ReturnsNilCmd(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "y"})
 	if cmd != nil {
-		msg := execCmd(cmd)
-		if _, isNav := msg.(messages.NavigateMsg); isNav {
-			t.Errorf("pressing 'y' in YAML view: expected nil cmd (already on YAML), got NavigateMsg")
-		}
+		t.Fatalf("pressing 'y' in YAML view: expected nil cmd (already on YAML), got non-nil cmd")
 	}
-	// nil cmd is the expected outcome — no further assertion needed
 }
