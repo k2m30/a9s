@@ -59,9 +59,7 @@
 
 | Key | Action |
 |-----|--------|
-| `N` | Sort by name |
-| `I` | Sort by ID |
-| `A` | Sort by date |
+| `1`-`0` | Sort by column position (1=first, 0=tenth) |
 
 ### General
 

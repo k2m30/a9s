@@ -326,8 +326,8 @@ func TestQA_EC2_A6_4_BottomJumpsToLastRow(t *testing.T) {
 func TestQA_EC2_A7_1_SortByNameAscending(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press N to sort by name ascending
-	m, _ = rootApplyMsg(m, rootKeyPress("N"))
+	// Press 1 to sort by name ascending (column 0 = Name, 1-indexed key "1")
+	m, _ = rootApplyMsg(m, rootKeyPress("1"))
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -339,9 +339,9 @@ func TestQA_EC2_A7_1_SortByNameAscending(t *testing.T) {
 func TestQA_EC2_A7_2_SortByNameDescending(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press N twice to toggle to descending
-	m, _ = rootApplyMsg(m, rootKeyPress("N"))
-	m, _ = rootApplyMsg(m, rootKeyPress("N"))
+	// Press 1 twice to toggle to descending (column 0 = Name)
+	m, _ = rootApplyMsg(m, rootKeyPress("1"))
+	m, _ = rootApplyMsg(m, rootKeyPress("1"))
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -353,35 +353,35 @@ func TestQA_EC2_A7_2_SortByNameDescending(t *testing.T) {
 func TestQA_EC2_A7_3_SortByIDAscending(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press I to sort by ID ascending
-	m, _ = rootApplyMsg(m, rootKeyPress("I"))
+	// Press 7 to sort by Instance ID ascending (column 6 = Instance ID, 1-indexed key "7")
+	m, _ = rootApplyMsg(m, rootKeyPress("7"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "Instance ID\u2191") {
-		t.Error("A.7.3: Instance ID column header should show ascending indicator")
+	if !strings.Contains(plain, "7:Instance ID\u2191") {
+		t.Error("A.7.3: Instance ID column header should show ascending indicator with prefix 7:Instance ID↑")
 	}
 }
 
 func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press A to sort by age ascending
-	m, _ = rootApplyMsg(m, rootKeyPress("A"))
+	// Press 8 to sort by age ascending (column 7 = Launch Time, 1-indexed key "8")
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "Launch Time\u2191") {
-		t.Error("A.7.5: Launch Time column header should show ascending indicator")
+	if !strings.Contains(plain, "8:Launch Time\u2191") {
+		t.Error("A.7.5: Launch Time column header should show ascending indicator with prefix 8:Launch Time↑")
 	}
 }
 
 func TestQA_EC2_A7_7_SortIndicatorExactlyOneColumn(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Sort by name first, then switch to ID
-	m, _ = rootApplyMsg(m, rootKeyPress("N"))
-	m, _ = rootApplyMsg(m, rootKeyPress("I"))
+	// Sort by name first (col 0, key "1"), then switch to ID (col 6, key "7")
+	m, _ = rootApplyMsg(m, rootKeyPress("1"))
+	m, _ = rootApplyMsg(m, rootKeyPress("7"))
 
 	plain := stripANSI(rootViewContent(m))
 

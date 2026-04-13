@@ -29,8 +29,10 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		},
 	})
 
-	m, _ = rootApplyMsg(m, rootKeyPress("I"))
-	m, _ = rootApplyMsg(m, rootKeyPress("I"))
+	// Press 7 twice: sort by Instance ID (column 7, absolute) ascending then descending.
+	// Column 7 may be off-screen at width 80 — that's fine, absolute keys still work.
+	m, _ = rootApplyMsg(m, rootKeyPress("7"))
+	m, _ = rootApplyMsg(m, rootKeyPress("7"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))

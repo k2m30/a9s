@@ -303,30 +303,27 @@ func TestQA_Redis_ListSort(t *testing.T) {
 		Resources:    multiStatusRedisFixtures(),
 	})
 
-	// Sort by ID ('I') -- Cluster ID column header contains "id" in the key (cluster_id)
+	// Sort by column 0 ('1') -- Cluster ID column (key "cluster_id", index 0, 1-indexed key "1")
 	// so the sort indicator should appear on that column.
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
 	out := m.View()
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow in Cluster ID column header after pressing I")
+		t.Error("expected sort indicator arrow in Cluster ID column header after pressing 1")
 	}
 
-	// Press I again to toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
+	// Press 1 again to toggle sort direction
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
 	out2 := m.View()
 	// Sort should still be active (indicator present)
 	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
 		t.Error("expected sort indicator to remain after toggling sort direction")
 	}
 
-	// Sort by name ('N') -- the fallback typeDef columns have key "cluster_id"
-	// which doesn't contain "name", so the indicator may not appear on a column header.
-	// Instead, verify that the sort actually reorders data by checking the first selected
-	// resource changed or stayed consistent.
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "N"})
+	// Sort by column 1 ('2') -- "Version" column; verify sort happens without crashing.
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "2"})
 	sel := m.SelectedResource()
 	if sel == nil {
-		t.Error("after sort by N, should still have a selected resource")
+		t.Error("after sort by column 2, should still have a selected resource")
 	}
 }
 

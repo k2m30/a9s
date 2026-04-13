@@ -316,25 +316,25 @@ func TestQA_DocDB_ListSort(t *testing.T) {
 		Resources:    multiStatusDocDBFixtures(),
 	})
 
-	// Sort by ID ('I') -- "Cluster ID" column has key "cluster_id" which contains "id"
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
+	// Sort by column 0 ('1') -- "Cluster ID" column (key "cluster_id", index 0, 1-indexed key "1")
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
 	out := m.View()
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow after pressing I for DocumentDB Cluster ID column")
+		t.Error("expected sort indicator arrow after pressing 1 for DocumentDB Cluster ID column")
 	}
 
 	// Toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "I"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
 	out2 := m.View()
 	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
 		t.Error("expected sort indicator to remain after toggling DocumentDB sort direction")
 	}
 
-	// Sort by name ('N') -- verify sort happens (selected resource may change)
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "N"})
+	// Sort by column 1 ('2') -- "Version" column; verify sort happens (selected resource may change)
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "2"})
 	sel := m.SelectedResource()
 	if sel == nil {
-		t.Error("after sort by N, should still have a selected DocumentDB resource")
+		t.Error("after sort by column 2, should still have a selected DocumentDB resource")
 	}
 }
 

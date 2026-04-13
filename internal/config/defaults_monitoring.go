@@ -23,7 +23,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"logs": {
 			List: []ListColumn{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
-				{Title: "Size", Path: "", Key: "stored_bytes", Width: 14},
+				{Title: "Size", Key: "stored_bytes", SortPath: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
@@ -85,7 +85,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"ct-events": {
 			List: []ListColumn{
 				{Title: "V", Key: "_ct.verb", Width: 1},
-				{Title: "TIME", Key: "time", Width: 15},
+				{Title: "TIME", Key: "time", SortKey: "event_time", Width: 15},
 				{Title: "ACTOR", Key: "_ct.actor", Width: 36},
 				{Title: "ORIGIN", Key: "_ct.origin", Width: 7},
 				{Title: "EVENT", Path: "EventName", Width: 34},

@@ -579,8 +579,8 @@ func TestQA_RDS_FrameTitle_ClearedFilter(t *testing.T) {
 func TestQA_RDS_Sort_ByNameAscending(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Press 'N' for sort by name ascending.
-	m, _ = m.Update(rdsKeyPress("N"))
+	// Press '1' to sort by column 0 (DB Identifier) ascending.
+	m, _ = m.Update(rdsKeyPress("1"))
 	out := m.View()
 	plain := stripANSI(out)
 
@@ -597,9 +597,9 @@ func TestQA_RDS_Sort_ByNameAscending(t *testing.T) {
 func TestQA_RDS_Sort_ByNameDescending(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Press 'N' twice for descending.
-	m, _ = m.Update(rdsKeyPress("N"))
-	m, _ = m.Update(rdsKeyPress("N"))
+	// Press '1' twice for descending (column 0 = DB Identifier).
+	m, _ = m.Update(rdsKeyPress("1"))
+	m, _ = m.Update(rdsKeyPress("1"))
 	out := m.View()
 	plain := stripANSI(out)
 
@@ -614,22 +614,21 @@ func TestQA_RDS_Sort_ByNameDescending(t *testing.T) {
 func TestQA_RDS_Sort_ByID(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Press 'I' for sort by ID.
-	m, _ = m.Update(rdsKeyPress("I"))
+	// Press '1' to sort by column 0 (DB Identifier) ascending.
+	m, _ = m.Update(rdsKeyPress("1"))
 	out := m.View()
 
-	// DB Identifier column key is "db_identifier" which contains "id",
-	// so the sort indicator should appear on that column.
+	// Sort indicator should appear on the DB Identifier column.
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator after pressing I")
+		t.Error("expected sort indicator after pressing '1'")
 	}
 }
 
 func TestQA_RDS_Sort_IndicatorOnlyOneColumn(t *testing.T) {
 	m := rdsExtendedModel(t)
 
-	// Sort by ID (which matches the "DB Identifier" column key containing "id").
-	m, _ = m.Update(rdsKeyPress("I"))
+	// Sort by column 0 (DB Identifier).
+	m, _ = m.Update(rdsKeyPress("1"))
 	out := m.View()
 	plain := stripANSI(out)
 	lines := strings.Split(plain, "\n")

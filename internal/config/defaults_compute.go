@@ -184,8 +184,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Timestamp", Key: "timestamp", Width: 22},
 				{Title: "Request ID", Key: "request_id", Width: 38},
 				{Title: "Status", Key: "status", Width: 10},
-				{Title: "Duration", Key: "duration_ms", Width: 14},
-				{Title: "Memory", Key: "memory_used", Width: 16},
+				{Title: "Duration", Key: "duration_ms", SortKey: "duration_ms_raw", Width: 14},
+				{Title: "Memory", Key: "memory_used", SortKey: "memory_used_mb_raw", Width: 16},
 				{Title: "Cold Start", Key: "cold_start", Width: 12},
 			},
 			Detail: []string{

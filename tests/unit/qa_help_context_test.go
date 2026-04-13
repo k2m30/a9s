@@ -470,20 +470,26 @@ func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
 
-	// Sort by age is confusing — should say "sort date" or "sort created"
+	// Old mnemonic sort labels must NOT appear — these were replaced by positional keys.
 	if strings.Contains(plainLower, "sort age") {
-		t.Errorf("HC-09: sort label should say 'sort date' not 'sort age', got:\n%s", plain)
+		t.Errorf("HC-09: old 'sort age' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
 	}
-	if !strings.Contains(plainLower, "sort date") {
-		t.Errorf("HC-09: resource list help should contain 'sort date', got:\n%s", plain)
+	if strings.Contains(plainLower, "sort date") {
+		t.Errorf("HC-09: old 'sort date' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
+	}
+	if strings.Contains(plainLower, "sort name") {
+		t.Errorf("HC-09: old 'sort name' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
+	}
+	if strings.Contains(plainLower, "sort status") {
+		t.Errorf("HC-09: old 'sort status' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
+	}
+	if strings.Contains(plainLower, "sort id") {
+		t.Errorf("HC-09: old 'sort id' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
 	}
 
-	// Sort by status was replaced with sort by id
-	if strings.Contains(plainLower, "sort status") {
-		t.Errorf("HC-09: sort label should say 'sort id' not 'sort status', got:\n%s", plain)
-	}
-	if !strings.Contains(plainLower, "sort id") {
-		t.Errorf("HC-09: resource list help should contain 'sort id', got:\n%s", plain)
+	// New positional sort label must be present — keys "1"-"0" sort by column position.
+	if !strings.Contains(plainLower, "sort col") {
+		t.Errorf("HC-09: resource list help should contain 'sort col' (positional sort labels), got:\n%s", plain)
 	}
 }
 
