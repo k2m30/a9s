@@ -30,6 +30,7 @@ func securityDefaultViews() map[string]ViewDef {
 				"AttachmentCount", "PermissionsBoundaryUsageCount",
 				"IsAttachable", "DefaultVersionId",
 				"CreateDate", "UpdateDate", "Description", "Tags",
+				"Document",
 			},
 		},
 		"iam-user": {

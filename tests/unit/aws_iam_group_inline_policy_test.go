@@ -526,22 +526,43 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 			inlinePolicy.Fields["path"])
 	}
 
-	// Open detail for the inline policy — triggers related-check commands.
-	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	// Open detail for the inline policy — triggers related-check + enrichment commands.
+	var batchCmd tea.Cmd
+	*m, batchCmd = rootApplyMsg(*m, messages.NavigateMsg{
 		Target:       messages.TargetDetail,
 		Resource:     &inlinePolicy,
 		ResourceType: "policy",
 	})
-	if relatedCmd == nil {
-		t.Fatal("expected related-check cmd after opening inline policy detail; " +
-			"are RelatedDefs registered for policy?")
+	if batchCmd == nil {
+		t.Fatal("expected cmd after opening inline policy detail; " +
+			"are RelatedDefs/Enrichers registered for policy?")
 	}
 
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
-	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg, got %T", relatedMsg)
+	// The returned cmd may be a batch (enrichment + related check).
+	// Drain it to find the RelatedCheckStartedMsg.
+	batchMsg := batchCmd()
+	var started messages.RelatedCheckStartedMsg
+	switch msg := batchMsg.(type) {
+	case messages.RelatedCheckStartedMsg:
+		started = msg
+	case tea.BatchMsg:
+		found := false
+		for _, sub := range msg {
+			if sub == nil {
+				continue
+			}
+			subMsg := sub()
+			if s, ok := subMsg.(messages.RelatedCheckStartedMsg); ok {
+				started = s
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("batch did not contain RelatedCheckStartedMsg")
+		}
+	default:
+		t.Fatalf("expected RelatedCheckStartedMsg or BatchMsg, got %T", batchMsg)
 	}
 
 	var checkCmds tea.Cmd
