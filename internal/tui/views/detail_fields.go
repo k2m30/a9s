@@ -349,8 +349,9 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + item.Key + ":"
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
-				// Navigable or injected sub-fields have Key/Value pre-split.
-				if item.Key != "" && !strings.Contains(item.Key, ":") {
+				// Navigable or injected sub-fields have Key != Value (pre-split by buildFieldList).
+				// General sub-fields have Key == Value (raw YAML line).
+				if item.Key != item.Value {
 					line = indent + item.Key + ": " + item.Value
 					break
 				}
@@ -367,13 +368,13 @@ func (m DetailModel) renderFromFieldList() string {
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
 				indent := subFieldIndent(item.IndentLevel)
-				// Navigable sub-fields: buildFieldList stores Key=subKey and Value=subValue.
-				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
+				// Navigable sub-fields have Key != Value (pre-split by buildFieldList).
+				if item.IsNavigable && item.Key != item.Value {
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + styles.NavigableField.Render(item.Value)
 					break
 				}
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
-				if item.Key != "" && !strings.Contains(item.Key, ":") {
+				if item.Key != item.Value {
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + item.Value
 					break
 				}
