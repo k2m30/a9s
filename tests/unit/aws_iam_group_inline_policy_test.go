@@ -334,6 +334,15 @@ func (s *stubGroupPolicyIAM) ListAccountAliases(_ context.Context, _ *iam.ListAc
 func (s *stubGroupPolicyIAM) GetGroup(_ context.Context, _ *iam.GetGroupInput, _ ...func(*iam.Options)) (*iam.GetGroupOutput, error) {
 	panic("stubGroupPolicyIAM.GetGroup called unexpectedly")
 }
+func (s *stubGroupPolicyIAM) GetPolicy(_ context.Context, _ *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
+	panic("stubGroupPolicyIAM.GetPolicy called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) GetPolicyVersion(_ context.Context, _ *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
+	panic("stubGroupPolicyIAM.GetPolicyVersion called unexpectedly")
+}
+func (s *stubGroupPolicyIAM) GetRolePolicy(_ context.Context, _ *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
+	panic("stubGroupPolicyIAM.GetRolePolicy called unexpectedly")
+}
 
 // compile-time check
 var _ awsclient.IAMAPI = (*stubGroupPolicyIAM)(nil)
@@ -517,22 +526,43 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 			inlinePolicy.Fields["path"])
 	}
 
-	// Open detail for the inline policy — triggers related-check commands.
-	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	// Open detail for the inline policy — triggers related-check + enrichment commands.
+	var batchCmd tea.Cmd
+	*m, batchCmd = rootApplyMsg(*m, messages.NavigateMsg{
 		Target:       messages.TargetDetail,
 		Resource:     &inlinePolicy,
 		ResourceType: "policy",
 	})
-	if relatedCmd == nil {
-		t.Fatal("expected related-check cmd after opening inline policy detail; " +
-			"are RelatedDefs registered for policy?")
+	if batchCmd == nil {
+		t.Fatal("expected cmd after opening inline policy detail; " +
+			"are RelatedDefs/Enrichers registered for policy?")
 	}
 
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
-	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg, got %T", relatedMsg)
+	// The returned cmd may be a batch (enrichment + related check).
+	// Drain it to find the RelatedCheckStartedMsg.
+	batchMsg := batchCmd()
+	var started messages.RelatedCheckStartedMsg
+	switch msg := batchMsg.(type) {
+	case messages.RelatedCheckStartedMsg:
+		started = msg
+	case tea.BatchMsg:
+		found := false
+		for _, sub := range msg {
+			if sub == nil {
+				continue
+			}
+			subMsg := sub()
+			if s, ok := subMsg.(messages.RelatedCheckStartedMsg); ok {
+				started = s
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("batch did not contain RelatedCheckStartedMsg")
+		}
+	default:
+		t.Fatalf("expected RelatedCheckStartedMsg or BatchMsg, got %T", batchMsg)
 	}
 
 	var checkCmds tea.Cmd

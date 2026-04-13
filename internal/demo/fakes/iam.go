@@ -141,3 +141,52 @@ func (f *IAMFake) ListGroupPolicies(_ context.Context, input *iam.ListGroupPolic
 	policies := f.fix.InlineGroupPolicies[name]
 	return &iam.ListGroupPoliciesOutput{PolicyNames: policies}, nil
 }
+
+func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...func(*iam.Options)) (*iam.GetPolicyOutput, error) {
+	if input.PolicyArn == nil {
+		return nil, fmt.Errorf("GetPolicy: policy ARN is required")
+	}
+	for i := range f.fix.Policies {
+		if f.fix.Policies[i].Arn != nil && *f.fix.Policies[i].Arn == *input.PolicyArn {
+			p := f.fix.Policies[i]
+			return &iam.GetPolicyOutput{Policy: &p}, nil
+		}
+	}
+	return &iam.GetPolicyOutput{}, nil
+}
+
+func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
+	if input.PolicyArn == nil {
+		return nil, fmt.Errorf("GetPolicyVersion: policy ARN is required")
+	}
+	doc, ok := f.fix.PolicyDocuments[*input.PolicyArn]
+	if !ok {
+		return &iam.GetPolicyVersionOutput{
+			PolicyVersion: &iamtypes.PolicyVersion{
+				VersionId: input.VersionId,
+			},
+		}, nil
+	}
+	return &iam.GetPolicyVersionOutput{
+		PolicyVersion: &iamtypes.PolicyVersion{
+			Document:  aws.String(doc),
+			VersionId: input.VersionId,
+		},
+	}, nil
+}
+
+func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
+	if input.RoleName == nil {
+		return nil, fmt.Errorf("GetRolePolicy: role name is required")
+	}
+	if input.PolicyName == nil {
+		return nil, fmt.Errorf("GetRolePolicy: policy name is required")
+	}
+	key := *input.RoleName + "/" + *input.PolicyName
+	doc := f.fix.InlinePolicyDocuments[key]
+	return &iam.GetRolePolicyOutput{
+		PolicyName:     input.PolicyName,
+		RoleName:       input.RoleName,
+		PolicyDocument: aws.String(doc),
+	}, nil
+}
