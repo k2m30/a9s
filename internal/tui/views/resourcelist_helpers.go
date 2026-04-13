@@ -36,6 +36,9 @@ func (m *ResourceListModel) updateSortColKey() {
 }
 
 // handleSortByCol checks all 10 positional sort bindings against msg.
+// Key "1" = absolute column 0, "2" = column 1, …, "0" = column 9.
+// Column numbers are absolute: key "7" always sorts the 7th column regardless
+// of horizontal scroll. Keys for columns that don't exist are absorbed.
 // Returns true if a sort binding was matched (key consumed).
 func (m *ResourceListModel) handleSortByCol(msg tea.KeyMsg) bool {
 	for colIdx, kb := range m.keys.SortByCol {

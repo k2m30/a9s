@@ -379,7 +379,8 @@ func TestQA_S3_A6_2_Sort_ByNameToggle(t *testing.T) {
 
 func TestQA_S3_A6_3_Sort_ByAge(t *testing.T) {
 	m := s3RLBucketModel()
-	// Press 3 to sort by Creation Date (column 2, 1-indexed key "3")
+	// Press 3 to sort by Creation Date (3rd column after Region inserted by defaults:
+	// col 1 = Bucket Name, col 2 = Region, col 3 = Creation Date)
 	m, _ = m.Update(s3KeyPress("3"))
 
 	out := m.View()
@@ -391,7 +392,7 @@ func TestQA_S3_A6_3_Sort_ByAge(t *testing.T) {
 
 func TestQA_S3_A6_4_Sort_ByAgeToggle(t *testing.T) {
 	m := s3RLBucketModel()
-	// Press 3 twice: ascending then descending (column 2 = Creation Date)
+	// Press 3 twice: ascending then descending (col 3 = Creation Date after Region injected by defaults)
 	m, _ = m.Update(s3KeyPress("3"))
 	m, _ = m.Update(s3KeyPress("3"))
 

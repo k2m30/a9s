@@ -85,13 +85,28 @@ func (m ResourceListModel) resolveColumns() []listCol {
 	}
 
 	// Fall back to typeDef columns.
+	// Build a lookup of default columns by title so we can carry over SortKey/SortPath
+	// from defaults for any column that matches by title.
+	defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
+	for _, lc := range defaultVD.List {
+		defaultByTitle[lc.Title] = lc
+	}
 	cols := make([]listCol, len(m.typeDef.Columns))
 	for i, c := range m.typeDef.Columns {
-		cols[i] = listCol{
+		lc := listCol{
 			title: c.Title,
 			width: c.Width,
 			key:   c.Key,
 		}
+		if def, ok := defaultByTitle[c.Title]; ok {
+			if lc.sortKey == "" {
+				lc.sortKey = def.SortKey
+			}
+			if lc.sortPath == "" {
+				lc.sortPath = def.SortPath
+			}
+		}
+		cols[i] = lc
 	}
 	return cols
 }
@@ -138,10 +153,10 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 }
 
 // colHeaderTitle returns the column title with a position number prefix and
-// sort indicator. absIdx is the 0-based absolute column index (before hScrollOffset).
-// Position numbers 1-9 correspond to keys "1"-"9"; position 10 shows as "0".
-// The prefix is only shown when len("N:"+title) <= c.width so that narrow
-// columns remain legible (fall back to plain title when there is no room).
+// sort indicator. absIdx is the 0-based absolute column index (accounting for
+// hScrollOffset). Position numbers 1-9 correspond to keys "1"-"9"; position 10
+// shows as "0". The prefix is only shown when len("N:"+title) <= c.width so
+// that narrow columns remain legible (fall back to plain title when there is no room).
 func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	title := c.title
 	// Append sort glyph if this is the active sort column.

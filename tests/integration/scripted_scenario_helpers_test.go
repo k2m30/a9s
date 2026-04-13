@@ -319,6 +319,9 @@ func (s *fullIntegrationScenario) SearchPrev() {
 
 func (s *fullIntegrationScenario) SortByColumn(col int) {
 	s.t.Helper()
+	if col < 1 || col > 10 {
+		s.t.Fatalf("SortByColumn: col must be between 1 and 10, got %d", col)
+	}
 	k := strconv.Itoa(col)
 	if col == 10 {
 		k = "0"
@@ -336,12 +339,6 @@ func (s *fullIntegrationScenario) SortByID() {
 	s.SortByColumn(2) // ID is typically column 2
 }
 
-func (s *fullIntegrationScenario) SortByAge() {
-	// Age column position varies by resource type — caller should use SortByColumn directly
-	// Default to column 3 as a reasonable fallback
-	s.t.Helper()
-	s.SortByColumn(3)
-}
 
 func (s *fullIntegrationScenario) OpenYAML() {
 	s.t.Helper()
