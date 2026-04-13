@@ -56,6 +56,7 @@ specs/           # feature specifications
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
+- `make mdlint` — run markdownlint on docs (MUST pass locally before any push that touches .md files)
 - `./a9s --demo` — run the app with synthetic fixture data (no AWS credentials needed)
 
 ## Prerequisites
@@ -63,6 +64,33 @@ specs/           # feature specifications
 - Go 1.26+ (`brew install go`)
 - golangci-lint v2.11+ (`brew install golangci-lint`)
 - govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`)
+- markdownlint-cli2 (`brew install markdownlint-cli2`) — for markdown linting
+
+## CodeRabbit (AI Code Reviewer)
+
+CodeRabbit is configured via `.coderabbit.yaml` in the repo root. Free for open-source (public repos).
+
+**Configuration:**
+- Profile: assertive (strict reviews, no poems/sequence diagrams)
+- Path-specific review instructions for each layer (tui, aws, resource, demo, tests, config)
+- Knowledge base points to `docs/architecture.md` and `docs/go-codebase-checklist.md`
+- `CLAUDE.md` is auto-detected
+- Only Go-relevant tools enabled (golangci-lint, shellcheck, yamllint, markdownlint, actionlint, gitleaks)
+- All non-Go tools explicitly disabled
+- Auto-review on PRs targeting main; skips WIP/draft
+
+**PR commands:**
+- `@coderabbitai review` — trigger a review manually
+- `@coderabbitai ignore` — pause reviews on a PR (saves free-tier hours)
+- `@coderabbitai configuration` — show active config with any parse errors
+- `@coderabbitai resolve` — resolve all CodeRabbit review comments
+- `@coderabbitai plan` — generate a plan from an issue
+
+**Cost management (open-source free tier):**
+- Rate limit: 200 files/hour, 3 back-to-back reviews then 4/hour
+- Use `@coderabbitai ignore` on PRs where you don't need further review
+- Use `[skip ci]` in commit messages for trivial follow-ups (CodeRabbit still reviews unless ignored)
+- CodeRabbit reviews are triggered per-push, not per-commit — batch small fixes into one push
 
 ## Architecture Principles
 
