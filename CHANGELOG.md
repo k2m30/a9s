@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.41.0] - 2026-04-13
+
+### Added
+- `:root` / `:main` colon command to navigate back to the main menu from any view depth (#258)
+- COMMANDS section in all help screens showing available colon commands (`:q`, `:ctx`, `:profile`, `:region`, `:theme`, `:help`, `:root`, `:main`, `:<resource>`) (#258)
+- Tab completion for `:root` and `:main` commands (#258)
+- Auto-detect and pretty-print JSON in detail view field values — top-level and sub-field JSON strings expand as indented YAML sub-fields (#262)
+- Syntax-colored JSON pretty-printing in secret/parameter reveal view (`x` key) with raw copy preserved (#262)
+- AWS tags render as flat `Key: Value` pairs in detail views instead of verbose `Key/Value` struct fields; rich tag structs (e.g., ASG with PropagateAtLaunch) are left unflattened (#210)
+
 ## [3.40.0] - 2026-04-13
 
 ### Fixed
