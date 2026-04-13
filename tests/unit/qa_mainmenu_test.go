@@ -502,10 +502,21 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 }
 
 func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
-	// Resource types in order as defined in AllResourceTypes()
-	expectedTypes := resource.AllShortNames()
+	// Representative sample — full sweep in CI slow suite.
+	// Build an index map so j-navigation count is derived correctly from menu order.
+	allTypes := resource.AllShortNames()
+	indexOf := make(map[string]int, len(allTypes))
+	for i, name := range allTypes {
+		indexOf[name] = i
+	}
 
-	for i, expected := range expectedTypes {
+	// First item, a middle item, and the last item.
+	last := allTypes[len(allTypes)-1]
+	mid := allTypes[len(allTypes)/2]
+	sampleTypes := []string{"ec2", mid, last}
+
+	for _, expected := range sampleTypes {
+		i := indexOf[expected]
 		t.Run(expected, func(t *testing.T) {
 			tui.Version = "1.0.2"
 			m := newRootSizedModel()

@@ -506,7 +506,8 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 	}
 
 	// Allow checkers to start and stabilize, then release the gate.
-	time.Sleep(100 * time.Millisecond)
+	// 10ms is sufficient for goroutines to reach the select statement.
+	time.Sleep(10 * time.Millisecond)
 	close(gate)
 	wg.Wait()
 

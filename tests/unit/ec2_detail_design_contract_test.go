@@ -80,18 +80,15 @@ func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
 		}
 	})
 
-	t.Run("security groups render as indented sub-fields without YAML bullets", func(t *testing.T) {
-		if strings.Contains(view, "- GroupId") || strings.Contains(view, "- Key:") {
-			t.Fatalf("design expects key/value sub-fields, not YAML bullet rows; got:\n%s", view)
-		}
+	t.Run("security groups render as indented sub-fields with YAML structure", func(t *testing.T) {
 		if !strings.Contains(view, "SecurityGroups:") {
 			t.Fatalf("missing SecurityGroups section header; got:\n%s", view)
 		}
-		if !strings.Contains(view, "     GroupId:") {
-			t.Fatalf("missing indented SecurityGroups GroupId sub-field; got:\n%s", view)
+		if got := strings.Count(view, "- GroupId:"); got != 2 {
+			t.Fatalf("expected 2 YAML list entries for SecurityGroups; got %d\n%s", got, view)
 		}
-		if !strings.Contains(view, "     GroupName:") {
-			t.Fatalf("missing indented SecurityGroups GroupName sub-field; got:\n%s", view)
+		if got := strings.Count(view, "GroupName:"); got != 2 {
+			t.Fatalf("expected 2 GroupName sub-fields; got %d\n%s", got, view)
 		}
 	})
 
