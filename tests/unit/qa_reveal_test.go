@@ -300,3 +300,72 @@ func TestQA_Reveal_EscBubblesUp(t *testing.T) {
 		t.Errorf("View() should still contain 'secret123' after Esc, got: %s", out)
 	}
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// JSON pretty-printing in reveal view
+// ════════════════════════════════════════════════════════════════════════════
+
+func TestQA_Reveal_JSONValue_PrettyPrintedInView(t *testing.T) {
+	jsonSecret := `{"api_key":"sk-123456","endpoint":"https://api.example.com","retries":3}`
+	k := keys.Default()
+	m := views.NewReveal("my-secret", jsonSecret, k)
+	m.SetSize(80, 24)
+
+	out := m.View()
+
+	// Should show indented JSON, not the compact single-line blob.
+	if strings.Contains(out, `{"api_key"`) {
+		t.Errorf("reveal view should pretty-print JSON, not show raw blob; got: %s", out)
+	}
+	if !strings.Contains(out, "api_key") {
+		t.Errorf("reveal view should contain key 'api_key'; got: %s", out)
+	}
+	if !strings.Contains(out, "sk-123456") {
+		t.Errorf("reveal view should contain value 'sk-123456'; got: %s", out)
+	}
+}
+
+func TestQA_Reveal_JSONValue_ColonInKeys_StaysQuoted(t *testing.T) {
+	// Secret keys with colons must stay quoted in JSON format (not YAML).
+	jsonSecret := `{"enterprise_pass:demo":"This*is*our*1st*BETA","mongodb_pass:root":"secret123"}`
+	k := keys.Default()
+	m := views.NewReveal("integration_test", jsonSecret, k)
+	m.SetSize(80, 24)
+
+	out := m.View()
+
+	// JSON format preserves quotes around keys with colons — unambiguous.
+	if !strings.Contains(out, `"enterprise_pass:demo"`) {
+		t.Errorf("reveal view should show quoted key with colon; got: %s", out)
+	}
+	if !strings.Contains(out, "This*is*our*1st*BETA") {
+		t.Errorf("reveal view should show secret value; got: %s", out)
+	}
+}
+
+func TestQA_Reveal_JSONValue_CopyReturnsRaw(t *testing.T) {
+	jsonSecret := `{"api_key":"sk-123456","endpoint":"https://api.example.com"}`
+	k := keys.Default()
+	m := views.NewReveal("my-secret", jsonSecret, k)
+	m.SetSize(80, 24)
+
+	content, _ := m.CopyContent()
+
+	// Copy must return the original raw JSON, not the formatted version.
+	if content != jsonSecret {
+		t.Errorf("CopyContent should return raw JSON %q, got %q", jsonSecret, content)
+	}
+}
+
+func TestQA_Reveal_NonJSON_RenderedAsIs(t *testing.T) {
+	plainSecret := "my-plain-password-123"
+	k := keys.Default()
+	m := views.NewReveal("plain-secret", plainSecret, k)
+	m.SetSize(80, 24)
+
+	out := m.View()
+
+	if !strings.Contains(out, plainSecret) {
+		t.Errorf("reveal view should show plain secret as-is; got: %s", out)
+	}
+}
