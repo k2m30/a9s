@@ -171,8 +171,8 @@ func extractDataIDs(rendered string) []string {
 func TestQA_SortOrder_NameAscending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press N to sort by name ascending
-	m, _ = m.Update(rlKeyPress("N"))
+	// Press 2 to sort by name ascending (column 1 = name, 1-indexed key "2")
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	names := extractDataNames(rendered)
@@ -191,9 +191,9 @@ func TestQA_SortOrder_NameAscending(t *testing.T) {
 func TestQA_SortOrder_NameDescending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press N twice: first ascending, second toggles to descending
-	m, _ = m.Update(rlKeyPress("N"))
-	m, _ = m.Update(rlKeyPress("N"))
+	// Press 2 twice: first ascending, second toggles to descending (column 1 = name)
+	m, _ = m.Update(rlKeyPress("2"))
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	names := extractDataNames(rendered)
@@ -216,8 +216,8 @@ func TestQA_SortOrder_NameDescending(t *testing.T) {
 func TestQA_SortOrder_IDAscending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press I to sort by ID ascending
-	m, _ = m.Update(rlKeyPress("I"))
+	// Press 1 to sort by ID ascending (column 0 = instance_id, 1-indexed key "1")
+	m, _ = m.Update(rlKeyPress("1"))
 
 	rendered := m.View()
 	ids := extractDataIDs(rendered)
@@ -236,9 +236,9 @@ func TestQA_SortOrder_IDAscending(t *testing.T) {
 func TestQA_SortOrder_IDDescending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press I twice: ascending then descending
-	m, _ = m.Update(rlKeyPress("I"))
-	m, _ = m.Update(rlKeyPress("I"))
+	// Press 1 twice: ascending then descending (column 0 = instance_id)
+	m, _ = m.Update(rlKeyPress("1"))
+	m, _ = m.Update(rlKeyPress("1"))
 
 	rendered := m.View()
 	ids := extractDataIDs(rendered)
@@ -261,8 +261,8 @@ func TestQA_SortOrder_IDDescending(t *testing.T) {
 func TestQA_SortOrder_AgeAscending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press A to sort by age (launch_time) ascending
-	m, _ = m.Update(rlKeyPress("A"))
+	// Press 4 to sort by age (launch_time) ascending (column 3 = launch_time, 1-indexed key "4")
+	m, _ = m.Update(rlKeyPress("4"))
 
 	rendered := m.View()
 	timestamps := extractDataTimestamps(rendered)
@@ -283,9 +283,9 @@ func TestQA_SortOrder_AgeAscending(t *testing.T) {
 func TestQA_SortOrder_AgeDescending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Press A twice: ascending then descending
-	m, _ = m.Update(rlKeyPress("A"))
-	m, _ = m.Update(rlKeyPress("A"))
+	// Press 4 twice: ascending then descending (column 3 = launch_time)
+	m, _ = m.Update(rlKeyPress("4"))
+	m, _ = m.Update(rlKeyPress("4"))
 
 	rendered := m.View()
 	timestamps := extractDataTimestamps(rendered)
@@ -314,7 +314,7 @@ func TestQA_SortOrder_PreservesAllRows(t *testing.T) {
 	namesBefore := extractDataNames(m.View())
 
 	// Sort ascending, then descending, then by different field
-	m, _ = m.Update(rlKeyPress("N"))
+	m, _ = m.Update(rlKeyPress("2"))
 	namesAfterSort := extractDataNames(m.View())
 
 	if len(namesBefore) != len(namesAfterSort) {
@@ -340,16 +340,16 @@ func TestQA_SortOrder_PreservesAllRows(t *testing.T) {
 func TestQA_SortOrder_ToggleCycle(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// First press: ascending
-	m, _ = m.Update(rlKeyPress("N"))
+	// First press: ascending (column 1 = name, key "2")
+	m, _ = m.Update(rlKeyPress("2"))
 	namesAsc := extractDataNames(m.View())
 
 	// Second press: descending
-	m, _ = m.Update(rlKeyPress("N"))
+	m, _ = m.Update(rlKeyPress("2"))
 	namesDesc := extractDataNames(m.View())
 
 	// Third press: back to ascending
-	m, _ = m.Update(rlKeyPress("N"))
+	m, _ = m.Update(rlKeyPress("2"))
 	namesAscAgain := extractDataNames(m.View())
 
 	// Asc and desc should be different
@@ -370,12 +370,12 @@ func TestQA_SortOrder_ToggleCycle(t *testing.T) {
 func TestQA_SortOrder_SwitchFieldResetsToAscending(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Sort by name descending (2 presses)
-	m, _ = m.Update(rlKeyPress("N"))
-	m, _ = m.Update(rlKeyPress("N"))
+	// Sort by name descending (2 presses of "2" — column 1 = name)
+	m, _ = m.Update(rlKeyPress("2"))
+	m, _ = m.Update(rlKeyPress("2"))
 
-	// Now switch to ID sort — should be ascending
-	m, _ = m.Update(rlKeyPress("I"))
+	// Now switch to ID sort — should be ascending (column 0 = instance_id, key "1")
+	m, _ = m.Update(rlKeyPress("1"))
 
 	rendered := m.View()
 	ids := extractDataIDs(rendered)
@@ -400,8 +400,8 @@ func TestQA_SortOrder_SwitchFieldResetsToAscending(t *testing.T) {
 func TestQA_SortOrder_IndicatorMatchesActualOrder(t *testing.T) {
 	m := sortLoadedModel(t)
 
-	// Sort by name ascending
-	m, _ = m.Update(rlKeyPress("N"))
+	// Sort by name ascending (column 1 = name, key "2")
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	plain := stripANSI(rendered)
@@ -418,7 +418,7 @@ func TestQA_SortOrder_IndicatorMatchesActualOrder(t *testing.T) {
 	}
 
 	// Toggle to descending
-	m, _ = m.Update(rlKeyPress("N"))
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered = m.View()
 	plain = stripANSI(rendered)
@@ -495,8 +495,8 @@ func TestQA_SortOrder_LogStreams_AgeSortWorks(t *testing.T) {
 		Resources:    logStreamSortResources(),
 	})
 
-	// Press A to sort by age ascending (oldest first)
-	m, _ = m.Update(rlKeyPress("A"))
+	// Press 2 to sort by age ascending (column 1 = last_event, 1-indexed key "2")
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	plain := stripANSI(rendered)
@@ -606,8 +606,8 @@ func TestQA_SortOrder_AgeDeterministic_MultipleTimeFields(t *testing.T) {
 		Resources:    multiTimeFieldResources(),
 	})
 
-	// Press A to sort by age ascending — should use creation_date (first time column)
-	m, _ = m.Update(rlKeyPress("A"))
+	// Press 2 to sort by age ascending — column 1 = creation_date (first time column)
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	plain := stripANSI(rendered)
@@ -684,8 +684,8 @@ func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
 		Resources:    resources,
 	})
 
-	// Press A to sort by age ascending — should use "started" (first time column)
-	m, _ = m.Update(rlKeyPress("A"))
+	// Press 2 to sort by age ascending — column 1 = started (first time column)
+	m, _ = m.Update(rlKeyPress("2"))
 
 	rendered := m.View()
 	plain := stripANSI(rendered)

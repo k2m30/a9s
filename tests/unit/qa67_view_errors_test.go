@@ -260,11 +260,11 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 		t.Error("I.8: View() should not be empty after sorting by status on SNS")
 	}
 
-	// Press N to sort by name — should work fine
-	m, _ = rootApplyMsg(m, rootKeyPress("N"))
+	// Press 1 to sort by column 0 (Topic Name) — should work fine
+	m, _ = rootApplyMsg(m, rootKeyPress("1"))
 	out = rootViewContent(m)
 	if out == "" {
-		t.Error("I.8: View() should not be empty after sorting by name on SNS")
+		t.Error("I.8: View() should not be empty after sorting by column 1 on SNS")
 	}
 }
 
