@@ -1,12 +1,36 @@
 # a9s Architecture Guide
 
-This document is the first thing you should read when joining the project. It covers every concept, pattern, interconnection, and design decision you need to understand before touching code.
+This document is the first thing you should read when joining the project. It covers the current runtime architecture, the intended boundaries between layers, and the design rules that new code should follow.
 
 ## What is a9s?
 
 a9s is a read-only terminal UI for AWS. Think k9s for Kubernetes, but for AWS services. It uses [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (the Elm Architecture for Go) and renders with [Lipgloss v2](https://github.com/charmbracelet/lipgloss).
 
 **Read-only by design** — a9s never makes write calls to AWS. Every AWS API call is a List, Describe, or Get operation.
+
+---
+
+## Architectural Direction
+
+The current codebase is already organized around a useful separation of concerns. When adding new code, prefer changes that reinforce these boundaries rather than blur them.
+
+### Desired Layer Boundaries
+
+- **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
+- **`internal/tui`** — UI shell and orchestration: view stack, global key handling, message routing, sizing, transient UI state, and session-scoped cache ownership.
+- **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
+- **`internal/aws`** — adapter layer: call AWS SDK APIs and transform responses into `resource.Resource`. This layer should not know about Bubble Tea views.
+- **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
+- **`internal/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
+
+### Architectural Invariants
+
+- Views never call AWS directly.
+- Views communicate with the rest of the app by emitting typed messages.
+- The root `tui.Model` owns navigation, clients, session caches, and async result routing.
+- Every async result must carry enough context to reject stale or wrong-target updates.
+- Cache invalidation rules must be explicit for refresh, profile switch, region switch, and view-open flows.
+- `Esc` is the back/dismiss key. `q` is the quit key in normal mode; it is not the navigation primitive.
 
 ---
 
@@ -424,6 +448,38 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 
 ---
 
+## Extension Guide
+
+### Adding a New Resource Type
+
+1. Add or update the `ResourceTypeDef` and built-in default view config.
+2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Fields`, and `RawStruct`.
+3. Register the resource behavior in `internal/resource/`:
+   - paginated fetcher
+   - child fetchers, if any
+   - related defs, if any
+   - navigable fields, if any
+   - reveal fetcher or enricher, if needed
+4. Add demo fixtures and fakes so the feature can be exercised without AWS access.
+5. Add both fetcher-level tests and TUI-level behavior tests.
+
+### Adding a Child View
+
+1. Define a `ChildViewDef` on the parent resource type.
+2. Implement and register the `PaginatedChildFetcher`.
+3. Ensure the parent resource exposes the `ContextKeys` required by the child fetcher.
+4. Add demo data and a navigation test that drives the real root model.
+
+### Adding an Enricher
+
+1. Keep the base list/detail fetch path fast; defer expensive or optional data to the enricher.
+2. Make the enricher idempotent and safe to re-run.
+3. Ensure stale results are rejectable by generation plus resource context.
+4. If the enricher caches, document its scope and invalidation rules.
+5. Add tests for success, error, stale-result rejection, and cache invalidation paths.
+
+---
+
 ## Test Architecture
 
 ### Philosophy
@@ -520,6 +576,15 @@ Gated by `//go:build integration`. Two modes:
 - **Live AWS integration** — requires `A9S_CT_PROFILE=<profile>`. Tests real API calls against a live AWS account.
 
 Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestName -count=1 -v -timeout 600s`
+
+---
+
+## Known Compromises
+
+- `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)`.
+- The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
+- Some enricher caches are package-global and rely on explicit invalidation rather than fully context-qualified cache keys.
+- Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
 ---
 
