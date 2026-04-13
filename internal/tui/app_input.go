@@ -132,7 +132,7 @@ func commandMatches(prefix string) []string {
 		seen[candidate] = struct{}{}
 		matches = append(matches, candidate)
 	}
-	for _, cmd := range []string{"q", "quit", "ctx", "profile", "region", "theme", "help"} {
+	for _, cmd := range []string{"q", "quit", "ctx", "profile", "region", "theme", "help", "root", "main"} {
 		add(cmd)
 	}
 	for _, rt := range resource.AllResourceTypes() {
@@ -154,6 +154,10 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	switch cmd {
 	case "q", "quit":
 		return m, tea.Quit
+	case "root", "main":
+		return m, func() tea.Msg {
+			return messages.NavigateMsg{Target: messages.TargetMainMenu}
+		}
 	case "ctx", "profile":
 		return m, func() tea.Msg {
 			return messages.NavigateMsg{Target: messages.TargetProfile}
