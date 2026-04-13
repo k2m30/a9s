@@ -80,9 +80,10 @@ See the **[Child Views](https://github.com/k2m30/a9s/wiki/Child-Views)** wiki pa
 
 ## Configuration
 
-<!-- INCLUDE: config.md -->
+a9s stores view configuration in `~/.a9s/views/` and theme configuration in `~/.a9s/themes/`. AWS profiles and regions are read from `~/.aws/config`.
 
-See the **[View Customization](https://github.com/k2m30/a9s/wiki/View-Customization)** wiki page for the full customization guide, and **[Color Themes](https://github.com/k2m30/a9s/wiki/Color-Themes)** for the complete color key reference and custom theme creation.
+- **[View Customization](https://github.com/k2m30/a9s/wiki/View-Customization)** -- customize columns, field paths, and detail views per resource type
+- **[Color Themes](https://github.com/k2m30/a9s/wiki/Color-Themes)** -- 11 built-in themes, custom theme creation, and color key reference
 
 ## AWS Permissions
 
