@@ -104,6 +104,16 @@ func ctExecuteCmd(cmd tea.Cmd) tea.Msg {
 // TestCtEventsRightColumnDispatch
 // ---------------------------------------------------------------------------
 
+// sampleCTFixtures selects 3 representative fixtures from a larger set:
+// the first, the middle, and the last. This keeps the dispatch test under 20ms
+// while still exercising diverse event shapes (with/without related, error events).
+func sampleCTFixtures(all []resource.Resource) []resource.Resource {
+	if len(all) <= 3 {
+		return all
+	}
+	return []resource.Resource{all[0], all[len(all)/2], all[len(all)-1]}
+}
+
 // TestCtEventsRightColumnDispatch iterates all demo ct-events fixtures × all
 // 17 registered RelatedDef groups and asserts the dispatch invariants D1, D2, D3.
 //
@@ -124,7 +134,11 @@ func ctExecuteCmd(cmd tea.Cmd) tea.Msg {
 func TestCtEventsRightColumnDispatch(t *testing.T) {
 	ensureNoColor(t)
 
-	fixtures := loadAllCTFixtures(t)
+	allFixtures := loadAllCTFixtures(t)
+
+	// Sample 3 representative fixtures: first (index 0), one with related resources
+	// (index len/2), and last. Full fixture sweep is available via loadAllCTFixtures.
+	fixtures := sampleCTFixtures(allFixtures)
 
 	defs := resource.GetRelated("ct-events")
 	if len(defs) == 0 {

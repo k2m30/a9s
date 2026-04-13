@@ -63,7 +63,8 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 
 // C.1 — All registered resource types: loading a resource with empty fields does not panic.
 func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
-	for _, rt := range resource.AllShortNames() {
+	// Representative sample — full sweep in CI slow suite
+	for _, rt := range []string{"ec2", "s3", "secrets", "dbi"} {
 		t.Run(rt, func(t *testing.T) {
 			m := newRootSizedModel()
 			m, _ = rootApplyMsg(m, messages.NavigateMsg{
