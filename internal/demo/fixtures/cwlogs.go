@@ -77,6 +77,29 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 				StoredBytes:         aws.Int64(2048),
 			},
 		},
+		"/aws/lambda/process-orders": {
+			{
+				LogStreamName:       aws.String("2026/03/22/[$LATEST]ord789"),
+				CreationTime:        aws.Int64(1774253000000),
+				FirstEventTimestamp: aws.Int64(1774253000000),
+				LastEventTimestamp:  aws.Int64(1774253900000),
+				StoredBytes:         aws.Int64(4096),
+			},
+			{
+				LogStreamName:       aws.String("2026/03/21/[$LATEST]ord456"),
+				CreationTime:        aws.Int64(1774166000000),
+				FirstEventTimestamp: aws.Int64(1774166000000),
+				LastEventTimestamp:  aws.Int64(1774167000000),
+				StoredBytes:         aws.Int64(3072),
+			},
+			{
+				LogStreamName:       aws.String("2026/03/20/[$LATEST]ord123"),
+				CreationTime:        aws.Int64(1774080000000),
+				FirstEventTimestamp: aws.Int64(1774080000000),
+				LastEventTimestamp:  aws.Int64(1774081000000),
+				StoredBytes:         aws.Int64(2048),
+			},
+		},
 	}
 
 	logEvents := map[string][]cwlogstypes.OutputLogEvent{
@@ -98,8 +121,55 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			},
 			{
 				Timestamp:     aws.Int64(1774253703000),
-				Message:       aws.String("REPORT RequestId: abc-123 Duration: 45.23 ms Billed Duration: 46 ms"),
+				Message:       aws.String("REPORT RequestId: abc-123 Duration: 45.23 ms Billed Duration: 46 ms Memory Size: 256 MB Max Memory Used: 87 MB"),
 				IngestionTime: aws.Int64(1774253703100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253600000),
+				Message:       aws.String("REPORT RequestId: abc-122 Duration: 312.50 ms Billed Duration: 313 ms Memory Size: 256 MB Max Memory Used: 112 MB Init Duration: 245.18 ms"),
+				IngestionTime: aws.Int64(1774253600100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253500000),
+				Message:       aws.String("REPORT RequestId: abc-121 Duration: 38.91 ms Billed Duration: 39 ms Memory Size: 256 MB Max Memory Used: 85 MB"),
+				IngestionTime: aws.Int64(1774253500100),
+			},
+		},
+		"/aws/lambda/process-orders": {
+			{
+				Timestamp:     aws.Int64(1774253800000),
+				Message:       aws.String("START RequestId: ord-901 Version: $LATEST"),
+				IngestionTime: aws.Int64(1774253800100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253801000),
+				Message:       aws.String("ERROR Failed to process order ORD-7842: DynamoDB ConditionalCheckFailedException: The conditional request failed. Item {pk: ORDER#7842, sk: STATUS} already exists with status=SHIPPED. Expected status=PENDING for transition to PROCESSING. This usually means a duplicate SQS message was delivered after the order was already fulfilled. Correlation-ID: cx-9f3a-44b1-8e72 Account: 123456789012 Region: us-east-1 Table: acme-orders-prod"),
+				IngestionTime: aws.Int64(1774253801100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253802000),
+				Message:       aws.String("REPORT RequestId: ord-901 Duration: 1523.47 ms Billed Duration: 1524 ms Memory Size: 128 MB Max Memory Used: 98 MB"),
+				IngestionTime: aws.Int64(1774253802100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253700000),
+				Message:       aws.String("REPORT RequestId: ord-900 Duration: 82.15 ms Billed Duration: 83 ms Memory Size: 128 MB Max Memory Used: 74 MB"),
+				IngestionTime: aws.Int64(1774253700100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253600000),
+				Message:       aws.String("REPORT RequestId: ord-899 Duration: 95.33 ms Billed Duration: 96 ms Memory Size: 128 MB Max Memory Used: 76 MB"),
+				IngestionTime: aws.Int64(1774253600100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253500000),
+				Message:       aws.String("REPORT RequestId: ord-898 Duration: 445.80 ms Billed Duration: 446 ms Memory Size: 128 MB Max Memory Used: 91 MB Init Duration: 387.22 ms"),
+				IngestionTime: aws.Int64(1774253500100),
+			},
+			{
+				Timestamp:     aws.Int64(1774253400000),
+				Message:       aws.String("REPORT RequestId: ord-897 Duration: 67.42 ms Billed Duration: 68 ms Memory Size: 128 MB Max Memory Used: 72 MB"),
+				IngestionTime: aws.Int64(1774253400100),
 			},
 		},
 	}
