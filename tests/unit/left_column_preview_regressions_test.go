@@ -51,12 +51,83 @@ func TestPreviewLeft_FirstSelectedRowShowsInstanceIDLabel(t *testing.T) {
 	}
 }
 
-func TestPreviewLeft_SecurityGroupsSubFields_NoYAMLBullets(t *testing.T) {
+func TestPreviewLeft_SecurityGroupsSubFields_YAMLStructure(t *testing.T) {
 	d := makePreviewEC2Detail(t, 120, 35)
 	plain := stripAnsi(d.View())
 
-	if strings.Contains(plain, "- GroupId:") {
-		t.Errorf("SecurityGroups sub-fields should render as indented key/value rows, not YAML bullets; got:\n%s", plain)
+	// Issue #265: detail view sub-fields should render with YAML structure
+	// including dashes for array items, matching the YAML view's formatting.
+	if !strings.Contains(plain, "GroupId:") {
+		t.Errorf("SecurityGroups sub-fields should contain GroupId key; got:\n%s", plain)
+	}
+
+	// Verify hierarchical indentation: SecurityGroups sub-field lines must be
+	// indented deeper than the section header (which sits at 1-space indent).
+	inSG := false
+	var subFieldIndents []int
+	for line := range strings.SplitSeq(plain, "\n") {
+		stripped := strings.TrimSpace(line)
+		if strings.HasPrefix(stripped, "SecurityGroups:") {
+			inSG = true
+			continue
+		}
+		if inSG {
+			if stripped == "" || (len(line) > 0 && line[0] != ' ') {
+				break // left the section
+			}
+			spaces := len(line) - len(strings.TrimLeft(line, " "))
+			if spaces <= 1 {
+				break // hit next top-level field
+			}
+			if strings.Contains(stripped, ":") {
+				subFieldIndents = append(subFieldIndents, spaces)
+			}
+		}
+	}
+	if len(subFieldIndents) == 0 {
+		t.Errorf("expected SecurityGroups sub-field lines with indentation > 1; got:\n%s", plain)
+	}
+	for _, indent := range subFieldIndents {
+		if indent < 5 {
+			t.Errorf("SecurityGroups sub-field has indent %d (expected >= 5); got:\n%s", indent, plain)
+		}
+	}
+}
+
+// TestPreviewLeft_PlainTextIdenticalAcrossCursorPositions verifies that the
+// plain-text form of every detail line is the same regardless of which row the
+// cursor is on. This guards the search-indexing contract: detail search indexes
+// ansi.Strip(renderContent()) and uses literal substring matching, so the plain
+// text must not change when the cursor moves (e.g., no extra spaces on selected rows).
+func TestPreviewLeft_PlainTextIdenticalAcrossCursorPositions(t *testing.T) {
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	t.Cleanup(styles.Reinit)
+
+	d := makePreviewEC2Detail(t, 120, 35)
+	baseline := stripAnsi(d.View())
+	baseLines := strings.Split(baseline, "\n")
+
+	// Move cursor through every position and verify non-cursor lines stay identical.
+	for step := range 20 {
+		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
+		current := stripAnsi(d.View())
+		curLines := strings.Split(current, "\n")
+
+		if len(curLines) != len(baseLines) {
+			t.Fatalf("step %d: line count changed from %d to %d", step, len(baseLines), len(curLines))
+		}
+
+		cursor := d.FieldCursor()
+		for i, got := range curLines {
+			if i == cursor {
+				continue // cursor row may differ (selection indicator)
+			}
+			if got != baseLines[i] {
+				t.Errorf("step %d cursor=%d: line %d changed\n  baseline: %q\n  current:  %q",
+					step, cursor, i, baseLines[i], got)
+			}
+		}
 	}
 }
 

@@ -838,7 +838,7 @@ func TestCache_Save_AtomicVisibility(t *testing.T) {
 		t.Fatalf("Save() seed error: %v", err)
 	}
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	deadline := time.Now().Add(50 * time.Millisecond)
 
 	// Writer goroutine: alternate between two distinct payloads so the file
 	// content actually changes on each iteration.

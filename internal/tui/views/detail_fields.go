@@ -116,6 +116,7 @@ func (m *DetailModel) buildFieldList() {
 		if leading := len(rawLine) - len(strings.TrimLeft(rawLine, " ")); leading > 0 {
 			level = leading / 2
 		}
+		hasDash := strings.HasPrefix(trimmed, "- ")
 		trimmed = strings.TrimPrefix(trimmed, "- ")
 		subKey, subVal, hasSep := strings.Cut(trimmed, ":")
 		if !hasSep {
@@ -139,7 +140,13 @@ func (m *DetailModel) buildFieldList() {
 		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
-			items[i].Key = subKey
+			// Preserve the YAML list marker so the navigable row aligns
+			// with sibling rows rendered via colorizeDetailLine.
+			if hasDash {
+				items[i].Key = "- " + subKey
+			} else {
+				items[i].Key = subKey
+			}
 			items[i].Value = subVal
 		}
 		if subVal == "" {
@@ -194,17 +201,18 @@ func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
 	return items
 }
 
-// statusCheckStyle returns a lipgloss.Style appropriate for the given EC2 status check value.
-func statusCheckStyle(status string) lipgloss.Style {
+// statusCheckTier maps an EC2 status check value to a ColorTier string
+// for deferred styling via RowColorStyle in the render path.
+func statusCheckTier(status string) string {
 	switch status {
 	case "ok":
-		return styles.StatusCheckOk
+		return "ok"
 	case "impaired":
-		return styles.StatusCheckFailed
+		return "impaired"
 	case "initializing":
-		return styles.StatusCheckWarn
+		return "initializing"
 	default:
-		return styles.DimText
+		return ""
 	}
 }
 
@@ -242,8 +250,8 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	}
 	inject := []fieldpath.FieldItem{
 		{Key: "Status Checks", IsHeader: true, Path: "StatusChecks"},
-		{Key: "System", Value: statusCheckStyle(sysStatus).Render(sysVal), IsSubField: true, Path: "StatusChecks"},
-		{Key: "Instance", Value: statusCheckStyle(instStatus).Render(instVal), IsSubField: true, Path: "StatusChecks"},
+		{Key: "System", Value: sysVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(sysStatus)},
+		{Key: "Instance", Value: instVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(instStatus)},
 	}
 
 	// Find the insertion point: after the "State" section header and its sub-fields.
@@ -275,6 +283,38 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	result = append(result, inject...)
 	result = append(result, m.fieldList[insertAt:]...)
 	m.fieldList = result
+}
+
+// subFieldIndent returns the left margin for a sub-field at the given indent level.
+// Level 1 = 5 spaces, level 2 = 7 spaces, level 3 = 9 spaces, etc.
+// This preserves hierarchical YAML indentation in the detail view.
+func subFieldIndent(level int) string {
+	if level < 1 {
+		level = 1
+	}
+	return " " + strings.Repeat("  ", level+1)
+}
+
+// colorizeDetailLine applies detail view key/value styling to a raw YAML line.
+// Leading whitespace is stripped — the caller provides indentation via subFieldIndent.
+// Uses shared yamlLine tokenization so markers and spacing match plainDetailLine exactly.
+func colorizeDetailLine(rawLine string) string {
+	yl := parseYAMLLine(rawLine)
+	if yl.Key != "" {
+		s := yl.Dash + styles.DetailKey.Render(yl.Key+":")
+		if yl.Value != "" {
+			s += " " + styles.DetailVal.Render(yl.Value)
+		}
+		return s
+	}
+	return yl.Dash + styles.DetailVal.Render(yl.Raw)
+}
+
+// plainDetailLine formats a raw YAML line as plain text for cursor-row rendering.
+// Leading whitespace is stripped — the caller provides indentation via subFieldIndent.
+// Uses shared yamlLine tokenization so markers and spacing match colorizeDetailLine exactly.
+func plainDetailLine(rawLine string) string {
+	return parseYAMLLine(rawLine).plain()
 }
 
 // renderFromFieldList renders the structured field list to a string.
@@ -309,22 +349,15 @@ func (m DetailModel) renderFromFieldList() string {
 			case item.IsHeader:
 				line = " " + item.Key + ":"
 			case item.IsSubField:
-				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
-					line = "     " + item.Key + ":  " + item.Value
+				indent := subFieldIndent(item.IndentLevel)
+				// Navigable or injected sub-fields have Key != Value (pre-split by buildFieldList).
+				// General sub-fields have Key == Value (raw YAML line).
+				if item.Key != item.Value {
+					line = indent + item.Key + ": " + item.Value
 					break
 				}
-				if !item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
-					line = "     " + item.Key + ":  " + item.Value
-					break
-				}
-				raw := strings.TrimSpace(item.Value)
-				raw = strings.TrimPrefix(raw, "- ")
-				subKey, subVal, hasSep := strings.Cut(raw, ": ")
-				if hasSep {
-					line = "     " + subKey + ":  " + subVal
-				} else {
-					line = "     " + raw
-				}
+				// General sub-field: use YAML-style rendering (plain, no colors for cursor row).
+				line = subFieldIndent(item.IndentLevel) + plainDetailLine(item.Value)
 			default:
 				line = " " + text.PadOrTrunc(item.Key+":", keyW) + item.Value
 			}
@@ -335,28 +368,23 @@ func (m DetailModel) renderFromFieldList() string {
 			case item.IsHeader:
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
-				// Bug2 fix: render sub-fields as "     Key:  value" with separate key/value styles.
-				// Sub-field items have Key == Value (the raw combined line like "Name: web-prod").
-				// Split on ": " to extract the key and value parts.
-				// For navigable sub-fields, buildFieldList stores Key=subKey and Value=subValue.
-				if item.IsNavigable && item.Key != "" && !strings.Contains(item.Key, ":") {
-					line = "     " + styles.DetailKey.Render(item.Key+":") + "  " + styles.NavigableField.Render(item.Value)
+				indent := subFieldIndent(item.IndentLevel)
+				// Navigable sub-fields have Key != Value (pre-split by buildFieldList).
+				if item.IsNavigable && item.Key != item.Value {
+					line = indent + styles.DetailKey.Render(item.Key+":") + " " + styles.NavigableField.Render(item.Value)
 					break
 				}
-				// For injected sub-fields with separate Key/Value (e.g., EC2 status checks),
-				// render key label and pre-styled value directly without raw-string splitting.
-				if item.Key != "" && !strings.Contains(item.Key, ":") {
-					line = "     " + styles.DetailKey.Render(item.Key+":") + "  " + item.Value
+				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
+				if item.Key != item.Value {
+					val := item.Value
+					if item.ColorTier != "" {
+						val = styles.RowColorStyle(item.ColorTier).Render(val)
+					}
+					line = indent + styles.DetailKey.Render(item.Key+":") + " " + val
 					break
 				}
-				raw := strings.TrimSpace(item.Value)
-				raw = strings.TrimPrefix(raw, "- ")
-				subKey, subVal, hasSep := strings.Cut(raw, ": ")
-				if hasSep {
-					line = "     " + styles.DetailKey.Render(subKey+":") + "  " + styles.DetailVal.Render(subVal)
-				} else {
-					line = "     " + styles.DetailVal.Render(raw)
-				}
+				// General sub-field: YAML-style colorization preserving hierarchy.
+				line = subFieldIndent(item.IndentLevel) + colorizeDetailLine(item.Value)
 			case item.IsNavigable:
 				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
 			default:

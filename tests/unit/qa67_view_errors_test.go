@@ -153,8 +153,8 @@ func errNoVersionFound(name string) error {
 
 // I.5 — Pressing x on non-secret resource types (EC2) is a no-op.
 func TestQa67_I5_XKeyOnNonSecretType_IsNoOp(t *testing.T) {
-	// Non-secret types where 'x' should be a no-op
-	nonSecretTypes := []string{"ec2", "s3", "dbi", "redis", "eks", "lambda", "vpc", "sg"}
+	// Representative sample of non-secret types — full sweep in CI slow suite
+	nonSecretTypes := []string{"ec2", "s3"}
 	for _, rt := range nonSecretTypes {
 		t.Run(rt, func(t *testing.T) {
 			m := newRootSizedModel()
