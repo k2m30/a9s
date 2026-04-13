@@ -764,11 +764,11 @@ func (m Model) headerRight() string {
 		}
 		return styles.FlashSuccess.Render(text)
 	}
-	if m.showErrorHint && len(m.errorHistory) > 0 {
-		return styles.FlashError.Render("! for errors")
-	}
 	if rv, ok := m.activeView().(*views.RevealModel); ok {
 		return rv.HeaderWarning()
+	}
+	if m.showErrorHint && len(m.errorHistory) > 0 {
+		return styles.FlashError.Render("! for errors")
 	}
 	return styles.DimText.Render("? for help")
 }

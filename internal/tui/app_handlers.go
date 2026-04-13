@@ -29,16 +29,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	// Clear error hint on any keypress.
-	m.showErrorHint = false
-
-	// Handle input modes
+	// Handle input modes — don't clear error hint during text input.
 	switch m.inputMode {
 	case modeFilter:
 		return m.updateFilterMode(msg)
 	case modeCommand:
 		return m.updateCommandMode(msg)
 	}
+
+	// Clear error hint on any navigation keypress (not during text input).
+	m.showErrorHint = false
 
 	// If the active view is in search input mode, delegate all keys to it.
 	// This prevents global keys (q, ?, i, etc.) from firing while typing a search query.
@@ -80,6 +80,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if key.Matches(msg, m.keys.ErrorLog) {
+		// If already viewing the error log, let the view handle the key.
+		if ym, ok := m.activeView().(*views.YAMLModel); ok && ym.IsTextViewer() {
+			return m.updateActiveView(msg)
+		}
 		if len(m.errorHistory) == 0 {
 			return m.handleFlash(messages.FlashMsg{Text: "No errors this session"})
 		}

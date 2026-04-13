@@ -56,6 +56,11 @@ func NewTextViewer(title, content string, k keys.Map) YAMLModel {
 	}
 }
 
+// IsTextViewer reports whether this YAMLModel is in raw-text mode (e.g. error log).
+func (m YAMLModel) IsTextViewer() bool {
+	return m.rawText != ""
+}
+
 // Init implements tea.Model. No async work.
 func (m YAMLModel) Init() (YAMLModel, tea.Cmd) {
 	return m, nil

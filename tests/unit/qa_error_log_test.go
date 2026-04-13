@@ -14,6 +14,8 @@ package unit
 // ══════════════════════════════════════════════════════════════════════════════
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -402,6 +404,108 @@ func TestTextViewer_SatisfiesViewInterface(t *testing.T) {
 	content, _ := tv.CopyContent()
 	if content != "content" {
 		t.Errorf("NewTextViewer CopyContent() = %q, want %q", content, "content")
+	}
+}
+
+// ── TestErrorHistoryFromAPIError ──────────────────────────────────────────────
+
+// TestErrorHistoryFromAPIError verifies that APIErrorMsg appends to error
+// history directly (bypasses handleFlash). Pressing "!" must open the viewer
+// with the error visible.
+func TestErrorHistoryFromAPIError(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+		ResourceType: "ec2-instances",
+		Err:          fmt.Errorf("AccessDenied: User is not authorized"),
+	})
+
+	// Press "!" — should open error log viewer, not show "No errors".
+	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "No errors this session") {
+		t.Error("APIErrorMsg should record to error history; pressing '!' should open viewer")
+	}
+	if !strings.Contains(plain, "AccessDenied") {
+		t.Error("error log viewer should contain the API error text")
+	}
+}
+
+// ── TestErrorHistoryFromClientsReady ─────────────────────────────────────────
+
+// TestErrorHistoryFromClientsReady verifies that a failed ClientsReadyMsg
+// appends to error history directly (bypasses handleFlash).
+func TestErrorHistoryFromClientsReady(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	// Gen 0 matches the model's initial connectGen (zero value).
+	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+		Err: errors.New("could not resolve credentials"),
+		Gen: 0,
+	})
+
+	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	if strings.Contains(plain, "No errors this session") {
+		t.Error("failed ClientsReadyMsg should record to error history; pressing '!' should open viewer")
+	}
+	if !strings.Contains(plain, "could not resolve credentials") {
+		t.Error("error log viewer should contain the ClientsReady error text")
+	}
+}
+
+// ── TestErrorLogTimestampFormat ───────────────────────────────────────────────
+
+// TestErrorLogTimestampFormat verifies that each error log entry has a
+// [HH:MM:SS] timestamp prefix.
+func TestErrorLogTimestampFormat(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "timestamp test error", IsError: true})
+
+	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
+
+	plain := stripANSI(rootViewContent(m))
+	// Timestamp format: [HH:MM:SS] — match the bracket pattern.
+	if !strings.Contains(plain, "[") || !strings.Contains(plain, "]") {
+		t.Error("error log entries should have [HH:MM:SS] timestamp prefix")
+	}
+	// Find a line with pattern [XX:XX:XX] followed by the error text.
+	// Lines may have frame border characters (│) from the layout.
+	found := false
+	for _, line := range strings.Split(plain, "\n") {
+		if !strings.Contains(line, "timestamp test error") {
+			continue
+		}
+		// Strip frame borders and whitespace to get raw content.
+		trimmed := strings.TrimLeft(line, " │")
+		if len(trimmed) >= 10 && trimmed[0] == '[' && trimmed[3] == ':' && trimmed[6] == ':' && trimmed[9] == ']' {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("could not find '[HH:MM:SS] timestamp test error' in error log viewer")
 	}
 }
 
