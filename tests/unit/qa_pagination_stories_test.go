@@ -1455,7 +1455,13 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	for _, rt := range resource.AllResourceTypes() {
+	// Representative sample — full sweep in CI slow suite
+	sampleJ2 := []resource.ResourceTypeDef{
+		*resource.FindResourceType("ec2"),
+		*resource.FindResourceType("s3"),
+		*resource.FindResourceType("secrets"),
+	}
+	for _, rt := range sampleJ2 {
 		t.Run(rt.ShortName+"_minimum_size_preserves_data", func(t *testing.T) {
 			k := keys.Default()
 			m := views.NewResourceList(rt, nil, k)
@@ -1727,7 +1733,13 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	for _, rt := range resource.AllResourceTypes() {
+	// Representative sample — full sweep in CI slow suite
+	sampleN1 := []resource.ResourceTypeDef{
+		*resource.FindResourceType("ec2"),
+		*resource.FindResourceType("s3"),
+		*resource.FindResourceType("secrets"),
+	}
+	for _, rt := range sampleN1 {
 		t.Run(rt.ShortName+"_copy_on_appended", func(t *testing.T) {
 			k := keys.Default()
 			m := views.NewResourceList(rt, nil, k)
@@ -1979,7 +1991,13 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	for _, rt := range resource.AllResourceTypes() {
+	// Representative sample — full sweep in CI slow suite
+	sampleN := []resource.ResourceTypeDef{
+		*resource.FindResourceType("ec2"),
+		*resource.FindResourceType("s3"),
+		*resource.FindResourceType("secrets"),
+	}
+	for _, rt := range sampleN {
 		t.Run(rt.ShortName+"_appended_items_accessible", func(t *testing.T) {
 			k := keys.Default()
 			m := views.NewResourceList(rt, nil, k)
@@ -2175,7 +2193,13 @@ func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	for _, rt := range resource.AllResourceTypes() {
+	// Representative sample — full sweep in CI slow suite
+	sampleLoadMore := []resource.ResourceTypeDef{
+		*resource.FindResourceType("ec2"),
+		*resource.FindResourceType("s3"),
+		*resource.FindResourceType("secrets"),
+	}
+	for _, rt := range sampleLoadMore {
 		t.Run(rt.ShortName+"_load_more_indicator", func(t *testing.T) {
 			k := keys.Default()
 			m := views.NewResourceList(rt, nil, k)

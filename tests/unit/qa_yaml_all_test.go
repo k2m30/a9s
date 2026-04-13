@@ -35,7 +35,13 @@ func TestQA_YAML_AllTypes(t *testing.T) {
 	clients := demo.NewServiceClients()
 	ctx := context.Background()
 
-	for _, rt := range resource.AllResourceTypes() {
+	// Representative sample — full sweep in CI slow suite
+	sampleYAML := []resource.ResourceTypeDef{
+		*resource.FindResourceType("ec2"),
+		*resource.FindResourceType("s3"),
+		*resource.FindResourceType("secrets"),
+	}
+	for _, rt := range sampleYAML {
 		t.Run(rt.ShortName, func(t *testing.T) {
 			fetcher := resource.GetPaginatedFetcher(rt.ShortName)
 			if fetcher == nil {
