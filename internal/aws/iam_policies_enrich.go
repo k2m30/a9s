@@ -30,12 +30,19 @@ func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (reso
 		return res, fmt.Errorf("invalid clients")
 	}
 
-	policy, ok := res.RawStruct.(iamtypes.Policy)
-	if !ok {
+	// Accept both the original SDK type and an already-enriched wrapper
+	// (re-enrichment happens when detail→YAML/JSON each trigger enrichment).
+	var policy iamtypes.Policy
+	switch raw := res.RawStruct.(type) {
+	case iamtypes.Policy:
+		policy = raw
+	case PolicyEnriched:
+		policy = raw.Policy
+	default:
 		return res, fmt.Errorf("unexpected RawStruct type: %T", res.RawStruct)
 	}
 
-	if policy.Arn == nil {
+	if policy.Arn == nil || *policy.Arn == "" {
 		return res, fmt.Errorf("policy has no ARN")
 	}
 	policyArn := *policy.Arn

@@ -422,23 +422,23 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 
 	// Policy documents (URL-encoded JSON)
-	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:*:123456789012:*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:*:123456789012:*"}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::acme-data-*","arn:aws:s3:::acme-data-*/*"]}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::acme-data-*","arn:aws:s3:::acme-data-*/*"]}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:*","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-deploy-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["codedeploy:*","s3:GetObject","s3:PutObject"],"Resource":"*"}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-secrets-access"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-secrets-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/*"}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::aws:policy/AdministratorAccess"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AdministratorAccess"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}`)
 
 	// AWS-managed policies used in role_policies
-	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ec2:DescribeInstances","ec2:DescribeRouteTables","ec2:DescribeSecurityGroups","ec2:DescribeSubnets","ec2:DescribeVolumes","ec2:DescribeVpcs","eks:DescribeCluster"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ec2:DescribeInstances","ec2:DescribeRouteTables","ec2:DescribeSecurityGroups","ec2:DescribeSubnets","ec2:DescribeVolumes","ec2:DescribeVpcs","eks:DescribeCluster"],"Resource":"*"}]}`)
 
-	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:BatchGetImage"],"Resource":"*"}]}`)
+	f.PolicyDocuments["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:BatchGetImage"],"Resource":"*"}]}`)
 
 	// Inline policy documents
-	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
+	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
 
-	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.QueryEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
+	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
 }

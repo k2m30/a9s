@@ -113,6 +113,7 @@ type Model struct {
 	relatedCache  *relatedCacheLRU
 	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
 	enrichGen     uint64 // incremented on refresh/profile/region switch to discard stale enrichment results
+	enrichResKey  string // "resourceType:resourceID" of last enrichment dispatch; gen only bumps on change
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.

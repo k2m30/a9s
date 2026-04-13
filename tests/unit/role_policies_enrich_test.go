@@ -77,7 +77,7 @@ func (m *countingEnrichGetPolicyVersionClient) GetPolicyVersion(_ context.Contex
 
 func TestFetchManagedPolicyDocument_ReturnsParsedDocument(t *testing.T) {
 	docJSON := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::my-bucket/*"}]}`
-	encoded := url.QueryEscape(docJSON)
+	encoded := url.PathEscape(docJSON)
 
 	getPolicyMock := &enrichGetPolicyClient{
 		output: &iam.GetPolicyOutput{
@@ -147,7 +147,7 @@ func TestFetchManagedPolicyDocument_GetPolicyVersionError_ReturnsError(t *testin
 
 func TestFetchInlinePolicyDocument_ReturnsParsedDocument(t *testing.T) {
 	docJSON := `{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}`
-	encoded := url.QueryEscape(docJSON)
+	encoded := url.PathEscape(docJSON)
 
 	mock := &enrichGetRolePolicyClient{
 		output: &iam.GetRolePolicyOutput{
@@ -219,7 +219,7 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 	// FetchManagedPolicyDocument is a pure fetch function with no internal cache.
 	// Each call should hit the API independently.
 	docJSON := `{"Version":"2012-10-17","Statement":[]}`
-	encoded := url.QueryEscape(docJSON)
+	encoded := url.PathEscape(docJSON)
 
 	callCount := 0
 	getPolicyMock := &enrichGetPolicyClient{
@@ -253,7 +253,7 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 	}
 }
 
-func TestEnricherRegistry_RolePolices_EnricherIsNonNil(t *testing.T) {
+func TestEnricherRegistry_RolePolicies_EnricherIsNonNil(t *testing.T) {
 	// Verify the registered enricher is the real one (not a stub).
 	e := resource.GetEnricher("role_policies")
 	if e == nil {
@@ -267,7 +267,7 @@ func TestDecodePolicyDocument_PlusSignPreserved(t *testing.T) {
 	// not converted to a space.
 	docJSON := `{"Version":"2012-10-17","Statement":[{"Condition":{"StringEquals":{"sts:ExternalId":"abc+def"}}}]}`
 	// Percent-encode the + as %2B (as IAM would)
-	encoded := url.QueryEscape(docJSON) // QueryEscape encodes + as %2B
+	encoded := url.PathEscape(docJSON) // PathEscape encodes + as %2B
 
 	getPolicyMock := &enrichGetPolicyClient{
 		output: &iam.GetPolicyOutput{

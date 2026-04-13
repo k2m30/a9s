@@ -65,10 +65,15 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 
 		// Dispatch enrichment if registered for this resource type.
-		// Increment enrichGen so in-flight results from a previous detail view
-		// (e.g., same inline policy name under a different role) are discarded.
+		// Only bump enrichGen when the resource identity changes, so
+		// switching to YAML/JSON for the same resource doesn't invalidate
+		// an in-flight enrichment from the detail view open.
 		if resource.HasEnricher(resType) {
-			m.enrichGen++
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
 			cmds = append(cmds, func() tea.Msg {
 				return messages.EnrichDetailMsg{
 					ResourceType: resType,
@@ -115,7 +120,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&y)
 		// Dispatch enrichment so YAML view updates when result arrives.
 		if resource.HasEnricher(resType) {
-			m.enrichGen++
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
 			return m, func() tea.Msg {
 				return messages.EnrichDetailMsg{
 					ResourceType: resType,
@@ -143,7 +152,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&j)
 		// Dispatch enrichment so JSON view updates when result arrives.
 		if resource.HasEnricher(resType) {
-			m.enrichGen++
+			key := resType + ":" + msg.Resource.ID
+			if key != m.enrichResKey {
+				m.enrichGen++
+				m.enrichResKey = key
+			}
 			return m, func() tea.Msg {
 				return messages.EnrichDetailMsg{
 					ResourceType: resType,
@@ -273,8 +286,9 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
-		m.relatedGen++ // cancel in-flight results from previous batch
-		m.enrichGen++  // cancel in-flight enrichment from previous batch
+		m.relatedGen++   // cancel in-flight results from previous batch
+		m.enrichGen++    // cancel in-flight enrichment from previous batch
+		m.enrichResKey = "" // force gen bump on next enrichment dispatch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 		var cmds []tea.Cmd

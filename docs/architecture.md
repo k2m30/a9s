@@ -40,7 +40,7 @@ The current codebase is already organized around a useful separation of concerns
 
 Every interaction follows this loop:
 
-```
+```text
 User Input → Update(msg) → (Model, Cmd) → View() → Terminal
                                 ↑                      |
                                 └──────────────────────┘
@@ -76,7 +76,7 @@ Key messages:
 
 The app maintains a stack of views (`stack []views.View`):
 
-```
+```text
 [MainMenu] → [ResourceList] → [DetailModel] → [YAMLModel]
    ↑ bottom                              top ↑ (activeView)
 ```
@@ -91,7 +91,7 @@ Views are created in `handleNavigate()` and pushed immediately. Async data arriv
 
 ## Project Structure
 
-```
+```text
 cmd/
   a9s/              # main binary — CLI flags, tea.NewProgram
   readmegen/        # generates README.md from docs/README.tmpl.md
@@ -208,6 +208,7 @@ All in `internal/tui/views/`:
 | **IdentityModel** | `identity.go` | Shows `sts:GetCallerIdentity` result |
 
 Views implement the `View` interface (`views/view.go`):
+
 ```go
 type View interface {
     View() string
@@ -297,7 +298,8 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 When a detail, YAML, or JSON view opens for a resource type with a registered enricher, the app async-fetches additional data and merges it into the resource.
 
 **Flow:**
-```
+
+```text
 View opens (detail, YAML, or JSON)
   → resource.HasEnricher(resType)?
     → increment enrichGen (invalidate prior in-flight results)
@@ -423,7 +425,7 @@ Demo mode is the primary way to develop and test the TUI without AWS access.
 
 ## App Lifecycle
 
-```
+```text
 main.go → parseFlags → tui.New(profile, region, opts...)
 ```
 
@@ -596,22 +598,29 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 ## Design Decisions
 
 ### Why no write operations?
+
 a9s is designed for investigation and monitoring. Write operations are dangerous in a TUI where a single keypress could modify production infrastructure. The CLI and Console exist for mutations.
 
 ### Why not use generics for fetchers?
+
 Fetchers return `any` for clients because each AWS service has a different client type. Type assertions happen inside each fetcher. This keeps the registry simple and avoids a complex generic type hierarchy.
 
 ### Why `RawStruct` and `Fields` both exist?
+
 `Fields` is fast and sufficient for table columns. `RawStruct` enables deep field extraction via reflection for detail/YAML/JSON views without pre-extracting every possible field.
 
 ### Why view stack instead of a router?
+
 The stack model maps naturally to drill-down navigation (list → detail → YAML). Each view preserves its state when covered. Esc always pops back to the previous state.
 
 ### Why generation counters?
+
 Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`) are incremented on refresh/profile/region switch and on new view opens, causing stale in-flight results to be silently discarded.
 
 ### Why a separate enricher pattern?
+
 Detail views render from pre-fetched `Fields`/`RawStruct`. Some data (like policy documents) requires additional API calls that are too expensive to make at list-fetch time. The enricher pattern fetches this data on demand when the user actually opens the detail, YAML, or JSON view.
 
 ### Why four separate caches?
+
 Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; resource cache enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate TTL/invalidation/eviction policies.
