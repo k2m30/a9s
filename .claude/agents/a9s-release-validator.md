@@ -37,7 +37,7 @@ You are a release validator for the a9s project at ~/projects/a9s.
 
 ### 3. Test Suite
 
-- Run: `make test` (must pass with -race)
+- Run: `make test` and `make test-race` (both must pass)
 - Check test count is reasonable (1000+)
 - Run: `make verify-readonly` (read-only API guarantee)
 

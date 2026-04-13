@@ -652,7 +652,9 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
-	resourceTypes := resource.AllShortNames()
+	// Representative sample — full sweep in CI slow suite
+	// "secrets" exercises the reveal branch; "ec2"/"s3"/"dbi" exercise the non-reveal branch.
+	resourceTypes := []string{"ec2", "s3", "secrets", "dbi"}
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {

@@ -4,16 +4,9 @@
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3 (012-ct-events-list-redesign)
-- N/A (in-memory `Resource.Fields` map; YAML view config on disk) (012-ct-events-list-redesign)
-- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib) (013-ct-event-detail-v2)
-- N/A (in-memory parsed event held only for the duration of one detail-view open) (013-ct-event-detail-v2)
-- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services) (014-demo-transport-mock)
-- In-process fixture store (per resource type, loaded at startup) (014-demo-transport-mock)
-- Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services) (015-ct-events-all-types)
-- Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2) + Lipgloss v2 (color types), yaml.v3 (config + custom themes) (016-color-themes)
-- YAML files on disk (~/.a9s/config.yaml, ~/.a9s/themes/*.yaml) (016-color-themes)
+- Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
+- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
+- In-process demo fixture store (per resource type, loaded at startup)
 
 ## Project Structure
 
@@ -47,7 +40,8 @@ specs/           # feature specifications
 ## Commands
 
 - `make build` — build the binary
-- `make test` — run all unit tests (with `-race`)
+- `make test` — run all unit tests (fast, no race detector)
+- `make test-race` — run all unit tests with `-race` (CI and pre-push)
 - `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
 - `make lint` — run golangci-lint (MUST pass locally before any push). Note: do NOT include the `run` subcommand when calling golangci-lint directly — rtk treats it as a package path, causing a spurious `/run: directory not found` error.
 - `make security` — check for known vulnerabilities via govulncheck (MUST pass locally before any push)
@@ -56,6 +50,7 @@ specs/           # feature specifications
 - `go run ./cmd/viewsgen/` — regenerate per-resource YAML files in .a9s/views/ from built-in defaults (run after any changes to defaults.go)
 - `go run ./cmd/refgen/ > .a9s/views_reference.yaml` — regenerate the views reference file from AWS SDK struct reflection (dev-time only, no AWS credentials needed). Must be re-run after AWS SDK version updates.
 - `go run ./cmd/preview/` — render static TUI design mockups using Lipgloss v2 (no AWS credentials needed). Used as visual truth for design spec compliance.
+- `make mdlint` — run markdownlint on docs (MUST pass locally before any push that touches .md files)
 - `./a9s --demo` — run the app with synthetic fixture data (no AWS credentials needed)
 
 ## Prerequisites
@@ -63,6 +58,13 @@ specs/           # feature specifications
 - Go 1.26+ (`brew install go`)
 - golangci-lint v2.11+ (`brew install golangci-lint`)
 - govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`)
+- markdownlint-cli2 (`brew install markdownlint-cli2`) — for markdown linting
+
+## CodeRabbit (AI Code Reviewer)
+
+- Use `@coderabbitai ignore` on PRs where you don't need further review
+- Use `[skip ci]` in commit messages for trivial follow-ups (CodeRabbit still reviews unless ignored)
+- CodeRabbit reviews are triggered per-push, not per-commit — batch small fixes into one push
 
 ## Architecture Principles
 
@@ -72,10 +74,6 @@ specs/           # feature specifications
 - **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
 - **Message-driven** — views communicate via typed messages, never import each other
 - **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`
-
-## Code Style
-
-Go 1.26+: Follow standard conventions
 
 ## Skills
 
@@ -104,42 +102,13 @@ Go 1.26+: Follow standard conventions
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 
-## Related-View Architecture
-
-The right-column related panel is data-driven via `RelatedDef` and `NavigableField` on each resource type:
-
-```go
-type RelatedDef struct {
-    TargetType       string         // target resource short name (e.g., "vpc")
-    DisplayName      string         // display label in the right column
-    Checker          RelatedChecker // async checker function
-    NeedsTargetCache bool           // true if checker reads target type from ResourceCache (Pattern C)
-}
-
-type NavigableField struct {
-    FieldPath  string // dot-path into resource fields (e.g., "VpcId")
-    TargetType string // resource type to navigate to
-}
-```
-
-Key registries:
-- `resource.RegisterRelated(shortName, []RelatedDef{...})` — registers related checkers
-- `resource.RegisterNavigableFields(shortName, []NavigableField{...})` — registers navigable fields
-- `resource.RegisterRelatedDemo(shortName, func)` — registers demo-mode checker override
-
-Adding a new related view requires **NO changes** to `app.go`, `detail.go`, `app_related.go`, or `messages.go`. All dispatch, rendering, and navigation are generic.
-
-ContextKeys resolution for related navigation (parallel to ChildView ContextKeys):
-- `"ID"` → `Resource.ID`
-- `"Name"` → `Resource.Name`
-- `"@parent.x"` → inherited from parent context key `x`
-- anything else → `Resource.Fields[key]`
 
 ## Agent File Access Rules
 
 Agents MUST use targeted file access — never broad globs on large directories.
 
 ### DO
+- Use Explore agent wherever reasonable
 - `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
 - `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
 - `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
@@ -159,20 +128,13 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 
 #### Per-service fixture files are here (`internal/demo/fixtures/`)
 
-## Bash Command Rules
-
-- **Never chain bash commands** with `&&`, `;`, `|`, or `cd`. Always use single, standalone commands with absolute paths.
-- **Never use `git -C <dir>`** flag. `cd` into the directory first as a standalone command, then run git commands separately.
-- **Never use `$()` or backticks** in bash commands. Resolve values first, write intermediates to `$TMPDIR` files, read them in subsequent commands.
-- **Commit messages**: write to `$TMPDIR/msg.txt` with the Write tool, then `git commit -F $TMPDIR/msg.txt` as a standalone command.
-
 ## Rules
 
 - ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `internal/buildinfo`
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
-- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. CI is not a debugging tool.
+- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. Run `make test-race` for pre-push race detection. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
@@ -198,9 +160,3 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
-
-
-## Recent Changes
-- 016-color-themes: Added Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2) + Lipgloss v2 (color types), yaml.v3 (config + custom themes)
-- 015-ct-events-all-types: Added Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services)
-- 014-demo-transport-mock: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services)

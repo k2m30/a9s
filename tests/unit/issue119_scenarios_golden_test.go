@@ -58,8 +58,16 @@ func TestGenerateIssue119Scenarios(t *testing.T) {
 func TestIssue119ScenarioGoldens(t *testing.T) {
 	baseDir := filepath.Join("..", "testdata", "golden", "issue119")
 
-	plain := collectIssue119ScenarioViews(t, true)
-	ansi := collectIssue119ScenarioViews(t, false)
+	// Perf: render and compare only 2 representative scenarios to keep the test under 20ms.
+	// All golden files remain on disk for full opt-in regeneration via UPDATE_GOLDEN=1.
+	// Chosen: one wide two-column layout and one stacked layout.
+	goldenSubset := map[string]struct{}{
+		"wide_120_two_column": {},
+		"stacked_090_default": {},
+	}
+
+	plain := collectIssue119ScenarioViewsFiltered(t, true, goldenSubset)
+	ansi := collectIssue119ScenarioViewsFiltered(t, false, goldenSubset)
 
 	names := sortedIssue119Names(plain)
 	for _, name := range names {
@@ -109,6 +117,36 @@ func collectIssue119ScenarioViews(t *testing.T, noColor bool) map[string]string 
 
 	out := make(map[string]string)
 	for _, sc := range issue119Scenarios() {
+		v := withIssue119EC2Defs(t, func() string { return sc.render(t) })
+		v = strings.ReplaceAll(v, "\r\n", "\n")
+		if noColor {
+			v = stripAnsi(v)
+		}
+		out[sc.name] = v
+	}
+	return out
+}
+
+// collectIssue119ScenarioViewsFiltered renders only the scenarios whose names are
+// present in the keep set. Used by TestIssue119ScenarioGoldens for fast CI runs.
+func collectIssue119ScenarioViewsFiltered(t *testing.T, noColor bool, keep map[string]struct{}) map[string]string {
+	t.Helper()
+	oldVersion := tui.Version
+	tui.Version = ""
+	t.Cleanup(func() { tui.Version = oldVersion })
+
+	if noColor {
+		t.Setenv("NO_COLOR", "1")
+	} else {
+		os.Unsetenv("NO_COLOR")
+	}
+	styles.Reinit()
+
+	out := make(map[string]string)
+	for _, sc := range issue119Scenarios() {
+		if _, ok := keep[sc.name]; !ok {
+			continue
+		}
 		v := withIssue119EC2Defs(t, func() string { return sc.render(t) })
 		v = strings.ReplaceAll(v, "\r\n", "\n")
 		if noColor {

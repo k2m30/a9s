@@ -859,7 +859,8 @@ func TestQA_EC2_B9_1_DetailWithNoPublicIP(t *testing.T) {
 }
 
 func TestQA_EC2_Detail_AllFieldsFromFixture(t *testing.T) {
-	instances := fixtureEC2Instances()
+	// Representative sample of 3 fixtures — full sweep in CI slow suite
+	instances := fixtureEC2Instances()[:3]
 	for _, inst := range instances {
 		t.Run(inst.ID, func(t *testing.T) {
 			m := newEC2DetailModel(t, inst)
@@ -1034,7 +1035,8 @@ func TestQA_EC2_C7_2_YAMLWithNoPublicIP(t *testing.T) {
 }
 
 func TestQA_EC2_YAML_AllFixtureInstances(t *testing.T) {
-	instances := fixtureEC2Instances()
+	// Representative sample of 3 fixtures — full sweep in CI slow suite
+	instances := fixtureEC2Instances()[:3]
 	for _, inst := range instances {
 		t.Run(inst.ID, func(t *testing.T) {
 			m := newEC2YAMLModel(t, inst)

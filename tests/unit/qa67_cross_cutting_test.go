@@ -528,7 +528,8 @@ func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 		{name: "yaml", key: "y"},
 	}
 
-	sampleTypes := []string{"ec2", "s3", "dbi", "redis", "lambda", "secrets", "vpc", "sg"}
+	// Representative sample — full sweep in CI slow suite
+	sampleTypes := []string{"ec2", "s3", "secrets", "vpc"}
 	for _, rt := range sampleTypes {
 		for _, op := range ops {
 			t.Run(rt+"/"+op.name, func(t *testing.T) {

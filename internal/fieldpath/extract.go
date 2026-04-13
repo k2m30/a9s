@@ -455,12 +455,14 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 				if line == "" {
 					continue
 				}
+				leading := len(line) - len(strings.TrimLeft(line, " "))
+				level := leading/2 + 1 // 1 = first-level sub-field, 2 = nested, etc.
 				items = append(items, FieldItem{
 					Path:        path,
 					Key:         line,
 					Value:       line,
 					IsSubField:  true,
-					IndentLevel: 1,
+					IndentLevel: level,
 				})
 			}
 		} else {
@@ -484,18 +486,23 @@ type nestedFieldLine struct {
 }
 
 // extractNestedFieldLines expands dotted map keys under a section path.
-// Example:
 //
-//	path = "SecurityGroups"
-//	map keys = SecurityGroups.GroupId.0, SecurityGroups.GroupName.0
+// For array-indexed keys (e.g., SecurityGroups.GroupId.0), produces YAML
+// list-of-objects format with "- " markers and 2-space nesting per item:
 //
-// Produces lines:
+//	- GroupId: sg-xxx
+//	  GroupName: my-group
+//	- GroupId: sg-yyy
+//	  GroupName: another-group
 //
-//	GroupId: <...>
-//	GroupName: <...>
+// For non-indexed keys (e.g., IamInstanceProfile.Arn), produces flat lines:
+//
+//	Arn: arn:...
+//	Id: AIPA...
 func extractNestedFieldLines(fields map[string]string, path string) []string {
 	prefix := path + "."
 	var lines []nestedFieldLine
+	hasNumericIndex := false
 	for k, v := range fields {
 		if !strings.HasPrefix(k, prefix) {
 			continue
@@ -513,6 +520,7 @@ func extractNestedFieldLines(fields map[string]string, path string) []string {
 		for _, p := range parts[1:] {
 			if n, err := strconv.Atoi(p); err == nil {
 				idx = n
+				hasNumericIndex = true
 				break
 			}
 		}
@@ -527,9 +535,29 @@ func extractNestedFieldLines(fields map[string]string, path string) []string {
 		}
 		return lines[i].key < lines[j].key
 	})
+	if !hasNumericIndex {
+		// Single object: flat key-value lines (no list markers).
+		out := make([]string, 0, len(lines))
+		for _, l := range lines {
+			out = append(out, l.key+": "+l.value)
+		}
+		return out
+	}
+	// Array of objects: group by index, emit YAML list format.
 	out := make([]string, 0, len(lines))
+	currentIdx := -1
+	firstInGroup := true
 	for _, l := range lines {
-		out = append(out, l.key+": "+l.value)
+		if l.index != currentIdx {
+			currentIdx = l.index
+			firstInGroup = true
+		}
+		if firstInGroup {
+			out = append(out, "- "+l.key+": "+l.value)
+			firstInGroup = false
+		} else {
+			out = append(out, "  "+l.key+": "+l.value)
+		}
 	}
 	return out
 }

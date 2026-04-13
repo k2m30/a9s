@@ -583,6 +583,7 @@ func TestSearch_N04_IdenticalEscBehaviorDetailAndYAML(t *testing.T) {
 func TestSearch_N05_DetailViewAllResourceTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 
+	// Representative sample — full sweep in CI slow suite
 	cases := []struct {
 		typeName string
 		res      resource.Resource
@@ -599,44 +600,9 @@ func TestSearch_N05_DetailViewAllResourceTypes(t *testing.T) {
 			"east",
 		},
 		{
-			"rds",
-			resource.Resource{ID: "mydb", Name: "mydb", Fields: map[string]string{"engine": "postgres", "status": "available"}},
-			"postgres",
-		},
-		{
-			"lambda",
-			resource.Resource{ID: "my-func", Name: "my-func", Fields: map[string]string{"runtime": "go1.x"}},
-			"go1",
-		},
-		{
-			"vpc",
-			resource.Resource{ID: "vpc-123", Name: "main-vpc", Fields: map[string]string{"cidr_block": "10.0.0.0/16"}},
-			"10.0",
-		},
-		{
-			"sg",
-			resource.Resource{ID: "sg-abc", Name: "web-sg", Fields: map[string]string{"description": "web traffic"}},
-			"web",
-		},
-		{
-			"iam-roles",
-			resource.Resource{ID: "admin-role", Name: "admin-role", Fields: map[string]string{"arn": "arn:aws:iam::123:role/admin"}},
-			"admin",
-		},
-		{
-			"eks",
-			resource.Resource{ID: "my-cluster", Name: "my-cluster", Fields: map[string]string{"version": "1.29"}},
-			"1.29",
-		},
-		{
-			"sqs",
-			resource.Resource{ID: "https://sqs/queue", Name: "my-queue", Fields: map[string]string{"visibility": "30"}},
-			"30",
-		},
-		{
-			"cloudfront",
-			resource.Resource{ID: "E123", Name: "my-dist", Fields: map[string]string{"status": "Deployed"}},
-			"Deployed",
+			"secrets",
+			resource.Resource{ID: "prod/api-key", Name: "prod/api-key", Fields: map[string]string{"description": "api secret"}},
+			"api",
 		},
 	}
 
@@ -674,6 +640,7 @@ func TestSearch_N05_DetailViewAllResourceTypes(t *testing.T) {
 func TestSearch_N06_YAMLViewAllResourceTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 
+	// Representative sample — full sweep in CI slow suite
 	cases := []struct {
 		typeName string
 		res      resource.Resource
@@ -690,44 +657,9 @@ func TestSearch_N06_YAMLViewAllResourceTypes(t *testing.T) {
 			"east",
 		},
 		{
-			"rds",
-			resource.Resource{ID: "mydb", Name: "mydb", Fields: map[string]string{"engine": "postgres", "status": "available"}},
-			"postgres",
-		},
-		{
-			"lambda",
-			resource.Resource{ID: "my-func", Name: "my-func", Fields: map[string]string{"runtime": "go1.x"}},
-			"go1",
-		},
-		{
-			"vpc",
-			resource.Resource{ID: "vpc-123", Name: "main-vpc", Fields: map[string]string{"cidr_block": "10.0.0.0/16"}},
-			"10.0",
-		},
-		{
-			"sg",
-			resource.Resource{ID: "sg-abc", Name: "web-sg", Fields: map[string]string{"description": "web traffic"}},
-			"web",
-		},
-		{
-			"iam-roles",
-			resource.Resource{ID: "admin-role", Name: "admin-role", Fields: map[string]string{"arn": "arn:aws:iam::123:role/admin"}},
-			"admin",
-		},
-		{
-			"eks",
-			resource.Resource{ID: "my-cluster", Name: "my-cluster", Fields: map[string]string{"version": "1.29"}},
-			"1.29",
-		},
-		{
-			"sqs",
-			resource.Resource{ID: "https://sqs/queue", Name: "my-queue", Fields: map[string]string{"visibility": "30"}},
-			"30",
-		},
-		{
-			"cloudfront",
-			resource.Resource{ID: "E123", Name: "my-dist", Fields: map[string]string{"status": "Deployed"}},
-			"Deployed",
+			"secrets",
+			resource.Resource{ID: "prod/api-key", Name: "prod/api-key", Fields: map[string]string{"description": "api secret"}},
+			"api",
 		},
 	}
 

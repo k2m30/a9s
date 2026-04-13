@@ -1098,11 +1098,13 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 		t.Error("flash should be visible immediately")
 	}
 
-	// Execute the tick cmd to get the ClearFlashMsg
-	if cmd != nil {
-		msg := cmd()
-		m, _ = rootApplyMsg(m, msg)
+	// Verify clear cmd was scheduled.
+	if cmd == nil {
+		t.Fatal("expected clear-flash cmd, got nil")
 	}
+	// Apply ClearFlashMsg directly — timer duration is not under test.
+	// Gen=1: fresh model starts at gen=0; FlashMsg increments it once.
+	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
 
 	// Flash should be cleared
 	plain = stripANSI(rootViewContent(m))

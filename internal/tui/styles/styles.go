@@ -225,6 +225,7 @@ func initStyles() {
 		"import_rollback_complete":   lipgloss.NewStyle().Foreground(ColStopped), // CFN: import rollback = failure
 		"red":                        lipgloss.NewStyle().Foreground(ColStopped), // EB Health
 		"deregistered":               lipgloss.NewStyle().Foreground(ColStopped), // AMI
+		"impaired":                   lipgloss.NewStyle().Foreground(ColStopped).Bold(true), // EC2 Status Checks
 
 		// --- Yellow (ColPending) ---
 		"draining":           lipgloss.NewStyle().Foreground(ColPending), // TG Health
@@ -243,6 +244,7 @@ func initStyles() {
 		"temporary_failure":  lipgloss.NewStyle().Foreground(ColPending), // SES
 		"recovering":         lipgloss.NewStyle().Foreground(ColPending), // EBS Snapshot
 		"recoverable":        lipgloss.NewStyle().Foreground(ColPending), // EBS Snapshot
+		"initializing":       lipgloss.NewStyle().Foreground(ColPending), // EC2 Status Checks
 
 		// --- Dim (ColTerminated) ---
 		"unused":      lipgloss.NewStyle().Foreground(ColTerminated), // TG Health
