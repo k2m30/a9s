@@ -439,8 +439,8 @@ func TestResourceListView_SortIndicator(t *testing.T) {
 		Resources:    rlTestResources(),
 	})
 
-	// Trigger sort by name with 'N' key
-	m, _ = m.Update(rlKeyPress("N"))
+	// Trigger sort by name with '2' key (column 1 = name, 1-indexed key "2")
+	m, _ = m.Update(rlKeyPress("2"))
 
 	out := m.View()
 	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {

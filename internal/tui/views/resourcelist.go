@@ -26,7 +26,7 @@ type ResourceListModel struct {
 	scroll        ScrollState
 	hScrollOffset int
 
-	sort       SortField
+	sortColIdx int    // -1 = no sort, 0-based column index
 	sortAsc    bool
 	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
@@ -67,14 +67,21 @@ func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsC
 		loading:    true,
 		spinner:    sp,
 		keys:       k,
+		sortColIdx: SortColNone,
 	}
 	// ct-events: default sort is by event_time DESC (newest first).
 	// Only apply when a viewConfig is present (full app mode); unit tests
 	// that pass nil viewConfig work with synthetic data and are not affected.
 	if typeDef.ShortName == "ct-events" && viewConfig != nil {
-		m.sort = SortAge
-		m.sortAsc = false
-		m.sortColKey = "time" // §6: TIME column is bound to SortAge for ct-events
+		cols := m.resolveColumns()
+		for i, c := range cols {
+			if c.sortKey == "event_time" {
+				m.sortColIdx = i
+				m.sortAsc = false
+				m.sortColKey = colSortKey(c)
+				break
+			}
+		}
 	}
 	return m
 }
@@ -92,6 +99,7 @@ func NewChildResourceList(childType resource.ResourceTypeDef, parentCtx map[stri
 		loading:       true,
 		spinner:       sp,
 		keys:          k,
+		sortColIdx:    SortColNone,
 	}
 }
 
@@ -104,7 +112,7 @@ func NewResourceListFromCache(
 	resources []resource.Resource,
 	pagination *resource.PaginationMeta,
 	filterText string,
-	sortField SortField,
+	sortColIdx int,
 	sortAsc bool,
 	cursorPos int,
 	hScrollOffset int,
@@ -116,7 +124,7 @@ func NewResourceListFromCache(
 		allResources:  resources,
 		pagination:    pagination,
 		filterText:    filterText,
-		sort:          sortField,
+		sortColIdx:    sortColIdx,
 		sortAsc:       sortAsc,
 		hScrollOffset: hScrollOffset,
 		loading:       false,
@@ -293,33 +301,6 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			m.scroll.SetCursor(0)
 			m.styledRowCache = nil
 			return m, nil
-		case key.Matches(msg, m.keys.SortByName):
-			if m.sort == SortName {
-				m.sortAsc = !m.sortAsc
-			} else {
-				m.sort = SortName
-				m.sortAsc = true
-			}
-			m.updateSortColKey()
-			m.applySortAndFilter()
-		case key.Matches(msg, m.keys.SortByID):
-			if m.sort == SortID {
-				m.sortAsc = !m.sortAsc
-			} else {
-				m.sort = SortID
-				m.sortAsc = true
-			}
-			m.updateSortColKey()
-			m.applySortAndFilter()
-		case key.Matches(msg, m.keys.SortByAge):
-			if m.sort == SortAge {
-				m.sortAsc = !m.sortAsc
-			} else {
-				m.sort = SortAge
-				m.sortAsc = true
-			}
-			m.updateSortColKey()
-			m.applySortAndFilter()
 		case key.Matches(msg, m.keys.Events):
 			if r := m.SelectedResource(); r != nil {
 				if updated, cmd := m.handleChildKey("e", r); cmd != nil {
@@ -376,6 +357,10 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 						FetchFilter:       ff,
 					}
 				}
+			}
+		default:
+			if m.handleSortByCol(msg) {
+				return m, nil
 			}
 		}
 		// Invalidate styled row cache for old and new cursor positions.

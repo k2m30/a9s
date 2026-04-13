@@ -1,79 +1,138 @@
 package views
 
 import (
+	"reflect"
 	"sort"
-	"strings"
+	"strconv"
+	"time"
+
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 )
 
-// SortField identifies the active sort column.
-type SortField int
+// SortColNone indicates no active sort column.
+const SortColNone = -1
 
+// SortField is a backward-compatible type alias for the sort column index.
+// Kept for test compatibility.
+//
+// Deprecated: use sortColIdx (int) directly.
+type SortField = int
+
+// Deprecated sort-field sentinels. Kept for test compatibility.
+// SortNone maps to SortColNone (-1). SortName/SortID/SortAge map to column
+// indices 0/1/2 — these are approximate and only meaningful where those
+// columns exist at the expected positions.
 const (
-	SortNone SortField = iota
-	SortName
-	SortID
-	SortAge
+	SortNone SortField = SortColNone
+	SortName SortField = 0
+	SortID   SortField = 1
+	SortAge  SortField = 2
 )
 
-// isAgeKey reports whether a field key represents a time-related field.
-func isAgeKey(key string) bool {
-	kl := strings.ToLower(key)
-	return strings.Contains(kl, "time") || strings.Contains(kl, "date") ||
-		strings.Contains(kl, "launch") || strings.Contains(kl, "creation") ||
-		strings.Contains(kl, "event") || strings.Contains(kl, "start") ||
-		strings.Contains(kl, "timestamp")
+// compareRaw extracts raw values from two structs at the given path and compares
+// them directly (numeric, time). Returns comparison result and true if raw
+// comparison succeeded. Falls back to false when path doesn't resolve or types
+// aren't comparable.
+func compareRaw(a, b any, path string) (int, bool) {
+	va, errA := fieldpath.ExtractValue(a, path)
+	vb, errB := fieldpath.ExtractValue(b, path)
+	if errA != nil || errB != nil {
+		return 0, false
+	}
+	for va.Kind() == reflect.Pointer {
+		if va.IsNil() {
+			return 0, false
+		}
+		va = va.Elem()
+	}
+	for vb.Kind() == reflect.Pointer {
+		if vb.IsNil() {
+			return 0, false
+		}
+		vb = vb.Elem()
+	}
+	// time.Time
+	if va.Type() == reflect.TypeFor[time.Time]() && vb.Type() == reflect.TypeFor[time.Time]() {
+		return va.Interface().(time.Time).Compare(vb.Interface().(time.Time)), true
+	}
+	// Numeric (int/float)
+	fa, okA := toFloat(va)
+	fb, okB := toFloat(vb)
+	if okA && okB {
+		if fa < fb {
+			return -1, true
+		}
+		if fa > fb {
+			return 1, true
+		}
+		return 0, true
+	}
+	return 0, false
 }
 
-// ageFieldKey returns the deterministic field key for age sorting.
-// It scans the resolved columns in order and returns the first time-related key.
-// Config-driven columns may have empty keys, so it falls back to typeDef columns
-// which always carry canonical field keys.
-//
-// Special-case: ct-events stores a display-formatted "time" field for rendering
-// and a raw RFC3339 "event_time" field for sorting — return "event_time" so
-// the comparator gets a sortable value. The display column (TIME) still shows
-// the sort glyph because sortColKey="time" (set in NewResourceList) is matched
-// by the TIME column key independently of the comparator field.
-func (m ResourceListModel) ageFieldKey() string {
-	if m.typeDef.ShortName == "ct-events" {
-		return "event_time"
+func toFloat(v reflect.Value) (float64, bool) {
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), true
+	default:
+		return 0, false
 	}
-	for _, c := range m.resolveColumns() {
-		if isAgeKey(c.key) {
-			return c.key
-		}
-	}
-	// Fallback: scan typeDef columns which always have canonical keys.
-	for _, c := range m.typeDef.Columns {
-		if isAgeKey(c.Key) {
-			return c.Key
-		}
-	}
-	return ""
 }
 
 // sortFiltered sorts filteredResources in place based on current sort settings.
 func (m *ResourceListModel) sortFiltered() {
-	if m.sort == SortNone {
+	if m.sortColIdx == SortColNone {
 		return
 	}
 
-	var ageKey string
-	if m.sort == SortAge {
-		ageKey = m.ageFieldKey()
+	cols := m.resolveColumns()
+	if m.sortColIdx >= len(cols) {
+		return
 	}
+
+	col := cols[m.sortColIdx]
 
 	sort.SliceStable(m.filteredResources, func(i, j int) bool {
 		a := m.filteredResources[i]
 		b := m.filteredResources[j]
+
+		// Try raw struct comparison for path-backed columns (gives correct
+		// numeric/time ordering without parsing humanized display strings).
+		// sortPath overrides path when the display path differs from the sort path.
+		rawPath := col.sortPath
+		if rawPath == "" {
+			rawPath = col.path
+		}
+		if rawPath != "" && a.RawStruct != nil && b.RawStruct != nil {
+			if cmp, ok := compareRaw(a.RawStruct, b.RawStruct, rawPath); ok {
+				if m.sortAsc {
+					return cmp < 0
+				}
+				return cmp > 0
+			}
+		}
+
+		// Fall back to display value comparison.
 		var va, vb string
-		switch m.sort {
-		case SortName:
-			va, vb = a.Name, b.Name
-		case SortID:
-			va, vb = a.ID, b.ID
-		case SortAge:
-			va, vb = a.Fields[ageKey], b.Fields[ageKey]
+		if col.sortKey != "" {
+			va = a.Fields[col.sortKey]
+			vb = b.Fields[col.sortKey]
+		} else {
+			va = m.extractCellValue(col, a)
+			vb = m.extractCellValue(col, b)
+		}
+		// Try numeric comparison for plain number strings (e.g. sortKey raw values).
+		if fa, err := strconv.ParseFloat(va, 64); err == nil {
+			if fb, err := strconv.ParseFloat(vb, 64); err == nil {
+				if m.sortAsc {
+					return fa < fb
+				}
+				return fa > fb
+			}
 		}
 		if m.sortAsc {
 			return va < vb

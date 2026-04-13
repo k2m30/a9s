@@ -43,9 +43,7 @@ type Map struct {
 	CloudTrail key.Binding
 
 	// Sort
-	SortByName key.Binding
-	SortByID   key.Binding
-	SortByAge  key.Binding
+	SortByCol [10]key.Binding // 1-9,0 → sort by column position
 
 	// Pagination
 	PageUp   key.Binding
@@ -104,9 +102,18 @@ func Default() Map {
 
 		CloudTrail: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "cloudtrail")),
 
-		SortByName: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "sort name")),
-		SortByID:   key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "sort id")),
-		SortByAge:  key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "sort date")),
+		SortByCol: [10]key.Binding{
+			key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "sort col 1")),
+			key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "sort col 2")),
+			key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "sort col 3")),
+			key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "sort col 4")),
+			key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "sort col 5")),
+			key.NewBinding(key.WithKeys("6"), key.WithHelp("6", "sort col 6")),
+			key.NewBinding(key.WithKeys("7"), key.WithHelp("7", "sort col 7")),
+			key.NewBinding(key.WithKeys("8"), key.WithHelp("8", "sort col 8")),
+			key.NewBinding(key.WithKeys("9"), key.WithHelp("9", "sort col 9")),
+			key.NewBinding(key.WithKeys("0"), key.WithHelp("0", "sort col 10")),
+		},
 
 		PageUp:   key.NewBinding(key.WithKeys("pgup", "ctrl+u", "\x15"), key.WithHelp("pgup", "page up")),
 		PageDown: key.NewBinding(key.WithKeys("pgdown", "ctrl+d", "\x04"), key.WithHelp("pgdn", "page down")),

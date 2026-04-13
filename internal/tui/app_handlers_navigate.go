@@ -37,7 +37,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			rl := views.NewResourceListFromCache(
 				*rt, m.viewConfig, m.keys,
 				entry.resources, entry.pagination,
-				entry.filterText, entry.sortField, entry.sortAsc,
+				entry.filterText, entry.sortColIdx, entry.sortAsc,
 				entry.cursorPos, entry.hScrollOffset,
 				entry.attentionOnly,
 			)
