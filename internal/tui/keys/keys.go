@@ -67,6 +67,9 @@ type Map struct {
 	Search     key.Binding
 	SearchNext key.Binding
 	SearchPrev key.Binding
+
+	// Error log
+	ErrorLog key.Binding
 }
 
 // Default returns the canonical key bindings.
@@ -122,5 +125,7 @@ func Default() Map {
 		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 		SearchNext: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
 		SearchPrev: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match")),
+
+		ErrorLog: key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "error log")),
 	}
 }

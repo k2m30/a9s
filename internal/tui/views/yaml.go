@@ -34,6 +34,8 @@ type YAMLModel struct {
 	height       int
 	keys         keys.Map
 	search       SearchModel
+	rawText      string // non-empty = raw text mode (no YAML marshaling)
+	rawTitle     string // frame title for raw text mode
 }
 
 // NewYAML creates a YAMLModel for the given resource.
@@ -42,6 +44,15 @@ func NewYAML(res resource.Resource, resourceType string, k keys.Map) YAMLModel {
 		res:          res,
 		resourceType: resourceType,
 		keys:         k,
+	}
+}
+
+// NewTextViewer creates a read-only text viewer using the YAML viewport infrastructure.
+func NewTextViewer(title, content string, k keys.Map) YAMLModel {
+	return YAMLModel{
+		rawText:  content,
+		rawTitle: title,
+		keys:     k,
 	}
 }
 
@@ -193,6 +204,9 @@ func (m YAMLModel) SearchInfo() string {
 
 // FrameTitle returns e.g. "i-0abc123 yaml".
 func (m YAMLModel) FrameTitle() string {
+	if m.rawTitle != "" {
+		return m.rawTitle
+	}
 	id := m.res.ID
 	if m.res.Name != "" {
 		id = m.res.Name
@@ -202,6 +216,12 @@ func (m YAMLModel) FrameTitle() string {
 
 // BottomHints implements Hintable for YAMLModel.
 func (m YAMLModel) BottomHints() []layout.KeyHint {
+	if m.rawText != "" {
+		return []layout.KeyHint{
+			{Key: "w", Desc: "Wrap"},
+			{Key: "c", Desc: "Copy"},
+		}
+	}
 	hints := []layout.KeyHint{
 		{Key: "w", Desc: "Wrap"},
 		{Key: "c", Desc: "Copy"},
@@ -214,6 +234,9 @@ func (m YAMLModel) BottomHints() []layout.KeyHint {
 
 // CopyContent returns the raw YAML text for clipboard copy.
 func (m YAMLModel) CopyContent() (string, string) {
+	if m.rawText != "" {
+		return m.rawText, "Copied to clipboard"
+	}
 	content := m.RawContent()
 	if content == "" {
 		return "", ""
@@ -228,6 +251,9 @@ func (m YAMLModel) GetHelpContext() HelpContext {
 
 // RawContent returns the uncolored YAML text for clipboard copy.
 func (m YAMLModel) RawContent() string {
+	if m.rawText != "" {
+		return m.rawText
+	}
 	var data []byte
 	var err error
 
@@ -251,6 +277,9 @@ func (m YAMLModel) ResourceID() string {
 
 // renderContent marshals the resource to YAML and applies syntax coloring.
 func (m YAMLModel) renderContent() string {
+	if m.rawText != "" {
+		return m.rawText
+	}
 	var data []byte
 	var err error
 

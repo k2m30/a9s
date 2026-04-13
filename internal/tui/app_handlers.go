@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -27,6 +28,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.ForceQuit) {
 		return m, tea.Quit
 	}
+
+	// Clear error hint on any keypress.
+	m.showErrorHint = false
 
 	// Handle input modes
 	switch m.inputMode {
@@ -74,6 +78,20 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.identityFetching = true
 		cmd := m.fetchIdentity()
 		return m, cmd
+	}
+	if key.Matches(msg, m.keys.ErrorLog) {
+		if len(m.errorHistory) == 0 {
+			return m.handleFlash(messages.FlashMsg{Text: "No errors this session"})
+		}
+		var sb strings.Builder
+		for i := len(m.errorHistory) - 1; i >= 0; i-- {
+			e := m.errorHistory[i]
+			fmt.Fprintf(&sb, "[%s] %s\n", e.time.Format("15:04:05"), e.message)
+		}
+		tv := views.NewTextViewer("errors", sb.String(), m.keys)
+		tv.SetSize(m.innerSize())
+		m.pushView(&tv)
+		return m, nil
 	}
 	if key.Matches(msg, m.keys.Quit) {
 		return m, tea.Quit
@@ -151,6 +169,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleFlash(msg messages.FlashMsg) (tea.Model, tea.Cmd) {
 	newGen := m.flash.gen + 1
 	m.flash = flashState{text: msg.Text, isError: msg.IsError, active: true, gen: newGen}
+	if msg.IsError {
+		m.errorHistory = append(m.errorHistory, errorEntry{time: time.Now(), message: msg.Text})
+	}
 	gen := m.flash.gen
 	return m, tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
 		return messages.ClearFlashMsg{Gen: gen}
@@ -160,6 +181,9 @@ func (m Model) handleFlash(msg messages.FlashMsg) (tea.Model, tea.Cmd) {
 // handleClearFlash clears the flash if the generation matches (not stale).
 func (m Model) handleClearFlash(msg messages.ClearFlashMsg) (tea.Model, tea.Cmd) {
 	if msg.Gen == m.flash.gen {
+		if m.flash.isError {
+			m.showErrorHint = true
+		}
 		m.flash.active = false
 	}
 	return m, nil
@@ -185,6 +209,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		m.pendingRefresh = false
 		newGen := m.flash.gen + 1
 		m.flash = flashState{text: msg.Err.Error(), isError: true, active: true, gen: newGen}
+		m.errorHistory = append(m.errorHistory, errorEntry{time: time.Now(), message: msg.Err.Error()})
 		gen := m.flash.gen
 		clearFlash := tea.Tick(apiErrorFlashDuration, func(_ time.Time) tea.Msg {
 			return messages.ClearFlashMsg{Gen: gen}
@@ -451,6 +476,7 @@ func (m Model) handleAPIError(msg messages.APIErrorMsg) (tea.Model, tea.Cmd) {
 	}
 	newGen := m.flash.gen + 1
 	m.flash = flashState{text: flashText, isError: true, active: true, gen: newGen}
+	m.errorHistory = append(m.errorHistory, errorEntry{time: time.Now(), message: flashText})
 	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 		rl.ClearLoading()
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -41,6 +42,12 @@ type flashState struct {
 	gen     int // generation counter to avoid stale clears
 }
 
+// errorEntry records a single error for the session error log.
+type errorEntry struct {
+	time    time.Time
+	message string
+}
+
 // resourceCacheEntry stores the state of a previously-viewed resource list.
 // Used to restore the list when the user re-enters the same resource type
 // from the main menu, avoiding redundant API calls.
@@ -73,6 +80,9 @@ type Model struct {
 	inputMode inputMode
 	cmdInput  textinput.Model
 	flash     flashState
+
+	errorHistory  []errorEntry
+	showErrorHint bool
 
 	// Tab-completion cycle state for command mode. tabPrefix is the user's
 	// original input at the start of a cycle; tabMatches are all candidates
@@ -737,7 +747,11 @@ func (m Model) headerRight() string {
 		text := m.flash.text
 		// Truncate to prevent header wrapping (fixes #84).
 		// Reserve ~40 chars for the left side (a9s + version + profile:region + padding).
+		// Errors get more header width; reserve 6 chars minimum for the brand + gap.
 		maxFlash := max(m.width-40, 20)
+		if m.flash.isError {
+			maxFlash = max(m.width-6, 20) // errors get wider display; 6 = innerPad(2)+minLeft(3)+gap(1)
+		}
 		if lipgloss.Width(text) > maxFlash {
 			// Truncate by runes to handle Unicode safely.
 			runes := []rune(text)
@@ -749,6 +763,9 @@ func (m Model) headerRight() string {
 			return styles.FlashError.Render(text)
 		}
 		return styles.FlashSuccess.Render(text)
+	}
+	if m.showErrorHint && len(m.errorHistory) > 0 {
+		return styles.FlashError.Render("! for errors")
 	}
 	if rv, ok := m.activeView().(*views.RevealModel); ok {
 		return rv.HeaderWarning()
