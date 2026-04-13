@@ -1,4 +1,4 @@
-.PHONY: build install test lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint
+.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -16,6 +16,9 @@ install:
 	go install -trimpath -ldflags "$(LDFLAGS)" $(CMD)
 
 test:
+	go test ./tests/unit/ -count=1 -timeout 120s
+
+test-race:
 	go test ./tests/unit/ -count=1 -timeout 120s -race
 
 lint:

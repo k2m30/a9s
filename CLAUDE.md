@@ -40,7 +40,8 @@ specs/           # feature specifications
 ## Commands
 
 - `make build` — build the binary
-- `make test` — run all unit tests (with `-race`)
+- `make test` — run all unit tests (fast, no race detector)
+- `make test-race` — run all unit tests with `-race` (CI and pre-push)
 - `go test ./tests/unit/ -run TestResourceList -count=1 -v` — run a single test by name
 - `make lint` — run golangci-lint (MUST pass locally before any push). Note: do NOT include the `run` subcommand when calling golangci-lint directly — rtk treats it as a package path, causing a spurious `/run: directory not found` error.
 - `make security` — check for known vulnerabilities via govulncheck (MUST pass locally before any push)
@@ -133,7 +134,7 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
-- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. CI is not a debugging tool.
+- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. Run `make test-race` for pre-push race detection. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
