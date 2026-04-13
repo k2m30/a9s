@@ -198,8 +198,24 @@ func (m HelpModel) buildGroups() []helpGroup {
 	}
 }
 
+func (m HelpModel) commandsGroup() helpGroup {
+	return helpGroup{
+		title: "COMMANDS",
+		bindings: []helpBinding{
+			{":q", "exit"},
+			{":ctx", "switch profile"},
+			{":profile", "switch profile"},
+			{":region", "switch region"},
+			{":theme", "switch theme"},
+			{":root", "main menu"},
+			{":main", "main menu"},
+			{":<res>", "e.g. :ec2 :s3 :lambda"},
+		},
+	}
+}
+
 func (m HelpModel) mainMenuGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "NAVIGATION",
 			bindings: []helpBinding{
@@ -229,6 +245,7 @@ func (m HelpModel) mainMenuGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
@@ -282,11 +299,11 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 		},
 	}
 
-	return []helpGroup{nav, actions, sortGroup, other}
+	return append([]helpGroup{nav, actions, sortGroup, other}, m.commandsGroup())
 }
 
 func (m HelpModel) detailGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "SCROLL",
 			bindings: []helpBinding{
@@ -335,10 +352,11 @@ func (m HelpModel) detailGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 func (m HelpModel) yamlGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "SCROLL",
 			bindings: []helpBinding{
@@ -372,10 +390,11 @@ func (m HelpModel) yamlGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 func (m HelpModel) jsonGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "SCROLL",
 			bindings: []helpBinding{
@@ -409,10 +428,11 @@ func (m HelpModel) jsonGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 func (m HelpModel) selectorGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "NAVIGATION",
 			bindings: []helpBinding{
@@ -437,10 +457,11 @@ func (m HelpModel) selectorGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 func (m HelpModel) revealGroups() []helpGroup {
-	return []helpGroup{
+	groups := []helpGroup{
 		{
 			title: "ACTIONS",
 			bindings: []helpBinding{
@@ -457,6 +478,7 @@ func (m HelpModel) revealGroups() []helpGroup {
 			},
 		},
 	}
+	return append(groups, m.commandsGroup())
 }
 
 // CopyContent returns empty — nothing to copy from the help view.

@@ -20,6 +20,10 @@ import (
 // handleNavigate pushes the appropriate view onto the stack.
 func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	switch msg.Target {
+	case messages.TargetMainMenu:
+		m.stack = m.stack[:1]
+		return m, nil
+
 	case messages.TargetResourceList:
 		rt := resource.FindResourceType(msg.ResourceType)
 		if rt == nil {
