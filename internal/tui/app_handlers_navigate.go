@@ -21,7 +21,8 @@ import (
 func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	switch msg.Target {
 	case messages.TargetMainMenu:
-		m.stack = m.stack[:1]
+		for m.popView() {
+		}
 		return m, nil
 
 	case messages.TargetResourceList:

@@ -197,7 +197,7 @@ func TestQA_HelpContext_MainMenu_CommandsSectionContent(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
 
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("main menu help COMMANDS section should contain %q, got:\n%s", entry, plain)
@@ -237,7 +237,7 @@ func TestQA_HelpContext_Detail_ShowsCommandsSection(t *testing.T) {
 	if !strings.Contains(strings.ToLower(plain), "commands") {
 		t.Errorf("detail help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("detail help COMMANDS section should contain %q, got:\n%s", entry, plain)
@@ -255,7 +255,7 @@ func TestQA_HelpContext_YAML_ShowsCommandsSection(t *testing.T) {
 	if !strings.Contains(strings.ToLower(plain), "commands") {
 		t.Errorf("yaml help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("yaml help COMMANDS section should contain %q, got:\n%s", entry, plain)
@@ -273,7 +273,7 @@ func TestQA_HelpContext_JSON_ShowsCommandsSection(t *testing.T) {
 	if !strings.Contains(strings.ToLower(plain), "commands") {
 		t.Errorf("json help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("json help COMMANDS section should contain %q, got:\n%s", entry, plain)
@@ -291,7 +291,7 @@ func TestQA_HelpContext_Selector_ShowsCommandsSection(t *testing.T) {
 	if !strings.Contains(strings.ToLower(plain), "commands") {
 		t.Errorf("selector help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("selector help COMMANDS section should contain %q, got:\n%s", entry, plain)
@@ -309,7 +309,7 @@ func TestQA_HelpContext_Reveal_ShowsCommandsSection(t *testing.T) {
 	if !strings.Contains(strings.ToLower(plain), "commands") {
 		t.Errorf("reveal help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
-	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":root", ":main"}
+	mustContain := []string{":q", ":ctx", ":profile", ":region", ":theme", ":help", ":root", ":main"}
 	for _, entry := range mustContain {
 		if !strings.Contains(plain, entry) {
 			t.Errorf("reveal help COMMANDS section should contain %q, got:\n%s", entry, plain)

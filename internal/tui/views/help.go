@@ -207,6 +207,7 @@ func (m HelpModel) commandsGroup() helpGroup {
 			{":profile", "switch profile"},
 			{":region", "switch region"},
 			{":theme", "switch theme"},
+			{":help", "show help"},
 			{":root", "main menu"},
 			{":main", "main menu"},
 			{":<res>", "e.g. :ec2 :s3 :lambda"},
