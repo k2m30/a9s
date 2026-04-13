@@ -4,16 +4,9 @@
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), yaml.v3 (012-ct-events-list-redesign)
-- N/A (in-memory `Resource.Fields` map; YAML view config on disk) (012-ct-events-list-redesign)
-- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (`service/cloudtrail`), `encoding/json` (stdlib) (013-ct-event-detail-v2)
-- N/A (in-memory parsed event held only for the duration of one detail-view open) (013-ct-event-detail-v2)
-- Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services) (014-demo-transport-mock)
-- In-process fixture store (per resource type, loaded at startup) (014-demo-transport-mock)
-- Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services) (015-ct-events-all-types)
-- Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2) + Lipgloss v2 (color types), yaml.v3 (config + custom themes) (016-color-themes)
-- YAML files on disk (~/.a9s/config.yaml, ~/.a9s/themes/*.yaml) (016-color-themes)
+- Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
+- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
+- In-process demo fixture store (per resource type, loaded at startup)
 
 ## Project Structure
 
@@ -68,26 +61,6 @@ specs/           # feature specifications
 
 ## CodeRabbit (AI Code Reviewer)
 
-CodeRabbit is configured via `.coderabbit.yaml` in the repo root. Free for open-source (public repos).
-
-**Configuration:**
-- Profile: assertive (strict reviews, no poems/sequence diagrams)
-- Path-specific review instructions for each layer (tui, aws, resource, demo, tests, config)
-- Knowledge base points to `docs/architecture.md` and `docs/go-codebase-checklist.md`
-- `CLAUDE.md` is auto-detected
-- Only Go-relevant tools enabled (golangci-lint, shellcheck, yamllint, markdownlint, actionlint, gitleaks)
-- All non-Go tools explicitly disabled
-- Auto-review on PRs targeting main; skips WIP/draft
-
-**PR commands:**
-- `@coderabbitai review` — trigger a review manually
-- `@coderabbitai ignore` — pause reviews on a PR (saves free-tier hours)
-- `@coderabbitai configuration` — show active config with any parse errors
-- `@coderabbitai resolve` — resolve all CodeRabbit review comments
-- `@coderabbitai plan` — generate a plan from an issue
-
-**Cost management (open-source free tier):**
-- Rate limit: 200 files/hour, 3 back-to-back reviews then 4/hour
 - Use `@coderabbitai ignore` on PRs where you don't need further review
 - Use `[skip ci]` in commit messages for trivial follow-ups (CodeRabbit still reviews unless ignored)
 - CodeRabbit reviews are triggered per-push, not per-commit — batch small fixes into one push
@@ -100,10 +73,6 @@ CodeRabbit is configured via `.coderabbit.yaml` in the repo root. Free for open-
 - **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
 - **Message-driven** — views communicate via typed messages, never import each other
 - **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`
-
-## Code Style
-
-Go 1.26+: Follow standard conventions
 
 ## Skills
 
@@ -132,42 +101,13 @@ Go 1.26+: Follow standard conventions
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 
-## Related-View Architecture
-
-The right-column related panel is data-driven via `RelatedDef` and `NavigableField` on each resource type:
-
-```go
-type RelatedDef struct {
-    TargetType       string         // target resource short name (e.g., "vpc")
-    DisplayName      string         // display label in the right column
-    Checker          RelatedChecker // async checker function
-    NeedsTargetCache bool           // true if checker reads target type from ResourceCache (Pattern C)
-}
-
-type NavigableField struct {
-    FieldPath  string // dot-path into resource fields (e.g., "VpcId")
-    TargetType string // resource type to navigate to
-}
-```
-
-Key registries:
-- `resource.RegisterRelated(shortName, []RelatedDef{...})` — registers related checkers
-- `resource.RegisterNavigableFields(shortName, []NavigableField{...})` — registers navigable fields
-- `resource.RegisterRelatedDemo(shortName, func)` — registers demo-mode checker override
-
-Adding a new related view requires **NO changes** to `app.go`, `detail.go`, `app_related.go`, or `messages.go`. All dispatch, rendering, and navigation are generic.
-
-ContextKeys resolution for related navigation (parallel to ChildView ContextKeys):
-- `"ID"` → `Resource.ID`
-- `"Name"` → `Resource.Name`
-- `"@parent.x"` → inherited from parent context key `x`
-- anything else → `Resource.Fields[key]`
 
 ## Agent File Access Rules
 
 Agents MUST use targeted file access — never broad globs on large directories.
 
 ### DO
+- Use Explore agent wherever reasonable
 - `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
 - `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
 - `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
@@ -186,13 +126,6 @@ Agents MUST use targeted file access — never broad globs on large directories.
 When a single task would require reading 5+ files totaling >500 lines, OR when you need to trace a feature across multiple packages (fetcher → view → related → test), dispatch an `Explore` agent and ask for a summarized report rather than reading everything into main context. Direct Grep/Glob/Read remain correct for targeted lookups (known file, specific symbol, < 3 queries). This protects the main context window for synthesis and decision-making.
 
 #### Per-service fixture files are here (`internal/demo/fixtures/`)
-
-## Bash Command Rules
-
-- **Never chain bash commands** with `&&`, `;`, `|`, or `cd`. Always use single, standalone commands with absolute paths.
-- **Never use `git -C <dir>`** flag. `cd` into the directory first as a standalone command, then run git commands separately.
-- **Never use `$()` or backticks** in bash commands. Resolve values first, write intermediates to `$TMPDIR` files, read them in subsequent commands.
-- **Commit messages**: write to `$TMPDIR/msg.txt` with the Write tool, then `git commit -F $TMPDIR/msg.txt` as a standalone command.
 
 ## Rules
 
@@ -226,9 +159,3 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
-
-
-## Recent Changes
-- 016-color-themes: Added Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2) + Lipgloss v2 (color types), yaml.v3 (config + custom themes)
-- 015-ct-events-all-types: Added Go 1.26+ (Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2) + AWS SDK Go v2 (CloudTrail, all current services)
-- 014-demo-transport-mock: Added Go 1.26+ + charm.land/bubbletea v2.0.2, charm.land/lipgloss v2.0.2, charm.land/bubbles v2, AWS SDK Go v2 (all currently used services)
