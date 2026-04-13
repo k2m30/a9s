@@ -17,6 +17,127 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
+// flattenTagItems post-processes field items to render tag sections as
+// flat Key: Value pairs instead of verbose Key/Value struct sub-fields.
+// Only sections with Path "Tags" or "TagList" are flattened.
+// YAML/JSON views are unaffected because they don't use fieldList.
+func flattenTagItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
+	if len(items) == 0 {
+		return items
+	}
+	result := make([]fieldpath.FieldItem, 0, len(items))
+	i := 0
+	for i < len(items) {
+		item := items[i]
+		// Only flatten tag section headers.
+		if item.IsHeader && (item.Path == "Tags" || item.Path == "TagList") {
+			result = append(result, item)
+			i++
+			parentPath := item.Path
+			// Collect all sub-fields belonging to this header.
+			var subs []fieldpath.FieldItem
+			for i < len(items) && items[i].IsSubField && items[i].Path == parentPath {
+				subs = append(subs, items[i])
+				i++
+			}
+			if len(subs) == 0 {
+				// Empty tag section — leave header as-is, nothing to flatten.
+				continue
+			}
+			// Detect simple Key/Value struct-list format: every field in the struct
+			// must be either "Key" or "Value". If any element has additional metadata
+			// (e.g., ASG TagDescription with PropagateAtLaunch), skip flattening to
+			// preserve that information.
+			isSimpleTagList := false
+			hasExtraFields := false
+			for _, sub := range subs {
+				trimmed := strings.TrimSpace(sub.Value)
+				if rest, ok := strings.CutPrefix(trimmed, "- "); ok {
+					k, _, hasSep := strings.Cut(rest, ":")
+					if hasSep && strings.EqualFold(strings.TrimSpace(k), "key") {
+						isSimpleTagList = true
+					}
+				} else {
+					k, _, hasSep := strings.Cut(trimmed, ":")
+					if hasSep {
+						field := strings.ToLower(strings.TrimSpace(k))
+						if field != "key" && field != "value" {
+							hasExtraFields = true
+						}
+					}
+				}
+			}
+			if !isSimpleTagList || hasExtraFields {
+				// Not a simple Key/Value tag list, or has extra metadata — pass through.
+				result = append(result, subs...)
+				continue
+			}
+			// Parse the YAML struct-list lines to extract Key/Value tag pairs.
+			var currentKey string
+			emitPending := func() {
+				if currentKey != "" {
+					result = append(result, fieldpath.FieldItem{
+						IsSubField:  true,
+						IndentLevel: 1,
+						Key:         currentKey,
+						Value:       "",
+						Path:        parentPath,
+					})
+					currentKey = ""
+				}
+			}
+			for _, sub := range subs {
+				line := sub.Value
+				trimmed := strings.TrimSpace(line)
+				if trimmed == "" {
+					continue
+				}
+				// Detect new list element: starts with "- "
+				if rest, ok := strings.CutPrefix(trimmed, "- "); ok {
+					// Flush any pending key without a Value line (nil Value).
+					emitPending()
+					k, v, hasSep := strings.Cut(rest, ":")
+					if !hasSep {
+						continue
+					}
+					k = strings.TrimSpace(k)
+					v = strings.TrimSpace(v)
+					// Only handle the "Key:" line of a tag struct element.
+					if strings.EqualFold(k, "key") {
+						currentKey = v
+					}
+				} else {
+					// Continuation line: "  Value: Y" or other fields (PropagateAtLaunch, etc.)
+					k, v, hasSep := strings.Cut(trimmed, ":")
+					if !hasSep {
+						continue
+					}
+					k = strings.TrimSpace(k)
+					v = strings.TrimSpace(v)
+					if strings.EqualFold(k, "value") && currentKey != "" {
+						// Emit flat tag item.
+						result = append(result, fieldpath.FieldItem{
+							IsSubField:  true,
+							IndentLevel: 1,
+							Key:         currentKey,
+							Value:       v,
+							Path:        parentPath,
+						})
+						currentKey = ""
+					}
+					// Ignore extra fields (PropagateAtLaunch, ResourceId, etc.)
+				}
+			}
+			// Flush final pending key (last tag had nil Value).
+			emitPending()
+			continue
+		}
+		result = append(result, item)
+		i++
+	}
+	return result
+}
+
 // buildFieldList computes m.fieldList from the view config and navigable field registry.
 // Sets m.fieldList to nil when no config or detail paths are available (falls through to renderFromConfig).
 // After calling ExtractFieldList, post-processes sub-fields to mark navigable ones:
@@ -81,13 +202,13 @@ func (m *DetailModel) buildFieldList() {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		m.fieldList = fieldpath.ExtractFieldList(nil, fields, keys, nil)
+		m.fieldList = flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil))
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
 		return
 	}
-	items := fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)
+	items := flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap))
 	// Post-process: annotate sub-fields that match a navigable path.
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
 	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId
