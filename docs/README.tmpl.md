@@ -26,16 +26,20 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 - **66 AWS resource types** across 12 service categories
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
+- Auto-detect and pretty-print JSON in detail and reveal views
+- AWS tags flattened as `Key: Value` pairs in detail views for easy reading
 - Multi-profile and multi-region support
 - Categorized menu (Compute, Storage, Database, Network, Security, CI/CD, and more)
-- Column sorting by name, ID, or date
+- Column sorting by name, ID, date, or any column position (`1`-`0` keys)
 - Filter/search within resource lists
 - Horizontal scrolling for wide tables
 - Clipboard support (copy resource IDs and YAML)
 - 11 built-in color themes (Tokyo Night Dark default, Dracula, Nord, Catppuccin, and more) with custom theme support
 - Child view drill-downs (Listeners, Log Streams, Invocations, Tasks, Events, and more)
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
-- 8,600+ unit tests
+- Session error log with `!` key — timestamped, scrollable, searchable
+- Command mode (`:`) with profile/region switching, navigation, and tab completion
+- 8,700+ unit tests
 
 ## Installation
 
