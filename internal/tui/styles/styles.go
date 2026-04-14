@@ -210,7 +210,7 @@ func initStyles() {
 		"timed_out": true, "unhealthy": true, "unavailable": true, "alarm": true,
 		"expired": true, "revoked": true, "rejected": true, "pendingdeletion": true,
 		"rollback_complete": true, "import_rollback_complete": true, "red": true,
-		"deregistered": true, "impaired": true, "ct-danger": true,
+		"deregistered": true, "impaired": true,
 		// --- Yellow (ColPending) ---
 		"pending": true, "stopping": true, "creating": true, "modifying": true,
 		"updating": true, "draining": true, "initial": true, "insufficient_data": true,
@@ -218,7 +218,11 @@ func initStyles() {
 		"rebooting_broker": true, "maintenance": true, "rebooting": true, "resizing": true,
 		"pendingimport": true, "pendingacceptance": true, "yellow": true,
 		"temporary_failure": true, "recovering": true, "recoverable": true,
-		"initializing": true, "ct-attention": true, "pending_redrive": true,
+		"initializing": true, "pending_redrive": true,
+		// NOTE: ct-attention and ct-danger are NOT in issueStatusSet. They are
+		// CloudTrail event severity levels, not resource health states. They
+		// should render colored in event lists but not count as "resource issues"
+		// on the main menu badge.
 	}
 
 	if NoColorActive() {

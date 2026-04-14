@@ -356,8 +356,9 @@ func (m ResourceListModel) FrameTitle() string {
 	var title string
 	switch {
 	case hasTextFilter && isAttention:
-		// text filter + ctrl+z: name(filtered/N of total) [!]
-		title = name + "(" + itoa(filtered) + "/" + itoa(len(m.filteredResources)-filtered+filtered) + " of " + totalStr + ")"
+		// text filter + ctrl+z: name(filtered of total) [!]
+		// filtered is already the intersection of both filters
+		title = name + "(" + itoa(filtered) + " of " + totalStr + ")"
 	case hasTextFilter:
 		// text filter only: name(filtered/total) — no issue badge
 		title = name + "(" + itoa(filtered) + "/" + totalStr + ")"
