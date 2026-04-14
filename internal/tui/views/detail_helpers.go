@@ -322,6 +322,16 @@ func (m DetailModel) SourceResource() resource.Resource {
 	return m.res
 }
 
+// SetEnrichmentFinding sets (or clears) the enrichment finding for this resource.
+// A nil value clears any existing finding (recovery case). Setting a new value
+// invalidates the field list and triggers a viewport re-render so the "Background
+// Check" section appears or disappears immediately.
+func (m *DetailModel) SetEnrichmentFinding(f *resource.EnrichmentFinding) {
+	m.enrichmentFinding = f
+	m.fieldList = nil // force rebuild on next render
+	m.refreshViewportContent()
+}
+
 // NeedsRelatedCheck returns true when the right column was auto-shown
 // and checkers have not yet been dispatched. The root model checks this
 // after pushing the detail view to emit RelatedCheckStartedMsg.

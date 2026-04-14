@@ -415,27 +415,44 @@ func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 }
 
 // ===========================================================================
-// REDIS-DETAIL-04: Redis detail status coloring
+// REDIS-DETAIL-04: Redis detail status coloring (per-type Color func)
 // ===========================================================================
 
 func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	// Verify the style system maps "available" -> green (ColRunning)
-	availableStyle := styles.RowColorStyle("available")
+	// Redis Color func reads Fields["status"].
+	td := resource.FindResourceType("redis")
+	if td == nil {
+		t.Fatal("redis resource type not found")
+	}
+	if td.Color == nil {
+		t.Fatal("redis Color func is nil")
+	}
+
+	redisRes := func(status string) resource.Resource {
+		return resource.Resource{
+			ID:     "cache-001",
+			Status: status,
+			Fields: map[string]string{"status": status},
+		}
+	}
+
+	availableStyle := styles.ColorStyle(td.Color(redisRes("available")))
 	if availableStyle.GetForeground() != styles.ColRunning {
-		t.Errorf("expected 'available' to map to ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
+		t.Errorf("redis 'available': expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.RowColorStyle("creating")
+	creatingStyle := styles.ColorStyle(td.Color(redisRes("creating")))
 	if creatingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("expected 'creating' to map to ColPending (#e0af68), got %v", creatingStyle.GetForeground())
+		t.Errorf("redis 'creating': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
-	deletingStyle := styles.RowColorStyle("deleting")
-	if deletingStyle.GetForeground() != styles.ColStopped {
-		t.Errorf("expected 'deleting' to map to ColStopped (#f7768e), got %v", deletingStyle.GetForeground())
+	// Per spec: redis deleting → Warning (not Broken).
+	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting")))
+	if deletingStyle.GetForeground() != styles.ColPending {
+		t.Errorf("redis 'deleting': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
 	}
 }
 

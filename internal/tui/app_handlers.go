@@ -337,6 +337,9 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.enrichQueue = nil                                    // clear pending enrichment queue
 	m.probeResources = nil                                 // clear retained resources (stale context)
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
+	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
+	m.enrichmentRan = make(map[string]bool)
+	m.enrichmentTypeGen = make(map[string]int)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}
@@ -370,6 +373,9 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	m.enrichQueue = nil                                    // clear pending enrichment queue
 	m.probeResources = nil                                 // clear retained resources (stale context)
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
+	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
+	m.enrichmentRan = make(map[string]bool)
+	m.enrichmentTypeGen = make(map[string]int)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}

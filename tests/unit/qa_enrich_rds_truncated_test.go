@@ -1,8 +1,10 @@
 package unit
 
 // qa_enrich_rds_truncated_test.go — Tests that EnrichRDSDocDBMaintenance
-// correctly reports truncated=true when the DescribePendingMaintenanceActions
+// correctly reports Truncated=true when the DescribePendingMaintenanceActions
 // response has a non-nil Marker (pagination continuation token).
+//
+// Updated for EnricherResult return type: result, err := EnrichRDSDocDBMaintenance(...).
 
 import (
 	"context"
@@ -41,15 +43,15 @@ func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	probeResources := []resource.Resource{{ID: "prod-db"}}
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 1 {
-		t.Errorf("count = %d, want 1", count)
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1", len(result.Findings))
 	}
-	if truncated {
-		t.Error("truncated = true, want false (no Marker)")
+	if result.Truncated {
+		t.Error("Truncated = true, want false (no Marker)")
 	}
 }
 
@@ -67,15 +69,15 @@ func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
 		{ID: "prod-db-1"},
 		{ID: "prod-db-2"},
 	}
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 2 {
-		t.Errorf("count = %d, want 2", count)
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2", len(result.Findings))
 	}
-	if !truncated {
-		t.Error("truncated = false, want true (Marker is non-nil)")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (Marker is non-nil)")
 	}
 }
 
@@ -86,25 +88,25 @@ func TestEnrichRDSDocDBMaintenance_ZeroActionsNotTruncated(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 0 {
-		t.Errorf("count = %d, want 0", count)
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
 	}
-	if truncated {
-		t.Error("truncated = true, want false (empty response)")
+	if result.Truncated {
+		t.Error("Truncated = true, want false (empty response)")
 	}
 }
 
 func TestEnrichRDSDocDBMaintenance_NilClients(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: nil}
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 0 || truncated {
-		t.Errorf("nil RDS client: count=%d truncated=%v, want 0/false", count, truncated)
+	if len(result.Findings) != 0 || result.Truncated {
+		t.Errorf("nil RDS client: len(Findings)=%d Truncated=%v, want 0/false", len(result.Findings), result.Truncated)
 	}
 }

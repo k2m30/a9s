@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -489,11 +490,18 @@ func (m *ResourceListModel) applyFilter() {
 	}
 	result := FilterResources(m.filterText, base)
 
-	// §7 attention filter — hide dim rows when toggle is on.
+	// §7 attention filter — show only attention-worthy rows when toggle is on.
+	// "Attention-worthy" = issue-colored rows (stopped/failed/pending/etc. that
+	// feed the "N issues" badge) PLUS ct-event severities (ct-attention /
+	// ct-danger). Previously this used !IsDimRowColor which kept healthy
+	// running rows too, producing a "25 of 27 [!]" display when the badge
+	// claimed "11 issues" on the same data — a user-visible inconsistency.
+	// The badge-count invariant: on any resource list showing "N issues",
+	// ctrl+z reveals exactly N rows.
 	if m.IsEnabled() {
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
-			if !styles.IsDimRowColor(r.Status) {
+			if m.typeDef.ResolveColor(r).IsIssue() {
 				kept = append(kept, r)
 			}
 		}
@@ -506,11 +514,59 @@ func (m *ResourceListModel) applyFilter() {
 	// Recompute issue count from allResources (not filtered — represents the full page).
 	ic := 0
 	for _, r := range m.allResources {
-		if styles.IsIssueRowColor(r.Status) {
+		if m.typeDef.ResolveColor(r).IsIssue() {
 			ic++
 		}
 	}
 	m.issueCount = ic
+
+	// Recompute visible finding count from filteredResources (severity-agnostic).
+	vfc := 0
+	for _, r := range m.filteredResources {
+		if _, ok := m.findingsByID[r.ID]; ok {
+			vfc++
+		}
+	}
+	m.visibleFindingCount = vfc
+}
+
+// renderEnrichmentBanner returns a styled banner line when all three conditions hold:
+//  1. len(findingsByID) > 0 (severity-agnostic — includes ~ findings that don't count in menu badge)
+//  2. enrichmentRanThisSession is true (Wave 2 completed for this type)
+//  3. visibleIssueCount == 0 (no issue-colored rows visible in the filtered set)
+//
+// Returns an empty string when the banner should not be shown.
+func (m *ResourceListModel) renderEnrichmentBanner() string {
+	findingCount := len(m.findingsByID)
+	if findingCount == 0 || !m.enrichmentRanThisSession {
+		return ""
+	}
+	// Compute visible issue count from filtered resources.
+	visibleIssueCount := 0
+	for _, r := range m.filteredResources {
+		if m.typeDef.ResolveColor(r).IsIssue() {
+			visibleIssueCount++
+		}
+	}
+	if visibleIssueCount > 0 {
+		return ""
+	}
+
+	// Format N or N+ depending on truncation.
+	n := itoa(findingCount)
+	if m.enrichmentTruncated {
+		n += "+"
+	}
+
+	// Select long or short text based on visibleFindingCount.
+	var text string
+	if m.visibleFindingCount > 0 {
+		text = "⚠ " + n + " issues detected by background checks"
+	} else {
+		text = "⚠ " + n + " issues detected by background checks — not visible on this page"
+	}
+
+	return lipgloss.NewStyle().Foreground(styles.ColStopped).PaddingLeft(1).Render(text)
 }
 
 // FilterResources returns resources matching the query (case-insensitive).

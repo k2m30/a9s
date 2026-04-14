@@ -2,24 +2,26 @@ package unit
 
 // qa_probe_issue_count_test.go — T011: issue counting logic for availability probe.
 //
-// Tests the counting logic that will be used inside probeResourceAvailability
-// to populate AvailabilityCheckedMsg.Issues. Since the probe itself makes AWS
-// calls, we test the counting logic directly via styles.IsIssueRowColor.
+// Tests the counting logic used inside probeResourceAvailability to populate
+// AvailabilityCheckedMsg.Issues. Post-refactor, counting is per-type via
+// td.Color(r).IsIssue() (and ExcludeFromIssueBadge for badge-exempt types).
 
 import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
-// countIssueRowsInResources counts resources where IsIssueRowColor returns true.
-// This mirrors the logic that will be used inside probeResourceAvailability
-// to populate the Issues field of AvailabilityCheckedMsg.
-func countIssueRowsInResources(resources []resource.Resource) int {
+// countIssueRowsForType counts resources where td.Color(r).IsIssue() returns true,
+// excluding types with ExcludeFromIssueBadge set (they don't contribute to badge counts).
+// This mirrors the logic inside probeResourceAvailability.
+func countIssueRowsForType(td *resource.ResourceTypeDef, resources []resource.Resource) int {
+	if td == nil || td.Color == nil || td.ExcludeFromIssueBadge {
+		return 0
+	}
 	count := 0
 	for _, r := range resources {
-		if styles.IsIssueRowColor(r.Status) {
+		if td.Color(r).IsIssue() {
 			count++
 		}
 	}
@@ -27,62 +29,65 @@ func countIssueRowsInResources(resources []resource.Resource) int {
 }
 
 // ---------------------------------------------------------------------------
-// TestCountIssueRowsInResources
+// TestCountIssueRowsForType_EC2
 // ---------------------------------------------------------------------------
 
-// TestCountIssueRowsInResources verifies the counting logic across mixed
-// resource statuses, matching what the probe will compute.
-func TestCountIssueRowsInResources(t *testing.T) {
+// TestCountIssueRowsForType_EC2 verifies the counting logic for EC2 instances.
+// EC2 issue classification reads Fields["state"] and status fields, not Resource.Status.
+func TestCountIssueRowsForType_EC2(t *testing.T) {
+	td := resource.FindResourceType("ec2")
+	if td == nil {
+		t.Fatal("ec2 resource type not found")
+	}
+
 	tests := []struct {
 		name      string
 		resources []resource.Resource
 		want      int
 	}{
 		{
-			name: "mixed statuses: only red and yellow counted",
+			name: "mixed ec2 statuses: only stopped/pending counted",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "running"},    // green — not issue
-				{ID: "r-002", Status: "stopped"},    // red — issue
-				{ID: "r-003", Status: "pending"},    // yellow — issue
-				{ID: "r-004", Status: "terminated"}, // dim — not issue
-				{ID: "r-005", Status: "failed"},     // red — issue
+				{ID: "i-001", Fields: map[string]string{"state": "running"}},    // Healthy
+				{ID: "i-002", Fields: map[string]string{"state": "stopped"}},    // Broken — issue
+				{ID: "i-003", Fields: map[string]string{"state": "pending"}},    // Warning — issue
+				{ID: "i-004", Fields: map[string]string{"state": "terminated"}}, // Dim
+				{ID: "i-005", Fields: map[string]string{"state": "stopping"}},   // Broken — issue
 			},
-			want: 3, // stopped + pending + failed
+			want: 3, // stopped + pending + stopping
 		},
 		{
-			name: "all healthy (running)",
+			name: "all healthy running",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "running"},
-				{ID: "r-002", Status: "running"},
+				{ID: "i-001", Fields: map[string]string{"state": "running"}},
+				{ID: "i-002", Fields: map[string]string{"state": "running"}},
 			},
 			want: 0,
 		},
 		{
-			name: "all red (stopped)",
+			name: "all stopped",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "stopped"},
-				{ID: "r-002", Status: "stopped"},
-				{ID: "r-003", Status: "stopped"},
+				{ID: "i-001", Fields: map[string]string{"state": "stopped"}},
+				{ID: "i-002", Fields: map[string]string{"state": "stopped"}},
+				{ID: "i-003", Fields: map[string]string{"state": "stopped"}},
 			},
 			want: 3,
 		},
 		{
-			name: "yellow statuses (creating, updating, draining)",
+			name: "impaired running instance (system_status=impaired)",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "creating"},
-				{ID: "r-002", Status: "updating"},
-				{ID: "r-003", Status: "draining"},
+				{ID: "i-001", Fields: map[string]string{"state": "running", "system_status": "impaired"}},
+				{ID: "i-002", Fields: map[string]string{"state": "running", "system_status": "ok"}},
 			},
-			want: 3,
+			want: 1,
 		},
 		{
-			name: "suffix-matched issue statuses",
+			name: "initializing instance (instance_status=initializing)",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "deploy_failed"},
-				{ID: "r-002", Status: "update_in_progress"},
-				{ID: "r-003", Status: "running"}, // not an issue
+				{ID: "i-001", Fields: map[string]string{"state": "running", "instance_status": "initializing"}},
+				{ID: "i-002", Fields: map[string]string{"state": "running"}},
 			},
-			want: 2, // deploy_failed + update_in_progress
+			want: 1,
 		},
 		{
 			name: "empty list",
@@ -90,43 +95,57 @@ func TestCountIssueRowsInResources(t *testing.T) {
 			want:      0,
 		},
 		{
-			name: "single healthy resource",
+			name: "terminated and shutting-down are not issues (dim)",
 			resources: []resource.Resource{
-				{ID: "r-001", Status: "running"},
+				{ID: "i-001", Fields: map[string]string{"state": "terminated"}},
+				{ID: "i-002", Fields: map[string]string{"state": "shutting-down"}},
 			},
 			want: 0,
-		},
-		{
-			name: "single issue resource",
-			resources: []resource.Resource{
-				{ID: "r-001", Status: "stopped"},
-			},
-			want: 1,
-		},
-		{
-			name: "terminated and deleted are red (issues)",
-			resources: []resource.Resource{
-				{ID: "r-001", Status: "terminated"}, // dim — not issue
-				{ID: "r-002", Status: "deleted"},    // red — issue
-			},
-			want: 1, // only deleted
-		},
-		{
-			name: "error status is an issue",
-			resources: []resource.Resource{
-				{ID: "r-001", Status: "error"},
-				{ID: "r-002", Status: "available"}, // green-ish — not issue
-			},
-			want: 1,
 		},
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			got := countIssueRowsInResources(tc.resources)
+			got := countIssueRowsForType(td, tc.resources)
 			if got != tc.want {
-				t.Errorf("countIssueRowsInResources() = %d, want %d", got, tc.want)
+				t.Errorf("countIssueRowsForType(ec2, ...) = %d, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestCountIssueRowsForType_ExcludeFromIssueBadge verifies that types with
+// ExcludeFromIssueBadge set (e.g. ct-events) always return 0 from the counter,
+// even when they have Broken/Warning rows.
+func TestCountIssueRowsForType_ExcludeFromIssueBadge(t *testing.T) {
+	td := resource.FindResourceType("ct-events")
+	if td == nil {
+		t.Fatal("ct-events resource type not found")
+	}
+	if !td.ExcludeFromIssueBadge {
+		t.Fatal("ct-events: ExcludeFromIssueBadge must be true for this test to be meaningful")
+	}
+
+	resources := []resource.Resource{
+		{ID: "evt-0001", Status: "ct-danger"},
+		{ID: "evt-0002", Status: "ct-attention"},
+		{ID: "evt-0003", Status: "ct-info"},
+	}
+
+	got := countIssueRowsForType(td, resources)
+	if got != 0 {
+		t.Errorf("countIssueRowsForType(ct-events, ...) = %d, want 0 (ExcludeFromIssueBadge=true)", got)
+	}
+}
+
+// TestCountIssueRowsForType_NilTypeDef guards against nil type def.
+func TestCountIssueRowsForType_NilTypeDef(t *testing.T) {
+	resources := []resource.Resource{
+		{ID: "r-001", Status: "stopped"},
+	}
+	got := countIssueRowsForType(nil, resources)
+	if got != 0 {
+		t.Errorf("countIssueRowsForType(nil, ...) = %d, want 0", got)
 	}
 }

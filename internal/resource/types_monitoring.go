@@ -16,6 +16,17 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "namespace", Title: "Namespace", Width: 24, Sortable: true},
 				{Key: "threshold", Title: "Threshold", Width: 12, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state_value"] {
+				case "OK":
+					return ColorHealthy
+				case "ALARM":
+					return ColorBroken
+				case "INSUFFICIENT_DATA":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "alarm_history",
 				Key:            "enter",
@@ -35,6 +46,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "log_streams",
 				Key:            "enter",
@@ -54,6 +66,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "home_region", Title: "Home Region", Width: 16, Sortable: true},
 				{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:      "CloudTrail Events",
@@ -69,6 +82,16 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "resource_name", Title: "Resource Name", Width: 24, Sortable: true},
 				{Key: "read_only", Title: "Read Only", Width: 10, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Status {
+				case "ct-danger":
+					return ColorBroken
+				case "ct-attention":
+					return ColorWarning
+				}
+				return ColorDim
+			},
+			ExcludeFromIssueBadge: true,
 		},
 	}
 }

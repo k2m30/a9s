@@ -16,6 +16,17 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "active":
+					return ColorHealthy
+				case "provisioning":
+					return ColorWarning
+				case "failed", "active_impaired":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "elb_listeners",
 				Key:            "enter",
@@ -37,6 +48,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "target_type", Title: "Target Type", Width: 12, Sortable: true},
 				{Key: "health_check_path", Title: "Health Check", Width: 24, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "tg_health",
 				Key:            "enter",
@@ -56,6 +68,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "VPCs",
@@ -69,6 +82,15 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "cidr_block", Title: "CIDR Block", Width: 18, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending":
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -86,6 +108,15 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "available_ips", Title: "Available IPs", Width: 14, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Route Tables",
@@ -100,6 +131,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "routes_count", Title: "Routes", Width: 8, Sortable: true},
 				{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "NAT Gateways",
@@ -115,6 +147,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Internet Gateways",
@@ -128,6 +161,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Elastic IPs",
@@ -143,6 +177,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},
 				{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "VPC Endpoints",
@@ -157,6 +192,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Transit Gateways",
@@ -171,6 +207,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "owner_id", Title: "Owner", Width: 14, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Network Interfaces",
@@ -185,6 +222,15 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "type", Title: "Type", Width: 14, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "in-use", "available":
+					return ColorHealthy
+				case "attaching", "detaching":
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 	}
