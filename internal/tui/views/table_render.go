@@ -13,6 +13,37 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
+// lookupDecorator resolves a CellDecorator for column c by trying key, path,
+// lowercased title, and path's final segment. Returns nil if no match.
+func lookupDecorator(decs map[string]func(resource.Resource, string) string, c listCol) func(resource.Resource, string) string {
+	if len(decs) == 0 {
+		return nil
+	}
+	if c.key != "" {
+		if d, ok := decs[c.key]; ok {
+			return d
+		}
+	}
+	if c.path != "" {
+		if d, ok := decs[c.path]; ok {
+			return d
+		}
+		if i := strings.LastIndex(c.path, "."); i >= 0 {
+			if d, ok := decs[strings.ToLower(c.path[i+1:])]; ok {
+				return d
+			}
+		} else if d, ok := decs[strings.ToLower(c.path)]; ok {
+			return d
+		}
+	}
+	if c.title != "" {
+		if d, ok := decs[strings.ToLower(c.title)]; ok {
+			return d
+		}
+	}
+	return nil
+}
+
 // listCol is a resolved column definition for rendering.
 type listCol struct {
 	title    string
@@ -182,8 +213,48 @@ func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	return title
 }
 
-// renderDataRow renders a single data row.
-func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, base lipgloss.Style, totalWidth int, isSelected bool) string {
+// resolveIdentityColumn returns the index of the column that should carry the
+// enrichment-finding row marker. Cascade:
+//  1. td.IdentityKey matches a column's Key
+//  2. column Key == "name"
+//  3. column Path contains "Name" or "Identifier"
+//  4. column Title equals "Name" (case-insensitive) or equals td.Name
+//  5. fall back to 0
+func resolveIdentityColumn(cols []listCol, td resource.ResourceTypeDef) int {
+	// Step 1: explicit IdentityKey set on the type definition.
+	if td.IdentityKey != "" {
+		for i, c := range cols {
+			if c.key == td.IdentityKey {
+				return i
+			}
+		}
+	}
+	// Step 2: column key is literally "name".
+	for i, c := range cols {
+		if c.key == "name" {
+			return i
+		}
+	}
+	// Step 3: column path contains "Name" or "Identifier".
+	for i, c := range cols {
+		if strings.Contains(c.path, "Name") || strings.Contains(c.path, "Identifier") {
+			return i
+		}
+	}
+	// Step 4: column title equals "Name" (case-insensitive) or equals the type's display name.
+	for i, c := range cols {
+		if strings.EqualFold(c.title, "Name") || strings.EqualFold(c.title, td.Name) {
+			return i
+		}
+	}
+	// Step 5: fall back to index 0.
+	return 0
+}
+
+// renderDataRow renders a single data row. markerColIdx is the precomputed
+// identity-column index (via resolveIdentityColumn) to avoid recomputing the
+// cascade on every row.
+func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int) string {
 	var b strings.Builder
 	// Leading single space carries base style.
 	b.WriteString(base.Render(" "))
@@ -194,13 +265,32 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 			used += 2
 		}
 		val := m.extractCellValue(c, r)
-		if (c.key == "state" || c.path == "State.Name") && val == "running" {
-			sysStatus := r.Fields["system_status"]
-			instStatus := r.Fields["instance_status"]
-			if sysStatus == "impaired" || instStatus == "impaired" {
-				val = "! " + val
-			} else if sysStatus == "initializing" || instStatus == "initializing" {
-				val = "~ " + val
+		// Try decorator lookup by column key, then path, then lowercased title.
+		// viewConfig-loaded columns often lack Key; fallbacks keep decorators
+		// robust to the column-definition source.
+		if dec := lookupDecorator(m.typeDef.CellDecorators, c); dec != nil {
+			val = dec(r, val)
+		}
+		// Enrichment row marker: prepend a colored middle dot to the identity column
+		// when this resource has a finding. The dot is severity-colored (! → red,
+		// ~ → yellow) and rendered as a separate styled prefix so the base row style
+		// is not overridden.
+		if i == markerColIdx {
+			if finding, ok := m.findingsByID[r.ID]; ok {
+				var dotStyle lipgloss.Style
+				if finding.Severity == "!" {
+					dotStyle = lipgloss.NewStyle().Foreground(styles.ColStopped)
+				} else {
+					dotStyle = lipgloss.NewStyle().Foreground(styles.ColPending)
+				}
+				// Prepend the colored dot+space to the cell value, then fit to column width.
+				dot := dotStyle.Render("\u00b7 ")
+				// The dot occupies 2 display chars; shrink the remaining value to fit.
+				remaining := max(c.width-lipgloss.Width(dot), 0)
+				b.WriteString(dot)
+				b.WriteString(base.Render(text.PadOrTrunc(val, remaining)))
+				used += c.width
+				continue
 			}
 		}
 		padded := text.PadOrTrunc(val, c.width)
