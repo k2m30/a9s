@@ -15,6 +15,7 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "num_workers", Title: "Workers", Width: 9, Sortable: true},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "glue_runs",
 				Key:            "enter",
@@ -34,6 +35,7 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 				{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 	}
 }

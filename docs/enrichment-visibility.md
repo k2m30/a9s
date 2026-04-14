@@ -48,10 +48,13 @@ Enrichers return findings for every affected resource they inspect. For account-
 ```go
 // On root Model:
 enrichmentFindings map[string]map[string]resource.EnrichmentFinding // shortName → resourceID → finding
-enrichmentRan      map[string]bool // shortName → true if Wave 2 completed this session
+enrichmentRan      map[string]bool                                  // shortName → true if Wave 2 completed this session
+enrichmentTypeGen  map[string]int                                   // shortName → per-type generation; bumped on every rerun
 ```
 
 `enrichmentRan` is the "enrichment completed this session" signal — separate from `issueKnown` (which reflects cached counts). This drives banner visibility.
+
+`enrichmentTypeGen` is a per-type stale-guard/token counter. It is bumped whenever a rerun for that type starts (startup Wave 2 dispatch, menu Ctrl+R, or top-level list Ctrl+R). `probeEnrichment` captures the current value; `handleEnrichmentChecked` drops messages with stale TypeGen. The wrapped Ctrl+R fetch also captures it as a token so overlapping Ctrl+R presses dispatch only the newest rerun.
 
 **Populated by**: `handleEnrichmentChecked` — only on `msg.Err == nil`. Replaces (not merges) the per-type findings map from `msg.Findings`, sets `enrichmentRan[shortName] = true`. On error (`msg.Err != nil`), neither `enrichmentFindings` nor `enrichmentRan` is updated — the type keeps whatever state was set when the rerun started (cleared — see below).
 
@@ -72,7 +75,30 @@ This avoids stale findings surviving a failed rerun. The brief window between "r
 | Detail `Ctrl+R` | No | Findings unchanged (detail refresh is for related/detail enrichment, not Wave 2) |
 | Profile/region switch | Yes — full restart | All findings cleared |
 
-**New behavior for top-level list refresh**: When `Ctrl+R` is pressed on a top-level resource list, in addition to re-fetching the list data, also rerun Wave 2 enrichment for that specific resource type (if it has a registered enricher and the list is not in demo mode). This ensures the background-check banner/markers refresh alongside the list data. Implementation: after `refreshResourceList` dispatches the re-fetch, also call `probeEnrichment(shortName, m.enrichmentGen)` for the type.
+**New behavior for top-level list refresh**: When `Ctrl+R` is pressed on a top-level resource list, in addition to re-fetching the list data, also rerun Wave 2 enrichment for that specific resource type (if it has a registered enricher and the list is not in demo mode). This ensures the background-check banner/markers refresh alongside the list data.
+
+**Implementation — token stamped on `ResourcesLoadedMsg`** (do NOT call `probeEnrichment` immediately with the current stale `probeResources`; that slice is cleared once the initial Wave 2 completes, so an immediate dispatch would enrich against an empty input and wipe valid findings):
+
+1. Bump `m.enrichmentTypeGen[shortName]`; capture the new value as a token `tok`.
+2. Clear `m.enrichmentFindings[shortName]` and `m.enrichmentRan[shortName]`.
+3. Dispatch a **wrapped fetch command** that runs the normal refresh fetch and inspects the inner result:
+   - On `ResourcesLoadedMsg`: stamp `msg.TypeGen = tok` and return the same message type.
+   - On `APIErrorMsg`: pass through unchanged (no rerun).
+   - On any other message: pass through unchanged.
+4. The existing `ResourcesLoadedMsg` handler at `internal/tui/app.go:428` does its full list-update work unconditionally (unchanged). After its existing write-through block, add a small tail branch:
+
+   ```go
+   if msg.TypeGen != 0 && msg.TypeGen == m.enrichmentTypeGen[msg.ResourceType] {
+       m.probeResources[msg.ResourceType] = msg.Resources
+       cmd = tea.Batch(cmd, m.probeEnrichment(msg.ResourceType, msg.TypeGen))
+   }
+   ```
+
+   Normal fetches carry `TypeGen=0` and the tail is a no-op. Stale Ctrl+R fetches (overlap) carry a `TypeGen` that no longer matches and the tail is skipped — but the list still updated because the existing handler body runs first. Fresh Ctrl+R fetches match and dispatch the rerun.
+
+**Why a field instead of a new message type**: The existing handler already does the unconditional list update we need; stamping a token onto the existing `ResourcesLoadedMsg` lets us add the rerun as a conditional tail without duplicating handler logic, introducing a new message type, or extracting a helper. Earlier drafts of this design used an `EnrichmentRerunReadyMsg` composite envelope — that was more complex and strictly less maintainable because the envelope's handler had to re-implement (or call into) the existing list-update path.
+
+This handles overlapping refreshes and failed fetches correctly: a failed refresh emits `APIErrorMsg` (existing error banner applies) and leaves findings cleared (honest unknown) with no latent state. No shared flags, no new message types.
 
 ### 4. List-level enrichment banner (derived from list state)
 
@@ -81,14 +107,18 @@ The banner is **derived in `applySortAndFilter()`** after every data change.
 **Derivation logic**:
 
 ```
-visibleIssueCount = count of IsIssueRowColor(r.Status) in filteredResources (not allResources)
+findingCount       = len(enrichmentFindings[shortName])           // severity-agnostic (! AND ~)
+visibleIssueCount  = count of IsIssueRowColor(r.Status) in filteredResources
+visibleFindingCount = count of r in filteredResources where findingsByID[r.ID] exists
 showEnrichmentBanner =
-    enrichmentIssueCount > 0      // menu-level enrichment found issues for this type
+    findingCount > 0               // any finding exists (NOT tied to menu-badge IssueCount)
     AND enrichmentRanThisSession   // Wave 2 actually completed for this type (not just cached)
     AND visibleIssueCount == 0     // no issue-colored rows in the VISIBLE (filtered) set
 ```
 
-Note: `visibleIssueCount` counts from `filteredResources`, not `allResources`. This means a text filter that hides all issue-status rows will show the banner (correct — the visible list is all green).
+**Important**: The banner keys off `findingCount = len(Findings)`, NOT the menu-badge `IssueCount`. This is so that `~`-severity findings (e.g., RDS/DocDB pending maintenance) still trigger the banner — they don't bump the menu badge but they are legitimate hidden issues worth surfacing. The menu-badge rule (FR-015, decision 13: `!`-only) is independent and preserved.
+
+Note: `visibleIssueCount` and `visibleFindingCount` both count from `filteredResources`, not `allResources`. This means a text filter that hides all issue-status rows will show the banner (correct — the visible list is all green), and the short-form banner correctly reflects whether any marked row is actually visible after filtering.
 
 **Fields on ResourceListModel**:
 
@@ -112,7 +142,7 @@ When truncated (`enrichmentTruncated == true`):
 ⚠ N+ issues detected by background checks — not visible on this page
 ```
 
-When at least one loaded resource has a finding (checked against `enrichmentFindings` by ID):
+When at least one **visible (post-filter)** resource has a finding (checked against `findingsByID` against `filteredResources`, not `allResources`):
 
 ```
 ⚠ N issues detected by background checks
@@ -120,11 +150,14 @@ When at least one loaded resource has a finding (checked against `enrichmentFind
 
 (Or `N+` if truncated.) No "press d" or "load more" hints. The banner states a fact. The user can press `d` on any row to see if that specific resource has a finding — the detail view will show it if one exists.
 
+**Why visible-only**: The suffix "— not visible on this page" is a factual claim about the current filtered view. If a text filter hides all marked rows, they are genuinely not visible — the long-form wording is accurate. Using `loaded` (`allResources`) instead would display "no suffix" while the user sees zero marked rows, which is misleading.
+
 **Banner lifecycle**:
 - Derived after every `applySortAndFilter()` call
 - Disappears when `visibleIssueCount > 0` (issue-colored rows become visible)
-- Persists across list/detail refresh (findings are session-scoped, not cleared on Ctrl+R)
-- Disappears on profile/region switch (findings cleared, Wave 2 reruns)
+- **On top-level list `Ctrl+R`**: findings for that type are cleared immediately (banner disappears), then restored on wrapped fetch success → stamped `ResourcesLoadedMsg` → tail-branch token match → successful `probeEnrichment` completion. A failed refresh (`APIErrorMsg`) leaves findings cleared (banner stays gone — honest unknown).
+- **On detail `Ctrl+R`**: findings unchanged; banner state unchanged.
+- Disappears on profile/region switch (findings cleared, Wave 2 reruns).
 
 ### 5. Row marker for loaded resources with findings
 
@@ -271,8 +304,13 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 - [ ] Findings session-scoped, cleared entirely on profile/region switch
 - [ ] Per-type findings invalidated (cleared) when a Wave 2 rerun starts for that type
 - [ ] Failed Wave 2 rerun leaves the type with no findings (honest unknown, no stale data)
-- [ ] Top-level list Ctrl+R reruns Wave 2 for that specific type (alongside list re-fetch)
+- [ ] Top-level list Ctrl+R reruns Wave 2 for that specific type (alongside list re-fetch), seeded from the freshly fetched resources (not stale `probeResources`)
 - [ ] Per-type findings replaced on enrichment rerun
+- [ ] Overlapping Ctrl+R presses on the same list are safe: older fetches still update the list (existing handler behavior), but their tail-branch token check fails so no rerun dispatches; only the newest press has a token that matches `enrichmentTypeGen[T]` and dispatches enrichment
+- [ ] Stale Ctrl+R fetches still apply the list update via the existing handler; only the rerun tail-branch is skipped — FR-014 requires the list to refresh on every Ctrl+R success
+- [ ] Failed refresh leaves no latent rerun state; findings remain cleared until a later successful refresh reruns enrichment
+- [ ] Banner keys off `len(Findings)` (severity-agnostic), NOT the menu-badge `IssueCount` — RDS/DocDB with `~` findings still triggers the banner
+- [ ] Short-form banner ("no suffix") fires only when a finding exists in the VISIBLE (filtered) row set
 - [ ] RDS/DocDB: severity `~`, NOT counted in menu badge
 
 ### Files Affected
@@ -281,11 +319,11 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 |------|--------|
 | `internal/resource/enrichment.go` | NEW — `EnrichmentFinding` type |
 | `internal/aws/enrichment.go` | `EnricherResult` type; enrichers return findings |
-| `internal/tui/app.go` | `enrichmentFindings`, `enrichmentRan` maps |
-| `internal/tui/app_handlers.go` | Clear all findings on profile/region switch |
-| `internal/tui/app_handlers_navigate.go` | Store findings; invalidate per-type on rerun start; update detail live; pass enrichment state to list; rerun Wave 2 on top-level list Ctrl+R |
-| `internal/tui/app_fetchers.go` | `probeEnrichment` carries findings in message |
-| `internal/tui/messages/messages.go` | `EnrichmentCheckedMsg` carries `Findings` map |
+| `internal/tui/app.go` | Adds `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps. The existing `ResourcesLoadedMsg` case at `app.go:428` gets a small tail branch after its existing write-through block: `if msg.TypeGen != 0 && msg.TypeGen == m.enrichmentTypeGen[T] { seed probeResources; dispatch probeEnrichment }`. No helper extraction — the existing handler body already performs the unconditional list update. |
+| `internal/tui/app_handlers.go` | Clear all findings + `enrichmentTypeGen` on profile/region switch; on list Ctrl+R: bump `enrichmentTypeGen[T]`, clear `enrichmentFindings[T]`/`enrichmentRan[T]`, dispatch wrapped fetch command capturing the new gen as a token |
+| `internal/tui/app_handlers_navigate.go` | Store findings (validating BOTH session-wide `Gen` and per-type `TypeGen`); invalidate per-type on rerun start; update detail live; pass enrichment state to list |
+| `internal/tui/app_fetchers.go` | `probeEnrichment` captures and carries `TypeGen` (per-type gen); returns `Findings`; NEW wrapped fetch command for the Ctrl+R-for-rerun path. Shape: runs inner `refreshResourceList`; on `ResourcesLoadedMsg` result stamps `msg.TypeGen = tok` and returns the same message type; `APIErrorMsg` and any other inner message pass through unchanged |
+| `internal/tui/messages/messages.go` | `ResourcesLoadedMsg` gets new `TypeGen int` field (0 on normal fetches; non-zero only on Ctrl+R-for-rerun path); `EnrichmentCheckedMsg` carries `Findings` map + `TypeGen` field. No new message types. |
 | `internal/tui/views/resourcelist.go` | `enrichmentIssueCount`, `enrichmentRanThisSession`; banner derivation |
 | `internal/tui/views/resourcelist_helpers.go` | Render banner; `visibleIssueCount` from filteredResources |
 | `internal/tui/views/table_render.go` | `·` row marker on identity column for resources with findings |
@@ -298,12 +336,13 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 1. `EnrichmentFinding` in `internal/resource/enrichment.go`
 2. `EnricherResult` + update `EnricherFunc` signature in `internal/aws/enrichment.go`
 3. Update 9 enrichers to return `EnricherResult` with findings
-4. `enrichmentFindings` + `enrichmentRan` maps on Model; store from `EnrichmentCheckedMsg`
-5. Clear all findings on profile/region switch; invalidate per-type when rerun starts
-6a. Add per-type Wave 2 rerun to top-level list Ctrl+R path
-6. `enrichmentIssueCount` + `enrichmentRanThisSession` on ResourceListModel; derive banner
-7. Render banner in View()
-8. `·` row marker in table_render.go
-9. Pass finding to DetailModel; live update on enrichment completion
-10. Render "Background Check" in detail view
-11. Tests
+4. `enrichmentFindings` + `enrichmentRan` + `enrichmentTypeGen` maps on Model; add `TypeGen` field to `EnrichmentCheckedMsg`; store findings from `EnrichmentCheckedMsg` only when BOTH session-wide `Gen` and per-type `TypeGen` match (drop stale)
+5. Clear all findings and `enrichmentTypeGen` on profile/region switch; invalidate per-type (bump `TypeGen`, clear findings/ran) when a rerun starts
+6. Add `TypeGen int` field to `ResourcesLoadedMsg`; build wrapped fetch command in `app_fetchers.go` that stamps the captured token onto the `ResourcesLoadedMsg` it forwards (passes `APIErrorMsg` through unchanged).
+6a. Wire top-level list Ctrl+R path: bump `enrichmentTypeGen[T]`, clear findings/ran, dispatch wrapped fetch. In the existing `ResourcesLoadedMsg` case at `app.go:428`, add a tail branch that checks the stamped token and seeds `probeResources` + dispatches `probeEnrichment` only on match. Overlap-safe: older fetches still update the list but their tail branch fails the token check. Error-safe: `APIErrorMsg` path unchanged; findings stay cleared (honest unknown).
+7. `enrichmentIssueCount` + `enrichmentRanThisSession` + `findingsByID` on ResourceListModel; derive banner with severity-agnostic `findingCount = len(Findings)` and visible-only short-form check
+8. Render banner in View()
+9. `·` row marker in table_render.go
+10. Pass finding to DetailModel; live update on enrichment completion
+11. Render "Background Check" in detail view
+12. Tests — including explicit cases for overlapping Ctrl+R (stale ready-msg dropped), failed refresh (no latent state), `~`-only finding triggers banner (RDS case), and visible-only short banner under text filter

@@ -37,6 +37,14 @@ type ResourcesLoadedMsg struct {
 	Resources    []resource.Resource
 	Pagination   *resource.PaginationMeta // nil when result has no pagination info
 	Append       bool                     // true = append to existing list
+	// TypeGen is the enrichment-rerun token. 0 on normal fetches (no rerun
+	// intent). Non-zero only when the message originates from the
+	// Ctrl+R-for-rerun wrapped fetch: it carries the per-type enrichment
+	// generation captured at dispatch time. The ResourcesLoadedMsg handler
+	// applies the list update unconditionally, then — after its existing
+	// write-through block — checks this field; if it matches the current
+	// per-type gen, it seeds probeResources and dispatches probeEnrichment.
+	TypeGen int
 }
 
 // LoadMoreMsg triggers loading the next page of a paginated resource list.
@@ -209,10 +217,16 @@ type AvailabilityCheckedMsg struct {
 // EnrichmentCheckedMsg reports one resource type's Wave 2 enrichment result.
 type EnrichmentCheckedMsg struct {
 	ResourceType string
-	Issues       int   // updated issue count after enrichment
-	Truncated    bool  // whether the enrichment count is a lower bound
-	Err          error // enrichment error (nil on success)
-	Gen          int   // generation counter (stale probe protection)
+	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
+	Truncated    bool // whether the enrichment count is a lower bound
+	// Findings is the per-resource finding map for this type, keyed by
+	// resource.Resource.ID. Populated on success; nil/empty when Err != nil.
+	// May include findings for resources off-page (account-wide enrichers).
+	Findings map[string]resource.EnrichmentFinding
+	Err      error // enrichment error (nil on success)
+	Gen      int   // session-wide generation counter (stale probe protection; profile/region switch)
+	TypeGen  int   // per-type generation counter; bumped on every rerun for that type. Stale
+	// results whose TypeGen doesn't match the current per-type gen are discarded.
 }
 
 // IdentityLoadedMsg is sent when the caller identity has been fetched.
