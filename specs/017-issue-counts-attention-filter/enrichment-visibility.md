@@ -28,6 +28,15 @@ type EnricherResult struct {
     Truncated  bool
     Findings   map[string]resource.EnrichmentFinding // resourceID → finding
 }
+```
+
+**Finding key normalization**: The `Findings` map is keyed by `resource.Resource.ID` — the same identifier used in list rows. Enrichers that receive identifiers from AWS APIs in a different form (e.g., ARNs from `DescribePendingMaintenanceActions`) MUST normalize to `Resource.ID` before storing the finding. The existing RDS enricher already does ARN-suffix matching (`enrichment.go:83`); the same pattern applies to all enrichers. The canonical rule: **extract the resource identifier that matches `Resource.ID` as populated by the type's fetcher**. If the enricher cannot determine the matching ID, it skips that resource (no finding stored).
+
+```go
+// Example: RDS maintenance ARN → Resource.ID
+// ARN: arn:aws:rds:eu-west-2:123456789012:db:docdb-docdb-dev
+// Resource.ID: docdb-docdb-dev
+// Enricher extracts "docdb-docdb-dev" from the ARN suffix
 
 type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
 ```
@@ -68,6 +77,7 @@ Note: `visibleIssueCount` counts from `filteredResources`, not `allResources`. T
 
 ```go
 enrichmentIssueCount      int  // from menu, updated when enrichment completes
+enrichmentTruncated       bool // true if the enrichment count is a lower bound (issues:N+)
 enrichmentRanThisSession  bool // true only after Wave 2 ran for this type this session
 ```
 
@@ -79,13 +89,19 @@ Updated by the root Model via setters when enrichment completes or when the list
 ⚠ N issues detected by background checks — not visible on this page
 ```
 
+When truncated (`enrichmentTruncated == true`):
+
+```
+⚠ N+ issues detected by background checks — not visible on this page
+```
+
 When at least one loaded resource has a finding (checked against `enrichmentFindings` by ID):
 
 ```
 ⚠ N issues detected by background checks
 ```
 
-No "press d" or "load more" hints. The banner states a fact. The user can press `d` on any row to see if that specific resource has a finding — the detail view will show it if one exists.
+(Or `N+` if truncated.) No "press d" or "load more" hints. The banner states a fact. The user can press `d` on any row to see if that specific resource has a finding — the detail view will show it if one exists.
 
 **Banner lifecycle**:
 - Derived after every `applySortAndFilter()` call
@@ -94,20 +110,22 @@ No "press d" or "load more" hints. The banner states a fact. The user can press 
 
 ### 5. Row marker for loaded resources with findings
 
-For loaded resources that have a finding in `enrichmentFindings`, add a minimal row marker: a colored `·` (middle dot) at the start of the Name column. This gives the user a truthful per-row affordance without the full prefix system.
+For loaded resources that have a finding in `enrichmentFindings`, add a minimal row marker: a colored `·` (middle dot) prepended to the Name/ID column value. This gives the user a truthful per-row affordance without the full prefix system.
 
-**Implementation**: In `table_render.go`, after resolving the cell value for the first column (Name/ID), check if the resource has a finding. If yes, prepend `· `:
+**Column targeting**: The marker is attached to the **configured Name/ID column by key** (typically the column with key `"name"`, `"function_name"`, `"db_identifier"`, etc. — whatever column index 0 is in the view config). It is NOT "the leftmost visible column after horizontal scroll." The marker stays with the Name column even if the user scrolls right and the Name column scrolls off-screen. This is consistent with how the cursor highlight works — it highlights the logical row, not the visible viewport.
+
+**Implementation**: In `table_render.go`, when rendering column index 0 (the first configured column), check if the resource has a finding:
 
 ```go
-if isFirstColumn && r.Fields != nil {
-    // Check if this resource has an enrichment finding
-    if hasEnrichmentFinding(r.ID) {
+if colIndex == 0 {
+    if finding, ok := enrichmentFindingsForType[r.ID]; ok {
         val = "· " + val
+        // Override cell style to finding severity color
     }
 }
 ```
 
-The `hasEnrichmentFinding` check requires the list model to hold a reference to the relevant findings map (passed at construction/update). The dot renders in the finding's severity color (ColStopped for `!`, ColPending for `~`).
+The `enrichmentFindingsForType` reference is passed to the list model at creation/update (the subset of `m.enrichmentFindings[shortName]` for this type). The dot renders in ColStopped for `!` severity, ColPending for `~`.
 
 This is:
 - Truthful: only marks rows that actually have findings
@@ -135,14 +153,21 @@ if findings, ok := m.enrichmentFindings[resourceType]; ok {
 
 **Stale snapshot handling**: Current detail refresh (`Ctrl+R` in detail view) re-enriches the resource via `EnrichDetailMsg` but does NOT reconstruct the `DetailModel`. To handle the case where enrichment completes while a detail view is open, add a message-based update path:
 
-When `EnrichmentCheckedMsg` arrives and the active view is a `DetailModel` for a resource in the findings:
+When `EnrichmentCheckedMsg` arrives and the active view is a `DetailModel` for a resource of the enriched type:
 ```go
 if detail, ok := m.activeView().(*views.DetailModel); ok {
-    if f, ok := msg.Findings[detail.ResourceID()]; ok {
-        detail.SetEnrichmentFinding(&f)
+    if detail.ResourceType() == msg.ResourceType {
+        if f, ok := msg.Findings[detail.ResourceID()]; ok {
+            detail.SetEnrichmentFinding(&f)
+        } else {
+            // Resource recovered — clear stale finding
+            detail.SetEnrichmentFinding(nil)
+        }
     }
 }
 ```
+
+This handles both cases: enrichment discovers a new finding (set it), and enrichment reruns and the resource is no longer affected (clear it).
 
 This handles: detail opened before enrichment → enrichment completes → detail updates live.
 
@@ -190,15 +215,19 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 
 - [ ] `EnrichmentFinding` lives in `internal/resource/`, no import cycles
 - [ ] `EnricherFunc` returns `EnricherResult` with typed `Findings` map
+- [ ] Findings keyed by `resource.Resource.ID` — enrichers normalize API identifiers (ARNs) to match
 - [ ] Findings cover all affected resources from the API, including off-page
 - [ ] `enrichmentRan` is separate from `issueKnown` — banner does NOT show on cold start
 - [ ] Banner derived from `filteredResources` (not `allResources`) — text filter hiding issue rows triggers banner
 - [ ] Banner text does not promise row-level d affordance
 - [ ] Banner disappears when visible issue-colored rows appear
-- [ ] Row marker `·` shown on first column for loaded resources with findings
+- [ ] Banner text shows `N+` when enrichment count is truncated
+- [ ] Row marker `·` shown on column index 0 (Name/ID) for loaded resources with findings
+- [ ] Row marker attached to logical column, not leftmost visible after horizontal scroll
 - [ ] Row marker colored by severity (red `!`, yellow `~`)
 - [ ] Detail view shows "Background Check" section for resources with findings
 - [ ] Detail section updates live when enrichment completes while detail is open
+- [ ] Detail section clears when enrichment reruns and the resource is no longer affected (recovery)
 - [ ] YAML/JSON views do NOT show findings
 - [ ] Findings session-scoped, cleared on profile/region switch AND refresh
 - [ ] Per-type findings replaced on enrichment rerun
