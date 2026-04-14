@@ -143,13 +143,16 @@ func TestIsIssueRowColor_NoColorStillCountsIssues(t *testing.T) {
 }
 
 func TestIsIssueRowColor_CloudTrailSeverity(t *testing.T) {
+	// CloudTrail severity levels are NOT resource issues — they are event
+	// classifications. They should render colored in event lists but NOT
+	// count as issues on the main menu badge.
 	cases := []struct {
 		status string
 		want   bool
 	}{
 		{"ct-info", false},      // dim — routine reads
-		{"ct-attention", true},  // yellow — writes/sensitive
-		{"ct-danger", true},     // red — destructive/failed
+		{"ct-attention", false}, // yellow in event list, but NOT a resource issue
+		{"ct-danger", false},    // red in event list, but NOT a resource issue
 	}
 	for _, c := range cases {
 		t.Run(c.status, func(t *testing.T) {
