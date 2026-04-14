@@ -335,6 +335,13 @@ func (m Model) Cancel() {
 	}
 }
 
+// EnrichmentGen returns the current session-wide enrichment generation counter.
+// This accessor is used by tests to capture the pre-switch gen value and verify
+// that post-switch messages carrying the old gen are correctly discarded.
+func (m Model) EnrichmentGen() int {
+	return m.enrichmentGen
+}
+
 // Init implements tea.Model. Fires a command to establish the AWS session.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.

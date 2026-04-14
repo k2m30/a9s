@@ -57,9 +57,10 @@ func stageState(stageName string, status cptypes.StageExecutionStatus) cptypes.S
 	}
 }
 
-// TestEnrichCodePipelineStatus_FailedStageKeyedByPipelineName verifies findings
-// are keyed by pipeline name (r.Name).
-func TestEnrichCodePipelineStatus_FailedStageKeyedByPipelineName(t *testing.T) {
+// TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID verifies findings
+// are keyed by r.ID (matching the row-marker lookup contract). Pipeline fetcher
+// sets ID == Name, so real-world lookups work under either key.
+func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	fake := &pipelineStateFake{
 		states: map[string]*codepipeline.GetPipelineStateOutput{
 			"my-pipeline": {
@@ -76,8 +77,11 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByPipelineName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings["my-pipeline"]; !ok {
-		t.Errorf("expected finding keyed by pipeline name %q", "my-pipeline")
+	if _, ok := result.Findings["pipe-id"]; !ok {
+		t.Errorf("expected finding keyed by r.ID %q, got %d key(s)", "pipe-id", len(result.Findings))
+	}
+	if _, ok := result.Findings["my-pipeline"]; ok {
+		t.Error("finding must not be keyed by r.Name")
 	}
 }
 

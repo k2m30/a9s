@@ -6,10 +6,9 @@
 ## Active Technologies
 - Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
+- YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps
 - In-process demo fixture store (per resource type, loaded at startup)
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3 (017-issue-counts-attention-filter)
-- YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps (017-issue-counts-attention-filter)
-- In-memory session-scoped maps on root `Model` (findings cleared on profile/region switch; no disk persistence for findings themselves — cache format unchanged) (018-enrichment-visibility)
+- In-memory session-scoped maps on root `Model` (findings cleared on profile/region switch; no disk persistence for findings themselves — cache format unchanged)
 
 ## Project Structure
 
