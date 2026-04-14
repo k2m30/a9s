@@ -121,11 +121,27 @@ type Model struct {
 	availTotal      int      // total types to probe in current gen
 
 	// Issue count enrichment (Wave 2)
-	probeResources  map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
-	enrichQueue     []string                       // resource types pending Wave 2 enrichment
-	enrichmentGen   int                            // generation counter for enrichment (stale protection)
-	enrichChecked   int                            // number of enrichment probes completed in current gen
-	enrichTotal     int                            // total enrichment probes to run in current gen
+	probeResources map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
+	enrichQueue    []string                       // resource types pending Wave 2 enrichment
+	enrichmentGen  int                            // session-wide generation counter for enrichment (profile/region switch)
+	enrichChecked  int                            // number of enrichment probes completed in current gen
+	enrichTotal    int                            // total enrichment probes to run in current gen
+
+	// Enrichment finding state (feature 018-enrichment-visibility).
+	// enrichmentFindings[shortName][resourceID] = EnrichmentFinding for resources
+	// with Wave 2 findings. Populated by handleEnrichmentChecked on success;
+	// cleared per-type when a rerun starts; cleared entirely on profile/region switch.
+	enrichmentFindings map[string]map[string]resource.EnrichmentFinding
+	// enrichmentRan[shortName] == true only after Wave 2 completed successfully
+	// for that type in this session. Distinct from menu.issueKnown (cached counts).
+	// Banner visibility keys off this signal.
+	enrichmentRan map[string]bool
+	// enrichmentTypeGen[shortName] is a per-type generation counter. Bumped on
+	// every rerun (startup Wave 2 dispatch, menu Ctrl+R, top-level list Ctrl+R).
+	// Stamped on EnrichmentCheckedMsg and (when non-zero) on ResourcesLoadedMsg
+	// from the wrapped Ctrl+R-for-rerun fetch. Handlers discard messages whose
+	// TypeGen doesn't match the current per-type gen.
+	enrichmentTypeGen map[string]int
 
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
@@ -282,20 +298,23 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		profile:       profile,
-		region:        region,
-		keys:          k,
-		stack:         []views.View{&menu},
-		cmdInput:      ti,
-		viewConfig:    cfg,
-		configErr:     cfgErr,
-		activeTheme:   "tokyo-night.yaml",
-		resourceCache: make(map[string]*resourceCacheEntry),
-		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
-		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
-		enrichGen:     1, // same convention as relatedGen
-		appCtx:        ctx,
-		appCancel:     cancel,
+		profile:            profile,
+		region:             region,
+		keys:               k,
+		stack:              []views.View{&menu},
+		cmdInput:           ti,
+		viewConfig:         cfg,
+		configErr:          cfgErr,
+		activeTheme:        "tokyo-night.yaml",
+		resourceCache:      make(map[string]*resourceCacheEntry),
+		relatedCache:       newRelatedCacheLRU(maxRelatedCacheEntries),
+		relatedGen:         1, // start at 1 so Generation=0 (unset) is always stale and rejected
+		enrichGen:          1, // same convention as relatedGen
+		enrichmentFindings: make(map[string]map[string]resource.EnrichmentFinding),
+		enrichmentRan:      make(map[string]bool),
+		enrichmentTypeGen:  make(map[string]int),
+		appCtx:             ctx,
+		appCancel:          cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -445,7 +464,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cursorPos:     rl.CursorPosition(),
 						hScrollOffset: rl.HScrollOffset(),
 					}
-					return updatedModel, cmd
 				}
 			} else if msg.ResourceType != "" && !msg.Append {
 				// Active view is not a ResourceList for this type (e.g., detail or menu).
@@ -456,6 +474,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						resources: msg.Resources,
 					}
 				}
+			}
+			// Enrichment rerun tail: when the fetch was dispatched by
+			// the Ctrl+R-for-rerun path, the message carries a non-zero
+			// TypeGen token. Seed probeResources and dispatch
+			// probeEnrichment only when the token still matches the
+			// current per-type gen (i.e. not superseded by a later
+			// Ctrl+R press). Normal fetches carry TypeGen==0 and are
+			// unaffected.
+			// NOTE: This check runs regardless of which view is currently active —
+			// the user may have navigated away from the resource list before the
+			// fetch returned, but the rerun must still fire.
+			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.enrichmentTypeGen[msg.ResourceType] {
+				if updatedModel.probeResources == nil {
+					updatedModel.probeResources = make(map[string][]resource.Resource)
+				}
+				updatedModel.probeResources[msg.ResourceType] = msg.Resources
+				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.enrichmentGen))
 			}
 			return updatedModel, cmd
 		}

@@ -412,27 +412,44 @@ func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 }
 
 // ===========================================================================
-// DOCDB-DETAIL-05: DocumentDB detail status coloring
+// DOCDB-DETAIL-05: DocumentDB detail status coloring (per-type Color func)
 // ===========================================================================
 
 func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 
-	// Same color mapping applies to DocumentDB
-	availableStyle := styles.RowColorStyle("available")
+	// DocumentDB cluster (dbc) Color func reads Fields["status"].
+	td := resource.FindResourceType("dbc")
+	if td == nil {
+		t.Fatal("dbc resource type not found")
+	}
+	if td.Color == nil {
+		t.Fatal("dbc Color func is nil")
+	}
+
+	dbcRes := func(status string) resource.Resource {
+		return resource.Resource{
+			ID:     "cluster-001",
+			Status: status,
+			Fields: map[string]string{"status": status},
+		}
+	}
+
+	availableStyle := styles.ColorStyle(td.Color(dbcRes("available")))
 	if availableStyle.GetForeground() != styles.ColRunning {
-		t.Errorf("expected 'available' to map to ColRunning (#9ece6a)")
+		t.Errorf("dbc 'available': expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.RowColorStyle("creating")
+	creatingStyle := styles.ColorStyle(td.Color(dbcRes("creating")))
 	if creatingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("expected 'creating' to map to ColPending (#e0af68)")
+		t.Errorf("dbc 'creating': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
-	deletingStyle := styles.RowColorStyle("deleting")
-	if deletingStyle.GetForeground() != styles.ColStopped {
-		t.Errorf("expected 'deleting' to map to ColStopped (#f7768e)")
+	// Per spec: docdb deleting → Warning (not Broken).
+	deletingStyle := styles.ColorStyle(td.Color(dbcRes("deleting")))
+	if deletingStyle.GetForeground() != styles.ColPending {
+		t.Errorf("dbc 'deleting': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
 	}
 }
 

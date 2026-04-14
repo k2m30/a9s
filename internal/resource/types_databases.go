@@ -1,5 +1,29 @@
 package resource
 
+import "strings"
+
+// rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
+// Used by dbi and dbc types which share the same status vocabulary.
+func rdsInstanceColor(status string) Color {
+	switch status {
+	case "available":
+		return ColorHealthy
+	case "creating", "modifying", "backing-up", "rebooting", "upgrading",
+		"renaming", "resetting-master-credentials", "storage-optimization",
+		"starting", "stopping":
+		return ColorWarning
+	case "stopped", "restore-error":
+		return ColorBroken
+	case "deleting":
+		return ColorWarning
+	}
+	// incompatible-* and inaccessible-encryption-credentials patterns
+	if strings.HasPrefix(status, "incompatible-") || strings.HasPrefix(status, "inaccessible-") {
+		return ColorBroken
+	}
+	return ColorHealthy
+}
+
 func databasesResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -16,6 +40,9 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "class", Title: "Class", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				return rdsInstanceColor(r.Fields["db_instance_status"])
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "dbi_events",
@@ -34,6 +61,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 				{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "s3_objects",
 				Key:            "enter",
@@ -55,6 +83,17 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "nodes", Title: "Nodes", Width: 8, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "available":
+					return ColorHealthy
+				case "creating", "modifying", "snapshotting", "deleting":
+					return ColorWarning
+				case "incompatible-network":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "DB Clusters",
@@ -68,6 +107,9 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				return rdsInstanceColor(r.Fields["status"])
 			},
 		},
 		{
@@ -83,6 +125,17 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "size_bytes", Title: "Size", Width: 14, Sortable: true},
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["table_status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				case "INACCESSIBLE_ENCRYPTION_CREDENTIALS", "ARCHIVED", "ARCHIVING":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "OpenSearch Domains",
@@ -97,6 +150,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "instance_count", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Redshift Clusters",
@@ -112,6 +166,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "db_name", Title: "Database", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "EFS File Systems",
@@ -126,6 +181,17 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "performance_mode", Title: "Perf Mode", Width: 16, Sortable: true},
 				{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["life_cycle_state"] {
+				case "available":
+					return ColorHealthy
+				case "creating", "updating", "deleting":
+					return ColorWarning
+				case "error":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -142,6 +208,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "DocDB Snapshots",
@@ -157,6 +224,17 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "snapshot_create_time", Title: "Created", Width: 22, Sortable: true},
 				{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "available":
+					return ColorHealthy
+				case "creating":
+					return ColorWarning
+				case "failed":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 		},
 	}
