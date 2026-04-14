@@ -104,10 +104,12 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		runtime := string(fn.Runtime)
-		// Use State as Status when not Active — surfaces Failed/Pending/Inactive
-		// for issue detection. Fall back to runtime for healthy functions.
+		// Use State as Status when it signals a real problem (Failed, Pending).
+		// Inactive is not promoted — it means the function was evicted from
+		// memory after an idle period, not that it's broken. Fall back to
+		// runtime for healthy/inactive functions.
 		status := runtime
-		if fn.State != "" && fn.State != lambdatypes.StateActive {
+		if fn.State == lambdatypes.StateFailed || fn.State == lambdatypes.StatePending {
 			status = string(fn.State)
 		}
 
