@@ -98,6 +98,42 @@ func NewCFNFixtures() *CFNFixtures {
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{
+		"acme-legacy-api": {
+			{
+				EventId:              aws.String("evt-legacy-001"),
+				StackName:            aws.String("acme-legacy-api"),
+				Timestamp:            aws.Time(mustParseCFNTime("2026-03-21T11:00:00+00:00")),
+				LogicalResourceId:    aws.String("acme-legacy-api"),
+				ResourceType:         aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateInProgress,
+				ResourceStatusReason: aws.String("User Initiated"),
+			},
+			{
+				EventId:              aws.String("evt-legacy-002"),
+				StackName:            aws.String("acme-legacy-api"),
+				Timestamp:            aws.Time(mustParseCFNTime("2026-03-21T11:20:00+00:00")),
+				LogicalResourceId:    aws.String("ApiFunction"),
+				ResourceType:         aws.String("AWS::Lambda::Function"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
+				ResourceStatusReason: aws.String("Resource handler returned message: \"Layer arn:aws:lambda:us-east-1:123456789012:layer:legacy-utils:3 does not exist.\" (HandlerErrorCode: NotFound)"),
+			},
+			{
+				EventId:           aws.String("evt-legacy-003"),
+				StackName:         aws.String("acme-legacy-api"),
+				Timestamp:         aws.Time(mustParseCFNTime("2026-03-21T11:25:00+00:00")),
+				LogicalResourceId: aws.String("acme-legacy-api"),
+				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:    cfntypes.ResourceStatusRollbackInProgress,
+			},
+			{
+				EventId:           aws.String("evt-legacy-004"),
+				StackName:         aws.String("acme-legacy-api"),
+				Timestamp:         aws.Time(mustParseCFNTime("2026-03-21T11:47:00+00:00")),
+				LogicalResourceId: aws.String("acme-legacy-api"),
+				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:    cfntypes.ResourceStatusRollbackComplete,
+			},
+		},
 		"acme-vpc-stack": {
 			{
 				EventId:              aws.String("evt-001"),
@@ -120,6 +156,29 @@ func NewCFNFixtures() *CFNFixtures {
 	}
 
 	stackResources := map[string][]cfntypes.StackResourceSummary{
+		"acme-legacy-api": {
+			{
+				LogicalResourceId:    aws.String("ApiFunction"),
+				ResourceType:         aws.String("AWS::Lambda::Function"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
+				ResourceStatusReason: aws.String("Layer does not exist"),
+				LastUpdatedTimestamp:  aws.Time(mustParseCFNTime("2026-03-21T11:20:00+00:00")),
+			},
+			{
+				LogicalResourceId:   aws.String("ApiGateway"),
+				PhysicalResourceId:  aws.String("abc123xyz"),
+				ResourceType:        aws.String("AWS::ApiGatewayV2::Api"),
+				ResourceStatus:      cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseCFNTime("2026-03-21T11:10:00+00:00")),
+			},
+			{
+				LogicalResourceId:   aws.String("FunctionRole"),
+				PhysicalResourceId:  aws.String("acme-legacy-api-FunctionRole-1A2B3C"),
+				ResourceType:        aws.String("AWS::IAM::Role"),
+				ResourceStatus:      cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseCFNTime("2026-03-21T11:05:00+00:00")),
+			},
+		},
 		"acme-vpc-stack": {
 			{
 				LogicalResourceId:  aws.String("VPC"),

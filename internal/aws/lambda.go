@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -103,6 +104,12 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		runtime := string(fn.Runtime)
+		// Use State as Status when not Active — surfaces Failed/Pending/Inactive
+		// for issue detection. Fall back to runtime for healthy functions.
+		status := runtime
+		if fn.State != "" && fn.State != lambdatypes.StateActive {
+			status = string(fn.State)
+		}
 
 		memory := ""
 		if fn.MemorySize != nil {
@@ -143,7 +150,7 @@ func FetchLambdaFunctionsPageWithEventSources(
 		r := resource.Resource{
 			ID:     functionName,
 			Name:   functionName,
-			Status: runtime,
+			Status: status,
 			Fields: map[string]string{
 				"function_name":    functionName,
 				"runtime":          runtime,
