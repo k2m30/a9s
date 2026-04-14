@@ -48,6 +48,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // EC2DescribeInstancesAPI defines the interface for the EC2 DescribeInstances operation.
@@ -1025,3 +1027,30 @@ type EC2DescribeVolumeStatusAPI interface {
 type RDSDescribePendingMaintenanceAPI interface {
 	DescribePendingMaintenanceActions(ctx context.Context, params *rds.DescribePendingMaintenanceActionsInput, optFns ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error)
 }
+
+// EnricherResult is the typed return value of a Wave 2 enricher.
+//
+//   - IssueCount is the number of resources the enricher classifies as issue-worthy
+//     for the menu badge. Severity "!" findings contribute; severity "~" findings
+//     (informational) do NOT contribute to IssueCount.
+//   - Truncated is true when the enricher only inspected a subset (e.g., capped at
+//     EnrichmentCap) so the count is a lower bound.
+//   - Findings is a map from resource.Resource.ID → EnrichmentFinding for every
+//     affected resource the enricher observed. For account-wide enrichers (RDS,
+//     EC2 status checks, EBS), Findings may contain entries for resources that
+//     are NOT in the input `resources` slice — banner derivation uses this
+//     information. Enrichers that receive API identifiers in a different form
+//     (e.g., ARNs) MUST normalize to Resource.ID; if no match can be determined,
+//     the affected resource is skipped silently.
+//     MAY be empty when no issues are found. MUST NOT be nil on success — use
+//     make(map[string]resource.EnrichmentFinding) for the empty case.
+type EnricherResult struct {
+	IssueCount int
+	Truncated  bool
+	Findings   map[string]resource.EnrichmentFinding
+}
+
+// EnricherFunc is a pluggable function that makes additional API calls for a
+// resource type and returns a typed EnricherResult. The resources slice contains
+// retained first-page resources from Wave 1 probes.
+type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
