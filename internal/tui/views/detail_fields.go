@@ -291,6 +291,7 @@ func (m *DetailModel) buildFieldList() {
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
+		m.injectEnrichmentFinding()
 		return
 	}
 	items := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
@@ -363,6 +364,7 @@ func (m *DetailModel) buildFieldList() {
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()
 	}
+	m.injectEnrichmentFinding()
 }
 
 // extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
@@ -408,7 +410,7 @@ func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
 }
 
 // statusCheckTier maps an EC2 status check value to a ColorTier string
-// for deferred styling via RowColorStyle in the render path.
+// for deferred styling via TierColorStyle in the render path.
 func statusCheckTier(status string) string {
 	switch status {
 	case "ok":
@@ -491,6 +493,35 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	m.fieldList = result
 }
 
+// injectEnrichmentFinding prepends a "⚠ Background Check" section to m.fieldList
+// when m.enrichmentFinding is non-nil. The section header uses ColorTier "!" (red)
+// or "~" (yellow) to convey severity. This injection is skipped for ct-events paths
+// since those use sectionsToFieldItems and bypass buildFieldList's default flow.
+// YAML/JSON views do not call buildFieldList, so findings never appear there.
+func (m *DetailModel) injectEnrichmentFinding() {
+	if m.enrichmentFinding == nil {
+		return
+	}
+	inject := []fieldpath.FieldItem{
+		{
+			IsSection: true,
+			Key:       "⚠ Background Check",
+			Path:      "EnrichmentFinding",
+			ColorTier: m.enrichmentFinding.Severity,
+		},
+		{
+			Key:   "Summary",
+			Value: m.enrichmentFinding.Summary,
+			Path:  "EnrichmentFinding",
+		},
+	}
+	// Prepend before existing content.
+	result := make([]fieldpath.FieldItem, 0, len(inject)+len(m.fieldList))
+	result = append(result, inject...)
+	result = append(result, m.fieldList...)
+	m.fieldList = result
+}
+
 // subFieldIndent returns the left margin for a sub-field at the given indent level.
 // Level 1 = 5 spaces, level 2 = 7 spaces, level 3 = 9 spaces, etc.
 // This preserves hierarchical YAML indentation in the detail view.
@@ -551,7 +582,7 @@ func (m DetailModel) renderFromFieldList() string {
 			// labels remain legible on selection background across themes.
 			switch {
 			case item.IsSection:
-				line = " " + item.Key // cursor on a section header: plain, no color (cursor skip is handled in detail.go)
+				line = " " + item.Key // cursor on section header: plain text (cursor skip handled in detail.go)
 			case item.IsHeader:
 				line = " " + item.Key + ":"
 			case item.IsSubField:
@@ -570,7 +601,14 @@ func (m DetailModel) renderFromFieldList() string {
 		} else {
 			switch {
 			case item.IsSection:
-				line = " " + lipgloss.NewStyle().Bold(true).Render(item.Key)
+				sectionStyle := lipgloss.NewStyle().Bold(true)
+				switch item.ColorTier {
+				case "!":
+					sectionStyle = sectionStyle.Foreground(styles.ColStopped)
+				case "~":
+					sectionStyle = sectionStyle.Foreground(styles.ColPending)
+				}
+				line = " " + sectionStyle.Render(item.Key)
 			case item.IsHeader:
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
@@ -584,7 +622,7 @@ func (m DetailModel) renderFromFieldList() string {
 				if item.Key != item.Value {
 					val := item.Value
 					if item.ColorTier != "" {
-						val = styles.RowColorStyle(item.ColorTier).Render(val)
+						val = styles.TierColorStyle(item.ColorTier).Render(val)
 					}
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + val
 					break
@@ -597,7 +635,7 @@ func (m DetailModel) renderFromFieldList() string {
 				label := styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW))
 				var value string
 				if item.ColorTier != "" {
-					value = styles.RowColorStyle(item.ColorTier).Render(item.Value)
+					value = styles.TierColorStyle(item.ColorTier).Render(item.Value)
 				} else {
 					value = styles.DetailVal.Render(item.Value)
 				}

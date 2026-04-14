@@ -98,10 +98,12 @@ func TestQA_EKS_ListColumnsFromTypeDef(t *testing.T) {
 }
 
 // TestQA_EKS_StatusColoring_Active verifies that ACTIVE status uses green
-// coloring (#9ece6a), matching the "running" category in RowColorStyle.
+// coloring (#9ece6a), matching the ColorHealthy category (ColRunning).
 func TestQA_EKS_StatusColoring_Active(t *testing.T) {
-	style := styles.RowColorStyle("ACTIVE")
-	rendered := style.Render("ACTIVE row content")
+	eksTd := resource.FindResourceType("eks")
+	activeRes := resource.Resource{ID: "cluster-1", Status: "ACTIVE"}
+	activeStyle := styles.ColorStyle(eksTd.Color(activeRes))
+	rendered := activeStyle.Render("ACTIVE row content")
 
 	// The rendered text should contain ANSI color codes (non-empty styling applied)
 	if rendered == "ACTIVE row content" {
@@ -109,9 +111,10 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 	}
 
 	// Verify green color (#9ece6a) is applied — same as ColRunning
-	// RowColorStyle maps "active" to ColRunning which is green
-	runningStyled := styles.RowColorStyle("running").Render("test")
-	activeStyled := styles.RowColorStyle("ACTIVE").Render("test")
+	// ACTIVE maps to ColorHealthy which is the same color as running
+	runningRes := resource.Resource{ID: "cluster-2", Status: "running"}
+	runningStyled := styles.ColorStyle(eksTd.Color(runningRes)).Render("test")
+	activeStyled := styles.ColorStyle(eksTd.Color(activeRes)).Render("test")
 
 	// Both should produce the same ANSI styling since they map to the same color
 	if stripANSI(runningStyled) != stripANSI(activeStyled) {

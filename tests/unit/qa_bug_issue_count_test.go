@@ -79,47 +79,55 @@ func (f *rdsMaintenanceBugFake) DescribePendingMaintenanceActions(_ context.Cont
 	}, nil
 }
 
-func TestEnrichRDSDocDBMaintenance_CountsOnlyMatchingResources(t *testing.T) {
+func TestEnrichRDSDocDBMaintenance_FindingsContainMatchingResources(t *testing.T) {
 	fake := &rdsMaintenanceBugFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	// The probed resources for "dbi" are the 2 DB instances
+	// The probed resources for "dbi" are the 2 DB instances.
 	probeResources := []resource.Resource{
 		{ID: "docdb-docdb-dev", Name: "docdb-docdb-dev"},
 		{ID: "rds-eu-west-2-dev-instance", Name: "rds-eu-west-2-dev-instance"},
 	}
 
-	count, _, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should be 2 (only the instances that match our probed resources), NOT 4
-	if count != 2 {
-		t.Errorf("EnrichRDSDocDBMaintenance count = %d, want 2 (only matching probed resources, not all 4 ARNs)", count)
+	// RDS enricher is account-wide: Findings may include off-page resources (clusters, etc.).
+	// Verify the probed instance IDs ARE present in Findings (the key contract).
+	for _, r := range probeResources {
+		if _, ok := result.Findings[r.ID]; !ok {
+			t.Errorf("expected Findings to contain probed resource %q", r.ID)
+		}
 	}
 }
 
-func TestEnrichRDSDocDBMaintenance_NoMatchingResources(t *testing.T) {
+func TestEnrichRDSDocDBMaintenance_UnprobedResourcesAppearsAsArnSuffix(t *testing.T) {
 	fake := &rdsMaintenanceBugFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	// Probed resources don't match any maintenance ARNs
+	// Probed resources don't match any maintenance ARNs by ID.
+	// Account-wide enricher still emits findings, keyed by ARN suffix.
 	probeResources := []resource.Resource{
 		{ID: "unrelated-instance", Name: "unrelated-instance"},
 	}
 
-	count, _, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if count != 0 {
-		t.Errorf("count = %d, want 0 (no matching resources)", count)
+	// Unmatched ARNs still appear in Findings keyed by their ARN suffix.
+	// Verify the unprobed resource ID is NOT in Findings (no false positive for it).
+	if _, ok := result.Findings["unrelated-instance"]; ok {
+		t.Error("unrelated-instance must NOT appear in Findings — no matching maintenance action")
 	}
 }
 
-func TestEnrichRDSDocDBMaintenance_IssueCountNeverExceedsResourceCount(t *testing.T) {
+func TestEnrichRDSDocDBMaintenance_IssueCountIsAlwaysZero(t *testing.T) {
+	// RDS maintenance severity is "~" (informational) — IssueCount must always be 0
+	// so it does NOT contribute to the menu badge count.
 	fake := &rdsMaintenanceBugFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
@@ -128,12 +136,12 @@ func TestEnrichRDSDocDBMaintenance_IssueCountNeverExceedsResourceCount(t *testin
 		{ID: "rds-eu-west-2-dev-instance", Name: "rds-eu-west-2-dev-instance"},
 	}
 
-	count, _, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if count > len(probeResources) {
-		t.Errorf("issue count %d exceeds resource count %d — enricher must not count more issues than resources", count, len(probeResources))
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0 (RDS severity is ~ — excluded from menu badge)", result.IssueCount)
 	}
 }

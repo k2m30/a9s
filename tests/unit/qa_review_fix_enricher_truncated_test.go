@@ -1,5 +1,11 @@
 package unit
 
+// qa_review_fix_enricher_truncated_test.go — Tests for EnricherFunc signature
+// and EnrichmentCap constant behavior.
+//
+// Updated for the EnricherResult return type:
+//   EnricherFunc = func(ctx, clients, resources) (EnricherResult, error)
+
 import (
 	"context"
 	"testing"
@@ -8,52 +14,60 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestEnricherFuncSignatureReturnsTruncated verifies that EnricherFunc accepts
-// functions with the signature (ctx, clients, resources) → (int, bool, error)
-// and that the bool (truncated flag) can be returned.
-// This is the fix from issue #196 bug 5: signature changed to include the truncated bool.
-func TestEnricherFuncSignatureReturnsTruncated(t *testing.T) {
-	// A minimal enricher that always reports 3 issues and truncated=true.
+// TestEnricherFuncSignatureReturnsResult verifies that EnricherFunc accepts
+// functions with the new signature (ctx, clients, resources) → (EnricherResult, error).
+func TestEnricherFuncSignatureReturnsResult(t *testing.T) {
 	fn := awsclient.EnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
-	) (int, bool, error) {
-		return 3, true, nil
+	) (awsclient.EnricherResult, error) {
+		return awsclient.EnricherResult{
+			IssueCount: 3,
+			Truncated:  true,
+			Findings:   make(map[string]resource.EnrichmentFinding),
+		}, nil
 	})
 
-	count, truncated, err := fn(context.Background(), nil, nil)
+	result, err := fn(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from test enricher: %v", err)
 	}
-	if count != 3 {
-		t.Errorf("expected count=3, got %d", count)
+	if result.IssueCount != 3 {
+		t.Errorf("IssueCount = %d, want 3", result.IssueCount)
 	}
-	if !truncated {
-		t.Error("expected truncated=true, got false")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true")
+	}
+	if result.Findings == nil {
+		t.Error("Findings must not be nil on success")
 	}
 }
 
 // TestEnricherFuncSignatureReturnsFalseWhenNotTruncated verifies that an enricher
-// can return truncated=false when results are not capped.
+// can return Truncated=false when results are not capped.
 func TestEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 	fn := awsclient.EnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
-	) (int, bool, error) {
-		return 0, false, nil
+	) (awsclient.EnricherResult, error) {
+		return awsclient.EnricherResult{
+			IssueCount: 0,
+			Truncated:  false,
+			Findings:   make(map[string]resource.EnrichmentFinding),
+		}, nil
 	})
 
-	count, truncated, err := fn(context.Background(), nil, nil)
+	result, err := fn(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 0 {
-		t.Errorf("expected count=0, got %d", count)
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
-	if truncated {
-		t.Error("expected truncated=false, got true")
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
 	}
 }
 
@@ -69,18 +83,20 @@ func TestEnrichmentCapValue(t *testing.T) {
 }
 
 // TestEnrichmentCapTruncation verifies that per-resource enrichers report
-// truncated=true when the resource slice exceeds EnrichmentCap.
+// Truncated=true when the resource slice exceeds EnrichmentCap.
 // This test uses a synthetic enricher that mirrors the pattern used by the
 // real per-resource enrichers in enrichment.go.
 func TestEnrichmentCapTruncation(t *testing.T) {
-	// Simulate the per-resource enricher cap check:
-	//   return issues, len(resources) > EnrichmentCap, nil
 	fn := awsclient.EnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		resources []resource.Resource,
-	) (int, bool, error) {
-		return 0, len(resources) > awsclient.EnrichmentCap, nil
+	) (awsclient.EnricherResult, error) {
+		return awsclient.EnricherResult{
+			IssueCount: 0,
+			Truncated:  len(resources) > awsclient.EnrichmentCap,
+			Findings:   make(map[string]resource.EnrichmentFinding),
+		}, nil
 	})
 
 	tests := []struct {
@@ -97,13 +113,13 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resources := make([]resource.Resource, tc.count)
-			_, truncated, err := fn(context.Background(), nil, resources)
+			result, err := fn(context.Background(), nil, resources)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if truncated != tc.wantTrunc {
-				t.Errorf("len(resources)=%d: want truncated=%v, got %v",
-					tc.count, tc.wantTrunc, truncated)
+			if result.Truncated != tc.wantTrunc {
+				t.Errorf("len(resources)=%d: want Truncated=%v, got %v",
+					tc.count, tc.wantTrunc, result.Truncated)
 			}
 		})
 	}

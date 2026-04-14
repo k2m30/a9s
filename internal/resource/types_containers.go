@@ -15,6 +15,17 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 				{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				case "FAILED":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "EKS Node Groups",
@@ -29,6 +40,7 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "instance_types", Title: "Instance Types", Width: 20, Sortable: false},
 				{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 	}
 }
