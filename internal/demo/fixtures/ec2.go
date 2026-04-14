@@ -565,7 +565,7 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 		},
 		{
-			GroupId:     aws.String("sg-0ddd444444444444d"),
+			GroupId:     aws.String("sg-0eee555555555555e"),
 			GroupName:   aws.String("acme-bastion-sg"),
 			VpcId:       aws.String(fixtProdVPCID),
 			Description: aws.String("Bastion host SSH access"),
