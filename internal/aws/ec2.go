@@ -243,17 +243,33 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, res
 		}
 	}
 
-	// Merge status fields into resources.
+	// Merge status fields into resources and promote Status for running instances.
 	for i, r := range resources {
 		if pair, ok := statusMap[r.ID]; ok {
 			if resources[i].Fields == nil {
 				resources[i].Fields = make(map[string]string)
 			}
-			if pair[0] != "" {
-				resources[i].Fields["system_status"] = pair[0]
+			sysStatus := pair[0]
+			instStatus := pair[1]
+			if sysStatus != "" {
+				resources[i].Fields["system_status"] = sysStatus
 			}
-			if pair[1] != "" {
-				resources[i].Fields["instance_status"] = pair[1]
+			if instStatus != "" {
+				resources[i].Fields["instance_status"] = instStatus
+			}
+			// Promote Resource.Status for running instances only.
+			// A running instance whose status checks report "impaired" or
+			// "initializing" must surface as an issue in the menu badge and
+			// ctrl+z filter. We promote Status so the Color func's fallback path
+			// (via r.Status) also works for test doubles without a Color func.
+			if resources[i].Fields["state"] == "running" {
+				if sysStatus == "impaired" || instStatus == "impaired" {
+					resources[i].Status = "impaired"
+				} else if sysStatus == "initializing" || instStatus == "initializing" {
+					if resources[i].Status != "impaired" { // impaired has priority
+						resources[i].Status = "initializing"
+					}
+				}
 			}
 		}
 	}

@@ -15,6 +15,15 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "last_changed", Title: "Last Changed", Width: 18, Sortable: true},
 				{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "":
+					return ColorHealthy
+				case "scheduled for deletion":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "SSM Parameters",
@@ -29,6 +38,7 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "KMS Keys",
@@ -41,6 +51,19 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "key_id", Title: "Key ID", Width: 38, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["key_state"] {
+				case "Enabled":
+					return ColorHealthy
+				case "Disabled":
+					return ColorDim
+				case "PendingDeletion", "PendingImport":
+					return ColorWarning
+				case "Unavailable":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 		},
 	}

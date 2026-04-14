@@ -9,6 +9,7 @@
 - In-process demo fixture store (per resource type, loaded at startup)
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3 (017-issue-counts-attention-filter)
 - YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps (017-issue-counts-attention-filter)
+- In-memory session-scoped maps on root `Model` (findings cleared on profile/region switch; no disk persistence for findings themselves — cache format unchanged) (018-enrichment-visibility)
 
 ## Project Structure
 
@@ -164,4 +165,5 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+- 018-enrichment-visibility: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
 - 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3

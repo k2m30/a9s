@@ -12,7 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -387,8 +386,9 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 		truncated := result.Pagination != nil && result.Pagination.IsTruncated
 		// Count issue-status resources (red/yellow only, not green/dim).
 		issues := 0
+		td := resource.FindResourceType(shortName)
 		for _, r := range result.Resources {
-			if styles.IsIssueRowColor(r.Status) {
+			if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
 				issues++
 			}
 		}
@@ -489,8 +489,9 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			}
 			// Count issue-status resources (red/yellow only).
 			issues := 0
+			td := resource.FindResourceType(shortName)
 			for _, r := range result.Resources {
-				if styles.IsIssueRowColor(r.Status) {
+				if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
 					issues++
 				}
 			}
@@ -505,6 +506,27 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			IssueTruncated: issueTruncated,
 			Resources:      retainedResources,
 		}
+	}
+}
+
+// refreshResourceListWithEnrichmentRerun wraps the ordinary refresh fetch for
+// a top-level list so that the ResourcesLoadedMsg it produces carries an
+// enrichment-rerun token. The token is captured at Ctrl+R dispatch time and
+// stamped into the message; the ResourcesLoadedMsg handler in app.go checks
+// TypeGen in its tail branch to decide whether to seed probeResources and
+// dispatch probeEnrichment. APIErrorMsg and any other message pass through
+// unchanged.
+func (m *Model) refreshResourceListWithEnrichmentRerun(
+	rl views.ResourceListModel, tok int,
+) tea.Cmd {
+	inner := m.refreshResourceList(rl)
+	return func() tea.Msg {
+		msg := inner()
+		if loaded, ok := msg.(messages.ResourcesLoadedMsg); ok {
+			loaded.TypeGen = tok
+			return loaded
+		}
+		return msg
 	}
 }
 
@@ -528,11 +550,14 @@ func (m *Model) buildEnrichQueue() []string {
 
 // probeEnrichment returns a tea.Cmd that runs the registered enricher for a
 // resource type and returns an EnrichmentCheckedMsg.
+// typeGen is the per-type generation counter captured at dispatch time; it is
+// embedded in the message so handleEnrichmentChecked can drop stale results.
 func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
 	resources := m.probeResources[shortName]
 	enricher := awsclient.EnricherRegistry[shortName]
+	typeGen := m.enrichmentTypeGen[shortName]
 	if enricher == nil {
 		return nil
 	}
@@ -542,32 +567,30 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 				ResourceType: shortName,
 				Err:          fmt.Errorf("AWS clients not initialized"),
 				Gen:          gen,
+				TypeGen:      typeGen,
 			}
 		}
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
 
-		// EnricherFunc returns (int, bool, error) — wrap for RetryOnThrottle which expects (T, error).
-		type enrichResult struct {
-			issues    int
-			truncated bool
-		}
-		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (enrichResult, error) {
-			issues, truncated, err := enricher(ctx, clients, resources)
-			return enrichResult{issues, truncated}, err
+		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.EnricherResult, error) {
+			return enricher(ctx, clients, resources)
 		})
 		if err != nil {
 			return messages.EnrichmentCheckedMsg{
 				ResourceType: shortName,
 				Err:          err,
 				Gen:          gen,
+				TypeGen:      typeGen,
 			}
 		}
 		return messages.EnrichmentCheckedMsg{
 			ResourceType: shortName,
-			Issues:       result.issues,
-			Truncated:    result.truncated,
+			Issues:       result.IssueCount,
+			Truncated:    result.Truncated,
+			Findings:     result.Findings,
 			Gen:          gen,
+			TypeGen:      typeGen,
 		}
 	}
 }

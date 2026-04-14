@@ -121,8 +121,8 @@ func TestQA_EC2_A2_1_FrameTitleShowsResourceTypeAndCount(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
-		t.Errorf("A.2.1: frame title should show 'ec2(6)', got: %s", plain)
+	if !strings.Contains(plain, "ec2(6") {
+		t.Errorf("A.2.1: frame title should show 'ec2(6...)', got: %s", plain)
 	}
 }
 
@@ -538,8 +538,8 @@ func TestQA_EC2_A8_11_EscClearsFilter(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
-		t.Errorf("A.8.11: after Esc, frame title should revert to 'ec2(6)', got: %s", plain)
+	if !strings.Contains(plain, "ec2(6") {
+		t.Errorf("A.8.11: after Esc, frame title should revert to 'ec2(6...)', got: %s", plain)
 	}
 	if !strings.Contains(plain, "? for help") {
 		t.Error("A.8.11: after Esc, header should revert to '? for help'")
@@ -570,7 +570,7 @@ func TestQA_EC2_A9_5_EscCancelsCommandMode(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Error("A.9.5: Esc during command mode should stay on EC2 list")
 	}
 	if !strings.Contains(plain, "? for help") {
@@ -842,7 +842,7 @@ func TestQA_EC2_B8_3_EscFromDetailReturnsToList(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("B.8.3: Esc from detail should return to EC2 list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1015,7 +1015,7 @@ func TestQA_EC2_C6_1_EscFromYAMLReturnsToList(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("C.6.1: Esc from YAML should return to EC2 list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1100,7 +1100,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 		Resources:    fixtureEC2Instances(),
 	})
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: should be at EC2 list")
 	}
 
@@ -1112,7 +1112,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	}
 	plain = stripANSI(rootViewContent(m))
 	// Detail view should show fields
-	if strings.Contains(plain, "ec2(6)") {
+	if strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: should have left the list view")
 	}
 
@@ -1137,7 +1137,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	// Esc back to list
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: Esc from detail should return to EC2 list")
 	}
 
@@ -1167,7 +1167,7 @@ func TestQA_EC2_D2_ListToYAMLAndBack(t *testing.T) {
 	// Esc should return to list, not detail
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("D.2: Esc from YAML should return to list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1233,7 +1233,7 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 
-	if strings.Contains(plain, "ec2(6)") {
+	if strings.Contains(plain, "ec2(6") {
 		t.Error("D.8: Esc from YAML should return to detail, not list")
 	}
 	if strings.Contains(plain, "yaml") {
