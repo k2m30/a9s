@@ -6,6 +6,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -51,8 +52,10 @@ var EnricherRegistry = map[string]EnricherFunc{
 const EnrichmentCap = 50
 
 // EnrichRDSDocDBMaintenance calls DescribePendingMaintenanceActions (account-wide, 1 call)
-// and counts resources with pending maintenance.
-func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (int, bool, error) {
+// and counts only probed resources that have pending maintenance. The API returns
+// maintenance actions for all RDS/DocDB resources (clusters AND instances), so we
+// filter to only count resources matching the probed resource IDs.
+func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (int, bool, error) {
 	if clients.RDS == nil {
 		return 0, false, nil
 	}
@@ -60,8 +63,35 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, _ [
 	if err != nil {
 		return 0, false, err
 	}
+	// Build a set of probed resource IDs for matching against ARN suffixes.
+	probeIDs := make(map[string]bool, len(resources))
+	for _, r := range resources {
+		if r.ID != "" {
+			probeIDs[r.ID] = true
+		}
+	}
+	// Count only maintenance actions whose resource ARN contains a probed ID.
+	// ARN format: arn:aws:rds:region:account:db:instance-id (or :cluster:cluster-id)
+	issues := 0
+	for _, action := range out.PendingMaintenanceActions {
+		if action.ResourceIdentifier == nil {
+			continue
+		}
+		arn := *action.ResourceIdentifier
+		// Extract the resource ID from the ARN (last segment after the last colon-delimited type)
+		matched := false
+		for id := range probeIDs {
+			if strings.HasSuffix(arn, ":"+id) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			issues++
+		}
+	}
 	truncated := out.Marker != nil
-	return len(out.PendingMaintenanceActions), truncated, nil
+	return issues, truncated, nil
 }
 
 // EnrichEC2StatusChecks calls DescribeInstanceStatus (1 call, all instances)
