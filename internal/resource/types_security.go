@@ -16,6 +16,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{
 				{
 					ChildType:      "role_policies",
@@ -39,6 +40,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "IAM Users",
@@ -54,6 +56,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "IAM Groups",
@@ -69,6 +72,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{
 				{
 					ChildType:      "iam_group_members",
@@ -90,6 +94,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 	}
 }

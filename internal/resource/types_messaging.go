@@ -16,6 +16,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "SNS Topics",
@@ -28,6 +29,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "sns_subscriptions",
 				Key:            "enter",
@@ -48,6 +50,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "EventBridge Rules",
@@ -91,6 +94,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "MSK Clusters",
@@ -105,6 +109,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "version", Title: "Version", Width: 14, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Step Functions",
@@ -120,6 +125,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 			// StateMachineListItem has no status field; DescribeStateMachine would be needed for real color.
 			Color: func(r Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "sfn_executions",
 				Key:            "enter",

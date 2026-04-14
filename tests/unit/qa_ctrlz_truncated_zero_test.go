@@ -54,29 +54,10 @@ func TestCtrlZ_TruncatedZero_Hidden(t *testing.T) {
 	}
 }
 
-func TestCtrlZ_TruncatedZero_ENI_Hidden(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	defer func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	}()
-
-	m := views.NewMainMenu(keys.Default())
-	m.SetSize(80, 200)
-
-	m.SetAvailability("eni", 35)
-	m.SetTruncated("eni", true)
-	m.SetIssues("eni", 0, true) // zero issues, truncated
-
-	m.Toggle()
-	m.SetIssues("eni", 0, true) // re-trigger applyFilter after toggle
-
-	plain := m.View()
-	if strings.Contains(plain, "Network Interfaces") {
-		t.Error("ENI (truncated-zero) should be hidden under ctrl+z")
-	}
-}
+// Previously this test asserted ENI truncated-zero hidden. That was wrong —
+// ENI is a health-state type (attaching/detaching → Warning), so truncated-zero
+// means issues may exist on unread pages. Coverage for ENI-visible moved to
+// qa_ctrlz_truncated_zero_health_state_test.go:TestCtrlZ_TruncatedZero_ENI_Visible.
 
 func TestCtrlZ_TruncatedNonzero_Visible(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
