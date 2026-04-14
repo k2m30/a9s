@@ -332,7 +332,10 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
-	m.availabilityGen++                                    // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight Wave 1 probes
+	m.enrichmentGen++                                      // cancel in-flight Wave 2 probes
+	m.enrichQueue = nil                                    // clear pending enrichment queue
+	m.probeResources = nil                                 // clear retained resources (stale context)
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
@@ -362,7 +365,10 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	}
 	m.region = msg.Region
 	m.identity = nil
-	m.availabilityGen++                                    // cancel in-flight probes
+	m.availabilityGen++                                    // cancel in-flight Wave 1 probes
+	m.enrichmentGen++                                      // cancel in-flight Wave 2 probes
+	m.enrichQueue = nil                                    // clear pending enrichment queue
+	m.probeResources = nil                                 // clear retained resources (stale context)
 	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()

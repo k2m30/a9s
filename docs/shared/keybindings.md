@@ -24,7 +24,7 @@
 | `c` | Copy resource ID to clipboard |
 | `i` | IAM identity view |
 | `/` | Filter |
-| `Ctrl+Z` | Show only attention-worthy rows (hide dim/routine) |
+| `Ctrl+Z` | Show only attention-worthy rows (resource lists) / filter to types with issues (main menu) |
 | `:` | Command mode |
 | `?` | Help |
 | `Ctrl+R` | Refresh |

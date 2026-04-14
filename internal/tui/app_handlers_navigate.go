@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,11 +42,13 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				entry.cursorPos, entry.hScrollOffset,
 				entry.attentionOnly,
 			)
+			rl.SetShowIssueBadge(true) // top-level list from main menu
 			rl.SetSize(m.innerSize())
 			m.pushView(&rl)
 			return m, nil
 		}
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		rl.SetShowIssueBadge(true) // top-level list from main menu
 		rl.SetSize(m.innerSize())
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -399,6 +402,10 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		for shortName, trunc := range msg.Truncated {
 			menu.SetTruncated(shortName, trunc)
 		}
+		// Apply cached issue counts (T033).
+		if len(msg.IssueKnown) > 0 {
+			menu.SetIssuesFromCache(msg.IssueCounts, msg.IssueTruncated, msg.IssueKnown)
+		}
 	}
 
 	// Build queue of all resource types to check in background
@@ -434,7 +441,26 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 		for shortName, trunc := range msg.Truncated {
 			menu.SetTruncated(shortName, trunc)
 		}
+		// T034: wire issue counts from prefetch.
+		for shortName, count := range msg.IssueCounts {
+			trunc := msg.IssueTruncated[shortName]
+			menu.SetIssues(shortName, count, trunc)
+		}
 		menu.SetCheckProgress(0, 0) // signal "done"
+	}
+	// T034: retain prefetch resources for Wave 2 enrichment (--no-cache live AWS).
+	if msg.Resources != nil {
+		if m.probeResources == nil {
+			m.probeResources = make(map[string][]resource.Resource, len(msg.Resources))
+		}
+		maps.Copy(m.probeResources, msg.Resources)
+	}
+	// Start Wave 2 enrichment for live --no-cache sessions (skip in demo mode).
+	if !m.isDemo {
+		enrichCmd := m.startEnrichment()
+		if enrichCmd != nil {
+			return m, enrichCmd
+		}
 	}
 	return m, nil
 }
@@ -453,7 +479,14 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			menu.SetAvailability(msg.ResourceType, msg.Count)
 			menu.SetTruncated(msg.ResourceType, msg.Truncated)
+			// T032: wire issue counts from probe.
+			menu.SetIssues(msg.ResourceType, msg.Issues, msg.Truncated)
 		}
+		// T032: retain probe resources for Wave 2 enrichment.
+		if m.probeResources == nil {
+			m.probeResources = make(map[string][]resource.Resource)
+		}
+		m.probeResources[msg.ResourceType] = msg.Resources
 	}
 
 	// Update progress on menu
@@ -482,8 +515,80 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 	m.flash.active = false
 
 	// Save cache to disk
-	cmd := m.saveAvailabilityCache()
-	return m, cmd
+	saveCmd := m.saveAvailabilityCache()
+
+	// Start Wave 2 enrichment (skip in demo mode — no real AWS to query).
+	if !m.isDemo {
+		enrichCmd := m.startEnrichment()
+		if enrichCmd != nil {
+			return m, tea.Batch(saveCmd, enrichCmd)
+		}
+	}
+	return m, saveCmd
+}
+
+// startEnrichment builds the enrichment queue and fires the first batch of probes.
+func (m *Model) startEnrichment() tea.Cmd {
+	m.enrichQueue = m.buildEnrichQueue()
+	if len(m.enrichQueue) == 0 {
+		return nil
+	}
+	m.enrichmentGen++
+	m.enrichChecked = 0
+	m.enrichTotal = len(m.enrichQueue)
+
+	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+		menu.SetEnrichProgress(0, m.enrichTotal)
+	}
+
+	// Fire first batch (up to 4)
+	var cmds []tea.Cmd
+	for i := 0; i < 4 && len(m.enrichQueue) > 0; i++ {
+		name := m.enrichQueue[0]
+		m.enrichQueue = m.enrichQueue[1:]
+		cmds = append(cmds, m.probeEnrichment(name, m.enrichmentGen))
+	}
+	return tea.Batch(cmds...)
+}
+
+// handleEnrichmentChecked processes a single Wave 2 enrichment result.
+func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.Model, tea.Cmd) {
+	if msg.Gen != m.enrichmentGen {
+		return m, nil
+	}
+
+	m.enrichChecked++
+
+	// Update menu issue count (only-increase: never overwrite a higher count).
+	if msg.Err == nil {
+		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+			cur := menu.GetIssueCounts()[msg.ResourceType]
+			if msg.Issues > cur {
+				menu.SetIssues(msg.ResourceType, msg.Issues, msg.Truncated)
+			}
+			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
+		}
+	}
+
+	// Fire next from queue
+	if len(m.enrichQueue) > 0 {
+		next := m.enrichQueue[0]
+		m.enrichQueue = m.enrichQueue[1:]
+		cmd := m.probeEnrichment(next, m.enrichmentGen)
+		return m, cmd
+	}
+
+	// All enrichment done — clear progress, free retained resources, save cache
+	if m.enrichChecked >= m.enrichTotal {
+		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+			menu.SetEnrichProgress(0, 0)
+		}
+		m.probeResources = nil
+		// Save cache with enrichment-updated issue counts.
+		cmd := m.saveAvailabilityCache()
+		return m, cmd
+	}
+	return m, nil
 }
 
 func copyToClipboard(content, successLabel string) tea.Cmd {

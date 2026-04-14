@@ -114,10 +114,18 @@ type Model struct {
 	preSuppliedClients *awsclient.ServiceClients
 
 	noCache         bool
+	isDemo          bool     // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 	availabilityGen int      // incremented on profile/region switch to cancel stale probes
 	availQueue      []string // resource short names remaining to probe
 	availChecked    int      // number probed so far in current gen
 	availTotal      int      // total types to probe in current gen
+
+	// Issue count enrichment (Wave 2)
+	probeResources  map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
+	enrichQueue     []string                       // resource types pending Wave 2 enrichment
+	enrichmentGen   int                            // generation counter for enrichment (stale protection)
+	enrichChecked   int                            // number of enrichment probes completed in current gen
+	enrichTotal     int                            // total enrichment probes to run in current gen
 
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
@@ -214,6 +222,16 @@ func WithDemo(enabled bool) Option {
 		m.preSuppliedClients = demo.NewServiceClients()
 		m.profile = demo.DemoProfile
 		m.region = demo.DemoRegion
+		m.isDemo = true
+	}
+}
+
+// WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
+// Set by the --demo CLI bootstrap path. Distinct from WithNoCache which only
+// disables disk persistence.
+func WithIsDemo(demo bool) Option {
+	return func(m *Model) {
+		m.isDemo = demo
 	}
 }
 
@@ -452,6 +470,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.EnrichmentCheckedMsg:
+		return m.handleEnrichmentChecked(msg)
 	case messages.EnrichDetailMsg:
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResultMsg:
@@ -630,6 +650,14 @@ func (m *Model) popView() bool {
 					if !newTrunc || !known || newCount > curCount {
 						menu.SetAvailability(shortName, newCount)
 						menu.SetTruncated(shortName, newTrunc)
+					}
+					// Sync-back issue count with only-increase guard (T036, FR-022).
+					// The list's Status-based issueCount may be lower than the menu's
+					// enriched count. Never overwrite a higher enriched count.
+					newIssues := rl.IssueCount()
+					curIssues := menu.GetIssueCounts()[shortName]
+					if newIssues > curIssues {
+						menu.SetIssues(shortName, newIssues, newTrunc)
 					}
 				}
 			}

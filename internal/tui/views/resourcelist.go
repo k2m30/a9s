@@ -31,7 +31,9 @@ type ResourceListModel struct {
 	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
 	filterText           string
-	attentionOnly        bool                // §7: ctrl+z toggle — when true, hide dim/neutral rows
+	AttentionFilter                          // §7: ctrl+z toggle — when enabled, hide dim/neutral rows
+	issueCount           int                 // count of IsIssueRowColor() resources; recomputed in applySortAndFilter
+	showIssueBadge       bool                // when true, FrameTitle shows "issues:N" badge; set by main menu navigation
 	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
 	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
 	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
@@ -129,7 +131,7 @@ func NewResourceListFromCache(
 		hScrollOffset: hScrollOffset,
 		loading:       false,
 		keys:          k,
-		attentionOnly: attentionOnly,
+		AttentionFilter: AttentionFilter{enabled: attentionOnly},
 	}
 	m.applySortAndFilter()
 	m.updateSortColKey()
@@ -296,7 +298,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.ToggleAttentionOnly):
-			m.attentionOnly = !m.attentionOnly
+			m.Toggle()
 			m.applySortAndFilter()
 			m.scroll.SetCursor(0)
 			m.styledRowCache = nil

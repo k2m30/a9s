@@ -174,9 +174,12 @@ type RelatedNavigateMsg struct {
 // Entries maps resource short names to resource counts.
 // Only entries with a successful check (no error) are included.
 type AvailabilityCacheLoadedMsg struct {
-	Entries   map[string]int  // shortName -> resource count
-	Truncated map[string]bool // shortName -> true if truncated
-	Expired   bool            // true if cache was beyond TTL
+	Entries        map[string]int  // shortName -> resource count
+	Truncated      map[string]bool // shortName -> true if truncated
+	Expired        bool            // true if cache was beyond TTL
+	IssueCounts    map[string]int  // shortName -> cached issue count
+	IssueTruncated map[string]bool // shortName -> true if issue count was truncated
+	IssueKnown     map[string]bool // shortName -> true if issue count was probed (vs unknown)
 }
 
 // AvailabilityPrefetchedMsg is returned by the synchronous prefetch path in
@@ -184,8 +187,11 @@ type AvailabilityCacheLoadedMsg struct {
 // AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
 // are already populated.
 type AvailabilityPrefetchedMsg struct {
-	Entries   map[string]int  // shortName -> resource count
-	Truncated map[string]bool // shortName -> true if truncated
+	Entries        map[string]int                    // shortName -> resource count
+	Truncated      map[string]bool                   // shortName -> true if truncated
+	IssueCounts    map[string]int                    // shortName -> issue-status resource count
+	IssueTruncated map[string]bool                   // shortName -> true if issue count is lower bound
+	Resources      map[string][]resource.Resource    // shortName -> retained first-page resources for Wave 2
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
@@ -196,6 +202,17 @@ type AvailabilityCheckedMsg struct {
 	Truncated    bool  // true if count is from a truncated first page
 	Err          error // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          int   // generation counter -- ignore if != current availabilityGen
+	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
+	Resources    []resource.Resource // retained first-page resources for Wave 2 enricher consumption
+}
+
+// EnrichmentCheckedMsg reports one resource type's Wave 2 enrichment result.
+type EnrichmentCheckedMsg struct {
+	ResourceType string
+	Issues       int   // updated issue count after enrichment
+	Truncated    bool  // whether the enrichment count is a lower bound
+	Err          error // enrichment error (nil on success)
+	Gen          int   // generation counter (stale probe protection)
 }
 
 // IdentityLoadedMsg is sent when the caller identity has been fetched.

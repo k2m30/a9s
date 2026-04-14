@@ -345,6 +345,8 @@ func buildReservations() []ec2types.Reservation {
 		{"i-0a1b2c3d4e5f60008", "ml-trainer-gpu", "stopping", ec2types.InstanceTypeG4dnXlarge, "10.0.5.30", "", fixtProdVPCID, fixtStagingSubnetA, time.Date(2026, 2, 14, 22, 0, 0, 0, time.UTC), ec2types.InstanceLifecycleTypeSpot},
 		{"i-0a1b2c3d4e5f60009", "temp-load-test", "shutting-down", ec2types.InstanceTypeC5Large, "10.0.3.55", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 20, 16, 30, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60010", "old-migration-worker", "terminated", ec2types.InstanceTypeT3Small, "", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 8, 1, 12, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60030", "dev-sandbox-01", "stopped", ec2types.InstanceTypeT3Medium, "10.1.0.20", "", fixtStagingVPCID, fixtStagingSubnetA, time.Date(2025, 10, 12, 7, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60031", "dev-sandbox-02", "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
 	}
 
 	var reservations []ec2types.Reservation
