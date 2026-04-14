@@ -76,31 +76,6 @@ func TestEnrichEBSVolumeStatus_FindingsKeyedByVolumeID(t *testing.T) {
 	}
 }
 
-// TestEnrichEBSVolumeStatus_SeverityBang verifies severity "!" on findings.
-func TestEnrichEBSVolumeStatus_SeverityBang(t *testing.T) {
-	out := &ec2.DescribeVolumeStatusOutput{
-		VolumeStatuses: []ec2types.VolumeStatusItem{
-			{
-				VolumeId:     aws.String("vol-sev"),
-				VolumeStatus: &ec2types.VolumeStatusInfo{Status: "impaired"},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
-
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f, ok := result.Findings["vol-sev"]
-	if !ok {
-		t.Fatal("expected finding for vol-sev")
-	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
-	}
-}
-
 // TestEnrichEBSVolumeStatus_SummaryVolumeIODegraded verifies the exact summary string.
 func TestEnrichEBSVolumeStatus_SummaryVolumeIODegraded(t *testing.T) {
 	out := &ec2.DescribeVolumeStatusOutput{

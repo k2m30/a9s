@@ -84,7 +84,7 @@ func TestClearAvailabilityReappliesFilter(t *testing.T) {
 	menu.SetIssues("dbi", 0, false)
 
 	// Verify that ec2/dbi are now hidden (prerequisite for the clear test).
-	viewHidden := menu.View()
+	viewHidden := stripANSI(menu.View())
 	if strings.Contains(viewHidden, "EC2 Instances") {
 		t.Fatal("prerequisite failed: EC2 Instances should be hidden after SetIssues(ec2,0,false) with ctrl+z active")
 	}
@@ -95,7 +95,7 @@ func TestClearAvailabilityReappliesFilter(t *testing.T) {
 	// ClearAvailability() must restore all items to unknown state → all visible under ctrl+z.
 	menu.ClearAvailability()
 
-	viewAfter := menu.View()
+	viewAfter := stripANSI(menu.View())
 	if !strings.Contains(viewAfter, "EC2 Instances") {
 		t.Error("after ClearAvailability(), EC2 Instances should be visible again (restored to unknown state)")
 	}

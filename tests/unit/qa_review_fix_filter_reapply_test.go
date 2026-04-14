@@ -51,7 +51,7 @@ func TestSetIssuesReappliesFilterWhenCtrlZActive(t *testing.T) {
 
 	// With ctrl+z active and no issue data, all items are in "unknown" state → visible.
 	// EC2 Instances should appear in View().
-	viewBefore := menu.View()
+	viewBefore := stripANSI(menu.View())
 	if !strings.Contains(viewBefore, "EC2 Instances") {
 		t.Fatalf("EC2 Instances not visible in View() before SetIssues — check SetSize or resource registration")
 	}
@@ -61,7 +61,7 @@ func TestSetIssuesReappliesFilterWhenCtrlZActive(t *testing.T) {
 	menu.SetIssues("ec2", 0, false)
 
 	// After SetIssues, applyFilter() must have been called — EC2 should now be hidden.
-	viewAfter := menu.View()
+	viewAfter := stripANSI(menu.View())
 	if strings.Contains(viewAfter, "EC2 Instances") {
 		t.Errorf("SetIssues(ec2, 0, false) with ctrl+z active: EC2 Instances should be hidden but still appears in View()")
 	}
@@ -76,14 +76,14 @@ func TestSetIssuesReappliesFilterWhenCtrlZActive_HasIssuesVisible(t *testing.T) 
 	menu.Toggle()
 
 	// EC2 is visible in unknown state.
-	if !strings.Contains(menu.View(), "EC2 Instances") {
+	if !strings.Contains(stripANSI(menu.View()), "EC2 Instances") {
 		t.Fatal("EC2 Instances not visible in View() before SetIssues")
 	}
 
 	// Mark ec2 as having issues — must remain visible.
 	menu.SetIssues("ec2", 3, false)
 
-	if !strings.Contains(menu.View(), "EC2 Instances") {
+	if !strings.Contains(stripANSI(menu.View()), "EC2 Instances") {
 		t.Error("SetIssues(ec2, 3, false): ec2 has issues>0 so it must remain visible under ctrl+z")
 	}
 }
@@ -100,7 +100,7 @@ func TestSetIssuesFromCacheReappliesFilter(t *testing.T) {
 	}
 
 	// EC2 and RDS instances should be visible in unknown state.
-	viewBefore := menu.View()
+	viewBefore := stripANSI(menu.View())
 	if !strings.Contains(viewBefore, "EC2 Instances") {
 		t.Fatal("EC2 Instances not visible before SetIssuesFromCache")
 	}
@@ -116,7 +116,7 @@ func TestSetIssuesFromCacheReappliesFilter(t *testing.T) {
 	menu.SetIssuesFromCache(counts, truncated, known)
 
 	// After SetIssuesFromCache, applyFilter() must have been called — both should be hidden.
-	viewAfter := menu.View()
+	viewAfter := stripANSI(menu.View())
 	if strings.Contains(viewAfter, "EC2 Instances") {
 		t.Error("SetIssuesFromCache with ec2 confirmed-zero: EC2 Instances should be hidden but still appears in View()")
 	}
@@ -134,7 +134,7 @@ func TestSetIssuesFromCacheOnlyHidesKnownEntries(t *testing.T) {
 	menu.Toggle()
 
 	// EC2 visible before cache load.
-	if !strings.Contains(menu.View(), "EC2 Instances") {
+	if !strings.Contains(stripANSI(menu.View()), "EC2 Instances") {
 		t.Fatal("EC2 Instances not visible before SetIssuesFromCache")
 	}
 
@@ -145,7 +145,7 @@ func TestSetIssuesFromCacheOnlyHidesKnownEntries(t *testing.T) {
 	menu.SetIssuesFromCache(counts, truncated, known)
 
 	// EC2 should remain visible because known=false means it's still unknown state.
-	if !strings.Contains(menu.View(), "EC2 Instances") {
+	if !strings.Contains(stripANSI(menu.View()), "EC2 Instances") {
 		t.Error("SetIssuesFromCache with known=false should NOT hide ec2 (unknown state → visible)")
 	}
 }

@@ -138,7 +138,7 @@ return m, func() tea.Msg {
 
 ### Styled row rendering
 ```go
-style := styles.RowColorStyle(resource.Status)
+style := styles.ColorStyle(typeDef.ResolveColor(resource))
 if isSelected {
     style = styles.RowSelected
 }

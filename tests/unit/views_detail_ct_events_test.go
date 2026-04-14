@@ -74,7 +74,7 @@ const dangerCTJSON = `{
 //
 //go:fix inline
 func awsStrPtr(s string) *string {
-	return new(s)
+	return &s
 }
 
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
