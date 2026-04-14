@@ -55,21 +55,16 @@ docs/demos/social/
 2. Write `~/.a9s/config.yaml` with `theme: <picked>.yaml`
 3. Record which theme was picked — it determines the VHS `Set Theme` value
 
-**VHS controls the terminal background** via `Set Theme`, not the user's actual terminal. For light a9s themes, you MUST set a matching light VHS theme so the background is light. Map as follows:
+**The a9s theme name belongs ONLY in `~/.a9s/config.yaml`**, never in the `.tape` file. The a9s app reads its theme from config — VHS does not control app colors.
 
-| a9s theme | VHS `Set Theme` |
-|-----------|-----------------|
-| tokyo-night.yaml | TokyoNight |
-| catppuccin-mocha.yaml | Catppuccin Mocha |
-| dracula.yaml | Dracula |
-| nord.yaml | nord |
-| gruvbox-dark.yaml | GruvboxDark |
-| solarized-dark.yaml | Builtin Solarized Dark |
-| catppuccin-latte.yaml | Catppuccin Latte |
-| gruvbox-light.yaml | Gruvbox Light |
-| nord-light.yaml | nord-light |
-| solarized-light.yaml | Builtin Solarized Light |
-| tokyo-night-light.yaml | TokyoNightLight |
+**In the `.tape` file, `Set Theme` has only two valid values:**
+
+- `Set Theme "Builtin Dark"` — if the picked a9s theme is dark (tokyo-night, catppuccin-mocha, dracula, nord, gruvbox-dark, solarized-dark)
+- `Set Theme "Builtin Light"` — if the picked a9s theme is light (catppuccin-latte, gruvbox-light, nord-light, solarized-light, tokyo-night-light)
+
+VHS only controls the terminal chrome (background behind the app frame). Match it to dark/light so the chrome doesn't clash with the app palette. Do NOT try to match VHS theme names to a9s theme names — that couples two unrelated color systems and produces inconsistent results.
+
+Header comment in the `.tape` file: `# Theme: <picked-a9s-theme>` (e.g. `# Theme: gruvbox-dark`) — this documents which a9s theme was used; the actual rendering comes from `~/.a9s/config.yaml`.
 
 ### Step 3: Write post.md
 

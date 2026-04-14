@@ -118,15 +118,8 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: false},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 			},
-			Color: func(r Resource) Color {
-				switch r.Fields["status"] {
-				case "ACTIVE":
-					return ColorHealthy
-				case "DELETING":
-					return ColorDim
-				}
-				return ColorHealthy
-			},
+			// StateMachineListItem has no status field; DescribeStateMachine would be needed for real color.
+			Color: func(r Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "sfn_executions",
 				Key:            "enter",

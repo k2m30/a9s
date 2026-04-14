@@ -233,7 +233,29 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "health", Title: "Health", Width: 10, Sortable: true},
 				{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				// Environment health takes precedence over status when available.
+				switch r.Fields["health"] {
+				case "Red":
+					return ColorBroken
+				case "Yellow":
+					return ColorWarning
+				case "Grey":
+					return ColorDim
+				case "Green":
+					return ColorHealthy
+				}
+				// Fall back to status when health is not set.
+				switch r.Fields["status"] {
+				case "Ready":
+					return ColorHealthy
+				case "Launching", "Updating":
+					return ColorWarning
+				case "Terminating", "Terminated":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "EBS Volumes",

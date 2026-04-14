@@ -88,7 +88,7 @@ Key messages:
 | `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability + issue count data (includes `IssueCounts`, `IssueKnown` maps) |
 | `AvailabilityPrefetchedMsg` | No-cache-mode availability + issue counts + retained resources for Wave 2 |
 | `AvailabilityCheckedMsg` | One resource type's background probe result (includes `Issues` count + retained `Resources`) |
-| `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (issue count + truncated flag) |
+| `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (issue count + truncated flag + per-resource `Findings` map; dual-generation guard via `Gen` + `TypeGen`) |
 | **UI feedback** | |
 | `FlashMsg` | Show a temporary status/error message |
 | `ClearFlashMsg` | Auto-clear flash after timer |
@@ -188,12 +188,21 @@ resource.RegisterEnricher("role_policies", enrichRolePolicy)
 ```go
 // internal/resource/types.go
 type ResourceTypeDef struct {
-    Name       string           // "EC2 Instances"
-    ShortName  string           // "ec2"
-    Category   string           // "Compute"
-    Columns    []Column         // table columns
-    Children   []ChildViewDef   // child view triggers (key bindings)
-    // ...
+    Name        string           // "EC2 Instances" — display name
+    ShortName   string           // "ec2" — colon-command alias and registry key
+    ListTitle   string           // overrides ShortName in list frame titles; empty = use ShortName
+    Aliases     []string         // alternative command names
+    Category    string           // main-menu group (e.g., "COMPUTE")
+    Columns     []Column         // table columns for list view
+    Children    []ChildViewDef   // child views triggerable from the list (key bindings)
+    CopyField   string           // overrides which Fields key `c` copies; empty = copy ID
+    StubCreator func(id string) Resource // builds a minimal stub for auto-navigate when cache is empty
+    RelatedContextFromIDs func(relatedIDs []string) map[string]string // extracts parent context for related-panel navigation
+    CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
+    IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
+    Color func(Resource) Color   // REQUIRED: classifies row health; reads structural fields directly
+    ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
+    CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
 ```
 
@@ -201,18 +210,18 @@ Types are built once at package init by `buildResourceTypes()`. Categories map t
 
 | File | Category |
 |------|----------|
-| `types_compute.go` | Compute (EC2, Lambda, EKS, ASG, Elastic Beanstalk, EBS) |
-| `types_containers.go` | Containers (ECS Clusters, ECS Services) |
-| `types_networking.go` | Networking (VPC, Subnet, SG, ELB, TG, IGW, NAT, Route Tables, Node Groups, ACM, API Gateway, WAF) |
+| `types_compute.go` | Compute (EC2, Lambda, EKS Clusters, ASG, Elastic Beanstalk, EBS) |
+| `types_containers.go` | Containers (EKS Node Groups, ECS Clusters, ECS Services) |
+| `types_networking.go` | Networking (VPC, Subnet, SG, ELB, TG, IGW, NAT, Route Tables, ACM, API Gateway, WAF) |
 | `types_databases.go` | Databases & Storage (RDS, S3, Redis, OpenSearch, DynamoDB, Redshift, MSK, EFS, Kinesis) |
 | `types_security.go` | Security & IAM (IAM Roles, Users, Policies, Groups, KMS) |
 | `types_secrets.go` | Secrets & Config (Secrets Manager, SSM Parameter Store) |
 | `types_monitoring.go` | Monitoring (CloudWatch Alarms, Log Groups, CloudTrail) |
-| `types_messaging.go` | Messaging (SNS, SQS, EventBridge Rules, Step Functions, SES) |
+| `types_messaging.go` | Messaging (SNS, SQS, EventBridge Rules, Step Functions) |
 | `types_cicd.go` | CI/CD (CloudFormation, CodePipeline, CodeBuild, ECR) |
 | `types_dns_cdn.go` | DNS & CDN (Route 53, CloudFront) |
 | `types_data.go` | Data & Analytics (Athena, Glue) |
-| `types_backup.go` | Backup (AWS Backup) |
+| `types_backup.go` | Backup (AWS Backup, SES) |
 
 ---
 
@@ -227,7 +236,7 @@ All registered in `internal/resource/registry.go`, implemented in `internal/aws/
 | **FilteredPaginatedFetcher** | `func(ctx, clients, filter, token) (FetchResult, error)` | Server-side filtered queries (CloudTrail events) |
 | **RevealFetcher** | `func(ctx, clients, resourceID) (string, error)` | On-demand secret reveal (`x` key — Secrets Manager, SSM) |
 | **Enricher** | `func(ctx, clients, Resource) (Resource, error)` | On-demand detail enrichment (policy documents) |
-| **EnricherFunc** | `func(ctx, *ServiceClients, []Resource) (int, bool, error)` | Wave 2 issue enrichment (returns issue count + truncated flag) |
+| **EnricherFunc** | `func(ctx, *ServiceClients, []Resource) (EnricherResult, error)` | Wave 2 issue enrichment; `EnricherResult` carries issue count, truncated flag, and per-resource `Findings` map |
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
 
@@ -241,6 +250,7 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 - `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
 **Flow:**
+
 ```text
 Wave 1 probes complete
   → startEnrichment() builds queue from EnricherRegistry ∩ probeResources
@@ -257,7 +267,30 @@ Wave 1 probes complete
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
-**Lifecycle**: `probeResources` is cleared after Wave 2 completes and on profile/region switch. Manual refresh (Ctrl+R) does not currently clear Wave 2 state — it only bumps `availabilityGen` and reloads the cache.
+**Lifecycle**: `probeResources` is cleared after Wave 2 completes and on profile/region switch. On a top-level resource list with a registered enricher, Ctrl+R bumps `enrichmentTypeGen[rt]`, clears `enrichmentFindings[rt]` and `enrichmentRan[rt]`, calls `SetEnrichmentState(0, false, false, nil)` on the active list, and dispatches `refreshResourceListWithEnrichmentRerun` to rerun Wave 2 for that type. The main-menu Ctrl+R path invalidates Wave 2 for all types: it bumps `enrichmentGen` (the session-wide generation counter), resets `enrichmentTypeGen` to an empty map, clears `enrichmentFindings` and `enrichmentRan` — then reloads the cache from disk. Wave 2 re-runs when the user next navigates to a resource list.
+
+### Enrichment Visibility Subsystem
+
+After Wave 2 enrichment runs, findings are surfaced in list and detail views.
+
+**Types:**
+- `resource.EnrichmentFinding` (`internal/resource/enrichment.go`) — `Severity string` (`"!"` broken/degraded, `"~"` scheduled/informational) + `Summary string` (human-readable description).
+
+**List view integration:**
+- `ResourceListModel.SetEnrichmentState(issueCount int, truncated, ran bool, findings map[string]resource.EnrichmentFinding)` — stores Wave 2 results; called by `handleEnrichmentChecked` on arrival and called with zeroed args on Ctrl+R rerun start.
+- `renderEnrichmentBanner()` — emits a styled banner line above the table when `ran=true` and findings exist; invisible until Wave 2 completes.
+- Row-marker dot: a severity-colored middle dot (`·`) is prepended to the identity column for each resource that has a finding. Column position is determined by `resolveIdentityColumn()`.
+
+**Detail view integration:**
+- `DetailModel.SetEnrichmentFinding(f *resource.EnrichmentFinding)` — injects (or clears) a "Background Check" section in the detail view showing severity + summary. `nil` clears the section.
+
+**Stacked-view live-update pattern:**
+- `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
+
+**Session-scoped state on root `Model`:**
+- `enrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on profile/region switch.
+- `enrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
+- `enrichmentTypeGen map[string]int` — per-type generation counter; guards against stale in-flight rerun results.
 
 ---
 
@@ -295,17 +328,34 @@ type View interface {
 
 The main menu shows `issues:N` badges per resource type, counting resources in warning/error states. The ctrl+z key filters the menu to show only types with issues.
 
-**Two predicates** serve different purposes:
-- `IsDimRowColor(status)` — identifies dim/dead rows (terminated, deleted). Used by ctrl+z on resource lists to hide dead rows. Returns true for `ColTerminated` and `ColHeaderFg` colors.
-- `IsIssueRowColor(status)` — identifies warning/error rows (stopped, failed, pending, alarm). Used for issue count badges. Color-independent: uses a pre-built `issueStatusSet` map, works under `NO_COLOR`.
+**Row Coloring:**
+- `resource.Color` enum: `ColorHealthy` (green), `ColorWarning` (yellow), `ColorBroken` (red), `ColorDim` (grey).
+- `(Color).IsIssue() bool` — returns true for `ColorWarning` and `ColorBroken`. Used by both the attention filter and issue-count badges.
+- `ResourceTypeDef.Color func(Resource) Color` — per-type classification function; reads structural fields directly (e.g., EC2 checks `system_status` and `instance_status`). REQUIRED for all registered types.
+- `ResourceTypeDef.ResolveColor(r Resource) Color` — dispatcher: calls `d.Color(r)` when non-nil, falls back to `resource.fallbackColor(r.Status)` for ad-hoc test doubles that omit `Color`.
+- `resource.fallbackColor(status string) Color` — status-string fallback covering common AWS vocabulary; used only when `Color` is nil (test doubles).
+- `styles.ColorStyle(c resource.Color) lipgloss.Style` — maps `resource.Color` to a palette foreground style for row rendering.
+
+**`TierColorStyle`** (`styles.TierColorStyle(tier string) lipgloss.Style`): Maps detail-view tier strings to palette foreground styles. Tiers: `"ok"`, `"!"` (broken), `"~"` (warning/scheduled), `"impaired"`, `"initializing"`, `"ct-danger"`, `"ct-attention"`, `"ct-info"`.
+
+**`IdentityKey` and `resolveIdentityColumn`**: The enrichment row-marker dot is placed in the "identity column" — the column that most clearly names the resource. `ResourceTypeDef.IdentityKey` pins the column by key. When empty, `resolveIdentityColumn(cols, td)` applies a 5-step cascade:
+1. `td.IdentityKey` matches a column's `Key`
+2. column `Key == "name"`
+3. column `Path` contains `"Name"` or `"Identifier"`
+4. column `Title` equals `"Name"` (case-insensitive) or equals `td.Name`
+5. fall back to column index 0
+
+**`CellDecorators` and `lookupDecorator`**: `ResourceTypeDef.CellDecorators` is a `map[string]func(Resource, string) string` that transforms a cell's display value before render. `lookupDecorator(decs, col)` resolves the right decorator via a fallback chain: column `Key` → column `Path` → `Path`'s final segment (lowercased) → column `Title` (lowercased). Only EC2 currently uses this (to prefix state with `"! "` for impaired or `"~ "` for degraded-but-running).
 
 **AttentionFilter** (`internal/tui/views/attention.go`): A shared toggle struct embedded by both `MainMenuModel` and `ResourceListModel`. Owns only enabled/disabled state — views do their own counting and rendering.
 
 **Issue counting flow**:
-1. Wave 1 probes (or `demoPrefetchCounts()`) count `IsIssueRowColor()` rows from first page
+1. Wave 1 probes (or `demoPrefetchCounts()`) count `td.ResolveColor(r).IsIssue()` rows from first page
 2. Counts flow to `MainMenuModel` via `SetIssues()`, rendered as `issues:N` badges
 3. Wave 2 enrichment discovers hidden issues, updates badges (only-increase guard)
-4. `popView()` sync-back: when user returns from a list, the list's Status-based `issueCount` syncs back to the menu — but only if higher than the current menu count (prevents overwriting enriched counts)
+4. `popView()` sync-back: when user returns from a list, the list's `issueCount` syncs back to the menu — but only if higher than the current menu count (prevents overwriting enriched counts)
+
+**`ExcludeFromIssueBadge`**: When set on a `ResourceTypeDef`, rows are still colored and ctrl+z is honored, but the type is excluded from the main-menu badge count. Used by ct-events where severity is event-level, not resource-health.
 
 **Tri-state visibility** under ctrl+z on the main menu:
 
@@ -329,9 +379,8 @@ Key highlights:
 - `1`–`9`, `0` — sort by column position (1=first column, 0=tenth). Pressing the same key toggles sort direction.
 - `t` — jump to CloudTrail Events for the selected resource (all resource types)
 - `!` — error log (session errors with timestamps, rendered via `YAMLModel.NewTextViewer`)
-- `Ctrl+Z` — toggle attention filter: on resource lists, hides dim/routine rows (`!IsDimRowColor`); on main menu, filters to types with issues using quad-state visibility (unknown→visible, confirmed-zero→hidden, truncated-zero→visible, nonzero→visible)
+- `Ctrl+Z` — toggle attention filter: on resource lists, hides rows where `m.typeDef.ResolveColor(r).IsIssue()` is false (dim/routine rows); on main menu, filters to types with issues using quad-state visibility (unknown→visible, confirmed-zero→hidden, truncated-zero→visible, nonzero→visible)
 - `c` — copy resource ID to clipboard
-- `p` — role policies (and other child views via `ChildViewDef.Key`)
 - `e`, `L`, `R`, `s` — child view triggers (Events, Logs, Resources, Source)
 - `r` — toggle related panel
 - `x` — reveal secret value
@@ -481,6 +530,7 @@ The app has four distinct caches, each serving a different purpose:
 | **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
 | **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
 | **Enricher caches** | Feature-specific cache on `ServiceClients` (current example: `PolicyDocCache`) | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
+| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps on root `Model` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
@@ -740,7 +790,7 @@ The stack model maps naturally to drill-down navigation (list → detail → YAM
 
 ### Why generation counters?
 
-Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`, `availabilityGen`, `enrichmentGen`) are incremented on context changes, causing stale in-flight results to be silently discarded. `enrichmentGen` specifically guards Wave 2 enrichment — bumped on profile/region switch alongside `availabilityGen` to cancel in-flight Wave 2 probes. Note: manual refresh (Ctrl+R) currently only bumps `availabilityGen`, not `enrichmentGen`.
+Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`, `availabilityGen`, `enrichmentTypeGen`) are incremented on context changes, causing stale in-flight results to be silently discarded. `enrichmentTypeGen` is a per-type counter for Wave 2: bumped on profile/region switch and on Ctrl+R when the active view is a top-level list with a registered enricher. The dual-generation guard (`Gen` on `EnrichmentCheckedMsg` for session-wide staleness, `TypeGen` for per-type rerun staleness) lets multiple types enrich concurrently while rerun invalidation only cancels the refreshed type.
 
 ### Why a separate enricher pattern?
 

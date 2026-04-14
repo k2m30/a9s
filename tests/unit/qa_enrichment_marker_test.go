@@ -11,7 +11,6 @@ package unit
 //   - Under NO_COLOR the · character still appears in the rendered output.
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -61,10 +60,9 @@ func markerResources() []resource.Resource {
 // buildMarkerModel constructs a fully-loaded ResourceListModel for marker tests.
 func buildMarkerModel(t *testing.T, findings map[string]resource.EnrichmentFinding) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
+	t.Setenv("NO_COLOR", "")
 	styles.Reinit()
 	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
 		styles.Reinit()
 	})
 
@@ -239,7 +237,6 @@ func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	styles.Reinit()
 	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
 		styles.Reinit()
 	})
 

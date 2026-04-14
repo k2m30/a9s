@@ -53,7 +53,14 @@ import (
 // EC2DescribeInstancesAPI defines the interface for the EC2 DescribeInstances operation.
 type EC2DescribeInstancesAPI interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
-	DescribeInstanceStatus(ctx context.Context, params *ec2.DescribeInstanceStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error)
+}
+
+// EC2FetchInstancesAPI combines DescribeInstances and DescribeInstanceStatus,
+// which are both required by FetchEC2InstancesPage (status enrichment uses the second).
+// EC2DescribeInstanceStatusAPI is defined in the Wave 2 enrichment section below.
+type EC2FetchInstancesAPI interface {
+	EC2DescribeInstancesAPI
+	EC2DescribeInstanceStatusAPI
 }
 
 // S3ListBucketsAPI defines the interface for the S3 ListBuckets operation.

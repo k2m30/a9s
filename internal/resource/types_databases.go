@@ -42,7 +42,12 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				return rdsInstanceColor(r.Fields["db_instance_status"])
+				// Prefer "status" (set by fetcher); fall back to legacy "db_instance_status".
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Fields["db_instance_status"]
+				}
+				return rdsInstanceColor(status)
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "dbi_events",
@@ -126,7 +131,12 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["table_status"] {
+				// Prefer "status" (set by fetcher); fall back to legacy "table_status".
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Fields["table_status"]
+				}
+				switch status {
 				case "ACTIVE":
 					return ColorHealthy
 				case "CREATING", "UPDATING", "DELETING":

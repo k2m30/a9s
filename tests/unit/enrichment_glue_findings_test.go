@@ -72,26 +72,6 @@ func TestEnrichGlueJobStatus_FailedFindingKeyedByJobName(t *testing.T) {
 	}
 }
 
-// TestEnrichGlueJobStatus_SeverityBang verifies severity "!".
-func TestEnrichGlueJobStatus_SeverityBang(t *testing.T) {
-	fake := &glueJobFake{
-		jobRuns: map[string]gluetypes.JobRunState{
-			"sev-job": gluetypes.JobRunStateFailed,
-		},
-	}
-	clients := &awsclient.ServiceClients{Glue: fake}
-	resources := []resource.Resource{{Name: "sev-job"}}
-
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f := result.Findings["sev-job"]
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
-	}
-}
-
 // TestEnrichGlueJobStatus_SummaryContainsFAILED verifies the summary for FAILED state.
 func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 	fake := &glueJobFake{

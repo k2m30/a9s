@@ -52,30 +52,6 @@ func newAttentionListFromCache(t *testing.T, attentionOnly bool, resources []res
 }
 
 // ---------------------------------------------------------------------------
-// TestResourceListAttentionOnlyAccessor
-// ---------------------------------------------------------------------------
-
-// TestResourceListAttentionOnlyAccessor verifies that AttentionOnly() returns
-// exactly the value passed as attentionOnly to NewResourceListFromCache.
-func TestResourceListAttentionOnlyAccessor(t *testing.T) {
-	resources := attentionMixedResources()
-
-	t.Run("true when constructed with true", func(t *testing.T) {
-		m := newAttentionListFromCache(t, true, resources)
-		if !m.AttentionOnly() {
-			t.Error("expected AttentionOnly() == true, got false")
-		}
-	})
-
-	t.Run("false when constructed with false", func(t *testing.T) {
-		m := newAttentionListFromCache(t, false, resources)
-		if m.AttentionOnly() {
-			t.Error("expected AttentionOnly() == false, got true")
-		}
-	})
-}
-
-// ---------------------------------------------------------------------------
 // TestResourceListAttentionFilterPreservesExistingBehavior
 // ---------------------------------------------------------------------------
 

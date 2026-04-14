@@ -111,7 +111,7 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 	m2, _ := m.Update(findingMsg)
 	m, _ = m2.(tui.Model)
 
-	output := renderRootModel(m)
+	output := stripANSI(renderRootModel(m))
 
 	if !strings.Contains(output, "system status impaired — live update test") {
 		t.Errorf("after live EnrichmentCheckedMsg, detail view must show finding summary, got:\n%s", output)
@@ -147,7 +147,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m2, _ := m.Update(setFindingMsg)
 	m, _ = m2.(tui.Model)
 
-	withFinding := renderRootModel(m)
+	withFinding := stripANSI(renderRootModel(m))
 	if !strings.Contains(withFinding, "instance status impaired — will recover") {
 		t.Skip("pre-condition failed: finding was not set; skipping recovery check")
 	}
@@ -167,7 +167,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m3, _ := m.Update(clearFindingMsg)
 	m, _ = m3.(tui.Model)
 
-	withoutFinding := renderRootModel(m)
+	withoutFinding := stripANSI(renderRootModel(m))
 	if strings.Contains(withoutFinding, "instance status impaired — will recover") {
 		t.Errorf("after recovery EnrichmentCheckedMsg, old finding summary must be cleared from detail view, got:\n%s", withoutFinding)
 	}
@@ -198,7 +198,7 @@ func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 	m2, _ := m.Update(staleMsg)
 	m, _ = m2.(tui.Model)
 
-	output := renderRootModel(m)
+	output := stripANSI(renderRootModel(m))
 	if strings.Contains(output, "stale finding — should not appear") {
 		t.Errorf("stale TypeGen must be dropped; finding must not appear in detail view, got:\n%s", output)
 	}

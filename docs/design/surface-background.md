@@ -1,5 +1,7 @@
 # Plan: Surface Background Rendering for Themes
 
+> Note: references to `styles.RowColorStyle` in this file are historical. Current API: `styles.ColorStyle(resource.Color)` via `ResourceTypeDef.ResolveColor(r)`. See `docs/architecture.md` Row Coloring.
+
 ## Context
 
 Light themes look wrong because the app does not own the terminal background. Verified: Lipgloss v2's `Render()` sets outer bg once — inner `\x1b[m]` resets kill it for subsequent characters. Outer wrapping is unreliable. Per-fragment background is required at every composition site.

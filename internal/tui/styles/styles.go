@@ -46,6 +46,8 @@ var (
 	YAMLNullStyle        lipgloss.Style
 	SearchCurrentStyle   lipgloss.Style
 	SearchOtherStyle     lipgloss.Style
+
+	EnrichmentBannerStyle lipgloss.Style // warning text for enrichment banner in resource list
 )
 
 // NoColorActive reports whether NO_COLOR is set in the environment.
@@ -143,6 +145,7 @@ func initStyles() {
 	YAMLNullStyle = lipgloss.Style{}
 	SearchCurrentStyle = lipgloss.Style{}
 	SearchOtherStyle = lipgloss.Style{}
+	EnrichmentBannerStyle = lipgloss.Style{}
 
 	// These 13 styles were previously package-level vars in view files,
 	// initialized once at load time and unaffected by NO_COLOR / Reinit().
@@ -187,4 +190,5 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
 	StatusCheckWarn = lipgloss.NewStyle().Foreground(ColPending)
 	StatusCheckOk = lipgloss.NewStyle().Foreground(ColRunning)
+	EnrichmentBannerStyle = lipgloss.NewStyle().Foreground(ColStopped).PaddingLeft(1)
 }

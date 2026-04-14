@@ -309,8 +309,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		if m.noCache {
 			return m, nil
 		}
-		// Increment gen to cancel any in-flight probes
+		// Increment gen to cancel any in-flight probes and enrichment
 		m.availabilityGen++
+		m.enrichmentGen++
+		m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
+		m.enrichmentRan = make(map[string]bool)
+		m.enrichmentTypeGen = make(map[string]int)
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd

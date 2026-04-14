@@ -62,7 +62,7 @@ func init() {
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
 // of instances. Used by existing tests and the legacy fetcher.
-func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]resource.Resource, error) {
+func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
 	for {
@@ -81,7 +81,7 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 
 // FetchEC2InstancesPage calls the EC2 DescribeInstances API and returns
 // a single page of instances. Pass an empty continuationToken for the first page.
-func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, continuationToken string) (resource.FetchResult, error) {
+func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeInstancesInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -197,7 +197,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 // enrichEC2StatusChecks calls DescribeInstanceStatus for the page's resources
 // and merges system_status/instance_status into each resource's Fields map.
 // Errors are silently ignored (graceful degradation per design spec).
-func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, resources []resource.Resource) {
+func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI, resources []resource.Resource) {
 	// Collect instance IDs.
 	ids := make([]string, 0, len(resources))
 	for _, r := range resources {

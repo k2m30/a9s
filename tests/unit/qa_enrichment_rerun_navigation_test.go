@@ -48,7 +48,9 @@ import (
 // Post-fix: The tail branch runs regardless of active view whenever the TypeGen
 // token matches. The returned cmd is non-nil (probeEnrichment was dispatched).
 func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
+	oldVersion := tui.Version
 	tui.Version = "test"
+	t.Cleanup(func() { tui.Version = oldVersion })
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to EC2 list.

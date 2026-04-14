@@ -66,7 +66,7 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 					return ColorHealthy
 				case "PENDING_VALIDATION":
 					return ColorWarning
-				case "EXPIRED", "REVOKED", "FAILED":
+				case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT":
 					return ColorBroken
 				case "INACTIVE":
 					return ColorDim

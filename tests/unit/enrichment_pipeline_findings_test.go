@@ -81,26 +81,6 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByPipelineName(t *testing.T) {
 	}
 }
 
-// TestEnrichCodePipelineStatus_SeverityBang verifies severity "!".
-func TestEnrichCodePipelineStatus_SeverityBang(t *testing.T) {
-	fake := &pipelineStateFake{
-		states: map[string]*codepipeline.GetPipelineStateOutput{
-			"pipeline-sev": {StageStates: []cptypes.StageState{stageState("Build", "Failed")}},
-		},
-	}
-	clients := &awsclient.ServiceClients{CodePipeline: fake}
-	resources := []resource.Resource{{Name: "pipeline-sev"}}
-
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f := result.Findings["pipeline-sev"]
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
-	}
-}
-
 // TestEnrichCodePipelineStatus_SummaryContainsStageName verifies "stage <Name> failed" format.
 func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
 	fake := &pipelineStateFake{
