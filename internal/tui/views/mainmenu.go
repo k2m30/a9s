@@ -329,9 +329,17 @@ func (m MainMenuModel) FrameTitle() string {
 	total := len(m.allItems)
 	filtered := len(m.filteredItems)
 	var title string
-	if m.filterText != "" {
+	switch {
+	case m.filterText != "" && m.IsEnabled():
+		// Text filter + ctrl+z: show filtered/total [!]
 		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
-	} else {
+	case m.IsEnabled():
+		// ctrl+z only: show filtered/total [!] so user sees how many types have issues
+		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+	case m.filterText != "":
+		// Text filter only
+		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+	default:
 		title = "resource-types(" + itoa(total) + ")"
 	}
 	if m.IsEnabled() {
