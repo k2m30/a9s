@@ -44,12 +44,28 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			)
 			rl.SetShowIssueBadge(true) // top-level list from main menu
 			rl.SetSize(m.innerSize())
+			// Wire enrichment state so the banner and markers reflect current findings.
+			issueCount := 0
+			issueTrunc := false
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				issueCount = menu.GetIssueCounts()[msg.ResourceType]
+				issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
+			}
+			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentRan[msg.ResourceType], m.enrichmentFindings[msg.ResourceType])
 			m.pushView(&rl)
 			return m, nil
 		}
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
 		rl.SetShowIssueBadge(true) // top-level list from main menu
 		rl.SetSize(m.innerSize())
+		// Wire enrichment state so the banner and markers reflect current findings.
+		issueCount := 0
+		issueTrunc := false
+		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+			issueCount = menu.GetIssueCounts()[msg.ResourceType]
+			issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
+		}
+		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentRan[msg.ResourceType], m.enrichmentFindings[msg.ResourceType])
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
 		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
@@ -69,6 +85,12 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		}
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
 		d.SetSize(m.innerSize())
+		// Wire enrichment finding if one exists for this resource.
+		if findings, ok := m.enrichmentFindings[resType]; ok {
+			if f, exists := findings[msg.Resource.ID]; exists {
+				d.SetEnrichmentFinding(&f)
+			}
+		}
 		m.pushView(&d)
 		var cmds []tea.Cmd
 
@@ -330,6 +352,26 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rt := rl.ResourceType()
 	delete(m.resourceCache, rt) // clear cache for refreshed type only
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
+
+	// Top-level list with a registered enricher: bump per-type gen, clear
+	// findings, and dispatch a wrapped fetch that stamps TypeGen onto the
+	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
+	// probeResources and dispatch probeEnrichment on success.
+	if rl.ParentContext() == nil && !rl.EscPops() {
+		if _, hasEnricher := awsclient.EnricherRegistry[rt]; hasEnricher && !m.isDemo {
+			m.enrichmentTypeGen[rt]++
+			tok := m.enrichmentTypeGen[rt]
+			delete(m.enrichmentFindings, rt)
+			delete(m.enrichmentRan, rt)
+			// Propagate the cleared state to the active ResourceListModel so the
+			// banner and row markers disappear immediately at Ctrl+R — otherwise
+			// stale markers would remain visible until the rerun completes (and
+			// indefinitely if the refresh errors out).
+			rl.SetEnrichmentState(0, false, false, nil)
+			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
+			return m, cmd
+		}
+	}
 	return m, m.refreshResourceList(*rl)
 }
 
@@ -528,6 +570,9 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 }
 
 // startEnrichment builds the enrichment queue and fires the first batch of probes.
+// For each type dispatched, it bumps enrichmentTypeGen, clears any existing
+// findings and ran flag (clear-on-rerun-start), then captures the new gen into
+// the probeEnrichment call.
 func (m *Model) startEnrichment() tea.Cmd {
 	m.enrichQueue = m.buildEnrichQueue()
 	if len(m.enrichQueue) == 0 {
@@ -541,11 +586,15 @@ func (m *Model) startEnrichment() tea.Cmd {
 		menu.SetEnrichProgress(0, m.enrichTotal)
 	}
 
-	// Fire first batch (up to 4)
+	// Fire first batch (up to 4), bumping per-type gen before each dispatch.
 	var cmds []tea.Cmd
 	for i := 0; i < 4 && len(m.enrichQueue) > 0; i++ {
 		name := m.enrichQueue[0]
 		m.enrichQueue = m.enrichQueue[1:]
+		// Clear-on-rerun-start: bump type gen, wipe stale findings and ran flag.
+		m.enrichmentTypeGen[name]++
+		delete(m.enrichmentFindings, name)
+		delete(m.enrichmentRan, name)
 		cmds = append(cmds, m.probeEnrichment(name, m.enrichmentGen))
 	}
 	return tea.Batch(cmds...)
@@ -553,14 +602,23 @@ func (m *Model) startEnrichment() tea.Cmd {
 
 // handleEnrichmentChecked processes a single Wave 2 enrichment result.
 func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.Model, tea.Cmd) {
+	// Session-wide generation guard — drop stale messages from prior profile/region.
 	if msg.Gen != m.enrichmentGen {
+		return m, nil
+	}
+	// Per-type generation guard — drop stale probes superseded by a newer rerun.
+	if msg.TypeGen != m.enrichmentTypeGen[msg.ResourceType] {
 		return m, nil
 	}
 
 	m.enrichChecked++
 
-	// Update menu issue count (only-increase guard, plus truncated-flag upgrade).
+	// Update findings and menu issue count on success.
 	if msg.Err == nil {
+		// Persist findings and mark enrichment as ran for this type.
+		m.enrichmentFindings[msg.ResourceType] = msg.Findings
+		m.enrichmentRan[msg.ResourceType] = true
+
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			cur := menu.GetIssueCounts()[msg.ResourceType]
 			curTrunc := menu.GetIssueTruncated()[msg.ResourceType]
@@ -573,13 +631,43 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 				menu.SetIssues(msg.ResourceType, msg.Issues, true)
 			}
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
+
+			// Live-update ALL ResourceListModel views in the stack showing this type.
+			// Iterating the full stack ensures stacked (non-active) lists are also
+			// updated when the user has navigated to a detail view or another screen
+			// and enrichment completes while that view is active.
+			issueCount := menu.GetIssueCounts()[msg.ResourceType]
+			issueTrunc := menu.GetIssueTruncated()[msg.ResourceType]
+			for _, v := range m.stack {
+				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
+					rl.SetEnrichmentState(issueCount, issueTrunc, true, msg.Findings)
+				}
+			}
+		}
+
+		// Live-update ALL DetailModel views in the stack for this resource type.
+		// Iterating the full stack ensures stacked (non-active) detail views are also
+		// updated when the user has navigated to a second detail view or another screen
+		// and enrichment completes while that secondary view is active.
+		for _, v := range m.stack {
+			if d, ok := v.(*views.DetailModel); ok && d.ResourceType() == msg.ResourceType {
+				if f, exists := msg.Findings[d.ResourceID()]; exists {
+					d.SetEnrichmentFinding(&f)
+				} else {
+					d.SetEnrichmentFinding(nil)
+				}
+			}
 		}
 	}
 
-	// Fire next from queue
+	// Fire next from queue — bump per-type gen before each dispatch.
 	if len(m.enrichQueue) > 0 {
 		next := m.enrichQueue[0]
 		m.enrichQueue = m.enrichQueue[1:]
+		// Clear-on-rerun-start for the next type.
+		m.enrichmentTypeGen[next]++
+		delete(m.enrichmentFindings, next)
+		delete(m.enrichmentRan, next)
 		cmd := m.probeEnrichment(next, m.enrichmentGen)
 		return m, cmd
 	}

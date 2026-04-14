@@ -2,6 +2,59 @@ package resource
 
 import "strings"
 
+// Color classifies a resource's health for display, filtering, and badges.
+type Color uint8
+
+const (
+	ColorHealthy Color = iota // green  — nominal
+	ColorWarning              // yellow — transitioning / degrading
+	ColorBroken               // red    — stopped / failed / impaired
+	ColorDim                  // grey   — terminated / inactive
+)
+
+// IsIssue reports whether this color contributes to attention filtering and issue badges.
+func (c Color) IsIssue() bool { return c == ColorWarning || c == ColorBroken }
+
+// fallbackColor classifies a resource status string when no per-type Color func
+// is set. Covers the common AWS vocabulary so ad-hoc test ResourceTypeDef
+// instances (which omit Color) behave sensibly without requiring every test to
+// set up a full registered type.
+func fallbackColor(status string) Color {
+	switch status {
+	case "running", "available", "active", "ACTIVE", "AVAILABLE", "RUNNING",
+		"in-service", "healthy":
+		return ColorHealthy
+	case "stopped", "failed", "error", "impaired", "FAILED", "ERROR",
+		"STOPPED", "inactive":
+		return ColorBroken
+	case "terminated", "TERMINATED", "shutting-down", "deleted", "DELETED",
+		"deregistered":
+		return ColorDim
+	}
+	// Suffix patterns for compound statuses (e.g. "create_failed", "update_in_progress").
+	lower := strings.ToLower(status)
+	switch {
+	case strings.HasSuffix(lower, "_failed") || strings.HasSuffix(lower, "-failed"):
+		return ColorBroken
+	case strings.HasSuffix(lower, "_in_progress") || strings.HasSuffix(lower, "_progress") ||
+		strings.HasSuffix(lower, "-in-progress") || status == "pending" ||
+		status == "creating" || status == "modifying" || status == "updating" ||
+		status == "initializing":
+		return ColorWarning
+	}
+	return ColorHealthy
+}
+
+// ResolveColor classifies r using d.Color, defaulting to a generic status-based
+// color when d.Color is nil. All registered types have non-nil Color (invariant #7);
+// the fallback exists only for ad-hoc ResourceTypeDef test doubles.
+func (d ResourceTypeDef) ResolveColor(r Resource) Color {
+	if d.Color == nil {
+		return fallbackColor(r.Status)
+	}
+	return d.Color(r)
+}
+
 // Column defines a column in a resource table view.
 type Column struct {
 	// Key is the field key used to extract the value from Resource.Fields.
@@ -79,6 +132,26 @@ type ResourceTypeDef struct {
 	//   ValueSource = "ID" (res.ID), "Name" (res.Name), or "Fields.xxx" (res.Fields["xxx"])
 	// Empty string means no CloudTrail support (t key suppressed).
 	CloudTrailKey string
+	// IdentityKey optionally names the column key used to position the
+	// enrichment-finding row marker. When empty, the row-marker resolver uses
+	// a cascade: match "name" key → path contains "Name"/"Identifier" →
+	// title equal to "Name" or the type Name → column index 0.
+	// Set this only when the cascade would pick the wrong column.
+	IdentityKey string
+
+	// Color classifies the row's health. REQUIRED for all registered types.
+	// Reads the resource's structural fields directly.
+	Color func(Resource) Color
+
+	// ExcludeFromIssueBadge, when true, still colors rows and honors ctrl+z,
+	// but excludes the type from the main-menu badge count. Used for event-severity
+	// types (ct-events) where severity is event-level, not resource-health.
+	ExcludeFromIssueBadge bool
+
+	// CellDecorators optionally transforms cell values per column key before render.
+	// Key = column key; value = decorator func receiving the full resource and the
+	// already-extracted cell string, returning the replacement. nil map = no decorators.
+	CellDecorators map[string]func(r Resource, value string) string
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.
