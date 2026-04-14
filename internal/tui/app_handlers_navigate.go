@@ -559,12 +559,18 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 
 	m.enrichChecked++
 
-	// Update menu issue count (only-increase: never overwrite a higher count).
+	// Update menu issue count (only-increase guard, plus truncated-flag upgrade).
 	if msg.Err == nil {
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			cur := menu.GetIssueCounts()[msg.ResourceType]
+			curTrunc := menu.GetIssueTruncated()[msg.ResourceType]
 			if msg.Issues > cur {
+				// Higher count — update both count and truncated flag.
 				menu.SetIssues(msg.ResourceType, msg.Issues, msg.Truncated)
+			} else if msg.Issues == cur && msg.Truncated && !curTrunc {
+				// Same count but enrichment is truncated — upgrade the flag
+				// so the badge shows "issues:N+" instead of exact "issues:N".
+				menu.SetIssues(msg.ResourceType, msg.Issues, true)
 			}
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
 		}

@@ -108,11 +108,11 @@ func EnrichEC2StatusChecks(ctx context.Context, clients *ServiceClients, _ []res
 	}
 	issues := 0
 	for _, s := range out.InstanceStatuses {
-		if s.SystemStatus != nil && s.SystemStatus.Status != ec2types.SummaryStatusOk {
-			issues++
-			continue
-		}
-		if s.InstanceStatus != nil && s.InstanceStatus.Status != ec2types.SummaryStatusOk {
+		// Only count "impaired" — not "not-applicable" (stopped instances),
+		// "insufficient-data" (recently launched), or "initializing".
+		sysImpaired := s.SystemStatus != nil && s.SystemStatus.Status == ec2types.SummaryStatusImpaired
+		instImpaired := s.InstanceStatus != nil && s.InstanceStatus.Status == ec2types.SummaryStatusImpaired
+		if sysImpaired || instImpaired {
 			issues++
 		}
 	}
