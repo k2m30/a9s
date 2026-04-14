@@ -55,7 +55,9 @@ enrichmentRan      map[string]bool // shortName → true if Wave 2 completed thi
 
 **Populated by**: `handleEnrichmentChecked` — only on `msg.Err == nil`. Replaces (not merges) the per-type findings map from `msg.Findings`, sets `enrichmentRan[shortName] = true`. On error (`msg.Err != nil`), neither `enrichmentFindings` nor `enrichmentRan` is updated for that type — a failed enrichment call does not count as "enriched this session."
 
-**Cleared on**: profile switch, region switch, AND manual refresh. Both `enrichmentFindings` and `enrichmentRan` are cleared.
+**Cleared on**: profile switch and region switch only. These are the paths that also restart Wave 1 probes (which lead to Wave 2 rerun), so findings will be repopulated.
+
+Manual refresh (`Ctrl+R`) does NOT clear findings. Current refresh branches are scoped: main-menu refresh restarts availability probes (Wave 1 → Wave 2 reruns → findings replaced per-type on success), detail refresh only re-triggers related/detail enrichment, list refresh only re-fetches the list. None of them explicitly rerun Wave 2 for arbitrary types. Clearing findings on these paths would remove banners, markers, and detail sections with no mechanism to restore them. Instead, findings persist across refresh and are replaced naturally when Wave 2 reruns for each type.
 
 ### 4. List-level enrichment banner (derived from list state)
 
@@ -106,37 +108,46 @@ When at least one loaded resource has a finding (checked against `enrichmentFind
 **Banner lifecycle**:
 - Derived after every `applySortAndFilter()` call
 - Disappears when `visibleIssueCount > 0` (issue-colored rows become visible)
-- Disappears on refresh (findings cleared, enrichment reruns)
+- Persists across list/detail refresh (findings are session-scoped, not cleared on Ctrl+R)
+- Disappears on profile/region switch (findings cleared, Wave 2 reruns)
 
 ### 5. Row marker for loaded resources with findings
 
 For loaded resources that have a finding in `enrichmentFindings`, add a minimal row marker: a colored `·` (middle dot) prepended to the Name/ID column value. This gives the user a truthful per-row affordance without the full prefix system.
 
-**Column targeting**: The marker is attached to the **identity column** — resolved semantically, not by position. The resolver checks the resolved columns (from `resolveColumns()` in `table_render.go`) for the first column whose key matches the resource type's identity field (typically `"name"`, `"function_name"`, `"db_identifier"`, `"project_name"`, etc.). If no semantic match is found, fall back to index 0 of the resolved column list. This is stable across custom view configs where users reorder columns.
+**Column targeting**: The marker is attached to the **identity column** — resolved semantically, not by position. The resolver finds the identity column using a cascade that accounts for the current view config format where many columns have `Key` empty and only `Path` or `Title` set:
 
-The marker stays with the identity column even if the user scrolls horizontally and the column moves off-screen. This is consistent with how the cursor highlight works — it highlights the logical row, not the visible viewport.
+1. Match `c.key == typeDef.IdentityKey` (new optional field on `ResourceTypeDef`)
+2. Match `c.key == "name"` (common convention)
+3. Match `c.path` contains "Name" or "Identifier" (covers path-only configs like `Path: "DBInstanceIdentifier"`)
+4. Match `strings.EqualFold(c.title, "Name")` or `strings.EqualFold(c.title, typeDef.Name)` (title-based fallback)
+5. Fall back to index 0 of the resolved column list
+
+The marker stays with the identity column even if the user scrolls horizontally and the column moves off-screen.
 
 **Implementation**: In `table_render.go`, resolve the marker target column once per render pass:
 
 ```go
-markerColIdx := 0 // fallback
-for i, c := range resolvedColumns {
-    if c.key == m.typeDef.IdentityKey || c.key == "name" {
-        markerColIdx = i
-        break
-    }
-}
+markerColIdx := resolveIdentityColumn(resolvedColumns, m.typeDef)
 
-// Then during row rendering:
-if colIdx == markerColIdx {
-    if finding, ok := enrichmentFindingsForType[r.ID]; ok {
-        val = "· " + val
-        // Override cell style to finding severity color
+func resolveIdentityColumn(cols []resolvedColumn, td resource.ResourceTypeDef) int {
+    for i, c := range cols {
+        if td.IdentityKey != "" && c.key == td.IdentityKey { return i }
     }
+    for i, c := range cols {
+        if c.key == "name" { return i }
+    }
+    for i, c := range cols {
+        if strings.Contains(c.path, "Name") || strings.Contains(c.path, "Identifier") { return i }
+    }
+    for i, c := range cols {
+        if strings.EqualFold(c.title, "Name") { return i }
+    }
+    return 0
 }
 ```
 
-Note: `IdentityKey` is a new optional field on `ResourceTypeDef` that names the column key for the primary identifier. If unset, falls back to `"name"`. This avoids hardcoding column names per resource type in the renderer.
+`IdentityKey` is a new optional field on `ResourceTypeDef`. If unset, the cascade handles it. Most current types will resolve via the `path` or `title` match without needing `IdentityKey` set.
 
 The `enrichmentFindingsForType` reference is passed to the list model at creation/update (the subset of `m.enrichmentFindings[shortName]` for this type). The dot renders in ColStopped for `!` severity, ColPending for `~`.
 
@@ -235,14 +246,14 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 - [ ] Banner text does not promise row-level d affordance
 - [ ] Banner disappears when visible issue-colored rows appear
 - [ ] Banner text shows `N+` when enrichment count is truncated
-- [ ] Row marker `·` shown on column index 0 (Name/ID) for loaded resources with findings
-- [ ] Row marker attached to logical column, not leftmost visible after horizontal scroll
+- [ ] Row marker `·` shown on the identity column (resolved semantically via cascade, index 0 fallback) for loaded resources with findings
+- [ ] Row marker stable across custom view configs and horizontal scroll
 - [ ] Row marker colored by severity (red `!`, yellow `~`)
 - [ ] Detail view shows "Background Check" section for resources with findings
 - [ ] Detail section updates live when enrichment completes while detail is open
 - [ ] Detail section clears when enrichment reruns and the resource is no longer affected (recovery)
 - [ ] YAML/JSON views do NOT show findings
-- [ ] Findings session-scoped, cleared on profile/region switch AND refresh
+- [ ] Findings session-scoped, cleared on profile/region switch only (not manual refresh)
 - [ ] Per-type findings replaced on enrichment rerun
 - [ ] RDS/DocDB: severity `~`, NOT counted in menu badge
 
@@ -253,7 +264,7 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 | `internal/resource/enrichment.go` | NEW — `EnrichmentFinding` type |
 | `internal/aws/enrichment.go` | `EnricherResult` type; enrichers return findings |
 | `internal/tui/app.go` | `enrichmentFindings`, `enrichmentRan` maps |
-| `internal/tui/app_handlers.go` | Clear findings + ran on profile/region switch + refresh |
+| `internal/tui/app_handlers.go` | Clear findings + ran on profile/region switch only |
 | `internal/tui/app_handlers_navigate.go` | Store findings; update detail live; pass enrichment state to list |
 | `internal/tui/app_fetchers.go` | `probeEnrichment` carries findings in message |
 | `internal/tui/messages/messages.go` | `EnrichmentCheckedMsg` carries `Findings` map |
@@ -270,7 +281,7 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 2. `EnricherResult` + update `EnricherFunc` signature in `internal/aws/enrichment.go`
 3. Update 9 enrichers to return `EnricherResult` with findings
 4. `enrichmentFindings` + `enrichmentRan` maps on Model; store from `EnrichmentCheckedMsg`
-5. Clear on profile/region switch + refresh
+5. Clear on profile/region switch only
 6. `enrichmentIssueCount` + `enrichmentRanThisSession` on ResourceListModel; derive banner
 7. Render banner in View()
 8. `·` row marker in table_render.go
