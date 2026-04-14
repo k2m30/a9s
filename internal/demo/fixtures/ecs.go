@@ -203,6 +203,23 @@ func buildECSServices() []ecstypes.Service {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		{
+			ServiceName:        aws.String("canary-sidecar"),
+			ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-staging/canary-sidecar"),
+			ClusterArn:         aws.String(ecsClusterArnStaging),
+			Status:             aws.String("DRAINING"),
+			DesiredCount:       0,
+			RunningCount:       2,
+			PendingCount:       0,
+			LaunchType:         ecstypes.LaunchTypeFargate,
+			TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/canary-sidecar:2"),
+			SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+			CreatedAt:          aws.Time(mustTime("2025-11-10T09:00:00Z")),
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+				{Key: aws.String("Team"), Value: aws.String("reliability")},
+			},
+		},
 	}
 
 	// Generate 17 more services to reach 22 total.

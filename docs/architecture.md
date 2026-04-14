@@ -84,10 +84,11 @@ Key messages:
 | `EnrichDetailResultMsg` | Deliver enriched resource back to detail/YAML/JSON view |
 | `RelatedCheckStartedMsg` | Start async related-resource checks |
 | `RelatedCheckResultMsg` | Deliver one related-check result to detail view |
-| **Availability** | |
-| `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability data |
-| `AvailabilityPrefetchedMsg` | No-cache-mode availability counts |
-| `AvailabilityCheckedMsg` | One resource type's background probe result |
+| **Availability & Issue Counts** | |
+| `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability + issue count data (includes `IssueCounts`, `IssueKnown` maps) |
+| `AvailabilityPrefetchedMsg` | No-cache-mode availability + issue counts + retained resources for Wave 2 |
+| `AvailabilityCheckedMsg` | One resource type's background probe result (includes `Issues` count + retained `Resources`) |
+| `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (issue count + truncated flag) |
 | **UI feedback** | |
 | `FlashMsg` | Show a temporary status/error message |
 | `ClearFlashMsg` | Auto-clear flash after timer |
@@ -226,8 +227,37 @@ All registered in `internal/resource/registry.go`, implemented in `internal/aws/
 | **FilteredPaginatedFetcher** | `func(ctx, clients, filter, token) (FetchResult, error)` | Server-side filtered queries (CloudTrail events) |
 | **RevealFetcher** | `func(ctx, clients, resourceID) (string, error)` | On-demand secret reveal (`x` key — Secrets Manager, SSM) |
 | **Enricher** | `func(ctx, clients, Resource) (Resource, error)` | On-demand detail enrichment (policy documents) |
+| **EnricherFunc** | `func(ctx, *ServiceClients, []Resource) (int, bool, error)` | Wave 2 issue enrichment (returns issue count + truncated flag) |
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
+
+### Wave 2 Issue Enrichment Pipeline
+
+Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
+
+**Architecture:**
+- `internal/aws/enrichment.go` — 9 enricher functions implementing `EnricherFunc`, registered in `EnricherRegistry`
+- `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
+- `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
+
+**Flow:**
+```text
+Wave 1 probes complete
+  → startEnrichment() builds queue from EnricherRegistry ∩ probeResources
+  → probeEnrichment() dispatches enrichers (4-at-a-time, same as Wave 1)
+  → EnrichmentCheckedMsg arrives
+    → only-increase guard: menu badge updated only if new count > current
+    → progress indicator updated
+  → all done: clear probeResources, save cache with enriched counts (when caching enabled)
+```
+
+**Priority order** (batchable first): RDS/DocDB maintenance → EC2 status checks → EBS volume status → CodeBuild → Target Groups → CodePipeline → DynamoDB → Step Functions → Glue.
+
+**Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Batchable enrichers (priorities 1-3) make account-wide calls. Per-resource enrichers (priorities 5-9) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50).
+
+**Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
+
+**Lifecycle**: `probeResources` is cleared after Wave 2 completes and on profile/region switch. Manual refresh (Ctrl+R) does not currently clear Wave 2 state — it only bumps `availabilityGen` and reloads the cache.
 
 ---
 
@@ -237,8 +267,8 @@ All in `internal/tui/views/`:
 
 | View | File(s) | Purpose |
 |------|---------|---------|
-| **MainMenuModel** | `mainmenu.go` | Category-grouped resource list with availability badges |
-| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down |
+| **MainMenuModel** | `mainmenu.go` | Category-grouped resource list with availability badges, issue count badges (`issues:N`), ctrl+z quad-state filter, enrichment progress indicator |
+| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down; embeds `AttentionFilter` for ctrl+z; tracks `issueCount` for title badge |
 | **DetailModel** | `detail.go`, `detail_fields.go`, `detail_helpers.go` | Two-column: field list (left) + related panel (right) |
 | **YAMLModel** | `yaml.go` | YAML dump of RawStruct with syntax highlighting + search. Also doubles as a raw-text viewer via `NewTextViewer()` (used for the `!` error log) |
 | **JSONModel** | `json.go` | JSON dump of RawStruct with syntax highlighting + search |
@@ -261,6 +291,30 @@ type View interface {
 
 `Update` is deliberately excluded from the interface because each view returns its own concrete type. The root model's `updateActiveView()` type-switches on each concrete type to dispatch and write back.
 
+### Issue Counting & Attention Filter
+
+The main menu shows `issues:N` badges per resource type, counting resources in warning/error states. The ctrl+z key filters the menu to show only types with issues.
+
+**Two predicates** serve different purposes:
+- `IsDimRowColor(status)` — identifies dim/dead rows (terminated, deleted). Used by ctrl+z on resource lists to hide dead rows. Returns true for `ColTerminated` and `ColHeaderFg` colors.
+- `IsIssueRowColor(status)` — identifies warning/error rows (stopped, failed, pending, alarm). Used for issue count badges. Color-independent: uses a pre-built `issueStatusSet` map, works under `NO_COLOR`.
+
+**AttentionFilter** (`internal/tui/views/attention.go`): A shared toggle struct embedded by both `MainMenuModel` and `ResourceListModel`. Owns only enabled/disabled state — views do their own counting and rendering.
+
+**Issue counting flow**:
+1. Wave 1 probes (or `demoPrefetchCounts()`) count `IsIssueRowColor()` rows from first page
+2. Counts flow to `MainMenuModel` via `SetIssues()`, rendered as `issues:N` badges
+3. Wave 2 enrichment discovers hidden issues, updates badges (only-increase guard)
+4. `popView()` sync-back: when user returns from a list, the list's Status-based `issueCount` syncs back to the menu — but only if higher than the current menu count (prevents overwriting enriched counts)
+
+**Tri-state visibility** under ctrl+z on the main menu:
+
+| State | Badge | Visible under ctrl+z? |
+|-------|-------|----------------------|
+| Unknown (not probed) | None | Yes (prevent cold-start empty menu) |
+| Zero issues (any truncation) | None | No — config-only types (S3, ENI, IAM) never have issues regardless of page count |
+| Nonzero issues | `issues:N` | Yes |
+
 ---
 
 ## Key Handling
@@ -275,7 +329,7 @@ Key highlights:
 - `1`–`9`, `0` — sort by column position (1=first column, 0=tenth). Pressing the same key toggles sort direction.
 - `t` — jump to CloudTrail Events for the selected resource (all resource types)
 - `!` — error log (session errors with timestamps, rendered via `YAMLModel.NewTextViewer`)
-- `Ctrl+Z` — toggle attention-only filter (hide dim/routine rows)
+- `Ctrl+Z` — toggle attention filter: on resource lists, hides dim/routine rows (`!IsDimRowColor`); on main menu, filters to types with issues using quad-state visibility (unknown→visible, confirmed-zero→hidden, truncated-zero→visible, nonzero→visible)
 - `c` — copy resource ID to clipboard
 - `p` — role policies (and other child views via `ChildViewDef.Key`)
 - `e`, `L`, `R`, `s` — child view triggers (Events, Logs, Resources, Source)
@@ -355,7 +409,14 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 
 ---
 
-## Enrichment (On-Demand Detail Enhancement)
+## Enrichment
+
+a9s has two distinct enrichment pipelines:
+
+1. **Detail enrichment** (on-demand) — fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
+2. **Issue enrichment (Wave 2)** (background) — discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
+
+### On-Demand Detail Enhancement
 
 When a detail, YAML, or JSON view opens for a resource type with a registered enricher, the app async-fetches additional data and merges it into the resource.
 
@@ -421,7 +482,7 @@ The app has four distinct caches, each serving a different purpose:
 | **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
 | **Enricher caches** | Feature-specific cache on `ServiceClients` (current example: `PolicyDocCache`) | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
 
-**Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources and their counts. Loaded on startup to instantly grey-out empty types in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count}`.
+**Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
 **Resource cache**: Stores the full view state of previously-viewed resource lists (resources, pagination, filter, sort, cursor position). Enables instant back-navigation without re-fetching.
 
@@ -480,7 +541,7 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 - `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
-**API note**: `tui.WithDemo(true)` is a compatibility shim that calls `WithClients(demo.NewServiceClients())` internally. New code should use the explicit form: `tui.WithClients(demo.NewServiceClients())` + `tui.WithNoCache(true)`.
+**API note**: `tui.WithDemo(true)` is a compatibility shim equivalent to `WithClients(demo.NewServiceClients())` + `WithNoCache(true)` + `WithIsDemo(true)` (it directly sets the same fields rather than calling those options). New code should use the explicit form. The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality.
 
 Demo mode is the primary way to develop and test the TUI without AWS access.
 
@@ -512,9 +573,10 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 
 **Options:**
 - `WithClients(c)` — pre-supply AWS clients (used by demo mode and tests)
-- `WithNoCache(true)` — disable background availability probes
+- `WithNoCache(true)` — disable disk cache persistence (availability probes still run via `demoPrefetchCounts()`)
+- `WithIsDemo(true)` — mark session as demo mode (skips Wave 2 enrichment; set by `--demo` CLI bootstrap)
 - `WithCommand("ec2")` — open directly to a resource type on startup
-- `WithDemo(true)` — compatibility shim (see Demo Mode above)
+- `WithDemo(true)` — compatibility shim: equivalent to `WithClients` + `WithNoCache` + `WithIsDemo` (see Demo Mode above)
 
 ---
 
@@ -651,7 +713,7 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 ## Known Compromises
 
-- `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)`.
+- `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)` plus `WithIsDemo(true)`. Migration and removal of `WithDemo(true)` is tracked in #270.
 - The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
 - When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
@@ -678,7 +740,7 @@ The stack model maps naturally to drill-down navigation (list → detail → YAM
 
 ### Why generation counters?
 
-Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`) are incremented on refresh/profile/region switch and on new view opens, causing stale in-flight results to be silently discarded.
+Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`, `availabilityGen`, `enrichmentGen`) are incremented on context changes, causing stale in-flight results to be silently discarded. `enrichmentGen` specifically guards Wave 2 enrichment — bumped on profile/region switch alongside `availabilityGen` to cancel in-flight Wave 2 probes. Note: manual refresh (Ctrl+R) currently only bumps `availabilityGen`, not `enrichmentGen`.
 
 ### Why a separate enricher pattern?
 

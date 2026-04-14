@@ -72,6 +72,7 @@ func TestBottomHints_MainMenu_Normal(t *testing.T) {
 	hints := m.BottomHints()
 
 	want := []layout.KeyHint{
+		{Key: "ctrl+z", Desc: "Issues only"},
 		{Key: "ctrl+r", Desc: "Refresh"},
 	}
 	if !hintsEqual(hints, want) {

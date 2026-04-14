@@ -234,6 +234,31 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},
+		{
+			FunctionName:     aws.String("legacy-data-sync"),
+			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:legacy-data-sync"),
+			Role:             aws.String(lambdaProdRoleARN),
+			Runtime:          lambdatypes.RuntimePython312,
+			MemorySize:       aws.Int32(256),
+			Timeout:          aws.Int32(300),
+			Handler:          aws.String("sync.lambda_handler"),
+			Description:      aws.String("Legacy data sync function — failed during layer attachment update"),
+			LastModified:     aws.String("2026-03-18T04:12:00+00:00"),
+			CodeSize:         2097152,
+			State:            lambdatypes.StateFailed,
+			StateReason:      aws.String("Layer arn:aws:lambda:us-east-1:123456789012:layer:legacy-utils:3 could not be attached"),
+			StateReasonCode:  lambdatypes.StateReasonCodeInvalidConfiguration,
+			PackageType:      lambdatypes.PackageTypeZip,
+			Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+			EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+			TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+			LoggingConfig: &lambdatypes.LoggingConfig{
+				LogGroup:  aws.String("/aws/lambda/legacy-data-sync"),
+				LogFormat: lambdatypes.LogFormatText,
+			},
+			LastUpdateStatus:       lambdatypes.LastUpdateStatusFailed,
+			LastUpdateStatusReason: aws.String("Layer attachment limit exceeded"),
+		},
 	}
 
 	// Generate 18 more functions to reach 25 total.

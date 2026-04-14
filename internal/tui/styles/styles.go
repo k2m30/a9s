@@ -56,6 +56,12 @@ func NoColorActive() bool {
 // rowColorCache maps lowercase status strings to pre-built styles.
 var rowColorCache map[string]lipgloss.Style
 
+// issueStatusSet contains all status strings that represent warning/error
+// states (ColStopped red + ColPending yellow). Populated unconditionally in
+// init() regardless of NO_COLOR — issue counts are data semantics, not a
+// rendering effect. See spec FR-003, FR-025.
+var issueStatusSet map[string]bool
+
 // RowColorStyle returns a style for a full row based on resource status.
 // Uses a pre-built cache to avoid allocating new styles on every call.
 func RowColorStyle(status string) lipgloss.Style {
@@ -107,6 +113,27 @@ func IsDimRowColor(status string) bool {
 	neutralRef := lipgloss.NewStyle().Foreground(ColHeaderFg)
 	fg := s.GetForeground()
 	return fg == dimRef.GetForeground() || fg == neutralRef.GetForeground()
+}
+
+// IsIssueRowColor reports whether the given status represents a warning or
+// error state (red ColStopped or yellow ColPending). Unlike IsDimRowColor,
+// this function is color-independent: it uses issueStatusSet (a pre-built
+// string set) and suffix matching, never rowColorCache or NoColorActive().
+// This ensures issue counts remain correct in monochrome/NO_COLOR environments.
+func IsIssueRowColor(status string) bool {
+	lower := strings.ToLower(status)
+	if issueStatusSet[lower] {
+		return true
+	}
+	// Suffix branches mirror RowColorStyle — _failed maps to ColStopped,
+	// _in_progress maps to ColPending, _complete maps to ColRunning (not issue).
+	switch {
+	case strings.HasSuffix(lower, "_failed"):
+		return true
+	case strings.HasSuffix(lower, "_in_progress"):
+		return true
+	}
+	return false
 }
 
 func init() {
@@ -174,6 +201,25 @@ func initStyles() {
 	YAMLNullStyle = lipgloss.NewStyle().Foreground(ColYAMLNull)
 	SearchCurrentStyle = lipgloss.NewStyle().Foreground(ActiveTheme().SearchHighlightFg).Background(ActiveTheme().SearchHighlightBg)
 	SearchOtherStyle = lipgloss.NewStyle().Underline(true).Foreground(ActiveTheme().SearchHighlightBg)
+
+	// issueStatusSet is populated unconditionally — issue counting is data
+	// semantics, not a rendering effect. Must work under NO_COLOR too.
+	issueStatusSet = map[string]bool{
+		// --- Red (ColStopped) ---
+		"stopped": true, "failed": true, "error": true, "deleting": true, "deleted": true,
+		"timed_out": true, "unhealthy": true, "unavailable": true, "alarm": true,
+		"expired": true, "revoked": true, "rejected": true, "pendingdeletion": true,
+		"rollback_complete": true, "import_rollback_complete": true, "red": true,
+		"deregistered": true, "impaired": true, "ct-danger": true,
+		// --- Yellow (ColPending) ---
+		"pending": true, "stopping": true, "creating": true, "modifying": true,
+		"updating": true, "draining": true, "initial": true, "insufficient_data": true,
+		"pending_validation": true, "inprogress": true, "healing": true,
+		"rebooting_broker": true, "maintenance": true, "rebooting": true, "resizing": true,
+		"pendingimport": true, "pendingacceptance": true, "yellow": true,
+		"temporary_failure": true, "recovering": true, "recoverable": true,
+		"initializing": true, "ct-attention": true, "pending_redrive": true,
+	}
 
 	if NoColorActive() {
 		RowSelected = lipgloss.NewStyle().Reverse(true)

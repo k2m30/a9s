@@ -688,6 +688,8 @@ type EC2API interface {
 	EC2DescribeVolumesAPI
 	EC2DescribeSnapshotsAPI
 	EC2DescribeImagesAPI
+	EC2DescribeInstanceStatusAPI  // Wave 2 enrichment
+	EC2DescribeVolumeStatusAPI    // Wave 2 enrichment
 }
 
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
@@ -711,6 +713,7 @@ type RDSAPI interface {
 	RDSDescribeDBInstancesAPI
 	RDSDescribeDBSnapshotsAPI
 	RDSDescribeEventsAPI
+	RDSDescribePendingMaintenanceAPI // Wave 2 enrichment
 }
 
 // ElastiCacheAPI is the aggregate interface covering all ElastiCache operations used by a9s fetchers.
@@ -997,4 +1000,21 @@ type SESv2API interface {
 // *efs.Client structurally satisfies this interface.
 type EFSAPI interface {
 	EFSDescribeFileSystemsAPI
+}
+
+// --- Wave 2 enrichment interfaces (#196) ---
+
+// EC2DescribeInstanceStatusAPI defines the interface for the EC2 DescribeInstanceStatus operation.
+type EC2DescribeInstanceStatusAPI interface {
+	DescribeInstanceStatus(ctx context.Context, params *ec2.DescribeInstanceStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error)
+}
+
+// EC2DescribeVolumeStatusAPI defines the interface for the EC2 DescribeVolumeStatus operation.
+type EC2DescribeVolumeStatusAPI interface {
+	DescribeVolumeStatus(ctx context.Context, params *ec2.DescribeVolumeStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error)
+}
+
+// RDSDescribePendingMaintenanceAPI defines the interface for the RDS DescribePendingMaintenanceActions operation.
+type RDSDescribePendingMaintenanceAPI interface {
+	DescribePendingMaintenanceActions(ctx context.Context, params *rds.DescribePendingMaintenanceActionsInput, optFns ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error)
 }
