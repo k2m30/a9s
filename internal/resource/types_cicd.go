@@ -59,17 +59,9 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 				{Key: "updated", Title: "Updated", Width: 22, Sortable: true},
 			},
-			Color: func(r Resource) Color {
-				switch r.Fields["latest_execution_status"] {
-				case "Succeeded":
-					return ColorHealthy
-				case "InProgress":
-					return ColorWarning
-				case "Failed", "Cancelled", "Superseded":
-					return ColorBroken
-				}
-				return ColorHealthy
-			},
+			// Pipeline list itself carries no status; failed execution surfaces
+			// via the Wave 2 enricher (see EnrichCodePipelineStatus).
+			Color: func(r Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "pipeline_stages",
 				Key:            "enter",
@@ -89,17 +81,9 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
-			Color: func(r Resource) Color {
-				switch r.Fields["latest_build_status"] {
-				case "SUCCEEDED":
-					return ColorHealthy
-				case "IN_PROGRESS":
-					return ColorWarning
-				case "FAILED", "FAULT", "TIMED_OUT", "STOPPED":
-					return ColorBroken
-				}
-				return ColorHealthy
-			},
+			// CodeBuild project list itself carries no status; failed builds
+			// surface via the Wave 2 enricher (see EnrichCodeBuildStatus).
+			Color: func(r Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "cb_builds",
 				Key:            "enter",

@@ -262,7 +262,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		return EnricherResult{}, err
 	}
 	for _, b := range builds.Builds {
-		if b.BuildStatus == cbtypes.StatusTypeSucceeded {
+		// Only terminal failures produce findings. In-flight (InProgress, Stopping)
+		// and success are not user-actionable "issues".
+		switch b.BuildStatus {
+		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress:
 			continue
 		}
 		if b.Id == nil {

@@ -556,7 +556,10 @@ func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
 	if m.issueCounts[shortName] > 0 {
 		return true // has issues → visible
 	}
-	return false // zero issues (whether truncated or not) → hidden
+	// Zero issues (even if truncated) → hidden. Config-only types (S3, ENI, IAM)
+	// have always-Healthy Color funcs so truncated-zero is a confirmed zero, not
+	// a lower bound. See qa_ctrlz_truncated_zero_test.go for the design rationale.
+	return false
 }
 
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.
