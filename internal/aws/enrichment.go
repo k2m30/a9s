@@ -233,6 +233,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	// Track the project name for each build ID so we can key the finding by r.ID.
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
+	truncated := len(resources) > EnrichmentCap
 	for _, name := range names {
 		if len(buildIDs) >= EnrichmentCap {
 			break
@@ -242,6 +243,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			SortOrder:   cbtypes.SortOrderTypeDescending,
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		if len(out.Ids) > 0 {
@@ -279,7 +281,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			Summary:  summary,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
@@ -290,6 +292,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	if clients.ELBv2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
+	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -301,6 +304,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			TargetGroupArn: aws.String(r.ID),
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		total := len(out.TargetHealthDescriptions)
@@ -317,7 +321,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
@@ -328,6 +332,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	if clients.CodePipeline == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
+	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -339,6 +344,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			Name: aws.String(r.Name),
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		for _, stage := range out.StageStates {
@@ -348,7 +354,14 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					stageName = *stage.StageName
 				}
 				summary := fmt.Sprintf("stage %s failed", stageName)
-				findings[r.Name] = resource.EnrichmentFinding{
+				// Pipeline findings are keyed by r.Name (the pipeline name used for the
+				// GetPipelineState API call), since that is the natural lookup key for
+				// CodePipeline resources. Fall back to r.ID if Name is empty.
+				key := r.Name
+				if key == "" {
+					key = r.ID
+				}
+				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  summary,
 				}
@@ -356,7 +369,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichDynamoDBStatus calls DescribeTable for each table (1 per table, cap ~50).
@@ -368,6 +381,7 @@ func EnrichDynamoDBStatus(ctx context.Context, clients *ServiceClients, resource
 	if clients.DynamoDB == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
+	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -379,13 +393,18 @@ func EnrichDynamoDBStatus(ctx context.Context, clients *ServiceClients, resource
 			TableName: aws.String(r.Name),
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		if out.Table == nil {
 			continue
 		}
+		key := r.ID
+		if key == "" {
+			key = r.Name
+		}
 		if out.Table.TableStatus != dbtypes.TableStatusActive {
-			findings[r.Name] = resource.EnrichmentFinding{
+			findings[key] = resource.EnrichmentFinding{
 				Severity: "!",
 				Summary:  fmt.Sprintf("table status: %s", string(out.Table.TableStatus)),
 			}
@@ -398,7 +417,7 @@ func EnrichDynamoDBStatus(ctx context.Context, clients *ServiceClients, resource
 				if gsi.IndexName != nil {
 					gsiName = *gsi.IndexName
 				}
-				findings[r.Name] = resource.EnrichmentFinding{
+				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("GSI %s status: %s", gsiName, string(gsi.IndexStatus)),
 				}
@@ -406,7 +425,7 @@ func EnrichDynamoDBStatus(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
@@ -417,6 +436,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	if clients.SFN == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
+	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -429,6 +449,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			MaxResults:      1,
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		if len(out.Executions) > 0 {
@@ -441,7 +462,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
@@ -452,6 +473,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 	if clients.Glue == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
+	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -464,17 +486,22 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			MaxResults: aws.Int32(1),
 		})
 		if err != nil {
+			truncated = true
 			continue
 		}
 		if len(out.JobRuns) > 0 {
 			s := out.JobRuns[0].JobRunState
 			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout {
-				findings[r.Name] = resource.EnrichmentFinding{
+				key := r.ID
+				if key == "" {
+					key = r.Name
+				}
+				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("latest run %s", string(s)),
 				}
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: len(resources) > EnrichmentCap, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }

@@ -162,7 +162,6 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r := resource.Resource{
 				ID:     "i-0abc1234567",
@@ -252,7 +251,6 @@ func TestColorRefactor_EC2CellDecorator_StateParity(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r := resource.Resource{
 				ID:     "i-0abc1234567",

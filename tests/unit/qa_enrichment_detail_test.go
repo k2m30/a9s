@@ -7,7 +7,6 @@ package unit
 // All assertions are behavioral string-contains checks against rendered output.
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -38,8 +37,11 @@ func rdsDetailResource() resource.Resource {
 // newRDSDetailModel builds a DetailModel for an RDS resource with a fixed size.
 func newRDSDetailModel(t *testing.T) views.DetailModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
+	t.Setenv("NO_COLOR", "")
 	styles.Reinit()
+	t.Cleanup(func() {
+		styles.Reinit()
+	})
 	k := keys.Default()
 	m := views.NewDetail(rdsDetailResource(), "rds", nil, k)
 	m.SetSize(120, 40)
@@ -226,8 +228,9 @@ func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 // section renders correctly for all major resource types that have enrichers.
 // This ensures the finding injection is not type-specific.
 func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
+	t.Setenv("NO_COLOR", "")
 	styles.Reinit()
+	t.Cleanup(func() { styles.Reinit() })
 
 	type tc struct {
 		resourceType string

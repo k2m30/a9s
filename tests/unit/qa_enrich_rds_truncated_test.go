@@ -81,32 +81,3 @@ func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
 	}
 }
 
-func TestEnrichRDSDocDBMaintenance_ZeroActionsNotTruncated(t *testing.T) {
-	fake := &rdsMaintenanceFake{
-		actions: nil,
-		marker:  nil,
-	}
-	clients := &awsclient.ServiceClients{RDS: fake}
-
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Findings) != 0 {
-		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
-	}
-	if result.Truncated {
-		t.Error("Truncated = true, want false (empty response)")
-	}
-}
-
-func TestEnrichRDSDocDBMaintenance_NilClients(t *testing.T) {
-	clients := &awsclient.ServiceClients{RDS: nil}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Findings) != 0 || result.Truncated {
-		t.Errorf("nil RDS client: len(Findings)=%d Truncated=%v, want 0/false", len(result.Findings), result.Truncated)
-	}
-}

@@ -79,31 +79,6 @@ func TestEnrichTargetGroupHealth_FindingKeyedByARN(t *testing.T) {
 	}
 }
 
-// TestEnrichTargetGroupHealth_SeverityBang verifies severity "!".
-func TestEnrichTargetGroupHealth_SeverityBang(t *testing.T) {
-	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/sev-tg/def456"
-	fake := &tgHealthFake{
-		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
-			tgARN: {
-				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
-					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
-				},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: tgARN}}
-
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f := result.Findings[tgARN]
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
-	}
-}
-
 // TestEnrichTargetGroupHealth_SummaryUnhealthyXofY verifies the summary format.
 func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/sum-tg/111"

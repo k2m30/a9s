@@ -262,8 +262,8 @@ func TestFrameTitleIssueCountVariants(t *testing.T) {
 		{
 			name:            "only failed",
 			statuses:        []string{"failed"},
-			wantContains:    "1 issues",
-			wantNotContains: "",
+			wantContains:    "1 issue",
+			wantNotContains: "1 issues",
 		},
 		{
 			name:            "mixed running and stopped",
@@ -274,14 +274,14 @@ func TestFrameTitleIssueCountVariants(t *testing.T) {
 		{
 			name:            "suffix-matched: create_failed",
 			statuses:        []string{"running", "create_failed"},
-			wantContains:    "1 issues",
-			wantNotContains: "",
+			wantContains:    "1 issue",
+			wantNotContains: "1 issues",
 		},
 		{
 			name:            "suffix-matched: update_in_progress",
 			statuses:        []string{"running", "update_in_progress"},
-			wantContains:    "1 issues",
-			wantNotContains: "",
+			wantContains:    "1 issue",
+			wantNotContains: "1 issues",
 		},
 	}
 

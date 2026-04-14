@@ -5,7 +5,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -370,7 +369,11 @@ func (m ResourceListModel) FrameTitle() string {
 	default:
 		// No filters: show issue count if > 0 and badge is enabled.
 		if ic > 0 && m.showIssueBadge {
-			title = name + "(" + totalStr + "/" + issueStr + " issues)"
+			issueWord := "issues"
+			if ic == 1 {
+				issueWord = "issue"
+			}
+			title = name + "(" + totalStr + "/" + issueStr + " " + issueWord + ")"
 		} else {
 			title = name + "(" + totalStr + ")"
 		}
@@ -566,7 +569,7 @@ func (m *ResourceListModel) renderEnrichmentBanner() string {
 		text = "⚠ " + n + " issues detected by background checks — not visible on this page"
 	}
 
-	return lipgloss.NewStyle().Foreground(styles.ColStopped).PaddingLeft(1).Render(text)
+	return styles.EnrichmentBannerStyle.Render(text)
 }
 
 // FilterResources returns resources matching the query (case-insensitive).
