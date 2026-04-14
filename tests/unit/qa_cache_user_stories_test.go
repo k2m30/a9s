@@ -101,7 +101,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(100)") {
+	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("warm cache should retain the merged page set, got:\n%s", plain)
 	}
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))

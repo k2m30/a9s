@@ -20,10 +20,13 @@ const DefaultTTL = 1 * time.Hour
 
 // Entry holds availability info for a single resource type.
 type Entry struct {
-	HasResources bool   `yaml:"has_resources"`
-	Count        int    `yaml:"count"`
-	Truncated    bool   `yaml:"truncated,omitempty"`
-	Error        string `yaml:"error,omitempty"`
+	HasResources    bool   `yaml:"has_resources"`
+	Count           int    `yaml:"count"`
+	Truncated       bool   `yaml:"truncated,omitempty"`
+	Error           string `yaml:"error,omitempty"`
+	Issues          int    `yaml:"issues,omitempty"`           // issue-state resource count (red/yellow only)
+	IssuesTruncated bool   `yaml:"issues_truncated,omitempty"` // true if issue count is lower bound
+	IssuesKnown     bool   `yaml:"issues_known,omitempty"`     // true = probed (even if Issues=0); false = unknown
 }
 
 // File is the on-disk cache structure.
