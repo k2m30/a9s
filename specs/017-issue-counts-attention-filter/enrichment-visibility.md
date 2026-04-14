@@ -53,11 +53,26 @@ enrichmentRan      map[string]bool // shortName → true if Wave 2 completed thi
 
 `enrichmentRan` is the "enrichment completed this session" signal — separate from `issueKnown` (which reflects cached counts). This drives banner visibility.
 
-**Populated by**: `handleEnrichmentChecked` — only on `msg.Err == nil`. Replaces (not merges) the per-type findings map from `msg.Findings`, sets `enrichmentRan[shortName] = true`. On error (`msg.Err != nil`), neither `enrichmentFindings` nor `enrichmentRan` is updated for that type — a failed enrichment call does not count as "enriched this session."
+**Populated by**: `handleEnrichmentChecked` — only on `msg.Err == nil`. Replaces (not merges) the per-type findings map from `msg.Findings`, sets `enrichmentRan[shortName] = true`. On error (`msg.Err != nil`), neither `enrichmentFindings` nor `enrichmentRan` is updated — the type keeps whatever state was set when the rerun started (cleared — see below).
 
-**Cleared on**: profile switch and region switch only. These are the paths that also restart Wave 1 probes (which lead to Wave 2 rerun), so findings will be repopulated.
+**Invalidated per-type when a rerun starts**: When `startEnrichment()` fires a probe for a type, immediately clear that type's entry from `enrichmentFindings` and `enrichmentRan`. This ensures:
+- If the rerun succeeds: findings are replaced with fresh data.
+- If the rerun fails: the type has no findings (honest unknown state). Banner, markers, and detail section disappear for that type until the next successful enrichment.
 
-Manual refresh (`Ctrl+R`) does NOT clear findings. Current refresh branches are scoped: main-menu refresh restarts availability probes (Wave 1 → Wave 2 reruns → findings replaced per-type on success), detail refresh only re-triggers related/detail enrichment, list refresh only re-fetches the list. None of them explicitly rerun Wave 2 for arbitrary types. Clearing findings on these paths would remove banners, markers, and detail sections with no mechanism to restore them. Instead, findings persist across refresh and are replaced naturally when Wave 2 reruns for each type.
+This avoids stale findings surviving a failed rerun. The brief window between "rerun started" and "rerun completed" shows no findings for that type — this is correct since the old data is being replaced.
+
+**Cleared entirely on**: profile switch and region switch. These clear ALL types' findings and `enrichmentRan` maps.
+
+**Refresh semantics by path**:
+
+| Refresh path | Wave 2 rerun? | Findings behavior |
+|-------------|--------------|-------------------|
+| Main menu `Ctrl+R` | Yes — restarts Wave 1 → Wave 2 | Per-type cleared as each probe starts, replaced on success |
+| Top-level list `Ctrl+R` | **Yes — rerun Wave 2 for this type only** | This type's findings cleared on rerun start, replaced on success |
+| Detail `Ctrl+R` | No | Findings unchanged (detail refresh is for related/detail enrichment, not Wave 2) |
+| Profile/region switch | Yes — full restart | All findings cleared |
+
+**New behavior for top-level list refresh**: When `Ctrl+R` is pressed on a top-level resource list, in addition to re-fetching the list data, also rerun Wave 2 enrichment for that specific resource type (if it has a registered enricher and the list is not in demo mode). This ensures the background-check banner/markers refresh alongside the list data. Implementation: after `refreshResourceList` dispatches the re-fetch, also call `probeEnrichment(shortName, m.enrichmentGen)` for the type.
 
 ### 4. List-level enrichment banner (derived from list state)
 
@@ -253,7 +268,10 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 - [ ] Detail section updates live when enrichment completes while detail is open
 - [ ] Detail section clears when enrichment reruns and the resource is no longer affected (recovery)
 - [ ] YAML/JSON views do NOT show findings
-- [ ] Findings session-scoped, cleared on profile/region switch only (not manual refresh)
+- [ ] Findings session-scoped, cleared entirely on profile/region switch
+- [ ] Per-type findings invalidated (cleared) when a Wave 2 rerun starts for that type
+- [ ] Failed Wave 2 rerun leaves the type with no findings (honest unknown, no stale data)
+- [ ] Top-level list Ctrl+R reruns Wave 2 for that specific type (alongside list re-fetch)
 - [ ] Per-type findings replaced on enrichment rerun
 - [ ] RDS/DocDB: severity `~`, NOT counted in menu badge
 
@@ -264,8 +282,8 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 | `internal/resource/enrichment.go` | NEW — `EnrichmentFinding` type |
 | `internal/aws/enrichment.go` | `EnricherResult` type; enrichers return findings |
 | `internal/tui/app.go` | `enrichmentFindings`, `enrichmentRan` maps |
-| `internal/tui/app_handlers.go` | Clear findings + ran on profile/region switch only |
-| `internal/tui/app_handlers_navigate.go` | Store findings; update detail live; pass enrichment state to list |
+| `internal/tui/app_handlers.go` | Clear all findings on profile/region switch |
+| `internal/tui/app_handlers_navigate.go` | Store findings; invalidate per-type on rerun start; update detail live; pass enrichment state to list; rerun Wave 2 on top-level list Ctrl+R |
 | `internal/tui/app_fetchers.go` | `probeEnrichment` carries findings in message |
 | `internal/tui/messages/messages.go` | `EnrichmentCheckedMsg` carries `Findings` map |
 | `internal/tui/views/resourcelist.go` | `enrichmentIssueCount`, `enrichmentRanThisSession`; banner derivation |
@@ -281,7 +299,8 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 2. `EnricherResult` + update `EnricherFunc` signature in `internal/aws/enrichment.go`
 3. Update 9 enrichers to return `EnricherResult` with findings
 4. `enrichmentFindings` + `enrichmentRan` maps on Model; store from `EnrichmentCheckedMsg`
-5. Clear on profile/region switch only
+5. Clear all findings on profile/region switch; invalidate per-type when rerun starts
+6a. Add per-type Wave 2 rerun to top-level list Ctrl+R path
 6. `enrichmentIssueCount` + `enrichmentRanThisSession` on ResourceListModel; derive banner
 7. Render banner in View()
 8. `·` row marker in table_render.go
