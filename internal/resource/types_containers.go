@@ -41,6 +41,7 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 	}
 }

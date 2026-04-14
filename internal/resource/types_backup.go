@@ -15,6 +15,7 @@ func backupResourceTypes() []ResourceTypeDef {
 				{Key: "last_execution", Title: "Last Execution", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "SES Identities",
@@ -29,6 +30,7 @@ func backupResourceTypes() []ResourceTypeDef {
 				{Key: "sending_enabled", Title: "Sending", Width: 10, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 	}
 }

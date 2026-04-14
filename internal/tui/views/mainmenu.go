@@ -556,9 +556,17 @@ func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
 	if m.issueCounts[shortName] > 0 {
 		return true // has issues → visible
 	}
-	// Zero issues (even if truncated) → hidden. Config-only types (S3, ENI, IAM)
-	// have always-Healthy Color funcs so truncated-zero is a confirmed zero, not
-	// a lower bound. See qa_ctrlz_truncated_zero_test.go for the design rationale.
+	// Zero issues — truncation changes semantics depending on the type:
+	//   • Always-healthy types (S3, IAM, SG, etc.): zero is CONFIRMED zero;
+	//     the Color func ignores input and returns Healthy for any page. Hide.
+	//   • Health-state types (EC2, ENI, RDS, etc.): zero is a LOWER BOUND;
+	//     unread pages may carry issues. Show so the user can drill in.
+	if m.issueTruncated[shortName] {
+		td := resource.FindResourceType(shortName)
+		if td != nil && !td.AlwaysHealthy {
+			return true
+		}
+	}
 	return false
 }
 

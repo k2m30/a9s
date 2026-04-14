@@ -39,6 +39,7 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "KMS Keys",
