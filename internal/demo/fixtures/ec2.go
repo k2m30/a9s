@@ -587,6 +587,30 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 		},
 		{
+			GroupId:     aws.String(fixtProdDBProxySGID),
+			GroupName:   aws.String("acme-db-proxy-sg"),
+			VpcId:       aws.String(fixtProdVPCID),
+			Description: aws.String("RDS Proxy security group — allows DB access from app tier"),
+			OwnerId:     aws.String("123456789012"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(5432),
+					ToPort:     aws.Int32(5432),
+					UserIdGroupPairs: []ec2types.UserIdGroupPair{
+						{GroupId: aws.String(fixtProdAPIInternalSGID), Description: aws.String("API internal tier")},
+					},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-db-proxy-sg")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
 			GroupId:     aws.String("sg-0fff888888888888f"),
 			GroupName:   aws.String("staging-default-sg"),
 			VpcId:       aws.String(fixtStagingVPCID),

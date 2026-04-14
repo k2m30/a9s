@@ -13,6 +13,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // rdsMaintenanceFake stubs DescribePendingMaintenanceActions and satisfies RDSAPI
@@ -39,7 +40,8 @@ func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	probeResources := []resource.Resource{{ID: "prod-db"}}
+	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,7 +63,11 @@ func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	probeResources := []resource.Resource{
+		{ID: "prod-db-1"},
+		{ID: "prod-db-2"},
+	}
+	count, truncated, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
