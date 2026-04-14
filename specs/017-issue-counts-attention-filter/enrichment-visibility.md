@@ -42,11 +42,31 @@ Change `EnricherFunc` to mutate the resource slice:
 type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (issueCount int, truncated bool, err error)
 ```
 
-The enricher sets `resources[i].Fields["_issue"] = "!"` or `resources[i].Fields["_issue"] = "~"` on affected resources. The returned `issueCount` counts only Tier A + B marks (the `!` ones). Tier C marks (`~`) are set on resources but not counted.
+The enricher sets two fields on affected resources:
+- `resources[i].Fields["_issue"] = "!"` or `"~"` — the prefix for the list view
+- `resources[i].Fields["_issue_detail"]` — human-readable explanation for the detail view
 
-This requires enrichers to receive a mutable `[]resource.Resource` — they already do (slice of structs passed by value, but Fields map is a reference type so mutations are visible to the caller).
+Example for RDS pending maintenance:
+```
+Fields["_issue"] = "~"
+Fields["_issue_detail"] = "pending maintenance: system-update (New OS patch), db-upgrade (aurora-postgresql 16.11, auto-apply 2026-05-07)"
+```
 
-Wait — `[]resource.Resource` is a slice of structs, not pointers. Mutations to `resources[i].Fields` via index ARE visible to the caller because the Fields map is a shared reference. But `resources[i].Status = "x"` would NOT be visible because the struct is copied. So setting Fields works, setting Status doesn't. Use Fields only.
+Example for Target Groups:
+```
+Fields["_issue"] = "!"
+Fields["_issue_detail"] = "unhealthy targets: 2/5 (i-abc123: unhealthy, i-def456: draining)"
+```
+
+Example for CodeBuild:
+```
+Fields["_issue"] = "!"
+Fields["_issue_detail"] = "latest build FAILED: deploy-api-prod#142 (2026-04-13)"
+```
+
+The returned `issueCount` counts only Tier A + B marks (the `!` ones). Tier C marks (`~`) are set on resources but not counted.
+
+Note on mutability: `[]resource.Resource` is a slice of structs, not pointers. However, mutations to `resources[i].Fields` via index ARE visible to the caller because the Fields map is a shared reference. Use Fields only — do not mutate Status or other struct fields.
 
 #### 2. Probe retains resources; enricher marks them; marks flow back
 
@@ -89,7 +109,32 @@ if marks, ok := m.issueMarks[resourceType]; ok {
 }
 ```
 
-#### 3. Table renderer displays the prefix
+#### 3. Detail view shows the explanation
+
+When the user opens a detail view (`d` or `Enter`) for a resource with `Fields["_issue_detail"]` set, the detail view renders it as a visible field. The existing detail view already renders all `Fields` entries — `_issue_detail` will appear as a field with key `issue_detail` (strip the underscore prefix for display).
+
+The field should render near the top of the detail view (after ID/Name/Status) so the user sees it immediately. It uses the issue color: ColStopped for `!` marks, ColPending for `~` marks.
+
+For YAML and JSON views: `_issue_detail` appears in the Fields section alongside other fields. No special rendering needed — the content is already human-readable.
+
+User flow:
+1. Main menu shows `DB Instances (2) issues:2` → user enters
+2. List shows `~ available` on both rows (yellow) → user sees something is flagged
+3. User presses `d` on `docdb-docdb-dev` → detail view shows:
+   ```
+   DB Identifier:  docdb-docdb-dev
+   Status:         available
+   Issue:          pending maintenance: system-update (New OS patch)
+   Engine:         docdb
+   ...
+   ```
+4. User now understands WHY the `~` prefix was there
+
+For target groups (Tier A, no detail enrichment today):
+1. List shows `! api-prod-tg` (red) → user sees something is broken
+2. Detail shows: `Issue: unhealthy targets: 2/5 (i-abc123: unhealthy, i-def456: draining)`
+
+#### 4. Table renderer displays the prefix
 
 Generalize the existing EC2-specific check at `table_render.go:197-204`:
 
@@ -164,6 +209,9 @@ In `ResourceListModel.issueCount`: also check `r.Fields["_issue"] == "!"` in add
 - [ ] NO_COLOR mode: prefix is ASCII `!`/`~`, works without color
 - [ ] Demo mode: no enrichment runs, no prefixes (no real AWS)
 - [ ] Existing EC2 `! running`/`~ running` behavior preserved — the generic system is additive, not a replacement
+- [ ] Detail view shows `_issue_detail` field with human-readable explanation for marked resources
+- [ ] Detail view renders the issue field near the top, colored by severity (red for `!`, yellow for `~`)
+- [ ] YAML/JSON views include `_issue_detail` in the Fields section
 
 ### Files Affected
 
@@ -175,6 +223,7 @@ In `ResourceListModel.issueCount`: also check `r.Fields["_issue"] == "!"` in add
 | `internal/tui/app_handlers_navigate.go` | Merge marks into resources on `ResourcesLoadedMsg` |
 | `internal/tui/views/table_render.go` | Generic `_issue` prefix check + row color override |
 | `internal/tui/views/resourcelist_helpers.go` | `issueCount` also checks `Fields["_issue"]` |
+| `internal/tui/views/detail_fields.go` | Render `_issue_detail` field near top with severity color |
 | `internal/tui/styles/styles.go` | No change — uses existing ColStopped/ColPending |
 
 ### What This Does NOT Change
