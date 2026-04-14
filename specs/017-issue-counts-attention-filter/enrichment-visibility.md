@@ -53,7 +53,7 @@ enrichmentRan      map[string]bool // shortName → true if Wave 2 completed thi
 
 `enrichmentRan` is the "enrichment completed this session" signal — separate from `issueKnown` (which reflects cached counts). This drives banner visibility.
 
-**Populated by**: `handleEnrichmentChecked` — replaces (not merges) the per-type map from `msg.Findings`, sets `enrichmentRan[shortName] = true`.
+**Populated by**: `handleEnrichmentChecked` — only on `msg.Err == nil`. Replaces (not merges) the per-type findings map from `msg.Findings`, sets `enrichmentRan[shortName] = true`. On error (`msg.Err != nil`), neither `enrichmentFindings` nor `enrichmentRan` is updated for that type — a failed enrichment call does not count as "enriched this session."
 
 **Cleared on**: profile switch, region switch, AND manual refresh. Both `enrichmentFindings` and `enrichmentRan` are cleared.
 
@@ -112,18 +112,31 @@ When at least one loaded resource has a finding (checked against `enrichmentFind
 
 For loaded resources that have a finding in `enrichmentFindings`, add a minimal row marker: a colored `·` (middle dot) prepended to the Name/ID column value. This gives the user a truthful per-row affordance without the full prefix system.
 
-**Column targeting**: The marker is attached to the **configured Name/ID column by key** (typically the column with key `"name"`, `"function_name"`, `"db_identifier"`, etc. — whatever column index 0 is in the view config). It is NOT "the leftmost visible column after horizontal scroll." The marker stays with the Name column even if the user scrolls right and the Name column scrolls off-screen. This is consistent with how the cursor highlight works — it highlights the logical row, not the visible viewport.
+**Column targeting**: The marker is attached to the **identity column** — resolved semantically, not by position. The resolver checks the resolved columns (from `resolveColumns()` in `table_render.go`) for the first column whose key matches the resource type's identity field (typically `"name"`, `"function_name"`, `"db_identifier"`, `"project_name"`, etc.). If no semantic match is found, fall back to index 0 of the resolved column list. This is stable across custom view configs where users reorder columns.
 
-**Implementation**: In `table_render.go`, when rendering column index 0 (the first configured column), check if the resource has a finding:
+The marker stays with the identity column even if the user scrolls horizontally and the column moves off-screen. This is consistent with how the cursor highlight works — it highlights the logical row, not the visible viewport.
+
+**Implementation**: In `table_render.go`, resolve the marker target column once per render pass:
 
 ```go
-if colIndex == 0 {
+markerColIdx := 0 // fallback
+for i, c := range resolvedColumns {
+    if c.key == m.typeDef.IdentityKey || c.key == "name" {
+        markerColIdx = i
+        break
+    }
+}
+
+// Then during row rendering:
+if colIdx == markerColIdx {
     if finding, ok := enrichmentFindingsForType[r.ID]; ok {
         val = "· " + val
         // Override cell style to finding severity color
     }
 }
 ```
+
+Note: `IdentityKey` is a new optional field on `ResourceTypeDef` that names the column key for the primary identifier. If unset, falls back to `"name"`. This avoids hardcoding column names per resource type in the renderer.
 
 The `enrichmentFindingsForType` reference is passed to the list model at creation/update (the subset of `m.enrichmentFindings[shortName]` for this type). The dot renders in ColStopped for `!` severity, ColPending for `~`.
 
@@ -246,7 +259,8 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 | `internal/tui/messages/messages.go` | `EnrichmentCheckedMsg` carries `Findings` map |
 | `internal/tui/views/resourcelist.go` | `enrichmentIssueCount`, `enrichmentRanThisSession`; banner derivation |
 | `internal/tui/views/resourcelist_helpers.go` | Render banner; `visibleIssueCount` from filteredResources |
-| `internal/tui/views/table_render.go` | `·` row marker for resources with findings |
+| `internal/tui/views/table_render.go` | `·` row marker on identity column for resources with findings |
+| `internal/resource/types.go` | Optional `IdentityKey` field on `ResourceTypeDef` |
 | `internal/tui/views/detail.go` | `enrichmentFinding` field; `SetEnrichmentFinding()` |
 | `internal/tui/views/detail_fields.go` | Render "Background Check" section |
 
