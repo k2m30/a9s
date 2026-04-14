@@ -39,7 +39,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				return cfnStackColor(r.Fields["stack_status"])
+				return cfnStackColor(r.Fields["status"])
 			},
 			Children: []ChildViewDef{
 				{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},

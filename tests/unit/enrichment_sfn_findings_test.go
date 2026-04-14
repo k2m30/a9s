@@ -73,27 +73,6 @@ func TestEnrichStepFunctionsStatus_FailedFindingKeyedByARN(t *testing.T) {
 	}
 }
 
-// TestEnrichStepFunctionsStatus_SeverityBang verifies severity "!".
-func TestEnrichStepFunctionsStatus_SeverityBang(t *testing.T) {
-	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sev-sm"
-	fake := &sfnEnrichFake{
-		executions: map[string]sfntypes.ExecutionStatus{
-			smARN: sfntypes.ExecutionStatusFailed,
-		},
-	}
-	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
-
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f := result.Findings[smARN]
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
-	}
-}
-
 // TestEnrichStepFunctionsStatus_SummaryContainsFAILED verifies the summary for FAILED status.
 func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sum-sm"

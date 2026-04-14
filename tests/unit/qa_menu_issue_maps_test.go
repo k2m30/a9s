@@ -28,56 +28,6 @@ func TestMainMenuGettersReturnNilWhenEmpty(t *testing.T) {
 	}
 }
 
-// TestMainMenuSetIssuesFromCache verifies that bulk-loading from cache maps
-// stores all entries where known=true.
-func TestMainMenuSetIssuesFromCache(t *testing.T) {
-	m := views.NewMainMenu(keys.Default())
-
-	counts := map[string]int{
-		"ec2": 5,
-		"rds": 0,
-		"s3":  3,
-	}
-	truncated := map[string]bool{
-		"ec2": true,
-		"rds": false,
-		"s3":  false,
-	}
-	known := map[string]bool{
-		"ec2": true,
-		"rds": true,
-		"s3":  true,
-	}
-
-	m.SetIssuesFromCache(counts, truncated, known)
-
-	gotCounts := m.GetIssueCounts()
-	gotTrunc := m.GetIssueTruncated()
-	gotKnown := m.GetIssueKnown()
-
-	cases := []struct {
-		name      string
-		wantCount int
-		wantTrunc bool
-		wantKnown bool
-	}{
-		{"ec2", 5, true, true},
-		{"rds", 0, false, true},
-		{"s3", 3, false, true},
-	}
-	for _, tc := range cases {
-		if gotCounts[tc.name] != tc.wantCount {
-			t.Errorf("counts[%s] = %d, want %d", tc.name, gotCounts[tc.name], tc.wantCount)
-		}
-		if gotTrunc[tc.name] != tc.wantTrunc {
-			t.Errorf("truncated[%s] = %v, want %v", tc.name, gotTrunc[tc.name], tc.wantTrunc)
-		}
-		if gotKnown[tc.name] != tc.wantKnown {
-			t.Errorf("known[%s] = %v, want %v", tc.name, gotKnown[tc.name], tc.wantKnown)
-		}
-	}
-}
-
 // TestMainMenuSetIssuesFromCacheRespectsKnown verifies that only entries where
 // known=true are stored; entries with known=false are ignored.
 func TestMainMenuSetIssuesFromCacheRespectsKnown(t *testing.T) {

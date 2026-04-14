@@ -147,7 +147,19 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending", "deleting":
+					return ColorWarning
+				case "failed":
+					return ColorBroken
+				case "deleted":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Internet Gateways",

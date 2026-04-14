@@ -491,19 +491,37 @@ func (m *MainMenuModel) SetIssuesFromCache(counts map[string]int, truncated map[
 	m.applyFilter()
 }
 
-// GetIssueCounts returns the per-type issue count map for cache persistence.
+// GetIssueCounts returns a copy of the per-type issue count map for cache persistence.
+// Returns nil if no issue data has been set.
 func (m *MainMenuModel) GetIssueCounts() map[string]int {
-	return m.issueCounts
+	if m.issueCounts == nil {
+		return nil
+	}
+	cp := make(map[string]int, len(m.issueCounts))
+	maps.Copy(cp, m.issueCounts)
+	return cp
 }
 
-// GetIssueTruncated returns the per-type issue truncation map for cache persistence.
+// GetIssueTruncated returns a copy of the per-type issue truncation map for cache persistence.
+// Returns nil if no truncation data has been set.
 func (m *MainMenuModel) GetIssueTruncated() map[string]bool {
-	return m.issueTruncated
+	if m.issueTruncated == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.issueTruncated))
+	maps.Copy(cp, m.issueTruncated)
+	return cp
 }
 
-// GetIssueKnown returns the per-type issue known map for cache persistence.
+// GetIssueKnown returns a copy of the per-type issue known map for cache persistence.
+// Returns nil if no known data has been set.
 func (m *MainMenuModel) GetIssueKnown() map[string]bool {
-	return m.issueKnown
+	if m.issueKnown == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.issueKnown))
+	maps.Copy(cp, m.issueKnown)
+	return cp
 }
 
 // SetEnrichProgress updates the Wave 2 enrichment progress counters.

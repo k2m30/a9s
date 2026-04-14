@@ -106,7 +106,7 @@ The banner is **derived in `applySortAndFilter()`** after every data change.
 
 **Derivation logic**:
 
-```
+```text
 findingCount       = len(enrichmentFindings[shortName])           // severity-agnostic (! AND ~)
 visibleIssueCount  = count of IsIssueRowColor(r.Status) in filteredResources
 visibleFindingCount = count of r in filteredResources where findingsByID[r.ID] exists
@@ -132,19 +132,19 @@ Updated by the root Model via setters when enrichment completes or when the list
 
 **Banner text** — no row-specific guidance since rows have no affordance:
 
-```
+```text
 ⚠ N issues detected by background checks — not visible on this page
 ```
 
 When truncated (`enrichmentTruncated == true`):
 
-```
+```text
 ⚠ N+ issues detected by background checks — not visible on this page
 ```
 
 When at least one **visible (post-filter)** resource has a finding (checked against `findingsByID` against `filteredResources`, not `allResources`):
 
-```
+```text
 ⚠ N issues detected by background checks
 ```
 
@@ -215,6 +215,7 @@ enrichmentFinding *resource.EnrichmentFinding
 ```
 
 Set in `handleNavigate`:
+
 ```go
 if findings, ok := m.enrichmentFindings[resourceType]; ok {
     if f, ok := findings[res.ID]; ok {
@@ -226,6 +227,7 @@ if findings, ok := m.enrichmentFindings[resourceType]; ok {
 **Stale snapshot handling**: Current detail refresh (`Ctrl+R` in detail view) re-enriches the resource via `EnrichDetailMsg` but does NOT reconstruct the `DetailModel`. To handle the case where enrichment completes while a detail view is open, add a message-based update path:
 
 When `EnrichmentCheckedMsg` arrives and the active view is a `DetailModel` for a resource of the enriched type:
+
 ```go
 if detail, ok := m.activeView().(*views.DetailModel); ok {
     if detail.ResourceType() == msg.ResourceType {
@@ -247,7 +249,7 @@ YAML and JSON views do NOT show findings.
 
 **Rendered in detail view**: When finding is non-nil, render at the top:
 
-```
+```text
 ⚠ Background Check
   pending maintenance: system-update (New OS patch)
 ```

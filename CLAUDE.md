@@ -145,6 +145,8 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
 - BEFORE any push, run the full validation integration test against a REAL AWS profile (ask user for the profile name): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s`. If region is not set, the profile's default region is used. No push without this passing.
 - BEFORE any release, update `CHANGELOG.md` with a new version entry (follow [Keep a Changelog](https://keepachangelog.com/) format) and create a matching `releases/vX.Y.Z.md` file with user-facing release notes. Every tagged version MUST have both a changelog entry and a release notes file.
+- BEFORE any release, align `docs/architecture.md` with the current codebase. Verify: layer boundaries, message types, view stack, caching layers, key handling, message-driven invariants, and any newly added subsystems accurately reflect reality. Outdated architecture docs mislead future contributors — treat divergence from the codebase as a release blocker.
+- BEFORE any release, audit every test added or modified in the release for busywork. Reject and delete tests that: round-trip a struct literal back to itself (tautology); assert a fake against input the test itself passed (mock-its-own-assertion); verify struct shape instead of behavior; assert on stub output without exercising production dispatch; duplicate another test in the release; construct unused variables or dead setup; or exist solely to tick a coverage counter. Regression pins for real invariants, compile-time invariant tests, and focused bug repros are NOT busywork. Delete busywork rather than keep it — coverage earned by busywork is a liability.
 - **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require the pre-push checklist.
 
 ## Docs Sync Rule
@@ -165,5 +167,6 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+
 - 018-enrichment-visibility: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
 - 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3

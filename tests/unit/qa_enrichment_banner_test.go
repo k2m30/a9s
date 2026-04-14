@@ -94,7 +94,7 @@ func TestEnrichmentBanner_HiddenWhenNoFindings(t *testing.T) {
 		m.SetEnrichmentState(0, false, true, map[string]resource.EnrichmentFinding{})
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 	if strings.Contains(output, "background checks") {
 		t.Error("banner must be hidden when findingsByID is empty, but banner text was found in output")
 	}
@@ -118,7 +118,7 @@ func TestEnrichmentBanner_HiddenWhenEnrichmentNotRan(t *testing.T) {
 		m.SetEnrichmentState(0, false, false, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 	if strings.Contains(output, "background checks") {
 		t.Error("banner must be hidden when enrichmentRanThisSession=false, but banner text was found in output")
 	}
@@ -141,7 +141,7 @@ func TestEnrichmentBanner_HiddenWhenIssueRowVisible(t *testing.T) {
 		m.SetEnrichmentState(1, false, true, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 	if strings.Contains(output, "background checks") {
 		t.Error("banner must be hidden when issue-colored rows are visible, but banner text was found in output")
 	}
@@ -167,7 +167,7 @@ func TestEnrichmentBanner_ShownLongForm_WhenNoVisibleMarkedRow(t *testing.T) {
 		m.SetEnrichmentState(0, false, true, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 
 	if !strings.Contains(output, "background checks") {
 		t.Error("banner must be shown when findings exist, ran=true, and no issue-colored rows visible")
@@ -198,7 +198,7 @@ func TestEnrichmentBanner_ShownShortForm_WhenVisibleMarkedRow(t *testing.T) {
 		m.SetEnrichmentState(0, false, true, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 
 	if !strings.Contains(output, "background checks") {
 		t.Error("banner must be shown when findings exist, ran=true, and no issue-colored rows visible")
@@ -224,7 +224,7 @@ func TestEnrichmentBanner_TruncatedShowsNPlus(t *testing.T) {
 		m.SetEnrichmentState(0, true, true, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 
 	if !strings.Contains(output, "background checks") {
 		t.Error("banner must be shown when findings exist, ran=true, and no issue-colored rows visible")
@@ -256,7 +256,7 @@ func TestEnrichmentBanner_TildeOnlyFindingsStillTrigger(t *testing.T) {
 		m.SetEnrichmentState(0, false, true, findings)
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 
 	if !strings.Contains(output, "background checks") {
 		t.Errorf("banner must fire for ~-only findings (severity-agnostic count), but output was:\n%s", output)
@@ -307,7 +307,7 @@ func TestEnrichmentBanner_TextFilterHidingMarkedRowsUsesLongForm(t *testing.T) {
 		Resources:    bannerHealthyResources(),
 	})
 
-	output := m.View()
+	output := stripANSI(m.View())
 
 	if !strings.Contains(output, "background checks") {
 		t.Errorf("banner must fire even when finding's row is filtered out, but output was:\n%s", output)
@@ -352,7 +352,7 @@ func TestEnrichmentBanner_IssueRowRevealedByRemovingFilter(t *testing.T) {
 
 	// With filter "db-1": only db-1 (available) is visible — no issue rows,
 	// and db-2 (which has a finding) is hidden. Banner should fire (long form).
-	output := m.View()
+	output := stripANSI(m.View())
 	if !strings.Contains(output, "background checks") {
 		t.Errorf("banner must show when issue-colored row (db-2/failed) is filtered out and findings exist, got:\n%s", output)
 	}
