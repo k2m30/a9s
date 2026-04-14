@@ -15,6 +15,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "delay_seconds", Title: "Delay", Width: 8, Sortable: true},
 				{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "SNS Topics",
@@ -26,6 +27,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "sns_subscriptions",
 				Key:            "enter",
@@ -45,6 +47,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 				{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "EventBridge Rules",
@@ -58,6 +61,15 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "event_bus", Title: "Event Bus", Width: 18, Sortable: true},
 				{Key: "schedule", Title: "Schedule", Width: 24, Sortable: false},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ENABLED":
+					return ColorHealthy
+				case "DISABLED":
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "eb_rule_targets",
@@ -78,6 +90,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "stream_mode", Title: "Mode", Width: 14, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "MSK Clusters",
@@ -91,6 +104,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 14, Sortable: true},
 				{Key: "version", Title: "Version", Width: 14, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "Step Functions",
@@ -103,6 +117,15 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "type", Title: "Type", Width: 10, Sortable: true},
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: false},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "DELETING":
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "sfn_executions",

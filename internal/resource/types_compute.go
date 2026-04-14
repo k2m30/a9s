@@ -18,6 +18,45 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "instance_id", Title: "Instance ID", Width: 20, Sortable: true},
 				{Key: "launch_time", Title: "Launch Time", Width: 22, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				sys := r.Fields["system_status"]
+				inst := r.Fields["instance_status"]
+				if sys == "impaired" || inst == "impaired" {
+					return ColorBroken
+				}
+				if sys == "initializing" || inst == "initializing" {
+					return ColorWarning
+				}
+				switch r.Fields["state"] {
+				case "running", "":
+					return ColorHealthy
+				case "stopped", "stopping":
+					return ColorBroken
+				case "pending":
+					return ColorWarning
+				case "terminated", "shutting-down":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
+			CellDecorators: map[string]func(Resource, string) string{
+				"state": func(r Resource, v string) string {
+					// Only decorate a running instance — the prefix signals that a
+					// background status check is degrading a nominally-up instance.
+					if v != "running" {
+						return v
+					}
+					sys := r.Fields["system_status"]
+					inst := r.Fields["instance_status"]
+					if sys == "impaired" || inst == "impaired" {
+						return "! " + v
+					}
+					if sys == "initializing" || inst == "initializing" {
+						return "~ " + v
+					}
+					return v
+				},
+			},
 		},
 		{
 			Name:          "ECS Services",
@@ -32,6 +71,20 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "desired_count", Title: "Desired", Width: 9, Sortable: true},
 				{Key: "running_count", Title: "Running", Width: 9, Sortable: true},
 				{Key: "launch_type", Title: "Launch Type", Width: 12, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				running := r.Fields["running_count"]
+				desired := r.Fields["desired_count"]
+				if desired == "0" || desired == "" {
+					return ColorHealthy
+				}
+				if running == "0" {
+					return ColorBroken
+				}
+				if running != desired {
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{
 				{
@@ -67,6 +120,15 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "pending_tasks", Title: "Pending", Width: 9, Sortable: true},
 				{Key: "services_count", Title: "Services", Width: 10, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "INACTIVE":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "ECS Tasks",
@@ -83,6 +145,17 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "cpu", Title: "CPU", Width: 6, Sortable: true},
 				{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["last_status"] {
+				case "RUNNING":
+					return ColorHealthy
+				case "PENDING", "PROVISIONING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
+					return ColorWarning
+				case "STOPPED":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Lambda Functions",
@@ -97,6 +170,19 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "timeout", Title: "Timeout", Width: 8, Sortable: true},
 				{Key: "handler", Title: "Handler", Width: 30, Sortable: false},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "Active":
+					return ColorHealthy
+				case "Pending":
+					return ColorWarning
+				case "Inactive":
+					return ColorDim
+				case "Failed":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{
 				{
@@ -121,6 +207,15 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "":
+					return ColorHealthy
+				case "Delete in progress":
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{
 				{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 			},
@@ -138,6 +233,7 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "health", Title: "Health", Width: 10, Sortable: true},
 				{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "EBS Volumes",
@@ -157,6 +253,17 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "az", Title: "AZ", Width: 16, Sortable: true},
 				{Key: "created", Title: "Created", Width: 18, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "in-use", "available":
+					return ColorHealthy
+				case "creating", "deleting":
+					return ColorWarning
+				case "error":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "EBS Snapshots",
@@ -175,6 +282,17 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "started", Title: "Started", Width: 18, Sortable: true},
 				{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "completed":
+					return ColorHealthy
+				case "pending":
+					return ColorWarning
+				case "error":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "AMIs",
@@ -191,6 +309,17 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "root_device_type", Title: "Root Device", Width: 14, Sortable: true},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "public", Title: "Public", Width: 8, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending":
+					return ColorWarning
+				case "failed", "invalid", "error", "deregistered":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 			StubCreator: func(id string) Resource {
 				return Resource{

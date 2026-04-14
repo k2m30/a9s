@@ -58,6 +58,13 @@ type ResourceListModel struct {
 	// positions are invalidated. Full invalidation happens when data, filter,
 	// sort, width, or hScroll changes.
 	styledRowCache map[int]string
+
+	// enrichment banner state — populated by SetEnrichmentState.
+	enrichmentIssueCount     int                                    // from menu-level enrichment count (! only)
+	enrichmentTruncated      bool                                   // true if enrichment count is a lower bound
+	enrichmentRanThisSession bool                                   // true only after Wave 2 ran successfully for this type
+	findingsByID             map[string]resource.EnrichmentFinding  // this type's per-resource findings
+	visibleFindingCount      int                                    // count of filteredResources whose ID is in findingsByID
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -384,7 +391,14 @@ func (m *ResourceListModel) View() string {
 		return "No resources found"
 	}
 
-	cols := m.resolveColumns()
+	fullCols := m.resolveColumns()
+
+	// Resolve marker column index on the FULL (unsliced) column list so that
+	// horizontal scrolling cannot move the marker to a different semantic column
+	// (e.g. State.Name path matching "Name" when Name itself is scrolled off).
+	fullMarkerColIdx := resolveIdentityColumn(fullCols, m.typeDef)
+
+	cols := fullCols
 
 	// Apply horizontal scroll: skip hScrollOffset columns from the left.
 	if m.hScrollOffset > 0 && m.hScrollOffset < len(cols) {
@@ -403,9 +417,18 @@ func (m *ResourceListModel) View() string {
 	// Render header row.
 	headerLine := m.renderHeaderRow(cols)
 
-	// Determine visible row count: height minus column header row (1).
+	// Render enrichment banner above the table when conditions are met.
+	// Compute it before visibleRows so we can reserve a row for it.
+	banner := m.renderEnrichmentBanner()
+	bannerRows := 0
+	if banner != "" {
+		bannerRows = 1
+	}
+
+	// Determine visible row count: height minus column header row (1)
+	// minus the banner row (when shown).
 	// Frame borders are already excluded from m.height by the root model.
-	visibleRows := max(m.height-1, 1)
+	visibleRows := max(m.height-1-bannerRows, 1)
 
 	// Reserve one row for the "load more" indicator when paginated and truncated.
 	showLoadMore := m.pagination != nil && m.pagination.IsTruncated
@@ -417,7 +440,25 @@ func (m *ResourceListModel) View() string {
 	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
 
 	var sb strings.Builder
+
+	if banner != "" {
+		sb.WriteString(banner)
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(headerLine)
+
+	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
+	// column index. If the identity column is scrolled off-screen or truncated out,
+	// set to -1 so renderDataRow skips the marker entirely rather than falling back
+	// to the first visible column (which would jump the dot to State/Type/etc.).
+	markerColIdx := -1
+	if fullMarkerColIdx >= m.hScrollOffset {
+		candidate := fullMarkerColIdx - m.hScrollOffset
+		if candidate < len(cols) && cols[candidate].key == fullCols[fullMarkerColIdx].key && cols[candidate].path == fullCols[fullMarkerColIdx].path {
+			markerColIdx = candidate
+		}
+	}
 
 	for i := startRow; i < endRow; i++ {
 		sb.WriteString("\n")
@@ -430,9 +471,9 @@ func (m *ResourceListModel) View() string {
 			if isSelected {
 				base = styles.RowSelected
 			} else {
-				base = styles.RowColorStyle(r.Status)
+				base = styles.ColorStyle(m.typeDef.ResolveColor(r))
 			}
-			styled = m.renderDataRow(cols, r, base, m.width, isSelected)
+			styled = m.renderDataRow(cols, r, base, m.width, isSelected, markerColIdx)
 			if m.styledRowCache == nil {
 				m.styledRowCache = make(map[int]string)
 			}
@@ -457,6 +498,29 @@ func (m *ResourceListModel) View() string {
 	}
 
 	return sb.String()
+}
+
+// SetEnrichmentState stores Wave 2 enrichment results for this resource type.
+// issueCount is the menu-badge count (!-only); truncated indicates a lower-bound count;
+// ran is true when Wave 2 completed successfully this session;
+// findings is the per-resource finding map for this type.
+// Invalidates the styled row cache because findings affect marker rendering.
+func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated, ran bool, findings map[string]resource.EnrichmentFinding) {
+	m.enrichmentIssueCount = issueCount
+	m.enrichmentTruncated = truncated
+	m.enrichmentRanThisSession = ran
+	m.findingsByID = findings
+	// Recompute visibleFindingCount against the new findings map so the banner's
+	// long/short text selection reflects current state even when findings arrive
+	// after the list is already loaded (live EnrichmentCheckedMsg or cache reopen).
+	vfc := 0
+	for _, r := range m.filteredResources {
+		if _, ok := findings[r.ID]; ok {
+			vfc++
+		}
+	}
+	m.visibleFindingCount = vfc
+	m.styledRowCache = nil
 }
 
 // InvalidateStyleCache clears the styled row cache, forcing re-render

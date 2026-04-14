@@ -9,6 +9,7 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
@@ -125,28 +126,28 @@ func TestActiveTheme_ReturnsCurrentThemeName(t *testing.T) {
 }
 
 // ===========================================================================
-// T004 — ApplyTheme rebuilds rowColorCache with new status colors
+// T004 — ApplyTheme updates ColorStyle so ColorHealthy uses the new Running color
 // ===========================================================================
 
 func TestApplyTheme_RebuildsRowColorCache(t *testing.T) {
 	original := styles.DefaultTheme()
 	defer styles.ApplyTheme(original)
 
-	// Capture the original running foreground.
-	beforeFg := styles.RowColorStyle("running").GetForeground()
+	// Capture the original ColorHealthy (running/green) foreground.
+	beforeFg := styles.ColorStyle(resource.ColorHealthy).GetForeground()
 
 	// Apply a theme with a different Running color.
 	custom := styles.DefaultTheme()
 	custom.Running = lipgloss.Color("#aabbcc")
 	styles.ApplyTheme(custom)
 
-	afterFg := styles.RowColorStyle("running").GetForeground()
+	afterFg := styles.ColorStyle(resource.ColorHealthy).GetForeground()
 
 	if colorsEqual(beforeFg, afterFg) {
-		t.Error("ApplyTheme: RowColorStyle('running') foreground unchanged after applying new Running color")
+		t.Error("ApplyTheme: ColorStyle(ColorHealthy) foreground unchanged after applying new Running color")
 	}
 	if !colorsEqual(afterFg, lipgloss.Color("#aabbcc")) {
-		t.Errorf("ApplyTheme: RowColorStyle('running') expected #aabbcc, got %v", afterFg)
+		t.Errorf("ApplyTheme: ColorStyle(ColorHealthy) expected #aabbcc, got %v", afterFg)
 	}
 }
 
