@@ -47,6 +47,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "log_streams",
 				Key:            "enter",
@@ -67,6 +68,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:      "CloudTrail Events",

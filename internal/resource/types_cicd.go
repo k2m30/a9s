@@ -62,6 +62,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 			// Pipeline list itself carries no status; failed execution surfaces
 			// via the Wave 2 enricher (see EnrichCodePipelineStatus).
 			Color: func(r Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "pipeline_stages",
 				Key:            "enter",
@@ -84,6 +85,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 			// CodeBuild project list itself carries no status; failed builds
 			// surface via the Wave 2 enricher (see EnrichCodeBuildStatus).
 			Color: func(r Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "cb_builds",
 				Key:            "enter",
@@ -105,6 +107,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "ecr_images",
 				Key:            "enter",
@@ -125,6 +128,7 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "domain_owner", Title: "Owner", Width: 14, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 	}
 }

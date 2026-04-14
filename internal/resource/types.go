@@ -148,6 +148,15 @@ type ResourceTypeDef struct {
 	// types (ct-events) where severity is event-level, not resource-health.
 	ExcludeFromIssueBadge bool
 
+	// AlwaysHealthy, when true, declares that this type's Color func returns
+	// ColorHealthy for every possible input (e.g., config-only types like S3,
+	// IAM, SG that have no runtime state). Used by the main-menu ctrl+z
+	// attention filter: truncated-zero counts are treated as CONFIRMED zero for
+	// these types (hide), but as LOWER BOUNDS for health-state types (show —
+	// pages 2+ may have issues). Must be set whenever Color is a trivial
+	// `return ColorHealthy`. Enforced by qa_ctrlz_truncated_zero_health_state_test.
+	AlwaysHealthy bool
+
 	// CellDecorators optionally transforms cell values per column key before render.
 	// Key = column key; value = decorator func receiving the full resource and the
 	// already-extracted cell string, returning the replacement. nil map = no decorators.

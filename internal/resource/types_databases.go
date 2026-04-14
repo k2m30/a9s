@@ -67,6 +67,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "s3_objects",
 				Key:            "enter",
@@ -161,6 +162,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Redshift Clusters",
@@ -177,6 +179,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "EFS File Systems",
@@ -219,6 +222,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "DocDB Snapshots",

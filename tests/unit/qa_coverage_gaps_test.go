@@ -160,16 +160,35 @@ func TestRealApplyFilter_ConfirmedZeroHiddenWhenCtrlZActive(t *testing.T) {
 	}
 }
 
-func TestRealApplyFilter_TruncatedZeroHidden(t *testing.T) {
+func TestRealApplyFilter_TruncatedZeroHealthStateVisible(t *testing.T) {
 	setupNoColor(t)
 	m := views.NewMainMenu(keys.Default())
 	m.SetSize(80, 200)
 	m.Toggle()
-	m.SetIssues("ec2", 0, true) // truncated-zero → hidden under ctrl+z
+	// EC2 is a health-state type (AlwaysHealthy=false). Truncated-zero means
+	// issues may exist on unread pages → visible under ctrl+z.
+	m.SetIssues("ec2", 0, true)
 
 	plain := m.View()
-	if strings.Contains(plain, "EC2 Instances") {
-		t.Error("truncated-zero ec2 should be hidden under ctrl+z")
+	if !strings.Contains(plain, "EC2 Instances") {
+		t.Error("truncated-zero EC2 (health-state type) must be visible under ctrl+z — count is a lower bound")
+	}
+}
+
+func TestRealApplyFilter_TruncatedZeroAlwaysHealthyHidden(t *testing.T) {
+	setupNoColor(t)
+	m := views.NewMainMenu(keys.Default())
+	m.SetSize(80, 200)
+	// Seed EC2 so the menu is non-empty under ctrl+z.
+	m.SetIssues("ec2", 1, false)
+	m.Toggle()
+	// S3 is AlwaysHealthy. Truncated-zero is CONFIRMED zero → hidden.
+	m.SetIssues("s3", 0, true)
+	m.SetIssues("ec2", 1, false) // re-trigger applyFilter
+
+	plain := m.View()
+	if strings.Contains(plain, "S3 Buckets") {
+		t.Error("truncated-zero S3 (always-healthy) must be hidden — count is confirmed zero")
 	}
 }
 

@@ -49,6 +49,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "health_check_path", Title: "Health Check", Width: 24, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "tg_health",
 				Key:            "enter",
@@ -69,6 +70,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "VPCs",
@@ -132,6 +134,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "NAT Gateways",
@@ -174,6 +177,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Elastic IPs",
@@ -190,6 +194,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "VPC Endpoints",
@@ -205,6 +210,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Transit Gateways",
@@ -220,6 +226,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Network Interfaces",

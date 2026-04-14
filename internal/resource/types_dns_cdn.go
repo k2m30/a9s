@@ -16,6 +16,7 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "r53_records",
 				Key:            "enter",
@@ -88,6 +89,7 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 	}
 }
