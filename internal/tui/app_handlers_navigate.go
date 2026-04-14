@@ -315,6 +315,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 		m.enrichmentRan = make(map[string]bool)
 		m.enrichmentTypeGen = make(map[string]int)
+		m.probeResources = make(map[string][]resource.Resource)
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd

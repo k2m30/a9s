@@ -349,7 +349,9 @@ func (m ResourceListModel) FrameTitle() string {
 	hasTextFilter := m.filterText != "" && filtered != total
 	ic := m.issueCount
 	issueStr := itoa(ic)
-	if truncated && ic > 0 {
+	// "+" suffix when count is a lower bound: either list pagination is
+	// truncated (more pages unread) or Wave 2 enrichment returned truncated.
+	if ic > 0 && (truncated || m.enrichmentTruncated) {
 		issueStr = itoa(ic) + "+"
 	}
 
