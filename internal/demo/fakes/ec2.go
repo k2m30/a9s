@@ -147,6 +147,11 @@ func (f *EC2Fake) DescribeImages(_ context.Context, input *ec2.DescribeImagesInp
 	return &ec2.DescribeImagesOutput{Images: out}, nil
 }
 
+// DescribeVolumeStatus is a stub for the Wave 2 enrichment interface.
+func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error) {
+	return &ec2.DescribeVolumeStatusOutput{}, nil
+}
+
 // toSet converts a string slice into a lookup map.
 func toSet(ss []string) map[string]bool {
 	m := make(map[string]bool, len(ss))

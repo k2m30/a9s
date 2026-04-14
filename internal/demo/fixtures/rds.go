@@ -230,6 +230,34 @@ func buildRDSInstances() []rdstypes.DBInstance {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
+		{
+			DBInstanceIdentifier:  aws.String("legacy-reports-db"),
+			DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:legacy-reports-db"),
+			Engine:                aws.String("mysql"),
+			EngineVersion:         aws.String("8.0.36"),
+			DBInstanceStatus:      aws.String("failed"),
+			DBInstanceClass:       aws.String("db.t3.medium"),
+			MasterUsername:        aws.String("mysqladmin"),
+			AvailabilityZone:      aws.String("us-east-1b"),
+			AllocatedStorage:      aws.Int32(100),
+			StorageType:           aws.String("gp2"),
+			StorageEncrypted:      aws.Bool(false),
+			BackupRetentionPeriod: aws.Int32(0),
+			DeletionProtection:    aws.Bool(false),
+			PubliclyAccessible:    aws.Bool(false),
+			MultiAZ:               aws.Bool(false),
+			VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
+				{VpcSecurityGroupId: aws.String(rdsProdRDSSGID), Status: aws.String("active")},
+			},
+			DBSubnetGroup: &rdstypes.DBSubnetGroup{
+				VpcId:             aws.String(rdsProdVPCID),
+				DBSubnetGroupName: aws.String(rdsSubnetGroup),
+			},
+			TagList: []rdstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("legacy")},
+				{Key: aws.String("Team"), Value: aws.String("reporting")},
+			},
+		},
 	}
 
 	// Generate 17 more instances to reach 22 total.

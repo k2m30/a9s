@@ -77,6 +77,24 @@ func NewCFNFixtures() *CFNFixtures {
 			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-monitoring/44444444-4444-4444-4444-444444444444"),
 			RoleARN:         aws.String(prodCIDeployRoleARN),
 		},
+		{
+			StackName:           aws.String("acme-legacy-api"),
+			StackStatus:         cfntypes.StackStatusRollbackComplete,
+			StackStatusReason:   aws.String("The following resource(s) failed to create: [ApiFunction]. Rollback requested by user."),
+			CreationTime:        aws.Time(mustParseCFNTime("2026-03-21T11:00:00+00:00")),
+			LastUpdatedTime:     aws.Time(mustParseCFNTime("2026-03-21T11:47:00+00:00")),
+			Description:         aws.String("Legacy API migration stack — initial deployment rolled back"),
+			StackId:             aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-legacy-api/55555555-5555-5555-5555-555555555555"),
+			RoleARN:             aws.String(prodCIDeployRoleARN),
+			Capabilities:        []cfntypes.Capability{cfntypes.CapabilityCapabilityIam},
+			DriftInformation: &cfntypes.StackDriftInformation{
+				StackDriftStatus: cfntypes.StackDriftStatusNotChecked,
+			},
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Team"), Value: aws.String("backend")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{
