@@ -7,6 +7,8 @@
 - Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
 - In-process demo fixture store (per resource type, loaded at startup)
+- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3 (017-issue-counts-attention-filter)
+- YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps (017-issue-counts-attention-filter)
 
 ## Project Structure
 
@@ -160,3 +162,6 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
+
+## Recent Changes
+- 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
