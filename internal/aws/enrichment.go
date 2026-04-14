@@ -28,33 +28,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// EnricherResult is the typed return value of a Wave 2 enricher.
-//
-//   - IssueCount is the number of resources the enricher classifies as issue-worthy
-//     for the menu badge. Severity "!" findings contribute; severity "~" findings
-//     (informational) do NOT contribute to IssueCount.
-//   - Truncated is true when the enricher only inspected a subset (e.g., capped at
-//     EnrichmentCap) so the count is a lower bound.
-//   - Findings is a map from resource.Resource.ID → EnrichmentFinding for every
-//     affected resource the enricher observed. For account-wide enrichers (RDS,
-//     EC2 status checks, EBS), Findings may contain entries for resources that
-//     are NOT in the input `resources` slice — banner derivation uses this
-//     information. Enrichers that receive API identifiers in a different form
-//     (e.g., ARNs) MUST normalize to Resource.ID; if no match can be determined,
-//     the affected resource is skipped silently.
-//     MAY be empty when no issues are found. MUST NOT be nil on success — use
-//     make(map[string]resource.EnrichmentFinding) for the empty case.
-type EnricherResult struct {
-	IssueCount int
-	Truncated  bool
-	Findings   map[string]resource.EnrichmentFinding
-}
-
-// EnricherFunc is a pluggable function that makes additional API calls for a
-// resource type and returns a typed EnricherResult. The resources slice contains
-// retained first-page resources from Wave 1 probes.
-type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
-
 // EnricherRegistry maps resource short names to their Wave 2 enricher functions.
 // Ordered by priority: batchable (cheap) first, per-resource (expensive) last.
 var EnricherRegistry = map[string]EnricherFunc{
@@ -253,7 +226,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(buildIDs) == 0 {
-		return EnricherResult{Findings: findings}, nil
+		return EnricherResult{Truncated: truncated, Findings: findings}, nil
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 		Ids: buildIDs,
@@ -357,12 +330,12 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					stageName = *stage.StageName
 				}
 				summary := fmt.Sprintf("stage %s failed", stageName)
-				// Pipeline findings are keyed by r.Name (the pipeline name used for the
-				// GetPipelineState API call), since that is the natural lookup key for
-				// CodePipeline resources. Fall back to r.ID if Name is empty.
-				key := r.Name
+				// Findings are keyed by r.ID to match the row-marker lookup contract
+				// in table_render.go (m.findingsByID[r.ID]). Pipeline fetcher sets
+				// ID = Name, so the observable behavior is identical.
+				key := r.ID
 				if key == "" {
-					key = r.ID
+					key = r.Name
 				}
 				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
