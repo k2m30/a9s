@@ -32,6 +32,7 @@ const (
 	lambdaProdALBSGID   = "sg-0aaa111111111111a"
 	lambdaProcessOrders = "process-orders"
 	lambdaRotateDocDB   = "rotate-docdb-credentials"
+	lambdaRotateRDS     = "rotate-rds-credentials"
 )
 
 var lambdaNamePool = []string{
@@ -230,6 +231,28 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
 			LoggingConfig: &lambdatypes.LoggingConfig{
 				LogGroup:  aws.String("/aws/lambda/" + lambdaRotateDocDB),
+				LogFormat: lambdatypes.LogFormatText,
+			},
+			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+		},
+		{
+			FunctionName:     aws.String(lambdaRotateRDS),
+			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + lambdaRotateRDS),
+			Role:             aws.String(lambdaProdRoleARN),
+			Runtime:          lambdatypes.RuntimePython312,
+			MemorySize:       aws.Int32(128),
+			Timeout:          aws.Int32(30),
+			Handler:          aws.String("rotation.handler"),
+			Description:      aws.String("Rotates Aurora PostgreSQL credentials for prod/database/primary"),
+			LastModified:     aws.String("2026-03-10T08:00:00+00:00"),
+			CodeSize:         524288,
+			State:            lambdatypes.StateActive,
+			PackageType:      lambdatypes.PackageTypeZip,
+			Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+			EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+			TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+			LoggingConfig: &lambdatypes.LoggingConfig{
+				LogGroup:  aws.String("/aws/lambda/" + lambdaRotateRDS),
 				LogFormat: lambdatypes.LogFormatText,
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,

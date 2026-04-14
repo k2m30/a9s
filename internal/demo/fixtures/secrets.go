@@ -62,7 +62,7 @@ func NewSecretsFixtures() *SecretsFixtures {
 			KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			LastRotatedDate:   aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
 			PrimaryRegion:     aws.String("us-east-1"),
-			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"),
+			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-rds-credentials"),
 			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
 			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
