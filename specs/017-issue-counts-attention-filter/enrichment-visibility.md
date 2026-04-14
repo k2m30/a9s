@@ -1,143 +1,190 @@
-# Enrichment Visibility Spec (v2)
+# Enrichment Visibility Spec (v3)
 
 **Parent**: #196 (issue counts and attention filter)
 **Problem**: Wave 2 enrichment discovers hidden issues but the resource list shows no visual indicator. The menu says `issues:N` but all rows are green.
 
-## Previous Approach — Rejected
+## Approach: Derived Banner + Finding Snapshots
 
-v1 tried to mark individual resources with `Fields["_issue"]` prefixes and propagate marks through `issueMarks` maps. This was rejected because:
-- Off-page resources can still have issues the loaded page doesn't show
-- `probeResources` is cleared after enrichment, losing detail data
-- `Fields` is the wrong place for typed metadata (leaks into search, detail extraction)
-- Cache/session reopen paths don't get marks
-- Nine enrichers × mark propagation × detail rendering = high effort, still incomplete
+### 1. List-level enrichment banner (derived, not set-once)
 
-## New Approach: List-Level Banner + Typed Attention Metadata
+The banner is **derived after every list data change** — not set at construction time. It is recomputed in `applySortAndFilter()` (which already runs after `ResourcesLoadedMsg`, load-more, refresh, and filter changes).
 
-Two changes, both cheap, both solve the actual UX problem:
-
-### 1. List-level enrichment banner
-
-When the user enters a resource list where the menu badge shows enrichment-discovered issues but the loaded page has zero `IsIssueRowColor` rows, show a one-line banner below the column headers:
+**Derivation logic** (in `ResourceListModel`):
 
 ```
-┌──────────────────────── dbi(2) ─────────────────────────┐
-│ 1:DB Identifier     2:Engine     3:Version  4:Status    │
-│ ⚠ 2 issues found by background checks (d for details)  │
-│ docdb-docdb-dev     docdb        5.0.0      available   │
-│ rds-eu-west-2-dev…  aurora-post  16.8       available   │
-└─────────────────────────────────────────────────────────┘
+showEnrichmentBanner =
+    enrichmentIssueCount > 0           // menu-level enrichment found issues for this type
+    AND enrichmentFindingsAvailable     // findings were populated THIS session (not just cached counts)
+    AND issueCount == 0                 // no IsIssueRowColor rows on the currently loaded page
 ```
 
-The banner appears when:
-- `menu.GetIssueCounts()[shortName] > 0` (enrichment found issues)
-- AND the loaded page has zero `IsIssueRowColor` rows (no visible issue-status rows)
-- AND enrichment has completed for this type (`menu.GetIssueKnown()[shortName]`)
-
-The banner disappears when:
-- The user loads more pages that happen to contain issue-status rows
-- Or the user dismisses it (press any navigation key — it's informational, not blocking)
-
-**Why this works**: It solves the exact problem ("badge says issues, list looks green") without touching individual rows, without propagating marks, without modifying Fields, without cache changes. The banner reads from the same issue counts the menu already has.
-
-**Implementation**: A single `enrichmentBanner string` field on `ResourceListModel`, set when the list is created from the main menu if the condition is met. Rendered as a styled line in `View()` above the first data row.
-
-### 2. Typed attention metadata on the model (not Fields)
-
-For detail-view explanations, store enrichment findings as typed metadata on the root Model, not in `resource.Resource.Fields`:
+The two inputs (`enrichmentIssueCount` and `enrichmentFindingsAvailable`) are passed to the list model at creation and updated when enrichment completes. They are NOT derived from `issueKnown` or cached counts — they are a separate signal:
 
 ```go
-// On Model:
+// On ResourceListModel:
+enrichmentIssueCount        int  // from menu.GetIssueCounts(), set at creation + updated on enrichment
+enrichmentFindingsAvailable bool // true only after Wave 2 findings were populated THIS session
+```
+
+**Why `enrichmentFindingsAvailable` is separate from `issueKnown`**: On cold start, cached issue counts restore `issueKnown=true` and `issueCounts[type]=N`, but no session findings exist yet. The banner must NOT show until Wave 2 actually runs and populates findings. `enrichmentFindingsAvailable` is set to true only when `EnrichmentCheckedMsg` arrives with findings for this type.
+
+**Banner text** adapts based on whether any loaded row has a finding:
+
+- If at least one loaded row has a finding in the session findings map:
+  `"⚠ N issues found by background checks (press d on highlighted rows)"`
+- If no loaded row has a finding (all affected resources are off-page):
+  `"⚠ N issues found by background checks (load more pages with m)"`
+
+This eliminates the false "d for details" hint when findings are off-page.
+
+**Banner lifecycle**:
+- Appears: after `applySortAndFilter()` when derivation condition is true
+- Updates: on load-more (may disappear if loaded page now has issue rows, or text changes)
+- Disappears: when user loads a page containing issue-status rows (`issueCount > 0`), or on refresh, or when the filter changes the visible set
+
+### 2. Typed enrichment findings (session-scoped, passed to views)
+
+```go
+// On root Model:
 type EnrichmentFinding struct {
     Severity string // "!" (broken) or "~" (informational)
-    Summary  string // human-readable: "pending maintenance: system-update, os-upgrade"
+    Summary  string // "pending maintenance: system-update (New OS patch)"
 }
 
-enrichmentFindings map[string]map[string]EnrichmentFinding // shortName → resourceID → finding
+// shortName → resourceID → finding
+enrichmentFindings map[string]map[string]EnrichmentFinding
 ```
 
-This map is:
-- Populated by enrichers (they already receive and iterate over resources)
-- Session-scoped (cleared on profile/region switch alongside `probeResources`)
-- NOT persisted to disk cache (enrichment data is volatile)
-- NOT stored in `resource.Resource.Fields` (no search/detail/YAML leakage)
+**Populated by**: enrichers, after each `EnrichmentCheckedMsg`. The enricher iterates over `probeResources[shortName]`, checks each resource, and stores a finding for affected ones.
 
-When the user opens a detail view for a resource with a finding, the detail view reads from `m.enrichmentFindings[resourceType][resourceID]` and renders a dedicated section:
+**Cleared on**: profile switch, region switch, AND manual refresh (Ctrl+R). Per-type entries are replaced (not merged) when enrichment reruns for that type, so stale findings from a previous enrichment cycle don't linger.
 
-```
-┌─ docdb-docdb-dev ──────────────────────────────────────┐
-│ ⚠ Background Check                                     │
-│ pending maintenance: system-update (New OS patch)       │
-│                                                         │
-│ DB Identifier:  docdb-docdb-dev                         │
-│ Status:         available                               │
-│ Engine:         docdb                                   │
-│ ...                                                     │
-└─────────────────────────────────────────────────────────┘
+**NOT stored in**: `resource.Resource.Fields`, disk cache, or `resourceCacheEntry`.
+
+**Passed to DetailModel**: When `handleNavigate` constructs a `DetailModel`, it looks up `m.enrichmentFindings[resourceType][resource.ID]` and passes the finding as an explicit field on `DetailModel`:
+
+```go
+// On DetailModel (new field):
+enrichmentFinding *EnrichmentFinding // nil = no finding for this resource
 ```
 
-For resources without findings, this section is absent. No change to normal detail rendering.
+Set at construction in `handleNavigate`:
 
-### Tier Classification (unchanged from v1)
+```go
+detail := views.NewDetailModel(resource, viewConfig, keys)
+if f, ok := m.enrichmentFindings[resourceType][resource.ID]; ok {
+    detail.SetEnrichmentFinding(&f)
+}
+```
 
-| Prefix | Meaning | Menu badge counted? |
-|--------|---------|-------------------|
-| `!` | Actively broken/degraded NOW | Yes |
-| `~` | Scheduled/informational | No |
+No message path needed. No root-Model access from DetailModel. The finding is a snapshot passed at construction time — if the user refreshes detail (Ctrl+R), the detail is reconstructed from the root Model which has the current findings.
 
-| Type | Enricher | Finding | Severity |
-|------|----------|---------|----------|
-| EC2 | DescribeInstanceStatus | Impaired status checks | `!` |
-| EBS | DescribeVolumeStatus | I/O impaired | `!` |
-| Target Groups | DescribeTargetHealth | Unhealthy targets | `!` |
-| CodeBuild | BatchGetBuilds | Latest build failed | `!` |
-| CodePipeline | GetPipelineState | Latest stage failed | `!` |
-| SFN | ListExecutions | Latest execution failed | `!` |
-| Glue | GetJobRuns | Latest job run failed | `!` |
-| DynamoDB | DescribeTable | Table not ACTIVE | `!` |
-| RDS/DocDB | DescribePendingMaintenanceActions | Pending maintenance | `~` |
+**Rendered in detail view**: When `enrichmentFinding != nil`, render a section at the top of the detail view (after the title, before the first field group):
 
-### What This Does NOT Do
+```
+⚠ Background Check
+  pending maintenance: system-update (New OS patch)
+```
 
-- No per-row prefixes (no `! running`, `~ available` on individual rows)
-- No `Fields` mutation (no `_issue`, `_issue_detail` keys)
-- No cache format changes
-- No filter semantics changes (`AttentionFilter` unchanged)
-- No column additions
-- EC2's existing `! running`/`~ running` from the FETCHER-level enrichment stays as-is (it's not Wave 2 — it runs during the fetch itself)
+Styled with ColPending (yellow) for `~` severity, ColStopped (red) for `!`. If the finding is nil, this section is absent — no change to normal detail rendering.
+
+YAML and JSON views do NOT show findings (findings are operational metadata, not resource state).
+
+### 3. Enricher changes
+
+Enrichers currently return `(issueCount int, truncated bool, err error)`. The signature stays the same. The new behavior: after calling the AWS API, the enricher also populates `m.enrichmentFindings[shortName][resourceID]` for each affected resource.
+
+This requires the enricher to have access to the findings map. Two options:
+
+**Option A**: Pass findings map to the enricher (change `EnricherFunc` signature).
+**Option B**: Return findings alongside counts; handler stores them.
+
+Option B is cleaner — enrichers stay pure functions:
+
+```go
+type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
+
+type EnricherResult struct {
+    IssueCount int
+    Truncated  bool
+    Findings   map[string]EnrichmentFinding // resourceID → finding
+}
+```
+
+The handler extracts `Findings` from the result and stores them in `m.enrichmentFindings[shortName]`.
+
+### Tier Classification
+
+| Severity | Meaning | Menu badge? | Examples |
+|----------|---------|-------------|---------|
+| `!` | Actively broken/degraded | Yes | Impaired checks, unhealthy targets, failed builds |
+| `~` | Scheduled/informational | No | Pending maintenance |
+
+| Type | Enricher | Severity | Summary format |
+|------|----------|----------|---------------|
+| EC2 | DescribeInstanceStatus | `!` | `"impaired: system-status impaired"` |
+| EBS | DescribeVolumeStatus | `!` | `"impaired: volume I/O degraded"` |
+| Target Groups | DescribeTargetHealth | `!` | `"unhealthy targets: 2/5"` |
+| CodeBuild | BatchGetBuilds | `!` | `"latest build FAILED (2026-04-13)"` |
+| CodePipeline | GetPipelineState | `!` | `"stage Deploy failed"` |
+| SFN | ListExecutions | `!` | `"latest execution FAILED"` |
+| Glue | GetJobRuns | `!` | `"latest run FAILED"` |
+| DynamoDB | DescribeTable | `!` | `"table status: UPDATING"` |
+| RDS/DocDB | DescribePendingMaintenanceActions | `~` | `"pending maintenance: system-update, os-upgrade"` |
+
+### What This Does NOT Change
+
+- `resource.Resource.Fields` — no mutation, no `_issue` keys
+- `IsIssueRowColor` predicate — unchanged
+- `issueStatusSet` — unchanged
+- `AttentionFilter` semantics — unchanged (still keys off Status via `IsDimRowColor`)
+- Disk cache format — unchanged
+- `resourceCacheEntry` — unchanged
+- EC2 fetcher-level `! running`/`~ running` — unchanged (that's fetcher enrichment, not Wave 2)
 
 ### Acceptance Criteria
 
-- [ ] When menu shows `issues:N` for a type but the loaded list page has all green rows, a banner appears explaining enrichment found issues
-- [ ] Banner text includes the issue count and a hint to use detail view
-- [ ] Banner disappears on navigation (not sticky/blocking)
-- [ ] Detail view for a resource with an enrichment finding shows a dedicated section with severity + summary
+- [ ] Banner appears when enrichment found issues but loaded page has zero issue-status rows
+- [ ] Banner recomputes on every list data change (load-more, refresh, filter)
+- [ ] Banner does NOT appear on cold start with cached counts before Wave 2 runs
+- [ ] Banner text says "press d on highlighted rows" only when at least one loaded row has a finding
+- [ ] Banner text says "load more pages with m" when all findings are off-page
+- [ ] Banner disappears when loaded page gains issue-status rows
+- [ ] Detail view shows "Background Check" section for resources with findings
 - [ ] Detail section is absent for resources without findings
-- [ ] `enrichmentFindings` map is session-scoped, cleared on profile/region switch
-- [ ] `enrichmentFindings` is NOT stored in Fields, NOT persisted to cache, NOT visible in YAML/JSON dump
-- [ ] RDS/DocDB pending maintenance: severity `~`, NOT counted in menu badge
-- [ ] Tier A/B enrichers: severity `!`, counted in menu badge
-- [ ] EC2 fetcher-level `! running`/`~ running` behavior unchanged
+- [ ] Detail section uses severity-appropriate color (red for `!`, yellow for `~`)
+- [ ] YAML/JSON views do NOT show findings
+- [ ] Findings are session-scoped, not cached to disk
+- [ ] Findings cleared on profile/region switch AND manual refresh
+- [ ] Per-type findings replaced (not merged) on enrichment rerun
+- [ ] RDS/DocDB findings: severity `~`, NOT counted in menu badge
+- [ ] `EnricherFunc` returns `EnricherResult` with `Findings` map
+- [ ] EC2 fetcher-level `! running`/`~ running` unchanged
 
 ### Files Affected
 
 | File | Change |
 |------|--------|
-| `internal/tui/app.go` | Add `enrichmentFindings` map field |
-| `internal/tui/app_handlers.go` | Clear `enrichmentFindings` on profile/region switch |
-| `internal/tui/app_handlers_navigate.go` | Populate findings from enricher results; pass banner state to list on creation |
-| `internal/tui/app_fetchers.go` | Enrichers populate findings map |
-| `internal/aws/enrichment.go` | Enrichers return findings alongside counts (change return type or use output parameter) |
-| `internal/tui/views/resourcelist.go` | Add `enrichmentBanner` field, render in View() |
-| `internal/tui/views/detail_fields.go` | Render enrichment finding section when present |
+| `internal/aws/enrichment.go` | `EnricherResult` struct; enrichers return findings per resource |
+| `internal/tui/app.go` | `enrichmentFindings` map; `EnrichmentFinding` struct |
+| `internal/tui/app_handlers.go` | Clear findings on profile/region switch + refresh |
+| `internal/tui/app_handlers_navigate.go` | Store findings from enricher results; pass finding to DetailModel; pass enrichment state to list model |
+| `internal/tui/app_fetchers.go` | Update `probeEnrichment` to carry findings in message |
+| `internal/tui/messages/messages.go` | `EnrichmentCheckedMsg` carries `Findings` map |
+| `internal/tui/views/resourcelist.go` | `enrichmentIssueCount`, `enrichmentFindingsAvailable` fields; banner derivation in `applySortAndFilter()` |
+| `internal/tui/views/resourcelist_helpers.go` | Render banner in `View()` |
+| `internal/tui/views/detail.go` | `enrichmentFinding *EnrichmentFinding` field; `SetEnrichmentFinding()` |
+| `internal/tui/views/detail_fields.go` | Render "Background Check" section |
 
 ### Implementation Order
 
-1. Add `EnrichmentFinding` struct and `enrichmentFindings` map to Model
-2. Change enrichers to populate findings (severity + summary per resource)
-3. Store findings on Model after `EnrichmentCheckedMsg`
-4. Clear findings on profile/region switch
-5. Set `enrichmentBanner` on ResourceListModel when creating from menu (if enrichment issues exist but page is all green)
-6. Render banner in `ResourceListModel.View()`
-7. Pass findings to detail view, render dedicated section
-8. Tests
+1. Define `EnrichmentFinding` and `EnricherResult` types
+2. Change `EnricherFunc` signature to return `EnricherResult`
+3. Update 9 enrichers to populate `Findings` in results
+4. Add `enrichmentFindings` map to Model; store findings from `EnrichmentCheckedMsg`
+5. Clear findings on profile/region switch + refresh; replace per-type on rerun
+6. Add `enrichmentIssueCount`, `enrichmentFindingsAvailable` to ResourceListModel
+7. Derive banner in `applySortAndFilter()`; render in View()
+8. Pass finding snapshot to DetailModel at construction
+9. Render "Background Check" section in detail view
+10. Tests for banner derivation, finding lifecycle, detail rendering
