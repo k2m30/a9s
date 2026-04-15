@@ -55,8 +55,10 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"nat":      NoOpEnricher,
 	"redis":    NoOpEnricher,
 	"rtb":      NoOpEnricher,
+	"secrets":  NoOpEnricher,
 	"sg":       NoOpEnricher,
 	"sns-sub":  NoOpEnricher,
+	"ssm":      NoOpEnricher,
 	"subnet":   NoOpEnricher,
 	"vpce":     NoOpEnricher,
 }
