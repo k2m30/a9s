@@ -87,18 +87,46 @@ func FetchOpenSearchDomains(
 			}
 		}
 
+		processing := "false"
+		if domain.Processing != nil && *domain.Processing {
+			processing = "true"
+		}
+		upgradeProcessing := "false"
+		if domain.UpgradeProcessing != nil && *domain.UpgradeProcessing {
+			upgradeProcessing = "true"
+		}
+		deleted := "false"
+		if domain.Deleted != nil && *domain.Deleted {
+			deleted = "true"
+		}
+		clusterHealth := ""
+		if domain.DomainProcessingStatus != "" {
+			clusterHealth = string(domain.DomainProcessingStatus)
+		}
+		status := "available"
+		if deleted == "true" {
+			status = "deleted"
+		} else if processing == "true" || upgradeProcessing == "true" {
+			status = "processing"
+		}
+
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
-			Status: "",
+			Status: status,
 			Fields: map[string]string{
-				"domain_name":    domainName,
-				"engine_version": engineVersion,
-				"instance_type":  instanceType,
-				"instance_count": instanceCount,
-				"endpoint":       endpoint,
+				"domain_name":        domainName,
+				"engine_version":     engineVersion,
+				"instance_type":      instanceType,
+				"instance_count":     instanceCount,
+				"endpoint":           endpoint,
+				"status":             status,
+				"processing":         processing,
+				"upgrade_processing": upgradeProcessing,
+				"deleted":            deleted,
+				"cluster_health":     clusterHealth,
 			},
-			RawStruct:  domain,
+			RawStruct: domain,
 		}
 
 		resources = append(resources, r)
