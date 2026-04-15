@@ -21,3 +21,8 @@ func NewACM() *ACMFake {
 func (f *ACMFake) ListCertificates(_ context.Context, _ *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
 	return &acm.ListCertificatesOutput{CertificateSummaryList: f.fix.Certificates}, nil
 }
+
+// DescribeCertificate is a no-op stub — the demo transport does not exercise Wave 2 enrichment.
+func (f *ACMFake) DescribeCertificate(_ context.Context, _ *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+	return &acm.DescribeCertificateOutput{}, nil
+}
