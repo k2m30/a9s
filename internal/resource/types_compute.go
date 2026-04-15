@@ -172,8 +172,10 @@ func computeResourceTypes() []ResourceTypeDef {
 				switch r.Fields["status"] {
 				case "ACTIVE":
 					return ColorHealthy
-				case "INACTIVE":
-					return ColorDim
+				case "PROVISIONING", "DEPROVISIONING":
+					return ColorWarning
+				case "FAILED", "INACTIVE":
+					return ColorBroken
 				}
 				return ColorHealthy
 			},
