@@ -364,6 +364,12 @@ type CloudFrontListDistributionsAPI interface {
 	ListDistributions(ctx context.Context, params *cloudfront.ListDistributionsInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error)
 }
 
+// CloudFrontGetDistributionConfigAPI defines the interface for the CloudFront GetDistributionConfig operation.
+// Used by Wave 2 enrichment to inspect per-distribution security configuration.
+type CloudFrontGetDistributionConfigAPI interface {
+	GetDistributionConfig(ctx context.Context, params *cloudfront.GetDistributionConfigInput, optFns ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error)
+}
+
 // Route53ListHostedZonesAPI defines the interface for the Route53 ListHostedZones operation.
 type Route53ListHostedZonesAPI interface {
 	ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
@@ -377,6 +383,12 @@ type Route53ListResourceRecordSetsAPI interface {
 // APIGatewayV2GetApisAPI defines the interface for the API Gateway V2 GetApis operation.
 type APIGatewayV2GetApisAPI interface {
 	GetApis(ctx context.Context, params *apigatewayv2.GetApisInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error)
+}
+
+// APIGatewayV2GetStagesAPI defines the interface for the API Gateway V2 GetStages operation.
+// Used by Wave 2 enrichment to inspect stage-level configuration per API.
+type APIGatewayV2GetStagesAPI interface {
+	GetStages(ctx context.Context, params *apigatewayv2.GetStagesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error)
 }
 
 // ECRDescribeRepositoriesAPI defines the interface for the ECR DescribeRepositories operation.
@@ -900,6 +912,7 @@ type Route53API interface {
 // *cloudfront.Client structurally satisfies this interface.
 type CloudFrontAPI interface {
 	CloudFrontListDistributionsAPI
+	CloudFrontGetDistributionConfigAPI // Wave 2 enrichment
 }
 
 // ACMAPI is the aggregate interface covering all ACM operations used by a9s fetchers.
@@ -913,6 +926,7 @@ type ACMAPI interface {
 // *apigatewayv2.Client structurally satisfies this interface.
 type APIGatewayV2API interface {
 	APIGatewayV2GetApisAPI
+	APIGatewayV2GetStagesAPI // Wave 2 enrichment
 }
 
 // CFNAPI is the aggregate interface covering all CloudFormation operations used by a9s fetchers.
