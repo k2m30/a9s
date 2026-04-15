@@ -92,10 +92,12 @@ func databasesResourceTypes() []ResourceTypeDef {
 				switch r.Fields["status"] {
 				case "available":
 					return ColorHealthy
-				case "creating", "modifying", "snapshotting", "deleting":
+				case "creating", "modifying", "snapshotting", "deleting", "rebooting cluster nodes":
 					return ColorWarning
-				case "incompatible-network":
+				case "restore-failed", "incompatible-network":
 					return ColorBroken
+				case "deleted":
+					return ColorDim
 				}
 				return ColorHealthy
 			},
