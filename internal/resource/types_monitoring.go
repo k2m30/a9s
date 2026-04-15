@@ -17,7 +17,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "threshold", Title: "Threshold", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["state_value"] {
+				switch r.Fields["state"] {
 				case "OK":
 					return ColorHealthy
 				case "ALARM":

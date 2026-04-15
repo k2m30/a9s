@@ -14,6 +14,7 @@ package unit
 // expected TDD behavior. They MUST compile cleanly against Stream 1 + Stream 2 output.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -382,7 +383,7 @@ func TestColor_IsIssue(t *testing.T) {
 	}
 	for _, tc := range cases {
 		tc := tc
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("Color_%d", tc.color), func(t *testing.T) {
 			if got := tc.color.IsIssue(); got != tc.want {
 				t.Errorf("Color(%d).IsIssue() = %v, want %v", tc.color, got, tc.want)
 			}
