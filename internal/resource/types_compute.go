@@ -339,15 +339,37 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 18, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// Base color from volume state.
+				var base Color
 				switch r.Fields["state"] {
-				case "in-use", "available":
-					return ColorHealthy
+				case "in-use":
+					base = ColorHealthy
+				case "available":
+					base = ColorHealthy
+					// Orphan check: unattached and older than 7 days.
+					if r.Fields["attached_to"] == "" {
+						if t, err := time.Parse("2006-01-02 15:04", r.Fields["created"]); err == nil {
+							if time.Since(t) > 7*24*time.Hour {
+								base = ColorWarning
+							}
+						}
+					}
 				case "creating", "deleting":
-					return ColorWarning
+					base = ColorWarning
 				case "error":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
 					return ColorBroken
 				}
-				return ColorHealthy
+				// Unencrypted → upgrade to Warning (CIS EC2.7).
+				if r.Fields["encrypted"] == "false" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				return base
 			},
 		},
 		{

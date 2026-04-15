@@ -57,6 +57,7 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"lambda":     NoOpEnricher,
 	"nat":        NoOpEnricher,
 	"rds-snap":   NoOpEnricher,
+	"redshift":   NoOpEnricher,
 	"redis":      NoOpEnricher,
 	"rtb":        NoOpEnricher,
 	"secrets":    NoOpEnricher,

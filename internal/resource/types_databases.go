@@ -204,16 +204,45 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				// Base color from ClusterStatus.
+				var base Color
 				switch r.Fields["status"] {
 				case "available":
-					return ColorHealthy
-				case "creating", "modifying", "deleting", "resizing", "renaming", "rebooting":
-					return ColorWarning
+					base = ColorHealthy
+				case "creating", "modifying", "resizing", "rebooting", "renaming", "deleting":
+					base = ColorWarning
 				case "incompatible-hsm", "incompatible-network", "incompatible-parameters",
 					"incompatible-restore", "hardware-failure", "storage-full":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
 					return ColorBroken
 				}
-				return ColorHealthy
+				// ClusterAvailabilityStatus upgrades.
+				switch r.Fields["cluster_availability_status"] {
+				case "Unavailable", "Failed":
+					return ColorBroken
+				case "Maintenance", "Modifying":
+					if base == ColorHealthy {
+						base = ColorWarning
+					}
+				}
+				// Re-check after availability upgrade.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// Publicly accessible → upgrade to Warning.
+				if r.Fields["publicly_accessible"] == "true" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				// Unencrypted → upgrade to Warning.
+				if r.Fields["encrypted"] == "false" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				return base
 			},
 		},
 		{
