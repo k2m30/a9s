@@ -1,5 +1,7 @@
 package resource
 
+import "strconv"
+
 func monitoringResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -18,12 +20,16 @@ func monitoringResourceTypes() []ResourceTypeDef {
 			},
 			Color: func(r Resource) Color {
 				switch r.Fields["state"] {
-				case "OK":
-					return ColorHealthy
 				case "ALARM":
 					return ColorBroken
 				case "INSUFFICIENT_DATA":
 					return ColorWarning
+				case "OK":
+					actionsCount, err := strconv.Atoi(r.Fields["actions_count"])
+					if err != nil || actionsCount == 0 {
+						return ColorWarning
+					}
+					return ColorHealthy
 				}
 				return ColorHealthy
 			},

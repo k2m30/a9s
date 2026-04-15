@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold"})
+	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold", "actions_count"})
 
 	resource.RegisterPaginated("alarm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -89,16 +90,19 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
 		}
 
+		actionsCount := len(alarm.AlarmActions) + len(alarm.OKActions) + len(alarm.InsufficientDataActions)
+
 		r := resource.Resource{
 			ID:     alarmName,
 			Name:   alarmName,
 			Status: stateValue,
 			Fields: map[string]string{
-				"alarm_name":  alarmName,
-				"state":       stateValue,
-				"metric_name": metricName,
-				"namespace":   namespace,
-				"threshold":   threshold,
+				"alarm_name":    alarmName,
+				"state":         stateValue,
+				"metric_name":   metricName,
+				"namespace":     namespace,
+				"threshold":     threshold,
+				"actions_count": strconv.Itoa(actionsCount),
 			},
 			RawStruct: alarm,
 		}
