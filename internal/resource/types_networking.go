@@ -237,14 +237,16 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 			Color: func(r Resource) Color {
 				switch r.Fields["state"] {
-				case "available":
+				case "Available":
 					return ColorHealthy
-				case "pending", "creating", "deleting", "modifying":
+				case "PendingAcceptance", "Pending", "Deleting":
 					return ColorWarning
-				case "failed", "rejected", "expired":
+				case "Failed", "Rejected", "Expired", "Partial":
 					return ColorBroken
+				case "Deleted":
+					return ColorDim
 				}
-				return ColorWarning
+				return ColorHealthy
 			},
 		},
 		{
