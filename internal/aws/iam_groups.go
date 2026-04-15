@@ -25,6 +25,9 @@ func init() {
 		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false},
 	})
+
+	// iamtypes.Group: no navigable cross-ref fields — the Group struct carries only
+	// GroupName, GroupId, Arn, Path, CreateDate. Members and policies are runtime API relationships.
 }
 
 // FetchIAMGroups calls the IAM ListGroups API and returns all pages of groups.

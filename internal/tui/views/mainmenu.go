@@ -182,7 +182,8 @@ func (m *MainMenuModel) skipUnavailable(direction int) {
 	cur = start - direction
 	for cur >= 0 && cur < total {
 		item := m.filteredItems[cur]
-		if count, known := m.availability[item.ShortName]; !known || count > 0 {
+		isTruncated := m.truncated != nil && m.truncated[item.ShortName]
+		if count, known := m.availability[item.ShortName]; !known || count > 0 || isTruncated {
 			m.scroll.SetCursor(cur)
 			return
 		}
@@ -330,14 +331,7 @@ func (m MainMenuModel) FrameTitle() string {
 	filtered := len(m.filteredItems)
 	var title string
 	switch {
-	case m.filterText != "" && m.IsEnabled():
-		// Text filter + ctrl+z: show filtered/total [!]
-		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
-	case m.IsEnabled():
-		// ctrl+z only: show filtered/total [!] so user sees how many types have issues
-		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
-	case m.filterText != "":
-		// Text filter only
+	case m.filterText != "" || m.IsEnabled():
 		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
 	default:
 		title = "resource-types(" + itoa(total) + ")"
@@ -549,21 +543,32 @@ func (m MainMenuModel) issueBadge(shortName string) string {
 
 // isVisibleUnderIssueFilter determines whether a resource type should be
 // visible when the ctrl+z issue filter is active.
+//
+// Quad-state visibility (evaluated in order):
+//  1. ExcludeFromIssueBadge types (e.g. ct-events) — never probed; hide always.
+//  2. AlwaysHealthy types (e.g. S3, SG, IAM) — Color func is a constant; hide always.
+//  3. Unknown (not yet probed) — show to prevent cold-start empty menu.
+//  4. Has issues → show; confirmed-zero with no truncation → hide;
+//     truncated non-AlwaysHealthy → show (lower bound, unread pages may carry issues).
 func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
+	td := resource.FindResourceType(shortName)
+	if td != nil && td.ExcludeFromIssueBadge {
+		return false
+	}
+	if td != nil && td.AlwaysHealthy {
+		return false
+	}
 	if !m.issueKnown[shortName] {
 		return true // unknown → visible (prevent cold-start empty menu)
 	}
 	if m.issueCounts[shortName] > 0 {
 		return true // has issues → visible
 	}
-	// Zero issues — truncation changes semantics depending on the type:
-	//   • Always-healthy types (S3, IAM, SG, etc.): zero is CONFIRMED zero;
-	//     the Color func ignores input and returns Healthy for any page. Hide.
+	// Zero issues — truncation changes semantics:
 	//   • Health-state types (EC2, ENI, RDS, etc.): zero is a LOWER BOUND;
 	//     unread pages may carry issues. Show so the user can drill in.
 	if m.issueTruncated[shortName] {
-		td := resource.FindResourceType(shortName)
-		if td != nil && !td.AlwaysHealthy {
+		if td == nil || !td.AlwaysHealthy {
 			return true
 		}
 	}

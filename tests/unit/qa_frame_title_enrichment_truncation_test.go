@@ -14,11 +14,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
+
+// frameTitleTestFindings returns 3 distinct ! findings — drives issueCount=3.
+func frameTitleTestFindings() map[string]resource.EnrichmentFinding {
+	return map[string]resource.EnrichmentFinding{
+		"id-1": {Severity: "!", Summary: "instance unhealthy"},
+		"id-2": {Severity: "!", Summary: "instance unhealthy"},
+		"id-3": {Severity: "!", Summary: "instance unhealthy"},
+	}
+}
 
 // TestFrameTitle_EnrichmentTruncated_ShowsPlus verifies that when enrichmentTruncated
 // is true and issueCount > 0, FrameTitle includes "+" in the issue count portion.
@@ -32,20 +42,17 @@ func TestFrameTitle_EnrichmentTruncated_ShowsPlus(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	// Load resources — stopped and pending resources will be ColorBroken/ColorWarning
-	// via fallbackColor on r.Status, so issueCount > 0 after applyFilter.
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
 	m.SetShowIssueBadge(true)
 
-	// Set enrichment state with truncated=true — this should trigger the "+" in issueStr.
-	m.SetEnrichmentState(3, true, true, nil)
+	findings := frameTitleTestFindings()
+	m.SetEnrichmentState(3, true, findings)
 
 	title := m.FrameTitle()
 
-	// The issue count suffix must contain "+".
 	if !strings.Contains(title, "+") {
 		t.Errorf("FrameTitle with enrichmentTruncated=true must contain '+' in issue badge; got %q — was the enrichmentTruncated check reverted?", title)
 	}
@@ -69,12 +76,11 @@ func TestFrameTitle_EnrichmentNotTruncated_NoPlus(t *testing.T) {
 	})
 	m.SetShowIssueBadge(true)
 
-	// enrichmentTruncated=false, ran=true — badge should be exact.
-	m.SetEnrichmentState(3, false, true, nil)
+	findings := frameTitleTestFindings()
+	m.SetEnrichmentState(3, false, findings)
 
 	title := m.FrameTitle()
 
-	// No "+" expected when truncated=false.
 	if strings.Contains(title, "+") {
 		t.Errorf("FrameTitle with enrichmentTruncated=false must NOT contain '+' in issue badge; got %q", title)
 	}

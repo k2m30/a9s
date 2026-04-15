@@ -49,7 +49,6 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "health_check_path", Title: "Health Check", Width: 24, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "tg_health",
 				Key:            "enter",

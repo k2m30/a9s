@@ -25,6 +25,9 @@ func init() {
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
 	})
+
+	// cptypes.PipelineSummary (list response): no navigable fields — RoleArn and
+	// ArtifactStore are only on GetPipelineOutput, not the list summary struct used as RawStruct.
 }
 
 // FetchCodePipelines calls the CodePipeline ListPipelines API and converts

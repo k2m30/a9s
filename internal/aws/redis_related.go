@@ -16,6 +16,12 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
 	})
+
+	// elasticachetypes.CacheCluster: SecurityGroups[].SecurityGroupId
+	// skip KmsKeyId: CacheCluster exposes AtRestEncryptionEnabled (bool), not the key ARN
+	resource.RegisterNavigableFields("redis", []resource.NavigableField{
+		{FieldPath: "SecurityGroups.SecurityGroupId", TargetType: "sg"},
+	})
 }
 
 // checkRedisCFN returns Count: 0 because ElastiCache replication group tags are

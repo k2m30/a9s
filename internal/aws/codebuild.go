@@ -25,6 +25,11 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
 		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline},
 	})
+
+	// cbtypes.Project: ServiceRole (ARN — value is the full ARN string)
+	resource.RegisterNavigableFields("cb", []resource.NavigableField{
+		{FieldPath: "ServiceRole", TargetType: "role"},
+	})
 }
 
 // FetchCodeBuildProjectsPage fetches one page of project names from ListProjects

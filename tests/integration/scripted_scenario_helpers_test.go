@@ -694,10 +694,16 @@ func fullIntegrationScenarioKeyPress(t *testing.T, key string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyPgUp}
 	case "pgdown":
 		return tea.KeyPressMsg{Code: tea.KeyPgDown}
-	case "ctrl+r":
-		return tea.KeyPressMsg{Code: '\x12', Text: "\x12"}
-	case "ctrl+z":
-		return tea.KeyPressMsg{Code: '\x1a', Text: "\x1a"}
+	}
+
+	if strings.HasPrefix(key, "ctrl+") {
+		rest := strings.TrimPrefix(key, "ctrl+")
+		runes := []rune(rest)
+		if len(runes) == 1 {
+			return tea.KeyPressMsg{Code: runes[0], Mod: tea.ModCtrl}
+		}
+		t.Fatalf("unsupported ctrl+<char> key %q", key)
+		return tea.KeyPressMsg{}
 	}
 
 	if len([]rune(key)) == 1 {

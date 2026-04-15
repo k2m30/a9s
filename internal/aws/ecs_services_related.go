@@ -22,6 +22,15 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
 	})
+
+	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
+	resource.RegisterNavigableFields("ecs-svc", []resource.NavigableField{
+		{FieldPath: "ClusterArn", TargetType: "ecs"},
+		{FieldPath: "RoleArn", TargetType: "role"},
+		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.Subnets", TargetType: "subnet"},
+		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.SecurityGroups", TargetType: "sg"},
+		{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
+	})
 }
 
 // checkECSSvcCluster returns the ECS cluster this service belongs to (Pattern F).

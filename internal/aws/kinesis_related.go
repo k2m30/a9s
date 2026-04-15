@@ -15,6 +15,9 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, NeedsTargetCache: false},
 	})
+
+	// kinesisstypes.StreamSummary (list response): no navigable fields — KeyId/EncryptionType
+	// are on DescribeStream's StreamDescriptionSummary, not the list summary used as RawStruct.
 }
 
 // checkKinesisLambda returns Count: 0 because Kinesis stream event source

@@ -18,6 +18,13 @@ func init() {
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
 	})
+
+	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
+	// RotationLambdaARN (full ARN — UI resolves function name suffix to lambda cache)
+	resource.RegisterNavigableFields("secrets", []resource.NavigableField{
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
+	})
 }
 
 // checkSecretsKMS returns the KMS key used to encrypt this secret (Pattern F).

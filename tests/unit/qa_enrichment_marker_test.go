@@ -3,12 +3,12 @@ package unit
 // qa_enrichment_marker_test.go — T041: row marker rendering tests for US2.
 //
 // Tests verify that:
-//   - Resources with no finding render no middle-dot marker (·, U+00B7).
-//   - Resources with a "!" finding render a · in ColStopped (red) color.
-//   - Resources with a "~" finding render a · in ColPending (yellow) color.
+//   - Resources with no finding render no "! " / "~ " prefix marker.
+//   - Resources with a "!" finding render a "! " prefix on the identity column.
+//   - Resources with a "~" finding render a "~ " prefix on the identity column.
 //   - The marker appears at most once per affected row.
-//   - Exactly N dots appear when N resources have findings.
-//   - Under NO_COLOR the · character still appears in the rendered output.
+//   - Exactly N prefixed rows appear when N resources have findings.
+//   - Under NO_COLOR the prefix character still appears in the rendered output.
 
 import (
 	"strings"
@@ -75,14 +75,15 @@ func buildMarkerModel(t *testing.T, findings map[string]resource.EnrichmentFindi
 		ResourceType: "ec2",
 		Resources:    markerResources(),
 	})
-	m.SetEnrichmentState(len(findings), false, true, findings)
+	m.SetEnrichmentState(len(findings), false, findings)
 	return m
 }
 
-// countMiddleDots counts occurrences of the middle-dot rune (U+00B7) in
-// the plain-text (ANSI-stripped) rendered output.
-func countMiddleDots(rendered string) int {
-	return strings.Count(stripANSI(rendered), "\u00b7")
+// countFindingPrefixes counts occurrences of "! " and "~ " prefixes in the
+// rendered view. These prefixes mark rows whose identity column carries a
+// Wave-2 finding. The prefix is pure text; row color is unchanged.
+func countFindingPrefixes(rendered string) int {
+	return strings.Count(rendered, "! ") + strings.Count(rendered, "~ ")
 }
 
 // ---------------------------------------------------------------------------
@@ -90,12 +91,13 @@ func countMiddleDots(rendered string) int {
 // ---------------------------------------------------------------------------
 
 // TestRowMarker_Absent_WhenNoFinding verifies that when findingsByID is empty,
-// no middle-dot marker (·) appears in the rendered list output.
+// no "! " or "~ " prefix marker appears in the rendered list output.
 func TestRowMarker_Absent_WhenNoFinding(t *testing.T) {
 	m := buildMarkerModel(t, map[string]resource.EnrichmentFinding{})
 	rendered := m.View()
-	if strings.Contains(stripANSI(rendered), "\u00b7") {
-		t.Error("expected no middle-dot marker in output when findingsByID is empty, but · was found")
+	plain := stripANSI(rendered)
+	if strings.Contains(plain, "! ") || strings.Contains(plain, "~ ") {
+		t.Error("expected no prefix marker in output when findingsByID is empty, but marker was found")
 	}
 }
 
@@ -104,8 +106,7 @@ func TestRowMarker_Absent_WhenNoFinding(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRowMarker_PresentForFinding_SeverityBang verifies that a resource with
-// severity "!" has a middle-dot marker in the rendered output, and that the
-// styled output contains the ANSI sequence for ColStopped (red).
+// severity "!" has a "! " prefix marker in the rendered output.
 func TestRowMarker_PresentForFinding_SeverityBang(t *testing.T) {
 	findings := map[string]resource.EnrichmentFinding{
 		"i-1": {Severity: "!", Summary: "system status impaired"},
@@ -113,25 +114,22 @@ func TestRowMarker_PresentForFinding_SeverityBang(t *testing.T) {
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
 
-	// The · must appear in plain-text output.
-	if !strings.Contains(stripANSI(rendered), "\u00b7") {
-		t.Error("expected middle-dot marker · for severity=! finding, not found in output")
+	// The "! " prefix must appear in plain-text output.
+	if !strings.Contains(stripANSI(rendered), "! ") {
+		t.Error("expected '! ' prefix marker for severity=! finding, not found in output")
 	}
 
 	// The raw (ANSI-included) output must contain a color sequence for ColStopped.
-	// ColStopped is used for "!" severity (ColorBroken). We verify it by rendering a dot using
-	// the same style and checking that sequence appears somewhere in the rendered line.
 	dotStyleBang := styles.ColorStyle(resource.ColorBroken) // ColStopped path
 	_ = dotStyleBang                                        // ensure import is used
 
-	// Find the line that contains the resource's name and the middle dot.
+	// Find the line that contains the resource's name.
 	line := findLineContaining(rendered, "web-server-01")
 	if line == "" {
 		t.Fatal("could not find rendered row for web-server-01")
 	}
-	// The raw line must contain the middle-dot character (embedded in ANSI sequences).
-	if !strings.Contains(line, "\u00b7") {
-		t.Error("the rendered row for resource with severity=! does not contain · character")
+	if !strings.Contains(stripANSI(line), "! ") {
+		t.Error("the rendered row for resource with severity=! does not contain '! ' prefix")
 	}
 }
 
@@ -140,7 +138,7 @@ func TestRowMarker_PresentForFinding_SeverityBang(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRowMarker_PresentForFinding_SeverityTilde verifies that a resource with
-// severity "~" has a middle-dot marker in the rendered output.
+// severity "~" has a "~ " prefix marker in the rendered output.
 func TestRowMarker_PresentForFinding_SeverityTilde(t *testing.T) {
 	findings := map[string]resource.EnrichmentFinding{
 		"i-1": {Severity: "~", Summary: "pending maintenance: system-update"},
@@ -148,16 +146,16 @@ func TestRowMarker_PresentForFinding_SeverityTilde(t *testing.T) {
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
 
-	if !strings.Contains(stripANSI(rendered), "\u00b7") {
-		t.Error("expected middle-dot marker · for severity=~ finding, not found in output")
+	if !strings.Contains(stripANSI(rendered), "~ ") {
+		t.Error("expected '~ ' prefix marker for severity=~ finding, not found in output")
 	}
 
 	line := findLineContaining(rendered, "web-server-01")
 	if line == "" {
 		t.Fatal("could not find rendered row for web-server-01")
 	}
-	if !strings.Contains(line, "\u00b7") {
-		t.Error("the rendered row for resource with severity=~ does not contain · character")
+	if !strings.Contains(stripANSI(line), "~ ") {
+		t.Error("the rendered row for resource with severity=~ does not contain '~ ' prefix")
 	}
 }
 
@@ -165,8 +163,8 @@ func TestRowMarker_PresentForFinding_SeverityTilde(t *testing.T) {
 // TestRowMarker_PrefixedToIdentityColumn_NotOthers
 // ---------------------------------------------------------------------------
 
-// TestRowMarker_PrefixedToIdentityColumn_NotOthers verifies that the marker
-// appears at most once per row (not duplicated across multiple columns).
+// TestRowMarker_PrefixedToIdentityColumn_NotOthers verifies that the "! " prefix
+// marker appears at most once per row (not duplicated across multiple columns).
 // This indirectly verifies it is attached to the identity column only.
 func TestRowMarker_PrefixedToIdentityColumn_NotOthers(t *testing.T) {
 	findings := map[string]resource.EnrichmentFinding{
@@ -179,14 +177,13 @@ func TestRowMarker_PrefixedToIdentityColumn_NotOthers(t *testing.T) {
 	if line == "" {
 		t.Fatal("could not find rendered row for web-server-01")
 	}
-	// Strip ANSI to get plain text for dot counting within the row.
 	plain := stripANSI(line)
-	dotCount := strings.Count(plain, "\u00b7")
-	if dotCount > 1 {
-		t.Errorf("expected at most 1 middle-dot in row, got %d: %q", dotCount, plain)
+	markerCount := strings.Count(plain, "! ")
+	if markerCount > 1 {
+		t.Errorf("expected at most 1 '! ' prefix in row, got %d: %q", markerCount, plain)
 	}
-	if dotCount == 0 {
-		t.Error("expected exactly 1 middle-dot in row for resource with finding, got 0")
+	if markerCount == 0 {
+		t.Error("expected exactly 1 '! ' prefix in row for resource with finding, got 0")
 	}
 }
 
@@ -195,7 +192,7 @@ func TestRowMarker_PrefixedToIdentityColumn_NotOthers(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRowMarker_OnlyOnAffectedRows verifies that when only one of three
-// resources has a finding, exactly one middle-dot appears in the full
+// resources has a finding, exactly one prefix marker appears in the full
 // rendered output.
 func TestRowMarker_OnlyOnAffectedRows(t *testing.T) {
 	findings := map[string]resource.EnrichmentFinding{
@@ -204,14 +201,14 @@ func TestRowMarker_OnlyOnAffectedRows(t *testing.T) {
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
 
-	total := countMiddleDots(rendered)
+	total := countFindingPrefixes(rendered)
 	if total != 1 {
-		t.Errorf("expected exactly 1 middle-dot across all rows (only i-1 has a finding), got %d", total)
+		t.Errorf("expected exactly 1 prefix marker across all rows (only i-1 has a finding), got %d", total)
 	}
 }
 
-// TestRowMarker_OnlyOnAffectedRows_Multiple verifies dot count when multiple
-// resources have findings.
+// TestRowMarker_OnlyOnAffectedRows_Multiple verifies prefix marker count when
+// multiple resources have findings.
 func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
 	findings := map[string]resource.EnrichmentFinding{
 		"i-1": {Severity: "!", Summary: "impaired"},
@@ -220,9 +217,9 @@ func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
 
-	total := countMiddleDots(rendered)
+	total := countFindingPrefixes(rendered)
 	if total != 2 {
-		t.Errorf("expected exactly 2 middle-dots (i-1 and i-3 have findings), got %d", total)
+		t.Errorf("expected exactly 2 prefix markers (i-1 and i-3 have findings), got %d", total)
 	}
 }
 
@@ -231,8 +228,8 @@ func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRowMarker_NoColorMode_StillVisible verifies that under NO_COLOR, the
-// middle-dot character · still appears in the plain-text rendered output.
-// Color styling is additive; the character itself must always render.
+// "~ " prefix marker still appears in the plain-text rendered output.
+// Color styling is additive; the prefix character itself must always render.
 func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	styles.Reinit()
@@ -253,12 +250,12 @@ func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
 		ResourceType: "ec2",
 		Resources:    markerResources(),
 	})
-	m.SetEnrichmentState(1, false, true, findings)
+	m.SetEnrichmentState(1, false, findings)
 
 	rendered := m.View()
 	plain := stripANSI(rendered)
-	if !strings.Contains(plain, "\u00b7") {
-		t.Error("expected middle-dot · to be visible in NO_COLOR mode, but it was not found in plain-text output")
+	if !strings.Contains(plain, "! ") && !strings.Contains(plain, "~ ") {
+		t.Error("expected finding prefix (\"! \" or \"~ \") to be visible in NO_COLOR mode, but it was not found")
 	}
 }
 
@@ -294,7 +291,7 @@ func TestRowMarker_AllResourceTypes(t *testing.T) {
 				ResourceType: td.ShortName,
 				Resources:    res,
 			})
-			m.SetEnrichmentState(1, false, true, finding)
+			m.SetEnrichmentState(1, false, finding)
 			// Must not panic.
 			_ = m.View()
 		})

@@ -9,7 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // applySortAndFilter re-applies filter and then sorts the filtered results.
@@ -347,7 +346,11 @@ func (m ResourceListModel) FrameTitle() string {
 
 	isAttention := m.IsEnabled()
 	hasTextFilter := m.filterText != "" && filtered != total
+	// Use unified Wave-1 + Wave-2 count when enrichment has run; fall back to Wave-1 only.
 	ic := m.issueCount
+	if m.enrichmentIssueCount > 0 {
+		ic = m.enrichmentIssueCount
+	}
 	issueStr := itoa(ic)
 	// "+" suffix when count is a lower bound: either list pagination is
 	// truncated (more pages unread) or Wave 2 enrichment returned truncated.
@@ -525,53 +528,6 @@ func (m *ResourceListModel) applyFilter() {
 	}
 	m.issueCount = ic
 
-	// Recompute visible finding count from filteredResources (severity-agnostic).
-	vfc := 0
-	for _, r := range m.filteredResources {
-		if _, ok := m.findingsByID[r.ID]; ok {
-			vfc++
-		}
-	}
-	m.visibleFindingCount = vfc
-}
-
-// renderEnrichmentBanner returns a styled banner line when all three conditions hold:
-//  1. len(findingsByID) > 0 (severity-agnostic — includes ~ findings that don't count in menu badge)
-//  2. enrichmentRanThisSession is true (Wave 2 completed for this type)
-//  3. visibleIssueCount == 0 (no issue-colored rows visible in the filtered set)
-//
-// Returns an empty string when the banner should not be shown.
-func (m *ResourceListModel) renderEnrichmentBanner() string {
-	findingCount := len(m.findingsByID)
-	if findingCount == 0 || !m.enrichmentRanThisSession {
-		return ""
-	}
-	// Compute visible issue count from filtered resources.
-	visibleIssueCount := 0
-	for _, r := range m.filteredResources {
-		if m.typeDef.ResolveColor(r).IsIssue() {
-			visibleIssueCount++
-		}
-	}
-	if visibleIssueCount > 0 {
-		return ""
-	}
-
-	// Format N or N+ depending on truncation.
-	n := itoa(findingCount)
-	if m.enrichmentTruncated {
-		n += "+"
-	}
-
-	// Select long or short text based on visibleFindingCount.
-	var text string
-	if m.visibleFindingCount > 0 {
-		text = "⚠ " + n + " issues detected by background checks"
-	} else {
-		text = "⚠ " + n + " issues detected by background checks — not visible on this page"
-	}
-
-	return styles.EnrichmentBannerStyle.Render(text)
 }
 
 // FilterResources returns resources matching the query (case-insensitive).
