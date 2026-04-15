@@ -6,6 +6,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -25,9 +26,11 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	smithy "github.com/aws/smithy-go"
 
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -93,7 +96,9 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"ssm":        NoOpEnricher,
 	"subnet":     NoOpEnricher,
 	"trail":      NoOpEnricher,
+	"vpc":        EnrichVPCFlowLogs,
 	"vpce":       NoOpEnricher,
+	"s3":         EnrichS3PublicAccessBlock,
 }
 
 // NoOpEnricher is registered for resource types whose Wave 2 column in
@@ -1072,6 +1077,124 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		}
 		if worst != nil {
 			findings[tgwID] = *worst
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (cap EnrichmentCap)
+// and returns a Finding when no active flow logs exist for the VPC.
+// Severity is "~" (informational per CIS EC2.6).
+// Summary: "no active VPC flow logs (CIS EC2.6)".
+func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.EC2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		vpcID := r.ID
+		if vpcID == "" {
+			continue
+		}
+		out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
+			Filter: []ec2types.Filter{
+				{Name: aws.String("resource-id"), Values: []string{vpcID}},
+			},
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		// No flow logs at all, or none with ACTIVE status → finding.
+		hasActive := false
+		for _, fl := range out.FlowLogs {
+			if fl.FlowLogStatus != nil && *fl.FlowLogStatus == "ACTIVE" {
+				hasActive = true
+				break
+			}
+		}
+		if !hasActive {
+			findings[vpcID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "no active VPC flow logs (CIS EC2.6)",
+			}
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
+// and returns a Finding when the bucket has no PAB configuration, or when any of the
+// four PAB flags is false.
+// Severity is "~" (informational).
+// Summaries:
+//   - "no public access block (account-level may apply)" — NoSuchPublicAccessBlockConfiguration
+//   - "public-access block partial: <flag>=false" — one or more flags false
+func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.S3 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		name := r.Name
+		if name == "" {
+			name = r.ID
+		}
+		if name == "" {
+			continue
+		}
+		out, err := clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
+			Bucket: aws.String(name),
+		})
+		if err != nil {
+			// Check for NoSuchPublicAccessBlockConfiguration (bucket has no PAB config set).
+			var apiErr smithy.APIError
+			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchPublicAccessBlockConfiguration" {
+				findings[name] = resource.EnrichmentFinding{
+					Severity: "~",
+					Summary:  "no public access block (account-level may apply)",
+				}
+				continue
+			}
+			// Other errors: skip but signal incomplete data.
+			truncated = true
+			continue
+		}
+		if out.PublicAccessBlockConfiguration == nil {
+			findings[name] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "no public access block (account-level may apply)",
+			}
+			continue
+		}
+		cfg := out.PublicAccessBlockConfiguration
+		// Check each of the four PAB flags; report the first false one.
+		type flagCheck struct {
+			name  string
+			value *bool
+		}
+		flags := []flagCheck{
+			{"BlockPublicAcls", cfg.BlockPublicAcls},
+			{"IgnorePublicAcls", cfg.IgnorePublicAcls},
+			{"BlockPublicPolicy", cfg.BlockPublicPolicy},
+			{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
+		}
+		for _, fc := range flags {
+			if fc.value == nil || !*fc.value {
+				findings[name] = resource.EnrichmentFinding{
+					Severity: "~",
+					Summary:  fmt.Sprintf("public-access block partial: %s=false", fc.name),
+				}
+				break
+			}
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil

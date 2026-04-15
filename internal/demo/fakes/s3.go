@@ -89,3 +89,13 @@ func (f *S3Fake) GetBucketLocation(_ context.Context, input *s3.GetBucketLocatio
 	// All demo buckets are in us-east-1; S3 uses empty string for us-east-1.
 	return &s3.GetBucketLocationOutput{}, nil
 }
+
+// GetPublicAccessBlock is a stub for the Wave 2 enrichment interface.
+// Returns an empty configuration (all four PAB flags nil/false) so demo buckets
+// appear as partially configured.
+func (f *S3Fake) GetPublicAccessBlock(_ context.Context, input *s3.GetPublicAccessBlockInput, _ ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetPublicAccessBlock: bucket name is required")
+	}
+	return &s3.GetPublicAccessBlockOutput{}, nil
+}
