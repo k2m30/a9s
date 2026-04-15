@@ -725,6 +725,7 @@ type EC2API interface {
 	EC2DescribeImagesAPI
 	EC2DescribeInstanceStatusAPI  // Wave 2 enrichment
 	EC2DescribeVolumeStatusAPI    // Wave 2 enrichment
+	EC2DescribeFlowLogsAPI        // Wave 2 enrichment
 }
 
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
@@ -733,6 +734,7 @@ type S3API interface {
 	S3ListBucketsAPI
 	S3ListObjectsV2API
 	S3GetBucketNotificationConfigurationAPI
+	S3GetPublicAccessBlockAPI // Wave 2 enrichment
 }
 
 // CloudTrailAPI is the aggregate interface covering all CloudTrail operations used by a9s fetchers.
@@ -1054,9 +1056,21 @@ type EC2DescribeVolumeStatusAPI interface {
 	DescribeVolumeStatus(ctx context.Context, params *ec2.DescribeVolumeStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error)
 }
 
+// EC2DescribeFlowLogsAPI defines the interface for the EC2 DescribeFlowLogs operation.
+// Used by EnrichVPCFlowLogs to check whether flow logs are active for each VPC.
+type EC2DescribeFlowLogsAPI interface {
+	DescribeFlowLogs(ctx context.Context, params *ec2.DescribeFlowLogsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error)
+}
+
 // RDSDescribePendingMaintenanceAPI defines the interface for the RDS DescribePendingMaintenanceActions operation.
 type RDSDescribePendingMaintenanceAPI interface {
 	DescribePendingMaintenanceActions(ctx context.Context, params *rds.DescribePendingMaintenanceActionsInput, optFns ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error)
+}
+
+// S3GetPublicAccessBlockAPI defines the interface for the S3 GetPublicAccessBlock operation.
+// Used by EnrichS3PublicAccessBlock to check per-bucket PAB configuration.
+type S3GetPublicAccessBlockAPI interface {
+	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
 
 // EnricherResult is the typed return value of a Wave 2 enricher.
