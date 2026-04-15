@@ -23,3 +23,9 @@ func NewEB() *EBFake {
 func (f *EBFake) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {
 	return &elasticbeanstalk.DescribeEnvironmentsOutput{Environments: f.fix.Environments}, nil
 }
+
+// DescribeEnvironmentHealth is a no-op stub for demo mode.
+// Wave 2 enrichment is skipped in demo mode; this satisfies the ElasticBeanstalkAPI interface.
+func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentHealthInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error) {
+	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
+}
