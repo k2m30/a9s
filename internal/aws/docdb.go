@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn"})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "deletion_protection", "storage_encrypted", "backup_retention_period"})
 
 	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -97,17 +97,45 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			endpoint = *cluster.Endpoint
 		}
 
+		// has_writer: "true" if at least one member has IsClusterWriter == true.
+		hasWriter := "false"
+		for _, m := range cluster.DBClusterMembers {
+			if m.IsClusterWriter != nil && *m.IsClusterWriter {
+				hasWriter = "true"
+				break
+			}
+		}
+
+		deletionProtection := "true"
+		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
+			deletionProtection = "false"
+		}
+
+		storageEncrypted := "true"
+		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
+			storageEncrypted = "false"
+		}
+
+		backupRetentionPeriod := "0"
+		if cluster.BackupRetentionPeriod != nil {
+			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
+		}
+
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
 			Status: status,
 			Fields: map[string]string{
-				"cluster_id":     clusterID,
-				"engine_version": engineVersion,
-				"status":         status,
-				"instances":      instances,
-				"endpoint":       endpoint,
-				"arn":            aws.ToString(cluster.DBClusterArn),
+				"cluster_id":              clusterID,
+				"engine_version":          engineVersion,
+				"status":                  status,
+				"instances":               instances,
+				"endpoint":                endpoint,
+				"arn":                     aws.ToString(cluster.DBClusterArn),
+				"has_writer":              hasWriter,
+				"deletion_protection":     deletionProtection,
+				"storage_encrypted":       storageEncrypted,
+				"backup_retention_period": backupRetentionPeriod,
 			},
 			RawStruct: cluster,
 		}

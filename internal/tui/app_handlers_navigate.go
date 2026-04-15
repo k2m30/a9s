@@ -462,17 +462,45 @@ func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, te
 // handleAvailabilityCacheLoaded applies cached entries to the main menu
 // and starts background availability checks.
 func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoadedMsg) (tea.Model, tea.Cmd) {
+	// Canonicalize any alias keys (e.g. "rds" → "dbi") so the menu's filter and
+	// issue maps share the same key space as the ResourceTypeDef lookup.
+	canonKey := func(k string) string {
+		if td := resource.FindResourceType(k); td != nil {
+			return td.ShortName
+		}
+		return k
+	}
+	canonIntMap := func(src map[string]int) map[string]int {
+		dst := make(map[string]int, len(src))
+		for k, v := range src {
+			dst[canonKey(k)] = v
+		}
+		return dst
+	}
+	canonBoolMap := func(src map[string]bool) map[string]bool {
+		dst := make(map[string]bool, len(src))
+		for k, v := range src {
+			dst[canonKey(k)] = v
+		}
+		return dst
+	}
+	entries := canonIntMap(msg.Entries)
+	truncated := canonBoolMap(msg.Truncated)
+	issueCounts := canonIntMap(msg.IssueCounts)
+	issueTruncated := canonBoolMap(msg.IssueTruncated)
+	issueKnown := canonBoolMap(msg.IssueKnown)
+
 	// Apply cached entries to the main menu
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		for shortName, count := range msg.Entries {
+		for shortName, count := range entries {
 			menu.SetAvailability(shortName, count)
 		}
-		for shortName, trunc := range msg.Truncated {
+		for shortName, trunc := range truncated {
 			menu.SetTruncated(shortName, trunc)
 		}
 		// Apply cached issue counts (T033).
-		if len(msg.IssueKnown) > 0 {
-			menu.SetIssuesFromCache(msg.IssueCounts, msg.IssueTruncated, msg.IssueKnown)
+		if len(issueKnown) > 0 {
+			menu.SetIssuesFromCache(issueCounts, issueTruncated, issueKnown)
 		}
 	}
 
@@ -660,14 +688,21 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			} else {
 				unified = msg.Issues
 			}
-			menu.SetIssues(msg.ResourceType, unified, msg.Truncated)
+			// Wave 2 truncation with no findings and no wave-1 issues means a
+			// sub-call errored but no actual issue was seen. Truncation signals
+			// count completeness, not hidden issues — if Wave 2 had seen one, it
+			// would have produced a Finding. Don't promote into the attention filter.
+			issueTruncated := msg.Truncated
+			if unified == 0 && len(msg.Findings) == 0 {
+				issueTruncated = false
+			}
+			menu.SetIssues(msg.ResourceType, unified, issueTruncated)
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
 
 			// Live-update ALL ResourceListModel views in the stack showing this type.
-			issueTrunc := menu.GetIssueTruncated()[msg.ResourceType]
 			for _, v := range m.stack {
 				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
-					rl.SetEnrichmentState(unified, issueTrunc, msg.Findings)
+					rl.SetEnrichmentState(unified, issueTruncated, msg.Findings)
 				}
 			}
 		}

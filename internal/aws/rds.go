@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn"})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period"})
 
 	resource.RegisterRelated("dbi", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
@@ -112,19 +112,43 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			multiAZ = "Yes"
 		}
 
+		publiclyAccessible := "false"
+		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
+			publiclyAccessible = "true"
+		}
+
+		storageEncrypted := "true"
+		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
+			storageEncrypted = "false"
+		}
+
+		deletionProtection := "true"
+		if db.DeletionProtection != nil && !*db.DeletionProtection {
+			deletionProtection = "false"
+		}
+
+		backupRetentionPeriod := "0"
+		if db.BackupRetentionPeriod != nil {
+			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
+		}
+
 		r := resource.Resource{
 			ID:     dbIdentifier,
 			Name:   dbIdentifier,
 			Status: status,
 			Fields: map[string]string{
-				"db_identifier":  dbIdentifier,
-				"engine":         engine,
-				"engine_version": engineVersion,
-				"status":         status,
-				"class":          class,
-				"endpoint":       endpoint,
-				"multi_az":       multiAZ,
-				"arn":            aws.ToString(db.DBInstanceArn),
+				"db_identifier":          dbIdentifier,
+				"engine":                 engine,
+				"engine_version":         engineVersion,
+				"status":                 status,
+				"class":                  class,
+				"endpoint":               endpoint,
+				"multi_az":               multiAZ,
+				"arn":                    aws.ToString(db.DBInstanceArn),
+				"publicly_accessible":    publiclyAccessible,
+				"storage_encrypted":      storageEncrypted,
+				"deletion_protection":    deletionProtection,
+				"backup_retention_period": backupRetentionPeriod,
 			},
 			RawStruct: db,
 		}

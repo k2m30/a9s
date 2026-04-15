@@ -37,6 +37,7 @@ import (
 var EnricherRegistry = map[string]EnricherFunc{
 	"rds":      EnrichRDSDocDBMaintenance,
 	"dbi":      EnrichRDSDocDBMaintenance,
+	"dbc":      EnrichRDSDocDBMaintenance,
 	"ebs":      EnrichEBSVolumeStatus,
 	"cb":       EnrichCodeBuildStatus,
 	"tg":       EnrichTargetGroupHealth,
