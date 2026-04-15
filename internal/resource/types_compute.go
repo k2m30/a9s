@@ -1,5 +1,30 @@
 package resource
 
+import "time"
+
+// deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
+// has end-of-lifed per docs/attention-signals.md.
+var deprecatedLambdaRuntimes = map[string]struct{}{
+	"nodejs":          {},
+	"nodejs4.3":       {},
+	"nodejs6.10":      {},
+	"nodejs8.10":      {},
+	"nodejs10.x":      {},
+	"nodejs12.x":      {},
+	"nodejs14.x":      {},
+	"python2.7":       {},
+	"python3.6":       {},
+	"python3.7":       {},
+	"ruby2.5":         {},
+	"ruby2.7":         {},
+	"dotnetcore1.0":   {},
+	"dotnetcore2.0":   {},
+	"dotnetcore2.1":   {},
+	"dotnetcore3.1":   {},
+	"java8":           {},
+	"go1.x":           {},
+}
+
 func computeResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -186,17 +211,38 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// Compute state-based color first.
+				var stateColor Color
 				switch r.Fields["state"] {
 				case "Active":
-					return ColorHealthy
+					stateColor = ColorHealthy
 				case "Pending":
-					return ColorWarning
+					stateColor = ColorWarning
 				case "Inactive":
-					return ColorDim
+					stateColor = ColorDim
 				case "Failed":
+					stateColor = ColorBroken
+				default:
+					stateColor = ColorHealthy
+				}
+				// Override signals — Broken wins over Warning wins over Dim.
+				// last_update_status=Failed → Broken.
+				if r.Fields["last_update_status"] == "Failed" {
 					return ColorBroken
 				}
-				return ColorHealthy
+				// Deprecated runtime → Broken.
+				if _, ok := deprecatedLambdaRuntimes[r.Fields["runtime"]]; ok {
+					return ColorBroken
+				}
+				// State-based Broken is already set; return it before Warning upgrades.
+				if stateColor == ColorBroken {
+					return ColorBroken
+				}
+				// No dead-letter queue → Warning (unless already Broken).
+				if r.Fields["dlq_target_arn"] == "" {
+					return ColorWarning
+				}
+				return stateColor
 			},
 			Children: []ChildViewDef{
 				{
@@ -347,15 +393,36 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "public", Title: "Public", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// Compute state-based color first.
+				var stateColor Color
 				switch r.Fields["state"] {
 				case "available":
-					return ColorHealthy
-				case "pending":
-					return ColorWarning
-				case "failed", "invalid", "error", "deregistered":
+					stateColor = ColorHealthy
+				case "pending", "transient":
+					stateColor = ColorWarning
+				case "failed", "error", "invalid":
+					stateColor = ColorBroken
+				case "deregistered", "disabled":
+					// Admin terminal states — dim, not broken.
+					stateColor = ColorDim
+				default:
+					stateColor = ColorHealthy
+				}
+				// Broken wins over everything.
+				if stateColor == ColorBroken {
 					return ColorBroken
 				}
-				return ColorHealthy
+				// Deprecated AMI (deprecation_time is in the past) → Warning.
+				if depStr := r.Fields["deprecation_time"]; depStr != "" {
+					if depTime, err := time.Parse(time.RFC3339, depStr); err == nil {
+						if time.Now().After(depTime) {
+							if stateColor != ColorDim {
+								return ColorWarning
+							}
+						}
+					}
+				}
+				return stateColor
 			},
 			StubCreator: func(id string) Resource {
 				return Resource{
