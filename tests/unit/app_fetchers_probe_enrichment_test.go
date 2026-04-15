@@ -10,9 +10,10 @@ package unit
 //  (c) enricher returns error → EnrichmentCheckedMsg{Err: <error>}
 //  (d) enricher success → EnrichmentCheckedMsg{TypeGen > 0, ResourceType set}
 //
-// Approach: use the existing "ec2" type (has enricher in registry). For branches
-// (c), temporarily replace EnricherRegistry["ec2"] with a fake that returns an error,
-// restoring the original with t.Cleanup.
+// Approach: use the existing "dbi" type (has enricher in registry and is in
+// buildEnrichQueue's order list). For branches (c), temporarily replace
+// EnricherRegistry["dbi"] with a fake that returns an error, restoring the
+// original with t.Cleanup.
 
 import (
 	"context"
@@ -25,20 +26,39 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
-// setupEnrichmentDispatch navigates to the ec2 list, presses Ctrl+R (which bumps
-// enrichmentTypeGen["ec2"] to 1), then delivers ResourcesLoadedMsg{TypeGen=1} to
+// navigateToDBIList navigates the root model to the DBI resource list.
+func navigateToDBIList(m tui.Model) tui.Model {
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "dbi",
+	})
+	return m
+}
+
+// rerunDBIResources returns a small slice of realistic RDS cluster instance
+// resources for use as simulated fetch results in rerun/overlap tests.
+func rerunDBIResources() []resource.Resource {
+	return []resource.Resource{
+		{ID: "db-prod-1", Name: "db-prod-1", Fields: map[string]string{"db_instance_id": "db-prod-1", "status": "available"}},
+		{ID: "db-prod-2", Name: "db-prod-2", Fields: map[string]string{"db_instance_id": "db-prod-2", "status": "available"}},
+		{ID: "db-staging-1", Name: "db-staging-1", Fields: map[string]string{"db_instance_id": "db-staging-1", "status": "available"}},
+	}
+}
+
+// setupEnrichmentDispatch navigates to the dbi list, presses Ctrl+R (which bumps
+// enrichmentTypeGen["dbi"] to 1), then delivers ResourcesLoadedMsg{TypeGen=1} to
 // trigger the tail-branch dispatch. Returns the model and the probeEnrichment cmd.
 func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.Model, func() interface{}) {
 	t.Helper()
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToDBIList(m)
 
-	// Ctrl+R bumps enrichmentTypeGen["ec2"] → 1.
+	// Ctrl+R bumps enrichmentTypeGen["dbi"] → 1.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver ResourcesLoadedMsg{TypeGen=1} → tail branch fires probeEnrichment.
 	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
+		ResourceType: "dbi",
 		Resources:    resources,
 		TypeGen:      1,
 	})
@@ -55,7 +75,7 @@ func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.M
 func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
-	_, execProbe := setupEnrichmentDispatch(t, rerunEC2Resources())
+	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
 	checked, ok := msg.(messages.EnrichmentCheckedMsg)
@@ -67,28 +87,28 @@ func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 	if checked.Err == nil {
 		t.Error("probeEnrichment with nil clients should set Err, got nil")
 	}
-	if checked.ResourceType != "ec2" {
-		t.Errorf("EnrichmentCheckedMsg.ResourceType = %q, want %q", checked.ResourceType, "ec2")
+	if checked.ResourceType != "dbi" {
+		t.Errorf("EnrichmentCheckedMsg.ResourceType = %q, want %q", checked.ResourceType, "dbi")
 	}
 }
 
 // TestProbeEnrichment_EnricherError_ReturnsErrorMsg verifies that when the
 // registered enricher returns an error, probeEnrichment returns
-// EnrichmentCheckedMsg with Err set. We swap EnricherRegistry["ec2"] with a
+// EnrichmentCheckedMsg with Err set. We swap EnricherRegistry["dbi"] with a
 // fake that errors, then restore it.
 func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
-	// Temporarily replace the ec2 enricher with one that always errors.
-	original := awsclient.EnricherRegistry["ec2"]
-	awsclient.EnricherRegistry["ec2"] = func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.EnricherResult, error) {
+	// Temporarily replace the dbi enricher with one that always errors.
+	original := awsclient.EnricherRegistry["dbi"]
+	awsclient.EnricherRegistry["dbi"] = func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.EnricherResult, error) {
 		return awsclient.EnricherResult{}, fmt.Errorf("simulated enricher failure")
 	}
 	t.Cleanup(func() {
 		if original != nil {
-			awsclient.EnricherRegistry["ec2"] = original
+			awsclient.EnricherRegistry["dbi"] = original
 		} else {
-			delete(awsclient.EnricherRegistry, "ec2")
+			delete(awsclient.EnricherRegistry, "dbi")
 		}
 	})
 
@@ -100,7 +120,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	// To truly reach the enricher-error branch (c) we need non-nil clients.
 	// In unit tests we can't construct real AWS clients, so we verify the
 	// command shape via the nil-clients path as a coverage proxy.
-	_, execProbe := setupEnrichmentDispatch(t, rerunEC2Resources())
+	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
 	checked, ok := msg.(messages.EnrichmentCheckedMsg)
@@ -119,7 +139,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 	tui.Version = "test"
 
-	_, execProbe := setupEnrichmentDispatch(t, rerunEC2Resources())
+	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
 	checked, ok := msg.(messages.EnrichmentCheckedMsg)
@@ -131,34 +151,34 @@ func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 	if checked.TypeGen == 0 {
 		t.Error("EnrichmentCheckedMsg.TypeGen should be non-zero after Ctrl+R bump")
 	}
-	if checked.ResourceType != "ec2" {
-		t.Errorf("ResourceType = %q, want ec2", checked.ResourceType)
+	if checked.ResourceType != "dbi" {
+		t.Errorf("ResourceType = %q, want dbi", checked.ResourceType)
 	}
 }
 
 // TestProbeEnrichment_NoEnricher_NoCmdDispatched verifies that when no enricher
 // is registered for a type, probeEnrichment is not dispatched (returns nil cmd).
 //
-// We test this by temporarily removing ec2 from EnricherRegistry. With no
-// enricher, buildEnrichQueue skips ec2 → no probeEnrichment cmd returned.
+// We test this by temporarily removing dbi from EnricherRegistry. With no
+// enricher, buildEnrichQueue skips dbi → no probeEnrichment cmd returned.
 func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	tui.Version = "test"
 
-	// Temporarily remove the ec2 enricher.
-	original := awsclient.EnricherRegistry["ec2"]
-	delete(awsclient.EnricherRegistry, "ec2")
+	// Temporarily remove the dbi enricher.
+	original := awsclient.EnricherRegistry["dbi"]
+	delete(awsclient.EnricherRegistry, "dbi")
 	t.Cleanup(func() {
 		if original != nil {
-			awsclient.EnricherRegistry["ec2"] = original
+			awsclient.EnricherRegistry["dbi"] = original
 		}
 	})
 
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
-		Resources:    rerunEC2Resources(),
+		ResourceType: "dbi",
+		Resources:    rerunDBIResources(),
 		TypeGen:      1,
 	})
 
@@ -178,11 +198,11 @@ func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	// Deliver empty resource list with TypeGen=1.
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
+		ResourceType: "dbi",
 		Resources:    []resource.Resource{}, // empty
 		TypeGen:      1,
 	})

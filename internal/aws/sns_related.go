@@ -16,6 +16,9 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSNSCFN, NeedsTargetCache: true},
 		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
 	})
+
+	// snstypes topic: detail view renders only TopicArn — no cross-ref fields (KmsMasterKeyId,
+	// subscriptions, delivery policies are GetTopicAttributes results, not in the list RawStruct).
 }
 
 // checkSNSCFN returns Count: 0 because SNS topic tags are not included in the

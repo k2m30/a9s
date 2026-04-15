@@ -25,6 +25,11 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
 	})
+
+	// cloudwatchlogstypes.LogGroup: KmsKeyId
+	resource.RegisterNavigableFields("logs", []resource.NavigableField{
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and

@@ -15,15 +15,8 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "last_changed", Title: "Last Changed", Width: 18, Sortable: true},
 				{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
 			},
-			Color: func(r Resource) Color {
-				switch r.Fields["status"] {
-				case "":
-					return ColorHealthy
-				case "scheduled for deletion":
-					return ColorDim
-				}
-				return ColorHealthy
-			},
+			Color:         func(_ Resource) Color { return ColorHealthy },
+			AlwaysHealthy: true,
 		},
 		{
 			Name:          "SSM Parameters",

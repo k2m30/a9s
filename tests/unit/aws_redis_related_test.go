@@ -28,10 +28,13 @@ func redisCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 // --- Navigable Fields ---
 
-func TestNavigableFields_Redis_None(t *testing.T) {
-	nav := resource.IsFieldNavigable("redis", "CacheClusterId")
-	if nav != nil {
-		t.Errorf("expected no navigable fields for redis, but CacheClusterId resolved to %v", nav)
+func TestNavigableFields_Redis_SecurityGroup(t *testing.T) {
+	nav := resource.IsFieldNavigable("redis", "SecurityGroups.SecurityGroupId")
+	if nav == nil {
+		t.Fatal("expected SecurityGroups.SecurityGroupId to be navigable for redis")
+	}
+	if nav.TargetType != "sg" {
+		t.Errorf("expected TargetType=sg, got %q", nav.TargetType)
 	}
 }
 

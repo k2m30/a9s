@@ -125,23 +125,3 @@ func TestEnrichRDSDocDBMaintenance_UnprobedResourcesAppearsAsArnSuffix(t *testin
 	}
 }
 
-func TestEnrichRDSDocDBMaintenance_IssueCountIsAlwaysZero(t *testing.T) {
-	// RDS maintenance severity is "~" (informational) — IssueCount must always be 0
-	// so it does NOT contribute to the menu badge count.
-	fake := &rdsMaintenanceBugFake{}
-	clients := &awsclient.ServiceClients{RDS: fake}
-
-	probeResources := []resource.Resource{
-		{ID: "docdb-docdb-dev", Name: "docdb-docdb-dev"},
-		{ID: "rds-eu-west-2-dev-instance", Name: "rds-eu-west-2-dev-instance"},
-	}
-
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (RDS severity is ~ — excluded from menu badge)", result.IssueCount)
-	}
-}

@@ -25,6 +25,10 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true},
 	})
+
+	// cwtypes.MetricAlarm: Dimensions[].Value may reference EC2/RDS/ELB IDs but Dimensions
+	// is heterogeneous — a single FieldPath cannot map to one target type. AlarmActions/OKActions
+	// contain SNS ARNs, already handled by checkAlarmSNS. No single-type NavigableField applicable.
 }
 
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and returns all

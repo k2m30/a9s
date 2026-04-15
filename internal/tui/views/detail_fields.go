@@ -291,7 +291,7 @@ func (m *DetailModel) buildFieldList() {
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
-		m.injectEnrichmentFinding()
+		m.injectEnrichmentSection()
 		return
 	}
 	items := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
@@ -364,7 +364,7 @@ func (m *DetailModel) buildFieldList() {
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()
 	}
-	m.injectEnrichmentFinding()
+	m.injectEnrichmentSection()
 }
 
 // extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
@@ -493,33 +493,91 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	m.fieldList = result
 }
 
-// injectEnrichmentFinding prepends a "⚠ Background Check" section to m.fieldList
-// when m.enrichmentFinding is non-nil. The section header uses ColorTier "!" (red)
-// or "~" (yellow) to convey severity. This injection is skipped for ct-events paths
-// since those use sectionsToFieldItems and bypass buildFieldList's default flow.
-// YAML/JSON views do not call buildFieldList, so findings never appear there.
-func (m *DetailModel) injectEnrichmentFinding() {
+// injectEnrichmentSection dispatches to the per-type enrichment injector based on
+// m.resourceType. Types without a Wave 2 enricher (e.g. ec2, ddb) are not dispatched.
+func (m *DetailModel) injectEnrichmentSection() {
+	switch m.resourceType {
+	case "dbi", "rds":
+		m.injectRDSPendingMaintenance()
+	case "ebs":
+		m.injectEBSVolumeStatus()
+	case "cb":
+		m.injectCodeBuildLatestBuild()
+	case "tg":
+		m.injectTargetGroupHealth()
+	case "pipeline":
+		m.injectPipelineStageFailure()
+	case "sfn":
+		m.injectSFNLatestExecution()
+	case "glue":
+		m.injectGlueLatestRun()
+	}
+}
+
+// appendFindingSection appends a named section header and one row per FindingRow
+// to m.fieldList. Returns immediately when finding is nil. When Rows is empty
+// but Summary is set, falls back to rendering Summary as a single data row.
+func (m *DetailModel) appendFindingSection(header, pathKey string) {
 	if m.enrichmentFinding == nil {
 		return
 	}
-	inject := []fieldpath.FieldItem{
-		{
-			IsSection: true,
-			Key:       "⚠ Background Check",
-			Path:      "EnrichmentFinding",
-			ColorTier: m.enrichmentFinding.Severity,
-		},
-		{
-			Key:   "Summary",
-			Value: m.enrichmentFinding.Summary,
-			Path:  "EnrichmentFinding",
-		},
+	rows := m.enrichmentFinding.Rows
+	if len(rows) == 0 {
+		if m.enrichmentFinding.Summary == "" {
+			return
+		}
+		rows = []resource.FindingRow{{Label: "Summary", Value: m.enrichmentFinding.Summary}}
 	}
-	// Prepend before existing content.
-	result := make([]fieldpath.FieldItem, 0, len(inject)+len(m.fieldList))
-	result = append(result, inject...)
-	result = append(result, m.fieldList...)
-	m.fieldList = result
+	items := make([]fieldpath.FieldItem, 0, 1+len(rows))
+	items = append(items, fieldpath.FieldItem{
+		IsSection: true,
+		Key:       header,
+		Path:      pathKey,
+		ColorTier: m.enrichmentFinding.Severity,
+	})
+	for _, row := range rows {
+		tier := row.Tier
+		if tier == "" {
+			tier = m.enrichmentFinding.Severity
+		}
+		items = append(items, fieldpath.FieldItem{
+			IsSubField:  true,
+			IndentLevel: 1,
+			Key:         row.Label,
+			Value:       row.Value,
+			Path:        pathKey,
+			ColorTier:   tier,
+		})
+	}
+	m.fieldList = append(m.fieldList, items...)
+}
+
+func (m *DetailModel) injectRDSPendingMaintenance() {
+	m.appendFindingSection("Pending Maintenance", "PendingMaintenance")
+}
+
+func (m *DetailModel) injectEBSVolumeStatus() {
+	m.appendFindingSection("Volume Health", "VolumeHealth")
+}
+
+func (m *DetailModel) injectCodeBuildLatestBuild() {
+	m.appendFindingSection("Latest Build", "LatestBuild")
+}
+
+func (m *DetailModel) injectTargetGroupHealth() {
+	m.appendFindingSection("Target Health", "TargetHealth")
+}
+
+func (m *DetailModel) injectPipelineStageFailure() {
+	m.appendFindingSection("Pipeline State", "PipelineState")
+}
+
+func (m *DetailModel) injectSFNLatestExecution() {
+	m.appendFindingSection("Latest Execution", "LatestExecution")
+}
+
+func (m *DetailModel) injectGlueLatestRun() {
+	m.appendFindingSection("Latest Run", "LatestRun")
 }
 
 // subFieldIndent returns the left margin for a sub-field at the given indent level.

@@ -60,14 +60,14 @@ func detailRenderOutput(m views.DetailModel) string {
 
 // TestDetailView_NoBackgroundCheckSection_WhenNoFinding asserts that a DetailModel
 // with no enrichment finding (the default state) does NOT render a
-// "⚠ Background Check" section.
+// "Pending Maintenance" section.
 func TestDetailView_NoBackgroundCheckSection_WhenNoFinding(t *testing.T) {
 	m := newRDSDetailModel(t)
 
 	output := detailRenderOutput(m)
 
-	if strings.Contains(output, "Background Check") {
-		t.Errorf("detail view must not show 'Background Check' section when no finding set, got:\n%s", output)
+	if strings.Contains(output, "Pending Maintenance") {
+		t.Errorf("detail view must not show 'Pending Maintenance' section when no finding set, got:\n%s", output)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestDetailView_NoBackgroundCheckSection_WhenNoFinding(t *testing.T) {
 
 // TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet asserts that after
 // SetEnrichmentFinding is called with a non-nil finding, the detail view renders
-// a section containing "⚠ Background Check" and the finding's Summary text.
+// a section containing "Pending Maintenance" and the finding's Summary text.
 func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 	m := newRDSDetailModel(t)
 
@@ -89,8 +89,8 @@ func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 
 	output := detailRenderOutput(m)
 
-	if !strings.Contains(output, "Background Check") {
-		t.Errorf("detail view must show 'Background Check' section when finding is set, got:\n%s", output)
+	if !strings.Contains(output, "Pending Maintenance") {
+		t.Errorf("detail view must show 'Pending Maintenance' section when finding is set, got:\n%s", output)
 	}
 	if !strings.Contains(output, "pending maintenance: system-update (New OS patch)") {
 		t.Errorf("detail view must show finding summary text, got:\n%s", output)
@@ -110,8 +110,8 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 
 	// First render: no finding.
 	first := detailRenderOutput(m)
-	if strings.Contains(first, "Background Check") {
-		t.Error("pre-condition failed: initial render should not contain 'Background Check'")
+	if strings.Contains(first, "Pending Maintenance") {
+		t.Error("pre-condition failed: initial render should not contain 'Pending Maintenance'")
 	}
 
 	// Set finding and render again.
@@ -119,8 +119,8 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 	m.SetEnrichmentFinding(&finding)
 
 	second := detailRenderOutput(m)
-	if !strings.Contains(second, "Background Check") {
-		t.Errorf("after SetEnrichmentFinding, render must show 'Background Check', got:\n%s", second)
+	if !strings.Contains(second, "Pending Maintenance") {
+		t.Errorf("after SetEnrichmentFinding, render must show 'Pending Maintenance', got:\n%s", second)
 	}
 	if !strings.Contains(second, "minor-version-upgrade") {
 		t.Errorf("after SetEnrichmentFinding, render must show summary text, got:\n%s", second)
@@ -184,7 +184,7 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	m.SetEnrichmentFinding(&finding)
 
 	withFinding := detailRenderOutput(m)
-	if !strings.Contains(withFinding, "Background Check") {
+	if !strings.Contains(withFinding, "Pending Maintenance") {
 		t.Error("pre-condition failed: finding should appear after SetEnrichmentFinding")
 	}
 
@@ -192,8 +192,8 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	m.SetEnrichmentFinding(nil)
 
 	withoutFinding := detailRenderOutput(m)
-	if strings.Contains(withoutFinding, "Background Check") {
-		t.Errorf("after SetEnrichmentFinding(nil), 'Background Check' must not appear, got:\n%s", withoutFinding)
+	if strings.Contains(withoutFinding, "Pending Maintenance") {
+		t.Errorf("after SetEnrichmentFinding(nil), 'Pending Maintenance' must not appear, got:\n%s", withoutFinding)
 	}
 }
 
@@ -202,7 +202,7 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDetailView_YAMLViewDoesNotShowFinding asserts that the YAML/raw output
-// (RawYAML) for a resource with a finding does NOT include "Background Check".
+// (RawYAML) for a resource with a finding does NOT include finding summary text.
 // YAML views are raw data views and must not be enriched with findings.
 func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 	m := newRDSDetailModel(t)
@@ -212,9 +212,6 @@ func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 
 	// RawYAML is the YAML serialization path used for the YAML view.
 	yamlOutput := m.RawYAML()
-	if strings.Contains(yamlOutput, "Background Check") {
-		t.Errorf("YAML output must not contain 'Background Check', got:\n%s", yamlOutput)
-	}
 	if strings.Contains(yamlOutput, "instance status impaired") {
 		t.Errorf("YAML output must not contain finding summary, got:\n%s", yamlOutput)
 	}
@@ -225,30 +222,24 @@ func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDetailView_FindingRendersForMultipleResourceTypes asserts that the finding
-// section renders correctly for all major resource types that have enrichers.
-// This ensures the finding injection is not type-specific.
+// section renders correctly for resource types that have per-type enrichers.
+// Each type has its own section header injected by the per-type injector.
 func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 
 	type tc struct {
-		resourceType string
-		res          resource.Resource
-		summary      string
+		resourceType  string
+		res           resource.Resource
+		summary       string
+		sectionHeader string
 	}
 
 	cases := []tc{
 		{
-			resourceType: "ec2",
-			res: resource.Resource{
-				ID: "i-abc123", Name: "web-prod-01",
-				Fields: map[string]string{"instance_id": "i-abc123", "state": "running"},
-			},
-			summary: "system status impaired",
-		},
-		{
-			resourceType: "rds",
+			resourceType:  "rds",
+			sectionHeader: "Pending Maintenance",
 			res: resource.Resource{
 				ID: "db-prod", Name: "prod-db",
 				Fields: map[string]string{"db_instance_id": "db-prod", "status": "available"},
@@ -256,15 +247,8 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 			summary: "pending maintenance: system-update (New OS patch)",
 		},
 		{
-			resourceType: "ddb",
-			res: resource.Resource{
-				ID: "my-table", Name: "my-table",
-				Fields: map[string]string{"table_name": "my-table", "status": "ACTIVE"},
-			},
-			summary: "table status: DELETING",
-		},
-		{
-			resourceType: "cb",
+			resourceType:  "cb",
+			sectionHeader: "Latest Build",
 			res: resource.Resource{
 				ID: "my-project", Name: "my-project",
 				Fields: map[string]string{"project_name": "my-project"},
@@ -272,7 +256,8 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 			summary: "latest build FAILED (2026-04-10)",
 		},
 		{
-			resourceType: "sfn",
+			resourceType:  "sfn",
+			sectionHeader: "Latest Execution",
 			res: resource.Resource{
 				ID: "arn:aws:states:us-east-1:111:stateMachine:my-machine", Name: "my-machine",
 				Fields: map[string]string{"name": "my-machine"},
@@ -293,8 +278,8 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 
 			output := m.PlainContent()
 
-			if !strings.Contains(output, "Background Check") {
-				t.Errorf("[%s] detail view must show 'Background Check' section, got:\n%s", tc.resourceType, output)
+			if !strings.Contains(output, tc.sectionHeader) {
+				t.Errorf("[%s] detail view must show '%s' section, got:\n%s", tc.resourceType, tc.sectionHeader, output)
 			}
 			if !strings.Contains(output, tc.summary) {
 				t.Errorf("[%s] detail view must show summary '%s', got:\n%s", tc.resourceType, tc.summary, output)

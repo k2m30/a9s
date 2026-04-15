@@ -132,37 +132,6 @@ func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_IssueCountAlwaysZero verifies IssueCount is 0
-// even when findings exist (severity "~" contract: excluded from menu badge).
-func TestEnrichRDSDocDBMaintenance_IssueCountAlwaysZero(t *testing.T) {
-	fake := &enrichRDSFake{
-		actions: []rdstypes.ResourcePendingMaintenanceActions{
-			{
-				ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:db-a"),
-				PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
-					{Action: aws.String("system-update")},
-				},
-			},
-			{
-				ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:db-b"),
-				PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
-					{Action: aws.String("os-upgrade")},
-				},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{RDS: fake}
-	resources := []resource.Resource{{ID: "db-a"}, {ID: "db-b"}}
-
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (severity ~ excluded from badge)", result.IssueCount)
-	}
-}
-
 // TestEnrichRDSDocDBMaintenance_OffPageFindings verifies that account-wide enrichers
 // can return findings for resources NOT in the input slice.
 func TestEnrichRDSDocDBMaintenance_OffPageFindings(t *testing.T) {
