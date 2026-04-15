@@ -50,7 +50,36 @@ func databasesResourceTypes() []ResourceTypeDef {
 				if status == "" {
 					status = r.Fields["db_instance_status"]
 				}
-				return rdsInstanceColor(status)
+				base := rdsInstanceColor(status)
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// CIS RDS.2: publicly accessible → Warning.
+				if r.Fields["publicly_accessible"] == "true" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// CIS RDS.3: unencrypted storage → Warning.
+				if r.Fields["storage_encrypted"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No deletion protection → Warning.
+				if r.Fields["deletion_protection"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No automated backups (BackupRetentionPeriod == 0) → Warning.
+				if r.Fields["backup_retention_period"] == "0" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "dbi_events",
@@ -119,7 +148,36 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				return rdsInstanceColor(r.Fields["status"])
+				base := rdsInstanceColor(r.Fields["status"])
+				// No writer member → cluster cannot accept writes → Broken.
+				// has_writer == "false" is populated by the fetcher; "" (legacy/unset)
+				// is treated as unknown and not penalised.
+				if r.Fields["has_writer"] == "false" {
+					base = ColorBroken
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// No deletion protection → Warning.
+				if r.Fields["deletion_protection"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// Unencrypted storage → Warning.
+				if r.Fields["storage_encrypted"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No automated backups → Warning.
+				if r.Fields["backup_retention_period"] == "0" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
 			},
 		},
 		{
