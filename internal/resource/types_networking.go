@@ -70,7 +70,16 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				if r.Fields["wide_open"] == "true" {
+					return ColorBroken
+				}
+				count, _ := strconv.Atoi(r.Fields["dangerous_open_count"])
+				if count > 0 {
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "VPCs",
@@ -290,8 +299,13 @@ func networkingResourceTypes() []ResourceTypeDef {
 			},
 			Color: func(r Resource) Color {
 				switch r.Fields["status"] {
-				case "in-use", "available":
+				case "in-use":
 					return ColorHealthy
+				case "available":
+					if r.Fields["type"] == "requester-managed" {
+						return ColorHealthy
+					}
+					return ColorWarning
 				case "attaching", "detaching":
 					return ColorWarning
 				}
