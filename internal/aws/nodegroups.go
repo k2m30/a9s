@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,7 +14,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"})
+	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size", "health_issues_count", "health_issues"})
 
 	resource.RegisterRelated("ng", []resource.RelatedDef{
 		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true},
@@ -191,16 +192,28 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		desiredSize = fmt.Sprintf("%d", *ng.ScalingConfig.DesiredSize)
 	}
 
+	// Wave 2: health.issues[] — populated by DescribeNodegroup (called per node group in fetcher).
+	healthIssuesCount := 0
+	var issueCodes []string
+	if ng.Health != nil {
+		for _, issue := range ng.Health.Issues {
+			healthIssuesCount++
+			issueCodes = append(issueCodes, string(issue.Code))
+		}
+	}
+
 	return resource.Resource{
 		ID:     nodegroupName,
 		Name:   nodegroupName,
 		Status: status,
 		Fields: map[string]string{
-			"nodegroup_name": nodegroupName,
-			"cluster_name":   ngClusterName,
-			"status":         status,
-			"instance_types": instanceTypes,
-			"desired_size":   desiredSize,
+			"nodegroup_name":      nodegroupName,
+			"cluster_name":        ngClusterName,
+			"status":              status,
+			"instance_types":      instanceTypes,
+			"desired_size":        desiredSize,
+			"health_issues_count": strconv.Itoa(healthIssuesCount),
+			"health_issues":       strings.Join(issueCodes, ","),
 		},
 		RawStruct: ng,
 	}
