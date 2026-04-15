@@ -114,6 +114,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 					return ColorHealthy
 				case "pending":
 					return ColorWarning
+				case "unavailable", "failed", "failed-insufficient-capacity":
+					return ColorBroken
 				}
 				return ColorHealthy
 			},
