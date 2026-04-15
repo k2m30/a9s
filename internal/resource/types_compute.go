@@ -196,12 +196,20 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// health_status == UNHEALTHY overrides everything (Broken wins).
+				if r.Fields["health_status"] == "UNHEALTHY" {
+					return ColorBroken
+				}
 				switch r.Fields["last_status"] {
 				case "RUNNING":
 					return ColorHealthy
-				case "PENDING", "PROVISIONING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
+				case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
 					return ColorWarning
 				case "STOPPED":
+					sc := r.Fields["stop_code"]
+					if sc != "" && sc != "UserInitiated" {
+						return ColorBroken
+					}
 					return ColorDim
 				}
 				return ColorHealthy
