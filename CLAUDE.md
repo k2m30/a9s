@@ -71,11 +71,13 @@ specs/           # feature specifications
 ## Architecture Principles
 
 > **Full architecture guide**: [`docs/architecture.md`](docs/architecture.md) — covers all concepts, patterns, caching layers, key handling, test philosophy, and design decisions. Read it first when onboarding.
+>
+> ⚠️ **Related-resource panel is governed by [`docs/related-resources.md`](docs/related-resources.md) — SINGLE SOURCE OF TRUTH, DO NOT EDIT AD-HOC.** Every `RegisterRelated` call must match that contract. Adding/removing pivots requires an AWS API field citation or a documented DevOps workflow reason in the same PR that touches the registration.
 
 - **Read-only by design** — a9s never makes write calls to AWS
 - **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
 - **Message-driven** — views communicate via typed messages, never import each other
-- **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`
+- **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`, **related-panel contract in `docs/related-resources.md`**
 
 ## Skills
 
