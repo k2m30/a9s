@@ -79,10 +79,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 			Color: func(r Resource) Color {
 				switch strings.ToUpper(r.Fields["state"]) {
-				case "ENABLED":
+				case "ENABLED", "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS":
 					return ColorHealthy
 				case "DISABLED":
-					return ColorBroken
+					// DISABLED is an administrative action, not a fault.
+					return ColorDim
 				}
 				return ColorHealthy
 			},

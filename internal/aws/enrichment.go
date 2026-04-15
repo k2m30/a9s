@@ -37,6 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -55,6 +56,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"dbc":      EnrichRDSDocDBMaintenance,
 	"ecs-svc":  EnrichECSServices,
 	"ecs":      EnrichECSClusters,
+	"ecs-task": EnrichECSTasks,
+	"eb-rule":  EnrichEventBridgeRuleTargets,
 	"ddb":      EnrichDynamoDBPITR,
 	"ec2":      EnrichEC2InstanceStatus,
 	"asg":      EnrichASGScalingActivities,
@@ -1450,4 +1453,231 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
 	// do not contribute to the attention menu badge.
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichECSTasks is a Wave 2 enricher for ECS tasks.
+// It groups tasks by cluster ARN and calls DescribeTasks (up to 100 per call)
+// to surface failures that Wave 1 status coloring cannot detect.
+//
+// Findings raised (severity "!"):
+//   - StopCode == TaskFailedToStart → task never launched
+//   - StopCode == EssentialContainerExited → essential container died
+//   - Any container with a non-zero ExitCode → container crash detected
+func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.ECS == nil || len(resources) == 0 {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	// Group task ARNs by cluster ARN.
+	clusterTasks := make(map[string][]string)
+	taskIDToResource := make(map[string]string) // taskID → resource key (task_id field)
+	for _, r := range resources {
+		cluster := r.Fields["cluster"]
+		taskID := r.Fields["task_id"]
+		if cluster == "" || taskID == "" {
+			continue
+		}
+		// Reconstruct task ARN from cluster and task ID (task_id is the last segment).
+		// We need to find the full ARN — use the cluster ARN stored in the field.
+		// The cluster field stores the full cluster ARN from the fetcher.
+		clusterTasks[cluster] = append(clusterTasks[cluster], taskID)
+		taskIDToResource[taskID] = taskID
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	checked := 0
+
+	// DescribeTasks accepts up to 100 task ARNs per call.
+	const descBatch = 100
+	for clusterARN, taskIDs := range clusterTasks {
+		for i := 0; i < len(taskIDs); i += descBatch {
+			if checked >= EnrichmentCap {
+				truncated = true
+				break
+			}
+			end := min(i+descBatch, len(taskIDs))
+			batch := taskIDs[i:end]
+			checked += len(batch)
+
+			out, err := clients.ECS.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+				Cluster: aws.String(clusterARN),
+				Tasks:   batch,
+			})
+			if err != nil {
+				truncated = true
+				continue
+			}
+
+			for _, task := range out.Tasks {
+				// Identify the resource by task ID (last segment of ARN).
+				taskID := ""
+				if task.TaskArn != nil {
+					parts := strings.Split(*task.TaskArn, "/")
+					taskID = parts[len(parts)-1]
+				}
+				if taskID == "" {
+					continue
+				}
+
+				var rows []resource.FindingRow
+
+				// Check stop code for known failure modes.
+				switch task.StopCode {
+				case ecstypes.TaskStopCodeTaskFailedToStart:
+					rows = append(rows, resource.FindingRow{
+						Label: "Stop Code",
+						Value: "TaskFailedToStart — task never launched",
+						Tier:  "!",
+					})
+				case ecstypes.TaskStopCodeEssentialContainerExited:
+					rows = append(rows, resource.FindingRow{
+						Label: "Stop Code",
+						Value: "EssentialContainerExited — essential container died",
+						Tier:  "!",
+					})
+				}
+
+				// Check containers for non-zero exit codes.
+				for _, container := range task.Containers {
+					if container.ExitCode != nil && *container.ExitCode != 0 {
+						name := ""
+						if container.Name != nil {
+							name = *container.Name
+						}
+						rows = append(rows, resource.FindingRow{
+							Label: "Container",
+							Value: fmt.Sprintf("%s exited with code %d", name, *container.ExitCode),
+							Tier:  "!",
+						})
+						break // One finding per task is sufficient.
+					}
+				}
+
+				if len(rows) == 0 {
+					continue
+				}
+
+				summary := rows[0].Value
+				findings[taskID] = resource.EnrichmentFinding{
+					Severity: "!",
+					Summary:  summary,
+					Rows:     rows,
+				}
+			}
+		}
+	}
+
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
+// Per rule (cap 50) it calls ListTargetsByRule and raises findings for:
+//   - Rule state == ENABLED AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)
+//   - Rule state == DISABLED AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
+//   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
+func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.EventBridge == nil || len(resources) == 0 {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	checked := 0
+
+	for _, r := range resources {
+		if checked >= EnrichmentCap {
+			truncated = true
+			break
+		}
+
+		ruleName := r.Fields["name"]
+		if ruleName == "" {
+			ruleName = r.ID
+		}
+		if ruleName == "" {
+			continue
+		}
+
+		eventBus := r.Fields["event_bus"]
+		state := strings.ToUpper(r.Fields["state"])
+
+		input := &eventbridge.ListTargetsByRuleInput{
+			Rule: aws.String(ruleName),
+		}
+		if eventBus != "" {
+			input.EventBusName = aws.String(eventBus)
+		}
+
+		out, err := clients.EventBridge.ListTargetsByRule(ctx, input)
+		checked++
+		if err != nil {
+			truncated = true
+			continue
+		}
+
+		targets := out.Targets
+		var rows []resource.FindingRow
+
+		// ENABLED rule with no targets → rule fires but goes nowhere.
+		if state == "ENABLED" && len(targets) == 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "Targets",
+				Value: "enabled rule has no targets (rule matches but goes nowhere)",
+				Tier:  "!",
+			})
+		}
+
+		// DISABLED rule still has targets → probable drift/oversight.
+		if state == "DISABLED" && len(targets) > 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "Targets",
+				Value: fmt.Sprintf("disabled rule still has %d target(s) (drift)", len(targets)),
+				Tier:  "~",
+			})
+		}
+
+		// Targets without DeadLetterConfig → missing DLQ.
+		for _, target := range targets {
+			if target.DeadLetterConfig == nil {
+				targetID := ""
+				if target.Id != nil {
+					targetID = *target.Id
+				}
+				rows = append(rows, resource.FindingRow{
+					Label: "Target",
+					Value: fmt.Sprintf("%s: no dead-letter config", targetID),
+					Tier:  "~",
+				})
+			}
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+
+		// Determine severity: "!" if any row is "!", otherwise "~".
+		severity := "~"
+		for _, row := range rows {
+			if row.Tier == "!" {
+				severity = "!"
+				break
+			}
+		}
+
+		findings[ruleName] = resource.EnrichmentFinding{
+			Severity: severity,
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
+
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
 }
