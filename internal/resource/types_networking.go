@@ -208,8 +208,17 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending", "creating", "deleting", "modifying":
+					return ColorWarning
+				case "failed", "rejected", "expired":
+					return ColorBroken
+				}
+				return ColorWarning
+			},
 		},
 		{
 			Name:          "Transit Gateways",
@@ -224,8 +233,17 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "owner_id", Title: "Owner", Width: 14, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "available":
+					return ColorHealthy
+				case "pending", "modifying", "deleting":
+					return ColorWarning
+				case "deleted":
+					return ColorDim
+				}
+				return ColorWarning
+			},
 		},
 		{
 			Name:          "Network Interfaces",

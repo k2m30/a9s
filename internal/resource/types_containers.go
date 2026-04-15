@@ -40,8 +40,17 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "instance_types", Title: "Instance Types", Width: 20, Sortable: false},
 				{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				case "CREATE_FAILED", "DELETE_FAILED", "DEGRADED":
+					return ColorBroken
+				}
+				return ColorWarning
+			},
 		},
 	}
 }

@@ -10,6 +10,7 @@ package unit
 // filter params are stored and returned intact.
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -54,7 +55,7 @@ func buildEC2List(t *testing.T, width, height int) views.ResourceListModel {
 
 // TestInvalidateStyleCache_ViewRendersAfterInvalidate verifies that after
 // calling InvalidateStyleCache(), the subsequent View() call does not panic
-// and still returns a non-empty string containing the resource ID.
+// and still returns a non-empty string containing the resource name.
 func TestInvalidateStyleCache_ViewRendersAfterInvalidate(t *testing.T) {
 	m := buildEC2List(t, 120, 24)
 
@@ -62,6 +63,9 @@ func TestInvalidateStyleCache_ViewRendersAfterInvalidate(t *testing.T) {
 	view1 := m.View()
 	if view1 == "" {
 		t.Fatal("first View() returned empty string")
+	}
+	if !strings.Contains(stripANSI(view1), "test-instance") {
+		t.Fatal("first View() does not contain expected resource name 'test-instance'")
 	}
 
 	// Invalidate the cache.
@@ -72,16 +76,22 @@ func TestInvalidateStyleCache_ViewRendersAfterInvalidate(t *testing.T) {
 	if view2 == "" {
 		t.Fatal("View() after InvalidateStyleCache returned empty string")
 	}
+	if !strings.Contains(stripANSI(view2), "test-instance") {
+		t.Fatal("View() after InvalidateStyleCache does not contain expected resource name 'test-instance'")
+	}
 }
 
 // TestInvalidateStyleCache_RerendersWithNewWidth verifies that after a width
-// change + InvalidateStyleCache(), the resource ID still appears in View().
+// change + InvalidateStyleCache(), the resource name still appears in View().
 // This simulates a terminal resize scenario where style cache must be cleared.
 func TestInvalidateStyleCache_RerendersWithNewWidth(t *testing.T) {
 	m := buildEC2List(t, 80, 24)
 
 	// Render at width 80.
-	_ = m.View()
+	before := stripANSI(m.View())
+	if before == "" {
+		t.Fatal("initial View() returned empty string")
+	}
 
 	// Simulate terminal resize to 120.
 	m.SetSize(120, 24)
@@ -93,7 +103,10 @@ func TestInvalidateStyleCache_RerendersWithNewWidth(t *testing.T) {
 	}
 	plain := stripANSI(view)
 	if plain == "" {
-		t.Fatal("stripANSI(view) returned empty string")
+		t.Fatal("stripANSI(view) returned empty string after resize")
+	}
+	if !strings.Contains(plain, "test-instance") {
+		t.Fatal("View() after resize does not contain expected resource name 'test-instance'")
 	}
 }
 

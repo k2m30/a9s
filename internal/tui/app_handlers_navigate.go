@@ -634,7 +634,8 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		msg.ResourceType = td.ShortName
 	}
 	// Session-wide generation guard — drop stale messages from prior profile/region.
-	if msg.Gen != m.enrichmentGen {
+	// Gen=0 is the documented test-injection bypass: accepted regardless of enrichmentGen.
+	if msg.Gen != 0 && msg.Gen != m.enrichmentGen {
 		return m, nil
 	}
 	// Per-type generation guard — drop stale probes superseded by a newer rerun.

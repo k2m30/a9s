@@ -12,7 +12,7 @@ func rdsInstanceColor(status string) Color {
 		"renaming", "resetting-master-credentials", "storage-optimization",
 		"starting", "stopping":
 		return ColorWarning
-	case "stopped", "restore-error":
+	case "stopped", "restore-error", "storage-full", "failed":
 		return ColorBroken
 	case "deleting":
 		return ColorWarning

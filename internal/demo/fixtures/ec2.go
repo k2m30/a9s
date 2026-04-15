@@ -45,6 +45,7 @@ const (
 	fixtProdAPIInternalSGID     = "sg-0bbb222222222222b"
 	fixtProdRDSSGID             = "sg-0ccc333333333333c"
 	fixtProdDBProxySGID         = "sg-0ddd444444444444d"
+	fixtStagingDefaultSGID      = "sg-0fff888888888888f"
 	fixtProdAMIID1              = "ami-0a1b2c3d4e5f60001"
 	fixtProdAMIID2              = "ami-0a1b2c3d4e5f60002"
 	fixtProdAMIID3              = "ami-0a1b2c3d4e5f60003"
@@ -160,6 +161,21 @@ var namedExtras = map[string]instExtras{
 		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
 			{GroupId: aws.String(fixtProdAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	// Staging VPC instances — must use staging SG, not prod web-ALB SG.
+	"i-0a1b2c3d4e5f60030": {
+		imageID: fixtProdAMIID2, keyName: "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtStagingDefaultSGID), GroupName: aws.String("staging-default-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60031": {
+		imageID: fixtProdAMIID2, keyName: "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64, az: "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtStagingDefaultSGID), GroupName: aws.String("staging-default-sg")},
 		},
 	},
 }

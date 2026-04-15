@@ -145,6 +145,26 @@ func TestEnrichStepFunctionsStatus_SucceededExcluded(t *testing.T) {
 	}
 }
 
+// TestEnrichStepFunctionsStatus_RunningExcluded verifies RUNNING state machines
+// do not appear in Findings (still in-progress executions are not issues).
+func TestEnrichStepFunctionsStatus_RunningExcluded(t *testing.T) {
+	smARN := "arn:aws:states:us-east-1:000000000000:stateMachine:running-sm"
+	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusRunning}}
+	clients := &awsclient.ServiceClients{SFN: fake}
+	resources := []resource.Resource{{ID: smARN}}
+
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.Findings[smARN]; ok {
+		t.Error("RUNNING state machine must NOT appear in Findings")
+	}
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	}
+}
+
 // TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap verifies Truncated.
 func TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	count := awsclient.EnrichmentCap + 1
