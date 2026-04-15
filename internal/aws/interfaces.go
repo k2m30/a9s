@@ -814,6 +814,7 @@ type ASGAPI interface {
 // *elasticbeanstalk.Client structurally satisfies this interface.
 type ElasticBeanstalkAPI interface {
 	EBDescribeEnvironmentsAPI
+	ElasticBeanstalkDescribeEnvironmentHealthAPI // Wave 2 enrichment
 }
 
 // ELBv2API is the aggregate interface covering all ELBv2 operations used by a9s fetchers.
@@ -824,6 +825,7 @@ type ELBv2API interface {
 	ELBv2DescribeTargetHealthAPI
 	ELBv2DescribeListenersAPI
 	ELBv2DescribeRulesAPI
+	ELBv2DescribeLoadBalancerAttributesAPI // Wave 2 enrichment
 }
 
 // IAMAPI is the aggregate interface covering all IAM operations used by a9s fetchers.
@@ -1042,6 +1044,20 @@ type SESv2API interface {
 type EFSAPI interface {
 	EFSDescribeFileSystemsAPI
 	EFSDescribeMountTargetsAPI
+}
+
+// ElasticBeanstalkDescribeEnvironmentHealthAPI defines the interface for the
+// Elastic Beanstalk DescribeEnvironmentHealth operation.
+// Used by EnrichEBEnvironmentHealth (Wave 2 enrichment).
+type ElasticBeanstalkDescribeEnvironmentHealthAPI interface {
+	DescribeEnvironmentHealth(ctx context.Context, params *elasticbeanstalk.DescribeEnvironmentHealthInput, optFns ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error)
+}
+
+// ELBv2DescribeLoadBalancerAttributesAPI defines the interface for the ELBv2
+// DescribeLoadBalancerAttributes operation.
+// Used by EnrichELBAttributes (Wave 2 enrichment).
+type ELBv2DescribeLoadBalancerAttributesAPI interface {
+	DescribeLoadBalancerAttributes(ctx context.Context, params *elbv2.DescribeLoadBalancerAttributesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
 }
 
 // --- Wave 2 enrichment interfaces (#196) ---

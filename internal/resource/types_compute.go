@@ -345,15 +345,29 @@ func computeResourceTypes() []ResourceTypeDef {
 			},
 			Color: func(r Resource) Color {
 				// Environment health takes precedence over status when available.
+				// Grey means EB hasn't collected health data yet — treat as transitional Warning.
+				var healthColor Color
+				healthSet := true
 				switch r.Fields["health"] {
 				case "Red":
-					return ColorBroken
+					healthColor = ColorBroken
 				case "Yellow":
-					return ColorWarning
+					healthColor = ColorWarning
 				case "Grey":
-					return ColorDim
+					healthColor = ColorWarning
 				case "Green":
-					return ColorHealthy
+					healthColor = ColorHealthy
+				default:
+					healthSet = false
+					healthColor = ColorHealthy
+				}
+				// status==Terminated → Dim overrides Healthy or unknown health,
+				// but does NOT downgrade a Broken signal.
+				if r.Fields["status"] == "Terminated" && healthColor != ColorBroken {
+					return ColorDim
+				}
+				if healthSet {
+					return healthColor
 				}
 				// Fall back to status when health is not set.
 				switch r.Fields["status"] {
@@ -361,7 +375,7 @@ func computeResourceTypes() []ResourceTypeDef {
 					return ColorHealthy
 				case "Launching", "Updating":
 					return ColorWarning
-				case "Terminating", "Terminated":
+				case "Terminating":
 					return ColorDim
 				}
 				return ColorHealthy

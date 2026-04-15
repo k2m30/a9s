@@ -65,3 +65,9 @@ func (f *ELBFake) DescribeRules(_ context.Context, input *elbv2.DescribeRulesInp
 	}
 	return &elbv2.DescribeRulesOutput{Rules: rules}, nil
 }
+
+// DescribeLoadBalancerAttributes is a no-op stub for demo mode.
+// Wave 2 enrichment is skipped in demo mode; this satisfies the ELBv2API interface.
+func (f *ELBFake) DescribeLoadBalancerAttributes(_ context.Context, _ *elbv2.DescribeLoadBalancerAttributesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
+	return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
+}
