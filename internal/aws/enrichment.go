@@ -8,8 +8,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
@@ -18,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
@@ -44,6 +48,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"pipeline": EnrichCodePipelineStatus,
 	"sfn":      EnrichStepFunctionsStatus,
 	"glue":     EnrichGlueJobStatus,
+	"backup":   EnrichBackupJobs,
+	"ses":      EnrichSESAccount,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -525,6 +531,118 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichBackupJobs calls ListBackupJobs once (account-wide) and returns a Finding
+// for each BackupPlanId that has a failed/aborted/expired/partial job in the last 24h.
+// Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
+// IssueCount counts only "!" findings. First failure per plan wins; no pagination (TODO).
+func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.Backup == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	out, err := clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{})
+	if err != nil {
+		return EnricherResult{}, err
+	}
+	cutoff := time.Now().Add(-24 * time.Hour)
+	for _, job := range out.BackupJobs {
+		if job.CreationDate == nil || job.CreationDate.Before(cutoff) {
+			continue
+		}
+		// Determine the key from BackupPlanId (via CreatedBy) or fall back to BackupJobId.
+		key := ""
+		if job.CreatedBy != nil && job.CreatedBy.BackupPlanId != nil && *job.CreatedBy.BackupPlanId != "" {
+			key = *job.CreatedBy.BackupPlanId
+		} else if job.BackupJobId != nil {
+			key = *job.BackupJobId
+		}
+		if key == "" {
+			continue
+		}
+		// First failure wins — skip if already recorded.
+		if _, exists := findings[key]; exists {
+			continue
+		}
+		switch job.State {
+		case backuptypes.BackupJobStateFailed, backuptypes.BackupJobStateAborted, backuptypes.BackupJobStateExpired:
+			stateStr := strings.ToLower(string(job.State))
+			findings[key] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  fmt.Sprintf("backup %s in last 24h", stateStr),
+				Rows: []resource.FindingRow{
+					{Label: "State", Value: string(job.State), Tier: "!"},
+				},
+			}
+		case backuptypes.BackupJobStatePartial:
+			findings[key] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "backup PARTIAL in last 24h",
+				Rows: []resource.FindingRow{
+					{Label: "State", Value: string(job.State), Tier: "~"},
+				},
+			}
+		}
+	}
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: out.NextToken != nil, Findings: findings}, nil
+}
+
+// EnrichSESAccount calls GetAccount once (account-wide) and returns a Finding
+// keyed "account" when the account is shut down, on probation, or sending is disabled.
+// Severity "!" for SHUTDOWN, "~" for PROBATION or sending disabled.
+func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.SESv2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
+	if err != nil {
+		return EnricherResult{}, err
+	}
+	if out.EnforcementStatus != nil {
+		switch *out.EnforcementStatus {
+		case "SHUTDOWN":
+			findings["account"] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  "SES account SHUTDOWN — sending blocked",
+				Rows: []resource.FindingRow{
+					{Label: "Enforcement Status", Value: "SHUTDOWN", Tier: "!"},
+				},
+			}
+		case "PROBATION":
+			findings["account"] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "SES account on PROBATION",
+				Rows: []resource.FindingRow{
+					{Label: "Enforcement Status", Value: "PROBATION", Tier: "~"},
+				},
+			}
+		}
+	}
+	// Only check sending-disabled if enforcement status didn't already produce a finding.
+	if _, exists := findings["account"]; !exists && !out.SendingEnabled {
+		findings["account"] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  "SES account sending disabled",
+			Rows: []resource.FindingRow{
+				{Label: "Sending Enabled", Value: "false", Tier: "~"},
+			},
+		}
+	}
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: false, Findings: findings}, nil
 }
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).

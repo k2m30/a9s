@@ -451,6 +451,11 @@ type SESv2ListEmailIdentitiesAPI interface {
 	ListEmailIdentities(ctx context.Context, params *sesv2.ListEmailIdentitiesInput, optFns ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error)
 }
 
+// SESv2GetAccountAPI defines the interface for the SES v2 GetAccount operation.
+type SESv2GetAccountAPI interface {
+	GetAccount(ctx context.Context, params *sesv2.GetAccountInput, optFns ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error)
+}
+
 // RedshiftDescribeClustersAPI defines the interface for the Redshift DescribeClusters operation.
 type RedshiftDescribeClustersAPI interface {
 	DescribeClusters(ctx context.Context, params *redshift.DescribeClustersInput, optFns ...func(*redshift.Options)) (*redshift.DescribeClustersOutput, error)
@@ -517,6 +522,11 @@ type MSKListClustersV2API interface {
 // BackupListBackupPlansAPI defines the interface for the Backup ListBackupPlans operation.
 type BackupListBackupPlansAPI interface {
 	ListBackupPlans(ctx context.Context, params *backup.ListBackupPlansInput, optFns ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error)
+}
+
+// BackupListBackupJobsAPI defines the interface for the Backup ListBackupJobs operation.
+type BackupListBackupJobsAPI interface {
+	ListBackupJobs(ctx context.Context, params *backup.ListBackupJobsInput, optFns ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error)
 }
 
 // --- Child view interfaces ---
@@ -998,12 +1008,14 @@ type RedshiftAPI interface {
 // *backup.Client structurally satisfies this interface.
 type BackupAPI interface {
 	BackupListBackupPlansAPI
+	BackupListBackupJobsAPI
 }
 
 // SESv2API is the aggregate interface covering all SESv2 operations used by a9s fetchers.
 // *sesv2.Client structurally satisfies this interface.
 type SESv2API interface {
 	SESv2ListEmailIdentitiesAPI
+	SESv2GetAccountAPI
 }
 
 // EFSAPI is the aggregate interface covering all EFS operations used by a9s fetchers.
