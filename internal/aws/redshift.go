@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("redshift", []string{"cluster_id", "status", "node_type", "num_nodes", "db_name", "endpoint"})
+	resource.RegisterFieldKeys("redshift", []string{"cluster_id", "status", "node_type", "num_nodes", "db_name", "endpoint", "publicly_accessible", "encrypted", "cluster_availability_status"})
 
 	resource.RegisterPaginated("redshift", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -99,19 +99,37 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 			createTime = cluster.ClusterCreateTime.Format("2006-01-02 15:04")
 		}
 
+		publiclyAccessible := "false"
+		if cluster.PubliclyAccessible != nil && *cluster.PubliclyAccessible {
+			publiclyAccessible = "true"
+		}
+
+		encrypted := "false"
+		if cluster.Encrypted != nil && *cluster.Encrypted {
+			encrypted = "true"
+		}
+
+		clusterAvailabilityStatus := ""
+		if cluster.ClusterAvailabilityStatus != nil {
+			clusterAvailabilityStatus = *cluster.ClusterAvailabilityStatus
+		}
+
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
 			Status: status,
 			Fields: map[string]string{
-				"cluster_id":  clusterID,
-				"status":      status,
-				"node_type":   nodeType,
-				"num_nodes":   numNodes,
-				"db_name":     dbName,
-				"endpoint":    endpoint,
-				"master_user": masterUser,
-				"create_time": createTime,
+				"cluster_id":                  clusterID,
+				"status":                      status,
+				"node_type":                   nodeType,
+				"num_nodes":                   numNodes,
+				"db_name":                     dbName,
+				"endpoint":                    endpoint,
+				"master_user":                 masterUser,
+				"create_time":                 createTime,
+				"publicly_accessible":         publiclyAccessible,
+				"encrypted":                   encrypted,
+				"cluster_availability_status": clusterAvailabilityStatus,
 			},
 			RawStruct: cluster,
 		}
