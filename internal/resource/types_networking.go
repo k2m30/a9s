@@ -69,7 +69,6 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 		{
 			Name:          "VPCs",
@@ -133,7 +132,6 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 		{
 			Name:          "NAT Gateways",
@@ -176,7 +174,6 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 		{
 			Name:          "Elastic IPs",
@@ -192,8 +189,14 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},
 				{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			// Elastic IPs without an association are allocated-but-unused and
+			// continue to incur hourly charges. Surface those as warning.
+			Color: func(r Resource) Color {
+				if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "VPC Endpoints",

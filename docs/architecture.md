@@ -206,7 +206,6 @@ type ResourceTypeDef struct {
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
     Color func(Resource) Color   // REQUIRED: classifies row health; reads structural fields directly
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
-    AlwaysHealthy bool           // declares Color is trivially `return ColorHealthy`; truncated-zero means CONFIRMED zero for these types (hide under ctrl+z), but LOWER BOUND for health-state types (keep visible — later pages may hold issues). Enforced by `TestResourceTypeDef_AlwaysHealthy_Registered`.
     CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
 ```
@@ -372,16 +371,16 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 
 **`ExcludeFromIssueBadge`**: When set on a `ResourceTypeDef`, rows are still colored and ctrl+z is honored, but the type is excluded from the main-menu badge count. Used by ct-events where severity is event-level, not resource-health.
 
-**Quad-state visibility** under ctrl+z on the main menu. The key distinction is whether a zero issue count is CONFIRMED (the type can never hold issues) or a LOWER BOUND (we saw the first page only and page 2+ may have issues). `ResourceTypeDef.AlwaysHealthy` tags the former.
+**Tri-state visibility** under ctrl+z on the main menu. Per [`docs/attention-signals.md`](attention-signals.md), every registered resource type has at least a Wave 1 or Wave 2 signal, so there is no "always healthy" escape hatch — a zero issue count is only "CONFIRMED zero" when the probe was not truncated.
 
 | State | Condition | Badge | Visible under ctrl+z? |
 |-------|-----------|-------|----------------------|
 | Unknown | Not yet probed | None | Yes (prevent cold-start empty menu) |
-| Confirmed zero | `issues == 0` AND (`!truncated` OR `AlwaysHealthy == true`) | None | No — hide config-only types (S3, IAM, SG, IGW) that cannot hold issues regardless of pagination |
-| Truncated zero | `issues == 0` AND `truncated == true` AND `AlwaysHealthy == false` | None | Yes — health-state types (EC2, RDS, VPC, NAT, ENI, ELB) may have issues on later pages |
+| Confirmed zero | `issues == 0` AND `!truncated` | None | No — probe completed and saw no issues |
+| Truncated zero | `issues == 0` AND `truncated == true` | None | Yes — lower bound; later pages may hold issues |
 | Nonzero | `issues > 0` | `issues:N` (or `issues:N+` when truncated) | Yes |
 
-ENI carries a state-based color (`attaching`/`detaching` → warning) and is NOT marked `AlwaysHealthy`; a truncated-zero ENI page must stay visible under ctrl+z.
+`ExcludeFromIssueBadge` types (e.g. ct-events) are unconditionally hidden under ctrl+z — severity is event-level, not resource-health.
 
 ---
 

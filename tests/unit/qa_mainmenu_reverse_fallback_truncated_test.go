@@ -16,8 +16,8 @@ package unit
 //
 // Test layout
 // -----------
-// AllResourceTypes()[0] = "ec2"     (AlwaysHealthy=false)
-// AllResourceTypes()[1] = "ecs-svc" (AlwaysHealthy=false)
+// AllResourceTypes()[0] = "ec2"
+// AllResourceTypes()[1] = "ecs-svc"
 //
 //  Scenario — cursor at 0, press Up:
 //    scroll.Up() → cursor stays at 0 (clamped)

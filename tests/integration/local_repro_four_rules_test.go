@@ -259,8 +259,9 @@ func TestLiveR3_IssueBadgeNeverExceedsListCount(t *testing.T) {
 }
 
 // TestLiveR4_CtrlZShowsOnlyTypesWithIssues verifies R4: the ctrl+z issue filter
-// hides resource types with zero issues (including AlwaysHealthy types) and
-// preserves types that do have issues.
+// hides resource types whose zero issue count is confirmed (not truncated) and
+// preserves types that do have issues. Post-AlwaysHealthy-purge only
+// ExcludeFromIssueBadge types (ct-events) are unconditionally hidden.
 func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	if liveProfile() == "" {
 		t.Skip("A9S_REPRO_PROFILE not set; skipping live R4 test")
@@ -303,13 +304,14 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	scenario.Press("ctrl+z")
 	filteredView := scenario.currentView()
 
-	// AlwaysHealthy types must always be hidden under ctrl+z
+	// ExcludeFromIssueBadge types must always be hidden under ctrl+z.
+	// (Post-AlwaysHealthy-purge; every other type's visibility is driven by
+	// its per-type probe state.)
 	for _, name := range []string{
-		"S3 Buckets", "Secrets Manager", "SSM Parameters",
-		"IAM Users", "Security Groups", "CloudTrail Events",
+		"CloudTrail Events",
 	} {
 		if strings.Contains(filteredView, name) {
-			t.Errorf("R4: %q visible under ctrl+z but should always be hidden (AlwaysHealthy or ExcludeFromIssueBadge)", name)
+			t.Errorf("R4: %q visible under ctrl+z but must always be hidden (ExcludeFromIssueBadge)", name)
 		}
 	}
 
