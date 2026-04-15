@@ -11,7 +11,9 @@ func cfnStackColor(status string) Color {
 		return ColorHealthy
 	case "DELETE_COMPLETE":
 		return ColorDim
-	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED", "UPDATE_ROLLBACK_COMPLETE":
+	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
+		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
+		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
 		return ColorBroken
 	}
 	if strings.HasSuffix(status, "_IN_PROGRESS") {

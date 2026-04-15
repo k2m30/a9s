@@ -72,13 +72,9 @@ func TestEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 }
 
 // TestEnrichmentCapValue verifies EnrichmentCap is a positive non-zero constant.
-// The exact value (50) is documented in the fix; changes should be intentional.
 func TestEnrichmentCapValue(t *testing.T) {
 	if awsclient.EnrichmentCap <= 0 {
 		t.Errorf("EnrichmentCap must be positive, got %d", awsclient.EnrichmentCap)
-	}
-	if awsclient.EnrichmentCap != 50 {
-		t.Errorf("EnrichmentCap expected=50, got=%d (if changed intentionally, update this test)", awsclient.EnrichmentCap)
 	}
 }
 

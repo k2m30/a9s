@@ -103,11 +103,11 @@ func TestResourceTypeDef_AlwaysHealthy_Registered(t *testing.T) {
 	// derived by reading the Color function bodies in internal/resource/types_*.go.
 	expected := map[string]bool{
 		"backup": true, "ses": true, "ecr": true,
-		"codeartifact": true, "ng": true, "athena": true, "s3": true,
+		"codeartifact": true, "athena": true, "s3": true,
 		"opensearch": true, "redshift": true, "rds-snap": true, "r53": true,
 		"apigw": true, "sqs": true, "sns": true, "sns-sub": true, "kinesis": true,
 		"msk": true, "logs": true, "trail": true, "sg": true,
-		"rtb": true, "igw": true, "eip": true, "vpce": true, "tgw": true, "ssm": true,
+		"rtb": true, "igw": true, "eip": true, "ssm": true,
 		"role": true, "policy": true, "iam-user": true, "iam-group": true, "waf": true,
 		"secrets": true,
 	}
