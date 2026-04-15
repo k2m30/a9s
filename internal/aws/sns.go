@@ -18,7 +18,11 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSNSTopicsPage(ctx, c.SNS, continuationToken)
+		topicsAPI, ok := c.SNS.(SNSListTopicsAPI)
+		if !ok {
+			return resource.FetchResult{}, fmt.Errorf("SNS client does not support ListTopics")
+		}
+		return FetchSNSTopicsPage(ctx, topicsAPI, continuationToken)
 	})
 }
 
