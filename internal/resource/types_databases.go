@@ -340,15 +340,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				base := ColorHealthy
 				switch r.Fields["life_cycle_state"] {
 				case "available":
-					return ColorHealthy
+					base = ColorHealthy
 				case "creating", "updating", "deleting":
-					return ColorWarning
+					base = ColorWarning
 				case "error":
-					return ColorBroken
+					base = ColorBroken
 				}
-				return ColorHealthy
+				// Unreachable FS: no mount targets → upgrade to Broken.
+				if r.Fields["mount_targets"] == "0" {
+					base = ColorBroken
+				}
+				return base
 			},
 		},
 		{
