@@ -447,6 +447,11 @@ The old named sort sentinels (`SortName`, `SortID`, `SortAge`) are deprecated an
 
 The detail view has a right-column panel showing related resources.
 
+> ⚠️ **The expected related-panel contract per resource type lives in [`related-resources.md`](./related-resources.md) — the SINGLE SOURCE OF TRUTH.**
+> That document is produced from AWS API references + DevOps workflows (six
+> independent audits). DO NOT edit `RegisterRelated` calls without reconciling
+> against the golden table. Drift has already happened once — do not repeat it.
+
 ```go
 // internal/resource/related.go
 type RelatedDef struct {
