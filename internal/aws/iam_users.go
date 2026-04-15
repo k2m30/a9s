@@ -26,6 +26,10 @@ func init() {
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: true},
 	})
+
+	// iamtypes.User: no navigable cross-ref fields in the rendered detail view.
+	// Groups membership is a runtime API relationship (checkUserGroup), not a field on the User struct.
+	// PermissionsBoundary.PermissionsBoundaryArn exists but policy ARNs don't match a9s policy IDs.
 }
 
 // FetchIAMUsers calls the IAM ListUsers API and returns all pages of users.

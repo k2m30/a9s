@@ -17,6 +17,11 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
 	})
+
+	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
+	resource.RegisterNavigableFields("msk", []resource.NavigableField{
+		{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
+	})
 }
 
 // checkMSKLambda returns Count: 0 because MSK cluster event source mappings are

@@ -19,6 +19,9 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
 		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
 	})
+
+	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
+	// RedrivePolicy are embedded in the Attributes string map, not struct fields; no NavigableField path applies.
 }
 
 // checkSQSSNSSub searches the sns-sub cache for subscriptions where protocol=sqs

@@ -13,3 +13,7 @@ import (
 func checkBackupRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
+
+// No NavigableFields for backup: backup.BackupPlansListMember (list response) carries
+// only plan metadata (Name, Id, Arn, CreationDate). IamRoleArn and EncryptionKeyArn
+// are on individual backup jobs/rules, not on the plan list struct used as RawStruct.

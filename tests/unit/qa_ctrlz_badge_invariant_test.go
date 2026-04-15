@@ -148,7 +148,7 @@ func ctrlZRegisteredShortNames() []string {
 		// Serverless / Containers
 		"lambda", "ecs", "ecs-svc", "ecs-task", "ecr", "eks",
 		// DevOps
-		"cb", "pipe", "sfn", "glue",
+		"cb", "pipeline", "sfn", "glue",
 		// Observability / Ops
 		"alarm", "cwlogs", "eb", "eb-rule",
 		// Security

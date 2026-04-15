@@ -534,7 +534,7 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 // have retained probe resources. Ordered by priority: batchable first, per-resource last.
 func (m *Model) buildEnrichQueue() []string {
 	// Priority order matches the spec.
-	order := []string{"rds", "dbi", "ec2", "ebs", "cb", "tg", "pipe", "ddb", "sfn", "glue"}
+	order := []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	var queue []string
 	for _, name := range order {
 		if _, ok := awsclient.EnricherRegistry[name]; !ok {

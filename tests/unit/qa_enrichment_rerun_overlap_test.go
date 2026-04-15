@@ -63,6 +63,27 @@ func rerunEC2Resources() []resource.Resource {
 	}
 }
 
+// navigateToEBSList navigates a model to the EBS Volumes resource list.
+// EBS is used for tests that require probeEnrichment to fire: it is registered
+// in both EnricherRegistry and buildEnrichQueue's order list.
+func navigateToEBSList(m tui.Model) tui.Model {
+	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "ebs",
+	})
+	return m
+}
+
+// rerunEBSResources returns a small slice of realistic EBS volume resources for
+// use as simulated fetch results in probeEnrichment-testing scenarios.
+func rerunEBSResources() []resource.Resource {
+	return []resource.Resource{
+		{ID: "vol-0abc1111aaa11111a", Name: "vol-0abc1111aaa11111a", Status: "available", Fields: map[string]string{"volume_id": "vol-0abc1111aaa11111a", "state": "available"}},
+		{ID: "vol-0abc2222bbb22222b", Name: "vol-0abc2222bbb22222b", Status: "available", Fields: map[string]string{"volume_id": "vol-0abc2222bbb22222b", "state": "available"}},
+		{ID: "vol-0abc3333ccc33333c", Name: "vol-0abc3333ccc33333c", Status: "in-use", Fields: map[string]string{"volume_id": "vol-0abc3333ccc33333c", "state": "in-use"}},
+	}
+}
+
 // enrichmentCheckedWithFindings builds an EnrichmentCheckedMsg that will be
 // accepted by handleEnrichmentChecked when typeGen matches the model's current
 // per-type gen for "ec2".
@@ -143,22 +164,25 @@ func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
 //
 // We can't run a real fetch in unit tests, so we directly deliver a
 // ResourcesLoadedMsg with TypeGen=1 (as if the wrapped cmd produced it).
-// The tail branch: msg.TypeGen != 0 && msg.TypeGen == enrichmentTypeGen["ec2"]
+// The tail branch: msg.TypeGen != 0 && msg.TypeGen == enrichmentTypeGen["ebs"]
 // should seed probeResources and dispatch probeEnrichment → non-nil cmd.
+//
+// Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
+// list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToEBSList(m)
 
-	// Ctrl+R: bumps enrichmentTypeGen["ec2"] from 0 to 1.
+	// Ctrl+R: bumps enrichmentTypeGen["ebs"] from 0 to 1.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Simulate the wrapped fetch cmd returning ResourcesLoadedMsg{TypeGen:1}.
 	// This is what the wrapped cmd would produce on a successful fetch.
 	loadedMsg := messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
-		Resources:    rerunEC2Resources(),
-		TypeGen:      1, // matches enrichmentTypeGen["ec2"]=1 after Ctrl+R
+		ResourceType: "ebs",
+		Resources:    rerunEBSResources(),
+		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 after Ctrl+R
 	}
 	m, probeCmd := rootApplyMsg(m, loadedMsg)
 
@@ -221,33 +245,36 @@ func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 //     → list update MUST apply (unconditional), but rerun tail MUST be skipped.
 //   - Second fetch returns ResourcesLoadedMsg{TypeGen:2} — TypeGen=2 == current=2.
 //     → list update AND rerun both fire.
+//
+// Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
+// list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToEBSList(m)
 
-	// First Ctrl+R: enrichmentTypeGen["ec2"] → 1.
+	// First Ctrl+R: enrichmentTypeGen["ebs"] → 1.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Second Ctrl+R before first fetch returns: enrichmentTypeGen["ec2"] → 2.
+	// Second Ctrl+R before first fetch returns: enrichmentTypeGen["ebs"] → 2.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// --- Deliver FIRST (stale) fetch result: ResourcesLoadedMsg{TypeGen:1} ---
 	// TypeGen=1 < current per-type gen=2.
 	// Per FR-017: list update must apply unconditionally; rerun must be skipped.
 	firstResources := []resource.Resource{
-		{ID: "i-first1111111111", Name: "first-result-1", Fields: map[string]string{"State": "running"}},
+		{ID: "vol-first111111111a", Name: "vol-first111111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-first111111111a", "state": "available"}},
 	}
 	m, firstCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
+		ResourceType: "ebs",
 		Resources:    firstResources,
 		TypeGen:      1, // stale (current=2)
 	})
 
 	// LIST UPDATE MUST APPLY: view should reflect the 1 resource from first fetch.
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(1)") {
-		t.Errorf("stale TypeGen=1 must still update the list: expected 'ec2(1)' in view, got excerpt: %s",
+	if !strings.Contains(plain, "ebs(1)") {
+		t.Errorf("stale TypeGen=1 must still update the list: expected 'ebs(1)' in view, got excerpt: %s",
 			plain[:min(300, len(plain))])
 	}
 
@@ -272,19 +299,19 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	// TypeGen=2 == current per-type gen=2.
 	// List update AND rerun must both fire.
 	secondResources := []resource.Resource{
-		{ID: "i-second1111111111", Name: "second-result-1", Fields: map[string]string{"State": "running"}},
-		{ID: "i-second2222222222", Name: "second-result-2", Fields: map[string]string{"State": "stopped"}},
+		{ID: "vol-second11111111a", Name: "vol-second11111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-second11111111a", "state": "available"}},
+		{ID: "vol-second22222222b", Name: "vol-second22222222b", Status: "in-use", Fields: map[string]string{"volume_id": "vol-second22222222b", "state": "in-use"}},
 	}
 	m, secondCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
+		ResourceType: "ebs",
 		Resources:    secondResources,
 		TypeGen:      2, // matches current per-type gen=2
 	})
 
 	// LIST UPDATE MUST APPLY: view should now reflect 2 resources from second fetch.
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(2)") {
-		t.Errorf("fresh TypeGen=2 must update the list: expected 'ec2(2)' in view, got excerpt: %s",
+	if !strings.Contains(plain, "ebs(2)") {
+		t.Errorf("fresh TypeGen=2 must update the list: expected 'ebs(2)' in view, got excerpt: %s",
 			plain[:min(300, len(plain))])
 	}
 
@@ -306,20 +333,40 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 // Proof: after the error, a subsequent successful Ctrl+R with TypeGen=2 delivers
 // ResourcesLoadedMsg{TypeGen:2} and probeEnrichment fires cleanly — no latent
 // state from the failed attempt corrupts the second attempt.
+//
+// Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
+// list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
-	m = navigateToEC2List(m)
+	m = navigateToEBSList(m)
 
 	// First: seed findings via a valid EnrichmentCheckedMsg to confirm they exist.
-	// enrichmentTypeGen["ec2"]=0 on fresh model; Gen=0 is the fresh session gen.
-	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
+	// enrichmentTypeGen["ebs"]=0 on fresh model; Gen=0 is the fresh session gen.
+	ebsFinding := messages.EnrichmentCheckedMsg{
+		ResourceType: "ebs",
+		Issues:       1,
+		Findings: map[string]resource.EnrichmentFinding{
+			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		},
+		Gen:     0,
+		TypeGen: 0,
+	}
+	m, _ = rootApplyMsg(m, ebsFinding)
 
-	// First Ctrl+R: bumps enrichmentTypeGen["ec2"] → 1, clears findings and ran.
+	// First Ctrl+R: bumps enrichmentTypeGen["ebs"] → 1, clears findings and ran.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Findings are now cleared. Verify: TypeGen=0 is stale → dropped.
-	_, dropCmd := rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
+	_, dropCmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		ResourceType: "ebs",
+		Issues:       1,
+		Findings: map[string]resource.EnrichmentFinding{
+			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		},
+		Gen:     0,
+		TypeGen: 0,
+	})
 	if dropCmd != nil {
 		t.Error("after Ctrl+R: TypeGen=0 must be stale (gen bumped to 1)")
 	}
@@ -328,22 +375,29 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	// Deliver the APIErrorMsg to the model — existing error handler runs.
 	// No stamped ResourcesLoadedMsg should arrive → findings stay cleared.
 	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
-		ResourceType: "ec2",
+		ResourceType: "ebs",
 		Err:          errFetchFailed,
 	})
 
 	// enrichmentFindings must still be cleared (no latent state from failed attempt).
 	// Verify: TypeGen=1 EnrichmentCheckedMsg must STILL be accepted (gen not corrupted).
-	// (If latent state had incorrectly modified enrichmentTypeGen, this would fail.)
-	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 1))
+	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		ResourceType: "ebs",
+		Issues:       1,
+		Findings: map[string]resource.EnrichmentFinding{
+			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		},
+		Gen:     0,
+		TypeGen: 1,
+	})
 
-	// Second Ctrl+R: bumps enrichmentTypeGen["ec2"] → 2.
+	// Second Ctrl+R: bumps enrichmentTypeGen["ebs"] → 2.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver successful ResourcesLoadedMsg{TypeGen:2} — simulates wrapped fetch success.
 	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
-		Resources:    rerunEC2Resources(),
+		ResourceType: "ebs",
+		Resources:    rerunEBSResources(),
 		TypeGen:      2,
 	})
 

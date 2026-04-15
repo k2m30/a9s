@@ -68,3 +68,16 @@
 | `!` | Error log (session errors with timestamps) |
 | `q` | Quit |
 | `Ctrl+C` | Force quit |
+
+### Visual Indicators
+
+a9s surfaces background-health findings without making write calls. Markers and badges let you spot resources that need attention at a glance.
+
+| Marker | Meaning |
+|--------|---------|
+| `! ` prefix on a row | Broken / degraded (e.g. failed build, impaired volume, unhealthy target) |
+| `~ ` prefix on a row | Informational / scheduled (e.g. pending maintenance, non-urgent event) |
+| `issues:N` on main menu | `N` distinct resources of this type have an active finding |
+| `issues:N+` on main menu | `N` findings surfaced, more were truncated (enrichment cap reached) |
+
+In the detail view, each resource type renders its own section for background findings (e.g. `Pending Maintenance` for DB Instances, `Volume Status` for EBS, `Latest Build` for CodeBuild projects). Press `Ctrl+Z` on the main menu to filter to only types with findings, or on a list to show only affected rows.

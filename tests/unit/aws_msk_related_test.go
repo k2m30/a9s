@@ -27,10 +27,13 @@ func mskCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 // --- Navigable Fields ---
 
-func TestNavigableFields_MSK_None(t *testing.T) {
-	nav := resource.IsFieldNavigable("msk", "ClusterName")
-	if nav != nil {
-		t.Errorf("expected no navigable fields for msk, but ClusterName resolved to %v", nav)
+func TestNavigableFields_MSK_KmsKey(t *testing.T) {
+	nav := resource.IsFieldNavigable("msk", "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId")
+	if nav == nil {
+		t.Fatal("expected Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId to be navigable for msk")
+	}
+	if nav.TargetType != "kms" {
+		t.Errorf("expected TargetType=kms, got %q", nav.TargetType)
 	}
 }
 

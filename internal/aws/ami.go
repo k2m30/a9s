@@ -27,6 +27,11 @@ func init() {
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG},
 	})
+
+	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId
+	resource.RegisterNavigableFields("ami", []resource.NavigableField{
+		{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
+	})
 }
 
 // FetchAMIs calls the EC2 DescribeImages API and returns all pages of AMIs.

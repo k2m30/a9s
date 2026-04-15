@@ -98,27 +98,6 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	}
 }
 
-// TestEnrichDynamoDBStatus_DescribeTableError_SetsTruncated verifies that a
-// DescribeTable error sets Truncated=true.
-func TestEnrichDynamoDBStatus_DescribeTableError_SetsTruncated(t *testing.T) {
-	fake := &ddbStatusFake{
-		err: errFakeAPI,
-	}
-	clients := &awsclient.ServiceClients{DynamoDB: fake}
-	resources := []resource.Resource{
-		{ID: "arn:aws:dynamodb:us-east-1:123456789012:table/err-table", Name: "err-table"},
-		{ID: "arn:aws:dynamodb:us-east-1:123456789012:table/ok-table", Name: "ok-table"},
-	}
-
-	result, err := awsclient.EnrichDynamoDBStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
-	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when DescribeTable fails — was the per-resource error handling reverted?")
-	}
-}
-
 // TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated verifies that a
 // ListExecutions error sets Truncated=true.
 func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.T) {

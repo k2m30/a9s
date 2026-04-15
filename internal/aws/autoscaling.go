@@ -28,6 +28,12 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
 	})
+
+	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs
+	resource.RegisterNavigableFields("asg", []resource.NavigableField{
+		{FieldPath: "TargetGroupARNs", TargetType: "tg"},
+		{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
+	})
 }
 
 // FetchAutoScalingGroups calls the AutoScaling DescribeAutoScalingGroups API and converts the

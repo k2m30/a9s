@@ -13,10 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	dbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
@@ -25,22 +21,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // EnricherRegistry maps resource short names to their Wave 2 enricher functions.
 // Ordered by priority: batchable (cheap) first, per-resource (expensive) last.
 var EnricherRegistry = map[string]EnricherFunc{
-	"rds":  EnrichRDSDocDBMaintenance,
-	"dbi":  EnrichRDSDocDBMaintenance,
-	"ec2":  EnrichEC2StatusChecks,
-	"ebs":  EnrichEBSVolumeStatus,
-	"cb":   EnrichCodeBuildStatus,
-	"tg":   EnrichTargetGroupHealth,
-	"pipe": EnrichCodePipelineStatus,
-	"ddb":  EnrichDynamoDBStatus,
-	"sfn":  EnrichStepFunctionsStatus,
-	"glue": EnrichGlueJobStatus,
+	"rds":      EnrichRDSDocDBMaintenance,
+	"dbi":      EnrichRDSDocDBMaintenance,
+	"ebs":      EnrichEBSVolumeStatus,
+	"cb":       EnrichCodeBuildStatus,
+	"tg":       EnrichTargetGroupHealth,
+	"pipeline": EnrichCodePipelineStatus,
+	"sfn":      EnrichStepFunctionsStatus,
+	"glue":     EnrichGlueJobStatus,
 }
 
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.
@@ -56,6 +52,22 @@ func arnSuffix(arn string) string {
 	return arn[idx+1:]
 }
 
+// isInstanceARN returns true when the RDS ARN targets a DB instance
+// (resource-type segment = "db"), not a cluster, snapshot, or other resource.
+// ARN format: arn:aws:rds:region:account:resource-type:id
+func isInstanceARN(arn string) bool {
+	parts := strings.Split(arn, ":")
+	return len(parts) >= 7 && parts[5] == "db"
+}
+
+// formatDate formats a *time.Time as "2006-01-02" or returns "" for nil.
+func formatDate(t interface{ Format(string) string }) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02")
+}
+
 // EnrichRDSDocDBMaintenance calls DescribePendingMaintenanceActions (account-wide, 1 call)
 // and returns a Finding for every resource with pending maintenance.
 // Severity is "~" (informational); IssueCount is always 0 (excluded from menu badge).
@@ -69,38 +81,72 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 	if err != nil {
 		return EnricherResult{}, err
 	}
-	// Build a set of probed resource IDs for matching against ARN suffixes.
-	probeIDs := make(map[string]bool, len(resources))
+	// Collect probed resource IDs as an ordered slice for deterministic
+	// suffix matching below. Using a map's random iteration order would
+	// make key selection non-deterministic when two IDs both suffix-match
+	// the same ARN (e.g. "foo-db" and "bar-foo-db").
+	probeIDs := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
-			probeIDs[r.ID] = true
+			probeIDs = append(probeIDs, r.ID)
 		}
 	}
-	// Emit a finding for every ARN that has pending maintenance.
-	// Use the probed ID if it matches; otherwise fall back to the ARN suffix itself
-	// (account-wide enrichers may surface off-page resources).
+	// Emit a finding for every DB instance ARN that has pending maintenance.
 	for _, action := range out.PendingMaintenanceActions {
 		if action.ResourceIdentifier == nil {
 			continue
 		}
 		arn := *action.ResourceIdentifier
-		// Collect action descriptions for the summary.
+		if !isInstanceARN(arn) {
+			continue
+		}
+		// Collect action descriptions for the summary and rows.
 		var actions []string
+		var rows []resource.FindingRow
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil {
 				actions = append(actions, *pa.Action)
+			}
+			// Emit a row per action detail.
+			actionVal := ""
+			if pa.Action != nil {
+				actionVal = *pa.Action
+			}
+			applyMethod := ""
+			if pa.OptInStatus != nil {
+				applyMethod = *pa.OptInStatus
+			}
+			earliestTarget := ""
+			if pa.AutoAppliedAfterDate != nil {
+				earliestTarget = formatDate(pa.AutoAppliedAfterDate)
+			} else if pa.ForcedApplyDate != nil {
+				earliestTarget = formatDate(pa.ForcedApplyDate)
+			}
+			if actionVal != "" {
+				rows = append(rows, resource.FindingRow{Label: "Action", Value: actionVal, Tier: "~"})
+			}
+			if applyMethod != "" {
+				rows = append(rows, resource.FindingRow{Label: "Apply Method", Value: applyMethod})
+			}
+			if earliestTarget != "" {
+				rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: earliestTarget, Tier: "~"})
+			}
+			if pa.Description != nil && *pa.Description != "" {
+				rows = append(rows, resource.FindingRow{Label: "Description", Value: *pa.Description})
 			}
 		}
 		summary := "pending maintenance"
 		if len(actions) > 0 {
 			summary = "pending maintenance: " + strings.Join(actions, ", ")
 		}
-		// Determine the key: prefer the matching probeID; fall back to ARN suffix.
+		// Determine the key: prefer the longest matching probeID so that
+		// when two IDs both suffix-match the same ARN (e.g. "foo-db" and
+		// "bar-foo-db" for arn ":bar-foo-db"), the more specific one wins.
+		// Iteration is over the ordered probeIDs slice — deterministic.
 		key := ""
-		for id := range probeIDs {
-			if strings.HasSuffix(arn, ":"+id) {
+		for _, id := range probeIDs {
+			if strings.HasSuffix(arn, ":"+id) && len(id) > len(key) {
 				key = id
-				break
 			}
 		}
 		if key == "" {
@@ -112,49 +158,10 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 		findings[key] = resource.EnrichmentFinding{
 			Severity: "~",
 			Summary:  summary,
+			Rows:     rows,
 		}
 	}
-	// IssueCount is always 0 for RDS maintenance (severity "~" — excluded from menu badge).
-	return EnricherResult{IssueCount: 0, Truncated: out.Marker != nil, Findings: findings}, nil
-}
-
-// EnrichEC2StatusChecks calls DescribeInstanceStatus (1 call, all instances)
-// and returns a Finding for every instance with impaired system or instance status.
-// Severity is "!" (broken/degraded).
-func EnrichEC2StatusChecks(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings}, nil
-	}
-	out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2.DescribeInstanceStatusInput{
-		IncludeAllInstances: aws.Bool(true),
-	})
-	if err != nil {
-		return EnricherResult{}, err
-	}
-	for _, s := range out.InstanceStatuses {
-		// Only count "impaired" — not "not-applicable" (stopped instances),
-		// "insufficient-data" (recently launched), or "initializing".
-		sysImpaired := s.SystemStatus != nil && s.SystemStatus.Status == ec2types.SummaryStatusImpaired
-		instImpaired := s.InstanceStatus != nil && s.InstanceStatus.Status == ec2types.SummaryStatusImpaired
-		if !sysImpaired && !instImpaired {
-			continue
-		}
-		if s.InstanceId == nil {
-			continue
-		}
-		// Prefer "system status impaired" when both are impaired.
-		summary := "instance status impaired"
-		if sysImpaired {
-			summary = "system status impaired"
-		}
-		findings[*s.InstanceId] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  summary,
-		}
-	}
-	// Paginated API — result may be truncated (lower bound).
-	return EnricherResult{IssueCount: len(findings), Truncated: out.NextToken != nil, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: out.Marker != nil, Findings: findings}, nil
 }
 
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (1 call, all volumes)
@@ -165,7 +172,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, _ []res
 	if clients.EC2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
-	out, err := clients.EC2.DescribeVolumeStatus(ctx, &ec2.DescribeVolumeStatusInput{})
+	out, err := clients.EC2.DescribeVolumeStatus(ctx, &ec2svc.DescribeVolumeStatusInput{})
 	if err != nil {
 		return EnricherResult{}, err
 	}
@@ -176,9 +183,35 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, _ []res
 		if v.VolumeId == nil {
 			continue
 		}
+		ioState := string(v.VolumeStatus.Status)
+		rows := []resource.FindingRow{
+			{Label: "I/O State", Value: ioState, Tier: "!"},
+		}
+		// Most recent event (if any).
+		if len(v.Events) > 0 {
+			ev := v.Events[0]
+			eventVal := ""
+			if ev.EventType != nil {
+				eventVal = *ev.EventType
+			}
+			if ev.Description != nil && *ev.Description != "" {
+				eventVal = *ev.Description
+			}
+			if eventVal != "" {
+				rows = append(rows, resource.FindingRow{Label: "Event", Value: eventVal, Tier: "~"})
+			}
+		}
+		// Most recent action code (if any).
+		if len(v.Actions) > 0 {
+			ac := v.Actions[0]
+			if ac.Code != nil && *ac.Code != "" {
+				rows = append(rows, resource.FindingRow{Label: "Action Code", Value: *ac.Code})
+			}
+		}
 		findings[*v.VolumeId] = resource.EnrichmentFinding{
 			Severity: "!",
 			Summary:  "volume I/O degraded",
+			Rows:     rows,
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: out.NextToken != nil, Findings: findings}, nil
@@ -192,7 +225,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	if clients.CodeBuild == nil || len(resources) == 0 {
 		return EnricherResult{Findings: findings}, nil
 	}
-	// Collect project names from resources (r.ID is the project name for cb).
 	names := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
@@ -202,8 +234,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	if len(names) == 0 {
 		return EnricherResult{Findings: findings}, nil
 	}
-	// ListBuildsForProject for each to get the latest build ID, then batch get.
-	// Track the project name for each build ID so we can key the finding by r.ID.
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
 	truncated := len(resources) > EnrichmentCap
@@ -235,8 +265,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		return EnricherResult{}, err
 	}
 	for _, b := range builds.Builds {
-		// Only terminal failures produce findings. In-flight (InProgress, Stopping)
-		// and success are not user-actionable "issues".
 		switch b.BuildStatus {
 		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress:
 			continue
@@ -248,13 +276,36 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		if projectName == "" {
 			continue
 		}
-		summary := fmt.Sprintf("latest build %s", string(b.BuildStatus))
+		statusVal := string(b.BuildStatus)
+		rows := []resource.FindingRow{
+			{Label: "Status", Value: statusVal, Tier: "!"},
+		}
 		if b.EndTime != nil {
-			summary = fmt.Sprintf("latest build %s (%s)", string(b.BuildStatus), b.EndTime.Format("2006-01-02"))
+			rows = append(rows, resource.FindingRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02")})
+		}
+		// Append the latest failed phase if build is not complete.
+		if !b.BuildComplete {
+			if b.CurrentPhase != nil && *b.CurrentPhase != "" {
+				rows = append(rows, resource.FindingRow{Label: "Current Phase", Value: *b.CurrentPhase, Tier: "~"})
+			}
+		} else {
+			// Find the latest failed phase.
+			for i := len(b.Phases) - 1; i >= 0; i-- {
+				ph := b.Phases[i]
+				if ph.PhaseStatus == cbtypes.StatusTypeFailed {
+					rows = append(rows, resource.FindingRow{Label: "Phase", Value: string(ph.PhaseType), Tier: "!"})
+					break
+				}
+			}
+		}
+		summary := fmt.Sprintf("latest build %s", statusVal)
+		if b.EndTime != nil {
+			summary = fmt.Sprintf("latest build %s (%s)", statusVal, b.EndTime.Format("2006-01-02"))
 		}
 		findings[projectName] = resource.EnrichmentFinding{
 			Severity: "!",
 			Summary:  summary,
+			Rows:     rows,
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
@@ -285,15 +336,26 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		}
 		total := len(out.TargetHealthDescriptions)
 		unhealthy := 0
+		var firstReason string
 		for _, t := range out.TargetHealthDescriptions {
 			if t.TargetHealth != nil && t.TargetHealth.State != elbtypes.TargetHealthStateEnumHealthy {
 				unhealthy++
+				if firstReason == "" && t.TargetHealth.Reason != "" {
+					firstReason = string(t.TargetHealth.Reason)
+				}
 			}
 		}
 		if unhealthy > 0 {
+			rows := []resource.FindingRow{
+				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", unhealthy, total), Tier: "!"},
+			}
+			if firstReason != "" {
+				rows = append(rows, resource.FindingRow{Label: "Reason", Value: firstReason, Tier: "~"})
+			}
 			findings[r.ID] = resource.EnrichmentFinding{
 				Severity: "!",
 				Summary:  fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, total),
+				Rows:     rows,
 			}
 		}
 	}
@@ -324,81 +386,43 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			continue
 		}
 		for _, stage := range out.StageStates {
-			if stage.LatestExecution != nil && stage.LatestExecution.Status == "Failed" {
-				stageName := ""
-				if stage.StageName != nil {
-					stageName = *stage.StageName
-				}
-				summary := fmt.Sprintf("stage %s failed", stageName)
-				// Findings are keyed by r.ID to match the row-marker lookup contract
-				// in table_render.go (m.findingsByID[r.ID]). Pipeline fetcher sets
-				// ID = Name, so the observable behavior is identical.
-				key := r.ID
-				if key == "" {
-					key = r.Name
-				}
-				findings[key] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  summary,
-				}
-				break // first failed stage is sufficient
+			if stage.LatestExecution == nil || stage.LatestExecution.Status != "Failed" {
+				continue
 			}
-		}
-	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
-}
-
-// EnrichDynamoDBStatus calls DescribeTable for each table (1 per table, cap ~50).
-// Returns a Finding for each table with non-ACTIVE status or a non-ACTIVE GSI.
-// Severity is "!" (broken/degraded).
-// Summary: "table status: <status>" for the table itself, or "GSI <name> status: <status>" for a GSI.
-func EnrichDynamoDBStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	if clients.DynamoDB == nil {
-		return EnricherResult{Findings: findings}, nil
-	}
-	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
-		if r.Name == "" {
-			continue
-		}
-		out, err := clients.DynamoDB.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(r.Name),
-		})
-		if err != nil {
-			truncated = true
-			continue
-		}
-		if out.Table == nil {
-			continue
-		}
-		key := r.ID
-		if key == "" {
-			key = r.Name
-		}
-		if out.Table.TableStatus != dbtypes.TableStatusActive {
+			stageName := ""
+			if stage.StageName != nil {
+				stageName = *stage.StageName
+			}
+			rows := []resource.FindingRow{
+				{Label: "Failed Stage", Value: stageName, Tier: "!"},
+				{Label: "Status", Value: string(stage.LatestExecution.Status)},
+			}
+			// Collect error details from any failed action in this stage.
+			for _, action := range stage.ActionStates {
+				if action.LatestExecution == nil {
+					continue
+				}
+				if action.LatestExecution.Status != "Failed" {
+					continue
+				}
+				if action.LatestExecution.ErrorDetails != nil && action.LatestExecution.ErrorDetails.Message != nil {
+					msg := *action.LatestExecution.ErrorDetails.Message
+					if msg != "" {
+						rows = append(rows, resource.FindingRow{Label: "Error", Value: msg, Tier: "!"})
+					}
+					break
+				}
+			}
+			key := r.ID
+			if key == "" {
+				key = r.Name
+			}
 			findings[key] = resource.EnrichmentFinding{
 				Severity: "!",
-				Summary:  fmt.Sprintf("table status: %s", string(out.Table.TableStatus)),
+				Summary:  fmt.Sprintf("stage %s failed", stageName),
+				Rows:     rows,
 			}
-			continue
-		}
-		// Check GSIs — first non-ACTIVE GSI wins.
-		for _, gsi := range out.Table.GlobalSecondaryIndexes {
-			if gsi.IndexStatus != dbtypes.IndexStatusActive {
-				gsiName := ""
-				if gsi.IndexName != nil {
-					gsiName = *gsi.IndexName
-				}
-				findings[key] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  fmt.Sprintf("GSI %s status: %s", gsiName, string(gsi.IndexStatus)),
-				}
-				break
-			}
+			break // first failed stage is sufficient
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
@@ -431,9 +455,20 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if len(out.Executions) > 0 {
 			s := out.Executions[0].Status
 			if s == sfntypes.ExecutionStatusFailed || s == sfntypes.ExecutionStatusTimedOut || s == sfntypes.ExecutionStatusAborted {
+				exec := out.Executions[0]
+				rows := []resource.FindingRow{
+					{Label: "Latest Status", Value: string(s), Tier: "!"},
+				}
+				if exec.StopDate != nil {
+					rows = append(rows, resource.FindingRow{Label: "Ended", Value: exec.StopDate.Format("2006-01-02")})
+				}
+				if exec.Name != nil && *exec.Name != "" {
+					rows = append(rows, resource.FindingRow{Label: "Execution Name", Value: *exec.Name})
+				}
 				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("latest execution %s", string(s)),
+					Rows:     rows,
 				}
 			}
 		}
@@ -466,8 +501,18 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			continue
 		}
 		if len(out.JobRuns) > 0 {
-			s := out.JobRuns[0].JobRunState
+			run := out.JobRuns[0]
+			s := run.JobRunState
 			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout {
+				rows := []resource.FindingRow{
+					{Label: "State", Value: string(s), Tier: "!"},
+				}
+				if run.CompletedOn != nil {
+					rows = append(rows, resource.FindingRow{Label: "Ended", Value: run.CompletedOn.Format("2006-01-02")})
+				}
+				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
+					rows = append(rows, resource.FindingRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
+				}
 				key := r.ID
 				if key == "" {
 					key = r.Name
@@ -475,6 +520,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("latest run %s", string(s)),
+					Rows:     rows,
 				}
 			}
 		}

@@ -23,6 +23,15 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 	})
 
+	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
+	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
+	resource.RegisterNavigableFields("dbi", []resource.NavigableField{
+		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
+		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
+		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+	})
+
 	resource.RegisterPaginated("dbi", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {

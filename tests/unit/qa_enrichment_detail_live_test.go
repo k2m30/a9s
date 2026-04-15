@@ -25,41 +25,41 @@ import (
 // Helpers local to this file
 // ---------------------------------------------------------------------------
 
-// ec2Resource returns a minimal EC2 resource for live-update testing.
-func ec2Resource(id string) resource.Resource {
+// rdsLiveResource returns a minimal RDS resource for live-update testing.
+func rdsLiveResource(id string) resource.Resource {
 	return resource.Resource{
 		ID:   id,
 		Name: id + "-name",
 		Fields: map[string]string{
-			"instance_id": id,
-			"state":       "running",
+			"db_instance_id": id,
+			"status":         "available",
 		},
 	}
 }
 
-// navigateToDetailWithEC2 sets up a root model where:
-//   - A ResourceList for "ec2" is pushed (via NavigateMsg)
+// navigateToDetailWithRDS sets up a root model where:
+//   - A ResourceList for "rds" is pushed (via NavigateMsg)
 //   - Resources are loaded (via ResourcesLoadedMsg)
 //   - A DetailModel for the given resource is pushed (via NavigateMsg)
 //
 // Returns the model after all navigation.
-func navigateToDetailWithEC2(t *testing.T, res resource.Resource) tui.Model {
+func navigateToDetailWithRDS(t *testing.T, res resource.Resource) tui.Model {
 	t.Helper()
 
 	m := tui.New("", "")
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 
-	// Navigate to EC2 resource list.
+	// Navigate to RDS resource list.
 	m2, _ = m.Update(messages.NavigateMsg{
 		Target:       messages.TargetResourceList,
-		ResourceType: "ec2",
+		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
 	// Load resources into the list.
 	m2, _ = m.Update(messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Resources:    []resource.Resource{res},
 	})
 	m, _ = m2.(tui.Model)
@@ -67,7 +67,7 @@ func navigateToDetailWithEC2(t *testing.T, res resource.Resource) tui.Model {
 	// Navigate to detail for the resource.
 	m2, _ = m.Update(messages.NavigateMsg{
 		Target:       messages.TargetDetail,
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Resource:     &res,
 	})
 	m, _ = m2.(tui.Model)
@@ -92,20 +92,20 @@ func renderRootModel(m tui.Model) string {
 // shown in the active DetailModel, the root model updates the detail view so
 // that the finding summary appears in the rendered output.
 func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testing.T) {
-	res := ec2Resource("i-live-001")
-	m := navigateToDetailWithEC2(t, res)
+	res := rdsLiveResource("db-live-001")
+	m := navigateToDetailWithRDS(t, res)
 
 	// Send a valid EnrichmentCheckedMsg (Gen=0, TypeGen=0 match a fresh model).
 	findingMsg := messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Issues:       1,
 		Truncated:    false,
 		Findings: map[string]resource.EnrichmentFinding{
-			"i-live-001": {Severity: "!", Summary: "system status impaired — live update test"},
+			"db-live-001": {Severity: "!", Summary: "pending maintenance: system-update — live update test"},
 		},
 		Err:     nil,
 		Gen:     0, // matches fresh model's enrichmentGen=0
-		TypeGen: 0, // matches fresh model's enrichmentTypeGen["ec2"]=0
+		TypeGen: 0, // matches fresh model's enrichmentTypeGen["rds"]=0
 	}
 
 	m2, _ := m.Update(findingMsg)
@@ -113,11 +113,11 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 
 	output := stripANSI(renderRootModel(m))
 
-	if !strings.Contains(output, "system status impaired — live update test") {
+	if !strings.Contains(output, "pending maintenance: system-update — live update test") {
 		t.Errorf("after live EnrichmentCheckedMsg, detail view must show finding summary, got:\n%s", output)
 	}
-	if !strings.Contains(output, "Background Check") {
-		t.Errorf("after live EnrichmentCheckedMsg, detail view must show 'Background Check' section, got:\n%s", output)
+	if !strings.Contains(output, "Pending Maintenance") {
+		t.Errorf("after live EnrichmentCheckedMsg, detail view must show 'Pending Maintenance' section, got:\n%s", output)
 	}
 }
 
@@ -130,15 +130,15 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 // resource currently shown in the active DetailModel, the handler clears any
 // existing finding from the detail view (recovery case).
 func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
-	res := ec2Resource("i-live-002")
-	m := navigateToDetailWithEC2(t, res)
+	res := rdsLiveResource("db-live-002")
+	m := navigateToDetailWithRDS(t, res)
 
 	// Step 1: Set a finding via the first EnrichmentCheckedMsg.
 	setFindingMsg := messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
-			"i-live-002": {Severity: "!", Summary: "instance status impaired — will recover"},
+			"db-live-002": {Severity: "!", Summary: "pending maintenance: system-update — will recover"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -148,18 +148,18 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m, _ = m2.(tui.Model)
 
 	withFinding := stripANSI(renderRootModel(m))
-	if !strings.Contains(withFinding, "instance status impaired — will recover") {
+	if !strings.Contains(withFinding, "pending maintenance: system-update — will recover") {
 		t.Skip("pre-condition failed: finding was not set; skipping recovery check")
 	}
 
 	// Step 2: For the recovery EnrichmentCheckedMsg, TypeGen must be bumped
 	// to a value that still matches. The first message set TypeGen=0 for a fresh
-	// model. After that message was processed, enrichmentTypeGen["ec2"] is still 0
+	// model. After that message was processed, enrichmentTypeGen["rds"] is still 0
 	// (it's only bumped on rerun start, not on receipt). So TypeGen=0 still matches.
 	clearFindingMsg := messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Issues:       0,
-		Findings:     map[string]resource.EnrichmentFinding{}, // empty — "i-live-002" recovered
+		Findings:     map[string]resource.EnrichmentFinding{}, // empty — "db-live-002" recovered
 		Gen:          0,
 		TypeGen:      0, // still matches (TypeGen only changes on rerun start)
 	}
@@ -168,7 +168,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m, _ = m3.(tui.Model)
 
 	withoutFinding := stripANSI(renderRootModel(m))
-	if strings.Contains(withoutFinding, "instance status impaired — will recover") {
+	if strings.Contains(withoutFinding, "pending maintenance: system-update — will recover") {
 		t.Errorf("after recovery EnrichmentCheckedMsg, old finding summary must be cleared from detail view, got:\n%s", withoutFinding)
 	}
 }
@@ -182,17 +182,17 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 // current enrichmentTypeGen["ec2"], the handler drops the message and the detail
 // view is NOT updated with the finding.
 func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
-	res := ec2Resource("i-live-003")
-	m := navigateToDetailWithEC2(t, res)
+	res := rdsLiveResource("db-live-003")
+	m := navigateToDetailWithRDS(t, res)
 
 	staleMsg := messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
-			"i-live-003": {Severity: "!", Summary: "stale finding — should not appear"},
+			"db-live-003": {Severity: "!", Summary: "stale finding — should not appear"},
 		},
 		Gen:     0,
-		TypeGen: 99, // stale — fresh model's enrichmentTypeGen["ec2"] is 0
+		TypeGen: 99, // stale — fresh model's enrichmentTypeGen["rds"] is 0
 	}
 
 	m2, _ := m.Update(staleMsg)
@@ -217,19 +217,19 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 
-	// Navigate to EC2 list (NOT detail).
+	// Navigate to RDS list (NOT detail).
 	m2, _ = m.Update(messages.NavigateMsg{
 		Target:       messages.TargetResourceList,
-		ResourceType: "ec2",
+		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
 	// Send valid EnrichmentCheckedMsg while a list (not detail) is active.
 	findingMsg := messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
+		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
-			"i-not-in-detail": {Severity: "!", Summary: "finding for list-only scenario"},
+			"db-not-in-detail": {Severity: "!", Summary: "finding for list-only scenario"},
 		},
 		Gen:     0,
 		TypeGen: 0,

@@ -149,7 +149,7 @@ internal/
 tests/
   unit/          # all unit tests (run via `make test` with -race)
   integration/   # gated by //go:build integration
-  testdata/      # hand-crafted JSON fixtures
+  testdata/      # hand-crafted JSON fixtures — AWS SDK response bodies for fetcher unit tests (no live AWS)
 ```
 
 ---
@@ -181,7 +181,11 @@ resource.RegisterPaginatedChild("role_policies", fetchRolePolicies)
 resource.RegisterRelated("ec2", []RelatedDef{...})
 resource.RegisterNavigableFields("ec2", []NavigableField{...})
 resource.RegisterEnricher("role_policies", enrichRolePolicy)
+resource.RegisterFieldKeys("ec2", []string{"instance_id", "state", "type", ...})
+resource.RegisterFieldAliases("ec2", map[string]string{"id": "instance_id", "az": "availability_zone"})
 ```
+
+**Field registry** (`RegisterFieldKeys`, `RegisterFieldAliases`): Each fetcher declares the `Fields` map keys it emits and any user-facing aliases for them. `RegisterFieldKeys` lists the canonical keys (used by detail-view field ordering, YAML rendering, and column validation). `RegisterFieldAliases` maps alternative names to canonical keys (used by filter/search input and column config). Builtins are recorded on first registration; later calls (e.g., from tests) override without mutating the builtin snapshot, which keeps test registrations from leaking across suites.
 
 ### Resource Type Definitions
 
@@ -202,6 +206,7 @@ type ResourceTypeDef struct {
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
     Color func(Resource) Color   // REQUIRED: classifies row health; reads structural fields directly
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
+    AlwaysHealthy bool           // declares Color is trivially `return ColorHealthy`; truncated-zero means CONFIRMED zero for these types (hide under ctrl+z), but LOWER BOUND for health-state types (keep visible — later pages may hold issues). Enforced by `TestResourceTypeDef_AlwaysHealthy_Registered`.
     CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
 ```
@@ -240,6 +245,8 @@ All registered in `internal/resource/registry.go`, implemented in `internal/aws/
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
 
+**Throttling protection** (`internal/aws/retry.go`): `RetryOnThrottle[T any](ctx, cfg, fn)` wraps an AWS API call with exponential backoff for `ThrottlingException` / `Throttling` / `RequestLimitExceeded` errors. Fetchers and enrichers that iterate per-resource (e.g., `EnrichTargetGroupHealth` calling `DescribeTargetHealth` once per TG) wrap each call in `RetryOnThrottle` so a throttled slice still completes instead of returning a half-populated result. Non-throttling errors are returned immediately without retry.
+
 ### Wave 2 Issue Enrichment Pipeline
 
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
@@ -261,7 +268,7 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Priority order** (batchable first): RDS/DocDB maintenance → EC2 status checks → EBS volume status → CodeBuild → Target Groups → CodePipeline → DynamoDB → Step Functions → Glue.
+**Priority order** (batchable first; the order slice in `buildEnrichQueue` uses short names): `dbi` (RDS/DocDB maintenance) → `ec2` (status checks) → `ebs` (volume status) → `cb` (CodeBuild) → `tg` (Target Groups) → `pipeline` (CodePipeline) → `ddb` (DynamoDB) → `sfn` (Step Functions) → `glue` (Glue). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher (historic bug: `"pipe"` key never dispatched because Wave 1 stored under `"pipeline"`).
 
 **Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Batchable enrichers (priorities 1-3) make account-wide calls. Per-resource enrichers (priorities 5-9) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50).
 
@@ -324,6 +331,14 @@ type View interface {
 
 `Update` is deliberately excluded from the interface because each view returns its own concrete type. The root model's `updateActiveView()` type-switches on each concrete type to dispatch and write back.
 
+**Optional capability interfaces** (`views/view.go`): views implement these only when the capability applies. The root model type-asserts against each interface and calls only the implementations present, so older views without the capability keep working.
+
+| Interface | Methods | Implemented by |
+|-----------|---------|----------------|
+| `Filterable` | `SetFilter(text string)`, `GetFilter() string` | Navigable list views (main menu, resource list, selector). Static views (detail, YAML, JSON, help, reveal) do NOT implement it. |
+| `Searchable` | `IsSearchActive() bool`, `IsSearchInputMode() bool`, `SearchInfo() string` | Text-content views (detail, YAML, JSON). Drives the search status line in the frame footer. |
+| `Hintable` | `BottomHints() []layout.KeyHint` | Views that render context-specific key hints along the bottom border. Views that omit it get a plain bottom border — the absence is backward-compatible. |
+
 ### Issue Counting & Attention Filter
 
 The main menu shows `issues:N` badges per resource type, counting resources in warning/error states. The ctrl+z key filters the menu to show only types with issues.
@@ -357,13 +372,16 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 
 **`ExcludeFromIssueBadge`**: When set on a `ResourceTypeDef`, rows are still colored and ctrl+z is honored, but the type is excluded from the main-menu badge count. Used by ct-events where severity is event-level, not resource-health.
 
-**Tri-state visibility** under ctrl+z on the main menu:
+**Quad-state visibility** under ctrl+z on the main menu. The key distinction is whether a zero issue count is CONFIRMED (the type can never hold issues) or a LOWER BOUND (we saw the first page only and page 2+ may have issues). `ResourceTypeDef.AlwaysHealthy` tags the former.
 
-| State | Badge | Visible under ctrl+z? |
-|-------|-------|----------------------|
-| Unknown (not probed) | None | Yes (prevent cold-start empty menu) |
-| Zero issues (any truncation) | None | No — config-only types (S3, ENI, IAM) never have issues regardless of page count |
-| Nonzero issues | `issues:N` | Yes |
+| State | Condition | Badge | Visible under ctrl+z? |
+|-------|-----------|-------|----------------------|
+| Unknown | Not yet probed | None | Yes (prevent cold-start empty menu) |
+| Confirmed zero | `issues == 0` AND (`!truncated` OR `AlwaysHealthy == true`) | None | No — hide config-only types (S3, IAM, SG, IGW) that cannot hold issues regardless of pagination |
+| Truncated zero | `issues == 0` AND `truncated == true` AND `AlwaysHealthy == false` | None | Yes — health-state types (EC2, RDS, VPC, NAT, ENI, ELB) may have issues on later pages |
+| Nonzero | `issues > 0` | `issues:N` (or `issues:N+` when truncated) | Yes |
+
+ENI carries a state-based color (`attaching`/`detaching` → warning) and is NOT marked `AlwaysHealthy`; a truncated-zero ENI page must stay visible under ctrl+z.
 
 ---
 
@@ -503,10 +521,12 @@ Child views are drill-down lists from a parent resource (e.g., IAM Role → Role
 ```go
 // internal/resource/types.go
 type ChildViewDef struct {
-    ChildType      string            // "role_policies"
-    Key            string            // trigger key: "p"
-    ContextKeys    map[string]string // fetcher params from parent
-    DisplayNameKey string            // field to show in title
+    ChildType         string               // "role_policies"
+    Key               string               // trigger key: "p"
+    ContextKeys       map[string]string    // fetcher params from parent
+    DisplayNameKey    string               // field to show in title
+    DrillCondition    func(Resource) bool  // optional predicate; when non-nil, drill is allowed only when true. nil = always drill. Example: SFN Executions, where Express state machines have no execution history
+    DrillBlockMessage string               // flash text shown when DrillCondition returns false
 }
 ```
 
@@ -591,7 +611,7 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 - `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
-**API note**: `tui.WithDemo(true)` is a compatibility shim equivalent to `WithClients(demo.NewServiceClients())` + `WithNoCache(true)` + `WithIsDemo(true)` (it directly sets the same fields rather than calling those options). New code should use the explicit form. The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality.
+**API note**: `tui.WithDemo(true)` is a compatibility shim retained for tests written before the 014-demo-transport-mock refactor. It is NOT equivalent to `WithClients(demo.NewServiceClients()) + WithIsDemo(true)` alone — it additionally hardcodes `profile = demo.DemoProfile` and `region = demo.DemoRegion`. It does NOT set `noCache`; disk persistence remains enabled unless you also pass `WithNoCache(true)`. New code should use explicit options rather than `WithDemo`. The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality. Removal of `WithDemo` is tracked in tasks T045–T049.
 
 Demo mode is the primary way to develop and test the TUI without AWS access.
 
@@ -626,7 +646,8 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 - `WithNoCache(true)` — disable disk cache persistence (availability probes still run via `demoPrefetchCounts()`)
 - `WithIsDemo(true)` — mark session as demo mode (skips Wave 2 enrichment; set by `--demo` CLI bootstrap)
 - `WithCommand("ec2")` — open directly to a resource type on startup
-- `WithDemo(true)` — compatibility shim: equivalent to `WithClients` + `WithNoCache` + `WithIsDemo` (see Demo Mode above)
+- `WithActiveTheme(name)` — set the initial active theme filename for the theme selector (used by `--theme` CLI flag)
+- `WithDemo(true)` — compatibility shim for pre-014 tests: sets `preSuppliedClients = demo.NewServiceClients()`, `isDemo = true`, and hardcodes `profile = demo.DemoProfile` / `region = demo.DemoRegion`. Does NOT set `noCache`. See Demo Mode above and Known Compromises below.
 
 ---
 
@@ -763,7 +784,7 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 ## Known Compromises
 
-- `WithDemo(true)` still exists as a compatibility shim for older tests. New code should prefer explicit client injection plus `WithNoCache(true)` plus `WithIsDemo(true)`. Migration and removal of `WithDemo(true)` is tracked in #270.
+- `WithDemo(true)` still exists as a compatibility shim for older tests. It is NOT a simple composition — it hardcodes `profile`/`region` to demo values and sets `isDemo = true` but does NOT set `noCache`. New code should prefer explicit client injection (`WithClients(demo.NewServiceClients())`) plus `WithIsDemo(true)` (and `WithNoCache(true)` when disk persistence must also be off). Removal of `WithDemo(true)` is tracked in tasks T045–T049 (see the `//nolint:gocritic` banner above the function).
 - The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
 - When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.

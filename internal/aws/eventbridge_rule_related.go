@@ -13,6 +13,11 @@ func init() {
 	resource.RegisterRelated("eb-rule", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRuleRole, NeedsTargetCache: false},
 	})
+
+	// eventbridgetypes.Rule: RoleArn (execution role for the rule target)
+	resource.RegisterNavigableFields("eb-rule", []resource.NavigableField{
+		{FieldPath: "RoleArn", TargetType: "role"},
+	})
 }
 
 // checkEbRuleRole reads RoleArn from the Rule RawStruct and extracts the role name.

@@ -33,6 +33,12 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				return messages.FlashMsg{Text: fmt.Sprintf("unknown resource type: %s", msg.ResourceType), IsError: true}
 			}
 		}
+		// When navigated via an alias (e.g. "rds" → ShortName "dbi"), preserve the
+		// alias as the display name so the frame title reflects the user's intent.
+		requestedAlias := msg.ResourceType
+		if requestedAlias == rt.ShortName {
+			requestedAlias = ""
+		}
 		// Check resource cache before creating a new view and fetching.
 		if entry, ok := m.resourceCache[msg.ResourceType]; ok {
 			rl := views.NewResourceListFromCache(
@@ -42,30 +48,34 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				entry.cursorPos, entry.hScrollOffset,
 				entry.attentionOnly,
 			)
+			if requestedAlias != "" {
+				rl.SetDisplayName(requestedAlias)
+			}
 			rl.SetShowIssueBadge(true) // top-level list from main menu
 			rl.SetSize(m.innerSize())
-			// Wire enrichment state so the banner and markers reflect current findings.
-			issueCount := 0
-			issueTrunc := false
+			// Wire enrichment state so markers reflect current findings.
+			issueCount, issueTrunc := 0, false
 			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 				issueCount = menu.GetIssueCounts()[msg.ResourceType]
 				issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
 			}
-			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentRan[msg.ResourceType], m.enrichmentFindings[msg.ResourceType])
+			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[msg.ResourceType])
 			m.pushView(&rl)
 			return m, nil
 		}
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		if requestedAlias != "" {
+			rl.SetDisplayName(requestedAlias)
+		}
 		rl.SetShowIssueBadge(true) // top-level list from main menu
 		rl.SetSize(m.innerSize())
-		// Wire enrichment state so the banner and markers reflect current findings.
-		issueCount := 0
-		issueTrunc := false
+		// Wire enrichment state so markers reflect current findings.
+		issueCount, issueTrunc := 0, false
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			issueCount = menu.GetIssueCounts()[msg.ResourceType]
 			issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
 		}
-		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentRan[msg.ResourceType], m.enrichmentFindings[msg.ResourceType])
+		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[msg.ResourceType])
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
 		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
@@ -78,6 +88,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			m.popView()
 		}
 		resType := msg.ResourceType
+		// Normalize alias to canonical ShortName so the detail view's ResourceType()
+		// matches the ShortName used by handleEnrichmentChecked and injectEnrichmentSection.
+		if td := resource.FindResourceType(resType); td != nil {
+			resType = td.ShortName
+		}
 		if resType == "" {
 			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 				resType = rl.ResourceType()
@@ -368,13 +383,19 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			tok := m.enrichmentTypeGen[rt]
 			delete(m.enrichmentFindings, rt)
 			delete(m.enrichmentRan, rt)
-			// Propagate the cleared state to the active ResourceListModel so the
-			// banner and row markers disappear immediately at Ctrl+R — otherwise
-			// stale markers would remain visible until the rerun completes (and
-			// indefinitely if the refresh errors out).
-			rl.SetEnrichmentState(0, false, false, nil)
+			// Propagate the cleared state to the active ResourceListModel so
+			// row markers disappear immediately at Ctrl+R — otherwise stale markers
+			// would remain visible until the rerun completes (and indefinitely if
+			// the refresh errors out).
+			rl.SetEnrichmentState(0, false, nil)
 			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
 			return m, cmd
+		}
+		// Top-level list without an enricher: clear any stale findings immediately
+		// so row markers don't persist across a Ctrl+R refresh.
+		if _, hasFindings := m.enrichmentFindings[rt]; hasFindings {
+			delete(m.enrichmentFindings, rt)
+			rl.SetEnrichmentState(0, false, nil)
 		}
 	}
 	return m, m.refreshResourceList(*rl)
@@ -607,6 +628,11 @@ func (m *Model) startEnrichment() tea.Cmd {
 
 // handleEnrichmentChecked processes a single Wave 2 enrichment result.
 func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.Model, tea.Cmd) {
+	// Normalize to the canonical ShortName so alias-keyed messages (e.g. "rds" for
+	// the "dbi" type) match the ResourceType() returned by views in the stack.
+	if td := resource.FindResourceType(msg.ResourceType); td != nil {
+		msg.ResourceType = td.ShortName
+	}
 	// Session-wide generation guard — drop stale messages from prior profile/region.
 	if msg.Gen != m.enrichmentGen {
 		return m, nil
@@ -625,27 +651,22 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		m.enrichmentRan[msg.ResourceType] = true
 
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			cur := menu.GetIssueCounts()[msg.ResourceType]
-			curTrunc := menu.GetIssueTruncated()[msg.ResourceType]
-			if msg.Issues > cur {
-				// Higher count — update both count and truncated flag.
-				menu.SetIssues(msg.ResourceType, msg.Issues, msg.Truncated)
-			} else if msg.Issues == cur && msg.Truncated && !curTrunc {
-				// Same count but enrichment is truncated — upgrade the flag
-				// so the badge shows "issues:N+" instead of exact "issues:N".
-				menu.SetIssues(msg.ResourceType, msg.Issues, true)
+			// Wave 2 is authoritative: compute distinct-instance count across both waves.
+			td := resource.FindResourceType(msg.ResourceType)
+			var unified int
+			if td != nil {
+				unified = unifiedIssueCount(m.probeResources[msg.ResourceType], *td, msg.Findings)
+			} else {
+				unified = msg.Issues
 			}
+			menu.SetIssues(msg.ResourceType, unified, msg.Truncated)
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
 
 			// Live-update ALL ResourceListModel views in the stack showing this type.
-			// Iterating the full stack ensures stacked (non-active) lists are also
-			// updated when the user has navigated to a detail view or another screen
-			// and enrichment completes while that view is active.
-			issueCount := menu.GetIssueCounts()[msg.ResourceType]
 			issueTrunc := menu.GetIssueTruncated()[msg.ResourceType]
 			for _, v := range m.stack {
 				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
-					rl.SetEnrichmentState(issueCount, issueTrunc, true, msg.Findings)
+					rl.SetEnrichmentState(unified, issueTrunc, msg.Findings)
 				}
 			}
 		}
@@ -688,6 +709,22 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		return m, cmd
 	}
 	return m, nil
+}
+
+// unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
+// across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
+// Two findings on the same instance count as one.
+func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]resource.EnrichmentFinding) int {
+	ids := make(map[string]struct{})
+	for _, r := range wave1Resources {
+		if td.ResolveColor(r).IsIssue() {
+			ids[r.ID] = struct{}{}
+		}
+	}
+	for id := range findings {
+		ids[id] = struct{}{}
+	}
+	return len(ids)
 }
 
 func copyToClipboard(content, successLabel string) tea.Cmd {

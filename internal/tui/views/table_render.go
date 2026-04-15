@@ -271,26 +271,17 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 		if dec := lookupDecorator(m.typeDef.CellDecorators, c); dec != nil {
 			val = dec(r, val)
 		}
-		// Enrichment row marker: prepend a colored middle dot to the identity column
-		// when this resource has a finding. The dot is severity-colored (! → red,
-		// ~ → yellow) and rendered as a separate styled prefix so the base row style
-		// is not overridden.
+		// Enrichment row marker: prepend a plain-text severity prefix to the identity
+		// column when this resource has a finding. The whole cell (prefix + value) is
+		// painted by the base row style so cursor highlight is uninterrupted.
 		if i == markerColIdx {
 			if finding, ok := m.findingsByID[r.ID]; ok {
-				var dotStyle lipgloss.Style
-				if finding.Severity == "!" {
-					dotStyle = lipgloss.NewStyle().Foreground(styles.ColStopped)
-				} else {
-					dotStyle = lipgloss.NewStyle().Foreground(styles.ColPending)
+				switch finding.Severity {
+				case "!":
+					val = "! " + val
+				case "~":
+					val = "~ " + val
 				}
-				// Prepend the colored dot+space to the cell value, then fit to column width.
-				dot := dotStyle.Render("\u00b7 ")
-				// The dot occupies 2 display chars; shrink the remaining value to fit.
-				remaining := max(c.width-lipgloss.Width(dot), 0)
-				b.WriteString(dot)
-				b.WriteString(base.Render(text.PadOrTrunc(val, remaining)))
-				used += c.width
-				continue
 			}
 		}
 		padded := text.PadOrTrunc(val, c.width)

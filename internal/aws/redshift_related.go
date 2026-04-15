@@ -14,6 +14,12 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: false},
 	})
+
+	// redshifttypes.Cluster: VpcId, VpcSecurityGroups[].VpcSecurityGroupId, KmsKeyId
+	// skip: detail view YAML only renders basic metadata (ClusterIdentifier, ClusterStatus,
+	// NodeType, NumberOfNodes, DBName, MasterUsername, Endpoint, AvailabilityZone) — VPC
+	// and KMS fields are on the SDK struct but not exposed in the rendered detail view.
+	// no-op: NavigableFields registration omitted intentionally.
 }
 
 // checkRedshiftCFN returns Count: 0 because Redshift cluster tags are not

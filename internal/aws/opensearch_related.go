@@ -17,6 +17,12 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
 	})
+
+	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
+	// skip VPCOptions.{VPCId,SecurityGroupIds,SubnetIds}: VPCOptions not rendered in detail view YAML
+	resource.RegisterNavigableFields("opensearch", []resource.NavigableField{
+		{FieldPath: "EncryptionAtRestOptions.KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // checkOpenSearchCFN returns Count: 0 because OpenSearch domain tags are not

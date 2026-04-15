@@ -24,6 +24,11 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
 	})
+
+	// cfntypes.Stack: RoleARN (execution role assumed when applying the stack)
+	resource.RegisterNavigableFields("cfn", []resource.NavigableField{
+		{FieldPath: "RoleARN", TargetType: "role"},
+	})
 }
 
 // FetchCloudFormationStacks calls the CloudFormation DescribeStacks API and converts the

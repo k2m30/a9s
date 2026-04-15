@@ -16,6 +16,11 @@ func init() {
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
 	})
+
+	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
+	resource.RegisterNavigableFields("ecs-task", []resource.NavigableField{
+		{FieldPath: "ClusterArn", TargetType: "ecs"},
+	})
 }
 
 // checkECSTaskService returns the ECS service this task belongs to (Pattern F).

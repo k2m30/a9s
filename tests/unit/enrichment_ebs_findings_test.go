@@ -43,8 +43,8 @@ func (f *ebsStatusFake) DescribeVolumeStatus(
 	return &ec2.DescribeVolumeStatusOutput{}, nil
 }
 
-// EnrichEC2StatusChecks also calls DescribeInstanceStatus via EC2API; we need to stub that
-// to avoid panics when ebsStatusFake is used as EC2API. Add a no-op.
+// ebsStatusFake is typed as EC2API, so it must stub DescribeInstanceStatus
+// even though EnrichEBSVolumeStatus never calls it. No-op.
 func (f *ebsStatusFake) DescribeInstanceStatus(
 	_ context.Context,
 	_ *ec2.DescribeInstanceStatusInput,

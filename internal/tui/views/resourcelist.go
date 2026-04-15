@@ -59,12 +59,10 @@ type ResourceListModel struct {
 	// sort, width, or hScroll changes.
 	styledRowCache map[int]string
 
-	// enrichment banner state — populated by SetEnrichmentState.
-	enrichmentIssueCount     int                                    // from menu-level enrichment count (! only)
-	enrichmentTruncated      bool                                   // true if enrichment count is a lower bound
-	enrichmentRanThisSession bool                                   // true only after Wave 2 ran successfully for this type
-	findingsByID             map[string]resource.EnrichmentFinding  // this type's per-resource findings
-	visibleFindingCount      int                                    // count of filteredResources whose ID is in findingsByID
+	// enrichment state — populated by SetEnrichmentState.
+	enrichmentIssueCount int                                   // unified Wave-1 + Wave-2 distinct-instance count
+	enrichmentTruncated  bool                                  // true if enrichment count is a lower bound
+	findingsByID         map[string]resource.EnrichmentFinding // this type's per-resource findings
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -417,18 +415,9 @@ func (m *ResourceListModel) View() string {
 	// Render header row.
 	headerLine := m.renderHeaderRow(cols)
 
-	// Render enrichment banner above the table when conditions are met.
-	// Compute it before visibleRows so we can reserve a row for it.
-	banner := m.renderEnrichmentBanner()
-	bannerRows := 0
-	if banner != "" {
-		bannerRows = 1
-	}
-
-	// Determine visible row count: height minus column header row (1)
-	// minus the banner row (when shown).
+	// Determine visible row count: height minus column header row (1).
 	// Frame borders are already excluded from m.height by the root model.
-	visibleRows := max(m.height-1-bannerRows, 1)
+	visibleRows := max(m.height-1, 1)
 
 	// Reserve one row for the "load more" indicator when paginated and truncated.
 	showLoadMore := m.pagination != nil && m.pagination.IsTruncated
@@ -440,11 +429,6 @@ func (m *ResourceListModel) View() string {
 	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
 
 	var sb strings.Builder
-
-	if banner != "" {
-		sb.WriteString(banner)
-		sb.WriteString("\n")
-	}
 
 	sb.WriteString(headerLine)
 
@@ -501,25 +485,13 @@ func (m *ResourceListModel) View() string {
 }
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.
-// issueCount is the menu-badge count (!-only); truncated indicates a lower-bound count;
-// ran is true when Wave 2 completed successfully this session;
-// findings is the per-resource finding map for this type.
+// issueCount is the unified Wave-1 + Wave-2 distinct-instance count (R2/R3 source of truth).
+// truncated indicates a lower-bound count; findings is the per-resource finding map.
 // Invalidates the styled row cache because findings affect marker rendering.
-func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated, ran bool, findings map[string]resource.EnrichmentFinding) {
+func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]resource.EnrichmentFinding) {
 	m.enrichmentIssueCount = issueCount
 	m.enrichmentTruncated = truncated
-	m.enrichmentRanThisSession = ran
 	m.findingsByID = findings
-	// Recompute visibleFindingCount against the new findings map so the banner's
-	// long/short text selection reflects current state even when findings arrive
-	// after the list is already loaded (live EnrichmentCheckedMsg or cache reopen).
-	vfc := 0
-	for _, r := range m.filteredResources {
-		if _, ok := findings[r.ID]; ok {
-			vfc++
-		}
-	}
-	m.visibleFindingCount = vfc
 	m.styledRowCache = nil
 }
 
