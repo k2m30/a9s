@@ -13,6 +13,11 @@ func init() {
 	resource.RegisterRelated("ssm", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
 	})
+
+	// ssmtypes.ParameterMetadata: KeyId (present for SecureString parameters)
+	resource.RegisterNavigableFields("ssm", []resource.NavigableField{
+		{FieldPath: "KeyId", TargetType: "kms"},
+	})
 }
 
 // checkSSMKMS checks the KMS cache for the key used to encrypt this SecureString parameter.

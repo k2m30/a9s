@@ -17,6 +17,9 @@ func init() {
 		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCloudFront, NeedsTargetCache: false},
 	})
+
+	// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
+	// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
 }
 
 // checkWAFELB calls wafv2:ListResourcesForWebACL with ALB resource type and

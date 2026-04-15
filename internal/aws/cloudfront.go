@@ -29,6 +29,10 @@ func init() {
 		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true},
 		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCFR53},
 	})
+
+	// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname
+	// (e.g. bucket.s3.amazonaws.com), not a bucket name ID; all relationships handled by
+	// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
 }
 
 // FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts

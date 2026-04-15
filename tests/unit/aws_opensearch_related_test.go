@@ -28,10 +28,13 @@ func opensearchCheckerByTarget(t *testing.T, target string) resource.RelatedChec
 
 // --- Navigable Fields ---
 
-func TestNavigableFields_OpenSearch_None(t *testing.T) {
-	nav := resource.IsFieldNavigable("opensearch", "DomainName")
-	if nav != nil {
-		t.Errorf("expected no navigable fields for opensearch, but DomainName resolved to %v", nav)
+func TestNavigableFields_OpenSearch_KmsKey(t *testing.T) {
+	nav := resource.IsFieldNavigable("opensearch", "EncryptionAtRestOptions.KmsKeyId")
+	if nav == nil {
+		t.Fatal("expected EncryptionAtRestOptions.KmsKeyId to be navigable for opensearch")
+	}
+	if nav.TargetType != "kms" {
+		t.Errorf("expected TargetType=kms, got %q", nav.TargetType)
 	}
 }
 

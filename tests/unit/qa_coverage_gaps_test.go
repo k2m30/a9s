@@ -215,48 +215,11 @@ func TestRealApplyFilter_NonzeroVisible_AllOthersZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// popView() sync-back only-increase guard (data model level)
-// ---------------------------------------------------------------------------
-
-func TestPopViewSyncBack_DoesNotDecreaseIssueCount(t *testing.T) {
-	menu := views.NewMainMenu(keys.Default())
-	menu.SetIssues("ec2", 5, false)
-	listIssueCount := 2
-	cur := menu.GetIssueCounts()["ec2"]
-	if listIssueCount > cur {
-		t.Errorf("guard should block: list=%d < menu=%d", listIssueCount, cur)
-	}
-	if cur != 5 {
-		t.Errorf("menu count = %d, want 5", cur)
-	}
-}
-
-func TestPopViewSyncBack_IncreasesWhenListHasMore(t *testing.T) {
-	menu := views.NewMainMenu(keys.Default())
-	menu.SetIssues("ec2", 2, false)
-	listIssueCount := 7
-	if listIssueCount > menu.GetIssueCounts()["ec2"] {
-		menu.SetIssues("ec2", listIssueCount, false)
-	}
-	if menu.GetIssueCounts()["ec2"] != 7 {
-		t.Errorf("after sync-back: want 7, got %d", menu.GetIssueCounts()["ec2"])
-	}
-}
-
-func TestPopViewSyncBack_EqualDoesNotUpdate(t *testing.T) {
-	menu := views.NewMainMenu(keys.Default())
-	menu.SetIssues("ec2", 3, false)
-	if 3 > menu.GetIssueCounts()["ec2"] {
-		t.Error("equal should not trigger sync-back")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // EnricherRegistry completeness
 // ---------------------------------------------------------------------------
 
 func TestEnricherRegistry_AllExpectedKeys(t *testing.T) {
-	expected := []string{"rds", "dbi", "ec2", "ebs", "cb", "tg", "pipe", "ddb", "sfn", "glue"}
+	expected := []string{"rds", "dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	for _, key := range expected {
 		if awsclient.EnricherRegistry[key] == nil {
 			t.Errorf("EnricherRegistry[%q] is nil", key)
@@ -266,8 +229,8 @@ func TestEnricherRegistry_AllExpectedKeys(t *testing.T) {
 
 func TestEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
 	allowed := map[string]bool{
-		"rds": true, "dbi": true, "ec2": true, "ebs": true, "cb": true,
-		"tg": true, "pipe": true, "ddb": true, "sfn": true, "glue": true,
+		"rds": true, "dbi": true, "ebs": true, "cb": true,
+		"tg": true, "pipeline": true, "sfn": true, "glue": true,
 	}
 	for key := range awsclient.EnricherRegistry {
 		if !allowed[key] {

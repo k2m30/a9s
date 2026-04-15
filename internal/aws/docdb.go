@@ -27,6 +27,15 @@ func init() {
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
 	})
+
+	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
+	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
+	resource.RegisterNavigableFields("dbc", []resource.NavigableField{
+		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
+		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
+		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // FetchDocDBClusters calls the DescribeDBClusters API and converts

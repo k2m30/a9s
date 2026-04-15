@@ -36,9 +36,13 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway verifies FR-014 edge case:
-// when the user presses Ctrl+R on EC2 list and then navigates back to the main menu
-// BEFORE the fetch result arrives, the incoming ResourcesLoadedMsg{TypeGen=1} must
-// still dispatch probeEnrichment.
+// when the user presses Ctrl+R on the EBS Volumes list and then navigates back to
+// the main menu BEFORE the fetch result arrives, the incoming
+// ResourcesLoadedMsg{TypeGen=1} must still dispatch probeEnrichment.
+//
+// Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
+// list. EC2 was dropped from the enricher registry and no longer generates probes,
+// so the tail branch would never fire on ec2.
 //
 // Pre-fix: The tail branch is inside the active-ResourceListModel check, so when
 // the active view is MainMenuModel (after navigating away), the branch is never
@@ -53,23 +57,23 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	t.Cleanup(func() { tui.Version = oldVersion })
 	m := newRootSizedModel()
 
-	// Step 1: Navigate to EC2 list.
-	m = navigateToEC2List(m)
+	// Step 1: Navigate to EBS Volumes list.
+	m = navigateToEBSList(m)
 
-	// Step 2: Press Ctrl+R — bumps enrichmentTypeGen["ec2"] from 0 to 1.
+	// Step 2: Press Ctrl+R — bumps enrichmentTypeGen["ebs"] from 0 to 1.
 	// We capture the wrapped fetch cmd but do NOT execute it yet.
 	m, wrappedFetchCmd := rootApplyMsg(m, ctrlRKeyMsg())
 	if wrappedFetchCmd == nil {
-		t.Fatal("Ctrl+R on top-level EC2 list must return a non-nil cmd (wrapped fetch)")
+		t.Fatal("Ctrl+R on top-level EBS list must return a non-nil cmd (wrapped fetch)")
 	}
 
 	// Step 3: Navigate back to the main menu BEFORE the fetch returns.
-	// This simulates the user pressing Esc (or any key that pops the EC2 list).
+	// This simulates the user pressing Esc (or any key that pops the EBS list).
 	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
 
 	// Confirm we're back at the main menu (sanity check).
 	plain := stripANSI(rootViewContent(m))
-	if !containsAny(plain, "resource-types", "EC2") {
+	if !containsAny(plain, "resource-types", "EBS", "Volumes") {
 		t.Logf("after PopViewMsg, view: %s", plain[:min(200, len(plain))])
 		// Not fatal — continue with the test regardless.
 	}
@@ -79,9 +83,9 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	// cmd (which would fail due to nil clients). We use TypeGen=1 matching the gen
 	// that was bumped at Ctrl+R time.
 	loadedMsg := messages.ResourcesLoadedMsg{
-		ResourceType: "ec2",
-		Resources:    rerunEC2Resources(),
-		TypeGen:      1, // matches enrichmentTypeGen["ec2"]=1 set during Ctrl+R
+		ResourceType: "ebs",
+		Resources:    rerunEBSResources(),
+		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 set during Ctrl+R
 	}
 
 	// Step 5: Deliver the ResourcesLoadedMsg to the model.
@@ -99,7 +103,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	// unconditionally when msg.TypeGen != 0 && msg.TypeGen == enrichmentTypeGen[T].
 	if probeCmd == nil {
 		t.Error("ResourcesLoadedMsg{TypeGen=1} must dispatch probeEnrichment even when " +
-			"the user navigated away from the EC2 list before the fetch returned. " +
+			"the user navigated away from the EBS list before the fetch returned. " +
 			"Pre-fix: probeCmd is nil because the tail branch is nested inside the " +
 			"active-ResourceListModel check which fails when active view is MainMenuModel.")
 	}

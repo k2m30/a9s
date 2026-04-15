@@ -26,6 +26,11 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: checkDdbLambda},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
 	})
+
+	// ddbtypes.TableDescription: SSEDescription.KMSMasterKeyArn
+	resource.RegisterNavigableFields("ddb", []resource.NavigableField{
+		{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
+	})
 }
 
 // FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and

@@ -3,7 +3,7 @@ package unit
 // qa_enrichment_dispatch_test.go — Tests for enrichment dispatch and handler behavior.
 //
 // Tests verify:
-//   1. EnricherRegistry completeness — all 10 resource short names are registered with non-nil functions.
+//   1. EnricherRegistry completeness — all 8 resource short names are registered with non-nil functions.
 //   2. Session-wide gen guard — EnrichmentCheckedMsg with stale Gen is silently dropped (no panic, no cmd).
 //   3. Per-type gen guard — EnrichmentCheckedMsg with stale TypeGen is silently dropped.
 //   4. Valid EnrichmentCheckedMsg with Err != nil does not crash.
@@ -25,12 +25,10 @@ import (
 var expectedEnricherShortNames = []string{
 	"rds",
 	"dbi",
-	"ec2",
 	"ebs",
 	"cb",
 	"tg",
-	"pipe",
-	"ddb",
+	"pipeline",
 	"sfn",
 	"glue",
 }

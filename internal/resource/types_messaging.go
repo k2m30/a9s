@@ -125,7 +125,6 @@ func messagingResourceTypes() []ResourceTypeDef {
 			},
 			// StateMachineListItem has no status field; DescribeStateMachine would be needed for real color.
 			Color: func(r Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "sfn_executions",
 				Key:            "enter",

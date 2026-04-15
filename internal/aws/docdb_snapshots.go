@@ -25,6 +25,12 @@ func init() {
 		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
 	})
+
+	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId
+	resource.RegisterNavigableFields("docdb-snap", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+	})
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the

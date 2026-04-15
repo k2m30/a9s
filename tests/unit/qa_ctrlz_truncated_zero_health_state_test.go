@@ -92,21 +92,24 @@ func TestCtrlZ_TruncatedZero_S3_Hidden(t *testing.T) {
 	}
 }
 
-// TestResourceTypeDef_AlwaysHealthy_Registered — every type with a trivial
-// `return ColorHealthy` Color func must have AlwaysHealthy set. Guard against
-// forgetting to flag new always-healthy types.
+// TestResourceTypeDef_AlwaysHealthy_Registered — every type whose Color func
+// never returns an issue color (Warning/Broken) must have AlwaysHealthy set.
+// ColorDim is not an issue color; a type returning only Healthy+Dim qualifies.
+// Guard against forgetting to flag new always-healthy types.
 func TestResourceTypeDef_AlwaysHealthy_Registered(t *testing.T) {
-	// Types that are structurally always healthy (Color func always returns
-	// ColorHealthy regardless of input). This list is derived by reading the
-	// Color function bodies in internal/resource/types_*.go.
+	// AlwaysHealthy means the Color func never returns Warning or Broken.
+	// ColorDim (e.g. "scheduled for deletion") is not an issue — types that
+	// return only ColorHealthy and/or ColorDim also qualify. This list is
+	// derived by reading the Color function bodies in internal/resource/types_*.go.
 	expected := map[string]bool{
-		"backup": true, "ses": true, "pipeline": true, "cb": true, "ecr": true,
-		"codeartifact": true, "ng": true, "glue": true, "athena": true, "s3": true,
+		"backup": true, "ses": true, "ecr": true,
+		"codeartifact": true, "ng": true, "athena": true, "s3": true,
 		"opensearch": true, "redshift": true, "rds-snap": true, "r53": true,
 		"apigw": true, "sqs": true, "sns": true, "sns-sub": true, "kinesis": true,
-		"msk": true, "sfn": true, "logs": true, "trail": true, "tg": true, "sg": true,
+		"msk": true, "logs": true, "trail": true, "sg": true,
 		"rtb": true, "igw": true, "eip": true, "vpce": true, "tgw": true, "ssm": true,
 		"role": true, "policy": true, "iam-user": true, "iam-group": true, "waf": true,
+		"secrets": true,
 	}
 	for _, td := range resource.AllResourceTypes() {
 		if expected[td.ShortName] && !td.AlwaysHealthy {
