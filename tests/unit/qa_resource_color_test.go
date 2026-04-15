@@ -136,14 +136,17 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			want:   resource.ColorHealthy,
 		},
 		{
-			name:   "state=stopped → ColorBroken",
+			// Per docs/attention-signals.md ec2 row: stopped (no Server.* reason)
+			// is intentional → Warning. Capacity-forced stop is Broken (covered
+			// in qa_ec2_color_test.go).
+			name:   "state=stopped → ColorWarning",
 			fields: map[string]string{"state": "stopped"},
-			want:   resource.ColorBroken,
+			want:   resource.ColorWarning,
 		},
 		{
-			name:   "state=stopping → ColorBroken",
+			name:   "state=stopping → ColorWarning",
 			fields: map[string]string{"state": "stopping"},
-			want:   resource.ColorBroken,
+			want:   resource.ColorWarning,
 		},
 		{
 			name:   "state=pending → ColorWarning",
@@ -156,9 +159,10 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			want:   resource.ColorDim,
 		},
 		{
-			name:   "state=shutting-down → ColorDim",
+			// shutting-down is transitional — Warning per doc, not Dim.
+			name:   "state=shutting-down → ColorWarning",
 			fields: map[string]string{"state": "shutting-down"},
-			want:   resource.ColorDim,
+			want:   resource.ColorWarning,
 		},
 	}
 

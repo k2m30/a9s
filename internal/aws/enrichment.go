@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -26,6 +28,7 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -42,6 +45,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"rds":      EnrichRDSDocDBMaintenance,
 	"dbi":      EnrichRDSDocDBMaintenance,
 	"dbc":      EnrichRDSDocDBMaintenance,
+	"ec2":      EnrichEC2InstanceStatus,
+	"asg":      EnrichASGScalingActivities,
 	"ebs":      EnrichEBSVolumeStatus,
 	"cb":       EnrichCodeBuildStatus,
 	"tg":       EnrichTargetGroupHealth,
@@ -643,6 +648,164 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource
 		}
 	}
 	return EnricherResult{IssueCount: issueCount, Truncated: false, Findings: findings}, nil
+}
+
+// EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) once (account-wide)
+// and returns a Finding for every instance whose system or instance status is not "ok".
+// Scheduled events with NotBeforeDeadline within the next 7 days also produce a Finding.
+// Severity "!" for status != ok; "~" for scheduled events. IssueCount counts "!" findings only.
+func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.EC2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	out, err := clients.EC2.DescribeInstanceStatus(ctx, &ec2svc.DescribeInstanceStatusInput{
+		IncludeAllInstances: aws.Bool(true),
+	})
+	if err != nil {
+		return EnricherResult{}, err
+	}
+
+	now := time.Now()
+	cutoff := now.Add(7 * 24 * time.Hour)
+
+	for _, is := range out.InstanceStatuses {
+		if is.InstanceId == nil {
+			continue
+		}
+		id := *is.InstanceId
+
+		// Collect rows for this instance.
+		var rows []resource.FindingRow
+		severity := "~" // start informational; upgrade to "!" on real impairment
+
+		// Check instance status.
+		if is.InstanceStatus != nil && is.InstanceStatus.Status != ec2types.SummaryStatusOk {
+			statusStr := string(is.InstanceStatus.Status)
+			rows = append(rows, resource.FindingRow{Label: "Instance Status", Value: statusStr, Tier: "!"})
+			severity = "!"
+		}
+
+		// Check system status.
+		if is.SystemStatus != nil && is.SystemStatus.Status != ec2types.SummaryStatusOk {
+			statusStr := string(is.SystemStatus.Status)
+			rows = append(rows, resource.FindingRow{Label: "System Status", Value: statusStr, Tier: "!"})
+			severity = "!"
+		}
+
+		// Check scheduled events within 7 days.
+		// NotBeforeDeadline is the hard deadline (forced retirement/reboot).
+		// NotBefore is the earliest scheduled start — also within 7d is actionable.
+		for _, ev := range is.Events {
+			var eventDate *time.Time
+			if ev.NotBeforeDeadline != nil && ev.NotBeforeDeadline.Before(cutoff) {
+				eventDate = ev.NotBeforeDeadline
+			} else if ev.NotBefore != nil && ev.NotBefore.Before(cutoff) {
+				eventDate = ev.NotBefore
+			}
+			if eventDate == nil {
+				continue
+			}
+			code := string(ev.Code)
+			dateStr := eventDate.Format("2006-01-02")
+			rows = append(rows, resource.FindingRow{
+				Label: "Scheduled Event",
+				Value: fmt.Sprintf("%s at %s", code, dateStr),
+				Tier:  "~",
+			})
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+
+		// Build summary: prefer the first "!" row's value, fall back to "~".
+		summary := ""
+		for _, row := range rows {
+			if row.Tier == "!" {
+				summary = fmt.Sprintf("%s: %s", strings.ToLower(row.Label), row.Value)
+				break
+			}
+		}
+		if summary == "" && len(rows) > 0 {
+			summary = fmt.Sprintf("scheduled event: %s", rows[0].Value)
+		}
+
+		findings[id] = resource.EnrichmentFinding{
+			Severity: severity,
+			Summary:  summary,
+			Rows:     rows,
+		}
+	}
+
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: out.NextToken != nil, Findings: findings}, nil
+}
+
+// EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
+// (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
+// Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".
+func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.AutoScaling == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		if r.ID == "" {
+			continue
+		}
+		name := r.ID
+		out, err := clients.AutoScaling.DescribeScalingActivities(ctx, &autoscaling.DescribeScalingActivitiesInput{
+			AutoScalingGroupName: &name,
+			MaxRecords:           aws.Int32(1),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if len(out.Activities) == 0 {
+			continue
+		}
+		act := out.Activities[0]
+		if act.StatusCode != asgtypes.ScalingActivityStatusCodeFailed {
+			continue
+		}
+		statusMsg := ""
+		if act.StatusMessage != nil {
+			statusMsg = *act.StatusMessage
+		}
+		summary := "latest scaling activity failed"
+		if statusMsg != "" {
+			summary = fmt.Sprintf("latest scaling activity failed: %s", statusMsg)
+		}
+		rows := []resource.FindingRow{
+			{Label: "Status", Value: string(act.StatusCode), Tier: "!"},
+		}
+		if statusMsg != "" {
+			rows = append(rows, resource.FindingRow{Label: "Message", Value: statusMsg, Tier: "!"})
+		}
+		if act.Cause != nil && *act.Cause != "" {
+			rows = append(rows, resource.FindingRow{Label: "Cause", Value: *act.Cause})
+		}
+		if act.StartTime != nil {
+			rows = append(rows, resource.FindingRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "!",
+			Summary:  summary,
+			Rows:     rows,
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
