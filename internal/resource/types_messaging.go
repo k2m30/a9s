@@ -52,12 +52,16 @@ func messagingResourceTypes() []ResourceTypeDef {
 			// SNS ListSubscriptions returns SubscriptionArn="PendingConfirmation"
 			// for subscriptions that haven't been confirmed. Those endpoints
 			// receive nothing until the owner clicks the confirm link — worth
-			// surfacing.
+			// surfacing. "Deleted" subscriptions are dimmed.
 			Color: func(r Resource) Color {
-				if r.Fields["subscription_arn"] == "PendingConfirmation" {
+				switch r.Fields["subscription_arn"] {
+				case "PendingConfirmation":
 					return ColorWarning
+				case "Deleted":
+					return ColorDim
+				default:
+					return ColorHealthy
 				}
-				return ColorHealthy
 			},
 		},
 		{

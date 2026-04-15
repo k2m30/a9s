@@ -1,6 +1,9 @@
 package resource
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
 // has end-of-lifed per docs/attention-signals.md.
@@ -365,15 +368,41 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				// Base color from snapshot state.
+				var base Color
 				switch r.Fields["state"] {
 				case "completed":
-					return ColorHealthy
+					base = ColorHealthy
 				case "pending":
-					return ColorWarning
-				case "error":
-					return ColorBroken
+					base = ColorWarning
+				case "error", "recoverable", "recovering":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
 				}
-				return ColorHealthy
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return base
+				}
+				// CIS EC2.1 — unencrypted snapshot.
+				if r.Fields["encrypted"] == "false" {
+					return ColorWarning
+				}
+				// Long-lived automated snapshot (> 365 days).
+				if started, err := time.Parse(time.RFC3339, r.Fields["started"]); err == nil {
+					if time.Since(started) > 365*24*time.Hour {
+						desc := r.Fields["description"]
+						if strings.HasPrefix(desc, "Created by CreateImage") ||
+							strings.Contains(strings.ToLower(desc), "automated") {
+							return ColorWarning
+						}
+					}
+				}
+				// Orphaned snapshot — source volume is gone.
+				if strings.HasPrefix(r.Fields["volume_id"], "vol-") && r.Fields["volume_orphan"] == "true" {
+					return ColorWarning
+				}
+				return base
 			},
 		},
 		{

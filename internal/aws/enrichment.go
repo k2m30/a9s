@@ -45,8 +45,10 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"glue":     EnrichGlueJobStatus,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
-	"ami":    NoOpEnricher,
-	"lambda": NoOpEnricher,
+	"ami":     NoOpEnricher,
+	"ebs-snap": NoOpEnricher,
+	"lambda":  NoOpEnricher,
+	"sns-sub": NoOpEnricher,
 }
 
 // NoOpEnricher is registered for resource types whose Wave 2 column in
