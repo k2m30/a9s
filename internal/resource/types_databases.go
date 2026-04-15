@@ -166,27 +166,49 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// OpenSearch DomainStatus: ClusterHealth (Red/Yellow/Green) is the
-				// primary health signal; Processing/UpgradeProcessing flag transitions.
+				// OpenSearch DomainStatus per docs/attention-signals.md.
+				// Precedence: terminal/admin (Dim) overridden by Broken;
+				// Broken overrides Warning. ClusterHealth Red/Yellow comes
+				// from CloudWatch (populated by fetcher when available).
+				if r.Fields["deleted"] == "true" {
+					return ColorDim
+				}
+				color := ColorHealthy
 				switch r.Fields["cluster_health"] {
 				case "Red":
-					return ColorBroken
+					color = ColorBroken
 				case "Yellow":
-					return ColorWarning
+					if color < ColorWarning {
+						color = ColorWarning
+					}
 				}
-				if r.Fields["deleted"] == "true" {
-					return ColorBroken
+				if r.Fields["domain_processing_status"] == "Isolated" {
+					color = ColorBroken
 				}
 				if r.Fields["processing"] == "true" || r.Fields["upgrade_processing"] == "true" {
-					return ColorWarning
+					if color < ColorWarning {
+						color = ColorWarning
+					}
 				}
 				switch r.Fields["status"] {
 				case "failed", "FAILED", "error", "ERROR":
-					return ColorBroken
+					color = ColorBroken
 				case "creating", "CREATING", "updating", "UPDATING", "deleting", "DELETING":
-					return ColorWarning
+					if color < ColorWarning {
+						color = ColorWarning
+					}
 				}
-				return ColorHealthy
+				if r.Fields["service_software_update_available"] == "true" {
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				if r.Fields["encryption_at_rest_enabled"] == "false" {
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				return color
 			},
 		},
 		{
