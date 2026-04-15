@@ -28,6 +28,12 @@ import (
 
 // EnricherRegistry maps resource short names to their Wave 2 enricher functions.
 // Ordered by priority: batchable (cheap) first, per-resource (expensive) last.
+//
+// Every registered resource type per docs/attention-signals.md either:
+//   - has a real Wave 2 enricher registered here (Wave 2 column non-empty), or
+//   - is registered with NoOpEnricher (Wave 2 column is "None" in the doc).
+//
+// Doc-grounded test TestAttentionSignalsDoc enforces this contract.
 var EnricherRegistry = map[string]EnricherFunc{
 	"rds":      EnrichRDSDocDBMaintenance,
 	"dbi":      EnrichRDSDocDBMaintenance,
@@ -37,6 +43,18 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"pipeline": EnrichCodePipelineStatus,
 	"sfn":      EnrichStepFunctionsStatus,
 	"glue":     EnrichGlueJobStatus,
+}
+
+// NoOpEnricher is registered for resource types whose Wave 2 column in
+// docs/attention-signals.md is "None". It makes the "no Wave 2 signal"
+// classification explicit in the registry rather than implicit-by-absence.
+// Returns zero findings, zero issues, not truncated — never fails.
+func NoOpEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+	return EnricherResult{
+		Findings:   map[string]resource.EnrichmentFinding{},
+		IssueCount: 0,
+		Truncated:  false,
+	}, nil
 }
 
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.

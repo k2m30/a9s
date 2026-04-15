@@ -35,8 +35,18 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 				{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			// Athena WorkGroup State per ListWorkGroups: ENABLED | DISABLED.
+			// DISABLED workgroups can't run queries — admin has turned them off.
+			// We surface that as a warning so a curious operator notices.
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ENABLED":
+					return ColorHealthy
+				case "DISABLED":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 	}
 }

@@ -1,5 +1,7 @@
 package resource
 
+import "strings"
+
 func messagingResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -16,7 +18,6 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 		{
 			Name:          "SNS Topics",
@@ -29,7 +30,6 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "sns_subscriptions",
 				Key:            "enter",
@@ -49,8 +49,16 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 				{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			// SNS ListSubscriptions returns SubscriptionArn="PendingConfirmation"
+			// for subscriptions that haven't been confirmed. Those endpoints
+			// receive nothing until the owner clicks the confirm link — worth
+			// surfacing.
+			Color: func(r Resource) Color {
+				if r.Fields["subscription_arn"] == "PendingConfirmation" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "EventBridge Rules",
@@ -66,11 +74,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["state"] {
+				switch strings.ToUpper(r.Fields["state"]) {
 				case "ENABLED":
 					return ColorHealthy
 				case "DISABLED":
-					return ColorDim
+					return ColorBroken
 				}
 				return ColorHealthy
 			},
@@ -93,8 +101,21 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "stream_mode", Title: "Mode", Width: 14, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				switch r.Fields["stream_status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				}
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "MSK Clusters",
@@ -108,8 +129,17 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 14, Sortable: true},
 				{Key: "version", Title: "Version", Width: 14, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "MAINTENANCE", "REBOOTING_BROKER", "HEALING":
+					return ColorWarning
+				case "FAILED":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Step Functions",

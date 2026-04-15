@@ -544,35 +544,33 @@ func (m MainMenuModel) issueBadge(shortName string) string {
 // isVisibleUnderIssueFilter determines whether a resource type should be
 // visible when the ctrl+z issue filter is active.
 //
-// Quad-state visibility (evaluated in order):
+// Tri-state visibility (evaluated in order):
 //  1. ExcludeFromIssueBadge types (e.g. ct-events) — never probed; hide always.
-//  2. AlwaysHealthy types (e.g. S3, SG, IAM) — Color func is a constant; hide always.
-//  3. Unknown (not yet probed) — show to prevent cold-start empty menu.
-//  4. Has issues → show; confirmed-zero with no truncation → hide;
-//     truncated non-AlwaysHealthy → show (lower bound, unread pages may carry issues).
+//  2. Unknown (not yet probed) — show ONLY while no type has been probed yet
+//     (true cold-start). Once any probe has reported, unknown → hide so the
+//     user sees a focused issues-only view instead of the whole unknown menu.
+//  3. Has issues → show; zero + not truncated → hide (CONFIRMED zero);
+//     zero + truncated → show (LOWER BOUND — unread pages may hold issues).
+//
+// Per docs/attention-signals.md, every registered resource type has at least
+// a Wave 1 or Wave 2 signal; there is no "always healthy" class.
 func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
 	td := resource.FindResourceType(shortName)
 	if td != nil && td.ExcludeFromIssueBadge {
 		return false
 	}
-	if td != nil && td.AlwaysHealthy {
-		return false
-	}
 	if !m.issueKnown[shortName] {
-		return true // unknown → visible (prevent cold-start empty menu)
+		// Cold-start: no probe has reported anywhere → keep everything visible
+		// so the user isn't greeted with an empty menu. Once any probe lands,
+		// the filter tightens to "known-issue only".
+		return len(m.issueKnown) == 0
 	}
 	if m.issueCounts[shortName] > 0 {
-		return true // has issues → visible
+		return true
 	}
-	// Zero issues — truncation changes semantics:
-	//   • Health-state types (EC2, ENI, RDS, etc.): zero is a LOWER BOUND;
-	//     unread pages may carry issues. Show so the user can drill in.
-	if m.issueTruncated[shortName] {
-		if td == nil || !td.AlwaysHealthy {
-			return true
-		}
-	}
-	return false
+	// Zero issues — truncated count is a LOWER BOUND; unread pages may carry
+	// issues, so keep the type visible so the user can drill in.
+	return m.issueTruncated[shortName]
 }
 
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.

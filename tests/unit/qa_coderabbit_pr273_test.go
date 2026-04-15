@@ -357,17 +357,18 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 // Item 1: EKS Node Groups (ng) — AlwaysHealthy=true suppresses lifecycle states
 // =============================================================================
 
-// TestCR273_Item1_NGAlwaysHealthy_ShouldBeFalse asserts that EKS Node Groups
-// have AlwaysHealthy=false. Node groups have stateful lifecycle: CREATING,
-// UPDATING, DELETING, CREATE_FAILED, DEGRADED — all are observable issues.
-// Currently FAILS: AlwaysHealthy=true in types_containers.go line 44.
-func TestCR273_Item1_NGAlwaysHealthy_ShouldBeFalse(t *testing.T) {
+// TestCR273_Item1_NGHasColor asserts that EKS Node Groups have a non-nil Color
+// func. Node groups have stateful lifecycle (CREATING/UPDATING/DELETING/
+// CREATE_FAILED/DEGRADED); classification must happen.
+// (Pre-AH-purge this asserted AlwaysHealthy==false; the field has since been
+// removed, so we assert the Color func itself exists.)
+func TestCR273_Item1_NGHasColor(t *testing.T) {
 	td := resource.FindResourceType("ng")
 	if td == nil {
 		t.Fatal("resource type 'ng' not registered")
 	}
-	if td.AlwaysHealthy {
-		t.Errorf("ng.AlwaysHealthy = true, want false: node groups have stateful lifecycle (CREATING/UPDATING/DELETING/CREATE_FAILED/DEGRADED) — AlwaysHealthy must only be set for config-only types with no runtime state")
+	if td.Color == nil {
+		t.Error("ng.Color is nil: node groups have stateful lifecycle and must classify via Color")
 	}
 }
 
@@ -490,31 +491,29 @@ func TestCR273_Item1_NG_ACTIVE_ReturnsHealthy(t *testing.T) {
 // Item 4: VPCE and TGW — AlwaysHealthy=true wrong for stateful lifecycle types
 // =============================================================================
 
-// TestCR273_Item4_VPCEAlwaysHealthy_ShouldBeFalse asserts that VPC Endpoints
-// have AlwaysHealthy=false. VPCEs have a stateful lifecycle with "pending",
-// "failed", and "deleting" states that represent observable issues.
-// Currently FAILS: AlwaysHealthy=true in types_networking.go line 212.
-func TestCR273_Item4_VPCEAlwaysHealthy_ShouldBeFalse(t *testing.T) {
+// TestCR273_Item4_VPCEHasColor asserts VPC Endpoints classify via Color.
+// VPCEs have a stateful lifecycle (pending/failed/deleting) that must not
+// be suppressed. (Pre-AH-purge this asserted AlwaysHealthy==false.)
+func TestCR273_Item4_VPCEHasColor(t *testing.T) {
 	td := resource.FindResourceType("vpce")
 	if td == nil {
 		t.Fatal("resource type 'vpce' not registered")
 	}
-	if td.AlwaysHealthy {
-		t.Errorf("vpce.AlwaysHealthy = true, want false: VPC endpoints have stateful lifecycle (pending/failed/deleting) — AlwaysHealthy must only be set for config-only types with no runtime state")
+	if td.Color == nil {
+		t.Error("vpce.Color is nil: VPC endpoints have stateful lifecycle and must classify via Color")
 	}
 }
 
-// TestCR273_Item4_TGWAlwaysHealthy_ShouldBeFalse asserts that Transit Gateways
-// have AlwaysHealthy=false. TGWs have a stateful lifecycle with "pending",
-// "modifying", "deleting", and "deleted" states.
-// Currently FAILS: AlwaysHealthy=true in types_networking.go line 228.
-func TestCR273_Item4_TGWAlwaysHealthy_ShouldBeFalse(t *testing.T) {
+// TestCR273_Item4_TGWHasColor asserts Transit Gateways classify via Color.
+// TGWs have a stateful lifecycle (pending/modifying/deleting/deleted).
+// (Pre-AH-purge this asserted AlwaysHealthy==false.)
+func TestCR273_Item4_TGWHasColor(t *testing.T) {
 	td := resource.FindResourceType("tgw")
 	if td == nil {
 		t.Fatal("resource type 'tgw' not registered")
 	}
-	if td.AlwaysHealthy {
-		t.Errorf("tgw.AlwaysHealthy = true, want false: Transit Gateways have stateful lifecycle (pending/modifying/deleting/deleted) — AlwaysHealthy must only be set for config-only types with no runtime state")
+	if td.Color == nil {
+		t.Error("tgw.Color is nil: Transit Gateways have stateful lifecycle and must classify via Color")
 	}
 }
 
@@ -967,32 +966,27 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *test
 // behavior change. Skipped per task specification.
 
 // =============================================================================
-// Item 18: Trivial Color + AlwaysHealthy=false causes ghost entries in ctrl+z filter
+// Item 18: Trivial Color causes ghost entries in ctrl+z filter
 // =============================================================================
 //
-// The ctrl+z attention-only filter in the main menu uses isVisibleUnderIssueFilter,
-// which shows a type when its truncated-zero count is a "lower bound" (may have
-// issues on unseen pages). AlwaysHealthy=false is the signal that issues are
-// possible. When a type has a trivial Color func (returns ColorHealthy for every
-// input) but AlwaysHealthy=false, the filter treats the type as "may have issues"
-// and shows a bare entry like "Target Groups (4)" with no badge — the type appears
-// in the attention list despite being structurally incapable of raising issues.
+// The ctrl+z attention-only filter in the main menu shows a type when its
+// truncated-zero count is a "lower bound" (may have issues on unseen pages).
+// Per docs/attention-signals.md every registered type has at least a Wave 1
+// or Wave 2 signal, so the AlwaysHealthy escape hatch has been removed.
 //
-// Fix: every type whose Color func is observably trivial (returns only ColorHealthy
-// across the full realistic probe set) MUST have AlwaysHealthy=true, OR the Color
-// func must be replaced with one that actually classifies issues.
-//
-// Currently FAILS: tg, glue, sfn, pipeline, cb have trivial Color and AlwaysHealthy=false.
+// A type whose Color func returns ColorHealthy for every realistic probe is
+// a bug: the type can never flag an issue from Wave 1, so its Wave 1 cell in
+// the doc must be genuinely empty — and if it IS empty in the doc, the type
+// still needs a Wave 2 enricher registered (no-op or real) to make the
+// classification contract explicit. This test flags Color funcs that are
+// silently trivial across the realistic probe set.
 
-// TestCR273_Item18_TrivialColor_RequiresAlwaysHealthy iterates all registered
+// TestCR273_Item18_TrivialColor_MustClassify iterates all registered
 // ResourceTypeDefs and reports every type whose Color func returns only
-// ColorHealthy across the full realistic probe set AND whose AlwaysHealthy is
-// false. That combination causes phantom entries in the ctrl+z attention filter.
-//
-// The test FAILS until every listed type either:
-//   (a) gains AlwaysHealthy=true (correct when the type genuinely has no runtime state), or
-//   (b) gains a real Color func that classifies at least one probe as non-healthy.
-func TestCR273_Item18_TrivialColor_RequiresAlwaysHealthy(t *testing.T) {
+// ColorHealthy across the full realistic probe set. Those types must gain
+// a real classifier (or the doc must declare Wave 1 empty for them —
+// checked separately by TestAttentionSignalsDoc).
+func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 	// probeStatuses covers the realistic AWS status vocabulary that Color funcs
 	// must handle. Includes both lowercase and uppercase variants because different
 	// AWS services use different conventions. We also include AWS-specific compound
@@ -1067,10 +1061,6 @@ func TestCR273_Item18_TrivialColor_RequiresAlwaysHealthy(t *testing.T) {
 			// nil Color uses fallbackColor — not trivial; skip.
 			continue
 		}
-		if td.AlwaysHealthy {
-			// Correctly declared as always-healthy; no conflict.
-			continue
-		}
 
 		// Probe Color across all status strings. Build a resource that
 		// populates every field key a Color func might plausibly read.
@@ -1101,11 +1091,11 @@ func TestCR273_Item18_TrivialColor_RequiresAlwaysHealthy(t *testing.T) {
 	if len(buggy) > 0 {
 		t.Errorf(
 			"the following resource types have a trivial Color func (returns only ColorHealthy "+
-				"across all realistic status probes) but AlwaysHealthy=false — they will appear "+
-				"as phantom entries in the ctrl+z attention filter with no badge:\n  %v\n\n"+
-				"Fix each type by setting AlwaysHealthy=true (if it genuinely has no runtime state) "+
-				"or replacing Color with a real classifier that emits ColorWarning/ColorBroken/ColorDim "+
-				"for at least one of the probed statuses.",
+				"across all realistic status probes) — they will appear as phantom entries "+
+				"in the ctrl+z attention filter with no badge:\n  %v\n\n"+
+				"Fix each type by replacing Color with a real classifier that emits "+
+				"ColorWarning/ColorBroken/ColorDim for at least one of the probed statuses, "+
+				"matching the Wave 1 column of docs/attention-signals.md for this type.",
 			buggy,
 		)
 	}

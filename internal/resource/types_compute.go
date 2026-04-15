@@ -81,6 +81,12 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "launch_type", Title: "Launch Type", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "INACTIVE":
+					return ColorBroken
+				case "DRAINING":
+					return ColorWarning
+				}
 				running := r.Fields["running_count"]
 				desired := r.Fields["desired_count"]
 				if desired == "0" || desired == "" {

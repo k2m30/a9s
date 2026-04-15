@@ -160,35 +160,23 @@ func TestRealApplyFilter_ConfirmedZeroHiddenWhenCtrlZActive(t *testing.T) {
 	}
 }
 
-func TestRealApplyFilter_TruncatedZeroHealthStateVisible(t *testing.T) {
+func TestRealApplyFilter_TruncatedZeroVisible(t *testing.T) {
 	setupNoColor(t)
 	m := views.NewMainMenu(keys.Default())
 	m.SetSize(80, 200)
 	m.Toggle()
-	// EC2 is a health-state type (AlwaysHealthy=false). Truncated-zero means
-	// issues may exist on unread pages → visible under ctrl+z.
+	// Truncated-zero is a LOWER BOUND — issues may exist on unread pages. Per
+	// docs/attention-signals.md every registered type has at least a Wave 1 or
+	// Wave 2 signal, so "hide if truncated-zero" is wrong for every type.
 	m.SetIssues("ec2", 0, true)
+	m.SetIssues("s3", 0, true)
 
 	plain := m.View()
 	if !strings.Contains(plain, "EC2 Instances") {
-		t.Error("truncated-zero EC2 (health-state type) must be visible under ctrl+z — count is a lower bound")
+		t.Error("truncated-zero EC2 must be visible under ctrl+z — count is a lower bound")
 	}
-}
-
-func TestRealApplyFilter_TruncatedZeroAlwaysHealthyHidden(t *testing.T) {
-	setupNoColor(t)
-	m := views.NewMainMenu(keys.Default())
-	m.SetSize(80, 200)
-	// Seed EC2 so the menu is non-empty under ctrl+z.
-	m.SetIssues("ec2", 1, false)
-	m.Toggle()
-	// S3 is AlwaysHealthy. Truncated-zero is CONFIRMED zero → hidden.
-	m.SetIssues("s3", 0, true)
-	m.SetIssues("ec2", 1, false) // re-trigger applyFilter
-
-	plain := m.View()
-	if strings.Contains(plain, "S3 Buckets") {
-		t.Error("truncated-zero S3 (always-healthy) must be hidden — count is confirmed zero")
+	if !strings.Contains(plain, "S3 Buckets") {
+		t.Error("truncated-zero S3 must be visible under ctrl+z — unread pages may carry Wave 2 findings")
 	}
 }
 
