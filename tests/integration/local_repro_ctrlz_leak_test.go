@@ -19,17 +19,10 @@ func TestCtrlZ_HidesExcludeFromIssueBadgeTypes(t *testing.T) {
 	scenario.ExpectViewNotContains("CloudTrail Events")
 }
 
-// TestCtrlZ_HidesAlwaysHealthyTypes verifies that AlwaysHealthy resource types are
-// hidden under ctrl+z regardless of probe state. AlwaysHealthy types always return
-// ColorHealthy from their Color func so they can never have issues; they must be
-// unconditionally hidden when the issue filter is active.
-func TestCtrlZ_HidesAlwaysHealthyTypes(t *testing.T) {
-	scenario := fullIntegrationNewDemoScenario(t)
-
-	scenario.Press("ctrl+z")
-
-	scenario.ExpectViewNotContains("S3 Buckets")
-	scenario.ExpectViewNotContains("Secrets Manager")
-	scenario.ExpectViewNotContains("IAM Users")
-	scenario.ExpectViewNotContains("Security Groups")
-}
+// Post-AlwaysHealthy-purge: every registered type has at least a Wave 1 or Wave 2
+// signal per docs/attention-signals.md, so no type is unconditionally hidden under
+// ctrl+z. Types with zero known issues (and not truncated) are hidden — but that
+// is the "confirmed zero" rule, not an AlwaysHealthy rule. The former
+// TestCtrlZ_HidesAlwaysHealthyTypes asserted AlwaysHealthy types were always
+// hidden; that invariant is gone. Visibility under ctrl+z for those types is now
+// driven by their per-type probe state like any other type.

@@ -47,7 +47,6 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "log_streams",
 				Key:            "enter",
@@ -67,8 +66,21 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "home_region", Title: "Home Region", Width: 16, Sortable: true},
 				{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			Color: func(r Resource) Color {
+				// GetTrailStatus: IsLogging=false = trail not capturing events (broken).
+				// LatestDeliveryError = S3 delivery failing (broken).
+				if r.Fields["is_logging"] == "false" {
+					return ColorBroken
+				}
+				if r.Fields["latest_delivery_error"] != "" && r.Fields["latest_delivery_error"] != "-" {
+					return ColorBroken
+				}
+				switch r.Fields["status"] {
+				case "failed", "FAILED", "error", "ERROR":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:      "CloudTrail Events",
