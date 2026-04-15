@@ -21,3 +21,7 @@ func NewSES() *SESFake {
 func (f *SESFake) ListEmailIdentities(_ context.Context, _ *sesv2.ListEmailIdentitiesInput, _ ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error) {
 	return &sesv2.ListEmailIdentitiesOutput{EmailIdentities: f.fix.Identities}, nil
 }
+
+func (f *SESFake) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error) {
+	return &sesv2.GetAccountOutput{SendingEnabled: true}, nil
+}
