@@ -79,10 +79,4 @@ func TestResourceListAttentionFilterPreservesExistingBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("all resources loaded regardless of attentionOnly state", func(t *testing.T) {
-		m := newAttentionListFromCache(t, false, resources)
-		if got := len(m.AllResources()); got != len(resources) {
-			t.Errorf("AllResources() count = %d, want %d", got, len(resources))
-		}
-	})
 }

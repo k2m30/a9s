@@ -266,7 +266,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	}
 	for _, b := range builds.Builds {
 		switch b.BuildStatus {
-		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress:
+		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
 			continue
 		}
 		if b.Id == nil {

@@ -27,7 +27,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				if sys == "initializing" || inst == "initializing" {
 					return ColorWarning
 				}
-				switch r.Fields["state"] {
+				// Prefer Fields["state"] (set by real fetcher); fall back to r.Status
+				// for test doubles and synthetic resources that only set Status.
+				state := r.Fields["state"]
+				if state == "" {
+					state = r.Status
+				}
+				switch state {
 				case "running", "":
 					return ColorHealthy
 				case "stopped", "stopping":
@@ -37,7 +43,9 @@ func computeResourceTypes() []ResourceTypeDef {
 				case "terminated", "shutting-down":
 					return ColorDim
 				}
-				return ColorHealthy
+				// Delegate unknown states to the shared fallback classifier so generic
+				// status strings (e.g. "failed", "error", "creating") are handled correctly.
+				return fallbackColor(state)
 			},
 			CellDecorators: map[string]func(Resource, string) string{
 				"state": func(r Resource, v string) string {
