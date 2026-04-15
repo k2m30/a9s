@@ -1,6 +1,9 @@
 package resource
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
 // Used by dbi and dbc types which share the same status vocabulary.
@@ -254,15 +257,21 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["status"] {
-				case "available":
-					return ColorHealthy
-				case "creating", "copying":
-					return ColorWarning
-				case "failed":
-					return ColorBroken
+				status := r.Fields["status"]
+				c := ColorHealthy
+				switch {
+				case status == "failed":
+					c = ColorBroken
+				case strings.HasPrefix(status, "incompatible-"):
+					c = ColorBroken
+				case status == "creating" || status == "copying":
+					c = ColorWarning
 				}
-				return ColorHealthy
+				// CIS RDS.4: unencrypted snapshot → warning (Broken takes precedence)
+				if c != ColorBroken && r.Fields["encrypted"] == "false" {
+					c = ColorWarning
+				}
+				return c
 			},
 		},
 		{
@@ -281,15 +290,27 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["status"] {
-				case "available":
-					return ColorHealthy
-				case "creating":
-					return ColorWarning
+				status := r.Fields["status"]
+				c := ColorHealthy
+				switch status {
 				case "failed":
-					return ColorBroken
+					c = ColorBroken
+				case "creating":
+					c = ColorWarning
 				}
-				return ColorHealthy
+				// Unencrypted snapshot → warning
+				if c != ColorBroken && r.Fields["storage_encrypted"] == "false" {
+					c = ColorWarning
+				}
+				// Long-lived manual snapshot (>365 days) → warning (cost signal)
+				if c != ColorBroken && r.Fields["snapshot_type"] == "manual" {
+					if ts, err := time.Parse("2006-01-02 15:04", r.Fields["snapshot_create_time"]); err == nil {
+						if time.Since(ts) > 365*24*time.Hour {
+							c = ColorWarning
+						}
+					}
+				}
+				return c
 			},
 		},
 	}
