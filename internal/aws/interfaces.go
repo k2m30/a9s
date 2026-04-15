@@ -957,18 +957,17 @@ type CWLogsAPI interface {
 	CWLogsFilterLogEventsAPI
 }
 
-// SQSAPI is the aggregate interface covering all SQS operations used by a9s fetchers.
+// SQSAPI is the aggregate interface covering SQS operations used by a9s enrichers.
+// Fetchers that need ListQueues perform a runtime type assertion to SQSListQueuesAPI.
 // *sqs.Client structurally satisfies this interface.
 type SQSAPI interface {
-	SQSListQueuesAPI
 	SQSGetQueueAttributesAPI
 }
 
-// SNSAPI is the aggregate interface covering all SNS operations used by a9s fetchers.
+// SNSAPI is the aggregate interface covering SNS operations used by a9s enrichers.
+// Fetchers that need ListTopics or ListSubscriptions perform runtime type assertions.
 // *sns.Client structurally satisfies this interface.
 type SNSAPI interface {
-	SNSListTopicsAPI
-	SNSListSubscriptionsAPI
 	SNSListSubscriptionsByTopicAPI
 }
 

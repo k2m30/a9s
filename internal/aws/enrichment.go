@@ -32,6 +32,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
+	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	smithy "github.com/aws/smithy-go"
 
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -76,6 +79,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"tgw":      EnrichTGWAttachments,
 	"eb":       EnrichEBEnvironmentHealth,
 	"elb":      EnrichELBAttributes,
+	"sqs":      EnrichSQSAttributes,
+	"sns":      EnrichSNSSubscriptions,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -1805,4 +1810,119 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 	}
 	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
+// to surface missing DLQ and missing KMS encryption as Wave 2 findings.
+// Per-queue errors are treated as truncated (skip silently).
+func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.SQS == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		queueURL := r.Fields["queue_url"]
+		if queueURL == "" {
+			continue
+		}
+		out, err := clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
+			QueueUrl: aws.String(queueURL),
+			AttributeNames: []sqstypes.QueueAttributeName{
+				sqstypes.QueueAttributeNameRedrivePolicy,
+				sqstypes.QueueAttributeNameVisibilityTimeout,
+				sqstypes.QueueAttributeNameKmsMasterKeyId,
+			},
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		var rows []resource.FindingRow
+		if _, ok := out.Attributes["RedrivePolicy"]; !ok {
+			rows = append(rows, resource.FindingRow{
+				Label: "DLQ",
+				Value: "no DLQ configured",
+				Tier:  "~",
+			})
+		}
+		if _, ok := out.Attributes["KmsMasterKeyId"]; !ok {
+			rows = append(rows, resource.FindingRow{
+				Label: "Encryption",
+				Value: "no KMS encryption configured",
+				Tier:  "~",
+			})
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
+// to surface orphan topics and topics with all-pending-confirmation subscribers.
+// Per-topic errors are treated as truncated (skip silently).
+func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.SNS == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		topicARN := r.ID
+		if topicARN == "" {
+			continue
+		}
+		out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
+			TopicArn: aws.String(topicARN),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		subs := out.Subscriptions
+		if len(subs) == 0 {
+			findings[r.ID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "topic has no subscribers",
+				Rows: []resource.FindingRow{
+					{Label: "Subscribers", Value: "topic has no subscribers", Tier: "~"},
+				},
+			}
+			continue
+		}
+		allPending := true
+		for _, sub := range subs {
+			arn := ""
+			if sub.SubscriptionArn != nil {
+				arn = *sub.SubscriptionArn
+			}
+			if arn != "PendingConfirmation" {
+				allPending = false
+				break
+			}
+		}
+		if allPending {
+			findings[r.ID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "all pending confirmation",
+				Rows: []resource.FindingRow{
+					{Label: "Subscribers", Value: "all pending confirmation", Tier: "~"},
+				},
+			}
+		}
+	}
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
