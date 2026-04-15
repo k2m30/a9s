@@ -282,6 +282,11 @@ type ACMListCertificatesAPI interface {
 	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
 }
 
+// ACMDescribeCertificateAPI defines the interface for the ACM DescribeCertificate operation.
+type ACMDescribeCertificateAPI interface {
+	DescribeCertificate(ctx context.Context, params *acm.DescribeCertificateInput, optFns ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error)
+}
+
 // ASGDescribeAutoScalingGroupsAPI defines the interface for the AutoScaling DescribeAutoScalingGroups operation.
 type ASGDescribeAutoScalingGroupsAPI interface {
 	DescribeAutoScalingGroups(ctx context.Context, params *autoscaling.DescribeAutoScalingGroupsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
@@ -532,6 +537,11 @@ type KMSGetKeyRotationStatusAPI interface {
 // MSKListClustersV2API defines the interface for the Kafka ListClustersV2 operation.
 type MSKListClustersV2API interface {
 	ListClustersV2(ctx context.Context, params *kafka.ListClustersV2Input, optFns ...func(*kafka.Options)) (*kafka.ListClustersV2Output, error)
+}
+
+// KafkaDescribeClusterV2API defines the interface for the Kafka DescribeClusterV2 operation.
+type KafkaDescribeClusterV2API interface {
+	DescribeClusterV2(ctx context.Context, params *kafka.DescribeClusterV2Input, optFns ...func(*kafka.Options)) (*kafka.DescribeClusterV2Output, error)
 }
 
 // BackupListBackupPlansAPI defines the interface for the Backup ListBackupPlans operation.
@@ -896,6 +906,7 @@ type CloudFrontAPI interface {
 // *acm.Client structurally satisfies this interface.
 type ACMAPI interface {
 	ACMListCertificatesAPI
+	ACMDescribeCertificateAPI
 }
 
 // APIGatewayV2API is the aggregate interface covering all APIGatewayV2 operations used by a9s fetchers.
@@ -996,6 +1007,7 @@ type SFNAPI interface {
 // *kafka.Client structurally satisfies this interface.
 type MSKAPI interface {
 	MSKListClustersV2API
+	KafkaDescribeClusterV2API
 }
 
 // GlueAPI is the aggregate interface covering all Glue operations used by a9s fetchers.
