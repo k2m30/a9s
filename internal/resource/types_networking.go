@@ -1,5 +1,7 @@
 package resource
 
+import "strconv"
+
 func networkingResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -133,7 +135,17 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "routes_count", Title: "Routes", Width: 8, Sortable: true},
 				{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				blackhole, _ := strconv.Atoi(r.Fields["blackhole_routes_count"])
+				if blackhole > 0 {
+					return ColorBroken
+				}
+				assoc, _ := strconv.Atoi(r.Fields["associations_count"])
+				if assoc == 0 && r.Fields["is_main"] != "true" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "NAT Gateways",
@@ -175,7 +187,17 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
+				if attachments == 0 {
+					return ColorWarning
+				}
+				switch r.Fields["state"] {
+				case "attaching", "detaching":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Elastic IPs",

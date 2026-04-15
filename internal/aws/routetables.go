@@ -6,12 +6,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("rtb", []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count"})
+	resource.RegisterFieldKeys("rtb", []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count", "blackhole_routes_count", "is_main"})
 
 	resource.RegisterPaginated("rtb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -90,16 +91,26 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 			}
 		}
 
+		// Count blackhole routes (target deleted)
+		blackholeCount := 0
+		for _, route := range rtb.Routes {
+			if route.State == ec2types.RouteStateBlackhole {
+				blackholeCount++
+			}
+		}
+
 		r := resource.Resource{
 			ID:     rtbID,
 			Name:   name,
 			Status: isMain,
 			Fields: map[string]string{
-				"route_table_id":     rtbID,
-				"name":               name,
-				"vpc_id":             vpcID,
-				"routes_count":       routesCount,
-				"associations_count": associationsCount,
+				"route_table_id":        rtbID,
+				"name":                  name,
+				"vpc_id":                vpcID,
+				"routes_count":          routesCount,
+				"associations_count":    associationsCount,
+				"blackhole_routes_count": fmt.Sprintf("%d", blackholeCount),
+				"is_main":               isMain,
 			},
 			RawStruct: rtb,
 		}
