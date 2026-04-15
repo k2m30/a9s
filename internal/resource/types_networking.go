@@ -22,9 +22,9 @@ func networkingResourceTypes() []ResourceTypeDef {
 				switch r.Fields["state"] {
 				case "active":
 					return ColorHealthy
-				case "provisioning":
+				case "provisioning", "active_impaired":
 					return ColorWarning
-				case "failed", "active_impaired":
+				case "failed":
 					return ColorBroken
 				}
 				return ColorHealthy

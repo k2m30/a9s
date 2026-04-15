@@ -110,3 +110,38 @@ func TestEBColor_NoHealth_StatusTerminated_IsColorDim(t *testing.T) {
 		t.Errorf("eb Color health=''/status=Terminated = %v, want ColorDim", got)
 	}
 }
+
+// TestEbColor covers additional table-driven cases including precedence with Terminated status
+// and empty-fields fallback.
+func TestEbColor(t *testing.T) {
+	td := resource.FindResourceType("eb")
+	if td == nil {
+		t.Fatal("eb not registered")
+	}
+
+	cases := []struct {
+		name   string
+		fields map[string]string
+		want   resource.Color
+	}{
+		{
+			name:   "terminated_red_priority",
+			fields: map[string]string{"health": "Red", "status": "Terminated"},
+			want:   resource.ColorBroken,
+		},
+		{
+			name:   "empty",
+			fields: map[string]string{},
+			want:   resource.ColorHealthy,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := td.Color(resource.Resource{Fields: tc.fields})
+			if got != tc.want {
+				t.Errorf("Color(fields=%v) = %v, want %v", tc.fields, got, tc.want)
+			}
+		})
+	}
+}

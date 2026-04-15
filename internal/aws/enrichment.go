@@ -20,6 +20,8 @@ import (
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
@@ -72,6 +74,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"kms":      EnrichKMSRotation,
 	"efs":      EnrichEFSMountTargets,
 	"tgw":      EnrichTGWAttachments,
+	"eb":       EnrichEBEnvironmentHealth,
+	"elb":      EnrichELBAttributes,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -1679,5 +1683,126 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 	}
 
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
+// Beanstalk environment (1 per environment, cap 50). Returns an informational
+// "~" finding for each environment with a non-empty Causes slice.
+// Summary: "EB causes: <first cause>". IssueCount is always 0 — causes are
+// informational signals, not broken-state indicators.
+func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.ElasticBeanstalk == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		name := r.Name
+		if name == "" {
+			name = r.Fields["environment_name"]
+		}
+		if name == "" {
+			continue
+		}
+		out, err := clients.ElasticBeanstalk.DescribeEnvironmentHealth(ctx, &elasticbeanstalk.DescribeEnvironmentHealthInput{
+			EnvironmentName: aws.String(name),
+			AttributeNames:  []ebtypes.EnvironmentHealthAttribute{ebtypes.EnvironmentHealthAttributeCauses},
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if len(out.Causes) == 0 {
+			continue
+		}
+		firstCause := out.Causes[0]
+		rows := []resource.FindingRow{
+			{Label: "Cause", Value: firstCause, Tier: "~"},
+		}
+		// Record additional causes as extra rows.
+		for _, cause := range out.Causes[1:] {
+			rows = append(rows, resource.FindingRow{Label: "Cause", Value: cause, Tier: "~"})
+		}
+		// Key on resource ID (environment ID) for registry consistency.
+		// Fall back to name if ID is not set.
+		key := r.ID
+		if key == "" {
+			key = name
+		}
+		findings[key] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  fmt.Sprintf("EB causes: %s", firstCause),
+			Rows:     rows,
+		}
+	}
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
+// balancer (1 per LB, cap 50) and returns an informational "~" finding for
+// each LB missing deletion protection or access logging.
+// The worst finding per LB is promoted to "!" if both attributes are missing;
+// otherwise "~" is used. IssueCount counts findings with Severity "!".
+func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.ELBv2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		if r.ID == "" {
+			continue
+		}
+		out, err := clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
+			LoadBalancerArn: aws.String(r.ID),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		var rows []resource.FindingRow
+		for _, attr := range out.Attributes {
+			if attr.Key == nil || attr.Value == nil {
+				continue
+			}
+			switch *attr.Key {
+			case "deletion_protection.enabled":
+				if *attr.Value == "false" {
+					rows = append(rows, resource.FindingRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
+				}
+			case "access_logs.s3.enabled":
+				if *attr.Value == "false" {
+					rows = append(rows, resource.FindingRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
+				}
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		// Severity is "~" for each individual finding; promote to "!" only
+		// when both misconfiguration flags are present simultaneously.
+		severity := "~"
+		if len(rows) >= 2 {
+			severity = "!"
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: severity,
+			Summary:  rows[0].Label + ": " + rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
 	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
 }
