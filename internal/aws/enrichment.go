@@ -18,10 +18,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
@@ -45,6 +47,7 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"rds":      EnrichRDSDocDBMaintenance,
 	"dbi":      EnrichRDSDocDBMaintenance,
 	"dbc":      EnrichRDSDocDBMaintenance,
+	"ddb":      EnrichDynamoDBPITR,
 	"ec2":      EnrichEC2InstanceStatus,
 	"asg":      EnrichASGScalingActivities,
 	"ebs":      EnrichEBSVolumeStatus,
@@ -55,6 +58,7 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"glue":     EnrichGlueJobStatus,
 	"backup":   EnrichBackupJobs,
 	"ses":      EnrichSESAccount,
+	"kms":      EnrichKMSRotation,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -854,6 +858,93 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 					Summary:  fmt.Sprintf("latest run %s", string(s)),
 					Rows:     rows,
 				}
+			}
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
+// and returns a Finding when PITR is not enabled.
+// Severity is "~" (informational); IssueCount counts PITR-disabled findings.
+func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.DynamoDB == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		name := r.Name
+		if name == "" {
+			name = r.ID
+		}
+		if name == "" {
+			continue
+		}
+		out, err := clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
+			TableName: aws.String(name),
+		})
+		if err != nil {
+			// sub-call error: skip this table, mark truncated to signal incomplete data
+			truncated = true
+			continue
+		}
+		if out.ContinuousBackupsDescription == nil {
+			continue
+		}
+		pitr := out.ContinuousBackupsDescription.PointInTimeRecoveryDescription
+		if pitr == nil {
+			continue
+		}
+		if string(pitr.PointInTimeRecoveryStatus) != "ENABLED" {
+			findings[name] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "PITR disabled",
+			}
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
+// and returns a Finding when key rotation is not enabled.
+// Severity is "~" (informational per CIS KMS.1); IssueCount counts rotation-disabled findings.
+// AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
+// silently skipped without marking Truncated. Other per-key errors set Truncated=true.
+func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.KMS == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		keyID := r.ID
+		if keyID == "" {
+			continue
+		}
+		out, err := clients.KMS.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{
+			KeyId: aws.String(keyID),
+		})
+		if err != nil {
+			code, _, _ := ClassifyAWSError(err)
+			if code == "AccessDeniedException" || code == "AccessDenied" {
+				// AWS-managed keys: skip silently without marking truncated
+				continue
+			}
+			// Any other error: skip this key but signal incomplete data via truncated
+			truncated = true
+			continue
+		}
+		if !out.KeyRotationEnabled {
+			findings[keyID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "key rotation disabled (CIS KMS.1)",
 			}
 		}
 	}

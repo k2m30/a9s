@@ -34,3 +34,11 @@ func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.Describe
 	}
 	return &dynamodb.DescribeTableOutput{Table: tbl}, nil
 }
+
+func (f *DynamoDBFake) DescribeContinuousBackups(_ context.Context, input *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+	name := aws.ToString(input.TableName)
+	if _, ok := f.fix.Tables[name]; !ok {
+		return nil, fmt.Errorf("ResourceNotFoundException: table %q not found", name)
+	}
+	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
+}

@@ -45,3 +45,13 @@ func (f *KMSFake) DescribeKey(_ context.Context, input *kms.DescribeKeyInput, _ 
 func (f *KMSFake) ListAliases(_ context.Context, _ *kms.ListAliasesInput, _ ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
 	return &kms.ListAliasesOutput{Aliases: f.fix.Aliases}, nil
 }
+
+func (f *KMSFake) GetKeyRotationStatus(_ context.Context, input *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
+	if input.KeyId == nil {
+		return nil, fmt.Errorf("GetKeyRotationStatus: KeyId is required")
+	}
+	if _, ok := f.fix.Keys[*input.KeyId]; !ok {
+		return nil, fmt.Errorf("GetKeyRotationStatus: key %q not found", *input.KeyId)
+	}
+	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: false}, nil
+}

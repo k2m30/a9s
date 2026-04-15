@@ -267,6 +267,11 @@ type DDBDescribeTableAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 }
 
+// DynamoDBDescribeContinuousBackupsAPI defines the interface for the DynamoDB DescribeContinuousBackups operation.
+type DynamoDBDescribeContinuousBackupsAPI interface {
+	DescribeContinuousBackups(ctx context.Context, params *dynamodb.DescribeContinuousBackupsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error)
+}
+
 // EC2DescribeAddressesAPI defines the interface for the EC2 DescribeAddresses operation.
 type EC2DescribeAddressesAPI interface {
 	DescribeAddresses(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error)
@@ -514,6 +519,11 @@ type KMSListAliasesAPI interface {
 	ListAliases(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error)
 }
 
+// KMSGetKeyRotationStatusAPI defines the interface for the KMS GetKeyRotationStatus operation.
+type KMSGetKeyRotationStatusAPI interface {
+	GetKeyRotationStatus(ctx context.Context, params *kms.GetKeyRotationStatusInput, optFns ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error)
+}
+
 // MSKListClustersV2API defines the interface for the Kafka ListClustersV2 operation.
 type MSKListClustersV2API interface {
 	ListClustersV2(ctx context.Context, params *kafka.ListClustersV2Input, optFns ...func(*kafka.Options)) (*kafka.ListClustersV2Output, error)
@@ -747,6 +757,7 @@ type ElastiCacheAPI interface {
 type DynamoDBAPI interface {
 	DDBListTablesAPI
 	DDBDescribeTableAPI
+	DynamoDBDescribeContinuousBackupsAPI
 }
 
 // DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
@@ -856,6 +867,7 @@ type KMSAPI interface {
 	KMSListKeysAPI
 	KMSDescribeKeyAPI
 	KMSListAliasesAPI
+	KMSGetKeyRotationStatusAPI
 }
 
 // Route53API is the aggregate interface covering all Route53 operations used by a9s fetchers.
