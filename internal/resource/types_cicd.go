@@ -107,7 +107,6 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 			Children: []ChildViewDef{{
 				ChildType:      "ecr_images",
 				Key:            "enter",
@@ -128,7 +127,6 @@ func cicdResourceTypes() []ResourceTypeDef {
 				{Key: "domain_owner", Title: "Owner", Width: 14, Sortable: true},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 	}
 }

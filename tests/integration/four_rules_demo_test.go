@@ -150,20 +150,16 @@ func TestFourRules_Demo_R3_IssueBadgeNeverExceedsListCount(t *testing.T) {
 }
 
 // TestFourRules_Demo_R4_CtrlZShowsOnlyTypesWithIssues verifies that ctrl+z
-// (issue filter) hides resource types with no issues (AlwaysHealthy, etc.) and
-// shows types that do have issues.
+// (issue filter) hides resource types whose issue count is a confirmed zero and
+// surfaces types that have issues or whose zero is a lower bound (truncated).
+// Post-AlwaysHealthy-purge every registered type has a Wave 1 or Wave 2 signal
+// per docs/attention-signals.md, so visibility is driven only by probe state.
 func TestFourRules_Demo_R4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenarioWithWave1(t)
 
 	scenario.Press("ctrl+z")
 
-	// AlwaysHealthy types must be hidden
-	scenario.ExpectViewNotContains("S3 Buckets")
-	scenario.ExpectViewNotContains("Secrets Manager")
-	scenario.ExpectViewNotContains("SSM Parameters")
-	scenario.ExpectViewNotContains("KMS Keys")
-	scenario.ExpectViewNotContains("IAM Users")
-	scenario.ExpectViewNotContains("Security Groups")
+	// ExcludeFromIssueBadge types are unconditionally hidden under ctrl+z
 	scenario.ExpectViewNotContains("CloudTrail Events")
 
 	// Types with issues in demo fixtures must remain visible

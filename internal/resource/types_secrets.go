@@ -15,8 +15,9 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "last_changed", Title: "Last Changed", Width: 18, Sortable: true},
 				{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
 			},
-			Color:         func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
+			// Wave 2 enricher surfaces secrets whose scheduled rotation has
+			// failed — Wave 1 list carries no runtime signal.
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "SSM Parameters",
@@ -32,7 +33,6 @@ func secretsResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(_ Resource) Color { return ColorHealthy },
-			AlwaysHealthy: true,
 		},
 		{
 			Name:          "KMS Keys",
