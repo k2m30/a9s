@@ -41,6 +41,9 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	smithy "github.com/aws/smithy-go"
 
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -87,6 +90,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"sns":      EnrichSNSSubscriptions,
 	"msk":      EnrichMSKCluster,
 	"acm":      EnrichACMCertificate,
+	"cf":       EnrichCloudFrontDistribution,
+	"apigw":    EnrichAPIGatewayStage,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -2094,4 +2099,188 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 		}
 	}
 	return EnricherResult{IssueCount: bangCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)
+// and returns a Finding for any distribution with insecure viewer or origin protocol settings.
+//
+// Findings (severity "~" — informational):
+//   - DefaultCacheBehavior.ViewerProtocolPolicy == "allow-all" → "no HTTPS redirect (insecure)"
+//   - Any Origin with CustomOriginConfig.OriginProtocolPolicy == "http-only" → "origin without TLS"
+//
+// Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
+func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.CloudFront == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		distID := r.ID
+		if distID == "" {
+			continue
+		}
+		out, err := clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
+			Id: aws.String(distID),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if out.DistributionConfig == nil {
+			continue
+		}
+		cfg := out.DistributionConfig
+		var rows []resource.FindingRow
+		var summaries []string
+
+		// Check viewer protocol policy on default cache behavior.
+		if cfg.DefaultCacheBehavior != nil &&
+			cfg.DefaultCacheBehavior.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
+			summaries = append(summaries, "no HTTPS redirect (insecure)")
+			rows = append(rows, resource.FindingRow{
+				Label: "ViewerProtocolPolicy",
+				Value: "allow-all",
+				Tier:  "~",
+			})
+		}
+
+		// Check origin protocol policies.
+		if cfg.Origins != nil {
+			for _, origin := range cfg.Origins.Items {
+				if origin.CustomOriginConfig != nil &&
+					origin.CustomOriginConfig.OriginProtocolPolicy == cftypes.OriginProtocolPolicyHttpOnly {
+					originID := ""
+					if origin.Id != nil {
+						originID = *origin.Id
+					}
+					summaries = append(summaries, "origin without TLS")
+					rows = append(rows, resource.FindingRow{
+						Label: "Origin",
+						Value: originID,
+						Tier:  "~",
+					})
+					rows = append(rows, resource.FindingRow{
+						Label: "OriginProtocolPolicy",
+						Value: "http-only",
+						Tier:  "~",
+					})
+				}
+			}
+		}
+
+		if len(summaries) == 0 {
+			continue
+		}
+		summary := strings.Join(summaries, "; ")
+		findings[distID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  summary,
+			Rows:     rows,
+		}
+	}
+	// All CloudFront findings are severity "~" (informational).
+	// IssueCount counts only "!" severity findings; "~" do not contribute.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
+// and returns a Finding for any API with stage-level throttling or access-log issues.
+//
+// Findings (severity "~" — informational):
+//   - Any stage with DefaultRouteSettings.ThrottlingBurstLimit == 0 OR ThrottlingRateLimit == 0
+//     → "no throttling configured (DoS risk)"
+//   - Any stage with AccessLogSettings == nil → "access logs disabled"
+//
+// Findings are aggregated per API (one finding per API, covering all stages).
+// Skip if clients.APIGatewayV2 == nil. Per-API errors → truncated.
+func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.APIGatewayV2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		apiID := r.ID
+		if apiID == "" {
+			continue
+		}
+		out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
+			ApiId: aws.String(apiID),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		var summaries []string
+		var rows []resource.FindingRow
+
+		for _, stage := range out.Items {
+			stageName := stage.StageName
+			if stageName == nil {
+				stageName = aws.String("(unnamed)")
+			}
+
+			// Check throttling on DefaultRouteSettings.
+			if drs := stage.DefaultRouteSettings; drs != nil {
+				noThrottle := (drs.ThrottlingBurstLimit != nil && *drs.ThrottlingBurstLimit == 0) ||
+					(drs.ThrottlingRateLimit != nil && *drs.ThrottlingRateLimit == 0)
+				if noThrottle {
+					summaries = append(summaries, "no throttling configured (DoS risk)")
+					rows = append(rows, resource.FindingRow{
+						Label: "Stage",
+						Value: *stageName,
+						Tier:  "~",
+					})
+					rows = append(rows, resource.FindingRow{
+						Label: "Issue",
+						Value: "no throttling configured (DoS risk)",
+						Tier:  "~",
+					})
+				}
+			}
+
+			// Check access log settings.
+			if stage.AccessLogSettings == nil {
+				summaries = append(summaries, "access logs disabled")
+				rows = append(rows, resource.FindingRow{
+					Label: "Stage",
+					Value: *stageName,
+					Tier:  "~",
+				})
+				rows = append(rows, resource.FindingRow{
+					Label: "Issue",
+					Value: "access logs disabled",
+					Tier:  "~",
+				})
+			}
+		}
+
+		if len(summaries) == 0 {
+			continue
+		}
+		// Deduplicate repeated summary messages.
+		seen := make(map[string]bool)
+		var uniqueSummaries []string
+		for _, s := range summaries {
+			if !seen[s] {
+				seen[s] = true
+				uniqueSummaries = append(uniqueSummaries, s)
+			}
+		}
+		findings[apiID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  strings.Join(uniqueSummaries, "; "),
+			Rows:     rows,
+		}
+	}
+	// All API Gateway findings are severity "~" (informational).
+	// IssueCount counts only "!" severity findings; "~" do not contribute.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
