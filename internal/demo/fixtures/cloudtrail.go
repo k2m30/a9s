@@ -5,20 +5,40 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 )
 
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
 type CloudTrailFixtures struct {
-	Trails []cloudtrailtypes.Trail
-	Events []cloudtrailtypes.Event
+	Trails      []cloudtrailtypes.Trail
+	TrailStatus map[string]cloudtrail.GetTrailStatusOutput
+	Events      []cloudtrailtypes.Event
 }
 
 // NewCloudTrailFixtures builds and returns a fully-populated CloudTrailFixtures struct.
 func NewCloudTrailFixtures() *CloudTrailFixtures {
 	return &CloudTrailFixtures{
-		Trails: buildCTTrails(),
-		Events: buildCTEvents(),
+		Trails:      buildCTTrails(),
+		TrailStatus: buildCTTrailStatus(),
+		Events:      buildCTEvents(),
+	}
+}
+
+// buildCTTrailStatus keys GetTrailStatus responses by trail ARN. One trail is
+// intentionally not logging, one has a LatestDeliveryError, the rest healthy.
+func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
+	return map[string]cloudtrail.GetTrailStatusOutput{
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail": {
+			IsLogging: aws.Bool(true),
+		},
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/data-events-trail": {
+			IsLogging:           aws.Bool(true),
+			LatestDeliveryError: aws.String("AccessDenied: The S3 bucket policy denies CloudTrail writes"),
+		},
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/security-audit-trail": {
+			IsLogging: aws.Bool(false),
+		},
 	}
 }
 
