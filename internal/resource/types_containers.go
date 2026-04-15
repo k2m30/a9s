@@ -1,5 +1,7 @@
 package resource
 
+import "strconv"
+
 func containersResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -16,13 +18,28 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// Status-FAILED is Broken (highest precedence).
+				if r.Fields["status"] == "FAILED" {
+					return ColorBroken
+				}
+				// Wave 2: health.issues[] non-empty → Warning. Doc treats issues
+				// as advisory health signals, not failure (cluster is still
+				// running). Status-FAILED above already carries the failure.
+				hasIssues := false
+				if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
+					hasIssues = true
+				}
 				switch r.Fields["status"] {
 				case "ACTIVE":
+					if hasIssues {
+						return ColorWarning
+					}
 					return ColorHealthy
 				case "CREATING", "UPDATING", "DELETING":
 					return ColorWarning
-				case "FAILED":
-					return ColorBroken
+				}
+				if hasIssues {
+					return ColorWarning
 				}
 				return ColorHealthy
 			},
@@ -41,15 +58,30 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// Status-failed states are Broken (highest precedence).
+				if r.Fields["status"] == "CREATE_FAILED" ||
+					r.Fields["status"] == "DELETE_FAILED" ||
+					r.Fields["status"] == "DEGRADED" {
+					return ColorBroken
+				}
+				hasIssues := false
+				if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
+					hasIssues = true
+				}
 				switch r.Fields["status"] {
 				case "ACTIVE":
+					if hasIssues {
+						return ColorWarning
+					}
 					return ColorHealthy
 				case "CREATING", "UPDATING", "DELETING":
 					return ColorWarning
-				case "CREATE_FAILED", "DELETE_FAILED", "DEGRADED":
-					return ColorBroken
 				}
-				return ColorWarning
+				// Empty / unknown status: healthy unless health.issues set.
+				if hasIssues {
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 	}

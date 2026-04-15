@@ -3,6 +3,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -12,7 +14,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version", "arn"})
+	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version", "arn", "health_issues_count", "health_issues"})
 
 	resource.RegisterPaginated("eks", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -85,17 +87,29 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		platformVersion = *cluster.PlatformVersion
 	}
 
+	// Wave 2: health.issues[] — populated by DescribeCluster (called per cluster in fetcher).
+	healthIssuesCount := 0
+	var issueCodes []string
+	if cluster.Health != nil {
+		for _, issue := range cluster.Health.Issues {
+			healthIssuesCount++
+			issueCodes = append(issueCodes, string(issue.Code))
+		}
+	}
+
 	return resource.Resource{
 		ID:     name,
 		Name:   clusterName,
 		Status: status,
 		Fields: map[string]string{
-			"cluster_name":     clusterName,
-			"version":          version,
-			"status":           status,
-			"endpoint":         endpoint,
-			"platform_version": platformVersion,
-			"arn":              aws.ToString(cluster.Arn),
+			"cluster_name":        clusterName,
+			"version":             version,
+			"status":              status,
+			"endpoint":            endpoint,
+			"platform_version":    platformVersion,
+			"arn":                 aws.ToString(cluster.Arn),
+			"health_issues_count": strconv.Itoa(healthIssuesCount),
+			"health_issues":       strings.Join(issueCodes, ","),
 		},
 		RawStruct: cluster,
 	}
