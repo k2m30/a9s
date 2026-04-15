@@ -75,6 +75,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 			Color: func(r Resource) Color {
 				// GetTrailStatus: IsLogging=false = trail not capturing events (broken).
 				// LatestDeliveryError = S3 delivery failing (broken).
+				// LogFileValidationEnabled=false = warning per CIS CT.2.
 				if r.Fields["is_logging"] == "false" {
 					return ColorBroken
 				}
@@ -84,6 +85,9 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				switch r.Fields["status"] {
 				case "failed", "FAILED", "error", "ERROR":
 					return ColorBroken
+				}
+				if r.Fields["log_file_validation_enabled"] == "false" {
+					return ColorWarning
 				}
 				return ColorHealthy
 			},

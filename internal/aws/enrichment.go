@@ -56,6 +56,14 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"kinesis":    NoOpEnricher,
 	"lambda":     NoOpEnricher,
 	"nat":        NoOpEnricher,
+	// opensearch and trail use NoOpEnricher because their fetchers already
+	// perform the per-resource Describe* calls (DescribeDomains and
+	// GetTrailStatus respectively) and populate Wave 2 classification fields
+	// at fetch time. The Color funcs read those fields. This is a pragmatic
+	// in-fetcher Wave 2; the registry entry exists for contract conformance
+	// (TestAttentionSignalsDoc enforces every documented Wave 2 row has a
+	// registry entry).
+	"opensearch": NoOpEnricher,
 	"rds-snap":   NoOpEnricher,
 	"redshift":   NoOpEnricher,
 	"redis":      NoOpEnricher,
@@ -65,6 +73,7 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"sns-sub":    NoOpEnricher,
 	"ssm":        NoOpEnricher,
 	"subnet":     NoOpEnricher,
+	"trail":      NoOpEnricher,
 	"vpce":       NoOpEnricher,
 }
 

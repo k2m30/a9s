@@ -459,6 +459,7 @@ type RedshiftDescribeClustersAPI interface {
 // CloudTrailDescribeTrailsAPI defines the interface for the CloudTrail DescribeTrails operation.
 type CloudTrailDescribeTrailsAPI interface {
 	DescribeTrails(ctx context.Context, params *cloudtrail.DescribeTrailsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.DescribeTrailsOutput, error)
+	GetTrailStatus(ctx context.Context, params *cloudtrail.GetTrailStatusInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetTrailStatusOutput, error)
 }
 
 // AthenaListWorkGroupsAPI defines the interface for the Athena ListWorkGroups operation.

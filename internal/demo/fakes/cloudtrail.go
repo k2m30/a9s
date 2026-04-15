@@ -27,6 +27,14 @@ func (f *CloudTrailFake) DescribeTrails(_ context.Context, _ *cloudtrail.Describ
 	return &cloudtrail.DescribeTrailsOutput{TrailList: f.fix.Trails}, nil
 }
 
+func (f *CloudTrailFake) GetTrailStatus(_ context.Context, input *cloudtrail.GetTrailStatusInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.GetTrailStatusOutput, error) {
+	name := aws.ToString(input.Name)
+	if status, ok := f.fix.TrailStatus[name]; ok {
+		return &status, nil
+	}
+	return &cloudtrail.GetTrailStatusOutput{IsLogging: aws.Bool(true)}, nil
+}
+
 func (f *CloudTrailFake) LookupEvents(_ context.Context, input *cloudtrail.LookupEventsInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
 	if len(input.LookupAttributes) == 0 {
 		return &cloudtrail.LookupEventsOutput{Events: f.fix.Events}, nil

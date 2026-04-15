@@ -28,9 +28,10 @@ func init() {
 	})
 }
 
-// FetchCloudTrailTrails calls the CloudTrail DescribeTrails API and converts
-// the response into a slice of generic Resource structs.
-// Uses DescribeTrails only (no GetTrailStatus).
+// FetchCloudTrailTrails calls DescribeTrails and GetTrailStatus (per trail)
+// so the list row can classify `is_logging=false` / `latest_delivery_error` as
+// broken. GetTrailStatus is the authoritative source for logging health; the
+// DescribeTrails response alone has no runtime signal.
 func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeTrails(ctx, &cloudtrail.DescribeTrailsInput{})
 	if err != nil {
@@ -75,18 +76,41 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			logValidation = "true"
 		}
 
+		// Per-trail GetTrailStatus for runtime logging health. Failures here
+		// degrade the row gracefully (unknown status) rather than aborting
+		// the whole list.
+		isLogging := ""
+		latestDeliveryError := ""
+		if trailARN != "" {
+			statusOut, statusErr := api.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: &trailARN})
+			if statusErr == nil && statusOut != nil {
+				if statusOut.IsLogging != nil {
+					if *statusOut.IsLogging {
+						isLogging = "true"
+					} else {
+						isLogging = "false"
+					}
+				}
+				if statusOut.LatestDeliveryError != nil {
+					latestDeliveryError = *statusOut.LatestDeliveryError
+				}
+			}
+		}
+
 		r := resource.Resource{
 			ID:     trailName,
 			Name:   trailName,
 			Status: "",
 			Fields: map[string]string{
-				"trail_name":     trailName,
-				"trail_arn":      trailARN,
-				"s3_bucket":      s3Bucket,
-				"home_region":    homeRegion,
-				"multi_region":   multiRegion,
-				"org_trail":      orgTrail,
-				"log_validation": logValidation,
+				"trail_name":            trailName,
+				"trail_arn":             trailARN,
+				"s3_bucket":             s3Bucket,
+				"home_region":           homeRegion,
+				"multi_region":          multiRegion,
+				"org_trail":             orgTrail,
+				"log_validation":        logValidation,
+				"is_logging":            isLogging,
+				"latest_delivery_error": latestDeliveryError,
 			},
 			RawStruct: trail,
 		}
