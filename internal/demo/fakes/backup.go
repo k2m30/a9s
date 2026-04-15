@@ -21,3 +21,7 @@ func NewBackup() *BackupFake {
 func (f *BackupFake) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
 	return &backup.ListBackupPlansOutput{BackupPlansList: f.fix.Plans}, nil
 }
+
+func (f *BackupFake) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+	return &backup.ListBackupJobsOutput{}, nil
+}
