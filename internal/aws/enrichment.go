@@ -31,6 +31,7 @@ import (
 
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/efs"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -59,6 +60,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"backup":   EnrichBackupJobs,
 	"ses":      EnrichSESAccount,
 	"kms":      EnrichKMSRotation,
+	"efs":      EnrichEFSMountTargets,
+	"tgw":      EnrichTGWAttachments,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -946,6 +949,129 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 				Severity: "~",
 				Summary:  "key rotation disabled (CIS KMS.1)",
 			}
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap)
+// and returns a Finding for any file system with a mount target whose LifeCycleState
+// is not "available". Severity is "!" (broken/degraded).
+// Summary: "mount target unavailable: <mountTargetID> in <az>".
+func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.EFS == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		fsID := r.ID
+		if fsID == "" {
+			continue
+		}
+		out, err := clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
+			FileSystemId: aws.String(fsID),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		for _, mt := range out.MountTargets {
+			if mt.LifeCycleState == "available" {
+				continue
+			}
+			mtID := ""
+			if mt.MountTargetId != nil {
+				mtID = *mt.MountTargetId
+			}
+			az := ""
+			if mt.AvailabilityZoneName != nil {
+				az = *mt.AvailabilityZoneName
+			}
+			findings[fsID] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  fmt.Sprintf("mount target unavailable: %s in %s", mtID, az),
+				Rows: []resource.FindingRow{
+					{Label: "Mount Target", Value: mtID, Tier: "!"},
+					{Label: "AZ", Value: az},
+					{Label: "State", Value: string(mt.LifeCycleState), Tier: "!"},
+				},
+			}
+			break // first finding per FS is sufficient
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap)
+// and returns a Finding for any TGW with attachments in a failed or transitional state.
+// Severity "!" for failed/failing; severity "~" for modifying/pendingAcceptance/rollingBack.
+// When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
+func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.EC2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		tgwID := r.ID
+		if tgwID == "" {
+			continue
+		}
+		out, err := clients.EC2.DescribeTransitGatewayAttachments(ctx, &ec2svc.DescribeTransitGatewayAttachmentsInput{
+			Filters: []ec2types.Filter{
+				{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
+			},
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		// Collect worst finding across all attachments for this TGW.
+		// "!" severity beats "~" severity.
+		var worst *resource.EnrichmentFinding
+		for _, att := range out.TransitGatewayAttachments {
+			attID := ""
+			if att.TransitGatewayAttachmentId != nil {
+				attID = *att.TransitGatewayAttachmentId
+			}
+			state := string(att.State)
+			var candidate *resource.EnrichmentFinding
+			switch state {
+			case "failed", "failing":
+				candidate = &resource.EnrichmentFinding{
+					Severity: "!",
+					Summary:  fmt.Sprintf("attachment %s failed", attID),
+					Rows: []resource.FindingRow{
+						{Label: "Attachment", Value: attID, Tier: "!"},
+						{Label: "State", Value: state, Tier: "!"},
+					},
+				}
+			case "modifying", "pendingAcceptance", "rollingBack":
+				candidate = &resource.EnrichmentFinding{
+					Severity: "~",
+					Summary:  fmt.Sprintf("attachment %s %s", attID, state),
+					Rows: []resource.FindingRow{
+						{Label: "Attachment", Value: attID, Tier: "~"},
+						{Label: "State", Value: state, Tier: "~"},
+					},
+				}
+			}
+			if candidate == nil {
+				continue
+			}
+			if worst == nil || (worst.Severity != "!" && candidate.Severity == "!") {
+				worst = candidate
+			}
+		}
+		if worst != nil {
+			findings[tgwID] = *worst
 		}
 	}
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil

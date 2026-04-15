@@ -279,8 +279,10 @@ func networkingResourceTypes() []ResourceTypeDef {
 					return ColorWarning
 				case "deleted":
 					return ColorDim
+				case "failed":
+					return ColorBroken
 				}
-				return ColorWarning
+				return ColorHealthy
 			},
 		},
 		{
