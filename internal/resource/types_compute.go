@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,11 +65,16 @@ func computeResourceTypes() []ResourceTypeDef {
 				switch state {
 				case "running", "":
 					return ColorHealthy
-				case "stopped", "stopping":
-					return ColorBroken
-				case "pending":
+				case "pending", "shutting-down", "stopping":
 					return ColorWarning
-				case "terminated", "shutting-down":
+				case "stopped":
+					// Server.* reason code means AWS forced the stop (capacity issue) → Broken.
+					if strings.HasPrefix(r.Fields["state_reason_code"], "Server.") {
+						return ColorBroken
+					}
+					// User-initiated or default stop → Warning (intentional, not broken).
+					return ColorWarning
+				case "terminated":
 					return ColorDim
 				}
 				// Delegate unknown states to the shared fallback classifier so generic
@@ -271,12 +277,43 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["status"] {
-				case "":
-					return ColorHealthy
-				case "Delete in progress":
-					return ColorDim
+				// status="" → Healthy; "Delete in progress" → Warning (transitional, noteworthy).
+				status := r.Fields["status"]
+				if status == "Delete in progress" {
+					return ColorWarning
 				}
+
+				// TODO(enrichment): instances_unhealthy_count, in_service_count, and
+				// suspended_processes are not yet populated by the ASG fetcher
+				// (autoscaling.go registers only asg_name, min_size, max_size, desired,
+				// instances, status). The checks below are wired but will never fire
+				// until the fetcher is extended to emit those fields.
+
+				// InService count below minimum → Broken.
+				inService := r.Fields["in_service_count"]
+				minSz := r.Fields["min_size"]
+				if inService != "" && minSz != "" {
+					inSvc, err1 := strconv.Atoi(inService)
+					minSzInt, err2 := strconv.Atoi(minSz)
+					if err1 == nil && err2 == nil && inSvc < minSzInt {
+						return ColorBroken
+					}
+				}
+
+				// Any unhealthy instances → Warning.
+				if unhealthy := r.Fields["instances_unhealthy_count"]; unhealthy != "" {
+					if n, err := strconv.Atoi(unhealthy); err == nil && n > 0 {
+						return ColorWarning
+					}
+				}
+
+				// Critical suspended processes → Warning.
+				if sp := r.Fields["suspended_processes"]; sp != "" {
+					if strings.Contains(sp, "Launch") || strings.Contains(sp, "Terminate") || strings.Contains(sp, "HealthCheck") {
+						return ColorWarning
+					}
+				}
+
 				return ColorHealthy
 			},
 			Children: []ChildViewDef{
