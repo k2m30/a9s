@@ -6,10 +6,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestNatColor(t *testing.T) {
-	td := resource.FindResourceType("nat")
+func TestSubnetColor(t *testing.T) {
+	td := resource.FindResourceType("subnet")
 	if td == nil {
-		t.Fatal("nat not registered")
+		t.Fatal("subnet not registered")
 	}
 
 	cases := []struct {
@@ -19,9 +19,9 @@ func TestNatColor(t *testing.T) {
 	}{
 		{name: "available", state: "available", want: resource.ColorHealthy},
 		{name: "pending", state: "pending", want: resource.ColorWarning},
-		{name: "deleting", state: "deleting", want: resource.ColorWarning},
+		{name: "unavailable", state: "unavailable", want: resource.ColorBroken},
 		{name: "failed", state: "failed", want: resource.ColorBroken},
-		{name: "deleted", state: "deleted", want: resource.ColorDim},
+		{name: "failed_insufficient_capacity", state: "failed-insufficient-capacity", want: resource.ColorBroken},
 		{name: "unknown", state: "", want: resource.ColorHealthy},
 	}
 
