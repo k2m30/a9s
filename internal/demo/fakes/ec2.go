@@ -152,6 +152,12 @@ func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeS
 	return &ec2.DescribeVolumeStatusOutput{}, nil
 }
 
+// DescribeFlowLogs is a stub for the Wave 2 enrichment interface.
+// Returns empty flow logs so all demo VPCs appear without active flow logs.
+func (f *EC2Fake) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInput, _ ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error) {
+	return &ec2.DescribeFlowLogsOutput{}, nil
+}
+
 // toSet converts a string slice into a lookup map.
 func toSet(ss []string) map[string]bool {
 	m := make(map[string]bool, len(ss))
