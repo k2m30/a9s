@@ -47,8 +47,10 @@ var EnricherRegistry = map[string]EnricherFunc{
 	// makes the empty Wave 2 contract testable.
 	"ami":      NoOpEnricher,
 	"ebs-snap": NoOpEnricher,
+	"igw":      NoOpEnricher,
 	"lambda":   NoOpEnricher,
 	"nat":      NoOpEnricher,
+	"rtb":      NoOpEnricher,
 	"sns-sub":  NoOpEnricher,
 	"subnet":   NoOpEnricher,
 }
