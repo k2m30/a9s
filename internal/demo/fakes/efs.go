@@ -21,3 +21,8 @@ func NewEFS() *EFSFake {
 func (f *EFSFake) DescribeFileSystems(_ context.Context, _ *efs.DescribeFileSystemsInput, _ ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error) {
 	return &efs.DescribeFileSystemsOutput{FileSystems: f.fix.FileSystems}, nil
 }
+
+// DescribeMountTargets is a stub for the Wave 2 enrichment interface.
+func (f *EFSFake) DescribeMountTargets(_ context.Context, _ *efs.DescribeMountTargetsInput, _ ...func(*efs.Options)) (*efs.DescribeMountTargetsOutput, error) {
+	return &efs.DescribeMountTargetsOutput{}, nil
+}

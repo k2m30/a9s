@@ -389,6 +389,11 @@ type EFSDescribeFileSystemsAPI interface {
 	DescribeFileSystems(ctx context.Context, params *efs.DescribeFileSystemsInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error)
 }
 
+// EFSDescribeMountTargetsAPI defines the interface for the EFS DescribeMountTargets operation.
+type EFSDescribeMountTargetsAPI interface {
+	DescribeMountTargets(ctx context.Context, params *efs.DescribeMountTargetsInput, optFns ...func(*efs.Options)) (*efs.DescribeMountTargetsOutput, error)
+}
+
 // EventBridgeListRulesAPI defines the interface for the EventBridge ListRules operation.
 type EventBridgeListRulesAPI interface {
 	ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error)
@@ -1034,6 +1039,7 @@ type SESv2API interface {
 // *efs.Client structurally satisfies this interface.
 type EFSAPI interface {
 	EFSDescribeFileSystemsAPI
+	EFSDescribeMountTargetsAPI
 }
 
 // --- Wave 2 enrichment interfaces (#196) ---
