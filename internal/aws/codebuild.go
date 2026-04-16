@@ -26,6 +26,7 @@ func init() {
 		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkCbVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCbKMS},
 	})
 
 	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}

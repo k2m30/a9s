@@ -56,6 +56,7 @@ func init() {
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEbRule, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLambdaSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkLambdaVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLambdaKMS},
 	})
 }
 

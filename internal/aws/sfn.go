@@ -26,6 +26,7 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSFNRole, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSFNCFN, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSFNEbRule, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSFNKMS},
 	})
 
 	// sfntypes.StateMachineListItem: RoleArn (IAM execution role for the state machine)

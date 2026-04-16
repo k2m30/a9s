@@ -24,6 +24,7 @@ func init() {
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRoleKMS},
 	})
 }
 
@@ -207,6 +208,13 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
 	}
 	return relatedResult("ec2", ids)
+}
+
+// checkRoleKMS is a stub. IAM roles do not carry a direct KMS key reference —
+// key policies may grant role access, but the IAM Role struct itself has no
+// KMS key field.
+func checkRoleKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // roleRelatedResources returns the resource list for target from cache or by

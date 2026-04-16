@@ -25,6 +25,8 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true},
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECRRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
 	})
 
 	resource.RegisterNavigableFields("ecr", []resource.NavigableField{

@@ -23,6 +23,7 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
@@ -326,4 +327,19 @@ func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.Res
 // NetworkConfiguration.AwsvpcConfiguration. Stub for now.
 func checkECSSvcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}
+
+// checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
+// The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
+// the last segment after "/".
+func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
+	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *raw.RoleArn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }

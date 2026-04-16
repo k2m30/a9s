@@ -22,6 +22,8 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkTGAlarm, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkTGVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTGKMS},
 	})
 
 	resource.RegisterNavigableFields("tg", []resource.NavigableField{
@@ -202,6 +204,12 @@ func checkTGSG(_ context.Context, _ any, _ resource.Resource, _ resource.Resourc
 	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 }
 
+// checkTGRole returns Count: 0 because Target Groups do not have a directly
+// associated IAM role — role associations are on the ECS services or tasks, not on the TG.
+func checkTGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
 // checkTGVPC returns the VPC this target group is scoped to (Pattern F).
 // Reads vpc_id from Fields which is populated by the target groups fetcher.
 func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -210,6 +218,13 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	return relatedResult("vpc", []string{vpcID})
+}
+
+// checkTGKMS is a stub. Target Groups (ALB/NLB) do not have a KMS key
+// association — encryption at rest for load balancer logs is managed at
+// the S3 bucket level, not on the target group resource itself.
+func checkTGKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // tgRelatedResources returns the resource list for target from cache or by

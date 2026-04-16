@@ -7,6 +7,7 @@ import (
 
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -121,6 +122,27 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func ecrCFNStackName(res resource.Resource) string {
 	// Tags are not present on ecrtypes.Repository directly; check enriched Fields.
 	return res.Fields["cfn_stack_name"]
+}
+
+// checkECRRole returns Count: 0 because the ECR Repository struct does not
+// expose an IAM role ARN in the DescribeRepositories list response.
+func checkECRRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkECRKMS extracts the KMS key from the ECR Repository's
+// EncryptionConfiguration.KmsKey field. Returns the key ID (last segment after "/").
+// Pattern F — no cache needed.
+func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
+	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *repo.EncryptionConfiguration.KmsKey
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
 }
 
 // ecrRelatedResources returns the resource list for target from cache or fetches

@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -29,6 +30,8 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEKSLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEKSSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEKSVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEKSRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
 	})
 }
 
@@ -202,6 +205,39 @@ func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	return relatedResult("vpc", []string{*raw.ResourcesVpcConfig.VpcId})
+}
+
+// checkEKSKMS extracts the KMS key ID from the EKS Cluster's EncryptionConfig.
+// The KeyArn has the form arn:aws:kms::ACCOUNT:key/KEY-ID; the key ID is the
+// last segment after "/". Pattern F — no cache needed.
+func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
+	if !ok || len(raw.EncryptionConfig) == 0 ||
+		raw.EncryptionConfig[0].Provider == nil ||
+		raw.EncryptionConfig[0].Provider.KeyArn == nil ||
+		*raw.EncryptionConfig[0].Provider.KeyArn == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *raw.EncryptionConfig[0].Provider.KeyArn
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
+// checkEKSRole extracts the IAM role name from the EKS Cluster's RoleArn field.
+// The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
+// the last segment after "/".
+func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
+	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *raw.RoleArn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
 // eksRelatedResources returns the resource list for target from cache or by fetching the first page.

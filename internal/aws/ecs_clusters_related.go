@@ -128,6 +128,24 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("cfn", ids)
 }
 
+// checkECSKMS extracts the KMS key from the ECS Cluster's
+// Configuration.ExecuteCommandConfiguration.KmsKeyId field.
+// Returns the key ID (last segment after "/"). Pattern F — no cache needed.
+func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if !ok || cluster.Configuration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == nil ||
+		*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
 // ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

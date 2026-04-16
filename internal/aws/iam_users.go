@@ -25,6 +25,8 @@ func init() {
 		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkIAMUserRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkIAMUserKMS},
 	})
 
 	// iamtypes.User: no navigable cross-ref fields in the rendered detail view.
