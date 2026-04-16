@@ -35,11 +35,12 @@ func TestEBColor_HealthYellow_IsColorWarning(t *testing.T) {
 	}
 }
 
-// TestEBColor_HealthGrey_IsColorDim verifies health=Grey → ColorDim.
-func TestEBColor_HealthGrey_IsColorDim(t *testing.T) {
+// TestEBColor_HealthGrey_IsColorWarning verifies health=Grey → ColorWarning.
+// Grey means health unknown/degraded — an attention signal, not just dimmed.
+func TestEBColor_HealthGrey_IsColorWarning(t *testing.T) {
 	td := resource.FindResourceType("eb")
-	if got := td.Color(ebResource("Grey", "Ready")); got != resource.ColorDim {
-		t.Errorf("eb Color health=Grey = %v, want ColorDim", got)
+	if got := td.Color(ebResource("Grey", "Ready")); got != resource.ColorWarning {
+		t.Errorf("eb Color health=Grey = %v, want ColorWarning", got)
 	}
 }
 
