@@ -26,6 +26,7 @@ func init() {
 	resource.RegisterNavigableFields("ng", []resource.NavigableField{
 		{FieldPath: "ClusterName", TargetType: "eks"},
 		{FieldPath: "NodeRole", TargetType: "role"},
+		{FieldPath: "Subnets", TargetType: "subnet"},
 	})
 
 	resource.RegisterPaginated("ng", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {

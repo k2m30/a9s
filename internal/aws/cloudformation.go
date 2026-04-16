@@ -25,9 +25,10 @@ func init() {
 		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
 	})
 
-	// cfntypes.Stack: RoleARN (execution role assumed when applying the stack)
+	// cfntypes.Stack: RoleARN (execution role), NotificationARNs (SNS topics for stack events)
 	resource.RegisterNavigableFields("cfn", []resource.NavigableField{
 		{FieldPath: "RoleARN", TargetType: "role"},
+		{FieldPath: "NotificationARNs", TargetType: "sns"},
 	})
 }
 
