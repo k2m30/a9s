@@ -124,6 +124,21 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResult("vpc", []string{*project.VpcConfig.VpcId})
 }
 
+// checkCbKMS extracts the KMS key from the CodeBuild Project's EncryptionKey field.
+// EncryptionKey is a KMS key ARN or alias ARN. Returns the key ID (last segment after "/").
+// Pattern F — no cache needed.
+func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
+	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *project.EncryptionKey
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
 // cbRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

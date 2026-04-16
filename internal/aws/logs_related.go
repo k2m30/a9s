@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -81,6 +82,21 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId
+// field. The value may be a full ARN (arn:aws:kms:…/key-id) or a plain key ID.
+// Pattern F — no cache needed.
+func checkLogsKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
+	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *lg.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
 }
 
 // logsRelatedResources returns the resource list for target from cache or by fetching the first page.

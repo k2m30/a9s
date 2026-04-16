@@ -14,3 +14,17 @@ import (
 func checkCodeArtifactCB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
 }
+
+// checkCodeArtifactRole returns Count: 0 because CodeArtifact repository domain
+// policies reference roles but this is not surfaced on the ListRepositories
+// list response.
+func checkCodeArtifactRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkCodeArtifactKMS is a stub. The CodeArtifact domain's KMS key is not
+// surfaced on the ListRepositories list response — the relationship cannot be
+// determined from cache alone.
+func checkCodeArtifactKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
