@@ -272,8 +272,41 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 | CodePipeline | GetPipelineState | `!` | `"stage Deploy failed"` |
 | SFN | ListExecutions | `!` | `"latest execution FAILED"` |
 | Glue | GetJobRuns | `!` | `"latest run FAILED"` |
-| DynamoDB | DescribeTable | `!` | `"table status: UPDATING"` |
+| DynamoDB | DescribeContinuousBackups | `!` | `"PITR disabled"` |
 | RDS/DocDB | DescribePendingMaintenanceActions | `~` | `"pending maintenance: system-update, os-upgrade"` |
+| ASG | DescribeScalingActivities | `!` | `"scaling failure: insufficient capacity"` |
+| Backup | ListBackupJobs | `!` | `"backup job FAILED (2026-04-13)"` |
+| SES | GetAccount | `!` | `"sending PAUSED — enforcement status"` |
+| KMS | GetKeyRotationStatus | `!` | `"automatic rotation disabled"` |
+| EFS | DescribeMountTargets | `!` | `"no mount targets"` |
+| TGW | DescribeTransitGatewayAttachments | `!` | `"attachment state: failing"` |
+| VPC | DescribeFlowLogs | `!` | `"no flow logs (CIS EC2.6)"` |
+| S3 | GetPublicAccessBlock | `!` | `"public access block incomplete"` |
+| ECS Services | DescribeServices | `!` | `"deployment FAILED: reason"` |
+| ECS Clusters | DescribeClusters | `!` | `"active services: 5, running tasks: 12"` |
+| ECS Tasks | DescribeTasks | `!` | `"task stopped: EssentialContainerExited"` |
+| EB Rules | ListTargetsByRule | `!` | `"no targets attached"` |
+| EB Env | DescribeEnvironmentHealth | `!` | `"health: Red — cause"` |
+| ELB | DescribeLoadBalancerAttributes | `!` | `"access logs disabled, PAB off"` |
+| SQS | GetQueueAttributes | `!` | `"no DLQ configured, no KMS encryption"` |
+| SNS | ListSubscriptionsByTopic | `!` | `"no subscriptions"` |
+| MSK | DescribeClusterV2 | `!` | `"TLS disabled, outdated Kafka version"` |
+| ACM | DescribeCertificate | `!` | `"expires in 7 days"` |
+| CloudFront | GetDistributionConfig | `!` | `"TLSv1.0, no custom error response"` |
+| API Gateway | GetStages | `!` | `"no throttling, no access logging"` |
+| CloudFormation | DescribeStackEvents | `!` | `"stack event: UPDATE_FAILED"` |
+| ECR | DescribeImageScanFindings | `!` | `"HIGH: 3, CRITICAL: 1"` |
+| CodeArtifact | GetRepositoryPermissionsPolicy | `!` | `"no permissions policy"` |
+| Athena | GetWorkGroup | `!` | `"query enforcement disabled, no encryption"` |
+| Route 53 | GetHostedZone | `!` | `"private zone, orphan (0 records)"` |
+| WAF | GetLoggingConfiguration | `!` | `"no logging, no associated resources"` |
+| IAM Roles | GetRole | `!` | `"role unused >90 days"` |
+| IAM Policies | GetPolicyVersion | `!` | `"admin-star policy (CIS IAM.16)"` |
+| IAM Users | GetLoginProfile + ListMFADevices | `!` | `"console access, no MFA"` |
+| IAM Groups | GetGroup + ListAttachedGroupPolicies | `!` | `"inline policies attached, no members"` |
+| CW Logs | DescribeMetricFilters | `!` | `"no metric filters (audit gap)"` |
+
+Types with Wave 2 = "None" (26 total) are registered as `NoOpEnricher` — returns zero findings, zero issues. Some types use in-fetcher Wave 2 (their fetcher already performs per-resource Describe calls and populates health fields; the `NoOpEnricher` entry exists for contract conformance).
 
 ### What This Does NOT Change
 
@@ -337,7 +370,7 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 
 1. `EnrichmentFinding` in `internal/resource/enrichment.go`
 2. `EnricherResult` + update `EnricherFunc` signature in `internal/aws/enrichment.go`
-3. Update 9 enrichers to return `EnricherResult` with findings
+3. Update all enrichers to return `EnricherResult` with findings (40 real + 26 NoOpEnricher)
 4. `enrichmentFindings` + `enrichmentRan` + `enrichmentTypeGen` maps on Model; add `TypeGen` field to `EnrichmentCheckedMsg`; store findings from `EnrichmentCheckedMsg` only when BOTH session-wide `Gen` and per-type `TypeGen` match (drop stale)
 5. Clear all findings and `enrichmentTypeGen` on profile/region switch; invalidate per-type (bump `TypeGen`, clear findings/ran) when a rerun starts
 6. Add `TypeGen int` field to `ResourcesLoadedMsg`; build wrapped fetch command in `app_fetchers.go` that stamps the captured token onto the `ResourcesLoadedMsg` it forwards (passes `APIErrorMsg` through unchanged).
