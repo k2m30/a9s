@@ -22,6 +22,7 @@ func init() {
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkDbiRole},
 	})
 
 	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,

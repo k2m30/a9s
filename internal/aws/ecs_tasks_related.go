@@ -16,6 +16,8 @@ func init() {
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSTaskKMS},
 	})
 
 	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
@@ -122,6 +124,19 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 // SecurityGroups in the DescribeTasks/ListTasks response payload.
 func checkECSTaskSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+}
+
+// checkECSTaskRole returns Count: 0 because the ECS Task struct does not expose
+// a TaskRoleArn directly — the task role is on the task definition, not on the
+// running task in the ListTasks/DescribeTasks response.
+func checkECSTaskRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkECSTaskKMS is a stub. The ECS Task struct does not carry a KMS key ID
+// directly — KMS references are on the task definition, not the running task.
+func checkECSTaskKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.

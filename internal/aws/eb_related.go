@@ -18,6 +18,7 @@ func init() {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRole},
 	})
 }
 
@@ -202,6 +203,12 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 // managed by Elastic Beanstalk on the underlying EC2 and ASG resources.
 func checkEbSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+}
+
+// checkEbRole returns Count: 0 because EnvironmentDescription does not expose
+// an IAM service role ARN in the DescribeEnvironments list response.
+func checkEbRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
 // ebRelatedResources returns the resource list for target from cache or fetches it.

@@ -26,6 +26,7 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkAMIKMS},
 	})
 
 	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId
@@ -114,6 +115,13 @@ func FetchAMIByID(ctx context.Context, api EC2DescribeImagesAPI, imageID string)
 		return resource.Resource{}, fmt.Errorf("AMI %s not found", imageID)
 	}
 	return imageResource(output.Images[0]), nil
+}
+
+// checkAMIKMS is a stub. AMI images carry KMS key references in their block
+// device mapping EBS snapshots, not on the Image struct directly. Multi-hop
+// resolution is not supported from the list cache.
+func checkAMIKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 func imageResource(img ec2types.Image) resource.Resource {

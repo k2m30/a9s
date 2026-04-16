@@ -25,6 +25,7 @@ func init() {
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSServices, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSCFN, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSKMS},
 	})
 
 	resource.RegisterNavigableFields("ecs", []resource.NavigableField{
