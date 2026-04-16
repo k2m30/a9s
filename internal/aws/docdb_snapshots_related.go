@@ -42,3 +42,11 @@ func checkDocdbSnapKMS(_ context.Context, _ any, res resource.Resource, _ resour
 	}
 	return relatedResult("kms", []string{keyID})
 }
+
+func checkDocdbSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
+	if !ok || snap.VpcId == nil || *snap.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*snap.VpcId})
+}

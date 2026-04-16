@@ -187,3 +187,9 @@ func asgRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+// checkASGVPC — ASG has no direct VPC field; VPCZoneIdentifier is CSV subnet IDs.
+// Resolving VPC requires subnet cache lookup. Stub for now.
+func checkASGVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}

@@ -23,6 +23,7 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC},
 	})
 }
 
@@ -197,4 +198,8 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkEFSVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
