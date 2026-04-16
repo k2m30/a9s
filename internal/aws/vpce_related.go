@@ -12,6 +12,10 @@ import (
 func init() {
 	resource.RegisterNavigableFields("vpce", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "SubnetIds", TargetType: "subnet"},
+		{FieldPath: "NetworkInterfaceIds", TargetType: "eni"},
+		{FieldPath: "Groups.GroupId", TargetType: "sg"},
+		{FieldPath: "RouteTableIds", TargetType: "rtb"},
 	})
 
 	resource.RegisterRelated("vpce", []resource.RelatedDef{

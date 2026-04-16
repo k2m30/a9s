@@ -257,7 +257,7 @@ var navigableContracts = []navContract{
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "RouteTableIds", targetType: "rtb", reasoning: "VpcEndpoint.RouteTableIds — route tables the gateway endpoint is associated with."},
 
 	// tgw — Transit Gateways
-	{shortName: "tgw", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html", fieldPath: "OwnerId", targetType: "", reasoning: "TransitGateway has no built-in cross-resource ID fields beyond Options (ASNs, CIDRs). No navigable fields required today; attachments are a separate API."},
+	{shortName: "tgw", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html", fieldPath: "", targetType: "", reasoning: "TransitGateway has no built-in cross-resource ID fields beyond Options (ASNs, CIDRs). No navigable fields required today; attachments are a separate API."},
 
 	// Types with no cross-reference on the list/describe response — no navigable fields.
 	// Declaring as empty-row sentinels so test C (orphan detection) accepts the absence.

@@ -12,11 +12,14 @@ import (
 )
 
 func init() {
-	// Only scalar fields are navigable — slice fields (SecurityGroupIds, SubnetIds)
-	// resolve to multi-value YAML which doesn't match single fixture IDs.
+	// Cluster.ResourcesVpcConfig: VpcId, ClusterSecurityGroupId, SubnetIds, SecurityGroupIds
+	// Cluster: RoleArn (IAM role for cluster operations)
 	resource.RegisterNavigableFields("eks", []resource.NavigableField{
 		{FieldPath: "ResourcesVpcConfig.VpcId", TargetType: "vpc"},
 		{FieldPath: "ResourcesVpcConfig.ClusterSecurityGroupId", TargetType: "sg"},
+		{FieldPath: "ResourcesVpcConfig.SubnetIds", TargetType: "subnet"},
+		{FieldPath: "ResourcesVpcConfig.SecurityGroupIds", TargetType: "sg"},
+		{FieldPath: "RoleArn", TargetType: "role"},
 	})
 
 	resource.RegisterRelated("eks", []resource.RelatedDef{

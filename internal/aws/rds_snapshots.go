@@ -21,6 +21,8 @@ func init() {
 
 	resource.RegisterNavigableFields("rds-snap", []resource.NavigableField{
 		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 
 	resource.RegisterPaginated("rds-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {

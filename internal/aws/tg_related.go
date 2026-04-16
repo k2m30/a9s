@@ -24,6 +24,7 @@ func init() {
 
 	resource.RegisterNavigableFields("tg", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "LoadBalancerArns", TargetType: "elb"},
 	})
 }
 

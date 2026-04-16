@@ -19,9 +19,12 @@ func init() {
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
-	// skip VPCOptions.{VPCId,SecurityGroupIds,SubnetIds}: VPCOptions not rendered in detail view YAML
+	// VPCOptions: VPCId, SubnetIds, SecurityGroupIds
 	resource.RegisterNavigableFields("opensearch", []resource.NavigableField{
 		{FieldPath: "EncryptionAtRestOptions.KmsKeyId", TargetType: "kms"},
+		{FieldPath: "VPCOptions.VPCId", TargetType: "vpc"},
+		{FieldPath: "VPCOptions.SubnetIds", TargetType: "subnet"},
+		{FieldPath: "VPCOptions.SecurityGroupIds", TargetType: "sg"},
 	})
 }
 

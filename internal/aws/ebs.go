@@ -37,6 +37,7 @@ func init() {
 	})
 	resource.RegisterNavigableFields("ebs", []resource.NavigableField{
 		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 
 	resource.RegisterRelated("ebs-snap", []resource.RelatedDef{

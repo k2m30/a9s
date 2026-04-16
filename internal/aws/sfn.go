@@ -27,6 +27,11 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSFNCFN, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSFNEbRule, NeedsTargetCache: true},
 	})
+
+	// sfntypes.StateMachineListItem: RoleArn (IAM execution role for the state machine)
+	resource.RegisterNavigableFields("sfn", []resource.NavigableField{
+		{FieldPath: "RoleArn", TargetType: "role"},
+	})
 }
 
 // FetchStepFunctions calls the SFN ListStateMachines API and converts

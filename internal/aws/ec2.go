@@ -57,6 +57,8 @@ func init() {
 		{FieldPath: "ImageId", TargetType: "ami"},
 		{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
+		{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
+		{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
 	})
 }
 

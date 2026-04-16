@@ -20,6 +20,10 @@ func init() {
 
 	resource.RegisterNavigableFields("trail", []resource.NavigableField{
 		{FieldPath: "S3BucketName", TargetType: "s3"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "SnsTopicARN", TargetType: "sns"},
+		{FieldPath: "CloudWatchLogsLogGroupArn", TargetType: "logs"},
+		{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
 	})
 }
 
