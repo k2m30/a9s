@@ -25,6 +25,7 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: false},
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: false},
 		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkR53VPC},
 	})
 }
 

@@ -22,6 +22,7 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
@@ -319,4 +320,10 @@ func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.Res
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkECSSvcVPC — ECS service has no direct VPC field; subnets are in
+// NetworkConfiguration.AwsvpcConfiguration. Stub for now.
+func checkECSSvcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }

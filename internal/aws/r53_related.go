@@ -27,3 +27,9 @@ func checkR53CF(_ context.Context, _ any, _ resource.Resource, _ resource.Resour
 func checkR53ACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 }
+
+// checkR53VPC — private hosted zones are associated with VPCs, but the
+// association list requires a separate GetHostedZone call. Stub for now.
+func checkR53VPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}

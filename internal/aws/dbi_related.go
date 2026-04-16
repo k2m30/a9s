@@ -186,3 +186,11 @@ func dbiRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	inst, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
+	if !ok || inst.DBSubnetGroup == nil || inst.DBSubnetGroup.VpcId == nil || *inst.DBSubnetGroup.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
+}

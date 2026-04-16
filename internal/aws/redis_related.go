@@ -15,6 +15,7 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC},
 	})
 
 	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
@@ -90,4 +91,10 @@ func redisRelatedResources(ctx context.Context, clients any, cache resource.Reso
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkRedisVPC — ElastiCache replication group has no direct VPC field
+// on the list response. VPC is on the cache subnet group. Stub for now.
+func checkRedisVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
