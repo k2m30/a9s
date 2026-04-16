@@ -23,6 +23,9 @@ func init() {
 	resource.RegisterRelated("cfn", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfnS3},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
 	})
 
 	// cfntypes.Stack: RoleARN (execution role), NotificationARNs (SNS topics for stack events)

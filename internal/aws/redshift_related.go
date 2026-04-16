@@ -5,6 +5,7 @@ import (
 	"context"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -13,6 +14,8 @@ func init() {
 	resource.RegisterRelated("redshift", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedshiftSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedshiftVPC},
 	})
 
 	// redshifttypes.Cluster: VpcId
@@ -60,6 +63,36 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkRedshiftSG extracts security group IDs from the Redshift Cluster's
+// VpcSecurityGroups slice.
+// Pattern F — no cache needed.
+func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	var ids []string
+	for _, vsg := range cluster.VpcSecurityGroups {
+		if vsg.VpcSecurityGroupId != nil && *vsg.VpcSecurityGroupId != "" {
+			ids = append(ids, *vsg.VpcSecurityGroupId)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkRedshiftVPC returns the VPC this Redshift cluster runs in (Pattern R).
+// Reads Cluster.VpcId from the RawStruct.
+func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	if cluster.VpcId == nil || *cluster.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*cluster.VpcId})
 }
 
 // redshiftRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -24,6 +24,8 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
 		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkCbVPC},
 	})
 
 	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}

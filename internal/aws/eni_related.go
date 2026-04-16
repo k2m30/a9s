@@ -22,6 +22,7 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkENIEC2, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkENISG, NeedsTargetCache: true},
 		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkENIEIP, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkENIVPC},
 	})
 }
 
@@ -131,6 +132,16 @@ func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
 	}
 	return relatedResult("eip", ids)
+}
+
+// checkENIVPC returns the VPC this network interface belongs to (Pattern F).
+// Reads vpc_id from Fields which is populated by the ENI fetcher.
+func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }
 
 // eniRelatedResources returns the resource list for target from cache or fetches

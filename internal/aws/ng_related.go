@@ -173,6 +173,22 @@ func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("ec2", ids)
 }
 
+// checkNGSG extracts the remote access security group from the EKS Node Group's
+// Resources.RemoteAccessSecurityGroup field (present when the node group is not
+// using a launch template and SSH access is configured).
+// Pattern F — no cache needed.
+func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if ng.Resources == nil || ng.Resources.RemoteAccessSecurityGroup == nil ||
+		*ng.Resources.RemoteAccessSecurityGroup == "" {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	return relatedResult("sg", []string{*ng.Resources.RemoteAccessSecurityGroup})
+}
+
 // ngRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ngRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

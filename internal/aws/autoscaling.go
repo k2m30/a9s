@@ -27,6 +27,7 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG},
 	})
 
 	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs

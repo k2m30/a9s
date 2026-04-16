@@ -16,6 +16,8 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkOpenSearchSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -106,6 +108,40 @@ func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ reso
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 	return relatedResult("logs", ids)
+}
+
+// checkOpenSearchSG extracts security group IDs from the OpenSearch Domain's
+// VPCOptions.SecurityGroupIds slice (only present for VPC-attached domains).
+// Pattern F — no cache needed.
+func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if domain.VPCOptions == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	var ids []string
+	for _, sgID := range domain.VPCOptions.SecurityGroupIds {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkOpenSearchVPC returns the VPC this OpenSearch domain is attached to (Pattern R).
+// Reads VPCOptions.VPCId from the DomainStatus RawStruct.
+// Returns Count: 0 for public domains not attached to a VPC.
+func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	if domain.VPCOptions == nil || domain.VPCOptions.VPCId == nil || *domain.VPCOptions.VPCId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*domain.VPCOptions.VPCId})
 }
 
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.

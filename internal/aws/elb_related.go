@@ -113,6 +113,33 @@ func checkELBR53(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
 }
 
+// checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's
+// SecurityGroups slice (ALBs only; NLBs and GLBs return an empty list).
+// Pattern F — no cache needed.
+func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	var ids []string
+	for _, sgID := range raw.SecurityGroups {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkELBVPC returns the VPC this load balancer runs in (Pattern F).
+// Reads vpc_id from Fields which is populated by the ELB fetcher.
+func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
+}
+
 // elbRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func elbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

@@ -920,11 +920,11 @@ var relatedSmokeTable = []smokeTestCase{
 		s06: func(t *testing.T) {
 			t.Helper()
 			defs := resource.GetRelated("vpce")
-			if len(defs) != 5 {
-				t.Fatalf("VPCE-S06: expected 5 related defs for vpce, got %d", len(defs))
+			if len(defs) != 6 {
+				t.Fatalf("VPCE-S06: expected 6 related defs for vpce, got %d", len(defs))
 			}
 			// Entries that require a real async Checker implementation.
-			checkerTargets := []string{"subnet", "sg", "rtb", "eni"}
+			checkerTargets := []string{"subnet", "sg", "rtb", "eni", "vpc"}
 			for _, target := range checkerTargets {
 				var found *resource.RelatedDef
 				for i := range defs {

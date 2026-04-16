@@ -23,6 +23,7 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCESG, NeedsTargetCache: false},
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVPCERTB, NeedsTargetCache: false},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCEENI, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkVPCEVPC},
 	})
 }
 
@@ -82,4 +83,14 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	return relatedResult("eni", vpce.NetworkInterfaceIds)
+}
+
+// checkVPCEVPC returns the VPC this endpoint is attached to (Pattern F).
+// Reads vpc_id from Fields which is populated by the VPC endpoints fetcher.
+func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }

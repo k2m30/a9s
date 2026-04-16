@@ -54,6 +54,8 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkLambdaLogs, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEbRule, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLambdaSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkLambdaVPC},
 	})
 }
 

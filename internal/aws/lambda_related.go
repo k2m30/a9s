@@ -140,6 +140,40 @@ func checkLambdaEbRule(_ context.Context, _ any, _ resource.Resource, _ resource
 	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
 }
 
+// checkLambdaSG extracts security group IDs from the Lambda FunctionConfiguration's
+// VpcConfig.SecurityGroupIds (only present for VPC-attached functions).
+// Pattern F — no cache needed.
+func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if fn.VpcConfig == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	var ids []string
+	for _, sgID := range fn.VpcConfig.SecurityGroupIds {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkLambdaVPC returns the VPC this Lambda function runs in (Pattern R).
+// Reads FunctionConfiguration.VpcConfig.VpcId from the RawStruct.
+// Returns Count: 0 for functions not attached to a VPC.
+func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	if fn.VpcConfig == nil || fn.VpcConfig.VpcId == nil || *fn.VpcConfig.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*fn.VpcConfig.VpcId})
+}
+
 // lambdaRelatedResources returns the resource list for target from cache or by fetching the first page.
 func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

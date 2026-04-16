@@ -91,6 +91,39 @@ func checkCbPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.R
 	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
 }
 
+// checkCbSG extracts security group IDs from the CodeBuild Project's VpcConfig.
+// Pattern F — no cache needed.
+func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if project.VpcConfig == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	var ids []string
+	for _, sgID := range project.VpcConfig.SecurityGroupIds {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkCbVPC returns the VPC this CodeBuild project runs in (Pattern R).
+// Reads Project.VpcConfig.VpcId from the RawStruct.
+// Returns Count: 0 for projects not configured with VPC access.
+func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	if project.VpcConfig == nil || project.VpcConfig.VpcId == nil || *project.VpcConfig.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*project.VpcConfig.VpcId})
+}
+
 // cbRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

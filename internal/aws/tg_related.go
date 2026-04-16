@@ -20,6 +20,8 @@ func init() {
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkTGECSSvc, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkTGASG, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkTGAlarm, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkTGVPC},
 	})
 
 	resource.RegisterNavigableFields("tg", []resource.NavigableField{
@@ -192,6 +194,22 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkTGSG returns Count: 0 because Target Groups do not have security groups
+// — they are associated with load balancers and targets, not security groups directly.
+func checkTGSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+}
+
+// checkTGVPC returns the VPC this target group is scoped to (Pattern F).
+// Reads vpc_id from Fields which is populated by the target groups fetcher.
+func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }
 
 // tgRelatedResources returns the resource list for target from cache or by

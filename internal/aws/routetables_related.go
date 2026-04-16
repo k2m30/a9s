@@ -27,6 +27,7 @@ func init() {
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkRTBNAT, NeedsTargetCache: true},
 		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRTBCFN, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRTBVPC},
 	})
 }
 
@@ -185,6 +186,16 @@ func rtbCFNStackName(res resource.Resource) string {
 		return ""
 	}
 	return tagValue(rtb.Tags, "aws:cloudformation:stack-name")
+}
+
+// checkRTBVPC returns the VPC this route table belongs to (Pattern F).
+// Reads vpc_id from Fields which is populated by the route tables fetcher.
+func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }
 
 // rtbRelatedResources returns the resource list for target from cache or fetches

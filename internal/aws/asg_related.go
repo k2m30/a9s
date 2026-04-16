@@ -169,6 +169,14 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("ng", ids)
 }
 
+// checkASGSG returns Count: 0 because AutoScalingGroup list response does not
+// include security group IDs directly — they are defined on the launch
+// template/configuration and are not surfaced in the DescribeAutoScalingGroups
+// response payload.
+func checkASGSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+}
+
 // asgRelatedResources returns the resource list for target from cache or fetches it.
 func asgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

@@ -22,6 +22,7 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSubnetELB, NeedsTargetCache: true},
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkSubnetRTB, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSubnetCFN, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkSubnetVPC},
 	})
 }
 
@@ -216,6 +217,16 @@ func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	return relatedResult("cfn", []string{stackName})
+}
+
+// checkSubnetVPC returns the VPC this subnet belongs to (Pattern F).
+// Reads vpc_id from Fields which is populated by the subnet fetcher.
+func checkSubnetVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }
 
 // subnetRelatedResources returns the resource list for target from cache or fetches

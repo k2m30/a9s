@@ -112,3 +112,10 @@ func dbcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 func checkDbcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 }
+
+// checkDbcVPC returns Count: 0 because DocumentDB's DescribeDBClusters API
+// returns DBSubnetGroup as a name string, not a struct — the VpcId is not
+// available from the cached DBCluster without an additional DescribeDBSubnetGroups call.
+func checkDbcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}
