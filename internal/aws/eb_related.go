@@ -17,6 +17,7 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG},
 	})
 }
 
@@ -194,6 +195,13 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
 	}
 	return relatedResult("ec2", ids)
+}
+
+// checkEbSG returns Count: 0 because EnvironmentDescription (Elastic Beanstalk
+// list response) does not include security group IDs directly — they are
+// managed by Elastic Beanstalk on the underlying EC2 and ASG resources.
+func checkEbSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 }
 
 // ebRelatedResources returns the resource list for target from cache or fetches it.

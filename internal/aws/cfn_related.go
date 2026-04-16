@@ -109,6 +109,38 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("cfn", ids)
 }
 
+// checkCfnEBRule returns Count: 0 because Stack.NotificationARNs contains SNS ARNs,
+// not EventBridge rule ARNs — the eb-rule relationship cannot be determined from cache alone.
+func checkCfnEBRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+// checkCfnS3 returns Count: 0 because Stack does not include S3 template/artifact bucket
+// ARNs in the list response — the relationship cannot be determined from cache alone.
+func checkCfnS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+}
+
+// checkCfnSNS extracts notification ARNs from the CloudFormation Stack's
+// NotificationARNs field and returns SNS topic identifiers.
+// Pattern F — no cache needed.
+func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+	}
+	var ids []string
+	for _, arn := range stack.NotificationARNs {
+		if arn != "" {
+			ids = append(ids, arn)
+		}
+	}
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+	}
+	return relatedResult("sns", ids)
+}
+
 // cfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
