@@ -27,10 +27,6 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true},
 		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true},
 		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true},
-		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCFR53},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCfAlarm},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkCfLambda},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCfLogs},
 	})
 
 	// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname

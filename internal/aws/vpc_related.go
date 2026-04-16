@@ -21,8 +21,6 @@ func init() {
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVPCRTB, NeedsTargetCache: true},
 		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkVPCVPCE, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkVPCCFN, NeedsTargetCache: false},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCENI},
-		{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW},
 	})
 }
 
@@ -290,10 +288,4 @@ func vpcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkVPCENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}
 
-func checkVPCTGW(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
-}

@@ -106,19 +106,7 @@ func dbcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-// checkDbcSecrets returns Count: 0 because the DocumentDB DescribeDBClusters API
-// does not include Secrets Manager ARNs in the list response — the relationship
-// cannot be determined from cache alone.
-func checkDbcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-// checkDbcVPC returns Count: 0 because DocumentDB's DescribeDBClusters API
-// returns DBSubnetGroup as a name string, not a struct — the VpcId is not
-// available from the cached DBCluster without an additional DescribeDBSubnetGroups call.
-func checkDbcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
 // checkDbcKMS extracts the KMS key from the DocumentDB DBCluster's KmsKeyId field.
 // KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
@@ -135,14 +123,5 @@ func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
-func checkDbcDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
-}
 
-func checkDbcDocdbSnap(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: 0}
-}
 
-func checkDbcSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

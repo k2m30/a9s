@@ -19,12 +19,8 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbiSubnets},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbiAlarm, NeedsTargetCache: true},
 		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkDbiRDSSnap, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkDbiRole},
-		{TargetType: "dbc", DisplayName: "DocumentDB Clusters", Checker: checkDbiDBC},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
 	})
 
 	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,

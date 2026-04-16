@@ -9,11 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkACMELB returns Count: 0 because ELBv2 DescribeLoadBalancers does not
-// include listener/certificate data — the relationship cannot be determined from cache.
-func checkACMELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
 
 // checkACMCF searches the CloudFront cache for distributions whose viewer
 // certificate ARN matches this ACM certificate's ARN.
@@ -51,19 +46,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("cf", ids)
 }
 
-// checkACMAPIGW returns Count: 0 because API Gateway custom domain certificate
-// data is not available in the list API — the relationship cannot be determined
-// from cache alone.
-func checkACMAPIGW(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
-}
 
-// checkACMR53 returns Count: 0 because ACM validation DNS records are not
-// available in the hosted zone list API — the relationship cannot be determined
-// from cache alone.
-func checkACMR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-}
 
 // acmRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
