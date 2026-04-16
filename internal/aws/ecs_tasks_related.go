@@ -18,6 +18,13 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSTaskKMS},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSTaskEC2},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSTaskECR},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkECSTaskENI},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkECSTaskSecrets},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSTaskSubnet},
 	})
 
 	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
@@ -137,6 +144,34 @@ func checkECSTaskRole(_ context.Context, _ any, _ resource.Resource, _ resource.
 // directly — KMS references are on the task definition, not the running task.
 func checkECSTaskKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
+func checkECSTaskAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkECSTaskEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+}
+
+func checkECSTaskECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+}
+
+func checkECSTaskENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+}
+
+func checkECSTaskSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
+func checkECSTaskSSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+}
+
+func checkECSTaskSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }
 
 // ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.

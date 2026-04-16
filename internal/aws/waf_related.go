@@ -17,6 +17,8 @@ func init() {
 		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCloudFront, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkWAFRole},
+		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkWAFAlarm},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
 	})
 
 	// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
@@ -97,4 +99,12 @@ func checkWAFRole(_ context.Context, _ any, _ resource.Resource, _ resource.Reso
 // CloudFront distributions.
 func checkWAFCloudFront(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+}
+
+func checkWAFAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkWAFLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 }

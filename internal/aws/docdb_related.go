@@ -134,3 +134,15 @@ func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	return relatedResult("kms", []string{keyID})
 }
+
+func checkDbcDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+}
+
+func checkDbcDocdbSnap(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: 0}
+}
+
+func checkDbcSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+}

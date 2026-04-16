@@ -20,6 +20,13 @@ func init() {
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEIPENI},
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkEIPNAT, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEIPKMS},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEIPAlarm},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEIPASG},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEIPCFN},
+		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkEIPECS},
+		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkEIPECSSvc},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEIPECSTask},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEIPLogs},
 	})
 }
 
@@ -98,6 +105,34 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 // and do not carry a KMS key reference.
 func checkEIPKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
+func checkEIPAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkEIPASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+}
+
+func checkEIPCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
+func checkEIPECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+}
+
+func checkEIPECSSvc(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+}
+
+func checkEIPECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkEIPLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 }
 
 // eipRelatedResources returns the resource list for target from cache or fetches

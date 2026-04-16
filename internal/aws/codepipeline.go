@@ -25,6 +25,15 @@ func init() {
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkPipelineKMS},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkPipelineCFN},
+		{TargetType: "codeartifact", DisplayName: "CodeArtifact", Checker: checkPipelineCodeArtifact},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkPipelineEbRule},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkPipelineECR},
+		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkPipelineECSSvc},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkPipelineLambda},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkPipelineLogs},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkPipelineS3},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkPipelineSNS},
 	})
 
 	// cptypes.PipelineSummary (list response): no navigable fields — RoleArn and

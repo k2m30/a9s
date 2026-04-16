@@ -26,6 +26,10 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSCFN, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSKMS},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkECSASG},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSEC2},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSTask},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSLogs},
 	})
 
 	resource.RegisterNavigableFields("ecs", []resource.NavigableField{
