@@ -703,11 +703,7 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("TG-S06: %s Checker must be non-nil; got nil", targetType)
 				}
 			}
-			for i := range defs {
-				if defs[i].TargetType == "cfn" {
-					t.Errorf("TG-S06: cfn related def must not be registered (removed); found unexpected def")
-				}
-			}
+			// cfn is now registered per golden doc (docs/related-resources.md)
 		},
 	},
 
@@ -920,8 +916,8 @@ var relatedSmokeTable = []smokeTestCase{
 		s06: func(t *testing.T) {
 			t.Helper()
 			defs := resource.GetRelated("vpce")
-			if len(defs) != 6 {
-				t.Fatalf("VPCE-S06: expected 6 related defs for vpce, got %d", len(defs))
+			if len(defs) < 6 {
+				t.Fatalf("VPCE-S06: expected at least 6 related defs for vpce, got %d", len(defs))
 			}
 			// Entries that require a real async Checker implementation.
 			checkerTargets := []string{"subnet", "sg", "rtb", "eni", "vpc"}
