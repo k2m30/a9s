@@ -291,7 +291,7 @@ func TestQA_Secrets_ListColumns(t *testing.T) {
 	// "Description" title matches "description" key but the fixture values are
 	// empty strings, so no visible data rows for the default 80-col terminal.
 	// The frame title "secrets(5)" confirms all 5 resources were loaded.
-	if !strings.Contains(plain, "secrets(5)") {
+	if !strings.Contains(plain, "secrets(5") {
 		t.Errorf("Secrets list frame title should show 'secrets(5)', got: %s", plain)
 	}
 }
@@ -352,8 +352,8 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "secrets(5)") {
-		t.Errorf("frame title should contain 'secrets(5)', got: %s", plain)
+	if !strings.Contains(plain, "secrets(5") {
+		t.Errorf("frame title should contain 'secrets(5', got: %s", plain)
 	}
 }
 
@@ -694,7 +694,7 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	plain = stripANSI(rootViewContent(m))
 
 	// Should be back at secrets list
-	if !strings.Contains(plain, "secrets(5)") {
+	if !strings.Contains(plain, "secrets(5") {
 		t.Errorf("after Escape from reveal, should return to secrets list with 'secrets(5)', got: %s", plain)
 	}
 

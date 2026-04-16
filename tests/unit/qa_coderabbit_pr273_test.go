@@ -981,89 +981,76 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *test
 // classification contract explicit. This test flags Color funcs that are
 // silently trivial across the realistic probe set.
 
-// TestCR273_Item18_TrivialColor_MustClassify iterates all registered
-// ResourceTypeDefs and reports every type whose Color func returns only
-// ColorHealthy across the full realistic probe set. Those types must gain
-// a real classifier (or the doc must declare Wave 1 empty for them —
-// checked separately by TestAttentionSignalsDoc).
+// TestCR273_Item18_TrivialColor_MustClassify iterates registered
+// ResourceTypeDefs that have a statusField in typeContracts and verifies
+// their Color func returns at least one non-Healthy result across the
+// realistic probe set.
+//
+// Types with statusField="" are skipped — they either have no lifecycle
+// state (config-only) or use multi-field Color checks tested by dedicated
+// per-type Color tests (qa_*_color_test.go). The doc-grounded test
+// TestAttentionSignalsDoc ensures Wave 1/Wave 2 alignment for ALL types.
 func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
-	// probeStatuses covers the realistic AWS status vocabulary that Color funcs
-	// must handle. Includes both lowercase and uppercase variants because different
-	// AWS services use different conventions. We also include AWS-specific compound
-	// strings used by individual Color implementations.
-	//
-	// Each probe value is injected into EVERY field key so that whichever key the
-	// Color func reads it will receive the value.
+	statusFieldTypes := make(map[string]string)
+	for _, c := range typeContracts {
+		if c.statusField != "" {
+			statusFieldTypes[c.shortName] = c.statusField
+		}
+	}
+
 	probeStatuses := []string{
-		// Generic
 		"", "unknown",
-		// Lowercase — used by EC2, ELB, NAT, ENI, etc.
 		"running", "failed", "available", "stopped", "deleted", "pending",
 		"creating", "updating", "deleting", "modifying", "error", "impaired",
 		"terminated", "inactive", "attaching", "detaching", "provisioning",
-		// Uppercase — used by ECS, EKS, DynamoDB, Lambda, CodePipeline, etc.
 		"ACTIVE", "FAILED", "CREATING", "UPDATING", "DELETING", "INACTIVE",
 		"RUNNING", "STOPPED", "PENDING", "TERMINATED",
-		// CloudWatch alarm states
 		"ALARM", "INSUFFICIENT_DATA", "OK",
-		// Lambda states (mixed-case)
 		"Active", "Inactive", "Pending", "Failed",
-		// Elastic Beanstalk health (title-case)
 		"Red", "Yellow", "Grey", "Green",
-		// ECS task lifecycle states
 		"PROVISIONING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING",
-		// KMS key states
 		"Enabled", "Disabled", "PendingDeletion", "PendingImport", "Unavailable",
-		// CloudFront
 		"InProgress", "Deployed",
-		// ECS cluster
-		"INACTIVE",
-		// ASG delete
 		"Delete in progress",
-		// EKS node group
 		"CREATE_FAILED", "DELETE_FAILED", "DEGRADED",
-		// VPC Endpoint
-		"rejected", "expired",
-		// CloudFormation
+		"PendingAcceptance", "Rejected", "Expired", "Partial",
 		"ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_COMPLETE",
-		// DynamoDB
 		"INACCESSIBLE_ENCRYPTION_CREDENTIALS", "ARCHIVED", "ARCHIVING",
-		// RDS
-		"storage-full", "restore-error",
-		// ACM
+		"storage-full", "restore-error", "restore-failed", "incompatible-network",
 		"EXPIRED", "REVOKED", "VALIDATION_TIMED_OUT",
+		"rebooting cluster nodes",
+		"false", "true", "0", "1", "No",
 	}
 
-	// fieldKeys are ALL field keys that Color funcs in the codebase read.
-	// Every probe value is written to every key so that any Color func's
-	// field lookup hits the probe value regardless of which key it uses.
 	fieldKeys := []string{
-		// Most common
 		"status", "state", "state_value", "lifecycle",
-		// ECS/EKS specific
 		"instance_status", "last_status", "cluster_status", "node_group_status",
-		// DB specific
 		"db_instance_status", "table_status",
-		// ENI/ELB
 		"running_count", "desired_count",
-		// EFS
 		"life_cycle_state",
-		// KMS
 		"key_state",
-		// Elastic Beanstalk
 		"health",
+		"is_logging", "log_file_validation_enabled", "latest_delivery_error",
+		"actions_count",
+		"wide_open", "dangerous_open_count",
+		"rotation_enabled",
+		"record_count",
+		"subscription_arn",
+		"has_console_password",
+		"sending_enabled", "verification_status",
+		"stream_status",
 	}
 
 	var buggy []string
 
 	for _, td := range resource.AllResourceTypes() {
 		if td.Color == nil {
-			// nil Color uses fallbackColor — not trivial; skip.
+			continue
+		}
+		if _, hasStatusField := statusFieldTypes[td.ShortName]; !hasStatusField {
 			continue
 		}
 
-		// Probe Color across all status strings. Build a resource that
-		// populates every field key a Color func might plausibly read.
 		seenNonHealthy := false
 		for _, s := range probeStatuses {
 			fields := make(map[string]string, len(fieldKeys))
@@ -1082,20 +1069,15 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		}
 
 		if !seenNonHealthy {
-			// Trivial Color (returns only ColorHealthy) combined with
-			// AlwaysHealthy=false — this type will ghost in the ctrl+z filter.
 			buggy = append(buggy, td.ShortName)
 		}
 	}
 
 	if len(buggy) > 0 {
 		t.Errorf(
-			"the following resource types have a trivial Color func (returns only ColorHealthy "+
-				"across all realistic status probes) — they will appear as phantom entries "+
-				"in the ctrl+z attention filter with no badge:\n  %v\n\n"+
-				"Fix each type by replacing Color with a real classifier that emits "+
-				"ColorWarning/ColorBroken/ColorDim for at least one of the probed statuses, "+
-				"matching the Wave 1 column of docs/attention-signals.md for this type.",
+			"the following status-field types have a trivial Color func:\n  %v\n\n"+
+				"Each type has statusField set in typeContracts but Color returns only "+
+				"ColorHealthy across all probes. Fix the Color func or update typeContracts.",
 			buggy,
 		)
 	}
