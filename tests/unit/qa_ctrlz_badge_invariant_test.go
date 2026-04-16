@@ -211,16 +211,17 @@ func TestCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes(t *testing.T) {
 }
 
 
-// TestCtrlZ_EC2_27Rows11Issues reproduces the exact scenario from the bug
-// report screenshot: 27 EC2 rows with a mix of statuses yielding 11 issues
-// (per ec2.Color(r).IsIssue()). Pressing ctrl+z must reveal exactly 11 rows.
-// Fields["state"] is populated so the EC2 Color func classifies correctly.
+// TestCtrlZ_EC2_27Rows12Issues reproduces a scenario with 27 EC2 rows
+// yielding 12 issues (per ec2.Color(r).IsIssue()). Pressing ctrl+z must
+// reveal exactly 12 rows. shutting-down is Warning (transitional state),
+// not Dim like terminated. Fields["state"] is populated so the EC2 Color
+// func classifies correctly.
 func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
-	// Build 27 rows: 11 issue-colored, 14 running, 2 terminated/shutting-down.
+	// Build 27 rows: 12 issue-colored (Warning/Broken), 14 running, 1 terminated.
 	issueStatuses := []string{
 		"stopped", "stopped", "stopped", "stopped", "stopped",
 		"stopped", "stopped", "stopped", "stopped",
-		"pending", "stopping",
+		"pending", "stopping", "shutting-down",
 	}
 	var resources []resource.Resource
 	for i, s := range issueStatuses {
@@ -242,8 +243,6 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 	resources = append(resources,
 		resource.Resource{ID: "i-term-1", Name: "legacy-app", Status: "terminated",
 			Fields: map[string]string{"state": "terminated"}},
-		resource.Resource{ID: "i-shut-1", Name: "temp-load-test", Status: "shutting-down",
-			Fields: map[string]string{"state": "shutting-down"}},
 	)
 	if got := len(resources); got != 27 {
 		t.Fatalf("test setup error: want 27 resources, got %d", got)
@@ -261,7 +260,7 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 	m, _ = m.Update(ctrlZ())
 	view := stripANSI(m.View())
 
-	// Count visible issue-node-* rows — must be exactly 11.
+	// Count visible issue-node-* rows — must be exactly 12.
 	visibleIssues := 0
 	for i := 0; i < len(issueStatuses); i++ {
 		name := "issue-node-" + string(rune('a'+i))
@@ -269,8 +268,8 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 			visibleIssues++
 		}
 	}
-	if visibleIssues != 11 {
-		t.Errorf("ctrl+z visible issue-rows: got %d, want 11 (badge says 27/11)", visibleIssues)
+	if visibleIssues != 12 {
+		t.Errorf("ctrl+z visible issue-rows: got %d, want 12", visibleIssues)
 	}
 
 	// No running rows visible.
@@ -281,12 +280,9 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 		}
 	}
 
-	// No terminated/shutting-down rows visible.
+	// Terminated row (Dim) hidden — not an issue.
 	if strings.Contains(view, "legacy-app") {
 		t.Errorf("terminated row 'legacy-app' must be hidden after ctrl+z")
-	}
-	if strings.Contains(view, "temp-load-test") {
-		t.Errorf("shutting-down row 'temp-load-test' must be hidden after ctrl+z")
 	}
 }
 
