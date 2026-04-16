@@ -967,10 +967,17 @@ type ECRAPI interface {
 	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
 }
 
+// CodeArtifactGetRepositoryPermissionsPolicyAPI defines the interface for the CodeArtifact
+// GetRepositoryPermissionsPolicy operation. Used by EnrichCodeArtifactRepository (Wave 2 enrichment).
+type CodeArtifactGetRepositoryPermissionsPolicyAPI interface {
+	GetRepositoryPermissionsPolicy(ctx context.Context, params *codeartifact.GetRepositoryPermissionsPolicyInput, optFns ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error)
+}
+
 // CodeArtifactAPI is the aggregate interface covering all CodeArtifact operations used by a9s fetchers.
 // *codeartifact.Client structurally satisfies this interface.
 type CodeArtifactAPI interface {
 	CodeArtifactListRepositoriesAPI
+	CodeArtifactGetRepositoryPermissionsPolicyAPI // Wave 2 enrichment
 }
 
 // CloudWatchAPI is the aggregate interface covering all CloudWatch operations used by a9s fetchers.
@@ -1038,10 +1045,17 @@ type GlueAPI interface {
 	GlueGetJobRunsAPI
 }
 
+// AthenaGetWorkGroupAPI defines the interface for the Athena GetWorkGroup operation.
+// Used by EnrichAthenaWorkGroup (Wave 2 enrichment).
+type AthenaGetWorkGroupAPI interface {
+	GetWorkGroup(ctx context.Context, params *athena.GetWorkGroupInput, optFns ...func(*athena.Options)) (*athena.GetWorkGroupOutput, error)
+}
+
 // AthenaAPI is the aggregate interface covering all Athena operations used by a9s fetchers.
 // *athena.Client structurally satisfies this interface.
 type AthenaAPI interface {
 	AthenaListWorkGroupsAPI
+	AthenaGetWorkGroupAPI // Wave 2 enrichment
 }
 
 // OpenSearchAPI is the aggregate interface covering all OpenSearch operations used by a9s fetchers.
