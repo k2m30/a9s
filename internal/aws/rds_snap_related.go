@@ -83,6 +83,60 @@ func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("kms", ids)
 }
 
+// checkRDSSnapDBC resolves the owning Aurora/RDS cluster by two-hop lookup
+// through the dbi cache (no extra API call — reuses the dbi list):
+// snap.DBInstanceIdentifier → dbi entry → dbi.DBClusterIdentifier → dbc.
+// Returns Count=0 when the source instance is standalone (no cluster).
+func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	}
+	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+	}
+	dbName := *snap.DBInstanceIdentifier
+
+	dbiList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "dbi")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
+	}
+	if dbiList == nil {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	}
+
+	var clusterID string
+	for _, dbiRes := range dbiList {
+		if dbiRes.Name != dbName && dbiRes.ID != dbName {
+			continue
+		}
+		db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if db.DBClusterIdentifier != nil && *db.DBClusterIdentifier != "" {
+			clusterID = *db.DBClusterIdentifier
+		}
+		break
+	}
+	if clusterID == "" {
+		if truncated {
+			return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+	}
+	return relatedResult("dbc", []string{clusterID})
+}
+
+// checkRDSSnapBackup returns Count: -1 (unknown). RDS snapshots created via
+// AWS Backup have metadata linking them to the backup plan only through
+// Backup's ListRecoveryPointsByResource API (filtered by the source
+// DBInstance ARN). DescribeDBSnapshots does not return backup-plan
+// information. The fetcher does not make that per-snapshot call.
+func checkRDSSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+}
+
 // rdsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
 func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
@@ -93,5 +147,3 @@ func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 	}
 	return resources, isTruncated, err
 }
-
-

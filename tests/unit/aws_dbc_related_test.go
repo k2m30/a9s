@@ -6,6 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -287,17 +289,70 @@ func TestRelated_DBC_Logs_NilCache(t *testing.T) {
 	}
 }
 
-// --- dbc→secrets: undeterminable from cache, returns Count: 0 ---
+// --- dbc→secrets: resolves via DBCluster.MasterUserSecret.SecretArn ---
 
-func TestRelated_DBC_Secrets_ReturnsZero(t *testing.T) {
+// TestRelated_DBC_Secrets_MatchesByARN verifies the dbc→secrets checker resolves
+// the managed master-user secret by matching DBCluster.MasterUserSecret.SecretArn
+// against the secrets cache by ARN.
+func TestRelated_DBC_Secrets_MatchesByARN(t *testing.T) {
+	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:docdb!cluster-XYZ"
+	checker := dbcCheckerByTarget(t, "secrets")
+
 	source := resource.Resource{
 		ID:   "acme-docdb-prod",
 		Name: "acme-docdb-prod",
+		RawStruct: docdbtypes.DBCluster{
+			DBClusterIdentifier: aws.String("acme-docdb-prod"),
+			MasterUserSecret: &docdbtypes.ClusterMasterUserSecret{
+				SecretArn: aws.String(secretARN),
+			},
+		},
+	}
+	secretRes := resource.Resource{
+		ID:     "docdb!cluster-XYZ",
+		Name:   "docdb!cluster-XYZ",
+		Fields: map[string]string{"arn": secretARN},
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("docdb!cluster-XYZ"),
+			ARN:  aws.String(secretARN),
+		},
+	}
+	cache := resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{secretRes}},
+	}
+
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if result.TargetType != "secrets" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "secrets")
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "docdb!cluster-XYZ" {
+		t.Errorf("ResourceIDs = %v, want [docdb!cluster-XYZ]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_DBC_Secrets_NoManagedSecret verifies that when DBCluster has no
+// MasterUserSecret (self-managed credentials) the checker returns Count=0.
+func TestRelated_DBC_Secrets_NoManagedSecret(t *testing.T) {
+	source := resource.Resource{
+		ID:   "self-managed-cluster",
+		Name: "self-managed-cluster",
+		RawStruct: docdbtypes.DBCluster{
+			DBClusterIdentifier: aws.String("self-managed-cluster"),
+			MasterUserSecret:    nil,
+		},
+	}
+	cache := resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-secret", Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:some-secret"}},
+		}},
 	}
 	checker := dbcCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, cache)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+		t.Errorf("Count = %d, want 0 (no MasterUserSecret)", result.Count)
 	}
 	if result.TargetType != "secrets" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "secrets")

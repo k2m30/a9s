@@ -23,9 +23,16 @@ func init() {
 	resource.RegisterRelated("cb", []resource.RelatedDef{
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
+		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkCbSubnet, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkCbVPC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCbKMS},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCbAlarm, NeedsTargetCache: true},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkCbECR, NeedsTargetCache: true},
+		{TargetType: "s3", DisplayName: "S3 Buckets (source/artifacts)", Checker: checkCbS3, NeedsTargetCache: true},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkCbSecrets, NeedsTargetCache: false},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkCbSSM, NeedsTargetCache: false},
 	})
 
 	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}

@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdb_types "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -106,7 +109,170 @@ func dbcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
+// checkDbcDBI does a reverse lookup — scans the dbi cache for DBInstances
+// whose DBClusterIdentifier matches this cluster's identifier. Aurora /
+// DocumentDB clusters own one or more DBInstance members.
+func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterID := res.ID
+	if cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok && cluster.DBClusterIdentifier != nil && *cluster.DBClusterIdentifier != "" {
+		clusterID = *cluster.DBClusterIdentifier
+	}
+	if clusterID == "" {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+	}
 
+	dbiList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbi")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+	}
+	if dbiList == nil {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+	}
+
+	var ids []string
+	for _, dbiRes := range dbiList {
+		db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if db.DBClusterIdentifier != nil && *db.DBClusterIdentifier == clusterID {
+			ids = append(ids, dbiRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+	}
+	return relatedResult("dbi", ids)
+}
+
+// checkDbcDocdbSnap does a reverse lookup — scans the docdb-snap cache for
+// snapshots whose DBClusterIdentifier matches this cluster's identifier.
+func checkDbcDocdbSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterID := res.ID
+	if cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok && cluster.DBClusterIdentifier != nil && *cluster.DBClusterIdentifier != "" {
+		clusterID = *cluster.DBClusterIdentifier
+	}
+	if clusterID == "" {
+		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: 0}
+	}
+
+	snapList, truncated, err := dbcRelatedResources(ctx, clients, cache, "docdb-snap")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1, Err: err}
+	}
+	if snapList == nil {
+		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1}
+	}
+
+	var ids []string
+	for _, snapRes := range snapList {
+		snap, ok := assertStruct[docdb_types.DBClusterSnapshot](snapRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if snap.DBClusterIdentifier != nil && *snap.DBClusterIdentifier == clusterID {
+			ids = append(ids, snapRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1}
+	}
+	return relatedResult("docdb-snap", ids)
+}
+
+// checkDbcSubnet resolves the subnets inside the cluster's DBSubnetGroup via
+// a single docdb:DescribeDBSubnetGroups call (Pattern C — live API). The
+// DBCluster response only carries the subnet-group name; this call resolves
+// it to the concrete Subnets slice.
+func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	sng := dbcSubnetGroup(ctx, clients, res)
+	if sng == nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+	var ids []string
+	for _, s := range sng.Subnets {
+		if s.SubnetIdentifier != nil && *s.SubnetIdentifier != "" {
+			ids = append(ids, *s.SubnetIdentifier)
+		}
+	}
+	return relatedResult("subnet", ids)
+}
+
+// checkDbcVPC resolves the VPC that hosts the cluster's subnet group via a
+// single docdb:DescribeDBSubnetGroups call (Pattern C).
+func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	sng := dbcSubnetGroup(ctx, clients, res)
+	if sng == nil {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	}
+	if sng.VpcId == nil || *sng.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{*sng.VpcId})
+}
+
+// dbcSubnetGroup makes a single docdb:DescribeDBSubnetGroups call for this
+// cluster's DBSubnetGroup name, wrapped in RetryOnThrottle. Returns nil if
+// the call cannot be made or the group was not found.
+func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *docdb_types.DBSubnetGroup {
+	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
+	if !ok || cluster.DBSubnetGroup == nil || *cluster.DBSubnetGroup == "" {
+		return nil
+	}
+	name := *cluster.DBSubnetGroup
+
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.DocDB == nil {
+		return nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBSubnetGroupsOutput, error) {
+		return c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
+			DBSubnetGroupName: &name,
+		})
+	})
+	if err != nil || out == nil || len(out.DBSubnetGroups) == 0 {
+		return nil
+	}
+	return &out.DBSubnetGroups[0]
+}
+
+// checkDbcSecrets resolves the Secrets Manager secret managed for this cluster's
+// master user password. DBCluster.MasterUserSecret.SecretArn holds the full
+// secret ARN; we match it against the secrets cache by ARN.
+func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+	if cluster.MasterUserSecret == nil || cluster.MasterUserSecret.SecretArn == nil || *cluster.MasterUserSecret.SecretArn == "" {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+	secretARN := *cluster.MasterUserSecret.SecretArn
+
+	secretList, truncated, err := dbcRelatedResources(ctx, clients, cache, "secrets")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+	}
+	if secretList == nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+
+	var ids []string
+	for _, secretRes := range secretList {
+		if secretRes.Fields["arn"] == secretARN {
+			ids = append(ids, secretRes.ID)
+			continue
+		}
+		raw, rawOK := assertStruct[smtypes.SecretListEntry](secretRes.RawStruct)
+		if rawOK && raw.ARN != nil && *raw.ARN == secretARN {
+			ids = append(ids, secretRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+	return relatedResult("secrets", ids)
+}
 
 // checkDbcKMS extracts the KMS key from the DocumentDB DBCluster's KmsKeyId field.
 // KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
@@ -122,6 +288,3 @@ func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	return relatedResult("kms", []string{keyID})
 }
-
-
-

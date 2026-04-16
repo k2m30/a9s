@@ -6,6 +6,7 @@ import (
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -81,4 +82,44 @@ func ddbRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream
+// (Pattern A — live API). DDB Streams are consumed through
+// lambda:ListEventSourceMappings; the EventSourceArn on each mapping matches
+// the table's LatestStreamArn. Lambda FunctionConfiguration does not embed
+// event-source info, so there is no cache-only path. Returns Count: -1 when
+// no live clients are available.
+func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	if table.LatestStreamArn == nil || *table.LatestStreamArn == "" {
+		// Streams not enabled on this table — no Lambda triggers are possible.
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+	streamARN := *table.LatestStreamArn
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.Lambda == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
+		EventSourceArn: &streamARN,
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, m := range out.EventSourceMappings {
+		if m.FunctionArn == nil {
+			continue
+		}
+		parts := strings.Split(*m.FunctionArn, ":")
+		name := parts[len(parts)-1]
+		if name != "" {
+			ids = append(ids, name)
+		}
+	}
+	return relatedResult("lambda", ids)
 }

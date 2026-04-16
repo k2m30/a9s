@@ -127,7 +127,15 @@ func init() {
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Roles (key policy grants)", Checker: checkKMSRole, NeedsTargetCache: false},
 	})
+}
+
+// checkKMSRole returns Count: -1. The roles granted by a KMS key's policy are only
+// visible via GetKeyPolicy (policy JSON) and ListGrants — N+1 per key, plus JSON
+// parsing. Intentionally not fetched during related-panel rendering.
+func checkKMSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
 }
 
 // FetchKMSKeys performs a multi-step fetch:
