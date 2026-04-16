@@ -18,3 +18,21 @@ func checkAthenaS3(_ context.Context, _ any, _ resource.Resource, _ resource.Res
 func checkAthenaKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
+
+// checkAthenaGlue returns Count: 0 because WorkGroupSummary does not include
+// Glue catalog references — the relationship cannot be determined from cache alone.
+func checkAthenaGlue(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
+}
+
+// checkAthenaLogs returns Count: 0 because WorkGroupSummary does not include
+// CloudWatch Logs configuration — the relationship cannot be determined from cache alone.
+func checkAthenaLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+// checkAthenaRole returns Count: 0 because WorkGroupSummary does not include
+// IAM role information — the relationship cannot be determined from cache alone.
+func checkAthenaRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}

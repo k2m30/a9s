@@ -84,6 +84,15 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("asg", ids)
 }
 
+// checkAlarmStub returns a stub checker that always returns Count: 0 for the given target type.
+// Used for alarm relationships where the target cannot be determined from the MetricAlarm cache entry
+// alone without dimension-based lookup that requires per-type handling.
+func checkAlarmStub(targetType string) func(context.Context, any, resource.Resource, resource.ResourceCache) resource.RelatedCheckResult {
+	return func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+		return resource.RelatedCheckResult{TargetType: targetType, Count: 0}
+	}
+}
+
 // alarmRelatedResources returns the resource list for target from cache or by fetching the first page.
 func alarmRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

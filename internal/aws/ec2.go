@@ -49,6 +49,8 @@ func init() {
 		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{

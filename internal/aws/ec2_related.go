@@ -323,6 +323,22 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("ebs-snap", ids)
 }
 
+// checkEC2SG extracts security group IDs from the EC2 Instance's SecurityGroups slice.
+// Pattern F — no cache needed.
+func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	var ids []string
+	for _, sg := range raw.SecurityGroups {
+		if sg.GroupId != nil && *sg.GroupId != "" {
+			ids = append(ids, *sg.GroupId)
+		}
+	}
+	return relatedResult("sg", ids)
+}
+
 // ec2RelatedResources returns the resource list for target from cache or by
 // fetching the first page. Returns (resources, isTruncated, error).
 // isTruncated=true means the list is partial; callers should return Count=-1
@@ -437,5 +453,15 @@ func tagValue(tags []ec2types.Tag, key string) string {
 		}
 	}
 	return ""
+}
+
+// checkEC2VPC returns the VPC this EC2 instance runs in (Pattern F).
+// Reads vpc_id from Fields which is populated by the EC2 fetcher.
+func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
 }
 

@@ -15,6 +15,7 @@ func init() {
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
 	})
 
 	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
@@ -113,6 +114,14 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 	}
 	return relatedResult("logs", ids)
+}
+
+// checkECSTaskSG returns Count: 0 because the ECS Task struct does not carry
+// security group IDs directly — they are set at the task definition level and
+// resolved by ECS at launch time. The running task does not surface awsvpc
+// SecurityGroups in the DescribeTasks/ListTasks response payload.
+func checkECSTaskSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 }
 
 // ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.

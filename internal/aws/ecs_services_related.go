@@ -21,6 +21,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
@@ -285,6 +286,27 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 	}
 	return relatedResult("logs", ids)
+}
+
+// checkECSSvcSG extracts security group IDs from the ECS Service's
+// NetworkConfiguration.AwsvpcConfiguration.SecurityGroups slice (awsvpc mode).
+// Pattern F — no cache needed.
+func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if raw.NetworkConfiguration == nil ||
+		raw.NetworkConfiguration.AwsvpcConfiguration == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	var ids []string
+	for _, sgID := range raw.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
 }
 
 // ecsSvcRelatedResources returns the resource list for target from cache or fetches
