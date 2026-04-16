@@ -65,6 +65,18 @@ func checkSESCFN(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
+// checkSESRole returns Count: 0 because SES identities do not expose an IAM role
+// ARN in the ListEmailIdentities response.
+func checkSESRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkSESKMS is a stub. The SES v2 ListEmailIdentities API does not include
+// DKIM signing key or configuration-set KMS details in the list response.
+func checkSESKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
 // sesRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

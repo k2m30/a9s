@@ -114,6 +114,13 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
+// checkGlueKMS is a stub. The Glue GetJobs list response does not include
+// SecurityConfiguration details (which hold KMS config) — the KMS relationship
+// cannot be determined from the list RawStruct alone.
+func checkGlueKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
 // glueRelatedResources returns the resource list for target from cache or by fetching the first page.
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

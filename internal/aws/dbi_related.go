@@ -194,3 +194,9 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
 }
+
+// checkDbiRole returns Count: 0 because the RDS DBInstance struct does not
+// expose an IAM role ARN directly in the DescribeDBInstances list response.
+func checkDbiRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}

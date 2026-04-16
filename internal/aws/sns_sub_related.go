@@ -13,6 +13,7 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSSubKMS},
 	})
 
 	resource.RegisterNavigableFields("sns-sub", []resource.NavigableField{
@@ -124,6 +125,12 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
 	}
 	return relatedResult("sqs", ids)
+}
+
+// checkSNSSubKMS is a stub. SNS subscriptions do not carry a KMS key reference —
+// encryption at rest is managed at the topic level, not the subscription level.
+func checkSNSSubKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // snsSubRelatedResources returns the cached resource list for the given target type,

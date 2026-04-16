@@ -17,6 +17,7 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSecretsRole},
 	})
 
 	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
@@ -163,6 +164,12 @@ func secretsCFNStackName(res resource.Resource) string {
 		}
 	}
 	return ""
+}
+
+// checkSecretsRole returns Count: 0 because Secrets Manager secrets do not expose
+// an IAM role ARN in the ListSecrets response.
+func checkSecretsRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
 // secretsRelatedResources returns the resource list for target from cache or by

@@ -119,3 +119,18 @@ func checkDbcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.R
 func checkDbcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
+
+// checkDbcKMS extracts the KMS key from the DocumentDB DBCluster's KmsKeyId field.
+// KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
+// Pattern F — no cache needed.
+func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
+	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *cluster.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}

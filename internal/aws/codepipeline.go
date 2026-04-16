@@ -24,6 +24,7 @@ func init() {
 	resource.RegisterRelated("pipeline", []resource.RelatedDef{
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkPipelineKMS},
 	})
 
 	// cptypes.PipelineSummary (list response): no navigable fields — RoleArn and

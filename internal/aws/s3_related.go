@@ -115,11 +115,26 @@ func checkS3CFN(_ context.Context, _ any, _ resource.Resource, _ resource.Resour
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
+// checkS3Role returns Count: 0 because the S3 list API does not expose IAM role
+// information — bucket policies and replication roles are not available from cache.
+func checkS3Role(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
 func init() {
 	resource.RegisterRelated("s3", []resource.RelatedDef{
 		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkS3Trail, NeedsTargetCache: true},
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkS3CF, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda (notifications)", Checker: checkS3Lambda, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkS3Role},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkS3KMS},
 	})
+}
+
+// checkS3KMS is a stub. S3 bucket default encryption KMS key configuration
+// is not included in the ListBuckets response — it requires a separate
+// GetBucketEncryption API call, which is not part of the list-page RawStruct.
+func checkS3KMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }

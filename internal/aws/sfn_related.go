@@ -96,6 +96,13 @@ func checkSFNEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.Re
 	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
 }
 
+// checkSFNKMS is a stub. Step Functions StateMachineListItem does not expose
+// a KMS key ID — encryption at rest configuration is not surfaced in the
+// ListStateMachines response.
+func checkSFNKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
 // sfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

@@ -193,3 +193,10 @@ func asgRelatedResources(ctx context.Context, clients any, cache resource.Resour
 func checkASGVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
+
+// checkASGRole returns Count: 0 because the IAM role is on the launch template
+// or launch configuration, not on the ASG struct itself — the relationship
+// cannot be determined from the ASG list response alone.
+func checkASGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}

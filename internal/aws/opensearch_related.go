@@ -18,6 +18,8 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkOpenSearchSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkOpenSearchRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -142,6 +144,28 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	return relatedResult("vpc", []string{*domain.VPCOptions.VPCId})
+}
+
+// checkOpenSearchRole returns Count: 0 because the OpenSearch domain list response
+// (ListDomainNames/DescribeDomains) does not expose an IAM role ARN.
+func checkOpenSearchRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
+// EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
+func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
+	if !ok || domain.EncryptionAtRestOptions == nil ||
+		domain.EncryptionAtRestOptions.KmsKeyId == nil ||
+		*domain.EncryptionAtRestOptions.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *domain.EncryptionAtRestOptions.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
 }
 
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.

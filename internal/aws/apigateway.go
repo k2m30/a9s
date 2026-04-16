@@ -25,6 +25,8 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true},
 		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkApigwWAF},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkApigwRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkApigwKMS},
 	})
 }
 

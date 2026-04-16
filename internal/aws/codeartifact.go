@@ -23,6 +23,8 @@ func init() {
 
 	resource.RegisterRelated("codeartifact", []resource.RelatedDef{
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkCodeArtifactCB},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkCodeArtifactRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeArtifactKMS},
 	})
 }
 

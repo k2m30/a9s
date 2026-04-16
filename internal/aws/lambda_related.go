@@ -174,6 +174,21 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 	return relatedResult("vpc", []string{*fn.VpcConfig.VpcId})
 }
 
+// checkLambdaKMS extracts the KMS key ARN from the Lambda FunctionConfiguration
+// KMSKeyArn field (used for environment variable encryption). Pattern F — no
+// cache needed. The ARN last segment after "/" is used as the key ID.
+func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *fn.KMSKeyArn
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
 // lambdaRelatedResources returns the resource list for target from cache or by fetching the first page.
 func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

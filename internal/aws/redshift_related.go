@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
@@ -16,6 +17,8 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedshiftSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedshiftVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkRedshiftRole},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedshiftKMS},
 	})
 
 	// redshifttypes.Cluster: VpcId
@@ -93,6 +96,46 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	return relatedResult("vpc", []string{*cluster.VpcId})
+}
+
+// checkRedshiftRole extracts IAM role ARNs from the Redshift Cluster's IamRoles slice.
+// Each ClusterIamRole has an IamRoleArn field; we extract the role name (last segment after "/").
+// Pattern F — no cache needed.
+func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	if len(cluster.IamRoles) == 0 {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	var ids []string
+	for _, r := range cluster.IamRoles {
+		if r.IamRoleArn == nil || *r.IamRoleArn == "" {
+			continue
+		}
+		arn := *r.IamRoleArn
+		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+			ids = append(ids, arn[idx+1:])
+		} else {
+			ids = append(ids, arn)
+		}
+	}
+	return relatedResult("role", ids)
+}
+
+// checkRedshiftKMS extracts the KMS key ID from the Redshift Cluster's KmsKeyId
+// field. Pattern F — no cache needed.
+func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
+	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *cluster.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
 }
 
 // redshiftRelatedResources returns the resource list for target from cache or by fetching the first page.

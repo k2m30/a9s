@@ -14,6 +14,7 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, NeedsTargetCache: false},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
 	})
 
 	// kinesisstypes.StreamSummary (list response): no navigable fields — KeyId/EncryptionType
@@ -66,6 +67,13 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
+}
+
+// checkKinesisKMS is a stub. The Kinesis ListStreams response returns
+// StreamSummary objects which do not include EncryptionType or KeyId —
+// those fields are only on DescribeStream's StreamDescriptionSummary.
+func checkKinesisKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // kinesisRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -27,6 +27,7 @@ func init() {
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcKMS},
 	})
 
 	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,

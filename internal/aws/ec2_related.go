@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"sort"
+	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -463,5 +464,28 @@ func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	return relatedResult("vpc", []string{vpcID})
+}
+
+// checkEC2Role extracts the IAM instance profile role name from the EC2 Instance's
+// IamInstanceProfile.Arn field. The instance profile ARN has the form
+// arn:aws:iam::ACCOUNT:instance-profile/ROLE-NAME; the role name is the last
+// segment after "/".
+func checkEC2Role(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok || inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil || *inst.IamInstanceProfile.Arn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *inst.IamInstanceProfile.Arn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkEC2KMS returns Count: 0 because EC2 instances do not have a direct KMS
+// key reference on the Instance struct — encryption is configured at the EBS
+// volume level, not on the instance itself.
+func checkEC2KMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 

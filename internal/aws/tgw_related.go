@@ -31,6 +31,7 @@ func init() {
 			Checker:          checkTGWCFN,
 			NeedsTargetCache: false,
 		},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole},
 	})
 }
 
@@ -111,6 +112,12 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
 	}
 	return relatedResult("rtb", ids)
+}
+
+// checkTGWRole returns Count: 0 because Transit Gateways do not expose an IAM role
+// ARN in the DescribeTransitGateways response.
+func checkTGWRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
 // tgwRelatedResources returns the cached resource list for the given target type,

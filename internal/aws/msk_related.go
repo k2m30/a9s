@@ -17,6 +17,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkMSKVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMSKKMS},
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
@@ -103,4 +104,19 @@ func mskRelatedResources(ctx context.Context, clients any, cache resource.Resour
 
 func checkMSKVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}
+
+// checkMSKKMS extracts the KMS key ID from the MSK cluster's
+// Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId field.
+// Pattern F — no cache needed.
+func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
+	if !ok || cluster.Provisioned == nil ||
+		cluster.Provisioned.EncryptionInfo == nil ||
+		cluster.Provisioned.EncryptionInfo.EncryptionAtRest == nil ||
+		cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == nil ||
+		*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }

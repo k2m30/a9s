@@ -24,6 +24,7 @@ func init() {
 	resource.RegisterRelated("logs", []resource.RelatedDef{
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
 	})
 
 	// cloudwatchlogstypes.LogGroup: KmsKeyId

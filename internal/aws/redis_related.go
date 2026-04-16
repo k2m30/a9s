@@ -16,6 +16,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS},
 	})
 
 	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
@@ -97,4 +98,12 @@ func redisRelatedResources(ctx context.Context, clients any, cache resource.Reso
 // on the list response. VPC is on the cache subnet group. Stub for now.
 func checkRedisVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}
+
+// checkRedisKMS is a stub. The ElastiCache DescribeReplicationGroups response
+// does include KmsKeyId on the ReplicationGroup struct, but the a9s fetcher
+// stores CacheCluster (not ReplicationGroup) as RawStruct — the KMS key ID
+// is not available from the per-node list response.
+func checkRedisKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }

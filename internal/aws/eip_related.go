@@ -19,6 +19,7 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEIPEC2},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEIPENI},
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkEIPNAT, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEIPKMS},
 	})
 }
 
@@ -91,6 +92,12 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
 	}
 	return relatedResult("nat", ids)
+}
+
+// checkEIPKMS is a stub. Elastic IP addresses are not KMS-encrypted resources
+// and do not carry a KMS key reference.
+func checkEIPKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // eipRelatedResources returns the resource list for target from cache or fetches

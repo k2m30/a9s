@@ -29,6 +29,7 @@ func init() {
 		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkASGVPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkASGRole},
 	})
 
 	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs

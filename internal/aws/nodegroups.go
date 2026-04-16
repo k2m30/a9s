@@ -22,6 +22,7 @@ func init() {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkNGASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkNGEC2, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkNGSG},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkNGKMS},
 	})
 
 	resource.RegisterNavigableFields("ng", []resource.NavigableField{

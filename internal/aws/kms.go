@@ -127,6 +127,7 @@ func init() {
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkKMSRole},
 	})
 }
 

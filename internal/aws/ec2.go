@@ -51,6 +51,8 @@ func init() {
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEC2KMS},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{

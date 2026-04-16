@@ -62,6 +62,19 @@ func checkApigwWAF(_ context.Context, _ any, _ resource.Resource, _ resource.Res
 	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
 }
 
+// checkApigwRole returns Count: 0 because the API Gateway V2 GetApis response
+// does not include an IAM role ARN — the relationship cannot be determined from
+// the list response alone.
+func checkApigwRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// checkApigwKMS is a stub. API Gateway V2 does not expose a KMS key field in the
+// GetApis list response — the relationship cannot be determined from cache alone.
+func checkApigwKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
 // apigwRelatedResources returns the resource list for target from cache or by fetching the first page.
 func apigwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

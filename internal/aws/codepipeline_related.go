@@ -20,3 +20,10 @@ func checkPipelineCB(_ context.Context, _ any, _ resource.Resource, _ resource.R
 func checkPipelineRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
+
+// checkPipelineKMS is a stub. The CodePipeline PipelineSummary list response does
+// not include artifact store encryption key details — the KMS key is only on
+// GetPipelineOutput, not the list summary RawStruct.
+func checkPipelineKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
