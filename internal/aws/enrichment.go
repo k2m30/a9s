@@ -42,10 +42,13 @@ import (
 	smithy "github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ecrsvc "github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -92,6 +95,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"acm":      EnrichACMCertificate,
 	"cf":       EnrichCloudFrontDistribution,
 	"apigw":    EnrichAPIGatewayStage,
+	"cfn":      EnrichCFNStackEvents,
+	"ecr":      EnrichECRRepository,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -2283,4 +2288,216 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
+// up to EnrichmentCap stacks). It scans the most recent events client-side for any
+// resource with ResourceStatus ending in "_FAILED". A failed resource event produces
+// a "!" finding: "recent resource failure: <ResourceType>/<LogicalResourceId>".
+// This surfaces hidden failures that are not reflected in the top-level StackStatus.
+func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.CloudFormation == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		stackName := r.Fields["stack_name"]
+		if stackName == "" {
+			stackName = r.ID
+		}
+		if stackName == "" {
+			continue
+		}
+		out, err := clients.CloudFormation.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
+			StackName: aws.String(stackName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		// Scan events from the first page for any resource with a _FAILED status.
+		// The API returns events in reverse-chronological order; we inspect all
+		// events on the first page to catch recent failures.
+		var failedRows []resource.FindingRow
+		for _, ev := range out.StackEvents {
+			status := string(ev.ResourceStatus)
+			if !strings.HasSuffix(status, "_FAILED") {
+				continue
+			}
+			logicalID := ""
+			if ev.LogicalResourceId != nil {
+				logicalID = *ev.LogicalResourceId
+			}
+			resourceType := ""
+			if ev.ResourceType != nil {
+				resourceType = *ev.ResourceType
+			}
+			reason := ""
+			if ev.ResourceStatusReason != nil {
+				reason = *ev.ResourceStatusReason
+			}
+			label := resourceType
+			if label == "" {
+				label = logicalID
+			} else if logicalID != "" {
+				label = resourceType + "/" + logicalID
+			}
+			row := resource.FindingRow{Label: label, Value: status, Tier: "!"}
+			failedRows = append(failedRows, row)
+			if reason != "" {
+				failedRows = append(failedRows, resource.FindingRow{Label: "Reason", Value: reason, Tier: "~"})
+			}
+		}
+		if len(failedRows) == 0 {
+			continue
+		}
+		key := r.ID
+		if key == "" {
+			key = stackName
+		}
+		findings[key] = resource.EnrichmentFinding{
+			Severity: "!",
+			Summary:  fmt.Sprintf("recent resource failure: %s", failedRows[0].Label),
+			Rows:     failedRows,
+		}
+	}
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichCFNDrift calls DescribeStacks per stack (up to EnrichmentCap stacks) to
+// read DriftInformation.StackDriftStatus. A status of DRIFTED produces a "~" finding
+// "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
+// Severity "~" findings do not contribute to IssueCount.
+func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.CloudFormation == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		stackName := r.Fields["stack_name"]
+		if stackName == "" {
+			stackName = r.ID
+		}
+		if stackName == "" {
+			continue
+		}
+		out, err := clients.CloudFormation.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
+			StackName: aws.String(stackName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if len(out.Stacks) == 0 {
+			continue
+		}
+		stack := out.Stacks[0]
+		if stack.DriftInformation == nil {
+			continue
+		}
+		if stack.DriftInformation.StackDriftStatus != "DRIFTED" {
+			continue
+		}
+		key := r.ID
+		if key == "" {
+			key = stackName
+		}
+		findings[key] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  "stack drifted from template",
+			Rows: []resource.FindingRow{
+				{Label: "Drift Status", Value: string(stack.DriftInformation.StackDriftStatus), Tier: "~"},
+			},
+		}
+	}
+	// "~" findings do not contribute to IssueCount per the EnricherResult contract.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichECRRepository calls DescribeImageScanFindings for each ECR repository (up to
+// EnrichmentCap repos). It reads ImageScanFindings.FindingSeverityCounts directly:
+//   - CRITICAL > 0 → "!" finding "critical vulnerabilities: <count>"
+//   - HIGH > 0 (and no CRITICAL) → "~" finding "high vulnerabilities: <count>"
+//
+// ScanNotFoundException (scan never ran) is silently skipped — Truncated is NOT set.
+// Any other API error causes the repo to be skipped with Truncated=true.
+func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.ECR == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	issueCount := 0
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		repoName := r.Fields["repository_name"]
+		if repoName == "" {
+			repoName = r.ID
+		}
+		if repoName == "" {
+			continue
+		}
+		out, err := clients.ECR.DescribeImageScanFindings(ctx, &ecrsvc.DescribeImageScanFindingsInput{
+			RepositoryName: aws.String(repoName),
+		})
+		if err != nil {
+			// ScanNotFoundException means the scan has never run — normal operational
+			// state, silently skip without marking Truncated.
+			var scanNotFound *ecrtypes.ScanNotFoundException
+			if errors.As(err, &scanNotFound) {
+				continue
+			}
+			truncated = true
+			continue
+		}
+		if out.ImageScanFindings == nil {
+			continue
+		}
+		counts := out.ImageScanFindings.FindingSeverityCounts
+		critical := counts["CRITICAL"]
+		high := counts["HIGH"]
+		if critical == 0 && high == 0 {
+			continue
+		}
+		key := r.ID
+		if key == "" {
+			key = repoName
+		}
+		if critical > 0 {
+			rows := []resource.FindingRow{
+				{Label: "CRITICAL", Value: fmt.Sprintf("%d", critical), Tier: "!"},
+			}
+			if high > 0 {
+				rows = append(rows, resource.FindingRow{Label: "HIGH", Value: fmt.Sprintf("%d", high), Tier: "~"})
+			}
+			findings[key] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  fmt.Sprintf("critical vulnerabilities: %d", critical),
+				Rows:     rows,
+			}
+			issueCount++
+		} else {
+			// high > 0, critical == 0
+			rows := []resource.FindingRow{
+				{Label: "HIGH", Value: fmt.Sprintf("%d", high), Tier: "~"},
+			}
+			findings[key] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  fmt.Sprintf("high vulnerabilities: %d", high),
+				Rows:     rows,
+			}
+			// "~" severity does not contribute to IssueCount.
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
 }
