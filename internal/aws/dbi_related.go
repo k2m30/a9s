@@ -200,3 +200,11 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
+
+func checkDbiDBC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+}
+
+func checkDbiENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+}

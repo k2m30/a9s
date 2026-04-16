@@ -129,6 +129,16 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkS3Role},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkS3KMS},
+		{TargetType: "athena", DisplayName: "Athena Workgroups", Checker: checkS3Athena},
+		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkS3Backup},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkS3EbRule},
+		{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkS3Glue},
+		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkS3IAMUser},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkS3Logs},
+		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkS3R53},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkS3SNS},
+		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkS3SQS},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkS3WAF},
 	})
 }
 
@@ -137,4 +147,44 @@ func init() {
 // GetBucketEncryption API call, which is not part of the list-page RawStruct.
 func checkS3KMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
+func checkS3Athena(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
+}
+
+func checkS3Backup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
+func checkS3EbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+func checkS3Glue(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
+}
+
+func checkS3IAMUser(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+}
+
+func checkS3Logs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkS3R53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+}
+
+func checkS3SNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+}
+
+func checkS3SQS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
+}
+
+func checkS3WAF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
 }

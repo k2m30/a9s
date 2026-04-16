@@ -17,6 +17,10 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkRedisSecrets},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkRedisSNS},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet},
 	})
 
 	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
@@ -106,4 +110,20 @@ func checkRedisVPC(_ context.Context, _ any, _ resource.Resource, _ resource.Res
 // is not available from the per-node list response.
 func checkRedisKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
+func checkRedisLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkRedisSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
+func checkRedisSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+}
+
+func checkRedisSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }

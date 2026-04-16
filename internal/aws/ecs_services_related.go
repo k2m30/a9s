@@ -24,6 +24,14 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
+		{TargetType: "cf", DisplayName: "CloudFront Distributions", Checker: checkECSSvcCF},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTask},
+		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkECSSvcR53},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkECSSvcSecrets},
+		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
@@ -342,4 +350,36 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+func checkECSSvcCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+}
+
+func checkECSSvcEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+func checkECSSvcECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+}
+
+func checkECSSvcTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkECSSvcR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+}
+
+func checkECSSvcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
+func checkECSSvcSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+}
+
+func checkECSSvcSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }

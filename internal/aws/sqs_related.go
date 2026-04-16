@@ -20,6 +20,8 @@ func init() {
 		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSQSRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS},
 	})
 
 	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
@@ -252,4 +254,12 @@ func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	return relatedResult("kms", []string{keyID})
+}
+
+func checkSQSEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+func checkSQSSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 }

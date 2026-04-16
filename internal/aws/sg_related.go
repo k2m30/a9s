@@ -19,6 +19,7 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSGELB, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSGCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSGLambda},
 	})
 
 	resource.RegisterNavigableFields("sg", []resource.NavigableField{
@@ -211,4 +212,8 @@ func sgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkSGLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 }

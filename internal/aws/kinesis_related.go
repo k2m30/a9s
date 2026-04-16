@@ -15,6 +15,9 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
+		{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkKinesisDDB},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkKinesisEbRule},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkKinesisLogs},
 	})
 
 	// kinesisstypes.StreamSummary (list response): no navigable fields — KeyId/EncryptionType
@@ -85,4 +88,16 @@ func kinesisRelatedResources(ctx context.Context, clients any, cache resource.Re
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkKinesisDDB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
+}
+
+func checkKinesisEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+func checkKinesisLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 }
