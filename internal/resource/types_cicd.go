@@ -3,8 +3,9 @@ package resource
 import "strings"
 
 // cfnStackColor maps CloudFormation stack status strings to a Color.
-// Healthy: *_COMPLETE (except DELETE_COMPLETE), Warning: *_IN_PROGRESS,
-// Broken: *_FAILED and ROLLBACK_COMPLETE/ROLLBACK_FAILED, Dim: DELETE_COMPLETE.
+// Healthy: *_COMPLETE (non-rollback, non-delete), Warning: *_IN_PROGRESS,
+// Broken: *_FAILED and *_ROLLBACK_COMPLETE (terminal rolled-back states — user
+// intervention required), Dim: DELETE_COMPLETE.
 func cfnStackColor(status string) Color {
 	switch status {
 	case "CREATE_COMPLETE", "UPDATE_COMPLETE", "IMPORT_COMPLETE":

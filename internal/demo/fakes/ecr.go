@@ -29,3 +29,9 @@ func (f *ECRFake) DescribeImages(_ context.Context, input *ecr.DescribeImagesInp
 	}
 	return &ecr.DescribeImagesOutput{ImageDetails: f.fix.Images[repoName]}, nil
 }
+
+// DescribeImageScanFindings is a stub for Wave 2 enrichment in demo mode.
+// Returns an empty response (no scan findings) for all repositories.
+func (f *ECRFake) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
+	return &ecr.DescribeImageScanFindingsOutput{}, nil
+}
