@@ -12,16 +12,9 @@ import (
 
 func init() {
 	resource.RegisterRelated("msk", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkMSKLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkMSKVPC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMSKKMS},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkMSKLogs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkMSKS3},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkMSKSecrets},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkMSKSubnet},
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
@@ -30,19 +23,7 @@ func init() {
 	})
 }
 
-// checkMSKLambda returns Count: 0 because MSK cluster event source mappings are
-// not available in the list API — the relationship cannot be determined from
-// cache alone.
-func checkMSKLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-// checkMSKCFN returns Count: 0 because MSK cluster tags are not included in the
-// ListClusters response — the CFN relationship cannot be determined from cache
-// alone.
-func checkMSKCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkMSKAlarms checks the cache for CloudWatch alarms with "Cluster Name" dimension matching this cluster.
 func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -106,9 +87,6 @@ func mskRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkMSKVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's
 // Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId field.
@@ -125,18 +103,6 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }
 
-func checkMSKLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkMSKS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkMSKSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkMSKSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

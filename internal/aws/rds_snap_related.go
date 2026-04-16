@@ -94,10 +94,4 @@ func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 	return resources, isTruncated, err
 }
 
-func checkRDSSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-}
 
-func checkRDSSnapDBC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-}

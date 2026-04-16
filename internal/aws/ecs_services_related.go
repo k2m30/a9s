@@ -18,20 +18,10 @@ func init() {
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster},
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkECSSvcTargetGroups},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSSvcAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
-		{TargetType: "cf", DisplayName: "CloudFront Distributions", Checker: checkECSSvcCF},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTask},
-		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkECSSvcR53},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkECSSvcSecrets},
-		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
@@ -331,11 +321,6 @@ func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.Res
 	return resources, isTruncated, err
 }
 
-// checkECSSvcVPC — ECS service has no direct VPC field; subnets are in
-// NetworkConfiguration.AwsvpcConfiguration. Stub for now.
-func checkECSSvcVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
 // checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
 // The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
@@ -352,34 +337,10 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
-func checkECSSvcCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-}
 
-func checkECSSvcEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-func checkECSSvcECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
 
-func checkECSSvcTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
-}
 
-func checkECSSvcR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-}
 
-func checkECSSvcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkECSSvcSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-}
 
-func checkECSSvcSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

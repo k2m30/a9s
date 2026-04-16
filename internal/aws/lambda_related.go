@@ -83,17 +83,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 	return relatedResult("alarm", ids)
 }
 
-// checkLambdaSQS returns Count: 0 because Lambda event source mappings are not
-// available in the list API — the relationship cannot be determined from cache.
-func checkLambdaSQS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
-}
 
-// checkLambdaCFN returns Count: 0 because Lambda FunctionConfiguration (list API)
-// does not include Tags — the CFN relationship cannot be determined from cache alone.
-func checkLambdaCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.
 // Pattern N — default: /aws/lambda/{function-name}, with custom override via LoggingConfig.
@@ -133,12 +123,6 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("logs", ids)
 }
 
-// checkLambdaEbRule returns Count: -1 (unknown) because EventBridge rule targets
-// are not included in the ListRules response — the relationship cannot be
-// determined from cache alone without calling ListTargetsByRule per rule.
-func checkLambdaEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
 
 // checkLambdaSG extracts security group IDs from the Lambda FunctionConfiguration's
 // VpcConfig.SecurityGroupIds (only present for VPC-attached functions).
@@ -200,82 +184,22 @@ func lambdaRelatedResources(ctx context.Context, clients any, cache resource.Res
 	return resources, isTruncated, err
 }
 
-func checkLambdaAPIGW(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
-}
 
-func checkLambdaASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
-}
 
-func checkLambdaCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-}
 
-func checkLambdaDDB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
-}
 
-func checkLambdaEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
 
-func checkLambdaECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
 
-func checkLambdaEFS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
-}
 
-func checkLambdaELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
 
-func checkLambdaENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}
 
-func checkLambdaKinesis(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-}
 
-func checkLambdaMSK(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "msk", Count: 0}
-}
 
-func checkLambdaR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-}
 
-func checkLambdaS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkLambdaSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkLambdaSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-}
 
-func checkLambdaSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}
 
-func checkLambdaSNSSub(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns-sub", Count: 0}
-}
 
-func checkLambdaSSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
-}
 
-func checkLambdaSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}
 
-func checkLambdaTG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
-}

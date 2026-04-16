@@ -23,11 +23,6 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkENISG, NeedsTargetCache: true},
 		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkENIEIP, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkENIVPC},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkENIELB},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkENILambda},
-		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkENINAT},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkENISubnet},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkENIVPCE},
 	})
 }
 
@@ -149,25 +144,10 @@ func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{vpcID})
 }
 
-func checkENIELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
 
-func checkENILambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-func checkENINAT(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
-}
 
-func checkENISubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}
 
-func checkENIVPCE(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
-}
 
 // eniRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.

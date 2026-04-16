@@ -124,11 +124,6 @@ func ecrCFNStackName(res resource.Resource) string {
 	return res.Fields["cfn_stack_name"]
 }
 
-// checkECRRole returns Count: 0 because the ECR Repository struct does not
-// expose an IAM role ARN in the DescribeRepositories list response.
-func checkECRRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // checkECRKMS extracts the KMS key from the ECR Repository's
 // EncryptionConfiguration.KmsKey field. Returns the key ID (last segment after "/").
@@ -145,25 +140,10 @@ func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
-func checkECREbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-func checkECRECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
-}
 
-func checkECRECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
-}
 
-func checkECREKS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
-}
 
-func checkECRPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
-}
 
 // ecrRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.

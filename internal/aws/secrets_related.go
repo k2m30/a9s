@@ -15,18 +15,7 @@ func init() {
 	resource.RegisterRelated("secrets", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSecretsRole},
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB},
-		{TargetType: "codeartifact", DisplayName: "CodeArtifact", Checker: checkSecretsCodeArtifact},
-		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkSecretsECR},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs},
-		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkSecretsPipeline},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkSecretsS3},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSecretsSNS},
 	})
 
 	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
@@ -120,12 +109,6 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 	return relatedResult("lambda", ids)
 }
 
-// checkSecretsDBI returns Count: 0 because the RDS instance associated with a
-// secret is not captured in the SecretListEntry — the relationship cannot be
-// determined from cache alone.
-func checkSecretsDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
-}
 
 // checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name
 // and matches against the CFN stack cache.
@@ -175,11 +158,6 @@ func secretsCFNStackName(res resource.Resource) string {
 	return ""
 }
 
-// checkSecretsRole returns Count: 0 because Secrets Manager secrets do not expose
-// an IAM role ARN in the ListSecrets response.
-func checkSecretsRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // secretsRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
@@ -193,38 +171,11 @@ func secretsRelatedResources(ctx context.Context, clients any, cache resource.Re
 	return resources, isTruncated, err
 }
 
-func checkSecretsCB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
-}
 
-func checkSecretsCodeArtifact(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "codeartifact", Count: 0}
-}
 
-func checkSecretsEB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb", Count: 0}
-}
 
-func checkSecretsECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
 
-func checkSecretsECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
-}
 
-func checkSecretsLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkSecretsPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
-}
 
-func checkSecretsS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkSecretsSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}

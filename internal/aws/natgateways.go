@@ -31,9 +31,6 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkNATVPC, NeedsTargetCache: true},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNATSubnet, NeedsTargetCache: true},
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkNATRTB, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkNATAlarm},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkNATEIP},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkNATENI},
 	})
 }
 

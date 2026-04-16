@@ -84,11 +84,6 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("alarm", ids)
 }
 
-// checkGlueCFN returns Count: 0 because Glue job tags are not included in the
-// GetJobs list response — the CFN relationship cannot be determined from cache alone.
-func checkGlueCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.
 // Pattern N — Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
@@ -114,12 +109,6 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
-// checkGlueKMS is a stub. The Glue GetJobs list response does not include
-// SecurityConfiguration details (which hold KMS config) — the KMS relationship
-// cannot be determined from the list RawStruct alone.
-func checkGlueKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // glueRelatedResources returns the resource list for target from cache or by fetching the first page.
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -132,14 +121,5 @@ func glueRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	return resources, isTruncated, err
 }
 
-func checkGlueAthena(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
-}
 
-func checkGlueS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkGlueSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}

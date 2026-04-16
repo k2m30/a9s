@@ -139,12 +139,6 @@ func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("rds-snap", ids)
 }
 
-// checkDbiSecrets returns Count: 0 because the RDS DescribeDBInstances API does not
-// include Secrets Manager ARNs in the list response — the relationship cannot be
-// determined from cache alone.
-func checkDbiSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
 // checkDBILogs searches the logs cache for log groups matching the RDS naming convention.
 // Pattern N — naming convention: /aws/rds/instance/{db-instance-id}/{log-type}
@@ -195,16 +189,5 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
 }
 
-// checkDbiRole returns Count: 0 because the RDS DBInstance struct does not
-// expose an IAM role ARN directly in the DescribeDBInstances list response.
-func checkDbiRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-func checkDbiDBC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-}
 
-func checkDbiENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}

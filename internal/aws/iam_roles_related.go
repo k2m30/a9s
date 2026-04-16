@@ -24,10 +24,6 @@ func init() {
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRoleKMS},
-		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS},
-		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkRoleIAMGroup},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkRoleIAMUser},
 	})
 }
 
@@ -213,12 +209,6 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("ec2", ids)
 }
 
-// checkRoleKMS is a stub. IAM roles do not carry a direct KMS key reference —
-// key policies may grant role access, but the IAM Role struct itself has no
-// KMS key field.
-func checkRoleKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // roleRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
@@ -232,14 +222,5 @@ func roleRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	return resources, isTruncated, err
 }
 
-func checkRoleEKS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
-}
 
-func checkRoleIAMGroup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
-}
 
-func checkRoleIAMUser(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
-}

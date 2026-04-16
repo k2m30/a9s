@@ -25,19 +25,6 @@ func init() {
 	resource.RegisterRelated("alarm", []resource.RelatedDef{
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true},
-		{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkAlarmStub("apigw")},
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkAlarmStub("cb")},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkAlarmStub("dbi")},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAlarmStub("ec2")},
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkAlarmStub("ecs")},
-		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkAlarmStub("eks")},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAlarmStub("kms")},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkAlarmStub("lambda")},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAlarmStub("logs")},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAlarmStub("role")},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmStub("s3")},
-		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmStub("sfn")},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmStub("waf")},
 	})
 
 	// cwtypes.MetricAlarm: Dimensions[].Value may reference EC2/RDS/ELB IDs but Dimensions

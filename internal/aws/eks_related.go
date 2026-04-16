@@ -32,13 +32,6 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEKSVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEKSRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkEKSACM},
-		{TargetType: "ami", DisplayName: "AMIs", Checker: checkEKSAMI},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkEKSECR},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkEKSIAMUser},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEKSSubnet},
 	})
 }
 
@@ -247,33 +240,12 @@ func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
-func checkEKSACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
 
-func checkEKSAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
-}
 
-func checkEKSASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
-}
 
-func checkEKSEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
 
-func checkEKSECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
 
-func checkEKSIAMUser(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
-}
 
-func checkEKSSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}
 
 // eksRelatedResources returns the resource list for target from cache or by fetching the first page.
 func eksRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

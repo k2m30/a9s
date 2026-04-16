@@ -27,13 +27,6 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkASGVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkASGRole},
-		{TargetType: "ami", DisplayName: "AMIs", Checker: checkASGAMI},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkASGCFN},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkASGELB},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkASGSNS},
 	})
 
 	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs

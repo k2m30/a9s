@@ -13,14 +13,7 @@ import (
 func init() {
 	resource.RegisterRelated("redis", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkRedisSecrets},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkRedisSNS},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet},
 	})
 
 	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
@@ -30,12 +23,6 @@ func init() {
 	})
 }
 
-// checkRedisCFN returns Count: 0 because ElastiCache replication group tags are
-// not included in the DescribeReplicationGroups list response — the CFN
-// relationship cannot be determined from cache alone.
-func checkRedisCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkRedisAlarms checks the cache for CloudWatch alarms with CacheClusterId dimension matching this cluster's ID.
 func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -98,32 +85,8 @@ func redisRelatedResources(ctx context.Context, clients any, cache resource.Reso
 	return resources, isTruncated, err
 }
 
-// checkRedisVPC — ElastiCache replication group has no direct VPC field
-// on the list response. VPC is on the cache subnet group. Stub for now.
-func checkRedisVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
-// checkRedisKMS is a stub. The ElastiCache DescribeReplicationGroups response
-// does include KmsKeyId on the ReplicationGroup struct, but the a9s fetcher
-// stores CacheCluster (not ReplicationGroup) as RawStruct — the KMS key ID
-// is not available from the per-node list response.
-func checkRedisKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
-func checkRedisLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkRedisSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkRedisSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}
 
-func checkRedisSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

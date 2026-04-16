@@ -20,15 +20,8 @@ func init() {
 	resource.RegisterRelated("efs", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm},
-		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkEFSBackup},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI},
 	})
 }
 
@@ -105,11 +98,6 @@ func efsCFNStackName(res resource.Resource) string {
 	return ""
 }
 
-// checkEFSLambda returns Count: 0 because Lambda EFS mount point configurations
-// are not available in the list API — the relationship cannot be determined from cache.
-func checkEFSLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
 // checkEFSSG finds security groups for this EFS file system by scanning the ENI
 // cache for mount-target ENIs whose Description contains the filesystem ID (Pattern C).
@@ -205,26 +193,8 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkEFSVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
-func checkEFSAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-}
 
-func checkEFSBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-}
 
-func checkEFSEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
 
-func checkEFSECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
-}
 
-func checkEFSENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}

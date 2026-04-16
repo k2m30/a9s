@@ -20,20 +20,7 @@ func init() {
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkTGECSSvc, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkTGASG, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkTGAlarm, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkTGVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGRole},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTGKMS},
-		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkTGBackup},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkTGCFN},
-		{TargetType: "dbc", DisplayName: "DB Clusters", Checker: checkTGDBC},
-		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkTGDBI},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkTGEC2},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTGLambda},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTGLogs},
-		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkTGRDSSnap},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkTGSecrets},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
 	})
 
 	resource.RegisterNavigableFields("tg", []resource.NavigableField{
@@ -208,17 +195,7 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("alarm", ids)
 }
 
-// checkTGSG returns Count: 0 because Target Groups do not have security groups
-// — they are associated with load balancers and targets, not security groups directly.
-func checkTGSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-}
 
-// checkTGRole returns Count: 0 because Target Groups do not have a directly
-// associated IAM role — role associations are on the ECS services or tasks, not on the TG.
-func checkTGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // checkTGVPC returns the VPC this target group is scoped to (Pattern F).
 // Reads vpc_id from Fields which is populated by the target groups fetcher.
@@ -230,12 +207,6 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResult("vpc", []string{vpcID})
 }
 
-// checkTGKMS is a stub. Target Groups (ALB/NLB) do not have a KMS key
-// association — encryption at rest for load balancer logs is managed at
-// the S3 bucket level, not on the target group resource itself.
-func checkTGKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // tgRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
@@ -249,42 +220,12 @@ func tgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	return resources, isTruncated, err
 }
 
-func checkTGBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-}
 
-func checkTGCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-func checkTGDBC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-}
 
-func checkTGDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
-}
 
-func checkTGEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
 
-func checkTGLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-func checkTGLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkTGRDSSnap(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "rds-snap", Count: 0}
-}
 
-func checkTGSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkTGSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

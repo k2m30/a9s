@@ -14,15 +14,10 @@ import (
 func init() {
 	resource.RegisterRelated("redshift", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedshiftSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedshiftVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkRedshiftRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedshiftKMS},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedshiftLogs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkRedshiftS3},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkRedshiftSecrets},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedshiftSubnet},
 	})
 
 	// redshifttypes.Cluster: VpcId
@@ -31,12 +26,6 @@ func init() {
 	})
 }
 
-// checkRedshiftCFN returns Count: 0 because Redshift cluster tags are not
-// reliably available from cache — the CFN relationship cannot be determined
-// from cache alone.
-func checkRedshiftCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkRedshiftAlarms checks the cache for CloudWatch alarms with ClusterIdentifier dimension matching this cluster.
 func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -153,18 +142,6 @@ func redshiftRelatedResources(ctx context.Context, clients any, cache resource.R
 	return resources, isTruncated, err
 }
 
-func checkRedshiftLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkRedshiftS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkRedshiftSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkRedshiftSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

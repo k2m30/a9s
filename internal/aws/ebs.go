@@ -34,9 +34,6 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSEC2, NeedsTargetCache: false},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEBSSnap, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSKMS, NeedsTargetCache: false},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEBSAlarm},
-		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkEBSBackup},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEBSCFN},
 	})
 	resource.RegisterNavigableFields("ebs", []resource.NavigableField{
 		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
@@ -48,7 +45,6 @@ func init() {
 		{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
 		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSSnapEC2, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
-		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkEBSSnapBackup},
 	})
 	resource.RegisterNavigableFields("ebs-snap", []resource.NavigableField{
 		{FieldPath: "VolumeId", TargetType: "ebs"},

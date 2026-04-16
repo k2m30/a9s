@@ -97,19 +97,7 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 	return result
 }
 
-// checkIAMUserRole returns Count: 0 because IAM users do not have a direct role
-// association — roles are assumed by users at runtime, not as a static property
-// on the User struct in the ListUsers response.
-func checkIAMUserRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-// checkIAMUserKMS is a stub. IAM users do not have a direct KMS key association —
-// KMS grants and key policies reference users, but the IAM User struct itself
-// carries no KMS key reference.
-func checkIAMUserKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // iamUserRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.

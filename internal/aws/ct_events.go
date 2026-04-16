@@ -53,7 +53,6 @@ func init() {
 		{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: checkCtEventsPivotByUsername, NeedsTargetCache: false},
 		{TargetType: "ct-events", DisplayName: "CT events by EventName", Checker: checkCtEventsPivotByEventName, NeedsTargetCache: false},
 		{TargetType: "ct-events", DisplayName: "CT events by SharedEventId", Checker: checkCtEventsPivotBySharedEventId, NeedsTargetCache: false},
-		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkCtEventsTrail},
 	})
 
 	resource.RegisterNavigableFields("ct-events", []resource.NavigableField{

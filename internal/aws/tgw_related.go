@@ -31,8 +31,6 @@ func init() {
 			Checker:          checkTGWCFN,
 			NeedsTargetCache: false,
 		},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet},
 	})
 }
 
@@ -115,11 +113,6 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("rtb", ids)
 }
 
-// checkTGWRole returns Count: 0 because Transit Gateways do not expose an IAM role
-// ARN in the DescribeTransitGateways response.
-func checkTGWRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // tgwRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
@@ -133,6 +126,3 @@ func tgwRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkTGWSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

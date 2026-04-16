@@ -26,7 +26,6 @@ func init() {
 		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDocdbSnapVPC},
-		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkDocdbSnapBackup},
 	})
 
 	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId

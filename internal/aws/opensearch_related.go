@@ -14,14 +14,10 @@ import (
 func init() {
 	resource.RegisterRelated("opensearch", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkOpenSearchSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkOpenSearchRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -34,12 +30,6 @@ func init() {
 	})
 }
 
-// checkOpenSearchCFN returns Count: 0 because OpenSearch domain tags are not
-// included in the ListDomainNames response — the CFN relationship cannot be
-// determined from cache alone.
-func checkOpenSearchCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkOpenSearchAlarms checks the cache for CloudWatch alarms with DomainName dimension matching this domain.
 func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -148,11 +138,6 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 	return relatedResult("vpc", []string{*domain.VPCOptions.VPCId})
 }
 
-// checkOpenSearchRole returns Count: 0 because the OpenSearch domain list response
-// (ListDomainNames/DescribeDomains) does not expose an IAM role ARN.
-func checkOpenSearchRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
 // EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
@@ -181,10 +166,4 @@ func opensearchRelatedResources(ctx context.Context, clients any, cache resource
 	return resources, isTruncated, err
 }
 
-func checkOpenSearchACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
 
-func checkOpenSearchSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

@@ -30,17 +30,8 @@ func init() {
 	resource.RegisterRelated("elb", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN, NeedsTargetCache: true},
-		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkELBR53, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkELBSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkELBVPC},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkELBACM},
-		{TargetType: "cf", DisplayName: "CloudFront Distributions", Checker: checkELBCF},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkELBENI},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkELBLogs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkELBS3},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkELBSubnet},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkELBWAF},
 	})
 }
 

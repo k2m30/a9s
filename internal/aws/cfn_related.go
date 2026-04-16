@@ -109,17 +109,7 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("cfn", ids)
 }
 
-// checkCfnEBRule returns Count: 0 because Stack.NotificationARNs contains SNS ARNs,
-// not EventBridge rule ARNs — the eb-rule relationship cannot be determined from cache alone.
-func checkCfnEBRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-// checkCfnS3 returns Count: 0 because Stack does not include S3 template/artifact bucket
-// ARNs in the list response — the relationship cannot be determined from cache alone.
-func checkCfnS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
 // checkCfnSNS extracts notification ARNs from the CloudFormation Stack's
 // NotificationARNs field and returns SNS topic identifiers.

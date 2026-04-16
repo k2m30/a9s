@@ -98,20 +98,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("alarm", ids)
 }
 
-// checkELBCFN returns Count: 0 because ELBv2 LoadBalancer tags are not included
-// in the DescribeLoadBalancers response — the CFN relationship cannot be
-// determined from cache alone.
-func checkELBCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-// checkELBR53 returns Count: -1 (unknown) because Route 53 cached resources
-// are hosted zones, not record sets. Alias target information (which references
-// ELB DNS names) is only available at the record level via ListResourceRecordSets,
-// which is not stored in the r53 hosted-zone cache.
-func checkELBR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
-}
 
 // checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's
 // SecurityGroups slice (ALBs only; NLBs and GLBs return an empty list).
@@ -140,33 +127,12 @@ func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{vpcID})
 }
 
-func checkELBACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
 
-func checkELBCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-}
 
-func checkELBENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}
 
-func checkELBLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkELBS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkELBSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}
 
-func checkELBWAF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
-}
 
 // elbRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.

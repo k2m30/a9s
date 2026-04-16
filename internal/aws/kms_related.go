@@ -134,11 +134,6 @@ func checkKMSS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 }
 
-// checkKMSRole returns Count: 0 because KMS keys have key policies (not IAM
-// roles) and the key metadata in DescribeKey does not reference a role ARN.
-func checkKMSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // kmsIDMatches reports whether a KMS reference value (full ARN, bare key UUID,
 // or alias ARN) contains the given bare key UUID.

@@ -14,14 +14,10 @@ import (
 
 func init() {
 	resource.RegisterRelated("sqs", []resource.RelatedDef{
-		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
 		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSQSRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS},
 	})
 
 	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
@@ -206,11 +202,6 @@ func sqsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-// checkSQSRole returns Count: 0 because SQS queues do not expose an IAM role ARN
-// in the list API response (queue policies are per-resource, not IAM role bindings).
-func checkSQSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
 // triggered by this SQS queue (Pattern A — direct API call).
@@ -256,10 +247,4 @@ func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
-func checkSQSEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-func checkSQSSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}
