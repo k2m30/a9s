@@ -15,10 +15,6 @@ func init() {
 	resource.RegisterRelated("waf", []resource.RelatedDef{
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
 		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCloudFront, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkWAFRole},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkWAFAlarm},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
 	})
 
 	// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
@@ -87,24 +83,6 @@ func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 	return relatedResult("apigw", ids)
 }
 
-// checkWAFRole returns Count: 0 because WAF Web ACLs do not expose an IAM role
-// ARN in the ListWebACLs response.
-func checkWAFRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-// checkWAFCloudFront always returns 0 for REGIONAL-scope WAF Web ACLs.
-// CloudFront associations require CLOUDFRONT scope (us-east-1 only). Our waf.go
-// fetcher lists REGIONAL scope, so REGIONAL Web ACLs cannot be associated with
-// CloudFront distributions.
-func checkWAFCloudFront(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-}
 
-func checkWAFAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-}
 
-func checkWAFLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}

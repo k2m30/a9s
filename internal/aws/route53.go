@@ -22,13 +22,6 @@ func init() {
 	})
 
 	resource.RegisterRelated("r53", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: false},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: false},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkR53VPC},
-		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3},
 	})
 }
 

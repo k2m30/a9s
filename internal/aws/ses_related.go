@@ -58,24 +58,8 @@ func sesIdentityDomain(res resource.Resource) string {
 	return name
 }
 
-// checkSESCFN returns Count: 0 because SES identity tags are not included in
-// the ListEmailIdentities response — the CFN relationship cannot be determined
-// from cache alone.
-func checkSESCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-// checkSESRole returns Count: 0 because SES identities do not expose an IAM role
-// ARN in the ListEmailIdentities response.
-func checkSESRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-// checkSESKMS is a stub. The SES v2 ListEmailIdentities API does not include
-// DKIM signing key or configuration-set KMS details in the list response.
-func checkSESKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // sesRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -88,38 +72,11 @@ func sesRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkSESACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
 
-func checkSESAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-}
 
-func checkSESEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-func checkSESKinesis(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-}
 
-func checkSESLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-func checkSESLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkSESS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkSESSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}
 
-func checkSESTrail(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
-}
