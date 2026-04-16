@@ -380,6 +380,18 @@ type Route53ListResourceRecordSetsAPI interface {
 	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
 }
 
+// Route53GetHostedZoneAPI defines the interface for the Route53 GetHostedZone operation.
+// Used by Wave 2 enrichment to retrieve VPC associations for private hosted zones.
+type Route53GetHostedZoneAPI interface {
+	GetHostedZone(ctx context.Context, params *route53.GetHostedZoneInput, optFns ...func(*route53.Options)) (*route53.GetHostedZoneOutput, error)
+}
+
+// WAFGetLoggingConfigurationAPI defines the interface for the WAFv2 GetLoggingConfiguration operation.
+// Used by Wave 2 enrichment to detect WebACLs with no logging configured.
+type WAFGetLoggingConfigurationAPI interface {
+	GetLoggingConfiguration(ctx context.Context, params *wafv2.GetLoggingConfigurationInput, optFns ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error)
+}
+
 // APIGatewayV2GetApisAPI defines the interface for the API Gateway V2 GetApis operation.
 type APIGatewayV2GetApisAPI interface {
 	GetApis(ctx context.Context, params *apigatewayv2.GetApisInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error)
@@ -882,6 +894,7 @@ type IAMAPI interface {
 type WAFv2API interface {
 	WAFv2ListWebACLsAPI
 	WAFv2ListResourcesForWebACLAPI
+	WAFGetLoggingConfigurationAPI // Wave 2 enrichment
 }
 
 // SecretsManagerAPI is the aggregate interface covering all SecretsManager operations used by a9s fetchers.
@@ -912,6 +925,7 @@ type KMSAPI interface {
 type Route53API interface {
 	Route53ListHostedZonesAPI
 	Route53ListResourceRecordSetsAPI
+	Route53GetHostedZoneAPI // Wave 2 enrichment
 }
 
 // CloudFrontAPI is the aggregate interface covering all CloudFront operations used by a9s fetchers.

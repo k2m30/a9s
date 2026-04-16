@@ -1,5 +1,7 @@
 package resource
 
+import "strconv"
+
 func dnsCdnResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -15,7 +17,15 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 				{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				s := r.Fields["record_count"]
+				if s != "" {
+					if n, err := strconv.ParseInt(s, 10, 64); err == nil && n <= 2 {
+						return ColorWarning
+					}
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "r53_records",
 				Key:            "enter",

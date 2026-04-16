@@ -35,6 +35,7 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
@@ -42,6 +43,8 @@ import (
 	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	smithy "github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
@@ -102,6 +105,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"ecr":          EnrichECRRepository,
 	"codeartifact": EnrichCodeArtifactRepository,
 	"athena":       EnrichAthenaWorkGroup,
+	"r53":          EnrichRoute53Zone,
+	"waf":          EnrichWAFLogging,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -2665,3 +2670,134 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 	}
 	return EnricherResult{Truncated: truncated, Findings: findings}, nil
 }
+
+// EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
+// for private zones that have no VPC associations (orphaned private zone).
+//
+// Findings:
+//   - HostedZone.Config.PrivateZone == true AND VPCs[] empty → "~" finding
+//     "private zone with no VPC associations (orphan)"
+//
+// Skip if clients.Route53 == nil. Per-zone errors → Truncated.
+func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.Route53 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		zoneID := r.Fields["zone_id"]
+		if zoneID == "" {
+			zoneID = r.ID
+		}
+		if zoneID == "" {
+			continue
+		}
+		out, err := clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
+			Id: aws.String(zoneID),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if out.HostedZone == nil {
+			continue
+		}
+		// Only raise a finding for private zones — public zones cannot have VPC associations.
+		if out.HostedZone.Config == nil || !out.HostedZone.Config.PrivateZone {
+			continue
+		}
+		if len(out.VPCs) > 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  "private zone with no VPC associations (orphan)",
+			Rows: []resource.FindingRow{
+				{Label: "Zone ID", Value: zoneID, Tier: "~"},
+				{Label: "Issue", Value: "private zone with no VPC associations (orphan)", Tier: "~"},
+			},
+		}
+	}
+	// All Route53 findings are severity "~" (informational).
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichWAFLogging calls GetLoggingConfiguration and ListResourcesForWebACL per WebACL
+// (cap EnrichmentCap) and raises findings for:
+//   - GetLoggingConfiguration returns WAFNonexistentItemException → "~" finding
+//     "no logging configuration"
+//   - ListResourcesForWebACL returns empty ResourceArns → "~" finding
+//     "WebACL not associated with any resources (orphan)"
+//
+// Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) → Truncated.
+func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.WAFv2 == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		arn := r.Fields["arn"]
+		if arn == "" {
+			arn = r.ID
+		}
+		if arn == "" {
+			continue
+		}
+		var rows []resource.FindingRow
+
+		// Check logging configuration.
+		_, err := clients.WAFv2.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
+			ResourceArn: aws.String(arn),
+		})
+		if err != nil {
+			var noExist *wafv2types.WAFNonexistentItemException
+			if errors.As(err, &noExist) {
+				rows = append(rows, resource.FindingRow{
+					Label: "Logging",
+					Value: "no logging configuration",
+					Tier:  "~",
+				})
+			} else {
+				// Unexpected error — skip this ACL but flag truncation.
+				truncated = true
+				continue
+			}
+		}
+
+		// Check resource associations.
+		assocOut, err := clients.WAFv2.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
+			WebACLArn: aws.String(arn),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if len(assocOut.ResourceArns) == 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "Associations",
+				Value: "WebACL not associated with any resources (orphan)",
+				Tier:  "~",
+			})
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	// All WAF logging findings are severity "~" (informational).
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
