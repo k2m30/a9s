@@ -251,7 +251,7 @@ Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` inter
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
 
 **Architecture:**
-- `internal/aws/enrichment.go` — 9 enricher functions implementing `EnricherFunc`, registered in `EnricherRegistry`
+- `internal/aws/enrichment.go` — 66 enricher entries in `EnricherRegistry` (40 real enricher functions + 26 `NoOpEnricher` entries for types with Wave 2 = "None" per `docs/attention-signals.md`)
 - `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
 - `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
@@ -267,9 +267,13 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Priority order** (batchable first; the order slice in `buildEnrichQueue` uses short names): `dbi` (RDS/DocDB maintenance) → `ec2` (status checks) → `ebs` (volume status) → `cb` (CodeBuild) → `tg` (Target Groups) → `pipeline` (CodePipeline) → `ddb` (DynamoDB) → `sfn` (Step Functions) → `glue` (Glue). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher (historic bug: `"pipe"` key never dispatched because Wave 1 stored under `"pipeline"`).
+**Registry**: All 66 registered resource types have an `EnricherRegistry` entry per `docs/attention-signals.md`. 40 entries are real enricher functions; the remaining 26 are `NoOpEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
-**Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Batchable enrichers (priorities 1-3) make account-wide calls. Per-resource enrichers (priorities 5-9) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50).
+**Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
+
+**Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
+
+**Golden contract**: [`docs/attention-signals.md`](attention-signals.md) is the single source of truth for Wave 1 (Color func) and Wave 2 (enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `EnricherRegistry` entry. Adding or removing enrichers requires updating the doc.
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
@@ -345,7 +349,7 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 **Row Coloring:**
 - `resource.Color` enum: `ColorHealthy` (green), `ColorWarning` (yellow), `ColorBroken` (red), `ColorDim` (grey).
 - `(Color).IsIssue() bool` — returns true for `ColorWarning` and `ColorBroken`. Used by both the attention filter and issue-count badges.
-- `ResourceTypeDef.Color func(Resource) Color` — per-type classification function; reads structural fields directly (e.g., EC2 checks `system_status` and `instance_status`). REQUIRED for all registered types.
+- `ResourceTypeDef.Color func(Resource) Color` — per-type classification function. Two patterns: (1) status-driven types read `r.Fields["state"]` or `r.Fields["status"]` (e.g., EC2, ECS, VPC); (2) field-specific types check multi-field conditions (e.g., SG checks `dangerous_open_count > 0`, IAM Role checks `assume_role_policy_document` for wildcard principal). Types with Wave 1 = "None" in `docs/attention-signals.md` have a trivial `func(_ Resource) Color { return ColorHealthy }` — they rely on Wave 2 enrichers. REQUIRED for all registered types.
 - `ResourceTypeDef.ResolveColor(r Resource) Color` — dispatcher: calls `d.Color(r)` when non-nil, falls back to `resource.fallbackColor(r.Status)` for ad-hoc test doubles that omit `Color`.
 - `resource.fallbackColor(status string) Color` — status-string fallback covering common AWS vocabulary; used only when `Color` is nil (test doubles).
 - `styles.ColorStyle(c resource.Color) lipgloss.Style` — maps `resource.Color` to a palette foreground style for row rendering.
