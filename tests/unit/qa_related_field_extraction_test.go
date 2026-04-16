@@ -18,20 +18,41 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// checkerCache captures related checkers at init time, before any test can
+// overwrite the global registry. This makes field-extraction tests immune
+// to test-order pollution from tests that call RegisterRelated("ec2", ...).
+var checkerCache = func() map[string]map[string]resource.RelatedChecker {
+	cache := make(map[string]map[string]resource.RelatedChecker)
+	for _, td := range resource.AllResourceTypes() {
+		sn := td.ShortName
+		defs := resource.GetRelated(sn)
+		if len(defs) == 0 {
+			continue
+		}
+		m := make(map[string]resource.RelatedChecker, len(defs))
+		for _, def := range defs {
+			if def.Checker != nil {
+				m[def.TargetType] = def.Checker
+			}
+		}
+		cache[sn] = m
+	}
+	return cache
+}()
+
 // fieldExtractionChecker retrieves the RelatedChecker for the given source type
-// and target type. Fails the test immediately if not found or nil.
+// and target type from the init-time cache. Immune to test pollution.
 func fieldExtractionChecker(t *testing.T, shortName, targetType string) resource.RelatedChecker {
 	t.Helper()
-	for _, def := range resource.GetRelated(shortName) {
-		if def.TargetType == targetType {
-			if def.Checker == nil {
-				t.Fatalf("%s→%s: Checker is nil (stub, not a field-extraction checker)", shortName, targetType)
-			}
-			return def.Checker
-		}
+	m, ok := checkerCache[shortName]
+	if !ok {
+		t.Fatalf("%s: no related checkers cached at init time", shortName)
 	}
-	t.Fatalf("%s→%s: related checker not found", shortName, targetType)
-	return nil
+	checker, ok := m[targetType]
+	if !ok {
+		t.Fatalf("%s→%s: related checker not found in init-time cache", shortName, targetType)
+	}
+	return checker
 }
 
 // =============================================================================
