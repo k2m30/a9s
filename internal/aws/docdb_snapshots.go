@@ -25,6 +25,7 @@ func init() {
 	resource.RegisterRelated("docdb-snap", []resource.RelatedDef{
 		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDocdbSnapVPC},
 	})
 
 	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId

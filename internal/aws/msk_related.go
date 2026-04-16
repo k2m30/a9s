@@ -16,6 +16,7 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkMSKVPC},
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
@@ -98,4 +99,8 @@ func mskRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkMSKVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
