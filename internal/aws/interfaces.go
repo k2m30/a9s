@@ -357,6 +357,24 @@ type IAMListGroupsAPI interface {
 	ListGroups(ctx context.Context, params *iam.ListGroupsInput, optFns ...func(*iam.Options)) (*iam.ListGroupsOutput, error)
 }
 
+// IAMGetLoginProfileAPI defines the interface for the IAM GetLoginProfile operation.
+// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA (CIS IAM.5).
+type IAMGetLoginProfileAPI interface {
+	GetLoginProfile(ctx context.Context, params *iam.GetLoginProfileInput, optFns ...func(*iam.Options)) (*iam.GetLoginProfileOutput, error)
+}
+
+// IAMListMFADevicesAPI defines the interface for the IAM ListMFADevices operation.
+// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA (CIS IAM.5).
+type IAMListMFADevicesAPI interface {
+	ListMFADevices(ctx context.Context, params *iam.ListMFADevicesInput, optFns ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error)
+}
+
+// IAMListAccessKeysAPI defines the interface for the IAM ListAccessKeys operation.
+// Used by Wave 2 EnrichIAMUserMFA to detect stale access keys (>90d rotation).
+type IAMListAccessKeysAPI interface {
+	ListAccessKeys(ctx context.Context, params *iam.ListAccessKeysInput, optFns ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error)
+}
+
 // DocDBDescribeDBClusterSnapshotsAPI defines the interface for the DocumentDB DescribeDBClusterSnapshots operation.
 type DocDBDescribeDBClusterSnapshotsAPI interface {
 	DescribeDBClusterSnapshots(ctx context.Context, params *docdb.DescribeDBClusterSnapshotsInput, optFns ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error)
@@ -594,6 +612,12 @@ type BackupListBackupJobsAPI interface {
 // CWLogsDescribeLogStreamsAPI defines the interface for the CloudWatchLogs DescribeLogStreams operation.
 type CWLogsDescribeLogStreamsAPI interface {
 	DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
+}
+
+// CWLogsDescribeMetricFiltersAPI defines the interface for the CloudWatchLogs DescribeMetricFilters operation.
+// Used by Wave 2 EnrichLogsMetricFilters to detect audit log groups missing metric filters.
+type CWLogsDescribeMetricFiltersAPI interface {
+	DescribeMetricFilters(ctx context.Context, params *cloudwatchlogs.DescribeMetricFiltersInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeMetricFiltersOutput, error)
 }
 
 // CWLogsGetLogEventsAPI defines the interface for the CloudWatchLogs GetLogEvents operation.
@@ -892,6 +916,10 @@ type IAMAPI interface {
 	IAMGetPolicyAPI
 	IAMGetPolicyVersionAPI
 	IAMGetRolePolicyAPI
+	// Wave 2 enrichment interfaces.
+	IAMGetLoginProfileAPI
+	IAMListMFADevicesAPI
+	IAMListAccessKeysAPI
 }
 
 // WAFv2API is the aggregate interface covering all WAFv2 operations used by a9s fetchers.
@@ -1013,6 +1041,7 @@ type CWLogsAPI interface {
 	CWLogsDescribeLogStreamsAPI
 	CWLogsGetLogEventsAPI
 	CWLogsFilterLogEventsAPI
+	CWLogsDescribeMetricFiltersAPI // Wave 2 enrichment
 }
 
 // SQSAPI is the aggregate interface covering SQS operations used by a9s enrichers.

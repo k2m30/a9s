@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("iam-user", []string{"user_name", "user_id", "path", "create_date", "password_last_used"})
+	resource.RegisterFieldKeys("iam-user", []string{"user_name", "user_id", "path", "create_date", "password_last_used", "has_console_password"})
 
 	resource.RegisterPaginated("iam-user", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -98,11 +98,16 @@ func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationTok
 			Name:   userName,
 			Status: "",
 			Fields: map[string]string{
-				"user_name":          userName,
-				"user_id":            userID,
-				"path":               path,
-				"create_date":        createDate,
-				"password_last_used": passwordLastUsed,
+				"user_name":            userName,
+				"user_id":              userID,
+				"path":                 path,
+				"create_date":          createDate,
+				"password_last_used":   passwordLastUsed,
+				// has_console_password is set to "false" at fetch time; Wave 2
+				// EnrichIAMUserMFA calls GetLoginProfile per user to detect
+				// console password presence and updates this field via findings.
+				// The Color func reads this field directly for row-level coloring.
+				"has_console_password": "false", //nolint:gosec // not a credential, display field key
 			},
 			RawStruct: user,
 		}

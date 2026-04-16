@@ -1,6 +1,9 @@
 package resource
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 func monitoringResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
@@ -52,7 +55,28 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			// Color: Warning for no retention, no KMS key (CIS CW.7), or orphan (0 bytes, >90d old).
+			// Precedence: any Warning condition → ColorWarning; otherwise ColorHealthy.
+			// retention_days is "" when no retention policy is set.
+			// kms_key_id is "" when no KMS key is configured.
+			// stored_bytes is "0 B" when the log group holds no data.
+			// creation_time is stored as "2006-01-02 15:04".
+			Color: func(r Resource) Color {
+				if r.Fields["retention_days"] == "" {
+					return ColorWarning
+				}
+				if r.Fields["kms_key_id"] == "" {
+					return ColorWarning
+				}
+				if r.Fields["stored_bytes"] == "0 B" {
+					ct := r.Fields["creation_time"]
+					t, err := time.Parse("2006-01-02 15:04", ct)
+					if err == nil && time.Since(t) > 90*24*time.Hour {
+						return ColorWarning
+					}
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "log_streams",
 				Key:            "enter",

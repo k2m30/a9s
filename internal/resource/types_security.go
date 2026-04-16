@@ -1,6 +1,9 @@
 package resource
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func securityResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
@@ -67,9 +70,24 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
 			},
-			// Wave 2 enricher surfaces users with old active keys or no
-			// recent sign-in — Wave 1 list is config-only.
-			Color: func(_ Resource) Color { return ColorHealthy },
+			// Color: console password set AND last used >90d ago → Warning.
+			// has_console_password defaults to "false" at fetch time; the Wave 2
+			// EnrichIAMUserMFA enricher sets it to "true" when GetLoginProfile succeeds.
+			// password_last_used is stored as "2006-01-02 15:04" or "Never".
+			Color: func(r Resource) Color {
+				if r.Fields["has_console_password"] != "true" {
+					return ColorHealthy
+				}
+				plu := r.Fields["password_last_used"]
+				t, err := time.Parse("2006-01-02 15:04", plu)
+				if err != nil {
+					return ColorHealthy
+				}
+				if time.Since(t) > 90*24*time.Hour {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "IAM Groups",
