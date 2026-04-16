@@ -37,8 +37,14 @@ func init() {
 	// Role is a full ARN on Lambda (arn:aws:iam::.../role/name); the navigable
 	// field uses the ARN path directly. The target role fixture must carry the ARN
 	// as its ID for the infrastructure integrity check to pass.
+	// VpcConfig: VpcId, SubnetIds, SecurityGroupIds — present when function runs in a VPC.
+	// KMSKeyArn — KMS key for environment variable encryption.
 	resource.RegisterNavigableFields("lambda", []resource.NavigableField{
 		{FieldPath: "Role", TargetType: "role"},
+		{FieldPath: "KMSKeyArn", TargetType: "kms"},
+		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
+		{FieldPath: "VpcConfig.SubnetIds", TargetType: "subnet"},
+		{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 	})
 
 	resource.RegisterRelated("lambda", []resource.RelatedDef{
