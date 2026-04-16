@@ -16,7 +16,7 @@
                                                                                                                                                    │  CT events by Username
                                                                                                                                                    │  CT events by EventName
                                                                                                                                                    │  CT events by SharedEventId
-                                                                                                                                                   │
+                                                                                                                                                   │  CloudTrail Trails
                                                                                                                                                    │
                                                                                                                                                    │
                                                                                                                                                    │
