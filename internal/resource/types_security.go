@@ -1,5 +1,7 @@
 package resource
 
+import "strings"
+
 func securityResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -15,7 +17,14 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				doc := r.Fields["assume_role_policy_document"]
+				if doc != "" &&
+					(strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`)) {
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{
 				{
 					ChildType:      "role_policies",
@@ -38,7 +47,12 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			Color: func(r Resource) Color {
+				if r.Fields["attachment_count"] == "0" && r.Fields["is_attachable"] == "true" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "IAM Users",

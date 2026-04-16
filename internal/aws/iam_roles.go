@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description"})
+	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document"})
 
 	resource.RegisterPaginated("role", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -83,16 +84,27 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			description = *role.Description
 		}
 
+		assumeRolePolicyDoc := ""
+		if role.AssumeRolePolicyDocument != nil {
+			decoded, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
+			if err == nil {
+				assumeRolePolicyDoc = decoded
+			} else {
+				assumeRolePolicyDoc = *role.AssumeRolePolicyDocument
+			}
+		}
+
 		r := resource.Resource{
 			ID:     roleName,
 			Name:   roleName,
 			Status: "",
 			Fields: map[string]string{
-				"role_name":   roleName,
-				"role_id":     roleID,
-				"path":        path,
-				"create_date": createDate,
-				"description": description,
+				"role_name":                    roleName,
+				"role_id":                      roleID,
+				"path":                         path,
+				"create_date":                  createDate,
+				"description":                  description,
+				"assume_role_policy_document":  assumeRolePolicyDoc,
 			},
 			RawStruct: role,
 		}

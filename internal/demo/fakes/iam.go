@@ -175,6 +175,19 @@ func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersio
 	}, nil
 }
 
+func (f *IAMFake) GetRole(_ context.Context, input *iam.GetRoleInput, _ ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+	if input.RoleName == nil {
+		return nil, fmt.Errorf("GetRole: role name is required")
+	}
+	for i := range f.fix.Roles {
+		if f.fix.Roles[i].RoleName != nil && *f.fix.Roles[i].RoleName == *input.RoleName {
+			r := f.fix.Roles[i]
+			return &iam.GetRoleOutput{Role: &r}, nil
+		}
+	}
+	return nil, fmt.Errorf("GetRole: role %q not found", *input.RoleName)
+}
+
 func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
 	if input.RoleName == nil {
 		return nil, fmt.Errorf("GetRolePolicy: role name is required")
