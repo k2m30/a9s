@@ -36,3 +36,9 @@ func (f *RDSFake) DescribeEvents(_ context.Context, _ *rds.DescribeEventsInput, 
 func (f *RDSFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error) {
 	return &rds.DescribePendingMaintenanceActionsOutput{}, nil
 }
+
+// DescribeDBSubnetGroups returns an empty list — demo mode does not model
+// RDS subnet groups.
+func (f *RDSFake) DescribeDBSubnetGroups(_ context.Context, _ *rds.DescribeDBSubnetGroupsInput, _ ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error) {
+	return &rds.DescribeDBSubnetGroupsOutput{}, nil
+}

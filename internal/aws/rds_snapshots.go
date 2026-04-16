@@ -17,6 +17,8 @@ func init() {
 	resource.RegisterRelated("rds-snap", []resource.RelatedDef{
 		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkRDSSnapDBI, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkRDSSnapKMS, NeedsTargetCache: true},
+		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkRDSSnapDBC},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkRDSSnapBackup},
 	})
 
 	resource.RegisterNavigableFields("rds-snap", []resource.NavigableField{

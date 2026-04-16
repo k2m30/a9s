@@ -134,19 +134,42 @@ func TestRelated_Redis_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- redis→cfn: undeterminable from cache, returns Count: 0 ---
+// --- redis→cfn: unknown (Count: -1) because DescribeCacheClusters does not
+// return tags — ListTagsForResource is required to determine CFN ownership and
+// the fetcher does not make that per-cluster call. ---
 
-func TestRelated_Redis_CFN_ReturnsZero(t *testing.T) {
+// TestRelated_Redis_CFN_UnknownWithoutTags verifies the checker returns Count=-1
+// (unknown) regardless of whether there are CFN stacks in cache, because the
+// CacheCluster RawStruct has no Tags field to read aws:cloudformation:stack-name
+// from. Real behavior: we cannot deterministically decide relatedness.
+func TestRelated_Redis_CFN_UnknownWithoutTags(t *testing.T) {
+	checker := redisCheckerByTarget(t, "cfn")
+
 	source := resource.Resource{
 		ID:   "acme-prod-sessions",
 		Name: "acme-prod-sessions",
+		RawStruct: elasticachetypes.CacheCluster{
+			CacheClusterId: aws.String("acme-prod-sessions"),
+		},
 	}
-	checker := redisCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+
+	// With a populated cfn cache we still cannot answer (no tags available).
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-stack", Name: "some-stack", Fields: map[string]string{"stack_name": "some-stack"}},
+		}},
+	}
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown — tags not fetched)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
+
+	// With an empty cache the answer is still unknown (not zero).
+	result2 := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result2.Count != -1 {
+		t.Errorf("empty cache: Count = %d, want -1", result2.Count)
 	}
 }

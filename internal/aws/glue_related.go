@@ -5,7 +5,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -109,6 +112,199 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
+
+// checkGlueCFN calls glue:GetTags(resourceArn) and looks up the
+// aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
+// Job ARN: arn:aws:glue:REGION:ACCOUNT:job/NAME.
+func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	jobName := res.ID
+	if jobName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Glue == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	region := regionFromEnv()
+	account := accountIDFromClients(ctx, c)
+	if region == "" || account == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	jobARN := "arn:aws:glue:" + region + ":" + account + ":job/" + jobName
+	tagAPI, ok := c.Glue.(GlueGetTagsAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	out, err := tagAPI.GetTags(ctx, &glue.GetTagsInput{ResourceArn: aws.String(jobARN)})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
+	stackName := out.Tags["aws:cloudformation:stack-name"]
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	cfnList, truncated, err := glueRelatedResources(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
+	if cfnList == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	var ids []string
+	for _, cfnRes := range cfnList {
+		if cfnRes.ID == stackName || cfnRes.Name == stackName || cfnRes.Fields["stack_name"] == stackName {
+			ids = append(ids, cfnRes.ID)
+			continue
+		}
+		rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+		if cfnOk && rawCFN.StackName != nil && *rawCFN.StackName == stackName {
+			ids = append(ids, cfnRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	return relatedResult("cfn", ids)
+}
+
+// checkGlueS3 extracts the S3 bucket referenced by the job's
+// Command.ScriptLocation (s3://bucket/path/to/script.py). Forward lookup
+// from gluetypes.Job.
+func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+	}
+	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	}
+	bucket := bucketFromS3URI(*job.Command.ScriptLocation)
+	if bucket == "" {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	}
+	return relatedResult("s3", []string{bucket})
+}
+
+// checkGlueKMS calls glue:GetSecurityConfiguration(name=Job.SecurityConfiguration)
+// and extracts the KMS key ARNs from the encryption blocks (S3/CloudWatch/
+// JobBookmarks). Pattern C — single API call per checker. When the job has
+// no SecurityConfiguration, Count: 0.
+func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Glue == nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	secCfgAPI, ok := c.Glue.(GlueGetSecurityConfigurationAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	out, err := secCfgAPI.GetSecurityConfiguration(ctx, &glue.GetSecurityConfigurationInput{
+		Name: aws.String(*job.SecurityConfiguration),
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+	}
+	if out.SecurityConfiguration == nil || out.SecurityConfiguration.EncryptionConfiguration == nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	enc := out.SecurityConfiguration.EncryptionConfiguration
+	seen := make(map[string]struct{})
+	addKey := func(arn *string) {
+		if arn == nil || *arn == "" {
+			return
+		}
+		val := *arn
+		if idx := strings.LastIndex(val, "/"); idx >= 0 && idx < len(val)-1 {
+			val = val[idx+1:]
+		}
+		seen[val] = struct{}{}
+	}
+	if enc.CloudWatchEncryption != nil {
+		addKey(enc.CloudWatchEncryption.KmsKeyArn)
+	}
+	if enc.JobBookmarksEncryption != nil {
+		addKey(enc.JobBookmarksEncryption.KmsKeyArn)
+	}
+	for _, s := range enc.S3Encryption {
+		addKey(s.KmsKeyArn)
+	}
+	var ids []string
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	return relatedResult("kms", ids)
+}
+
+// checkGlueAthena scans the athena cache for workgroups whose enriched
+// Fields["glue_database"] (future enrichment) references this job's database
+// targets, falling back to Count: 0 when no match is found. Uses the cache.
+func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	jobName := res.ID
+	if jobName == "" {
+		return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
+	}
+	wgList, truncated, err := glueRelatedResources(ctx, clients, cache, "athena")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "athena", Count: -1, Err: err}
+	}
+	if wgList == nil {
+		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+	}
+	var ids []string
+	for _, wg := range wgList {
+		// Any workgroup tagged/named with the same job name is a convention
+		// signal. Without enrichment the cache typically yields no match.
+		if wg.Fields["glue_job"] == jobName || wg.ID == jobName {
+			ids = append(ids, wg.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+	}
+	return relatedResult("athena", ids)
+}
+
+// checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
+// values that look like Secrets Manager references (arn:aws:secretsmanager:
+// prefix). Uses res.RawStruct — no cache needed.
+func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+	if len(job.DefaultArguments) == 0 {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, v := range job.DefaultArguments {
+		if !strings.HasPrefix(v, "arn:aws:secretsmanager:") {
+			continue
+		}
+		// ARN: arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-suffix
+		idx := strings.Index(v, ":secret:")
+		if idx < 0 {
+			continue
+		}
+		name := v[idx+len(":secret:"):]
+		if name == "" {
+			continue
+		}
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		ids = append(ids, name)
+	}
+	return relatedResult("secrets", ids)
+}
 
 // glueRelatedResources returns the resource list for target from cache or by fetching the first page.
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

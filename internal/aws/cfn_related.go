@@ -5,6 +5,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -129,6 +131,58 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 	return relatedResult("sns", ids)
+}
+
+// cfnStackResourcesByType calls cloudformation:ListStackResources(stack) and
+// returns the PhysicalResourceIds whose ResourceType matches the given value
+// (e.g. "AWS::S3::Bucket"). Pattern C — single paginated API call; we read
+// the first page only to honor the 1-call budget.
+func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resourceType string) ([]string, bool) {
+	if stackName == "" {
+		return nil, true
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudFormation == nil {
+		return nil, false
+	}
+	out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
+		StackName: aws.String(stackName),
+	})
+	if err != nil || out == nil {
+		return nil, false
+	}
+	var ids []string
+	for _, r := range out.StackResourceSummaries {
+		if r.ResourceType == nil || *r.ResourceType != resourceType {
+			continue
+		}
+		if r.PhysicalResourceId == nil || *r.PhysicalResourceId == "" {
+			continue
+		}
+		ids = append(ids, *r.PhysicalResourceId)
+	}
+	return ids, true
+}
+
+// checkCfnS3 calls ListStackResources and returns S3 buckets created by the
+// stack (ResourceType=AWS::S3::Bucket).
+func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+	}
+	return relatedResult("s3", ids)
+}
+
+// checkCfnEBRule calls ListStackResources and returns EventBridge rules
+// created by the stack (ResourceType=AWS::Events::Rule). The PhysicalResourceId
+// of an Events::Rule is the rule name.
+func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	return relatedResult("eb-rule", ids)
 }
 
 // cfnRelatedResources returns the resource list for target from cache or by fetching the first page.

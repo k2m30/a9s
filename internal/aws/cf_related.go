@@ -5,7 +5,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -172,9 +174,147 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("acm", ids)
 }
 
+// checkCfR53 reports Route 53 hosted zones whose alias records point at this
+// CloudFront distribution. The r53 hosted-zone cache holds zones only —
+// resource record sets live on route53:ListResourceRecordSets (per-zone) and
+// are not cached. Determining this relationship requires O(N)-per-zone record
+// queries, which is outside the 1-call budget for related-panel checkers.
+// Returns Count: -1 (unknown) to signal the data is not available.
+func checkCfR53(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+}
 
+// checkCfAlarm reports CloudWatch alarms on this CloudFront distribution.
+// CloudFront alarms use dimension "DistributionId" (global metrics). Scans
+// the alarm cache for that dimension matching this distribution's ID.
+func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	distID := res.ID
+	if distID == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
 
+	alarmList, truncated, err := cfRelatedResources(ctx, clients, cache, "alarm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+	}
+	if alarmList == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
 
+	var ids []string
+	for _, alarmRes := range alarmList {
+		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, d := range raw.Dimensions {
+			if d.Name != nil && *d.Name == "DistributionId" && d.Value != nil && *d.Value == distID {
+				ids = append(ids, alarmRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	return relatedResult("alarm", ids)
+}
+
+// checkCfLambda reports Lambda@Edge associations on this distribution.
+// Pattern C: one cloudfront:GetDistributionConfig call; extract
+// LambdaFunctionAssociations across default + ordered cache behaviors.
+func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	distID := res.ID
+	if distID == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudFront == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
+		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if out.DistributionConfig == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+	cfg := out.DistributionConfig
+
+	seen := make(map[string]bool)
+	var ids []string
+	collect := func(lfa *cftypes.LambdaFunctionAssociations) {
+		if lfa == nil {
+			return
+		}
+		for _, item := range lfa.Items {
+			if item.LambdaFunctionARN == nil || *item.LambdaFunctionARN == "" {
+				continue
+			}
+			arn := *item.LambdaFunctionARN
+			name := arn
+			if idx := strings.LastIndex(arn, ":function:"); idx >= 0 {
+				rest := arn[idx+len(":function:"):]
+				if colon := strings.Index(rest, ":"); colon >= 0 {
+					name = rest[:colon]
+				} else {
+					name = rest
+				}
+			}
+			if seen[name] {
+				return
+			}
+			seen[name] = true
+			ids = append(ids, name)
+		}
+	}
+	if cfg.DefaultCacheBehavior != nil {
+		collect(cfg.DefaultCacheBehavior.LambdaFunctionAssociations)
+	}
+	if cfg.CacheBehaviors != nil {
+		for _, cb := range cfg.CacheBehaviors.Items {
+			collect(cb.LambdaFunctionAssociations)
+		}
+	}
+	return relatedResult("lambda", ids)
+}
+
+// checkCfLogs reports the S3 bucket receiving access logs for this
+// distribution (CloudFront writes access logs to S3, not CW Logs).
+// Pattern C: one cloudfront:GetDistributionConfig call; read Logging.Bucket.
+func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	distID := res.ID
+	if distID == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudFront == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
+		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if out.DistributionConfig == nil || out.DistributionConfig.Logging == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	lg := out.DistributionConfig.Logging
+	if lg.Enabled == nil || !*lg.Enabled || lg.Bucket == nil || *lg.Bucket == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	bucket := *lg.Bucket
+	if idx := strings.Index(bucket, ".s3"); idx > 0 {
+		bucket = bucket[:idx]
+	}
+	return relatedResult("logs", []string{bucket})
+}
 
 // cfRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.

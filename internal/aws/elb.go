@@ -32,6 +32,15 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkELBSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkELBVPC},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN},
+		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkELBR53},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkELBACM},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkELBCF},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkELBENI, NeedsTargetCache: true},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkELBLogs},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkELBS3},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkELBSubnet},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkELBWAF},
 	})
 }
 

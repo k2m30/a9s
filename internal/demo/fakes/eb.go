@@ -29,3 +29,13 @@ func (f *EBFake) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.Des
 func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentHealthInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error) {
 	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
 }
+
+// DescribeConfigurationSettings is a no-op stub for demo mode.
+func (f *EBFake) DescribeConfigurationSettings(_ context.Context, _ *elasticbeanstalk.DescribeConfigurationSettingsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
+	return &elasticbeanstalk.DescribeConfigurationSettingsOutput{}, nil
+}
+
+// DescribeEnvironmentResources is a no-op stub for demo mode.
+func (f *EBFake) DescribeEnvironmentResources(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentResourcesInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
+	return &elasticbeanstalk.DescribeEnvironmentResourcesOutput{}, nil
+}

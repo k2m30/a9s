@@ -161,19 +161,34 @@ func TestRelated_EFS_CFN_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- efs→lambda: undeterminable from cache, returns Count: 0 ---
+// --- efs→lambda: requires live EFS DescribeAccessPoints + lambda cache scan ---
 
-func TestRelated_EFS_Lambda_ReturnsZero(t *testing.T) {
+// TestRelated_EFS_Lambda_UnknownWithoutClients verifies the checker reports
+// Count=-1 when no live EFS client is available. Lambda FileSystemConfigs
+// carry access-point ARNs, not filesystem ARNs, so the link cannot be resolved
+// from cache alone.
+func TestRelated_EFS_Lambda_UnknownWithoutClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "fs-0a1b2c3d4e5f60001",
 		Name: "prod-shared-efs",
 	}
 	checker := efsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (requires live efs:DescribeAccessPoints)", result.Count)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
+}
+
+// TestRelated_EFS_Lambda_EmptyIDReturnsZero verifies the checker short-circuits
+// with Count=0 for a resource with no filesystem ID — no API call is attempted.
+func TestRelated_EFS_Lambda_EmptyIDReturnsZero(t *testing.T) {
+	source := resource.Resource{ID: "", Name: ""}
+	checker := efsCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no filesystem id)", result.Count)
 	}
 }

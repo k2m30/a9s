@@ -20,9 +20,6 @@ func init() {
 		}
 		return FetchBackupPlansPage(ctx, c.Backup, continuationToken)
 	})
-
-	resource.RegisterRelated("backup", []resource.RelatedDef{
-	})
 }
 
 // FetchBackupPlans calls the Backup ListBackupPlans API and returns a slice of

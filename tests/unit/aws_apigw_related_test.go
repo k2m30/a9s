@@ -162,51 +162,65 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwLambda tests (stub — Count=0, data not available from GetApis)
+// checkApigwLambda tests (requires GetIntegrations per API — outside budget)
 // ---------------------------------------------------------------------------
 
-// TestRelated_APIGW_Lambda_AlwaysZero verifies that checkApigwLambda returns
-// Count=0 regardless of input. Lambda integration targets are not available
-// in the GetApis list response.
-func TestRelated_APIGW_Lambda_AlwaysZero(t *testing.T) {
+// TestRelated_APIGW_Lambda_Unknown: valid API → Count: -1 (integrations via GetIntegrations).
+func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "api-abc123",
 		Name:   "my-api",
 		Fields: map[string]string{},
 	}
-
 	checker := apigwCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub: Lambda integration not available from list API)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: integration targets via GetIntegrations)", result.Count)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
 	}
 }
 
+// TestRelated_APIGW_Lambda_EmptyInput: empty API id → Count: 0.
+func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	}
+}
+
 // ---------------------------------------------------------------------------
-// checkApigwWAF tests (stub — Count=0, data not available from GetApis)
+// checkApigwWAF tests (requires ListResourcesForWebACL per Web ACL — outside budget)
 // ---------------------------------------------------------------------------
 
-// TestRelated_APIGW_WAF_AlwaysZero verifies that checkApigwWAF returns
-// Count=0 regardless of input. WAF Web ACL associations are not available
-// in the GetApis list response.
-func TestRelated_APIGW_WAF_AlwaysZero(t *testing.T) {
+// TestRelated_APIGW_WAF_Unknown: valid API → Count: -1 (Web ACL links resolved from WAF side).
+func TestRelated_APIGW_WAF_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "api-abc123",
 		Name:   "my-api",
 		Fields: map[string]string{},
 	}
-
 	checker := apigwCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub: WAF association not available from list API)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: WAF associations require ListResourcesForWebACL)", result.Count)
 	}
 	if result.TargetType != "waf" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "waf")
+	}
+}
+
+// TestRelated_APIGW_WAF_EmptyInput: empty API id → Count: 0.
+func TestRelated_APIGW_WAF_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "waf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
 	}
 }

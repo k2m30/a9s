@@ -13,6 +13,9 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
+		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkSNSSubECS, NeedsTargetCache: false},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSSubKMS, NeedsTargetCache: false},
+		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkSNSSubPolicy, NeedsTargetCache: false},
 	})
 
 	resource.RegisterNavigableFields("sns-sub", []resource.NavigableField{
@@ -126,6 +129,25 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("sqs", ids)
 }
 
+
+// checkSNSSubECS returns Count: -1. SNS subscriptions can target ECS tasks via
+// application-generated workflows, but there is no direct subscription→cluster
+// relationship exposed by ListSubscriptions or GetSubscriptionAttributes.
+func checkSNSSubECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs", Count: -1}
+}
+
+// checkSNSSubKMS returns Count: -1. The subscription DeliveryPolicy / KmsMasterKey
+// fields are only returned by GetSubscriptionAttributes, not ListSubscriptions.
+func checkSNSSubKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+}
+
+// checkSNSSubPolicy returns Count: -1. The filter policy is on the subscription
+// attributes (GetSubscriptionAttributes) — not on the list entry.
+func checkSNSSubPolicy(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
+}
 
 // snsSubRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.

@@ -20,9 +20,6 @@ func init() {
 		}
 		return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
 	})
-
-	resource.RegisterRelated("r53", []resource.RelatedDef{
-	})
 }
 
 // FetchHostedZones calls the Route53 ListHostedZones API and converts

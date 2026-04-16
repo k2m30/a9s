@@ -6,10 +6,29 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ddbtypesForTest constructs a ddbtypes.TableDescription for tests without
+// pulling in the aws.String helper at every call site.
+type ddbtypesForTest struct {
+	TableName       string
+	LatestStreamArn string
+}
+
+func (d ddbtypesForTest) Build() ddbtypes.TableDescription {
+	out := ddbtypes.TableDescription{}
+	if d.TableName != "" {
+		out.TableName = aws.String(d.TableName)
+	}
+	if d.LatestStreamArn != "" {
+		out.LatestStreamArn = aws.String(d.LatestStreamArn)
+	}
+	return out
+}
 
 func TestRelated_DDB_Registered(t *testing.T) {
 	defs := resource.GetRelated("ddb")
@@ -182,19 +201,59 @@ func TestRelated_DDB_Alarm_NilCache(t *testing.T) {
 	}
 }
 
-// --- ddb→lambda: undeterminable from cache, returns Count: 0 ---
+// --- ddb→lambda: requires live API (lambda:ListEventSourceMappings on stream ARN) ---
 
-func TestRelated_DDB_Lambda_ReturnsZero(t *testing.T) {
+// TestRelated_DDB_Lambda_NoStreamReturnsZero verifies that when streams are
+// disabled on the table (LatestStreamArn is nil/empty), the checker reports
+// Count=0 without calling any API — no Lambda trigger is possible.
+func TestRelated_DDB_Lambda_NoStreamReturnsZero(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-orders-table",
 		Name: "acme-orders-table",
+		RawStruct: ddbtypesForTest{
+			TableName: "acme-orders-table",
+			// No LatestStreamArn — streams disabled.
+		}.Build(),
 	}
 	checker := ddbCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+		t.Errorf("Count = %d, want 0 (streams disabled)", result.Count)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
+	}
+}
+
+// TestRelated_DDB_Lambda_StreamsEnabledUnknownWithoutClients verifies that when
+// streams are enabled but no live Lambda client is available, the checker
+// reports Count=-1 (undeterminable) rather than a silent zero.
+func TestRelated_DDB_Lambda_StreamsEnabledUnknownWithoutClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-orders-table",
+		Name: "acme-orders-table",
+		RawStruct: ddbtypesForTest{
+			TableName:       "acme-orders-table",
+			LatestStreamArn: "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders-table/stream/2026-01-01T00:00:00.000",
+		}.Build(),
+	}
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (requires live lambda:ListEventSourceMappings)", result.Count)
+	}
+}
+
+// TestRelated_DDB_Lambda_InvalidRawStruct verifies the checker reports
+// Count=-1 when the RawStruct is not a TableDescription (cannot read streams).
+func TestRelated_DDB_Lambda_InvalidRawStruct(t *testing.T) {
+	source := resource.Resource{
+		ID:        "acme-orders-table",
+		RawStruct: "not-a-table",
+	}
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
 	}
 }

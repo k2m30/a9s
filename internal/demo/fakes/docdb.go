@@ -27,3 +27,9 @@ func (f *DocDBFake) DescribeDBClusters(_ context.Context, _ *docdb.DescribeDBClu
 func (f *DocDBFake) DescribeDBClusterSnapshots(_ context.Context, _ *docdb.DescribeDBClusterSnapshotsInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 	return &docdb.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: f.fix.DBClusterSnapshots}, nil
 }
+
+// DescribeDBSubnetGroups returns an empty list — demo mode does not model
+// DocumentDB subnet groups.
+func (f *DocDBFake) DescribeDBSubnetGroups(_ context.Context, _ *docdb.DescribeDBSubnetGroupsInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBSubnetGroupsOutput, error) {
+	return &docdb.DescribeDBSubnetGroupsOutput{}, nil
+}

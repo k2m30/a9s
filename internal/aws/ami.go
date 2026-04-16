@@ -25,6 +25,10 @@ func init() {
 	resource.RegisterRelated("ami", []resource.RelatedDef{
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS},
+		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkAMING, NeedsTargetCache: true},
 	})
 
 	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId

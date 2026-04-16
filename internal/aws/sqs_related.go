@@ -17,11 +17,89 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
 		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
+		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role (Policy)", Checker: checkSQSRole, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
 	})
 
 	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
 	// RedrivePolicy are embedded in the Attributes string map, not struct fields; no NavigableField path applies.
+}
+
+// checkSQSSNS resolves the SNS topics publishing to this queue by scanning the
+// sns-sub cache: any subscription with protocol=sqs and Endpoint matching this
+// queue's ARN maps back to its topic_arn. Pattern C — reverse two-hop.
+func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	queueARN := ""
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		queueARN = raw.Attributes["QueueArn"]
+	}
+	queueName := res.ID
+	if queueARN == "" && queueName == "" {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+	}
+
+	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+	}
+	if subList == nil {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+	}
+
+	topicSet := make(map[string]struct{})
+	for _, sub := range subList {
+		if sub.Fields["protocol"] != "sqs" {
+			continue
+		}
+		endpoint := sub.Fields["endpoint"]
+		if endpoint == "" {
+			continue
+		}
+		match := false
+		if queueARN != "" && strings.Contains(endpoint, queueARN) {
+			match = true
+		} else if queueName != "" && strings.HasSuffix(endpoint, ":"+queueName) {
+			match = true
+		}
+		if !match {
+			continue
+		}
+		if ta := sub.Fields["topic_arn"]; ta != "" {
+			topicSet[ta] = struct{}{}
+		}
+	}
+
+	if len(topicSet) == 0 {
+		if truncated {
+			return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+	}
+
+	var ids []string
+	for arn := range topicSet {
+		ids = append(ids, arn)
+	}
+	return relatedResult("sns", ids)
+}
+
+// checkSQSEbRule attempts to reverse-look up EventBridge rules whose targets
+// include this queue. Returns Count:-1 — the eb-rule list cache only carries
+// ListRules output (no targets). Resolving targets would require
+// ListTargetsByRule per rule (N+1), which is intentionally avoided.
+func checkSQSEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+}
+
+// checkSQSRole attempts to resolve IAM roles whose policies grant access to this
+// queue. Returns Count:-1 — role policies are embedded JSON documents that would
+// require per-role SimulatePrincipalPolicy / GetRolePolicy parsing (N+1, not in
+// the role list cache).
+func checkSQSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
 }
 
 // checkSQSSNSSub searches the sns-sub cache for subscriptions where protocol=sqs
