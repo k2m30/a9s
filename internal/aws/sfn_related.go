@@ -113,3 +113,7 @@ func sfnRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+func checkSFNLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}

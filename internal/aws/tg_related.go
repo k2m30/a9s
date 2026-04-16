@@ -24,6 +24,16 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkTGVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTGKMS},
+		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkTGBackup},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkTGCFN},
+		{TargetType: "dbc", DisplayName: "DB Clusters", Checker: checkTGDBC},
+		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkTGDBI},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkTGEC2},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTGLambda},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTGLogs},
+		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkTGRDSSnap},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkTGSecrets},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
 	})
 
 	resource.RegisterNavigableFields("tg", []resource.NavigableField{
@@ -237,4 +247,44 @@ func tgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkTGBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
+func checkTGCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
+func checkTGDBC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+}
+
+func checkTGDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+}
+
+func checkTGEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+}
+
+func checkTGLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+func checkTGLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkTGRDSSnap(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "rds-snap", Count: 0}
+}
+
+func checkTGSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
+func checkTGSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }

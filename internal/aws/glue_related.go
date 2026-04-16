@@ -131,3 +131,15 @@ func glueRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	}
 	return resources, isTruncated, err
 }
+
+func checkGlueAthena(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
+}
+
+func checkGlueS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+}
+
+func checkGlueSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}

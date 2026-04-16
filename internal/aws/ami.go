@@ -27,6 +27,8 @@ func init() {
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkAMIKMS},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN},
+		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkAMING},
 	})
 
 	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId

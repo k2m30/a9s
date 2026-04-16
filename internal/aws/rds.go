@@ -23,6 +23,8 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkDbiRole},
+		{TargetType: "dbc", DisplayName: "DocumentDB Clusters", Checker: checkDbiDBC},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
 	})
 
 	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,

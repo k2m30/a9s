@@ -32,6 +32,7 @@ func init() {
 			NeedsTargetCache: false,
 		},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet},
 	})
 }
 
@@ -130,4 +131,8 @@ func tgwRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkTGWSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }

@@ -206,3 +206,15 @@ func ngRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
+
+func checkNGAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+}
+
+func checkNGEBS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
+}
+
+func checkNGSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+}

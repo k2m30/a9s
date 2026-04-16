@@ -200,3 +200,19 @@ func checkASGVPC(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 func checkASGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
+
+func checkASGAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+}
+
+func checkASGCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
+func checkASGELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+}
+
+func checkASGSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+}

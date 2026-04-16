@@ -23,6 +23,10 @@ func init() {
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkSubnetRTB, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSubnetCFN, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkSubnetVPC},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkSubnetASG},
+		{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkSubnetEFS},
+		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkSubnetEKS},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkSubnetVPCE},
 	})
 }
 
@@ -239,4 +243,20 @@ func subnetRelatedResources(ctx context.Context, clients any, cache resource.Res
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkSubnetASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+}
+
+func checkSubnetEFS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
+}
+
+func checkSubnetEKS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
+}
+
+func checkSubnetVPCE(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 }

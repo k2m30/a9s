@@ -146,6 +146,22 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
+func checkECSASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+}
+
+func checkECSEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+}
+
+func checkECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkECSLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
 // ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

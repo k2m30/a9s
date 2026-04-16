@@ -140,6 +140,34 @@ func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{vpcID})
 }
 
+func checkELBACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+}
+
+func checkELBCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+}
+
+func checkELBENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+}
+
+func checkELBLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkELBS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+}
+
+func checkELBSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+}
+
+func checkELBWAF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+}
+
 // elbRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func elbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

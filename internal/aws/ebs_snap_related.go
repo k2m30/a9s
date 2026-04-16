@@ -86,6 +86,10 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("kms", []string{keyID})
 }
 
+func checkEBSSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
 // ebsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
 func ebsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

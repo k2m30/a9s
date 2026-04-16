@@ -489,3 +489,27 @@ func checkEC2KMS(_ context.Context, _ any, _ resource.Resource, _ resource.Resou
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
+func checkEC2AMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+}
+
+func checkEC2Backup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
+func checkEC2ENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+}
+
+func checkEC2Logs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkEC2SSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+}
+
+func checkEC2Subnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+}
+

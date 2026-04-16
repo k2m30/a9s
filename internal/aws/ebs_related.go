@@ -62,6 +62,18 @@ func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{arn[idx+1:]})
 }
 
+func checkEBSAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkEBSBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
+func checkEBSCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+}
+
 // ebsRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
 func ebsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

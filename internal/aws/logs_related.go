@@ -109,3 +109,19 @@ func logsRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	}
 	return resources, isTruncated, err
 }
+
+func checkLogsAPIGW(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+}
+
+func checkLogsECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkLogsKinesis(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+}
+
+func checkLogsS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+}

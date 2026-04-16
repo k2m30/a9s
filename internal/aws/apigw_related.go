@@ -75,6 +75,38 @@ func checkApigwKMS(_ context.Context, _ any, _ resource.Resource, _ resource.Res
 	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
+func checkApigwACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+}
+
+func checkApigwAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkApigwCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
+}
+
+func checkApigwELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+}
+
+func checkApigwR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+}
+
+func checkApigwSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+}
+
+func checkApigwSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+}
+
+func checkApigwVPCE(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+}
+
 // apigwRelatedResources returns the resource list for target from cache or by fetching the first page.
 func apigwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

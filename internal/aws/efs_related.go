@@ -24,6 +24,11 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm},
+		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkEFSBackup},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI},
 	})
 }
 
@@ -202,4 +207,24 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 
 func checkEFSVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+}
+
+func checkEFSAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkEFSBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}
+
+func checkEFSEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+}
+
+func checkEFSECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkEFSENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 }

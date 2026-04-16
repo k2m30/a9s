@@ -25,6 +25,12 @@ func init() {
 		{TargetType: "kms",    DisplayName: "KMS Key",           Checker: checkDdbKMS},
 		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: checkDdbLambda},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
+		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkDdbBackup},
+		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDdbSecrets},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkDdbSNS},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkDdbVPCE},
 	})
 
 	// ddbtypes.TableDescription: SSEDescription.KMSMasterKeyArn

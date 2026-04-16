@@ -23,6 +23,9 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkNGEC2, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkNGSG},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkNGKMS},
+		{TargetType: "ami", DisplayName: "AMIs", Checker: checkNGAMI},
+		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkNGEBS},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNGSubnet},
 	})
 
 	resource.RegisterNavigableFields("ng", []resource.NavigableField{

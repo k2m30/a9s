@@ -145,6 +145,26 @@ func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
+func checkECREbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+}
+
+func checkECRECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+}
+
+func checkECRECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+}
+
+func checkECREKS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
+}
+
+func checkECRPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
+}
+
 // ecrRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
 func ecrRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

@@ -27,6 +27,12 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkCbVPC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCbKMS},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCbAlarm},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkCbECR},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCbS3},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkCbSecrets},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkCbSSM},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkCbSubnet},
 	})
 
 	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}

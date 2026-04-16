@@ -50,3 +50,7 @@ func checkDocdbSnapVPC(_ context.Context, _ any, res resource.Resource, _ resour
 	}
 	return relatedResult("vpc", []string{*snap.VpcId})
 }
+
+func checkDocdbSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+}

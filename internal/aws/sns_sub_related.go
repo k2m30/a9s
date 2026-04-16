@@ -14,6 +14,8 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSSubKMS},
+		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkSNSSubECS},
+		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkSNSSubPolicy},
 	})
 
 	resource.RegisterNavigableFields("sns-sub", []resource.NavigableField{
@@ -143,4 +145,12 @@ func snsSubRelatedResources(ctx context.Context, clients any, cache resource.Res
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkSNSSubECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+}
+
+func checkSNSSubPolicy(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "policy", Count: 0}
 }
