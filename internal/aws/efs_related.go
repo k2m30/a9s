@@ -7,7 +7,9 @@ import (
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -22,6 +24,13 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2, NeedsTargetCache: true},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true},
 	})
 }
 
@@ -191,6 +200,71 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkEFSLambda finds Lambda functions that mount this EFS file system via
+// FileSystemConfigs. Lambda FileSystemConfigs carry EFS *access-point* ARNs,
+// not filesystem ARNs, so the link requires resolving the filesystem's access
+// points via efs:DescribeAccessPoints (Pattern A + C): collect this file
+// system's access point ARNs, then scan the lambda cache for
+// FunctionConfiguration.FileSystemConfigs entries whose Arn is in that set.
+// Returns Count: -1 when no live EFS client is available to list access points.
+func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	fsID := res.ID
+	if fsID == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.EFS == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	apOut, err := c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
+		FileSystemId: &fsID,
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	apARNs := make(map[string]struct{})
+	for _, ap := range apOut.AccessPoints {
+		if ap.AccessPointArn != nil && *ap.AccessPointArn != "" {
+			apARNs[*ap.AccessPointArn] = struct{}{}
+		}
+	}
+	if len(apARNs) == 0 {
+		// No access points exist for this filesystem — no Lambda can mount it.
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	lambdaList, truncated, err := efsRelatedResources(ctx, clients, cache, "lambda")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if lambdaList == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	var ids []string
+	for _, lRes := range lambdaList {
+		fn, ok := assertStruct[lambdatypes.FunctionConfiguration](lRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, cfg := range fn.FileSystemConfigs {
+			if cfg.Arn == nil {
+				continue
+			}
+			if _, matched := apARNs[*cfg.Arn]; matched {
+				ids = append(ids, lRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	return relatedResult("lambda", ids)
 }
 
 

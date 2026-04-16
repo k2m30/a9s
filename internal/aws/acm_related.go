@@ -3,12 +3,15 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/acm"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
-
 
 // checkACMCF searches the CloudFront cache for distributions whose viewer
 // certificate ARN matches this ACM certificate's ARN.
@@ -46,7 +49,158 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("cf", ids)
 }
 
+// acmCertInUseBy returns the ARNs from acm:DescribeCertificate.InUseBy for
+// this ACM certificate. Pattern C: one API call.
+func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]string, error) {
+	certARN := ""
+	raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct)
+	if ok && raw.CertificateArn != nil {
+		certARN = *raw.CertificateArn
+	}
+	if certARN == "" {
+		return nil, nil
+	}
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.ACM == nil {
+		return nil, errNoR53Client
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
+		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out.Certificate == nil {
+		return nil, nil
+	}
+	return out.Certificate.InUseBy, nil
+}
 
+// checkACMELB reports load balancers using this certificate via
+// acm:DescribeCertificate.InUseBy filtered to elbv2:loadbalancer ARNs.
+func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" && res.Name == "" {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+	}
+	arns, err := acmCertInUseBy(ctx, clients, res)
+	if err != nil {
+		if errors.Is(err, errNoR53Client) {
+			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, arn := range arns {
+		if !strings.Contains(arn, ":loadbalancer/") {
+			continue
+		}
+		parts := strings.Split(arn, "/")
+		if len(parts) >= 3 {
+			ids = append(ids, parts[len(parts)-2])
+		}
+	}
+	return relatedResult("elb", ids)
+}
+
+// checkACMAPIGW reports API Gateway custom domains using this certificate
+// via acm:DescribeCertificate.InUseBy filtered to apigateway domain ARNs.
+func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" && res.Name == "" {
+		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
+	}
+	arns, err := acmCertInUseBy(ctx, clients, res)
+	if err != nil {
+		if errors.Is(err, errNoR53Client) {
+			return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, arn := range arns {
+		if strings.Contains(arn, "/domainnames/") {
+			if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+				ids = append(ids, arn[idx+1:])
+			}
+		} else if strings.Contains(arn, "/restapis/") {
+			parts := strings.Split(arn, "/")
+			for i, p := range parts {
+				if p == "restapis" && i+1 < len(parts) {
+					ids = append(ids, parts[i+1])
+					break
+				}
+			}
+		}
+	}
+	return relatedResult("apigw", ids)
+}
+
+// checkACMR53 reports Route 53 hosted zones containing DNS validation
+// records for this ACM certificate. Pattern C: one acm:DescribeCertificate
+// call extracts DomainValidationOptions[].ResourceRecord.Name; then we
+// determine which hosted zone hosts each validation record by matching the
+// record name against cached zones' names (longest suffix match).
+func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" && res.Name == "" {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	certARN := ""
+	raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct)
+	if ok && raw.CertificateArn != nil {
+		certARN = *raw.CertificateArn
+	}
+	if certARN == "" {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.ACM == nil {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
+		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+	}
+	if out.Certificate == nil {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	var recordNames []string
+	for _, dvo := range out.Certificate.DomainValidationOptions {
+		if dvo.ResourceRecord != nil && dvo.ResourceRecord.Name != nil {
+			recordNames = append(recordNames, strings.TrimSuffix(strings.ToLower(*dvo.ResourceRecord.Name), "."))
+		}
+	}
+	if len(recordNames) == 0 {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	zoneList, _, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
+	if zoneList == nil {
+		// Without zone cache we can only report a "we saw validation records" signal.
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+	}
+	seen := map[string]bool{}
+	var ids []string
+	for _, recordName := range recordNames {
+		// Longest-suffix match against zone names.
+		bestZoneID := ""
+		bestZoneLen := 0
+		for _, zoneRes := range zoneList {
+			zn := strings.TrimSuffix(strings.ToLower(zoneRes.Fields["name"]), ".")
+			if zn == "" {
+				continue
+			}
+			if strings.HasSuffix(recordName, zn) && len(zn) > bestZoneLen {
+				bestZoneID = zoneRes.ID
+				bestZoneLen = len(zn)
+			}
+		}
+		if bestZoneID != "" && !seen[bestZoneID] {
+			seen[bestZoneID] = true
+			ids = append(ids, bestZoneID)
+		}
+	}
+	return relatedResult("r53", ids)
+}
 
 // acmRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.

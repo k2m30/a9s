@@ -33,3 +33,20 @@ func (f *SNSFake) ListSubscriptionsByTopic(_ context.Context, input *sns.ListSub
 	}
 	return &sns.ListSubscriptionsByTopicOutput{Subscriptions: f.fix.SubscriptionsByTopic[topicARN]}, nil
 }
+
+// GetTopicAttributes returns an empty attributes map — demo mode does not
+// model SNS topic attributes.
+func (f *SNSFake) GetTopicAttributes(_ context.Context, _ *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	return &sns.GetTopicAttributesOutput{Attributes: map[string]string{}}, nil
+}
+
+// GetSubscriptionAttributes returns an empty attributes map — demo mode does not
+// model subscription attributes.
+func (f *SNSFake) GetSubscriptionAttributes(_ context.Context, _ *sns.GetSubscriptionAttributesInput, _ ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error) {
+	return &sns.GetSubscriptionAttributesOutput{Attributes: map[string]string{}}, nil
+}
+
+// ListTagsForResource returns an empty tag list — demo mode does not model SNS tags.
+func (f *SNSFake) ListTagsForResource(_ context.Context, _ *sns.ListTagsForResourceInput, _ ...func(*sns.Options)) (*sns.ListTagsForResourceOutput, error) {
+	return &sns.ListTagsForResourceOutput{}, nil
+}

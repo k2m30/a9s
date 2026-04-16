@@ -26,3 +26,8 @@ func (f *EFSFake) DescribeFileSystems(_ context.Context, _ *efs.DescribeFileSyst
 func (f *EFSFake) DescribeMountTargets(_ context.Context, _ *efs.DescribeMountTargetsInput, _ ...func(*efs.Options)) (*efs.DescribeMountTargetsOutput, error) {
 	return &efs.DescribeMountTargetsOutput{}, nil
 }
+
+// DescribeAccessPoints returns no access points by default in demo mode.
+func (f *EFSFake) DescribeAccessPoints(_ context.Context, _ *efs.DescribeAccessPointsInput, _ ...func(*efs.Options)) (*efs.DescribeAccessPointsOutput, error) {
+	return &efs.DescribeAccessPointsOutput{}, nil
+}

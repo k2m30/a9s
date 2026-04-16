@@ -24,6 +24,8 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
+		{TargetType: "s3", DisplayName: "S3 (stack resources)", Checker: checkCfnS3},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
 	})
 
 	// cfntypes.Stack: RoleARN (execution role), NotificationARNs (SNS topics for stack events)

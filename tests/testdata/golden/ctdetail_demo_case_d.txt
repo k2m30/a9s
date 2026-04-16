@@ -11,11 +11,11 @@
  Recipient:            444444444444 (cross-account)                                                                                                │  Security Groups
  Time:                 2026-04-07T02:00:07Z                                                                                                        │  DynamoDB Tables
  REQUEST                                                                                                                                           │  CloudFormation Stacks
- backingKey:           true                                                                                                                        │  CT events by AccessKeyId
- rotationType:         AUTOMATIC                                                                                                                   │  CT events by Username
+ backingKey:           true                                                                                                                        │  CloudTrail Trails
+ rotationType:         AUTOMATIC                                                                                                                   │  CT events by AccessKeyId
+                                                                                                                                                   │  CT events by Username
                                                                                                                                                    │  CT events by EventName
                                                                                                                                                    │  CT events by SharedEventId
-                                                                                                                                                   │  CloudTrail Trails
                                                                                                                                                    │
                                                                                                                                                    │
                                                                                                                                                    │

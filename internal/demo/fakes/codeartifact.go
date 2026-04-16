@@ -27,3 +27,8 @@ func (f *CodeArtifactFake) ListRepositories(_ context.Context, _ *codeartifact.L
 func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
 	return &codeartifact.GetRepositoryPermissionsPolicyOutput{}, nil
 }
+
+// DescribeRepository returns an empty repository — demo mode does not model repository details.
+func (f *CodeArtifactFake) DescribeRepository(_ context.Context, _ *codeartifact.DescribeRepositoryInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeRepositoryOutput, error) {
+	return &codeartifact.DescribeRepositoryOutput{}, nil
+}

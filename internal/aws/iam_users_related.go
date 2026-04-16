@@ -99,6 +99,19 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 
 
 
+// checkIAMUserKMS returns Count: -1. Keys granted to a user via key policies are
+// only discoverable by enumerating KMS keys and parsing GetKeyPolicy per key (N+1).
+func checkIAMUserKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+}
+
+// checkIAMUserRole returns Count: -1. Roles that a user can assume are only
+// resolvable by scanning every role's AssumeRolePolicyDocument (N+1 per role) —
+// the role trust policy is required, not carried on the user struct.
+func checkIAMUserRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+}
+
 // iamUserRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func iamUserRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

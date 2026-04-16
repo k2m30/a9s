@@ -22,6 +22,17 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSSvcCTEvents, NeedsTargetCache: true},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkECSSvcCF},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTasks, NeedsTargetCache: true},
+		{TargetType: "r53", DisplayName: "Route53 Zones", Checker: checkECSSvcR53},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSSvcSecrets},
+		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC, NeedsTargetCache: true},
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs

@@ -63,16 +63,36 @@ func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	}
 }
 
-// --- CF checker returns Count:0 for REGIONAL scope ---
+// --- CF checker: real scope-based dispatch ---
 
-// TestRelated_WAF_CF_ReturnsZero verifies that the cf checker returns Count:0
-// for REGIONAL scope WAFs (CloudFront associations only apply to CLOUDFRONT scope).
-func TestRelated_WAF_CF_ReturnsZero(t *testing.T) {
+// TestRelated_WAF_CF_RegionalReturnsZero: REGIONAL scope → definitively no CF association.
+func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, res, nil)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (REGIONAL scope WAF cannot associate with CloudFront)", result.Count)
+		t.Errorf("Count = %d, want 0 (REGIONAL scope cannot bind CloudFront)", result.Count)
+	}
+	if result.TargetType != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	}
+}
+
+// TestRelated_WAF_CF_CloudfrontScopeUnknown: CLOUDFRONT scope → Count: -1 (would need API).
+func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
+	res := resource.Resource{
+		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
+		Name: "my-cf-waf",
+		Fields: map[string]string{
+			"name":  "my-cf-waf",
+			"id":    "a1b2c3d4-5678-90ab-cdef-222222222222",
+			"scope": "CLOUDFRONT",
+		},
+	}
+	checker := wafCheckerByTarget(t, "cf")
+	result := checker(context.Background(), nil, res, nil)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (CLOUDFRONT scope: requires ListResourcesForWebACL)", result.Count)
 	}
 }
 

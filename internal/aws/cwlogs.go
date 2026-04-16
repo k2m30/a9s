@@ -25,6 +25,10 @@ func init() {
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
+		{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true},
+		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLogsKinesis},
+		{TargetType: "s3", DisplayName: "S3 (exports)", Checker: checkLogsS3},
 	})
 
 	// cloudwatchlogstypes.LogGroup: KmsKeyId

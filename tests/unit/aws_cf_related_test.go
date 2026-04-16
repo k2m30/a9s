@@ -411,3 +411,31 @@ func TestRelated_CF_ACM_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
+
+// --- checkCfR53 tests (requires per-zone ListResourceRecordSets — outside budget) ---
+
+// TestRelated_CF_R53_Unknown: valid distribution → Count: -1 (alias records per-zone).
+func TestRelated_CF_R53_Unknown(t *testing.T) {
+	res := resource.Resource{
+		ID:     "E1A2B3C4D5E6F7",
+		Fields: map[string]string{},
+	}
+	checker := cfCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: alias records via ListResourceRecordSets)", result.Count)
+	}
+	if result.TargetType != "r53" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
+	}
+}
+
+// TestRelated_CF_R53_EmptyInput: empty distribution id → Count: 0.
+func TestRelated_CF_R53_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := cfCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty distribution id)", result.Count)
+	}
+}

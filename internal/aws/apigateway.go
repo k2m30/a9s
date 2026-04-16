@@ -23,6 +23,18 @@ func init() {
 
 	resource.RegisterRelated("apigw", []resource.RelatedDef{
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkApigwWAF},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkApigwAlarm, NeedsTargetCache: true},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkApigwCF},
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkApigwELB},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkApigwKMS},
+		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkApigwR53},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkApigwRole},
+		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkApigwSFN},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkApigwSNS},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkApigwVPCE},
 	})
 }
 

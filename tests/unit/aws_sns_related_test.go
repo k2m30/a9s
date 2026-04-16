@@ -178,17 +178,21 @@ func TestRelated_SNS_Alarm_EmptyCache(t *testing.T) {
 	}
 }
 
-// --- sns→cfn: undeterminable from cache, returns Count: 0 ---
+// --- sns→cfn: undeterminable — snstypes.Topic has no Tags field ---
 
-func TestRelated_SNS_CFN_ReturnsZero(t *testing.T) {
+// TestRelated_SNS_CFN_ReturnsUnknown verifies that sns→cfn reports Count=-1 because
+// the SNS Topic RawStruct carries only TopicArn; Tags are only available via
+// ListTagsForResource (N+1 call per topic) and are intentionally not fetched during
+// related-panel rendering.
+func TestRelated_SNS_CFN_ReturnsUnknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "arn:aws:sns:us-east-1:111122223333:alarm-notifications",
 		Name: "alarm-notifications",
 	}
 	checker := snsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (undeterminable — no Tags on snstypes.Topic)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")

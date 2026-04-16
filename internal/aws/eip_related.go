@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -19,6 +20,14 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEIPEC2},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEIPENI},
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkEIPNAT, NeedsTargetCache: true},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEIPAlarm},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEIPASG},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEIPCFN},
+		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkEIPECS},
+		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkEIPECSSvc},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEIPECSTask},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEIPKMS},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEIPLogs},
 	})
 }
 
@@ -100,6 +109,162 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 
 
 
+
+// checkEIPCFN returns the CloudFormation stack that owns this EIP via
+// aws:cloudformation:stack-name tag on the Address Tags slice.
+func checkEIPCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	}
+	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+	return relatedResult("cfn", []string{stackName})
+}
+
+// checkEIPAlarm reports CloudWatch alarms on entities this EIP is attached
+// to. EIPs have no CW dimension of their own; alarms operationally related
+// to an EIP target the InstanceId or NetworkInterfaceId it's attached to.
+// Scans the alarm cache for those dimension values.
+func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	wanted := map[string]string{}
+	if raw.InstanceId != nil && *raw.InstanceId != "" {
+		wanted["InstanceId"] = *raw.InstanceId
+	}
+	if raw.NetworkInterfaceId != nil && *raw.NetworkInterfaceId != "" {
+		wanted["NetworkInterfaceId"] = *raw.NetworkInterfaceId
+	}
+	if len(wanted) == 0 {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
+	alarmList, _, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
+	if err != nil {
+		if _, sok := clients.(*ServiceClients); !sok {
+			return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+	}
+	if alarmList == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+	}
+	seen := map[string]bool{}
+	var ids []string
+	for _, alarmRes := range alarmList {
+		a, aok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !aok {
+			continue
+		}
+		for _, d := range a.Dimensions {
+			if d.Name == nil || d.Value == nil {
+				continue
+			}
+			if v, exists := wanted[*d.Name]; exists && v == *d.Value {
+				if !seen[alarmRes.ID] {
+					seen[alarmRes.ID] = true
+					ids = append(ids, alarmRes.ID)
+				}
+				break
+			}
+		}
+	}
+	return relatedResult("alarm", ids)
+}
+
+// checkEIPASG reports Auto Scaling Groups whose instances hold this EIP.
+// Cache-based: if this EIP is attached to an EC2 instance, look up that
+// instance in the ec2 cache, read its aws:autoscaling:groupName tag, then
+// match the name against the asg cache.
+func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+	}
+	if raw.InstanceId == nil || *raw.InstanceId == "" {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+	}
+	instanceID := *raw.InstanceId
+
+	ec2List, _, err := FetchRelatedTarget(ctx, clients, cache, "ec2")
+	if err != nil {
+		if _, sok := clients.(*ServiceClients); !sok {
+			return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+	}
+	if ec2List == nil {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+	}
+	asgName := ""
+	for _, ec2Res := range ec2List {
+		if ec2Res.ID != instanceID {
+			continue
+		}
+		inst, iok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
+		if !iok {
+			break
+		}
+		asgName = tagValue(inst.Tags, "aws:autoscaling:groupName")
+		break
+	}
+	if asgName == "" {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+	}
+	return relatedResult("asg", []string{asgName})
+}
+
+// checkEIPECS reports ECS clusters whose tasks currently hold this EIP.
+// ECS tasks that use awsvpc networking get ENIs but do not attach EIPs
+// directly; association requires DescribeTasks per cluster — outside the
+// 1-call budget. Returns Count: -1.
+func checkEIPECS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "ecs", Count: -1}
+}
+
+// checkEIPECSSvc reports ECS services whose tasks currently hold this EIP.
+// Same limitation as checkEIPECS — task networking is not in the list caches.
+func checkEIPECSSvc(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+}
+
+// checkEIPECSTask reports ECS tasks currently holding this EIP.
+// ECS task ENIs are not in the EIP list response; resolving requires
+// DescribeTasks per cluster — outside the 1-call budget.
+func checkEIPECSTask(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+}
+
+// checkEIPKMS reports KMS keys associated with this Elastic IP.
+// EC2 Addresses carry no KMS key reference in DescribeAddresses; there is
+// no native AWS API field tying EIPs to KMS keys.
+func checkEIPKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
+// checkEIPLogs reports CloudWatch log groups related to this EIP.
+// EIPs themselves do not emit logs; flow logs attached to the associated
+// ENI/subnet/VPC cover the traffic but are not identifiable from EIP ID
+// without per-ENI DescribeFlowLogs — outside the 1-call budget.
+func checkEIPLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+}
 
 // eipRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.

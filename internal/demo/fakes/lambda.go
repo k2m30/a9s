@@ -59,3 +59,7 @@ func (f *LambdaFake) GetFunction(_ context.Context, input *lambda.GetFunctionInp
 		Message: "Function not found: " + name,
 	}
 }
+
+func (f *LambdaFake) ListTags(_ context.Context, _ *lambda.ListTagsInput, _ ...func(*lambda.Options)) (*lambda.ListTagsOutput, error) {
+	return &lambda.ListTagsOutput{Tags: map[string]string{}}, nil
+}

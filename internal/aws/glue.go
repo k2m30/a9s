@@ -30,6 +30,11 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkGlueLogs, NeedsTargetCache: true},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN},
+		{TargetType: "s3", DisplayName: "S3 (script bucket)", Checker: checkGlueS3},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkGlueKMS},
+		{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkGlueAthena},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkGlueSecrets},
 	})
 }
 

@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -139,7 +142,6 @@ func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("rds-snap", ids)
 }
 
-
 // checkDBILogs searches the logs cache for log groups matching the RDS naming convention.
 // Pattern N — naming convention: /aws/rds/instance/{db-instance-id}/{log-type}
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -181,6 +183,45 @@ func dbiRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
+// checkDbiSecrets resolves the Secrets Manager secret managed for this RDS
+// instance's master user password. DBInstance.MasterUserSecret.SecretArn holds
+// the full secret ARN; we match it against the secrets cache by ARN, ID (secret
+// name), or Name.
+func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+	secretARN := *db.MasterUserSecret.SecretArn
+
+	secretList, truncated, err := dbiRelatedResources(ctx, clients, cache, "secrets")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+	}
+	if secretList == nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+
+	var ids []string
+	for _, secretRes := range secretList {
+		if secretRes.Fields["arn"] == secretARN {
+			ids = append(ids, secretRes.ID)
+			continue
+		}
+		raw, rawOK := assertStruct[smtypes.SecretListEntry](secretRes.RawStruct)
+		if rawOK && raw.ARN != nil && *raw.ARN == secretARN {
+			ids = append(ids, secretRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+	return relatedResult("secrets", ids)
+}
+
 func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	inst, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok || inst.DBSubnetGroup == nil || inst.DBSubnetGroup.VpcId == nil || *inst.DBSubnetGroup.VpcId == "" {
@@ -189,5 +230,111 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
 }
 
+// checkDbiDBC returns the Aurora/RDS cluster this DB instance belongs to, if
+// any. DBInstance.DBClusterIdentifier is non-nil only for Aurora/RDS cluster
+// members. We match that identifier against the dbc cache by ID/Name.
+func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	}
+	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+	}
+	clusterID := *db.DBClusterIdentifier
 
+	dbcList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbc")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
+	}
+	if dbcList == nil {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	}
+	var ids []string
+	for _, dbcRes := range dbcList {
+		if dbcRes.ID == clusterID || dbcRes.Name == clusterID {
+			ids = append(ids, dbcRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	}
+	return relatedResult("dbc", ids)
+}
 
+// checkDbiRole extracts IAM role ARNs from the DBInstance's AssociatedRoles
+// and MonitoringRoleArn fields. Each DBInstanceRole has a RoleArn; we extract
+// the role name (last segment after "/"). MonitoringRoleArn is the enhanced
+// monitoring role.
+func checkDbiRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	var ids []string
+	for _, r := range db.AssociatedRoles {
+		if r.RoleArn == nil || *r.RoleArn == "" {
+			continue
+		}
+		arn := *r.RoleArn
+		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+			ids = append(ids, arn[idx+1:])
+		} else {
+			ids = append(ids, arn)
+		}
+	}
+	if db.MonitoringRoleArn != nil && *db.MonitoringRoleArn != "" {
+		arn := *db.MonitoringRoleArn
+		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+			ids = append(ids, arn[idx+1:])
+		} else {
+			ids = append(ids, arn)
+		}
+	}
+	return relatedResult("role", ids)
+}
+
+// checkDbiENI resolves the ENIs that RDS provisions for this DB instance via
+// a single ec2:DescribeNetworkInterfaces call (Pattern C). RDS manages its
+// ENIs with the description "RDSNetworkInterface" and attaches them to the
+// instance's security groups. We filter by description + group-id to scope.
+func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+	}
+	var sgIDs []string
+	for _, sg := range db.VpcSecurityGroups {
+		if sg.VpcSecurityGroupId != nil && *sg.VpcSecurityGroupId != "" {
+			sgIDs = append(sgIDs, *sg.VpcSecurityGroupId)
+		}
+	}
+	if len(sgIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+	}
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.EC2 == nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+	}
+	descName := "description"
+	descVal := "RDSNetworkInterface"
+	groupName := "group-id"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeNetworkInterfacesOutput, error) {
+		return c.EC2.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
+			Filters: []ec2types.Filter{
+				{Name: &descName, Values: []string{descVal}},
+				{Name: &groupName, Values: sgIDs},
+			},
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, ni := range out.NetworkInterfaces {
+		if ni.NetworkInterfaceId != nil && *ni.NetworkInterfaceId != "" {
+			ids = append(ids, *ni.NetworkInterfaceId)
+		}
+	}
+	return relatedResult("eni", ids)
+}

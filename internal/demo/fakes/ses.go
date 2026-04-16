@@ -25,3 +25,8 @@ func (f *SESFake) ListEmailIdentities(_ context.Context, _ *sesv2.ListEmailIdent
 func (f *SESFake) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error) {
 	return &sesv2.GetAccountOutput{SendingEnabled: true}, nil
 }
+
+// GetEmailIdentity returns an empty identity — demo mode does not model SES identity details.
+func (f *SESFake) GetEmailIdentity(_ context.Context, _ *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
+	return &sesv2.GetEmailIdentityOutput{}, nil
+}

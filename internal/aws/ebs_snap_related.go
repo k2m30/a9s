@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -86,6 +88,46 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("kms", []string{keyID})
 }
 
+
+// checkEBSSnapBackup calls backup:ListRecoveryPointsByResource with the
+// snapshot's ARN and returns the recovery-point ARNs. Pattern C.
+// Snapshot ARN: arn:aws:ec2:REGION::snapshot/SNAP-ID (no account segment).
+func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	snapID := res.ID
+	if snapID == "" {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Backup == nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	region := regionFromEnv()
+	if region == "" {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	snapARN := "arn:aws:ec2:" + region + "::snapshot/" + snapID
+	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	out, err := api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{
+		ResourceArn: aws.String(snapARN),
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, rp := range out.RecoveryPoints {
+		if rp.RecoveryPointArn == nil {
+			continue
+		}
+		arn := *rp.RecoveryPointArn
+		if idx := strings.Index(arn, ":recovery-point:"); idx >= 0 {
+			ids = append(ids, arn[idx+len(":recovery-point:"):])
+		}
+	}
+	return relatedResult("backup", ids)
+}
 
 // ebsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
 func ebsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

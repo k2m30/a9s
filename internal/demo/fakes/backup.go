@@ -25,3 +25,29 @@ func (f *BackupFake) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlan
 func (f *BackupFake) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
 	return &backup.ListBackupJobsOutput{}, nil
 }
+
+// GetBackupPlan returns an empty plan — demo mode does not model plan rules.
+func (f *BackupFake) GetBackupPlan(_ context.Context, _ *backup.GetBackupPlanInput, _ ...func(*backup.Options)) (*backup.GetBackupPlanOutput, error) {
+	return &backup.GetBackupPlanOutput{}, nil
+}
+
+// ListBackupSelections returns an empty list — demo mode does not model
+// backup selections.
+func (f *BackupFake) ListBackupSelections(_ context.Context, _ *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
+	return &backup.ListBackupSelectionsOutput{}, nil
+}
+
+// DescribeBackupVault returns an empty vault description.
+func (f *BackupFake) DescribeBackupVault(_ context.Context, _ *backup.DescribeBackupVaultInput, _ ...func(*backup.Options)) (*backup.DescribeBackupVaultOutput, error) {
+	return &backup.DescribeBackupVaultOutput{}, nil
+}
+
+// GetBackupVaultNotifications returns an empty notification config.
+func (f *BackupFake) GetBackupVaultNotifications(_ context.Context, _ *backup.GetBackupVaultNotificationsInput, _ ...func(*backup.Options)) (*backup.GetBackupVaultNotificationsOutput, error) {
+	return &backup.GetBackupVaultNotificationsOutput{}, nil
+}
+
+// ListRecoveryPointsByResource returns an empty list.
+func (f *BackupFake) ListRecoveryPointsByResource(_ context.Context, _ *backup.ListRecoveryPointsByResourceInput, _ ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error) {
+	return &backup.ListRecoveryPointsByResourceOutput{}, nil
+}

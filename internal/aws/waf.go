@@ -95,6 +95,7 @@ func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuat
 				"arn":         arn,
 				"description": description,
 				"lock_token":  lockToken,
+				"scope":       string(wafv2types.ScopeRegional),
 			},
 			RawStruct: acl,
 		}

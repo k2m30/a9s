@@ -803,13 +803,13 @@ func TestRelatedFieldExtraction_ECSSvc_Role_ReturnsZeroWhenNilRawStruct(t *testi
 }
 
 // --- checkECSTaskRole ---
-// checkECSTaskRole is a stub: ECS Task struct does not expose TaskRoleArn
-// in DescribeTasks response (it is on the task definition). Always returns Count: 0.
+// The DescribeTasks response does NOT include TaskRoleArn/ExecutionRoleArn
+// (they live on the TaskDefinition). When the fetcher resolves them it
+// populates Fields["task_role"] and Fields["execution_role"] on the task
+// Resource; the checker extracts role names from those ARNs. With no role
+// fields populated the checker reports Count:0 (no link to surface).
 
-func TestRelatedFieldExtraction_ECSTask_Role_IsStubReturnsZero(t *testing.T) {
-	// The scope spec describes TaskRoleArn extraction, but the actual implementation
-	// is a stub because the ECS Task DescribeTasks response does not carry TaskRoleArn.
-	// This test pins the stub contract: always Count: 0.
+func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroWhenNoRoleFields(t *testing.T) {
 	res := resource.Resource{
 		ID:     "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
 		Fields: map[string]string{},
@@ -821,14 +821,14 @@ func TestRelatedFieldExtraction_ECSTask_Role_IsStubReturnsZero(t *testing.T) {
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ecs-task role checker is a stub)", result.Count)
+		t.Errorf("Count = %d, want 0 (no task_role/execution_role fields)", result.Count)
 	}
 	if result.TargetType != "role" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
 	}
 }
 
-func TestRelatedFieldExtraction_ECSTask_Role_StubReturnsZeroForNilRawStruct(t *testing.T) {
+func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroForNilRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:     "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
 		Fields: map[string]string{},
@@ -837,7 +837,48 @@ func TestRelatedFieldExtraction_ECSTask_Role_StubReturnsZeroForNilRawStruct(t *t
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub — ignores RawStruct entirely)", result.Count)
+		t.Errorf("Count = %d, want 0 (no role fields, regardless of RawStruct)", result.Count)
+	}
+}
+
+func TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole(t *testing.T) {
+	res := resource.Resource{
+		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
+		Fields: map[string]string{
+			"task_role": "arn:aws:iam::123456789012:role/app-task-role",
+		},
+	}
+	checker := fieldExtractionChecker(t, "ecs-task", "role")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "app-task-role" {
+		t.Errorf("ResourceIDs = %v, want [app-task-role]", result.ResourceIDs)
+	}
+}
+
+func TestRelatedFieldExtraction_ECSTask_Role_ExtractsBothRoles(t *testing.T) {
+	res := resource.Resource{
+		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
+		Fields: map[string]string{
+			"task_role":      "arn:aws:iam::123456789012:role/app-task-role",
+			"execution_role": "arn:aws:iam::123456789012:role/ecs-task-exec-role",
+		},
+	}
+	checker := fieldExtractionChecker(t, "ecs-task", "role")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count)
+	}
+	got := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		got[id] = true
+	}
+	if !got["app-task-role"] || !got["ecs-task-exec-role"] {
+		t.Errorf("ResourceIDs = %v, want both app-task-role and ecs-task-exec-role", result.ResourceIDs)
 	}
 }
 

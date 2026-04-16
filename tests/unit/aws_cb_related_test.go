@@ -276,3 +276,34 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
+
+// --- cb→pipeline tests (undeterminable — pipeline cache lacks stage data) ---
+
+// TestRelated_CB_Pipeline_ReturnsUnknown verifies cb→pipeline reports Count=-1 because
+// the pipeline list cache only carries cptypes.PipelineSummary — stages/actions are
+// only available via GetPipeline per pipeline, so reverse CodeBuild-project lookup
+// cannot be done from cache.
+func TestRelated_CB_Pipeline_ReturnsUnknown(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Name: aws.String("my-project"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"pipeline": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-pipeline", Name: "some-pipeline"},
+		}},
+	}
+
+	checker := cbCheckerByTarget(t, "pipeline")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (undeterminable — pipeline cache lacks stages)", result.Count)
+	}
+	if result.TargetType != "pipeline" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "pipeline")
+	}
+}

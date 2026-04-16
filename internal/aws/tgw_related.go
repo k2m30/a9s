@@ -31,6 +31,18 @@ func init() {
 			Checker:          checkTGWCFN,
 			NeedsTargetCache: false,
 		},
+		{
+			TargetType:       "role",
+			DisplayName:      "IAM Role",
+			Checker:          checkTGWRole,
+			NeedsTargetCache: false,
+		},
+		{
+			TargetType:       "subnet",
+			DisplayName:      "Subnets",
+			Checker:          checkTGWSubnet,
+			NeedsTargetCache: false,
+		},
 	})
 }
 
@@ -113,6 +125,60 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("rtb", ids)
 }
 
+
+// checkTGWRole reports the IAM role that TGW assumes for cross-account/service
+// attachments. Transit Gateways themselves do not carry a service role in
+// DescribeTransitGateways output — role-based attachments are per-attachment
+// configuration and would require DescribeTransitGatewayAttachments with
+// per-attachment resolution — outside the 1-call budget.
+// Returns Count: -1 (unknown).
+func checkTGWRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+}
+
+// checkTGWSubnet reports subnets this transit gateway is attached to via VPC
+// attachments. Pattern C: one ec2:DescribeTransitGatewayVpcAttachments call
+// filtered by the TGW id.
+func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	tgwID := res.ID
+	if tgwID == "" {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EC2 == nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+	api, ok := c.EC2.(EC2DescribeTransitGatewayVpcAttachmentsAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+	}
+	filterName := "transit-gateway-id"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
+		return api.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+			Filters: []ec2types.Filter{
+				{Name: &filterName, Values: []string{tgwID}},
+			},
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+	}
+	seen := make(map[string]bool)
+	var ids []string
+	for _, att := range out.TransitGatewayVpcAttachments {
+		for _, sID := range att.SubnetIds {
+			if sID == "" || seen[sID] {
+				continue
+			}
+			seen[sID] = true
+			ids = append(ids, sID)
+		}
+	}
+	return relatedResult("subnet", ids)
+}
 
 // tgwRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
