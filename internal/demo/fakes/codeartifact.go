@@ -21,3 +21,9 @@ func NewCodeArtifact() *CodeArtifactFake {
 func (f *CodeArtifactFake) ListRepositories(_ context.Context, _ *codeartifact.ListRepositoriesInput, _ ...func(*codeartifact.Options)) (*codeartifact.ListRepositoriesOutput, error) {
 	return &codeartifact.ListRepositoriesOutput{Repositories: f.fix.Repositories}, nil
 }
+
+// GetRepositoryPermissionsPolicy is a stub satisfying CodeArtifactGetRepositoryPermissionsPolicyAPI.
+// Demo mode returns no policy (nil Policy), simulating repositories without a permissions policy.
+func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
+	return &codeartifact.GetRepositoryPermissionsPolicyOutput{}, nil
+}
