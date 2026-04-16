@@ -21,8 +21,12 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
-// expectedEnricherShortNames lists all resource types that must have registered enrichers.
-var expectedEnricherShortNames = []string{
+// originalIssue196Enrichers lists the foundational enrichers from issue #196.
+// These must remain registered (real, not noop). The full Wave 2 contract is
+// enforced by TestAttentionSignalsDoc (per docs/attention-signals.md), so this
+// allowlist is no longer the source of truth — it's a regression pin for the
+// initial enricher set.
+var originalIssue196Enrichers = []string{
 	"rds",
 	"dbi",
 	"ebs",
@@ -33,10 +37,10 @@ var expectedEnricherShortNames = []string{
 	"glue",
 }
 
-// TestEnricherRegistry_AllExpectedTypesRegistered verifies that every resource type
-// listed in the enricher contract has a non-nil entry in EnricherRegistry.
-func TestEnricherRegistry_AllExpectedTypesRegistered(t *testing.T) {
-	for _, shortName := range expectedEnricherShortNames {
+// TestEnricherRegistry_OriginalSetStillRegistered pins the original 8
+// enrichers from issue #196.
+func TestEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
+	for _, shortName := range originalIssue196Enrichers {
 		fn, ok := awsclient.EnricherRegistry[shortName]
 		if !ok {
 			t.Errorf("EnricherRegistry missing entry for %q", shortName)
@@ -48,16 +52,15 @@ func TestEnricherRegistry_AllExpectedTypesRegistered(t *testing.T) {
 	}
 }
 
-// TestEnricherRegistry_NoUnexpectedEntries verifies the registry contains exactly
-// the expected entries (no phantom entries that might fire on unknown types).
-func TestEnricherRegistry_NoUnexpectedEntries(t *testing.T) {
-	expected := make(map[string]bool, len(expectedEnricherShortNames))
-	for _, name := range expectedEnricherShortNames {
-		expected[name] = true
-	}
+// TestEnricherRegistry_NoEntriesForUnregisteredTypes verifies the registry
+// only contains entries for shortNames that are registered as ResourceTypeDefs.
+// Replaces the prior allowlist-based test — that was authoritative when only
+// 8 enrichers existed; now the doc-grounded contract (TestAttentionSignalsDoc)
+// is the source of truth.
+func TestEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
 	for key := range awsclient.EnricherRegistry {
-		if !expected[key] {
-			t.Errorf("EnricherRegistry has unexpected entry %q — update expectedEnricherShortNames or remove the entry", key)
+		if resource.FindResourceType(key) == nil {
+			t.Errorf("EnricherRegistry[%q] has no matching ResourceTypeDef", key)
 		}
 	}
 }

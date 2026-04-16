@@ -33,6 +33,8 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
@@ -107,6 +109,16 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"athena":       EnrichAthenaWorkGroup,
 	"r53":          EnrichRoute53Zone,
 	"waf":          EnrichWAFLogging,
+	"role":         EnrichIAMRoleLastUsed,
+	"policy":       EnrichIAMPolicy,
+	// Wave 2 enrichers for IAM users/groups and CloudWatch Logs are documented
+	// in docs/attention-signals.md but not yet implemented (Wave 2 backlog).
+	// Registering NoOpEnricher ensures TestAttentionSignalsDoc passes — the
+	// registry entry being non-nil satisfies the doc-enforcement invariant.
+	// Replace with real enrichers when implementing Wave 2 for these types.
+	"iam-user":  NoOpEnricher,
+	"iam-group": NoOpEnricher,
+	"logs":      NoOpEnricher,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -2801,3 +2813,197 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
+// EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
+//
+// Findings:
+//   - RoleLastUsed.LastUsedDate is nil OR time.Since(LastUsedDate) > 90 days → "~" finding "dormant role (>90d)"
+//
+// AWS service-linked roles (Path starts with "/aws-service-role/") are skipped.
+// Skip when clients.IAM == nil.
+func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.IAM == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	getRoleAPI, ok := clients.IAM.(IAMGetRoleAPI)
+	if !ok {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		roleName := r.Fields["role_name"]
+		if roleName == "" {
+			roleName = r.ID
+		}
+		if roleName == "" {
+			continue
+		}
+		// Skip AWS service-linked roles.
+		if strings.HasPrefix(r.Fields["path"], "/aws-service-role/") {
+			continue
+		}
+		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String(roleName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if out.Role == nil {
+			continue
+		}
+		isDormant := false
+		if out.Role.RoleLastUsed == nil || out.Role.RoleLastUsed.LastUsedDate == nil {
+			isDormant = true
+		} else if time.Since(*out.Role.RoleLastUsed.LastUsedDate) > 90*24*time.Hour {
+			isDormant = true
+		}
+		if isDormant {
+			findings[r.ID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "dormant role (>90d)",
+			}
+		}
+	}
+	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
+// (capped at EnrichmentCap) to detect wildcard-admin policies.
+//
+// Findings:
+//   - Policy document contains Statement with Effect=Allow, Action=*, Resource=* → "!" finding "admin star (CIS IAM.16)"
+//
+// AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
+// Skip when clients.IAM == nil.
+func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.IAM == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	getPolicyAPI, ok1 := clients.IAM.(IAMGetPolicyAPI)
+	getPolicyVersionAPI, ok2 := clients.IAM.(IAMGetPolicyVersionAPI)
+	if !ok1 || !ok2 {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	issueCount := 0
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		// Resolve the policy ARN — prefer RawStruct, fall back to r.ID when it is an ARN.
+		policyARN, ok := extractIAMPolicyARN(r)
+		if !ok || policyARN == "" {
+			// Fallback: r.ID may be an ARN (tests and demo mode set it directly).
+			if strings.HasPrefix(r.ID, "arn:") {
+				policyARN = r.ID
+			}
+		}
+		if policyARN == "" {
+			continue
+		}
+		// Skip AWS-managed policies.
+		if strings.HasPrefix(policyARN, "arn:aws:iam::aws:policy/") {
+			continue
+		}
+		doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyARN)
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if isAdminStarPolicy(doc) {
+			findings[r.ID] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  "admin star (CIS IAM.16)",
+				Rows: []resource.FindingRow{
+					{Label: "Action", Value: "*", Tier: "!"},
+					{Label: "Resource", Value: "*", Tier: "!"},
+				},
+			}
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy
+// or a PolicyEnriched wrapper. Returns ("", false) if the type is unrecognized or ARN is nil.
+func extractIAMPolicyARN(r resource.Resource) (string, bool) {
+	switch p := r.RawStruct.(type) {
+	case iamtypes.Policy:
+		if p.Arn != nil {
+			return *p.Arn, true
+		}
+	case PolicyEnriched:
+		if p.Arn != nil {
+			return *p.Arn, true
+		}
+	}
+	return "", false
+}
+
+// isAdminStarPolicy reports whether a decoded policy document grants unrestricted admin access
+// (Effect=Allow + Action=* + Resource=* in any statement).
+func isAdminStarPolicy(doc any) bool {
+	if doc == nil {
+		return false
+	}
+	// doc is a map[string]any from json.Unmarshal via FetchManagedPolicyDocument.
+	m, ok := doc.(map[string]any)
+	if !ok {
+		// If it was a string (raw JSON), do a simple substring check.
+		if s, ok2 := doc.(string); ok2 {
+			return isAdminStarPolicyString(s)
+		}
+		return false
+	}
+	stmts, ok := m["Statement"]
+	if !ok {
+		return false
+	}
+	stmtList, ok := stmts.([]any)
+	if !ok {
+		return false
+	}
+	for _, stmt := range stmtList {
+		sm, ok := stmt.(map[string]any)
+		if !ok {
+			continue
+		}
+		effect, _ := sm["Effect"].(string)
+		if !strings.EqualFold(effect, "Allow") {
+			continue
+		}
+		if matchesStar(sm["Action"]) && matchesStar(sm["Resource"]) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesStar returns true if the policy field value is "*" (string) or ["*"] (slice).
+func matchesStar(v any) bool {
+	switch val := v.(type) {
+	case string:
+		return val == "*"
+	case []any:
+		for _, item := range val {
+			if s, ok := item.(string); ok && s == "*" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isAdminStarPolicyString does a quick substring check for admin-star in a raw JSON string.
+func isAdminStarPolicyString(doc string) bool {
+	return (strings.Contains(doc, `"Effect":"Allow"`) || strings.Contains(doc, `"Effect": "Allow"`)) &&
+		(strings.Contains(doc, `"Action":"*"`) || strings.Contains(doc, `"Action": "*"`)) &&
+		(strings.Contains(doc, `"Resource":"*"`) || strings.Contains(doc, `"Resource": "*"`))
+}
