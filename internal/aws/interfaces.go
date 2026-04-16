@@ -401,6 +401,12 @@ type ECRDescribeImagesAPI interface {
 	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
 }
 
+// ECRDescribeImageScanFindingsAPI defines the interface for the ECR DescribeImageScanFindings operation.
+// Used by the Wave 2 EnrichECRRepository enricher.
+type ECRDescribeImageScanFindingsAPI interface {
+	DescribeImageScanFindings(ctx context.Context, params *ecr.DescribeImageScanFindingsInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error)
+}
+
 // EFSDescribeFileSystemsAPI defines the interface for the EFS DescribeFileSystems operation.
 type EFSDescribeFileSystemsAPI interface {
 	DescribeFileSystems(ctx context.Context, params *efs.DescribeFileSystemsInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error)
@@ -958,6 +964,7 @@ type CodePipelineAPI interface {
 type ECRAPI interface {
 	ECRDescribeRepositoriesAPI
 	ECRDescribeImagesAPI
+	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
 }
 
 // CodeArtifactAPI is the aggregate interface covering all CodeArtifact operations used by a9s fetchers.
