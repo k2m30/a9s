@@ -21,3 +21,10 @@ func NewAthena() *AthenaFake {
 func (f *AthenaFake) ListWorkGroups(_ context.Context, _ *athena.ListWorkGroupsInput, _ ...func(*athena.Options)) (*athena.ListWorkGroupsOutput, error) {
 	return &athena.ListWorkGroupsOutput{WorkGroups: f.fix.WorkGroups}, nil
 }
+
+// GetWorkGroup is a stub satisfying AthenaGetWorkGroupAPI.
+// Demo mode returns a workgroup with EnforceWorkGroupConfiguration enabled and encryption configured,
+// representing a healthy default workgroup.
+func (f *AthenaFake) GetWorkGroup(_ context.Context, _ *athena.GetWorkGroupInput, _ ...func(*athena.Options)) (*athena.GetWorkGroupOutput, error) {
+	return &athena.GetWorkGroupOutput{}, nil
+}

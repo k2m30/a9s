@@ -18,8 +18,11 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
+	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -96,7 +99,9 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"cf":       EnrichCloudFrontDistribution,
 	"apigw":    EnrichAPIGatewayStage,
 	"cfn":      EnrichCFNStackEvents,
-	"ecr":      EnrichECRRepository,
+	"ecr":          EnrichECRRepository,
+	"codeartifact": EnrichCodeArtifactRepository,
+	"athena":       EnrichAthenaWorkGroup,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -2500,4 +2505,163 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 	}
 	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
+// EnrichmentCap) to surface IAM policy findings.
+//
+// Findings:
+//   - ResourceNotFoundException → "~" severity, "no permissions policy" (default open within domain).
+//   - Policy.Document contains `"Principal":"*"` → "!" severity, "public access policy".
+//
+// Per-repo errors other than ResourceNotFoundException mark Truncated=true and are skipped.
+// Skip when clients.CodeArtifact == nil.
+func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.CodeArtifact == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	issueCount := 0
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		// Support both "repo_name" (fetcher canonical) and "repository_name" (legacy/test alias).
+		repoName := r.Fields["repo_name"]
+		if repoName == "" {
+			repoName = r.Fields["repository_name"]
+		}
+		if repoName == "" {
+			repoName = r.ID
+		}
+		// Support both "domain_name" (fetcher canonical) and "domain" (legacy/test alias).
+		domainName := r.Fields["domain_name"]
+		if domainName == "" {
+			domainName = r.Fields["domain"]
+		}
+		domainOwner := r.Fields["domain_owner"]
+		if repoName == "" || domainName == "" {
+			continue
+		}
+		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
+			Domain:     aws.String(domainName),
+			Repository: aws.String(repoName),
+		}
+		if domainOwner != "" {
+			input.DomainOwner = aws.String(domainOwner)
+		}
+		out, err := clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
+		key := r.ID
+		if key == "" {
+			key = repoName
+		}
+		if err != nil {
+			var notFound *codeartifacttypes.ResourceNotFoundException
+			if errors.As(err, &notFound) {
+				// No policy set — default open within the domain.
+				findings[key] = resource.EnrichmentFinding{
+					Severity: "~",
+					Summary:  "no permissions policy",
+				}
+				// "~" does not contribute to IssueCount.
+				continue
+			}
+			// Any other error — skip this repo but flag truncation.
+			truncated = true
+			continue
+		}
+		if out.Policy == nil || out.Policy.Document == nil {
+			continue
+		}
+		doc := *out.Policy.Document
+		if strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`) {
+			findings[key] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  "public access policy",
+				Rows: []resource.FindingRow{
+					{Label: "Principal", Value: "*", Tier: "!"},
+				},
+			}
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
+// surface governance and security findings.
+//
+// Findings:
+//   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false → "~" severity,
+//     "EnforceWorkGroupConfiguration disabled (callers can bypass)".
+//   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil → "~" severity,
+//     "result encryption not configured".
+//
+// Per-WG errors mark Truncated=true and are skipped.
+// Skip when clients.Athena == nil.
+func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.Athena == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		wgName := r.Fields["workgroup_name"]
+		if wgName == "" {
+			wgName = r.ID
+		}
+		if wgName == "" {
+			continue
+		}
+		out, err := clients.Athena.GetWorkGroup(ctx, &athena.GetWorkGroupInput{
+			WorkGroup: aws.String(wgName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+		if out.WorkGroup == nil || out.WorkGroup.Configuration == nil {
+			continue
+		}
+		cfg := out.WorkGroup.Configuration
+		key := r.ID
+		if key == "" {
+			key = wgName
+		}
+		var rows []resource.FindingRow
+		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
+		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
+			rows = append(rows, resource.FindingRow{
+				Label: "EnforceWorkGroupConfiguration",
+				Value: "false",
+				Tier:  "~",
+			})
+		}
+		// Missing encryption on result configuration is a security concern.
+		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
+			rows = append(rows, resource.FindingRow{
+				Label: "ResultConfiguration.EncryptionConfiguration",
+				Value: "nil",
+				Tier:  "~",
+			})
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		summary := rows[0].Label
+		if len(rows) > 1 {
+			summary = fmt.Sprintf("%s (%d findings)", rows[0].Label, len(rows))
+		}
+		findings[key] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  summary,
+			Rows:     rows,
+		}
+		// "~" severity does not contribute to IssueCount.
+	}
+	return EnricherResult{Truncated: truncated, Findings: findings}, nil
 }
