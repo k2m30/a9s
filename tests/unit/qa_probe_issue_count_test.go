@@ -95,12 +95,12 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 			want:      0,
 		},
 		{
-			name: "terminated and shutting-down are not issues (dim)",
+			name: "terminated is dim, shutting-down is warning (issue)",
 			resources: []resource.Resource{
 				{ID: "i-001", Fields: map[string]string{"state": "terminated"}},
 				{ID: "i-002", Fields: map[string]string{"state": "shutting-down"}},
 			},
-			want: 0,
+			want: 1, // shutting-down → Warning (transitional issue), terminated → Dim (not issue)
 		},
 	}
 
