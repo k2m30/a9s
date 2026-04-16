@@ -284,33 +284,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("s3", matched)
 }
 
-// checkCtEventsS3Objects extracts S3 object keys from the CloudTrail event.
-// Note: s3_objects is a child type; the RelatedDef is registered for completeness
-// per §7b.10 but navigation is not supported (FindResourceType will not resolve it).
-func checkCtEventsS3Objects(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3_objects", Count: 0}
-	}
 
-	ids := extractCTResourceIDs(event, "AWS::S3::Object")
-
-	if len(ids) == 0 {
-		parsed := parseCTEventJSON(event.CloudTrailEvent)
-		if parsed != nil {
-			req, _ := parsed["requestParameters"].(map[string]any)
-			bucket := ctJSONString(req, "bucketName")
-			key := ctJSONString(req, "key")
-			if bucket != "" && key != "" {
-				ids = append(ids, bucket+"|"+key)
-			} else if key != "" {
-				ids = append(ids, key)
-			}
-		}
-	}
-
-	return relatedResult("s3_objects", ids)
-}
 
 // checkCtEventsLambda extracts Lambda function names from the CloudTrail event.
 func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
