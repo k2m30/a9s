@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -29,4 +30,26 @@ func (f *R53Fake) ListResourceRecordSets(_ context.Context, input *route53.ListR
 	}
 	records := f.fix.RecordSets[*input.HostedZoneId]
 	return &route53.ListResourceRecordSetsOutput{ResourceRecordSets: records}, nil
+}
+
+// GetHostedZone returns the hosted zone detail including VPC associations.
+// In demo mode the private zone Z1234567890ABCDEFGHIJ is returned with no VPC
+// associations, triggering the orphan finding in EnrichRoute53Zone.
+func (f *R53Fake) GetHostedZone(_ context.Context, input *route53.GetHostedZoneInput, _ ...func(*route53.Options)) (*route53.GetHostedZoneOutput, error) {
+	if input.Id == nil {
+		return nil, fmt.Errorf("GetHostedZone: Id is required")
+	}
+	for i := range f.fix.HostedZones {
+		hz := f.fix.HostedZones[i]
+		if hz.Id == nil || *hz.Id != *input.Id {
+			continue
+		}
+		out := &route53.GetHostedZoneOutput{HostedZone: &hz}
+		// Private zone with no VPCs — demo triggers the orphan finding.
+		if hz.Config != nil && hz.Config.PrivateZone {
+			out.VPCs = []r53types.VPC{}
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("GetHostedZone: zone %q not found", *input.Id)
 }
