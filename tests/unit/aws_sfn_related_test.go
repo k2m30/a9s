@@ -232,9 +232,11 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- sfn→role: undeterminable from cache, returns Count: 0 ---
+// --- sfn→role: undeterminable — StateMachineListItem has no RoleArn field ---
 
-func TestRelated_SFN_Role_ReturnsZero(t *testing.T) {
+// TestRelated_SFN_Role_EmptyARN verifies that with no ARN on the source resource,
+// sfn→role short-circuits to Count=0 (no lookup attempted).
+func TestRelated_SFN_Role_EmptyARN(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
 		Name: "order-fulfillment-workflow",
@@ -242,24 +244,44 @@ func TestRelated_SFN_Role_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count)
 	}
 	if result.TargetType != "role" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
 	}
 }
 
-// --- sfn→cfn: undeterminable from cache, returns Count: 0 ---
+// TestRelated_SFN_Role_NilClients verifies that with nil clients (cannot call
+// DescribeStateMachine), sfn→role reports Count=-1 (unknown).
+func TestRelated_SFN_Role_NilClients(t *testing.T) {
+	source := resource.Resource{
+		ID:   "order-fulfillment-workflow",
+		Name: "order-fulfillment-workflow",
+		Fields: map[string]string{
+			"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+		},
+	}
+	checker := sfnCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients — describe unavailable)", result.Count)
+	}
+}
 
-func TestRelated_SFN_CFN_ReturnsZero(t *testing.T) {
+// --- sfn→cfn: undeterminable — StateMachineListItem has no Tags field ---
+
+// TestRelated_SFN_CFN_ReturnsUnknown verifies that sfn→cfn reports Count=-1 because
+// the SFN list RawStruct has no Tags; resolving them would require ListTagsForResource
+// per state machine (N+1) — NOT a single Pattern C call, so deliberately -1.
+func TestRelated_SFN_CFN_ReturnsUnknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
 		Name: "order-fulfillment-workflow",
 	}
 	checker := sfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (undeterminable — no Tags on StateMachineListItem)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")

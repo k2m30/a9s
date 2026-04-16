@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -211,17 +212,115 @@ func TestRelated_Secrets_Lambda_NoRotation(t *testing.T) {
 	}
 }
 
-// --- DBI checker: undeterminable from cache, returns Count: 0 ---
+// --- DBI checker: reverse lookup — scan dbi cache for DBInstance entries whose
+// MasterUserSecret.SecretArn matches this secret's ARN ---
 
-func TestRelated_Secrets_DBI_ReturnsZero(t *testing.T) {
-	source := secretsSource()
+// TestRelated_Secrets_DBI_MatchesByARN verifies the reverse lookup: the checker
+// finds RDS instances whose MasterUserSecret.SecretArn equals this secret's ARN.
+func TestRelated_Secrets_DBI_MatchesByARN(t *testing.T) {
+	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-linked"
 	checker := secretsCheckerByTarget(t, "dbi")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+
+	source := resource.Resource{
+		ID:     "rds!db-linked",
+		Name:   "rds!db-linked",
+		Fields: map[string]string{"arn": secretARN},
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("rds!db-linked"),
+			ARN:  aws.String(secretARN),
+		},
+	}
+	linkedDB := resource.Resource{
+		ID:   "linked-db",
+		Name: "linked-db",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("linked-db"),
+			MasterUserSecret: &rdstypes.MasterUserSecret{
+				SecretArn: aws.String(secretARN),
+			},
+		},
+	}
+	unrelatedDB := resource.Resource{
+		ID:   "unrelated-db",
+		Name: "unrelated-db",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("unrelated-db"),
+			MasterUserSecret: &rdstypes.MasterUserSecret{
+				SecretArn: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-other"),
+			},
+		},
+	}
+	selfManagedDB := resource.Resource{
+		ID:   "self-managed-db",
+		Name: "self-managed-db",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("self-managed-db"),
+			MasterUserSecret:     nil,
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{linkedDB, unrelatedDB, selfManagedDB}},
+	}
+
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
 	}
 	if result.TargetType != "dbi" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "dbi")
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "linked-db" {
+		t.Errorf("ResourceIDs = %v, want [linked-db]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Secrets_DBI_NotFound verifies Count=0 when no DBInstance's
+// MasterUserSecret references this secret's ARN.
+func TestRelated_Secrets_DBI_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID:     "prod/api/stripe-key",
+		Name:   "prod/api/stripe-key",
+		Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/stripe-key"},
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/api/stripe-key"),
+			ARN:  aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/stripe-key"),
+		},
+	}
+	unrelatedDB := resource.Resource{
+		ID: "other-db",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("other-db"),
+			MasterUserSecret: &rdstypes.MasterUserSecret{
+				SecretArn: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-other"),
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{unrelatedDB}},
+	}
+	checker := secretsCheckerByTarget(t, "dbi")
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+// TestRelated_Secrets_DBI_CacheMiss verifies Count=-1 when the dbi cache is
+// empty and we have no clients to fetch (unknown) — but only when the secret
+// has an ARN. Without an ARN the checker correctly returns Count=0.
+func TestRelated_Secrets_DBI_CacheMiss(t *testing.T) {
+	source := resource.Resource{
+		ID:     "prod/docdb/acme-docdb-prod",
+		Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod"},
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("prod/docdb/acme-docdb-prod"),
+			ARN:  aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod"),
+		},
+	}
+	checker := secretsCheckerByTarget(t, "dbi")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
 

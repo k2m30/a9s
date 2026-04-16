@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -121,27 +122,66 @@ func TestRelated_Redshift_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- redshift→cfn: undeterminable from cache, returns Count: 0 ---
+// --- redshift→cfn: tag-based aws:cloudformation:stack-name → cfn cache ---
 
-func TestRelated_Redshift_CFN_ReturnsZero(t *testing.T) {
+// TestRelated_Redshift_CFN_Found verifies the checker extracts the CFN stack
+// name from the Cluster's Tags and matches against the cfn cache.
+func TestRelated_Redshift_CFN_Found(t *testing.T) {
+	checker := redshiftCheckerByTarget(t, "cfn")
+
 	source := resource.Resource{
 		ID:   "analytics-prod",
 		Name: "analytics-prod",
+		RawStruct: redshifttypes.Cluster{
+			ClusterIdentifier: aws.String("analytics-prod"),
+			Tags: []redshifttypes.Tag{
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("analytics-stack")},
+			},
+		},
 	}
-	for _, def := range resource.GetRelated("redshift") {
-		if def.TargetType == "cfn" {
-			if def.Checker == nil {
-				t.Fatal("redshift cfn Checker is nil")
-			}
-			result := def.Checker(context.Background(), nil, source, resource.ResourceCache{})
-			if result.Count != 0 {
-				t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-			}
-			if result.TargetType != "cfn" {
-				t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-			}
-			return
-		}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "analytics-stack", Name: "analytics-stack", Fields: map[string]string{"stack_name": "analytics-stack"}},
+			{ID: "other-stack", Name: "other-stack", Fields: map[string]string{"stack_name": "other-stack"}},
+		}},
 	}
-	t.Error("expected related def for target cfn not found for redshift")
+
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "analytics-stack" {
+		t.Errorf("ResourceIDs = %v, want [analytics-stack]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Redshift_CFN_NoTag verifies Count=0 when the cluster has no
+// aws:cloudformation:stack-name tag (not CFN-managed).
+func TestRelated_Redshift_CFN_NoTag(t *testing.T) {
+	source := resource.Resource{
+		ID:   "analytics-prod",
+		Name: "analytics-prod",
+		RawStruct: redshifttypes.Cluster{
+			ClusterIdentifier: aws.String("analytics-prod"),
+			Tags: []redshifttypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "any-stack", Name: "any-stack"},
+		}},
+	}
+	checker := redshiftCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	}
+	if result.TargetType != "cfn" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
 }

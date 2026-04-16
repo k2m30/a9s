@@ -752,6 +752,69 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 	}
 }
 
+// checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail
+// event. Trail resources appear either in the event's Resources slice as
+// AWS::CloudTrail::Trail entries or inline in the CloudTrailEvent JSON
+// requestParameters as "name"/"trailName"/"trailARN" for API calls that act
+// on a trail (e.g. CreateTrail, UpdateTrail, PutEventSelectors, StartLogging).
+// The extracted names/ARNs are then matched against the trail cache.
+func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+	}
+
+	ids := extractCTResourceIDs(event, "AWS::CloudTrail::Trail")
+
+	if len(ids) == 0 {
+		parsed := parseCTEventJSON(event.CloudTrailEvent)
+		if parsed != nil {
+			req, _ := parsed["requestParameters"].(map[string]any)
+			for _, key := range []string{"name", "trailName", "trailARN", "trailArn"} {
+				if v := ctJSONString(req, key); v != "" {
+					// If this looks like a full ARN, extract the trail name suffix.
+					name := v
+					if idx := strings.LastIndex(v, "/"); idx >= 0 && idx < len(v)-1 {
+						name = v[idx+1:]
+					}
+					ids = append(ids, name)
+				}
+			}
+		}
+	}
+
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+	}
+
+	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "trail")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
+	}
+	if resourceList == nil {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+	}
+
+	wantSet := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		wantSet[id] = struct{}{}
+	}
+	var matched []string
+	for _, r := range resourceList {
+		if _, ok := wantSet[r.ID]; ok {
+			matched = append(matched, r.ID)
+			continue
+		}
+		if _, ok := wantSet[r.Name]; ok {
+			matched = append(matched, r.ID)
+		}
+	}
+	if len(matched) == 0 && truncated {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+	}
+	return relatedResult("trail", matched)
+}
+
 // checkCtEventsCFN extracts CloudFormation stack names from the CloudTrail event.
 func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)

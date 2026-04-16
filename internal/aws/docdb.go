@@ -26,6 +26,11 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbcAlarm, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcKMS},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets, NeedsTargetCache: true},
+		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkDbcDBI, NeedsTargetCache: true},
+		{TargetType: "docdb-snap", DisplayName: "DocumentDB Snapshots", Checker: checkDbcDocdbSnap, NeedsTargetCache: true},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
 	})
 
 	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,

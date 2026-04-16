@@ -23,9 +23,17 @@ func init() {
 	resource.RegisterRelated("sfn", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSFNAlarm, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSFNRole, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSFNCFN, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSFNEbRule, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSFNKMS, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSFNLambda, NeedsTargetCache: false},
 	})
 
-	// sfntypes.StateMachineListItem: RoleArn (IAM execution role for the state machine)
+	// RoleArn is declared navigable even though sfntypes.StateMachineListItem (the
+	// list RawStruct) lacks it — the navigable-field registration is an intent
+	// contract: "if the raw struct exposes RoleArn, treat it as a role navigation".
+	// It resolves only when enriched detail (DescribeStateMachine) is present.
 	resource.RegisterNavigableFields("sfn", []resource.NavigableField{
 		{FieldPath: "RoleArn", TargetType: "role"},
 	})

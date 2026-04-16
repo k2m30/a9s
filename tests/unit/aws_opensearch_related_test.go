@@ -134,17 +134,17 @@ func TestRelated_OpenSearch_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- opensearch→cfn: undeterminable from cache, returns Count: 0 ---
+// --- opensearch→cfn: undeterminable without ListTags, returns Count: -1 ---
 
-func TestRelated_OpenSearch_CFN_ReturnsZero(t *testing.T) {
+func TestRelated_OpenSearch_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-logs",
 		Name: "acme-logs",
 	}
 	checker := opensearchCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (tags need ListTags enrichment)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")

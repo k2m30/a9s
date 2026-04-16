@@ -12,8 +12,10 @@ import (
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -39,69 +41,191 @@ func checkerByTargetUncovered(t *testing.T, shortName, target string) resource.R
 // STUB CHECKERS — return constant results regardless of input
 // ---------------------------------------------------------------------------
 
-func TestRelated_DBI_Secrets_AlwaysZero(t *testing.T) {
+// TestRelated_DBI_Secrets_MatchesByARN verifies the dbi→secrets checker resolves
+// the managed master-user secret via DBInstance.MasterUserSecret.SecretArn by
+// matching against the secrets cache by ARN (Fields["arn"] or SecretListEntry.ARN).
+func TestRelated_DBI_Secrets_MatchesByARN(t *testing.T) {
+	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-abc-defghij"
 	checker := checkerByTargetUncovered(t, "dbi", "secrets")
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	got := checker(context.Background(), nil, res, nil)
+
+	source := resource.Resource{
+		ID:     "acme-prod-db",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("acme-prod-db"),
+			MasterUserSecret: &rdstypes.MasterUserSecret{
+				SecretArn: aws.String(secretARN),
+			},
+		},
+	}
+	secretRes := resource.Resource{
+		ID:   "rds!db-abc-defghij",
+		Name: "rds!db-abc-defghij",
+		Fields: map[string]string{
+			"arn": secretARN,
+		},
+		RawStruct: smtypes.SecretListEntry{
+			Name: aws.String("rds!db-abc-defghij"),
+			ARN:  aws.String(secretARN),
+		},
+	}
+	otherSecret := resource.Resource{
+		ID:     "some-other-secret",
+		Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:other-XYZ"},
+	}
+	cache := resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{secretRes, otherSecret}},
+	}
+
+	got := checker(context.Background(), nil, source, cache)
+	if got.Count != 1 {
+		t.Errorf("expected Count=1, got %d", got.Count)
+	}
+	if got.TargetType != "secrets" {
+		t.Errorf("expected TargetType=secrets, got %q", got.TargetType)
+	}
+	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "rds!db-abc-defghij" {
+		t.Errorf("expected ResourceIDs=[rds!db-abc-defghij], got %v", got.ResourceIDs)
+	}
+}
+
+// TestRelated_DBI_Secrets_NoManagedSecret verifies that when DBInstance has no
+// MasterUserSecret (self-managed credentials) the checker returns Count=0.
+func TestRelated_DBI_Secrets_NoManagedSecret(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "dbi", "secrets")
+
+	source := resource.Resource{
+		ID:     "self-managed-db",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("self-managed-db"),
+			MasterUserSecret:     nil,
+		},
+	}
+	cache := resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-secret", Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:some-secret"}},
+		}},
+	}
+	got := checker(context.Background(), nil, source, cache)
 	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+		t.Errorf("expected Count=0 for no MasterUserSecret, got %d", got.Count)
 	}
 	if got.TargetType != "secrets" {
 		t.Errorf("expected TargetType=secrets, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_Pipeline_CB_AlwaysZero(t *testing.T) {
+// TestRelated_Pipeline_CB_ReturnsUnknown verifies pipeline→cb reports Count=-1 because
+// the pipeline list RawStruct (cptypes.PipelineSummary) carries no stages/actions —
+// resolving CodeBuild project references would require GetPipeline per pipeline (N+1).
+func TestRelated_Pipeline_CB_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "cb")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (undeterminable — no stages on PipelineSummary), got %d", got.Count)
 	}
 	if got.TargetType != "cb" {
 		t.Errorf("expected TargetType=cb, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_Pipeline_Role_AlwaysZero(t *testing.T) {
+// TestRelated_Pipeline_Role_ReturnsUnknown verifies pipeline→role reports Count=-1 because
+// the pipeline list RawStruct has no RoleArn — it is only on GetPipelineOutput.
+func TestRelated_Pipeline_Role_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "role")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (undeterminable — no RoleArn on PipelineSummary), got %d", got.Count)
 	}
 	if got.TargetType != "role" {
 		t.Errorf("expected TargetType=role, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_Lambda_SQS_AlwaysZero(t *testing.T) {
+// TestRelated_Lambda_SQS_UnknownWithoutClients verifies the lambda→sqs checker
+// returns Count=-1 when live Lambda clients are unavailable (requires
+// lambda:ListEventSourceMappings — FunctionConfiguration does not embed event
+// sources, so there is no cache-only path).
+func TestRelated_Lambda_SQS_UnknownWithoutClients(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "sqs")
 	res := resource.Resource{ID: "my-function", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
 	}
 	if got.TargetType != "sqs" {
 		t.Errorf("expected TargetType=sqs, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_Lambda_CFN_AlwaysZero(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "lambda", "cfn")
-	res := resource.Resource{ID: "my-function", Fields: map[string]string{}}
+// TestRelated_Lambda_SQS_EmptyIDReturnsZero verifies the checker short-circuits
+// with Count=0 when the function has no identifier, avoiding any API call.
+func TestRelated_Lambda_SQS_EmptyIDReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "lambda", "sqs")
+	res := resource.Resource{ID: "", Name: "", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
 	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+		t.Errorf("expected Count=0 for empty function id, got %d", got.Count)
+	}
+}
+
+// TestRelated_Lambda_CFN_UnknownWithoutClients verifies the lambda→cfn checker
+// returns Count=-1 when live Lambda clients are unavailable (requires
+// lambda:ListTags because FunctionConfiguration does not carry tags).
+func TestRelated_Lambda_CFN_UnknownWithoutClients(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "lambda", "cfn")
+	res := resource.Resource{
+		ID:     "my-function",
+		Fields: map[string]string{},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+			FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-function"),
+		},
+	}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
 	}
 	if got.TargetType != "cfn" {
 		t.Errorf("expected TargetType=cfn, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_Lambda_EbRule_AlwaysUnknown(t *testing.T) {
+// TestRelated_Lambda_CFN_NoARNReturnsZero verifies the checker reports Count=0
+// when the function has no ARN — tags cannot be resolved, and there is no
+// link to return.
+func TestRelated_Lambda_CFN_NoARNReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "lambda", "cfn")
+	res := resource.Resource{
+		ID:     "my-function",
+		Fields: map[string]string{},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+		},
+	}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (no function ARN), got %d", got.Count)
+	}
+}
+
+// TestRelated_Lambda_EbRule_UnknownWithoutClients verifies the lambda→eb-rule
+// checker returns Count=-1 without live clients. Rule structs do not include
+// targets (those come from events:ListTargetsByRule), so the checker has no
+// cache-only signal to use.
+func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "eb-rule")
-	res := resource.Resource{ID: "my-function", Fields: map[string]string{}}
+	res := resource.Resource{
+		ID:     "my-function",
+		Fields: map[string]string{},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+			FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-function"),
+		},
+	}
 	got := checker(context.Background(), nil, res, nil)
 	if got.Count != -1 {
 		t.Errorf("expected Count=-1, got %d", got.Count)
@@ -111,63 +235,115 @@ func TestRelated_Lambda_EbRule_AlwaysUnknown(t *testing.T) {
 	}
 }
 
-func TestRelated_ELB_R53_AlwaysUnknown(t *testing.T) {
+// TestRelated_ELB_R53_WithDNSReturnsUnknown: real ELB with dns_name → -1 (records per-zone).
+func TestRelated_ELB_R53_WithDNSReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "elb", "r53")
-	res := resource.Resource{ID: "my-alb", Fields: map[string]string{}}
+	res := resource.Resource{
+		ID: "my-alb",
+		Fields: map[string]string{
+			"dns_name": "my-alb-1234.us-east-1.elb.amazonaws.com",
+		},
+	}
 	got := checker(context.Background(), nil, res, nil)
 	if got.Count != -1 {
-		t.Errorf("expected Count=-1, got %d", got.Count)
+		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "r53" {
 		t.Errorf("expected TargetType=r53, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_SFN_EbRule_AlwaysUnknown(t *testing.T) {
+// TestRelated_ELB_R53_EmptyDNSReturnsZero: ELB without dns_name → 0 (nothing to resolve).
+func TestRelated_ELB_R53_EmptyDNSReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "elb", "r53")
+	res := resource.Resource{ID: "my-alb", Fields: map[string]string{}}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (empty dns_name), got %d", got.Count)
+	}
+}
+
+// TestRelated_SFN_EbRule_ReturnsUnknown verifies sfn→eb-rule reports Count=-1 because
+// the eb-rule list cache only carries ListRules output (no target list) — resolving
+// which rules target a given state machine would require ListTargetsByRule per rule (N+1).
+func TestRelated_SFN_EbRule_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "sfn", "eb-rule")
 	res := resource.Resource{ID: "my-state-machine", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
 	if got.Count != -1 {
-		t.Errorf("expected Count=-1, got %d", got.Count)
+		t.Errorf("expected Count=-1 (undeterminable — eb-rule cache lacks targets), got %d", got.Count)
 	}
 	if got.TargetType != "eb-rule" {
 		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_R53_ELB_AlwaysZero(t *testing.T) {
+// TestRelated_R53_ELB_ZoneReturnsUnknown: real zone → -1 (alias records live per-zone).
+func TestRelated_R53_ELB_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "elb")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "elb" {
 		t.Errorf("expected TargetType=elb, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_R53_CF_AlwaysZero(t *testing.T) {
+// TestRelated_R53_ELB_EmptyZoneReturnsZero: missing zone id → 0.
+func TestRelated_R53_ELB_EmptyZoneReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "r53", "elb")
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
+	}
+}
+
+// TestRelated_R53_CF_ZoneReturnsUnknown: real zone → -1 (alias records per-zone).
+func TestRelated_R53_CF_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "cf")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "cf" {
 		t.Errorf("expected TargetType=cf, got %q", got.TargetType)
 	}
 }
 
-func TestRelated_R53_ACM_AlwaysZero(t *testing.T) {
+// TestRelated_R53_CF_EmptyZoneReturnsZero: missing zone id → 0.
+func TestRelated_R53_CF_EmptyZoneReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "r53", "cf")
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
+	}
+}
+
+// TestRelated_R53_ACM_ZoneReturnsUnknown: real zone → -1 (validation records per-zone).
+func TestRelated_R53_ACM_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "acm")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
+	if got.Count != -1 {
+		t.Errorf("expected Count=-1 (validation records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "acm" {
 		t.Errorf("expected TargetType=acm, got %q", got.TargetType)
+	}
+}
+
+// TestRelated_R53_ACM_EmptyZoneReturnsZero: missing zone id → 0.
+func TestRelated_R53_ACM_EmptyZoneReturnsZero(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "r53", "acm")
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	got := checker(context.Background(), nil, res, nil)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count)
 	}
 }
 
