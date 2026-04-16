@@ -30,7 +30,7 @@
    workflow reference no longer applies. Evidence > opinion.
 3. **New resource type** — adding a type to the registry requires adding a
    section here in the same PR. The test suite
-   (`tests/unit/qa_coderabbit_pr273_related_test.go`) enforces this.
+   (`tests/unit/qa_related_panel_contract_test.go`) enforces this.
 4. **Universal pivots** — `ct-events` (CloudTrail audit trail) is implicitly
    relevant for every registered type; its presence is verified by the test
    suite directly against `resource.GetRelated`, not by per-type rows here.
