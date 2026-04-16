@@ -189,12 +189,6 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	return relatedResult("sg", []string{*ng.Resources.RemoteAccessSecurityGroup})
 }
 
-// checkNGKMS is a stub. The EKS Node Group struct (ekstypes.Nodegroup) does not
-// carry a direct KMS key reference — disk encryption KMS keys are set on the
-// launch template or AMI, not on the Nodegroup API response.
-func checkNGKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // ngRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ngRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -207,14 +201,5 @@ func ngRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	return resources, isTruncated, err
 }
 
-func checkNGAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
-}
 
-func checkNGEBS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
-}
 
-func checkNGSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}

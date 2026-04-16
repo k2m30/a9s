@@ -22,10 +22,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("acm", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
 		{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true},
-		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW},
-		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53},
 	})
 	// No NavigableFields — CertificateSummary has no forward refs to other resource types
 }

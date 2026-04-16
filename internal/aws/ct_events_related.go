@@ -801,6 +801,3 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("cfn", matched)
 }
 
-func checkCtEventsTrail(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
-}

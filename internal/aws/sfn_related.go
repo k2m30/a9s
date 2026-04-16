@@ -76,32 +76,9 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
-// checkSFNRole returns Count: 0 because StateMachineListItem does not expose the
-// execution role ARN — the relationship cannot be determined from cache.
-func checkSFNRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-// checkSFNCFN returns Count: 0 because SFN state machine tags are not included
-// in the ListStateMachines response — the CFN relationship cannot be determined
-// from cache alone.
-func checkSFNCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-// checkSFNEbRule returns Count: -1 (unknown) because EventBridge rule targets
-// are not included in the ListRules response — the relationship cannot be
-// determined from cache alone without calling ListTargetsByRule per rule.
-func checkSFNEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
 
-// checkSFNKMS is a stub. Step Functions StateMachineListItem does not expose
-// a KMS key ID — encryption at rest configuration is not surfaced in the
-// ListStateMachines response.
-func checkSFNKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // sfnRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -114,6 +91,3 @@ func sfnRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkSFNLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}

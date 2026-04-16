@@ -22,15 +22,6 @@ func init() {
 	})
 
 	resource.RegisterRelated("codeartifact", []resource.RelatedDef{
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkCodeArtifactCB},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkCodeArtifactRole},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeArtifactKMS},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCodeArtifactACM},
-		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkCodeArtifactKinesis},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkCodeArtifactLambda},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCodeArtifactLogs},
-		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkCodeArtifactR53},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCodeArtifactWAF},
 	})
 }
 

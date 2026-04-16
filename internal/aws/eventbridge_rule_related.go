@@ -12,12 +12,6 @@ import (
 func init() {
 	resource.RegisterRelated("eb-rule", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRuleRole, NeedsTargetCache: false},
-		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkEbRuleKinesis},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEbRuleLambda},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbRuleLogs},
-		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkEbRuleSFN},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkEbRuleSNS},
-		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkEbRuleSQS},
 	})
 
 	// eventbridgetypes.Rule: RoleArn (execution role for the rule target)
@@ -45,26 +39,8 @@ func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("role", []string{roleName})
 }
 
-func checkEbRuleKinesis(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-}
 
-func checkEbRuleLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-func checkEbRuleLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
 
-func checkEbRuleSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-}
 
-func checkEbRuleSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}
 
-func checkEbRuleSQS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sqs", Count: 0}
-}

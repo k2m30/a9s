@@ -13,27 +13,14 @@ import (
 func init() {
 	resource.RegisterRelated("sns", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSNSCFN, NeedsTargetCache: true},
 		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSNSRole},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSKMS},
 	})
 
 	// snstypes topic: detail view renders only TopicArn — no cross-ref fields (KmsMasterKeyId,
 	// subscriptions, delivery policies are GetTopicAttributes results, not in the list RawStruct).
 }
 
-// checkSNSCFN returns Count: 0 because SNS topic tags are not included in the
-// ListTopics response — the CFN relationship cannot be determined from cache alone.
-func checkSNSCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-// checkSNSRole returns Count: 0 because SNS topics do not expose an IAM role ARN
-// in the ListTopics response.
-func checkSNSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
 // checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,
 // or InsufficientDataActions reference this SNS topic ARN.
@@ -105,12 +92,6 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("sns-sub", ids)
 }
 
-// checkSNSKMS is a stub. The SNS ListTopics API returns only the TopicArn —
-// KmsMasterKeyId is only available via GetTopicAttributes, not in the list
-// response RawStruct.
-func checkSNSKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // snsAlarmReferences reports whether any of the alarm's action lists contain
 // an ARN that matches or contains the given SNS topic ARN.

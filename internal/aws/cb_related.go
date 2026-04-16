@@ -84,12 +84,6 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
-// checkCbPipeline returns Count: 0 because CodePipeline PipelineSummary does not
-// include stage details — the relationship between a CodeBuild project and its
-// containing pipeline cannot be determined from cache alone.
-func checkCbPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
-}
 
 // checkCbSG extracts security group IDs from the CodeBuild Project's VpcConfig.
 // Pattern F — no cache needed.
@@ -139,29 +133,11 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResult("kms", []string{keyID})
 }
 
-func checkCbAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-}
 
-func checkCbECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
 
-func checkCbS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkCbSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
 
-func checkCbSSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
-}
 
-func checkCbSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-}
 
 // cbRelatedResources returns the resource list for target from cache or by fetching the first page.
 func cbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

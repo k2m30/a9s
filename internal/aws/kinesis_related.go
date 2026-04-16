@@ -11,32 +11,14 @@ import (
 
 func init() {
 	resource.RegisterRelated("kinesis", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
-		{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkKinesisDDB},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkKinesisEbRule},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkKinesisLogs},
 	})
 
 	// kinesisstypes.StreamSummary (list response): no navigable fields — KeyId/EncryptionType
 	// are on DescribeStream's StreamDescriptionSummary, not the list summary used as RawStruct.
 }
 
-// checkKinesisLambda returns Count: 0 because Kinesis stream event source
-// mappings are not available in the list API — the relationship cannot be
-// determined from cache alone.
-func checkKinesisLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
-// checkKinesisCFN returns Count: 0 because Kinesis stream tags are not included
-// in the ListStreams response — the CFN relationship cannot be determined from
-// cache alone.
-func checkKinesisCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
 // checkKinesisAlarms checks the cache for CloudWatch alarms with StreamName dimension matching this stream.
 func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -72,12 +54,6 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 	return relatedResult("alarm", ids)
 }
 
-// checkKinesisKMS is a stub. The Kinesis ListStreams response returns
-// StreamSummary objects which do not include EncryptionType or KeyId —
-// those fields are only on DescribeStream's StreamDescriptionSummary.
-func checkKinesisKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
 
 // kinesisRelatedResources returns the resource list for target from cache or by fetching the first page.
 func kinesisRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -90,14 +66,5 @@ func kinesisRelatedResources(ctx context.Context, clients any, cache resource.Re
 	return resources, isTruncated, err
 }
 
-func checkKinesisDDB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
-}
 
-func checkKinesisEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
 
-func checkKinesisLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}

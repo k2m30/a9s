@@ -169,13 +169,6 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("ng", ids)
 }
 
-// checkASGSG returns Count: 0 because AutoScalingGroup list response does not
-// include security group IDs directly — they are defined on the launch
-// template/configuration and are not surfaced in the DescribeAutoScalingGroups
-// response payload.
-func checkASGSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-}
 
 // asgRelatedResources returns the resource list for target from cache or fetches it.
 func asgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -188,31 +181,8 @@ func asgRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-// checkASGVPC — ASG has no direct VPC field; VPCZoneIdentifier is CSV subnet IDs.
-// Resolving VPC requires subnet cache lookup. Stub for now.
-func checkASGVPC(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
-}
 
-// checkASGRole returns Count: 0 because the IAM role is on the launch template
-// or launch configuration, not on the ASG struct itself — the relationship
-// cannot be determined from the ASG list response alone.
-func checkASGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-func checkASGAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
-}
 
-func checkASGCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
 
-func checkASGELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
 
-func checkASGSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-}

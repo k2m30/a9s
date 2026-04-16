@@ -28,9 +28,6 @@ func init() {
 		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRTBCFN, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRTBVPC},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkRTBENI},
-		{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkRTBTGW},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkRTBVPCE},
 	})
 }
 
@@ -213,14 +210,5 @@ func rtbRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-func checkRTBENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-}
 
-func checkRTBTGW(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
-}
 
-func checkRTBVPCE(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
-}

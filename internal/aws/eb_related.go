@@ -17,12 +17,6 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRole},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEbAlarm},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkEbELB},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkEbS3},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEbTG},
 	})
 }
 
@@ -202,34 +196,11 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("ec2", ids)
 }
 
-// checkEbSG returns Count: 0 because EnvironmentDescription (Elastic Beanstalk
-// list response) does not include security group IDs directly — they are
-// managed by Elastic Beanstalk on the underlying EC2 and ASG resources.
-func checkEbSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-}
 
-// checkEbRole returns Count: 0 because EnvironmentDescription does not expose
-// an IAM service role ARN in the DescribeEnvironments list response.
-func checkEbRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
 
-func checkEbAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-}
 
-func checkEbELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
 
-func checkEbS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-}
 
-func checkEbTG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
-}
 
 // ebRelatedResources returns the resource list for target from cache or fetches it.
 func ebRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
