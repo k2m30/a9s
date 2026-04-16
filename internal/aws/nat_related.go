@@ -113,3 +113,15 @@ func natRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+func checkNATAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+func checkNATEIP(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+}
+
+func checkNATENI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+}

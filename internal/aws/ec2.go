@@ -53,6 +53,12 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEC2KMS},
+		{TargetType: "ami", DisplayName: "AMIs", Checker: checkEC2AMI},
+		{TargetType: "backup", DisplayName: "AWS Backups", Checker: checkEC2Backup},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEC2ENI},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEC2Logs},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEC2Subnet},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{

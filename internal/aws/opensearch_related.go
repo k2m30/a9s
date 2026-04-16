@@ -20,6 +20,8 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkOpenSearchRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -177,4 +179,12 @@ func opensearchRelatedResources(ctx context.Context, clients any, cache resource
 		}
 	}
 	return resources, isTruncated, err
+}
+
+func checkOpenSearchACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
+}
+
+func checkOpenSearchSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }

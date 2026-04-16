@@ -18,6 +18,10 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkMSKVPC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMSKKMS},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkMSKLogs},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkMSKS3},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkMSKSecrets},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkMSKSubnet},
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
@@ -119,4 +123,20 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
+}
+
+func checkMSKLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
+func checkMSKS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+}
+
+func checkMSKSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+}
+
+func checkMSKSubnet(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }
