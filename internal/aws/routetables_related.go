@@ -16,6 +16,10 @@ func init() {
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "Associations.SubnetId", TargetType: "subnet"},
 		{FieldPath: "Routes.NatGatewayId", TargetType: "nat"},
+		{FieldPath: "Routes.GatewayId", TargetType: "igw"},
+		{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
+		{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
+		{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
 	})
 
 	resource.RegisterRelated("rtb", []resource.RelatedDef{

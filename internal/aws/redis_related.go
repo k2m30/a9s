@@ -17,10 +17,10 @@ func init() {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
 	})
 
-	// elasticachetypes.CacheCluster: SecurityGroups[].SecurityGroupId
-	// skip KmsKeyId: CacheCluster exposes AtRestEncryptionEnabled (bool), not the key ARN
+	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
 	resource.RegisterNavigableFields("redis", []resource.NavigableField{
 		{FieldPath: "SecurityGroups.SecurityGroupId", TargetType: "sg"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 }
 

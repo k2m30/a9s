@@ -308,6 +308,9 @@ func makeInstance(
 			Key:   aws.String("kubernetes.io/cluster/" + fixtProdEKSClusterName),
 			Value: aws.String("owned"),
 		})
+		inst.NetworkInterfaces = []ec2types.InstanceNetworkInterface{
+			{NetworkInterfaceId: aws.String("eni-0aaa111111111111a")},
+		}
 	}
 	if instanceID == "i-0a1b2c3d4e5f60003" {
 		inst.Tags = append(inst.Tags,

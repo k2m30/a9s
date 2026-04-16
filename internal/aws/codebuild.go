@@ -26,9 +26,13 @@ func init() {
 		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline},
 	})
 
-	// cbtypes.Project: ServiceRole (ARN — value is the full ARN string)
+	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}
 	resource.RegisterNavigableFields("cb", []resource.NavigableField{
 		{FieldPath: "ServiceRole", TargetType: "role"},
+		{FieldPath: "EncryptionKey", TargetType: "kms"},
+		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
+		{FieldPath: "VpcConfig.Subnets", TargetType: "subnet"},
+		{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 	})
 }
 
