@@ -203,3 +203,22 @@ func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput
 		PolicyDocument: aws.String(doc),
 	}, nil
 }
+
+// GetLoginProfile returns NoSuchEntityException for all users in demo mode
+// (no demo users have a console password configured).
+func (f *IAMFake) GetLoginProfile(_ context.Context, input *iam.GetLoginProfileInput, _ ...func(*iam.Options)) (*iam.GetLoginProfileOutput, error) {
+	userName := aws.ToString(input.UserName)
+	return nil, &iamtypes.NoSuchEntityException{
+		Message: aws.String(fmt.Sprintf("Login Profile for User %s cannot be found.", userName)),
+	}
+}
+
+// ListMFADevices returns an empty list for all users in demo mode.
+func (f *IAMFake) ListMFADevices(_ context.Context, _ *iam.ListMFADevicesInput, _ ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error) {
+	return &iam.ListMFADevicesOutput{MFADevices: []iamtypes.MFADevice{}}, nil
+}
+
+// ListAccessKeys returns an empty list for all users in demo mode.
+func (f *IAMFake) ListAccessKeys(_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
+	return &iam.ListAccessKeysOutput{AccessKeyMetadata: []iamtypes.AccessKeyMetadata{}}, nil
+}

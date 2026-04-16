@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time"})
+	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"})
 
 	resource.RegisterPaginated("logs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -88,6 +88,11 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			creationTime = formatEpochMillis(*lg.CreationTime)
 		}
 
+		kmsKeyID := ""
+		if lg.KmsKeyId != nil {
+			kmsKeyID = *lg.KmsKeyId
+		}
+
 		r := resource.Resource{
 			ID:     logGroupName,
 			Name:   logGroupName,
@@ -97,6 +102,7 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				"stored_bytes":   storedBytes,
 				"retention_days": retentionDays,
 				"creation_time":  creationTime,
+				"kms_key_id":     kmsKeyID,
 			},
 			RawStruct: lg,
 		}

@@ -52,6 +52,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -111,14 +112,9 @@ var EnricherRegistry = map[string]EnricherFunc{
 	"waf":          EnrichWAFLogging,
 	"role":         EnrichIAMRoleLastUsed,
 	"policy":       EnrichIAMPolicy,
-	// Wave 2 enrichers for IAM users/groups and CloudWatch Logs are documented
-	// in docs/attention-signals.md but not yet implemented (Wave 2 backlog).
-	// Registering NoOpEnricher ensures TestAttentionSignalsDoc passes — the
-	// registry entry being non-nil satisfies the doc-enforcement invariant.
-	// Replace with real enrichers when implementing Wave 2 for these types.
-	"iam-user":  NoOpEnricher,
-	"iam-group": NoOpEnricher,
-	"logs":      NoOpEnricher,
+	"iam-user":  EnrichIAMUserMFA,
+	"iam-group": EnrichIAMGroup,
+	"logs":      EnrichLogsMetricFilters,
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      NoOpEnricher,
@@ -3006,4 +3002,272 @@ func isAdminStarPolicyString(doc string) bool {
 	return (strings.Contains(doc, `"Effect":"Allow"`) || strings.Contains(doc, `"Effect": "Allow"`)) &&
 		(strings.Contains(doc, `"Action":"*"`) || strings.Contains(doc, `"Action": "*"`)) &&
 		(strings.Contains(doc, `"Resource":"*"`) || strings.Contains(doc, `"Resource": "*"`))
+}
+
+// EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
+// (capped at EnrichmentCap) to surface console users without MFA and stale access keys.
+//
+// Findings:
+//   - GetLoginProfile succeeds AND ListMFADevices empty → "!" finding "console user without MFA (CIS IAM.5)"
+//   - Any active access key with CreateDate >90d → "~" finding "access key >90d (rotation)"
+//
+// Skip when clients.IAM == nil.
+func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.IAM == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	loginProfileAPI, ok1 := clients.IAM.(IAMGetLoginProfileAPI)
+	mfaAPI, ok2 := clients.IAM.(IAMListMFADevicesAPI)
+	accessKeyAPI, ok3 := clients.IAM.(IAMListAccessKeysAPI)
+	if !ok1 || !ok2 || !ok3 {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	issueCount := 0
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		userName := r.Fields["user_name"]
+		if userName == "" {
+			userName = r.ID
+		}
+		if userName == "" {
+			continue
+		}
+
+		// Determine if the user has a console password via GetLoginProfile.
+		hasConsolePassword := false
+		_, err := loginProfileAPI.GetLoginProfile(ctx, &iam.GetLoginProfileInput{
+			UserName: aws.String(userName),
+		})
+		if err != nil {
+			var noSuchEntity *iamtypes.NoSuchEntityException
+			var apiErr smithy.APIError
+			isNoSuchEntity := errors.As(err, &noSuchEntity) ||
+				(errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntityException")
+			if !isNoSuchEntity {
+				// Unexpected error — skip this user but flag truncation.
+				truncated = true
+				continue
+			}
+			// NoSuchEntityException means the user has no console password.
+		} else {
+			hasConsolePassword = true
+		}
+
+		var rows []resource.FindingRow
+		severity := "~"
+
+		// Check MFA only for console users.
+		if hasConsolePassword {
+			mfaOut, mfaErr := mfaAPI.ListMFADevices(ctx, &iam.ListMFADevicesInput{
+				UserName: aws.String(userName),
+			})
+			if mfaErr != nil {
+				truncated = true
+				continue
+			}
+			if len(mfaOut.MFADevices) == 0 {
+				rows = append(rows, resource.FindingRow{
+					Label: "MFA",
+					Value: "console user without MFA (CIS IAM.5)",
+					Tier:  "!",
+				})
+				severity = "!"
+				issueCount++
+			}
+		}
+
+		// Check access key age regardless of console password presence.
+		keysOut, keysErr := accessKeyAPI.ListAccessKeys(ctx, &iam.ListAccessKeysInput{
+			UserName: aws.String(userName),
+		})
+		if keysErr != nil {
+			truncated = true
+			continue
+		}
+		for _, key := range keysOut.AccessKeyMetadata {
+			if key.Status != iamtypes.StatusTypeActive {
+				continue
+			}
+			if key.CreateDate == nil {
+				continue
+			}
+			if time.Since(*key.CreateDate) > 90*24*time.Hour {
+				keyID := ""
+				if key.AccessKeyId != nil {
+					keyID = *key.AccessKeyId
+				}
+				rows = append(rows, resource.FindingRow{
+					Label: "Access Key",
+					Value: fmt.Sprintf("key %s >90d (rotation)", keyID),
+					Tier:  "~",
+				})
+			}
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: severity,
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
+// (capped at EnrichmentCap) to surface orphan groups and no-op groups.
+//
+// Findings:
+//   - GetGroup.Users empty → "~" finding "group has no members (orphan)"
+//   - ListAttachedGroupPolicies empty AND ListGroupPolicies empty → "~" finding "group has no policies (no-op group)"
+//
+// Skip when clients.IAM == nil.
+func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.IAM == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	getGroupAPI, ok1 := clients.IAM.(IAMGetGroupAPI)
+	attachedPoliciesAPI, ok2 := clients.IAM.(IAMListAttachedGroupPoliciesAPI)
+	inlinePoliciesAPI, ok3 := clients.IAM.(IAMListGroupPoliciesAPI)
+	if !ok1 || !ok2 || !ok3 {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		groupName := r.Fields["group_name"]
+		if groupName == "" {
+			groupName = r.ID
+		}
+		if groupName == "" {
+			continue
+		}
+
+		groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
+			GroupName: aws.String(groupName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+
+		attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
+			GroupName: aws.String(groupName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+
+		inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
+			GroupName: aws.String(groupName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+
+		var rows []resource.FindingRow
+
+		if len(groupOut.Users) == 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "Members",
+				Value: "group has no members (orphan)",
+				Tier:  "~",
+			})
+		}
+
+		if len(attachedOut.AttachedPolicies) == 0 && len(inlineOut.PolicyNames) == 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "Policies",
+				Value: "group has no policies (no-op group)",
+				Tier:  "~",
+			})
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	// Group findings are severity "~" (informational); IssueCount stays 0.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+}
+
+// EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
+// (capped at EnrichmentCap) to surface audit log groups missing metric filters.
+//
+// Only log groups matching the /aws/cloudtrail/* prefix are inspected.
+// Non-audit log groups are skipped.
+//
+// Findings:
+//   - CloudTrail log group with no metric filters → "~" finding "audit log group missing metric filters"
+//
+// Skip when clients.CloudWatchLogs == nil.
+func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	if clients.CloudWatchLogs == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	metricFiltersAPI, ok := clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI)
+	if !ok {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		logGroupName := r.Fields["log_group_name"]
+		if logGroupName == "" {
+			logGroupName = r.ID
+		}
+		if logGroupName == "" {
+			continue
+		}
+
+		// Only inspect audit (CloudTrail) log groups.
+		if !strings.HasPrefix(logGroupName, "/aws/cloudtrail/") {
+			continue
+		}
+
+		out, err := metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
+			LogGroupName: aws.String(logGroupName),
+		})
+		if err != nil {
+			truncated = true
+			continue
+		}
+
+		if len(out.MetricFilters) > 0 {
+			continue
+		}
+
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  "audit log group missing metric filters",
+			Rows: []resource.FindingRow{
+				{Label: "Log Group", Value: logGroupName, Tier: "~"},
+				{Label: "Metric Filters", Value: "none", Tier: "~"},
+			},
+		}
+	}
+	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
