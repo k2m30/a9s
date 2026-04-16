@@ -179,6 +179,25 @@ func checkCFR53(_ context.Context, _ any, _ resource.Resource, _ resource.Resour
 	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 }
 
+// checkCfAlarm returns Count: 0 because CloudFront metrics are available in CloudWatch
+// but the DistributionSummary does not include alarm references — the relationship
+// cannot be determined from cache alone.
+func checkCfAlarm(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+}
+
+// checkCfLambda returns Count: 0 because DistributionSummary does not include
+// Lambda@Edge function ARNs — the relationship cannot be determined from cache alone.
+func checkCfLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+}
+
+// checkCfLogs returns Count: 0 because DistributionSummary does not include
+// log destination configuration — the relationship cannot be determined from cache alone.
+func checkCfLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+}
+
 // cfRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func cfRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

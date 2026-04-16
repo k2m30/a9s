@@ -32,6 +32,8 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN, NeedsTargetCache: true},
 		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkELBR53, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkELBSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkELBVPC},
 	})
 }
 
