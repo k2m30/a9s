@@ -459,42 +459,6 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("s3", ids)
 }
 
-// checkLambdaELB scans the elb cache for load balancers whose listeners
-// forward to this Lambda via a TG. Without DescribeListeners we can only
-// match weakly; return Count:0 when no cache-visible link exists.
-func checkLambdaELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Resolving lambda→elb requires two hops (target-group with Lambda
-	// target → load balancer); ELB's DescribeTargetGroups already lives on
-	// the tg cache but neither struct carries the reverse LB ARN until
-	// DescribeListeners runs. Returning Count:0 keeps the slot surfaced
-	// without a misleading count.
-	return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-}
-
-// checkLambdaEC2 scans the ec2 cache for instances whose UserData or tags
-// reference this Lambda function (ec2.Instance struct does not carry this
-// info; UserData is base64-encoded and requires decode). Returns Count:0
-// when no cache-visible signal exists.
-func checkLambdaEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
-
-// checkLambdaASG scans the asg cache for Auto Scaling Groups whose lifecycle
-// hooks target this Lambda. The AutoScalingGroup struct does not embed
-// lifecycle hook notification targets; a live DescribeLifecycleHooks call per
-// ASG would be required. Returns Count:0 to keep the slot surfaced.
-func checkLambdaASG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
-}
-
-// checkLambdaECR scans the ecr cache for repositories whose imageUri this
-// Lambda is packaged from. The FunctionConfiguration struct does not embed
-// the image URI in the ListFunctions response; GetFunction returns it in
-// Code.ImageUri. Returns Count:0 when no cache-visible signal exists.
-func checkLambdaECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
-
 // checkLambdaENI scans the eni cache for ENIs attached to this Lambda's
 // hyperplane (VPC-attached functions get AWS-managed ENIs with a
 // well-known description prefix "AWS Lambda VPC ENI").
@@ -616,21 +580,6 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
 	}
 	return relatedResult("ssm", ids)
-}
-
-// checkLambdaSFN scans the sfn cache for state machines whose ASL definition
-// invokes this Lambda. StateMachineListItem doesn't embed the ASL — it needs
-// sfn:DescribeStateMachine per machine. Without that we cannot resolve
-// reliably. Returns Count:0 as a conservative default.
-func checkLambdaSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-}
-
-// checkLambdaR53 scans the r53 cache for any alias record referencing this
-// Lambda's URL or an API Gateway that fronts it. Too many hops to resolve
-// deterministically; return Count:0.
-func checkLambdaR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 }
 
 // Ensure cwtypes stays imported for future alarm-related extensions.

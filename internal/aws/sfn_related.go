@@ -120,22 +120,6 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 	return relatedResult("role", []string{arnRoleName(*out.RoleArn)})
 }
 
-// checkSFNCFN attempts to determine if this state machine was created by a CloudFormation
-// stack. Returns Count: -1 (unknown) because the list RawStruct carries no Tags —
-// Tags are only available via ListTagsForResource (per-state-machine call). Not
-// implemented to avoid N+1 calls during related-panel rendering.
-func checkSFNCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
-}
-
-// checkSFNEbRule attempts to reverse-look up EventBridge rules whose targets include
-// this state machine. Returns Count: -1 (unknown) because the eb-rule list cache only
-// carries ListRules output (no target list) — resolving targets would require
-// ListTargetsByRule per rule (N+1). Not implemented.
-func checkSFNEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
-
 // checkSFNKMS resolves the state machine's encryption KMS key via DescribeStateMachine
 // (Pattern C: 1 API call, EncryptionConfiguration.KmsKeyId → key ID).
 func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

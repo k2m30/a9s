@@ -325,13 +325,6 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 	return relatedResult("ec2", ids)
 }
 
-// checkTGKMS reports KMS keys encrypting resources behind this TG.
-// TargetGroup has no KMS reference in DescribeTargetGroups. Returns Count: 0
-// (real: no direct AWS API field ties a TG to a KMS key).
-func checkTGKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
-
 // checkTGLambda reports Lambda functions registered as targets (lambda-type TG).
 // Pattern C: one elbv2:DescribeTargetHealth call; targets are Lambda invoke
 // ARNs — extract the function name.
@@ -400,18 +393,6 @@ func checkTGRDSSnap(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.RelatedCheckResult{TargetType: "rds-snap", Count: 0}
 	}
 	return resource.RelatedCheckResult{TargetType: "rds-snap", Count: -1}
-}
-
-// checkTGRole reports IAM roles associated with this TG. TGs do not carry
-// IAM role fields directly in DescribeTargetGroups. Returns Count: 0.
-func checkTGRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
-
-// checkTGSecrets reports Secrets Manager secrets used by targets of this TG.
-// No direct TG→Secrets field exists in DescribeTargetGroups. Returns 0.
-func checkTGSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 }
 
 // checkTGSG reports security groups of the TG's targets. DescribeTargetGroups

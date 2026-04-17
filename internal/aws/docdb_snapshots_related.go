@@ -50,13 +50,3 @@ func checkDocdbSnapVPC(_ context.Context, _ any, res resource.Resource, _ resour
 	}
 	return relatedResult("vpc", []string{*snap.VpcId})
 }
-
-// checkDocdbSnapBackup returns Count: -1 (unknown). DocumentDB cluster
-// snapshots created via AWS Backup have a SnapshotType=="manual" but the
-// backup plan / recovery-point mapping lives in the Backup service's
-// ListRecoveryPointsByResource (filtered by the snapshot's cluster ARN) —
-// not on the docdbtypes.DBClusterSnapshot struct. Without that per-snapshot
-// Backup API call we cannot deterministically resolve the owning plan.
-func checkDocdbSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-}

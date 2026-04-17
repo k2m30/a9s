@@ -144,15 +144,6 @@ func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Re
 	return relatedResult("codeartifact", mapKeys(seen))
 }
 
-// checkPipelineEbRule attempts to enumerate EventBridge rules that trigger this pipeline.
-// CodePipeline is commonly started by an EventBridge rule with an AWS::CodePipeline::Pipeline
-// target. Pattern C here is the GetPipeline call itself — it won't find triggering rules
-// (those live outside the pipeline). Keeping Count: -1 with a clear justification:
-// requires an enumeration of the eb-rule cache + ListTargetsByRule per rule.
-func checkPipelineEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
-
 // checkPipelineECR resolves ECR repositories referenced as Source action inputs.
 // Provider=ECR (source action) → Configuration["RepositoryName"].
 func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -234,14 +225,6 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 		}
 	})
 	return relatedResult("lambda", mapKeys(seen))
-}
-
-// checkPipelineLogs: CodePipeline does not publish execution logs directly to a
-// log-group by default — Source actions and CodeBuild/Lambda targets publish their
-// own logs into their own groups. There is no pipeline→logs mapping on the
-// PipelineDeclaration. Count: -1.
-func checkPipelineLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 }
 
 // checkPipelineS3 resolves the S3 artifact bucket(s) for this pipeline.
