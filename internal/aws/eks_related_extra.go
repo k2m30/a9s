@@ -29,16 +29,6 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 	return relatedResult("subnet", ids)
 }
 
-// checkEKSACM returns Count:0 — ACM cert associations aren't in the Cluster struct.
-func checkEKSACM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
-
-// checkEKSAMI returns Count:0 — AMI is on NodeGroup's launch template, not cluster.
-func checkEKSAMI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
-}
-
 // checkEKSASG — ASGs are owned by NodeGroups; derive by scanning ng cache.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
@@ -77,22 +67,6 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
 	}
 	return relatedResult("asg", ids)
-}
-
-// checkEKSEC2 — EC2 instances backing this cluster's node groups. Not
-// cache-resolvable without launching-instance awareness.
-func checkEKSEC2(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-}
-
-// checkEKSECR — image repos used by pods; not in Cluster struct.
-func checkEKSECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
-
-// checkEKSIAMUser — cluster's access entries / aws-auth configmap; not in Cluster list.
-func checkEKSIAMUser(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
 }
 
 // checkEKSCTEvents scans ct-events for events involving this cluster.

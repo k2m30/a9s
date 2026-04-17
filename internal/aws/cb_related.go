@@ -140,15 +140,6 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 
 
-// checkCbPipeline attempts to reverse-look up CodePipelines whose action configuration
-// references this CodeBuild project name. Returns Count: -1 (unknown) because the
-// pipeline list cache only carries cptypes.PipelineSummary (name, type, version, created,
-// updated) — stages and action configurations are only returned by GetPipeline per
-// pipeline. Not implemented to avoid N+1 calls during related-panel rendering.
-func checkCbPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
-}
-
 // checkCbSubnet extracts subnet IDs from cbtypes.Project.VpcConfig.Subnets.
 // Pattern F — no cache needed.
 func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

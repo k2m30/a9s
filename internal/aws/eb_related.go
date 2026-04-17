@@ -261,44 +261,6 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("alarm", ids)
 }
 
-// checkEbELB scans the ELB cache for load balancers tagged with this EB environment
-// name. ELB tags aren't carried on the DescribeLoadBalancers list output — tag
-// relationships require DescribeTags per ELB (N+1). Returns Count: -1.
-func checkEbELB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
-}
-
-// checkEbTG scans the TG cache for target groups registered by this environment's
-// Beanstalk-managed load balancers. TG tag enrichment (via DescribeTags) is not
-// carried in the default list cache, so the reverse lookup requires N+1 calls.
-// Returns Count: -1.
-func checkEbTG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
-}
-
-// checkEbSG derives security groups from EC2 instances tagged to this environment.
-// The ebtypes.EnvironmentDescription list item carries no direct SG references —
-// SGs are only on the instances Beanstalk launches, requiring an ec2 cache join.
-// Returns Count: -1 (listable via the eb→ec2 → ec2 detail view path, not directly).
-func checkEbSG(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
-}
-
-// checkEbRole returns the IAM instance profile role used by this environment's
-// instance launches. Role bindings are in ConfigurationSettings options
-// (aws:autoscaling:launchconfiguration), not on EnvironmentDescription —
-// DescribeConfigurationSettings per env is required (N+1). Count: -1.
-func checkEbRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
-}
-
-// checkEbS3 resolves the versioned-app S3 bucket and log-bucket for this environment.
-// Bucket names are returned by CreateStorageLocation (per-region, per-account) — not
-// on EnvironmentDescription. Count: -1.
-func checkEbS3(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
-}
-
 // ebRelatedResources returns the resource list for target from cache or fetches it.
 func ebRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

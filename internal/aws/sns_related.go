@@ -118,15 +118,6 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 
-// checkSNSCFN attempts to determine if this SNS topic was created by a CloudFormation
-// stack. Returns Count: -1 (unknown) because the SNS Topic RawStruct (snstypes.Topic)
-// only carries TopicArn — no Tags. Determining the CFN stack would require an
-// additional ListTagsForResource API call per topic. Not implemented to avoid N+1
-// calls during related-panel rendering.
-func checkSNSCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
-}
-
 // checkSNSKMS resolves the KMS key used for at-rest encryption of this SNS topic
 // via GetTopicAttributes (Pattern C: 1 API call, attribute "KmsMasterKeyId").
 func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

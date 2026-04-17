@@ -158,6 +158,13 @@ func (f *EC2Fake) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInp
 	return &ec2.DescribeFlowLogsOutput{}, nil
 }
 
+// DescribeTransitGatewayVpcAttachments returns an empty but non-nil output.
+// The demo mode does not exercise tgw→vpc related-panel behavior; this stub
+// exists solely so EC2Fake satisfies the EC2API aggregate interface.
+func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, _ *ec2.DescribeTransitGatewayVpcAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
+	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{}, nil
+}
+
 // toSet converts a string slice into a lookup map.
 func toSet(ss []string) map[string]bool {
 	m := make(map[string]bool, len(ss))

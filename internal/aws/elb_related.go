@@ -304,14 +304,6 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("eni", ids)
 }
 
-// checkELBLogs reports CloudWatch log groups for this ELB. ELB access logs
-// go to S3 (per LoadBalancerAttribute), not CloudWatch Logs; NLB connection
-// logs also go to S3. No direct ELB→log-group link in the list response.
-// Returns Count: 0 (real: definitive negative).
-func checkELBLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-}
-
 // checkELBS3 reports the S3 bucket receiving ELB access logs.
 // Pattern C: one elbv2:DescribeLoadBalancerAttributes call; read the
 // "access_logs.s3.bucket" attribute.

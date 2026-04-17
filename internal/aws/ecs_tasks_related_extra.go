@@ -167,19 +167,6 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("eni", ids)
 }
 
-// checkECSTaskKMS returns Count:0 — KMS keys used for ECS Exec logging and
-// EphemeralStorage live on the cluster and task definition, not on the task.
-func checkECSTaskKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
-
-// checkECSTaskSecrets returns secrets referenced by this task. The task
-// struct does not embed secrets — they live on the task definition's
-// ContainerDefinitions. Count:0 when the task response lacks that info.
-func checkECSTaskSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
-
 // checkECSTaskSG extracts security group IDs from task.Attachments (awsvpc). Pattern F.
 func checkECSTaskSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
@@ -191,12 +178,6 @@ func checkECSTaskSG(_ context.Context, _ any, res resource.Resource, _ resource.
 	// parent service/run-task call. Return Count:0 here.
 	_ = task
 	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-}
-
-// checkECSTaskSSM returns SSM parameters referenced by this task's
-// containers. Not available on the Task struct.
-func checkECSTaskSSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
 }
 
 // checkECSTaskSubnet extracts subnet IDs from task.Attachments (awsvpc). Pattern F.

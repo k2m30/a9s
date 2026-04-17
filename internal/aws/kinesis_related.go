@@ -150,21 +150,6 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("cfn", ids)
 }
 
-// checkKinesisDDB would resolve DynamoDB tables that publish their change
-// stream into this Kinesis stream (EnableKinesisStreamingDestination).
-// StreamSummary does not expose inbound DDB links; identifying the DDB table
-// requires DescribeKinesisStreamingDestination per table. Returns Count: -1.
-func checkKinesisDDB(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
-}
-
-// checkKinesisEBRule would require scanning EventBridge rule targets
-// (ListTargetsByRule per rule) for this stream's ARN. Not in the rule list
-// cache. Returns Count: -1.
-func checkKinesisEBRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
-
 // checkKinesisKMS calls kinesis:DescribeStreamSummary and returns the KeyId
 // configured for KMS-at-rest encryption. Pattern C.
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -192,14 +177,6 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 		keyID = keyID[idx+1:]
 	}
 	return relatedResult("kms", []string{keyID})
-}
-
-// checkKinesisLogs would resolve the CloudWatch Logs destination subscribed to
-// this stream (subscription filters on log groups point at Kinesis stream ARNs).
-// Requires ListSubscriptionFilters per log group — not in the hub cache.
-// Returns Count: -1.
-func checkKinesisLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 }
 
 // kinesisRelatedResources returns the resource list for target from cache or by fetching the first page.

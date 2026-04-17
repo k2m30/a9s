@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -37,7 +39,7 @@ func tgwSrcResource() resource.Resource {
 			"tgw_id": tgwTestID,
 		},
 		RawStruct: ec2types.TransitGateway{
-			TransitGatewayId: new(tgwTestID),
+			TransitGatewayId: aws.String(tgwTestID),
 		},
 	}
 }
@@ -54,7 +56,7 @@ func TestRelated_TGW_RTB_Match(t *testing.T) {
 				ID: "rtb-match",
 				RawStruct: ec2types.RouteTable{
 					Routes: []ec2types.Route{
-						{TransitGatewayId: new(tgwTestID), DestinationCidrBlock: new("10.1.0.0/16")},
+						{TransitGatewayId: aws.String(tgwTestID), DestinationCidrBlock: aws.String("10.1.0.0/16")},
 					},
 				},
 			},
@@ -79,7 +81,7 @@ func TestRelated_TGW_RTB_NoMatch(t *testing.T) {
 				ID: "rtb-other",
 				RawStruct: ec2types.RouteTable{
 					Routes: []ec2types.Route{
-						{TransitGatewayId: new("tgw-different"), DestinationCidrBlock: new("10.2.0.0/16")},
+						{TransitGatewayId: aws.String("tgw-different"), DestinationCidrBlock: aws.String("10.2.0.0/16")},
 					},
 				},
 			},
@@ -111,7 +113,7 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 // --- VPC checker nil-clients test ---
 
 // TestRelated_TGW_VPC_NilClients verifies that the vpc checker returns Count:-1
-// when clients are nil (DescribeTransitGatewayAttachments cannot be called).
+// when clients are nil (DescribeTransitGatewayVpcAttachments cannot be called).
 func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	checker := tgwCheckerByTarget(t, "vpc")
@@ -130,7 +132,7 @@ func TestRelated_TGW_CFN_HasTag(t *testing.T) {
 		ID: tgwTestID,
 		RawStruct: ec2types.TransitGateway{
 			Tags: []ec2types.Tag{
-				{Key: new("aws:cloudformation:stack-name"), Value: new("network-stack")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("network-stack")},
 			},
 		},
 	}
@@ -159,5 +161,118 @@ func TestRelated_TGW_CFN_NoTag(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (TGW has no CFN tag)", result.Count)
+	}
+}
+
+// --- VPC checker tests (Pattern A — direct API call) ---
+
+// tgwVpcAttachmentsFake implements awsclient.EC2API for tgw→vpc checker testing.
+// It embeds the interface and overrides only DescribeTransitGatewayVpcAttachments
+// so test callers can seed a per-TGW-id response.
+type tgwVpcAttachmentsFake struct {
+	awsclient.EC2API
+	results map[string][]ec2types.TransitGatewayVpcAttachment
+	err     error
+}
+
+func (f *tgwVpcAttachmentsFake) DescribeTransitGatewayVpcAttachments(
+	_ context.Context,
+	in *ec2.DescribeTransitGatewayVpcAttachmentsInput,
+	_ ...func(*ec2.Options),
+) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	tgwID := ""
+	if in != nil {
+		for _, fl := range in.Filters {
+			if fl.Name != nil && *fl.Name == "transit-gateway-id" && len(fl.Values) > 0 {
+				tgwID = fl.Values[0]
+				break
+			}
+		}
+	}
+	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+		TransitGatewayVpcAttachments: f.results[tgwID],
+	}, nil
+}
+
+// Compile-time check: the fake satisfies the aggregate EC2API interface.
+var _ awsclient.EC2API = (*tgwVpcAttachmentsFake)(nil)
+
+// TestRelated_TGW_VPC_Match verifies that two distinct VpcIds returned by the
+// fake produce Count=2 with both ids in ResourceIDs.
+func TestRelated_TGW_VPC_Match(t *testing.T) {
+	fake := &tgwVpcAttachmentsFake{
+		results: map[string][]ec2types.TransitGatewayVpcAttachment{
+			tgwTestID: {
+				{VpcId: aws.String("vpc-aaa111")},
+				{VpcId: aws.String("vpc-bbb222")},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	res := tgwSrcResource()
+
+	checker := tgwCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count)
+	}
+	if len(result.ResourceIDs) != 2 {
+		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	for _, want := range []string{"vpc-aaa111", "vpc-bbb222"} {
+		if !seen[want] {
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+		}
+	}
+	// Guard against an error slipping through while Count still looks right.
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_TGW_VPC_Empty verifies that zero attachments produce Count=0.
+func TestRelated_TGW_VPC_Empty(t *testing.T) {
+	fake := &tgwVpcAttachmentsFake{
+		results: map[string][]ec2types.TransitGatewayVpcAttachment{
+			// Empty slice for this TGW id — valid, explicit "no attachments" response.
+			tgwTestID: {},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	res := tgwSrcResource()
+
+	checker := tgwCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no attachments)", result.Count)
+	}
+	if len(result.ResourceIDs) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+	}
+}
+
+// TestRelated_TGW_VPC_WrongRawStruct verifies the checker returns Count=-1
+// when RawStruct is not ec2types.TransitGateway (defensive guard).
+func TestRelated_TGW_VPC_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID: tgwTestID,
+		// Intentionally wrong type — a VPC struct, not a TransitGateway.
+		RawStruct: ec2types.Vpc{VpcId: aws.String("vpc-wrong")},
+	}
+
+	checker := tgwCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

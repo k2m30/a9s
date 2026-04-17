@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
+
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -222,5 +224,78 @@ func TestRelated_APIGW_WAF_EmptyInput(t *testing.T) {
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkApigwKMS tests — Count: 0 is definitive (apigatewayv2 exposes no
+// customer-managed CMK anywhere in the service model).
+// ---------------------------------------------------------------------------
+
+// TestRelated_Apigw_KMS_DefinitiveZero: real apigatewayv2types.Api RawStruct
+// → Count: 0 (definitive, not unknown).
+func TestRelated_Apigw_KMS_DefinitiveZero(t *testing.T) {
+	apiID := "abc123"
+	name := "my-api"
+	res := resource.Resource{
+		ID:     apiID,
+		Name:   name,
+		Fields: map[string]string{"api_id": apiID, "name": name},
+		RawStruct: apigwtypes.Api{
+			ApiId:        &apiID,
+			Name:         &name,
+			ProtocolType: apigwtypes.ProtocolTypeHttp,
+		},
+	}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (apigatewayv2 has no KMS relationship)", result.Count)
+	}
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+	if len(result.ResourceIDs) != 0 {
+		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Apigw_KMS_EmptyInput: empty API id → Count: 0.
+func TestRelated_Apigw_KMS_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	}
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+}
+
+// TestRelated_Apigw_KMS_WrongRawStructType: RawStruct is not apigatewayv2types.Api
+// → Count: 0 (still definitive; mis-typed input cannot yield KMS info).
+func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
+	res := resource.Resource{
+		ID:        "abc123",
+		Fields:    map[string]string{"api_id": "abc123"},
+		RawStruct: "not-an-api-struct",
+	}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type)", result.Count)
+	}
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
 	}
 }

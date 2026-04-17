@@ -142,13 +142,6 @@ func addKindedPrincipal(v any, kindMarker string, seen map[string]struct{}) {
 	}
 }
 
-// checkRoleKMS returns Count: -1. KMS keys whose key policy or grants reference this
-// role are only discoverable by enumerating KMS keys and inspecting GetKeyPolicy /
-// ListGrants per key (N+1 per key).
-func checkRoleKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
-}
-
 // roleNameFromARN extracts the role name from a role ARN or returns the input as-is
 // if it's not an ARN. Works for both:
 //

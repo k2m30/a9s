@@ -131,13 +131,6 @@ func init() {
 	})
 }
 
-// checkKMSRole returns Count: -1. The roles granted by a KMS key's policy are only
-// visible via GetKeyPolicy (policy JSON) and ListGrants — N+1 per key, plus JSON
-// parsing. Intentionally not fetched during related-panel rendering.
-func checkKMSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
-}
-
 // FetchKMSKeys performs a multi-step fetch:
 // 1. ListKeys to get key IDs
 // 2. DescribeKey for each key to get metadata

@@ -248,13 +248,6 @@ func checkEIPECSTask(_ context.Context, _ any, res resource.Resource, _ resource
 	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
 }
 
-// checkEIPKMS reports KMS keys associated with this Elastic IP.
-// EC2 Addresses carry no KMS key reference in DescribeAddresses; there is
-// no native AWS API field tying EIPs to KMS keys.
-func checkEIPKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-}
-
 // checkEIPLogs reports CloudWatch log groups related to this EIP.
 // EIPs themselves do not emit logs; flow logs attached to the associated
 // ENI/subnet/VPC cover the traffic but are not identifiable from EIP ID

@@ -61,16 +61,6 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ 
 	return relatedResult("role", ids)
 }
 
-// checkBackupEBRule returns Count: -1 (unknown). AWS Backup can react to
-// EventBridge events (e.g. scheduled plan invocation), but the linkage lives
-// inside the EventBridge rule's targets (arn:aws:backup:...:backup-vault/...
-// or startBackupJob target) — not on the backup plan side. Resolving this
-// requires scanning every EventBridge rule's targets for backup ARNs, which
-// would be a cross-resource traversal not exposed by ListBackupPlans.
-func checkBackupEBRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
-
 // checkBackupKMS resolves the KMS key(s) encrypting this plan's target
 // vaults via backup:GetBackupPlan → backup:DescribeBackupVault (Pattern C,
 // bounded N+1 where N = unique vaults referenced by plan rules, typically 1).
@@ -113,14 +103,6 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 		ids = append(ids, keyID)
 	}
 	return relatedResult("kms", ids)
-}
-
-// checkBackupLogs returns Count: -1 (unknown). AWS Backup emits logs to
-// CloudWatch via a service-linked log group, but the association is implicit
-// and not resolvable from the BackupPlansListMember. The fetcher does not
-// query the Backup service's monitoring settings.
-func checkBackupLogs(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 }
 
 // checkBackupSNS resolves the SNS topic(s) configured for this plan's target
