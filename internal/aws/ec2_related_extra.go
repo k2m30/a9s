@@ -133,16 +133,6 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("logs", ids)
 }
 
-// checkEC2SSM returns the SSM associations attached to this instance. SSM
-// parameter references are not reachable from the Instance struct alone; the
-// a9s "ssm" resource type is Parameter Store (not Session Manager). EC2
-// instances can reference SSM parameters via user-data, but the parameter
-// names are not in the Instance response. Return Count:0 — no cache-resolvable
-// link. A live call would require ssm:ListAssociations per instance (N+1).
-func checkEC2SSM(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
-}
-
 // checkEC2Backup scans the backup cache for backup plans that select this
 // EC2 instance by tag or by resource ARN. Pattern C.
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

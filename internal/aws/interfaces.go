@@ -901,6 +901,7 @@ type EC2API interface {
 	EC2DescribeAddressesAPI
 	EC2DescribeTransitGatewaysAPI
 	EC2DescribeTransitGatewayAttachmentsAPI
+	EC2DescribeTransitGatewayVpcAttachmentsAPI
 	EC2DescribeVpcEndpointsAPI
 	EC2DescribeNetworkInterfacesAPI
 	EC2DescribeVolumesAPI

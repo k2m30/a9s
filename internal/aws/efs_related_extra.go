@@ -46,11 +46,6 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
-// checkEFSBackup — plan selections not in ListBackupPlans response → Count:0.
-func checkEFSBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-}
-
 // checkEFSEC2 scans ec2 cache for instances whose ENIs mount this filesystem.
 // Cross-reference via the eni cache (EFS mount targets have ENIs with the
 // filesystem ID in their description, and are attached to an EC2 when an
@@ -88,13 +83,6 @@ func checkEFSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
 	}
 	return relatedResult("ec2", ids)
-}
-
-// checkEFSECSTask scans ecs-task cache for tasks whose attachments/ENIs carry
-// this filesystem ID. Not resolvable without task definition details →
-// Count:0.
-func checkEFSECSTask(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
 }
 
 // checkEFSENI scans eni cache for mount-target ENIs (description contains fs-id).

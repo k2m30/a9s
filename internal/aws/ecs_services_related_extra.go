@@ -44,26 +44,6 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 	return relatedResult("ct-events", ids)
 }
 
-// checkECSSvcCF scans the cf cache for CloudFront distributions whose origin
-// is the ELB backing this service. No direct linkage in Service struct → 0.
-func checkECSSvcCF(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-}
-
-// checkECSSvcEbRule scans eb-rule cache for rules targeting this service
-// (EventBridge → ECS run-task targets). Not in the Service struct → 0 unless
-// a future eb-rule cache carries enriched targets.
-func checkECSSvcEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
-
-// checkECSSvcECR scans ecr cache for repositories referenced by this
-// service's task definition's container images. Requires task definition
-// detail not in the Service struct → 0.
-func checkECSSvcECR(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
-}
-
 // checkECSSvcTasks scans the ecs-task cache for tasks belonging to this
 // service (task.Group == "service:{svcName}").
 func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -92,24 +72,6 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
 	}
 	return relatedResult("ecs-task", ids)
-}
-
-// checkECSSvcR53 scans r53 cache for records aliasing the ELB backing this
-// service. Requires cross-reference with elb cache; Count:0 conservatively.
-func checkECSSvcR53(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-}
-
-// checkECSSvcSecrets — secrets live on task definition ContainerDefinitions,
-// not on the Service struct. Count:0.
-func checkECSSvcSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
-
-// checkECSSvcSFN — Step Functions sometimes orchestrate ECS services; not
-// resolvable from Service struct.
-func checkECSSvcSFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
 }
 
 // checkECSSvcSubnet extracts subnet IDs from Service's
