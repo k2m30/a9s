@@ -154,13 +154,6 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 	return relatedResult("logs", ids)
 }
 
-// checkWAFRole reports IAM roles associated with this Web ACL (no such direct
-// association exists in the WAF v2 ListWebACLs response — Web ACLs have no
-// IAM role field). Returns Count: 0.
-func checkWAFRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
-
 // checkWAFCF reports CloudFront distributions associated with this Web ACL.
 // CloudFront can only bind Web ACLs with Scope=CLOUDFRONT. For REGIONAL
 // WAFs the answer is definitively 0. For CLOUDFRONT-scope WAFs: Pattern C

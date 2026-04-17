@@ -86,22 +86,6 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("sns", ids)
 }
 
-// checkSQSEbRule attempts to reverse-look up EventBridge rules whose targets
-// include this queue. Returns Count:-1 — the eb-rule list cache only carries
-// ListRules output (no targets). Resolving targets would require
-// ListTargetsByRule per rule (N+1), which is intentionally avoided.
-func checkSQSEbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
-}
-
-// checkSQSRole attempts to resolve IAM roles whose policies grant access to this
-// queue. Returns Count:-1 — role policies are embedded JSON documents that would
-// require per-role SimulatePrincipalPolicy / GetRolePolicy parsing (N+1, not in
-// the role list cache).
-func checkSQSRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
-}
-
 // checkSQSSNSSub searches the sns-sub cache for subscriptions where protocol=sqs
 // and the endpoint ARN contains this queue's ARN.
 // Pattern C — reverse lookup in sns-sub cache.

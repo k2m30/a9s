@@ -11,20 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkDdbKinesis returns the Kinesis stream ARN that this table streams into.
-// TableDescription does not embed KinesisStreamingDestination in DescribeTable
-// output; resolving requires DescribeKinesisStreamingDestination. Not in the
-// cached struct → Count:0.
-func checkDdbKinesis(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-}
-
-// checkDdbBackup scans backup cache for plans protecting this table. Plan
-// selections aren't in the ListBackupPlans response → Count:0.
-func checkDdbBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-}
-
 // checkDdbLogs scans logs cache for log groups named like the table. No
 // standard convention; match substring.
 func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -49,17 +35,6 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 	}
 	return relatedResult("logs", ids)
-}
-
-// checkDdbSecrets — DDB tables do not carry secret references in the struct.
-func checkDdbSecrets(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-}
-
-// checkDdbSNS — DDB tables can emit to SNS via CloudWatch alarms or app code,
-// but the table struct has no direct SNS link.
-func checkDdbSNS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 }
 
 // checkDdbVPCE scans the vpce cache for DynamoDB Gateway endpoints in this

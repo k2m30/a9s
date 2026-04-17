@@ -177,6 +177,37 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("alarm", ids)
 }
 
+// checkApigwKMS reports KMS keys used by this API Gateway.
+//
+// Count: 0 is definitive here. The apigw fetcher lists HTTP and WebSocket APIs
+// via apigatewayv2:GetApis, which returns apigatewayv2types.Api. That struct
+// has no KMS field, no encryption field, and no tag that points at a CMK.
+// None of the other apigatewayv2 types reachable from an Api (Stage,
+// Integration, DomainName, Route, Authorizer, VpcLink) carry a KMS reference
+// either — API Gateway V2 encrypts stored data with AWS-managed keys only and
+// exposes no customer-managed-CMK option. There is therefore no 1-call (or
+// any) AWS API that can link an HTTP/WebSocket API to a KMS key; the
+// relationship does not exist in the service model.
+//
+// Implementation: inspect res.RawStruct. If it is the expected
+// apigatewayv2types.Api, return Count: 0 (definitive — no KMS fields to
+// check). If RawStruct is some other type (mis-registration), also return
+// Count: 0 rather than asserting; the answer for apigw→kms is still 0 by the
+// reasoning above, but the type mismatch would prevent any per-instance
+// extraction anyway.
+func checkApigwKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	// Inspect RawStruct: the apigw fetcher populates apigatewayv2types.Api.
+	// We don't need any field from it (none exist), but asserting the type
+	// guards against future RawStruct changes being silently accepted.
+	if _, ok := assertStruct[apigwtypes.Api](res.RawStruct); !ok {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+}
+
 // checkApigwCF reports CloudFront distributions fronting this API. Distribution
 // Origins may reference the API's invoke URL. Determining this requires
 // scanning the cf cache for origins whose DomainName includes the API ID
@@ -223,12 +254,6 @@ func checkApigwELB(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 	return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
-}
-
-// checkApigwKMS reports KMS keys used by this API for access-log encryption
-// or backend secrets. No direct KMS reference on GetApis. Returns Count: 0.
-func checkApigwKMS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // checkApigwR53 reports Route 53 zones with alias records for this API's

@@ -126,12 +126,6 @@ func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.
 	return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 }
 
-func checkAlarmRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Alarms don't reference roles directly; CloudWatch composite/metric
-	// alarms do not carry a role identifier.
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
-
 func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {

@@ -275,14 +275,6 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	return relatedResult("acm", []string{certID})
 }
 
-// checkOpenSearchRole would resolve the service-linked role used by the
-// domain. DescribeDomains does not surface a user-visible role identifier;
-// the domain's access policy (JSON) may reference principals but not in a
-// structured list. Returns Count: -1 (unknown).
-func checkOpenSearchRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
-}
-
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.
 func opensearchRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

@@ -41,18 +41,6 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("ct-events", ids)
 }
 
-func checkECREbRule(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// EventBridge rules on ECR image-push events are resolvable only via
-	// events:ListTargetsByRule per rule (N+1). Not cache-resolvable.
-	return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
-}
-
-func checkECRECS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// ECS services pull images from repos, but the link is on the task
-	// definition ContainerDefinitions.Image field — requires task def fetch.
-	return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
-}
-
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoName := res.ID
 	if repoName == "" {
@@ -81,22 +69,5 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
 	}
 	return relatedResult("ecs-task", ids)
-}
-
-func checkECREKS(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// EKS Pod → ECR link lives in k8s manifests, not the cluster struct.
-	return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
-}
-
-func checkECRPipeline(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// CodePipeline stages reference ECR repos only in GetPipeline response
-	// (ActionTypeId). Not in ListPipelines response.
-	return resource.RelatedCheckResult{TargetType: "pipeline", Count: 0}
-}
-
-func checkECRRole(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Repository policies reference principals, but the repository list API
-	// does not return them. GetRepositoryPolicy is a separate call.
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 

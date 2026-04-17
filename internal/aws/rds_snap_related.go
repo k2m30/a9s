@@ -128,15 +128,6 @@ func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("dbc", []string{clusterID})
 }
 
-// checkRDSSnapBackup returns Count: -1 (unknown). RDS snapshots created via
-// AWS Backup have metadata linking them to the backup plan only through
-// Backup's ListRecoveryPointsByResource API (filtered by the source
-// DBInstance ARN). DescribeDBSnapshots does not return backup-plan
-// information. The fetcher does not make that per-snapshot call.
-func checkRDSSnapBackup(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-}
-
 // rdsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
 func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
