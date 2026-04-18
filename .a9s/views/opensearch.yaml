@@ -35,3 +35,4 @@ detail:
   - AdvancedSecurityOptions
   - Created
   - Deleted
+  - { key: cluster_health, label: "Cluster Health" }

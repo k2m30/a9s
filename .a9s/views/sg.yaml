@@ -25,3 +25,4 @@ detail:
   - IpPermissions
   - IpPermissionsEgress
   - Tags
+  - { key: risk_summary, label: "Risk Summary" }

@@ -10,10 +10,10 @@ func dataDefaultViews() map[string]ViewDef {
 				{Title: "Workers", Path: "NumberOfWorkers", Width: 9},
 				{Title: "Last Modified", Path: "LastModifiedOn", Width: 22},
 			},
-			Detail: []string{
-				"Name", "Role", "GlueVersion", "WorkerType",
-				"NumberOfWorkers", "MaxRetries", "Command",
-				"CreatedOn", "LastModifiedOn",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Role"}, {Path: "GlueVersion"}, {Path: "WorkerType"},
+				{Path: "NumberOfWorkers"}, {Path: "MaxRetries"}, {Path: "Command"},
+				{Path: "CreatedOn"}, {Path: "LastModifiedOn"},
 			},
 		},
 		"glue_runs": {
@@ -25,12 +25,12 @@ func dataDefaultViews() map[string]ViewDef {
 				{Title: "Error Message", Path: "ErrorMessage", Width: 44},
 				{Title: "DPU Hours", Key: "dpu_hours", Width: 10},
 			},
-			Detail: []string{
-				"Id", "JobRunState", "StartedOn", "CompletedOn",
-				"ExecutionTime", "ErrorMessage", "Attempt", "PreviousRunId",
-				"TriggerName", "JobName", "AllocatedCapacity", "MaxCapacity",
-				"WorkerType", "NumberOfWorkers", "Timeout", "GlueVersion",
-				"DPUSeconds", "ExecutionClass", "LogGroupName",
+			Detail: []DetailField{
+				{Path: "Id"}, {Path: "JobRunState"}, {Path: "StartedOn"}, {Path: "CompletedOn"},
+				{Path: "ExecutionTime"}, {Path: "ErrorMessage"}, {Path: "Attempt"}, {Path: "PreviousRunId"},
+				{Path: "TriggerName"}, {Path: "JobName"}, {Path: "AllocatedCapacity"}, {Path: "MaxCapacity"},
+				{Path: "WorkerType"}, {Path: "NumberOfWorkers"}, {Path: "Timeout"}, {Path: "GlueVersion"},
+				{Path: "DPUSeconds"}, {Path: "ExecutionClass"}, {Path: "LogGroupName"},
 			},
 		},
 		"athena": {
@@ -40,9 +40,9 @@ func dataDefaultViews() map[string]ViewDef {
 				{Title: "Description", Path: "Description", Width: 30},
 				{Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
 			},
-			Detail: []string{
-				"Name", "State", "Description",
-				"EngineVersion", "CreationTime",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "State"}, {Path: "Description"},
+				{Path: "EngineVersion"}, {Path: "CreationTime"},
 			},
 		},
 	}

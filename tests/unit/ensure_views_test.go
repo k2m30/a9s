@@ -38,7 +38,7 @@ func TestGenerateViewYAML_ListOnly(t *testing.T) {
 
 func TestGenerateViewYAML_DetailOnly(t *testing.T) {
 	v := config.ViewDef{
-		Detail: []string{"InstanceId", "State.Name", "InstanceType"},
+		Detail: []config.DetailField{{Path: "InstanceId"}, {Path: "State.Name"}, {Path: "InstanceType"}},
 	}
 	out := string(config.GenerateViewYAML(v))
 
@@ -60,7 +60,7 @@ func TestGenerateViewYAML_ListAndDetail(t *testing.T) {
 		List: []config.ListColumn{
 			{Title: "Name", Path: "BucketName", Width: 30},
 		},
-		Detail: []string{"BucketName", "CreationDate"},
+		Detail: []config.DetailField{{Path: "BucketName"}, {Path: "CreationDate"}},
 	}
 	out := string(config.GenerateViewYAML(v))
 

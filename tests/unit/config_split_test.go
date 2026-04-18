@@ -54,8 +54,8 @@ detail:
 	}
 	wantDetail := []string{"instanceId", "state", "instanceType", "placement"}
 	for i, want := range wantDetail {
-		if vd.Detail[i] != want {
-			t.Errorf("Detail[%d] = %q, want %q", i, vd.Detail[i], want)
+		if vd.Detail[i].String() != want {
+			t.Errorf("Detail[%d] = %q, want %q", i, vd.Detail[i].String(), want)
 		}
 	}
 }
