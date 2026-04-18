@@ -38,9 +38,13 @@ func makeSpec008Detail(t *testing.T, fieldPaths []string, width, height int) vie
 		Name:   "spec008-instance",
 		Fields: fields,
 	}
+	detailFields := make([]config.DetailField, len(fieldPaths))
+	for i, p := range fieldPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
-			"ec2": {Detail: fieldPaths},
+			"ec2": {Detail: detailFields},
 		},
 	}
 	k := keys.Default()
@@ -224,7 +228,7 @@ func TestDetail_008_SingleField_BothDirectionsClamped(t *testing.T) {
 // with no configured fields does not panic.
 func TestDetail_008_NoPanic_EmptyFields(t *testing.T) {
 	res := resource.Resource{ID: "i-noop", Name: "noop", Fields: map[string]string{}}
-	cfg := &config.ViewsConfig{Views: map[string]config.ViewDef{"ec2": {Detail: []string{}}}}
+	cfg := &config.ViewsConfig{Views: map[string]config.ViewDef{"ec2": {Detail: []config.DetailField{}}}}
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", cfg, k)
 	d.SetSize(80, 20)

@@ -11,12 +11,12 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Updated", Path: "LastUpdatedTime", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
-			Detail: []string{
-				"StackName", "StackId", "StackStatus", "DetailedStatus",
-				"StackStatusReason", "CreationTime", "LastUpdatedTime",
-				"DeletionTime", "Description", "RoleARN", "Capabilities",
-				"EnableTerminationProtection", "DriftInformation",
-				"Parameters", "Outputs", "Tags",
+			Detail: []DetailField{
+				{Path: "StackName"}, {Path: "StackId"}, {Path: "StackStatus"}, {Path: "DetailedStatus"},
+				{Path: "StackStatusReason"}, {Path: "CreationTime"}, {Path: "LastUpdatedTime"},
+				{Path: "DeletionTime"}, {Path: "Description"}, {Path: "RoleARN"}, {Path: "Capabilities"},
+				{Path: "EnableTerminationProtection"}, {Path: "DriftInformation"},
+				{Path: "Parameters"}, {Path: "Outputs"}, {Path: "Tags"},
 			},
 		},
 		"pipeline": {
@@ -27,9 +27,9 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "Created", Width: 22},
 				{Title: "Updated", Path: "Updated", Width: 22},
 			},
-			Detail: []string{
-				"Name", "PipelineType", "Version", "Created",
-				"Updated", "ExecutionMode",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "PipelineType"}, {Path: "Version"}, {Path: "Created"},
+				{Path: "Updated"}, {Path: "ExecutionMode"},
 			},
 		},
 		"cb": {
@@ -39,10 +39,10 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Description", Path: "Description", Width: 36},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
-			Detail: []string{
-				"Name", "Description", "Arn", "Source",
-				"Environment", "ServiceRole", "Created", "LastModified",
-				"Cache", "LogsConfig", "ConcurrentBuildLimit", "Tags",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Description"}, {Path: "Arn"}, {Path: "Source"},
+				{Path: "Environment"}, {Path: "ServiceRole"}, {Path: "Created"}, {Path: "LastModified"},
+				{Path: "Cache"}, {Path: "LogsConfig"}, {Path: "ConcurrentBuildLimit"}, {Path: "Tags"},
 			},
 		},
 		"ecr": {
@@ -53,10 +53,10 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6},
 				{Title: "Created", Path: "CreatedAt", Width: 22},
 			},
-			Detail: []string{
-				"RepositoryName", "RepositoryUri", "RepositoryArn",
-				"RegistryId", "ImageTagMutability", "ImageScanningConfiguration",
-				"EncryptionConfiguration", "CreatedAt",
+			Detail: []DetailField{
+				{Path: "RepositoryName"}, {Path: "RepositoryUri"}, {Path: "RepositoryArn"},
+				{Path: "RegistryId"}, {Path: "ImageTagMutability"}, {Path: "ImageScanningConfiguration"},
+				{Path: "EncryptionConfiguration"}, {Path: "CreatedAt"},
 			},
 		},
 		"codeartifact": {
@@ -66,9 +66,9 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Description", Path: "Description", Width: 30},
 				{Title: "Owner", Path: "DomainOwner", Width: 14},
 			},
-			Detail: []string{
-				"Name", "DomainName", "DomainOwner", "Arn",
-				"Description", "AdministratorAccount", "CreatedTime",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "DomainName"}, {Path: "DomainOwner"}, {Path: "Arn"},
+				{Path: "Description"}, {Path: "AdministratorAccount"}, {Path: "CreatedTime"},
 			},
 		},
 		"cb_builds": {
@@ -80,11 +80,11 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Source Version", Key: "source_version_short", Width: 14},
 				{Title: "Initiator", Key: "initiator", Width: 24},
 			},
-			Detail: []string{
-				"Id", "Arn", "BuildNumber", "BuildStatus", "StartTime", "EndTime",
-				"CurrentPhase", "SourceVersion", "ResolvedSourceVersion", "Initiator",
-				"Source", "Environment", "Phases", "Logs", "Cache", "VpcConfig",
-				"ServiceRole", "TimeoutInMinutes", "QueuedTimeoutInMinutes", "BuildBatchArn",
+			Detail: []DetailField{
+				{Path: "Id"}, {Path: "Arn"}, {Path: "BuildNumber"}, {Path: "BuildStatus"}, {Path: "StartTime"}, {Path: "EndTime"},
+				{Path: "CurrentPhase"}, {Path: "SourceVersion"}, {Path: "ResolvedSourceVersion"}, {Path: "Initiator"},
+				{Path: "Source"}, {Path: "Environment"}, {Path: "Phases"}, {Path: "Logs"}, {Path: "Cache"}, {Path: "VpcConfig"},
+				{Path: "ServiceRole"}, {Path: "TimeoutInMinutes"}, {Path: "QueuedTimeoutInMinutes"}, {Path: "BuildBatchArn"},
 			},
 		},
 		"cb_build_logs": {
@@ -92,8 +92,8 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Timestamp", Key: "timestamp", Width: 22},
 				{Title: "Message", Key: "message", Width: 120},
 			},
-			Detail: []string{
-				"Timestamp", "IngestionTime", "Message", "EventId",
+			Detail: []DetailField{
+				{Path: "Timestamp"}, {Path: "IngestionTime"}, {Path: "Message"}, {Path: "EventId"},
 			},
 		},
 		"pipeline_stages": {
@@ -105,10 +105,10 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Last Changed", Key: "last_change_time", Width: 22},
 				{Title: "External URL", Key: "external_url", Width: 40},
 			},
-			Detail: []string{
-				"StageName", "StageStatus", "ActionName", "ActionStatus",
-				"LastStatusChange", "ExternalURL", "Token",
-				"ErrorCode", "ErrorMessage", "RevisionId", "RevisionSummary",
+			Detail: []DetailField{
+				{Path: "StageName"}, {Path: "StageStatus"}, {Path: "ActionName"}, {Path: "ActionStatus"},
+				{Path: "LastStatusChange"}, {Path: "ExternalURL"}, {Path: "Token"},
+				{Path: "ErrorCode"}, {Path: "ErrorMessage"}, {Path: "RevisionId"}, {Path: "RevisionSummary"},
 			},
 		},
 		"ecr_images": {
@@ -120,11 +120,11 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Scan Status", Key: "scan_status", Width: 14},
 				{Title: "Findings", Key: "finding_counts", Width: 20},
 			},
-			Detail: []string{
-				"ImageDigest", "ImageTags", "ImagePushedAt",
-				"ImageSizeInBytes", "ImageManifestMediaType",
-				"ArtifactMediaType", "ImageScanStatus",
-				"ImageScanFindingsSummary", "LastRecordedPullTime",
+			Detail: []DetailField{
+				{Path: "ImageDigest"}, {Path: "ImageTags"}, {Path: "ImagePushedAt"},
+				{Path: "ImageSizeInBytes"}, {Path: "ImageManifestMediaType"},
+				{Path: "ArtifactMediaType"}, {Path: "ImageScanStatus"},
+				{Path: "ImageScanFindingsSummary"}, {Path: "LastRecordedPullTime"},
 			},
 		},
 		// Child views for CI/CD resources
@@ -136,11 +136,11 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Status", Key: "resource_status", Width: 24},
 				{Title: "Reason", Key: "resource_status_reason", Width: 40},
 			},
-			Detail: []string{
-				"EventId", "StackId", "StackName", "Timestamp",
-				"LogicalResourceId", "PhysicalResourceId",
-				"ResourceType", "ResourceStatus", "ResourceStatusReason",
-				"ResourceProperties", "ClientRequestToken",
+			Detail: []DetailField{
+				{Path: "EventId"}, {Path: "StackId"}, {Path: "StackName"}, {Path: "Timestamp"},
+				{Path: "LogicalResourceId"}, {Path: "PhysicalResourceId"},
+				{Path: "ResourceType"}, {Path: "ResourceStatus"}, {Path: "ResourceStatusReason"},
+				{Path: "ResourceProperties"}, {Path: "ClientRequestToken"},
 			},
 		},
 		"cfn_resources": {
@@ -152,10 +152,10 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "Drift", Key: "drift_status", Width: 12},
 				{Title: "Updated", Key: "last_updated", Width: 22},
 			},
-			Detail: []string{
-				"LogicalResourceId", "PhysicalResourceId",
-				"ResourceType", "ResourceStatus", "ResourceStatusReason",
-				"LastUpdatedTimestamp", "DriftInformation", "ModuleInfo",
+			Detail: []DetailField{
+				{Path: "LogicalResourceId"}, {Path: "PhysicalResourceId"},
+				{Path: "ResourceType"}, {Path: "ResourceStatus"}, {Path: "ResourceStatusReason"},
+				{Path: "LastUpdatedTimestamp"}, {Path: "DriftInformation"}, {Path: "ModuleInfo"},
 			},
 		},
 	}

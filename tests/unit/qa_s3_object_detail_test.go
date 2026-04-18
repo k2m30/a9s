@@ -30,7 +30,8 @@ func TestQA_S3ObjectFile_DetailPaths(t *testing.T) {
 	}
 
 	viewDef := config.DefaultViewDef("s3_objects")
-	for _, path := range viewDef.Detail {
+	for _, df := range viewDef.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -50,7 +51,8 @@ func TestQA_S3ObjectFolder_DetailPaths(t *testing.T) {
 	}
 
 	viewDef := config.DefaultViewDef("s3_objects")
-	for _, path := range viewDef.Detail {
+	for _, df := range viewDef.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {

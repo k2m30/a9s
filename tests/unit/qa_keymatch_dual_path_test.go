@@ -60,8 +60,8 @@ func makeDetailDualPath(t *testing.T) views.DetailModel {
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{
-					"InstanceId", "State", "InstanceType", "VpcId", "SubnetId",
+				Detail: []config.DetailField{
+					{Path: "InstanceId"}, {Path: "State"}, {Path: "InstanceType"}, {Path: "VpcId"}, {Path: "SubnetId"},
 				},
 			},
 		},
@@ -124,7 +124,7 @@ func makeDetailWithNavFieldDual(t *testing.T) views.DetailModel {
 	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
-			"ec2": {Detail: []string{"VpcId", "State"}},
+			"ec2": {Detail: []config.DetailField{{Path: "VpcId"}, {Path: "State"}}},
 		},
 	}
 	k := keys.Default()

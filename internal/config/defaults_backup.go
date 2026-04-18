@@ -9,10 +9,10 @@ func backupDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "CreationDate", Width: 22},
 				{Title: "Last Execution", Path: "LastExecutionDate", Width: 22},
 			},
-			Detail: []string{
-				"BackupPlanName", "BackupPlanId", "BackupPlanArn",
-				"CreationDate", "LastExecutionDate", "DeletionDate",
-				"VersionId", "CreatorRequestId", "AdvancedBackupSettings",
+			Detail: []DetailField{
+				{Path: "BackupPlanName"}, {Path: "BackupPlanId"}, {Path: "BackupPlanArn"},
+				{Path: "CreationDate"}, {Path: "LastExecutionDate"}, {Path: "DeletionDate"},
+				{Path: "VersionId"}, {Path: "CreatorRequestId"}, {Path: "AdvancedBackupSettings"},
 			},
 		},
 		"ses": {
@@ -22,9 +22,9 @@ func backupDefaultViews() map[string]ViewDef {
 				{Title: "Verification", Path: "VerificationStatus", Width: 16},
 				{Title: "Sending", Path: "SendingEnabled", Width: 10},
 			},
-			Detail: []string{
-				"IdentityName", "IdentityType",
-				"SendingEnabled", "VerificationStatus",
+			Detail: []DetailField{
+				{Path: "IdentityName"}, {Path: "IdentityType"},
+				{Path: "SendingEnabled"}, {Path: "VerificationStatus"},
 			},
 		},
 	}
