@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "deletion_protection", "storage_encrypted", "backup_retention_period"})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period"})
 
 	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -103,11 +104,13 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 		}
 
 		// has_writer: "true" if at least one member has IsClusterWriter == true.
+		// writer_count: number of members with IsClusterWriter == true (healthy = 1).
 		hasWriter := "false"
+		writerCount := 0
 		for _, m := range cluster.DBClusterMembers {
 			if m.IsClusterWriter != nil && *m.IsClusterWriter {
 				hasWriter = "true"
-				break
+				writerCount++
 			}
 		}
 
@@ -138,6 +141,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 				"endpoint":                endpoint,
 				"arn":                     aws.ToString(cluster.DBClusterArn),
 				"has_writer":              hasWriter,
+				"writer_count":            strconv.Itoa(writerCount),
 				"deletion_protection":     deletionProtection,
 				"storage_encrypted":       storageEncrypted,
 				"backup_retention_period": backupRetentionPeriod,

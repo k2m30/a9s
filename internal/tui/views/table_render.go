@@ -303,14 +303,24 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	if c.key == "@id" {
 		return r.ID
 	}
-	// Try config-driven path via ExtractScalar first (if path set and RawStruct available).
+	// Fields map (key-based columns) takes priority over raw struct fields.
+	// This ensures Wave-2 enriched values always win over struct literals,
+	// and allows columns to carry both a Key (enriched value) and a Path
+	// (raw-struct fallback for sorting / column introspection).
+	if c.key != "" {
+		if v, ok := r.Fields[c.key]; ok && v != "" {
+			return v
+		}
+	}
+	// Fall back to config-driven path via ExtractScalar (struct field extraction).
 	if c.path != "" && r.RawStruct != nil {
 		val := fieldpath.ExtractScalar(r.RawStruct, c.path)
 		if val != "" {
 			return val
 		}
 	}
-	// Fall back to Fields map.
+	// Fields map second pass: accept empty-string values stored explicitly.
+	// This covers keys that were set but happen to be empty strings.
 	if c.key != "" {
 		if v, ok := r.Fields[c.key]; ok {
 			return v

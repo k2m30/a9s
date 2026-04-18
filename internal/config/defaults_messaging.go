@@ -40,6 +40,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Rule Name", Path: "Name", Width: 28},
 				{Title: "State", Path: "State", Width: 10},
+				{Title: "Targets", Key: "target_count", Width: 8},
 				{Title: "Event Bus", Path: "EventBusName", Width: 18},
 				{Title: "Schedule", Path: "ScheduleExpression", Width: 24},
 				{Title: "Description", Path: "Description", Width: 30},

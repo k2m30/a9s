@@ -36,6 +36,7 @@ func secretsDefaultViews() map[string]ViewDef {
 				{Title: "Alias", Path: "AliasName", Width: 32},
 				{Title: "Key ID", Path: "KeyId", Width: 38},
 				{Title: "Status", Path: "KeyState", Width: 12},
+				{Title: "Rotation", Key: "rotation_enabled", Width: 10},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
 			Detail: []DetailField{

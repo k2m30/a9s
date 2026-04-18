@@ -11,6 +11,9 @@ list:
   Metric Filters:
     path: MetricFilterCount
     width: 8
+  Last Event:
+    key: last_event_at
+    width: 22
   Created:
     key: creation_time
     width: 16

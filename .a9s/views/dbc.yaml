@@ -11,6 +11,10 @@ list:
   Instances:
     path: DBClusterMembers
     width: 10
+  Writer:
+    path: EngineVersion
+    key: writer_count
+    width: 7
   Endpoint:
     path: Endpoint
     width: 48

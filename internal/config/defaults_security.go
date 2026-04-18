@@ -6,6 +6,7 @@ func securityDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Role Name", Path: "RoleName", Width: 36},
 				{Title: "Last Used", Path: "RoleLastUsed.LastUsedDate", Width: 22},
+				{Title: "Trust", Key: "trust_summary", Width: 12},
 				{Title: "Path", Path: "Path", Width: 20},
 				{Title: "Created", Path: "CreateDate", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},
@@ -36,6 +37,8 @@ func securityDefaultViews() map[string]ViewDef {
 		"iam-user": {
 			List: []ListColumn{
 				{Title: "User Name", Path: "UserName", Width: 32},
+				{Title: "MFA", Key: "mfa", Width: 5},
+				{Title: "Risk", Key: "risk", Width: 14},
 				{Title: "User ID", Path: "UserId", Width: 22},
 				{Title: "Path", Path: "Path", Width: 20},
 				{Title: "Created", Path: "CreateDate", Width: 22},
@@ -50,6 +53,7 @@ func securityDefaultViews() map[string]ViewDef {
 		"iam-group": {
 			List: []ListColumn{
 				{Title: "Group Name", Path: "GroupName", Width: 32},
+				{Title: "Members", Key: "member_count", Width: 9},
 				{Title: "Group ID", Path: "GroupId", Width: 22},
 				{Title: "Path", Path: "Path", Width: 20},
 				{Title: "Created", Path: "CreateDate", Width: 22},

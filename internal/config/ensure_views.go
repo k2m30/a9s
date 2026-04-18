@@ -20,10 +20,11 @@ func GenerateViewYAML(v ViewDef) []byte {
 		b.WriteString("list:\n")
 		for _, col := range v.List {
 			fmt.Fprintf(&b, "  %s:\n", yamlKey(col.Title))
+			if col.Path != "" {
+				fmt.Fprintf(&b, "    path: %s\n", col.Path)
+			}
 			if col.Key != "" {
 				fmt.Fprintf(&b, "    key: %s\n", col.Key)
-			} else if col.Path != "" {
-				fmt.Fprintf(&b, "    path: %s\n", col.Path)
 			}
 			fmt.Fprintf(&b, "    width: %d\n", col.Width)
 		}
