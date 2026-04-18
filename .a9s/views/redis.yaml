@@ -11,6 +11,9 @@ list:
   Status:
     path: CacheClusterStatus
     width: 14
+  Failover:
+    key: automatic_failover
+    width: 10
   Nodes:
     path: NumCacheNodes
     width: 8

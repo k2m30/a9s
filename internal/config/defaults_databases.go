@@ -41,12 +41,11 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Version", Path: "EngineVersion", Width: 10},
 				{Title: "Node Type", Path: "CacheNodeType", Width: 18},
 				{Title: "Status", Path: "CacheClusterStatus", Width: 14},
-				// Failover column intentionally omitted: AutomaticFailover lives on
-				// ReplicationGroup, but the redis fetcher uses DescribeCacheClusters
-				// (CacheCluster has no Failover field). Per docs/attention-signals.md,
-				// redis values should come from DescribeReplicationGroups; switching
-				// the fetcher is a separate refactor. Re-add this column when that
-				// lands. {Title: "Failover", Path: "AutomaticFailover", Width: 12}.
+				// Failover sourced from EnrichRedisReplicationGroup which calls
+				// DescribeReplicationGroups (account-wide, 1 call) and writes
+				// automatic_failover into Fields[] keyed by member CacheClusterId.
+				// Enum: enabled / disabled / enabling / disabling.
+				{Title: "Failover", Key: "automatic_failover", Width: 10},
 				{Title: "Nodes", Path: "NumCacheNodes", Width: 8},
 				{Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 			},
