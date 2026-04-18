@@ -3,7 +3,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -66,32 +68,76 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 }
 
 // computeSGRiskFields inspects the ingress rules of a security group and
-// returns (dangerous_open_count, wide_open) as strings ready for Fields.
-func computeSGRiskFields(perms []ec2types.IpPermission) (string, string) {
+// returns (dangerous_open_count, wide_open, risk_summary).
+//
+//	risk_summary is a short human-readable label:
+//	  ""              — no internet exposure on dangerous ports
+//	  "WIDE_OPEN"     — at least one rule with all-protocols (-1) open to 0.0.0.0/0
+//	  "PORTS:22,3306" — specific dangerous ports open to 0.0.0.0/0
+//	When both wide-open and specific ports are present, "WIDE_OPEN" wins
+//	(it's the more severe signal).
+func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
 	dangerousCount := 0
 	wideOpen := false
+	portSet := make(map[int32]struct{})
 	for _, p := range perms {
 		if !isInternetFacing(p) {
 			continue
 		}
-		// wide_open: all-protocols rule open to internet.
 		if aws.ToString(p.IpProtocol) == "-1" {
 			wideOpen = true
+			continue
 		}
-		// dangerous_open_count: sensitive port open to internet.
 		if coversSensitivePort(p) {
 			dangerousCount++
+			// Capture the specific port(s) covered.
+			if p.FromPort != nil && p.ToPort != nil {
+				from, to := *p.FromPort, *p.ToPort
+				if to < from {
+					from, to = to, from
+				}
+				// Always enumerate the dangerous ports that fall inside [from, to].
+				// We iterate the sensitive-port set (small, constant) rather than the
+				// range itself, so a 1-65535 rule stays O(|sensitivePorts|) and
+				// correctly surfaces every dangerous port the rule actually exposes.
+				for sp := range sensitivePorts {
+					if sp >= from && sp <= to {
+						portSet[sp] = struct{}{}
+					}
+				}
+			}
 		}
 	}
 	wideOpenStr := "false"
 	if wideOpen {
 		wideOpenStr = "true"
 	}
-	return strconv.Itoa(dangerousCount), wideOpenStr
+	riskSummary := ""
+	switch {
+	case wideOpen:
+		riskSummary = "WIDE_OPEN"
+	case dangerousCount > 0:
+		ports := make([]int, 0, len(portSet))
+		for p := range portSet {
+			ports = append(ports, int(p))
+		}
+		sort.Ints(ports)
+		parts := make([]string, len(ports))
+		for i, p := range ports {
+			parts[i] = strconv.Itoa(p)
+		}
+		if len(parts) > 0 {
+			riskSummary = "PORTS:" + strings.Join(parts, ",")
+		} else {
+			// dangerousCount > 0 but no specific port captured (large-range case).
+			riskSummary = "PORTS:?"
+		}
+	}
+	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
 func init() {
-	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open"})
+	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "risk_summary"})
 
 	resource.RegisterPaginated("sg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -162,7 +208,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 			description = *sg.Description
 		}
 
-		dangerousCount, wideOpen := computeSGRiskFields(sg.IpPermissions)
+		dangerousCount, wideOpen, riskSummary := computeSGRiskFields(sg.IpPermissions)
 
 		r := resource.Resource{
 			ID:     groupID,
@@ -175,6 +221,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"description":          description,
 				"dangerous_open_count": dangerousCount,
 				"wide_open":            wideOpen,
+				"risk_summary":         riskSummary,
 			},
 			RawStruct: sg,
 		}

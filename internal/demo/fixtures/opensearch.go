@@ -93,6 +93,86 @@ func NewOpenSearchFixtures() *OpenSearchFixtures {
 					EnforceHTTPS: aws.Bool(true),
 				},
 			},
+			// Issue: DomainProcessingStatus = Isolated → Broken (Processing="Isolated")
+			{
+				ARN:                    aws.String("arn:aws:es:us-east-1:123456789012:domain/legacy-search-isolated"),
+				DomainId:               aws.String("123456789012/legacy-search-isolated"),
+				DomainName:             aws.String("legacy-search-isolated"),
+				EngineVersion:          aws.String("Elasticsearch_7.10"),
+				Endpoint:               aws.String("search-legacy-search-isolated-jkl012.us-east-1.es.amazonaws.com"),
+				Created:                aws.Bool(true),
+				Deleted:                aws.Bool(false),
+				DomainProcessingStatus: ostypes.DomainProcessingStatusTypeIsolated,
+				ClusterConfig: &ostypes.ClusterConfig{
+					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeM5LargeSearch,
+					InstanceCount: aws.Int32(1),
+				},
+				EBSOptions: &ostypes.EBSOptions{
+					EBSEnabled: aws.Bool(true),
+					VolumeType: ostypes.VolumeTypeGp2,
+					VolumeSize: aws.Int32(20),
+				},
+				EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
+					Enabled: aws.Bool(true),
+				},
+				DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+					EnforceHTTPS: aws.Bool(true),
+				},
+			},
+			// Issue: in-progress modification → Warning, status="processing", Processing="ModifyingService"
+			{
+				ARN:                    aws.String("arn:aws:es:us-east-1:123456789012:domain/acme-events"),
+				DomainId:               aws.String("123456789012/acme-events"),
+				DomainName:             aws.String("acme-events"),
+				EngineVersion:          aws.String("OpenSearch_2.13"),
+				Endpoint:               aws.String("search-acme-events-mno345.us-east-1.es.amazonaws.com"),
+				Created:                aws.Bool(true),
+				Deleted:                aws.Bool(false),
+				Processing:             aws.Bool(true),
+				DomainProcessingStatus: ostypes.DomainProcessingStatusTypeModifying,
+				ClusterConfig: &ostypes.ClusterConfig{
+					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeR6gLargeSearch,
+					InstanceCount: aws.Int32(2),
+				},
+				EBSOptions: &ostypes.EBSOptions{
+					EBSEnabled: aws.Bool(true),
+					VolumeType: ostypes.VolumeTypeGp3,
+					VolumeSize: aws.Int32(150),
+				},
+				EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
+					Enabled: aws.Bool(true),
+				},
+				DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+					EnforceHTTPS: aws.Bool(true),
+				},
+			},
+			// Issue: software upgrade in progress → Warning, status="processing"
+			{
+				ARN:                    aws.String("arn:aws:es:us-east-1:123456789012:domain/acme-metrics"),
+				DomainId:               aws.String("123456789012/acme-metrics"),
+				DomainName:             aws.String("acme-metrics"),
+				EngineVersion:          aws.String("OpenSearch_2.11"),
+				Endpoint:               aws.String("search-acme-metrics-pqr678.us-east-1.es.amazonaws.com"),
+				Created:                aws.Bool(true),
+				Deleted:                aws.Bool(false),
+				UpgradeProcessing:      aws.Bool(true),
+				DomainProcessingStatus: ostypes.DomainProcessingStatusTypeUpgrading,
+				ClusterConfig: &ostypes.ClusterConfig{
+					InstanceType:  ostypes.OpenSearchPartitionInstanceTypeR6gXlargeSearch,
+					InstanceCount: aws.Int32(3),
+				},
+				EBSOptions: &ostypes.EBSOptions{
+					EBSEnabled: aws.Bool(true),
+					VolumeType: ostypes.VolumeTypeGp3,
+					VolumeSize: aws.Int32(300),
+				},
+				EncryptionAtRestOptions: &ostypes.EncryptionAtRestOptions{
+					Enabled: aws.Bool(true),
+				},
+				DomainEndpointOptions: &ostypes.DomainEndpointOptions{
+					EnforceHTTPS: aws.Bool(true),
+				},
+			},
 		},
 	}
 }
