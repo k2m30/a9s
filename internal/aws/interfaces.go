@@ -1449,28 +1449,20 @@ type S3GetPublicAccessBlockAPI interface {
 //     instead of a global banner. An ID appearing here MUST NOT also appear in
 //     Findings unless the partial data was still usable.
 //
-//   - UnmatchedIDs: API identifiers the enricher observed but could NOT normalize
-//     back to any input Resource.ID. Previously this was silently dropped —
-//     now it's explicit telemetry. The menu/banner MAY surface the count
-//     ("12 findings unattributable") to give the user a visible failure mode.
-//     Value = the raw identifier as seen from the API (ARN, ARN prefix, name).
-//
 //   - Findings: map from Resource.ID → EnrichmentFinding. May contain entries
 //     for resources NOT in the input slice (account-wide enrichers). Enrichers
 //     that receive API identifiers in a different form (e.g., ARNs) MUST
-//     normalize to Resource.ID; if no match can be determined, APPEND to
-//     UnmatchedIDs (do NOT silently drop).
+//     normalize to Resource.ID before writing to Findings.
 //
 //   - FieldUpdates: map from Resource.ID → (fieldKey → value). Same normalization
 //     rule applies.
 //
-// MAY have empty maps/slices but MUST NOT be nil for any reference field on
-// success — initialize each with `make(...)` / `[]string{}` before returning.
+// MAY have empty maps but MUST NOT be nil for any reference field on
+// success — initialize each with `make(...)` before returning.
 type EnricherResult struct {
 	IssueCount   int
 	Truncated    bool
 	TruncatedIDs map[string]bool
-	UnmatchedIDs []string
 	Findings     map[string]resource.EnrichmentFinding
 	// FieldUpdates carries per-resource Fields[] mutations the enricher wants
 	// merged into the cached row. Keyed by resource ID, then by field key.

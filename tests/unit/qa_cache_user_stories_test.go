@@ -11,6 +11,9 @@ import (
 )
 
 func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
@@ -28,10 +31,12 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		},
 	})
 
-	// Press 7 twice: sort by Instance ID (column 7, absolute) ascending then descending.
-	// Column 7 may be off-screen at width 80 — that's fine, absolute keys still work.
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
+	// Press 8 twice: sort by Instance ID (column 8, absolute) ascending then descending.
+	// EC2 layout is 1:Name 2:State 3:Health 4:Lifecycle 5:Type 6:Private IP
+	// 7:Public IP 8:Instance ID 9:Launch Time. Column 8 may be off-screen at
+	// width 80 — that's fine, absolute keys still work.
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
