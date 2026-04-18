@@ -168,3 +168,59 @@ func TestResolveRelatedNavigate(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveRelatedNavigate_FetchFilterRequiresRegisteredFetcher verifies that
+// a FetchFilter on a type with no registered FilteredPaginatedFetcher (e.g. "vpc")
+// is silently ignored and the resolver falls through to the standard RelatedIDs
+// path instead of returning KindFilteredList.
+//
+// Regression for: "no filtered fetcher registered for: X" runtime panic caused
+// by a checker that sets FetchFilter on an unsupported target type.
+func TestResolveRelatedNavigate_FetchFilterRequiresRegisteredFetcher(t *testing.T) {
+	// "vpc" does not have a FilteredPaginatedFetcher registered — only "ct-events" does.
+	msg := messages.RelatedNavigateMsg{
+		TargetType:  "vpc",
+		FetchFilter: map[string]string{"some-key": "some-value"},
+		RelatedIDs:  []string{"vpc-aaaa"},
+	}
+	cache := map[string][]resource.Resource{
+		"vpc": {{ID: "vpc-aaaa"}},
+	}
+
+	got := tui.ResolveRelatedNavigate(msg, cache)
+
+	// The guard must strip the filter path when no fetcher is registered.
+	if got.Kind == tui.KindFilteredList {
+		t.Errorf("Kind = KindFilteredList, want NOT KindFilteredList: FetchFilter without registered fetcher must not take the filtered path")
+	}
+	// With 1 RelatedID and a cache hit the resolver should land on KindDetail.
+	if got.Kind != tui.KindDetail {
+		t.Errorf("Kind = %v, want KindDetail: single RelatedID cache hit should navigate to detail", got.Kind)
+	}
+	if got.TargetID != "vpc-aaaa" && (len(got.RelatedIDs) == 0 || got.RelatedIDs[0] != "vpc-aaaa") {
+		t.Errorf("expected resolved ID = %q, got TargetID=%q RelatedIDs=%v", "vpc-aaaa", got.TargetID, got.RelatedIDs)
+	}
+}
+
+// TestResolveRelatedNavigate_FetchFilterHonoredForCtEvents verifies that a
+// FetchFilter on "ct-events" — the only type with a registered
+// FilteredPaginatedFetcher — correctly takes the KindFilteredList path and
+// preserves the filter map.
+func TestResolveRelatedNavigate_FetchFilterHonoredForCtEvents(t *testing.T) {
+	msg := messages.RelatedNavigateMsg{
+		TargetType:  "ct-events",
+		FetchFilter: map[string]string{"Username": "alice"},
+	}
+
+	got := tui.ResolveRelatedNavigate(msg, nil)
+
+	if got.Kind != tui.KindFilteredList {
+		t.Errorf("Kind = %v, want KindFilteredList: ct-events has a registered FilteredPaginatedFetcher", got.Kind)
+	}
+	if got.TargetType != "ct-events" {
+		t.Errorf("TargetType = %q, want %q", got.TargetType, "ct-events")
+	}
+	if got.FetchFilter["Username"] != "alice" {
+		t.Errorf("FetchFilter[%q] = %q, want %q", "Username", got.FetchFilter["Username"], "alice")
+	}
+}
