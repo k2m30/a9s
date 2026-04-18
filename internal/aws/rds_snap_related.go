@@ -107,13 +107,15 @@ func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	var clusterID string
+	dbiFound := false
 	for _, dbiRes := range dbiList {
 		if dbiRes.Name != dbName && dbiRes.ID != dbName {
 			continue
 		}
+		dbiFound = true
 		db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct)
 		if !ok {
-			continue
+			break
 		}
 		if db.DBClusterIdentifier != nil && *db.DBClusterIdentifier != "" {
 			clusterID = *db.DBClusterIdentifier
@@ -121,8 +123,14 @@ func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 		break
 	}
 	if clusterID == "" {
-		if truncated {
-			return resource.ApproximateZero("dbc")
+		// UnknownRelated ONLY when the DBI cache was truncated AND we didn't
+		// find the source DB instance in the visible window — in that case
+		// we never reached the dbc lookup at all. If the source DBI IS in the
+		// cache (dbiFound) but has no DBClusterIdentifier, the snapshot is
+		// confirmed standalone → Count:0 (definitive), regardless of whether
+		// OTHER dbi entries may exist off-page.
+		if !dbiFound && truncated {
+			return resource.UnknownRelated("dbc")
 		}
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 	}

@@ -52,6 +52,9 @@ type MainMenuModel struct {
 	issueTruncated map[string]bool    // per-type: true = issue count is lower bound
 	enrichChecked  int                // Wave 2 enrichment progress
 	enrichTotal    int                // Wave 2 total enrichment probes
+	// unmatchedIDs carries per-type API identifiers the enricher could not normalize
+	// to a Resource.ID. Surfaced in the menu badge as "(N unattributable)".
+	unmatchedIDs map[string][]string
 }
 
 // NewMainMenu returns an initialized MainMenuModel with all registered resource types.
@@ -403,6 +406,9 @@ func (m *MainMenuModel) ClearAvailability() {
 	m.issueCounts = nil
 	m.issueKnown = nil
 	m.issueTruncated = nil
+	// Unmatched-ID telemetry is per-account; clear it so a profile/region
+	// switch does not carry "(N unattributable)" badges across accounts.
+	m.unmatchedIDs = nil
 	m.enrichChecked = 0
 	m.enrichTotal = 0
 	m.applyFilter() // re-apply so ctrl+z visibility reflects the cleared state
@@ -524,19 +530,30 @@ func (m *MainMenuModel) SetEnrichProgress(checked, total int) {
 	m.enrichTotal = total
 }
 
+// SetUnmatched stores per-type unmatched IDs for display in the menu badge.
+func (m *MainMenuModel) SetUnmatched(shortName string, ids []string) {
+	if m.unmatchedIDs == nil {
+		m.unmatchedIDs = make(map[string][]string)
+	}
+	m.unmatchedIDs[shortName] = ids
+}
+
 // issueBadge returns the " issues:N" or " issues:N+" suffix for a resource type,
-// or empty string if no issues are known.
+// optionally appended with "(N unattributable)" when unmatched IDs are present.
+// Returns empty string if no issues are known and no unmatched IDs exist.
 func (m MainMenuModel) issueBadge(shortName string) string {
-	if !m.issueKnown[shortName] {
-		return ""
+	var badge string
+	if m.issueKnown[shortName] {
+		count := m.issueCounts[shortName]
+		if count > 0 {
+			badge = " issues:" + itoa(count)
+			if m.issueTruncated[shortName] {
+				badge += "+"
+			}
+		}
 	}
-	count := m.issueCounts[shortName]
-	if count == 0 {
-		return ""
-	}
-	badge := " issues:" + itoa(count)
-	if m.issueTruncated[shortName] {
-		badge += "+"
+	if unmatched := m.unmatchedIDs[shortName]; len(unmatched) > 0 {
+		badge += " (" + itoa(len(unmatched)) + " unattributable)"
 	}
 	return badge
 }

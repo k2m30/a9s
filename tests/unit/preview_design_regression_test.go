@@ -118,6 +118,7 @@ func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 		defs = append(defs, resource.RelatedDef{
 			TargetType:  target,
 			DisplayName: fmt.Sprintf("Type %02d", i),
+			Checker:     resource.NoopChecker,
 		})
 	}
 	resource.RegisterRelated("ec2", defs)
