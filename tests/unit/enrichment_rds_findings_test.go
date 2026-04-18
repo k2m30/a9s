@@ -132,10 +132,13 @@ func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_OffPageFindings verifies that account-wide enrichers
-// can return findings for resources NOT in the input slice.
-func TestEnrichRDSDocDBMaintenance_OffPageFindings(t *testing.T) {
-	// The API returns maintenance for "off-page-db" which is not in the input.
+// TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped verifies that
+// findings for resources NOT in the input slice are dropped. Emitting them
+// would inflate unifiedIssueCount above the visible row count — e.g. when
+// the enricher is dispatched for dbc (clusters), instance ARNs would otherwise
+// produce findings keyed by instance IDs that don't correspond to any
+// cluster row, surfacing as "DB Clusters (2) issues:4".
+func TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{
@@ -144,19 +147,29 @@ func TestEnrichRDSDocDBMaintenance_OffPageFindings(t *testing.T) {
 					{Action: aws.String("system-update")},
 				},
 			},
+			{
+				ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:on-page-db"),
+				PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
+					{Action: aws.String("system-update")},
+				},
+			},
 		},
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
-	// Input slice does NOT contain off-page-db.
 	resources := []resource.Resource{{ID: "on-page-db"}}
 
 	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// The off-page resource MUST appear in Findings (account-wide enricher contract).
-	if _, ok := result.Findings["off-page-db"]; !ok {
-		t.Error("expected finding for off-page-db (account-wide enricher includes resources not in input slice)")
+	if _, ok := result.Findings["off-page-db"]; ok {
+		t.Error("off-page-db must NOT appear in Findings — orphan finding inflates badge above visible rows")
+	}
+	if _, ok := result.Findings["on-page-db"]; !ok {
+		t.Error("expected finding for on-page-db (matches an input resource ID)")
+	}
+	if len(result.Findings) > len(resources) {
+		t.Errorf("invariant violated: len(Findings)=%d > len(resources)=%d", len(result.Findings), len(resources))
 	}
 }
 

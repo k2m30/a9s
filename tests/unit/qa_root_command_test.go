@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -20,7 +19,7 @@ import (
 // TestQA_RootCommand_EmitsNavigateToMainMenu verifies that typing `:root` and
 // pressing Enter emits NavigateMsg{Target: TargetMainMenu}.
 func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -45,7 +44,7 @@ func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
 // TestQA_MainCommand_EmitsNavigateToMainMenu verifies that typing `:main` and
 // pressing Enter emits NavigateMsg{Target: TargetMainMenu}.
 func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -74,7 +73,7 @@ func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
 // TestQA_RootCommand_TabCompletion verifies that typing `:ro` + Tab completes
 // to "root" in the command input buffer (visible in header).
 func TestQA_RootCommand_TabCompletion(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -91,7 +90,7 @@ func TestQA_RootCommand_TabCompletion(t *testing.T) {
 // TestQA_MainCommand_TabCompletion verifies that typing `:ma` + Tab completes
 // to "main" (it is the only built-in or resource command starting with "ma").
 func TestQA_MainCommand_TabCompletion(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -113,7 +112,7 @@ func TestQA_MainCommand_TabCompletion(t *testing.T) {
 // NavigateMsg{Target: TargetMainMenu} from the resource list returns to the
 // main menu.
 func TestQA_RootCommand_PopsToMainMenu_FromResourceList(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -132,7 +131,7 @@ func TestQA_RootCommand_PopsToMainMenu_FromResourceList(t *testing.T) {
 // NavigateMsg{Target: TargetMainMenu} from a deep stack (menu → list → detail)
 // returns all the way to the main menu in one step.
 func TestQA_RootCommand_PopsToMainMenu_FromDeepStack(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -156,7 +155,7 @@ func TestQA_RootCommand_PopsToMainMenu_FromDeepStack(t *testing.T) {
 // NavigateMsg{Target: TargetMainMenu} when already at the main menu does not
 // crash and leaves the model in the main menu state.
 func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
@@ -177,7 +176,7 @@ func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
 // TestQA_HelpContext_MainMenu_ShowsCommandsSection verifies that the COMMANDS
 // section title appears in help opened from the main menu.
 func TestQA_HelpContext_MainMenu_ShowsCommandsSection(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
@@ -191,7 +190,7 @@ func TestQA_HelpContext_MainMenu_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_MainMenu_CommandsSectionContent verifies that the
 // individual colon commands appear under the COMMANDS section.
 func TestQA_HelpContext_MainMenu_CommandsSectionContent(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
@@ -208,7 +207,7 @@ func TestQA_HelpContext_MainMenu_CommandsSectionContent(t *testing.T) {
 // TestQA_HelpContext_ResourceList_ShowsCommandsSection verifies that the
 // COMMANDS section appears in help opened from a resource list.
 func TestQA_HelpContext_ResourceList_ShowsCommandsSection(t *testing.T) {
-	tui.Version = "1.0.0"
+	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{

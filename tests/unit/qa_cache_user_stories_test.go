@@ -7,12 +7,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -60,7 +59,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 }
 
 func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -116,7 +115,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 }
 
 func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	src := resource.Resource{
@@ -159,7 +158,7 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 }
 
 func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	src := resource.Resource{
@@ -199,7 +198,7 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 }
 
 func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	stack := resource.Resource{
@@ -241,7 +240,7 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 }
 
 func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// New schema: Status is verb-based, not ReadOnly. _ct.actor is set to the resource

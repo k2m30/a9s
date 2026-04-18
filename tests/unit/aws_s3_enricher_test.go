@@ -151,8 +151,11 @@ func TestEnrichS3PublicAccessBlock_NoPABConfigProducesFindingSevTilde(t *testing
 	if _, ok := result.Findings["bucket-three"]; ok {
 		t.Error("bucket-three must NOT appear in Findings — it has full PAB")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0 (~ findings do not count toward badge)", result.IssueCount)
+	}
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (finding is produced even when IssueCount is 0)", len(result.Findings))
 	}
 	if result.Truncated {
 		t.Error("Truncated must be false — only PAB-absent error, not a generic API error")

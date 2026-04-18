@@ -25,10 +25,12 @@ func fallbackColor(status string) Color {
 		"in-service", "healthy":
 		return ColorHealthy
 	case "stopped", "failed", "error", "impaired", "FAILED", "ERROR",
-		"STOPPED", "inactive":
+		"STOPPED":
 		return ColorBroken
 	case "terminated", "TERMINATED", "shutting-down", "deleted", "DELETED",
-		"deregistered":
+		"deregistered", "inactive", "INACTIVE":
+		// "inactive" is a steady-state (e.g. ASG scaled to 0, disabled rule);
+		// dim, not broken. Aligns with StandardLifecycleColor.
 		return ColorDim
 	}
 	// Suffix patterns for compound statuses (e.g. "create_failed", "update_in_progress").
