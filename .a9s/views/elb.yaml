@@ -11,6 +11,9 @@ list:
   State:
     path: State.Code
     width: 12
+  State Reason:
+    path: State.Reason
+    width: 32
   DNS Name:
     path: DNSName
     width: 48

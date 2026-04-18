@@ -35,4 +35,3 @@ detail:
   - AdvancedSecurityOptions
   - Created
   - Deleted
-  # { key: cluster_health, label: "Cluster Health" } — re-add when CloudWatch Wave-3 enricher populates this field. Today the fetcher only writes domain_processing_status.

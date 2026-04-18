@@ -16,6 +16,9 @@ list:
   State:
     path: State
     width: 12
+  Public:
+    path: MapPublicIpOnLaunch
+    width: 8
   Available IPs:
     path: AvailableIpAddressCount
     width: 14

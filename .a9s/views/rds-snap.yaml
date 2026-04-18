@@ -8,6 +8,9 @@ list:
   Status:
     path: Status
     width: 12
+  Encrypted:
+    path: Encrypted
+    width: 10
   Engine:
     path: Engine
     width: 12

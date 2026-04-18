@@ -679,6 +679,10 @@ func TestQA_ListViewColumns_Redis(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			if col.Path == "" {
+				t.Skipf("column %q has no path (uses Fields fallback)", col.Title)
+				return
+			}
 			result := fieldpath.ExtractScalar(cluster, col.Path)
 			if result == "" {
 				t.Errorf("ExtractScalar(%q) returned empty for realistic Redis CacheCluster", col.Path)

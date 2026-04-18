@@ -8,6 +8,12 @@ list:
   Status:
     path: Status
     width: 12
+  WAF:
+    path: WebACLId
+    width: 14
+  TLS:
+    path: ViewerCertificate.MinimumProtocolVersion
+    width: 14
   Enabled:
     path: Enabled
     width: 9

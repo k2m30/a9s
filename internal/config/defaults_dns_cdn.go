@@ -20,6 +20,8 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 				{Title: "Domain Name", Path: "DomainName", Width: 40},
 				{Title: "Distribution ID", Path: "Id", Width: 16},
 				{Title: "Status", Path: "Status", Width: 12},
+				{Title: "WAF", Path: "WebACLId", Width: 14},
+				{Title: "TLS", Path: "ViewerCertificate.MinimumProtocolVersion", Width: 14},
 				{Title: "Enabled", Path: "Enabled", Width: 9},
 				{Title: "Aliases", Path: "Aliases.Items", Width: 30},
 				{Title: "Price Class", Path: "PriceClass", Width: 16},

@@ -8,6 +8,9 @@ list:
   State:
     path: State
     width: 12
+  Deprecated:
+    path: DeprecationTime
+    width: 22
   Arch:
     path: Architecture
     width: 10

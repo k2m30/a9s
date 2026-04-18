@@ -28,6 +28,7 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Topic ARN", Path: "TopicArn", Width: 48},
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
+				{Title: "Confirmed", Path: "SubscriptionArn", Width: 22},
 				{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60},
 			},
 			Detail: []DetailField{
