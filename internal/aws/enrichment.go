@@ -366,6 +366,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, _ []res
 // Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".
 func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.CodeBuild == nil || len(resources) == 0 {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -409,10 +410,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		return EnricherResult{}, err
 	}
 	for _, b := range builds.Builds {
-		switch b.BuildStatus {
-		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
-			continue
-		}
 		if b.Id == nil {
 			continue
 		}
@@ -420,7 +417,18 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		if projectName == "" {
 			continue
 		}
+		switch b.BuildStatus {
+		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
+			fieldUpdates[projectName] = map[string]string{"last_build": "OK"}
+			continue
+		}
 		statusVal := string(b.BuildStatus)
+		lastBuildVal := statusVal
+		if b.EndTime != nil {
+			elapsed := time.Since(*b.EndTime)
+			hours := int(elapsed.Hours())
+			lastBuildVal = fmt.Sprintf("%s %dh ago", statusVal, hours)
+		}
 		rows := []resource.FindingRow{
 			{Label: "Status", Value: statusVal, Tier: "!"},
 		}
@@ -451,8 +459,9 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			Summary:  summary,
 			Rows:     rows,
 		}
+		fieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
@@ -460,6 +469,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 // Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".
 func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.ELBv2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -489,6 +499,16 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 				}
 			}
 		}
+		healthy := total - unhealthy
+		healthSummary := ""
+		if total == 0 {
+			healthSummary = "ORPHAN"
+		} else {
+			healthSummary = fmt.Sprintf("%d/%d healthy", healthy, total)
+		}
+		fieldUpdates[r.ID] = map[string]string{
+			"health_summary": healthSummary,
+		}
 		if unhealthy > 0 {
 			rows := []resource.FindingRow{
 				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", unhealthy, total), Tier: "!"},
@@ -503,7 +523,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
@@ -511,6 +531,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 // Severity is "!" (broken/degraded). Summary: "stage <Name> failed".
 func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.CodePipeline == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -529,6 +550,11 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			truncated = true
 			continue
 		}
+		key := r.ID
+		if key == "" {
+			key = r.Name
+		}
+		lastStatus := "OK"
 		for _, stage := range out.StageStates {
 			if stage.LatestExecution == nil || stage.LatestExecution.Status != "Failed" {
 				continue
@@ -537,6 +563,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			if stage.StageName != nil {
 				stageName = *stage.StageName
 			}
+			lastStatus = stageName
 			rows := []resource.FindingRow{
 				{Label: "Failed Stage", Value: stageName, Tier: "!"},
 				{Label: "Status", Value: string(stage.LatestExecution.Status)},
@@ -557,10 +584,6 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					break
 				}
 			}
-			key := r.ID
-			if key == "" {
-				key = r.Name
-			}
 			findings[key] = resource.EnrichmentFinding{
 				Severity: "!",
 				Summary:  fmt.Sprintf("stage %s failed", stageName),
@@ -568,8 +591,9 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			}
 			break // first failed stage is sufficient
 		}
+		fieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
@@ -577,6 +601,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 // Severity is "!" (broken/degraded). Summary: "latest execution <STATUS>".
 func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.SFN == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -598,8 +623,16 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		}
 		if len(out.Executions) > 0 {
 			s := out.Executions[0].Status
+			exec := out.Executions[0]
+			lastRunVal := "OK"
 			if s == sfntypes.ExecutionStatusFailed || s == sfntypes.ExecutionStatusTimedOut || s == sfntypes.ExecutionStatusAborted {
-				exec := out.Executions[0]
+				if exec.StopDate != nil {
+					elapsed := time.Since(*exec.StopDate)
+					hours := int(elapsed.Hours())
+					lastRunVal = fmt.Sprintf("%s %dh ago", string(s), hours)
+				} else {
+					lastRunVal = string(s)
+				}
 				rows := []resource.FindingRow{
 					{Label: "Latest Status", Value: string(s), Tier: "!"},
 				}
@@ -615,9 +648,12 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 					Rows:     rows,
 				}
 			}
+			fieldUpdates[r.ID] = map[string]string{
+				"last_run": lastRunVal,
+			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichBackupJobs calls ListBackupJobs once (account-wide) and returns a Finding
@@ -626,6 +662,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 // IssueCount counts only "!" findings. First failure per plan wins; no pagination (TODO).
 func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.Backup == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -662,6 +699,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 					{Label: "State", Value: string(job.State), Tier: "!"},
 				},
 			}
+			fieldUpdates[key] = map[string]string{"last_status": string(job.State)}
 		case backuptypes.BackupJobStatePartial:
 			findings[key] = resource.EnrichmentFinding{
 				Severity: "~",
@@ -669,6 +707,11 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				Rows: []resource.FindingRow{
 					{Label: "State", Value: string(job.State), Tier: "~"},
 				},
+			}
+			fieldUpdates[key] = map[string]string{"last_status": "PARTIAL"}
+		default:
+			if _, ok := fieldUpdates[key]; !ok {
+				fieldUpdates[key] = map[string]string{"last_status": "OK"}
 			}
 		}
 	}
@@ -678,7 +721,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: out.NextToken != nil, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: out.NextToken != nil, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSESAccount calls GetAccount once (account-wide) and returns a Finding
@@ -895,6 +938,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 // Severity is "!" (broken/degraded). Summary: "latest run <STATUS>".
 func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.Glue == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -914,6 +958,10 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			continue
 		}
+		key := r.ID
+		if key == "" {
+			key = r.Name
+		}
 		if len(out.JobRuns) > 0 {
 			run := out.JobRuns[0]
 			s := run.JobRunState
@@ -927,19 +975,18 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
 					rows = append(rows, resource.FindingRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
 				}
-				key := r.ID
-				if key == "" {
-					key = r.Name
-				}
 				findings[key] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("latest run %s", string(s)),
 					Rows:     rows,
 				}
+				fieldUpdates[key] = map[string]string{"last_run": string(s)}
+			} else {
+				fieldUpdates[key] = map[string]string{"last_run": "OK"}
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
@@ -1104,6 +1151,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.EC2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1128,6 +1176,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		// Collect worst finding across all attachments for this TGW.
 		// "!" severity beats "~" severity.
 		var worst *resource.EnrichmentFinding
+		issueCount := 0
 		for _, att := range out.TransitGatewayAttachments {
 			attID := ""
 			if att.TransitGatewayAttachmentId != nil {
@@ -1137,6 +1186,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			var candidate *resource.EnrichmentFinding
 			switch state {
 			case "failed", "failing":
+				issueCount++
 				candidate = &resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  fmt.Sprintf("attachment %s failed", attID),
@@ -1146,6 +1196,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 					},
 				}
 			case "modifying", "pendingAcceptance", "rollingBack":
+				issueCount++
 				candidate = &resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  fmt.Sprintf("attachment %s %s", attID, state),
@@ -1162,11 +1213,18 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 				worst = candidate
 			}
 		}
+		attStatusVal := ""
+		if issueCount > 0 {
+			attStatusVal = fmt.Sprintf("%d issues", issueCount)
+		}
+		fieldUpdates[tgwID] = map[string]string{
+			"att_status": attStatusVal,
+		}
 		if worst != nil {
 			findings[tgwID] = *worst
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (cap EnrichmentCap)
@@ -1175,6 +1233,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 // Summary: "no active VPC flow logs (CIS EC2.6)".
 func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.EC2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1204,14 +1263,19 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 				break
 			}
 		}
+		flowLogsVal := "yes"
 		if !hasActive {
+			flowLogsVal = "no"
 			findings[vpcID] = resource.EnrichmentFinding{
 				Severity: "~",
 				Summary:  "no active VPC flow logs (CIS EC2.6)",
 			}
 		}
+		fieldUpdates[vpcID] = map[string]string{
+			"flow_logs": flowLogsVal,
+		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
@@ -1893,6 +1957,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 // Per-queue errors are treated as truncated (skip silently).
 func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.SQS == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1917,8 +1982,16 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			continue
 		}
+		_, hasDLQ := out.Attributes["RedrivePolicy"]
+		dlqVal := "no"
+		if hasDLQ {
+			dlqVal = "yes"
+		}
+		fieldUpdates[r.ID] = map[string]string{
+			"dlq": dlqVal,
+		}
 		var rows []resource.FindingRow
-		if _, ok := out.Attributes["RedrivePolicy"]; !ok {
+		if !hasDLQ {
 			rows = append(rows, resource.FindingRow{
 				Label: "DLQ",
 				Value: "no DLQ configured",
@@ -1941,7 +2014,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
@@ -1949,6 +2022,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 // Per-topic errors are treated as truncated (skip silently).
 func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.SNS == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1969,6 +2043,9 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			continue
 		}
 		subs := out.Subscriptions
+		fieldUpdates[r.ID] = map[string]string{
+			"subs_count": strconv.Itoa(len(subs)),
+		}
 		if len(subs) == 0 {
 			findings[r.ID] = resource.EnrichmentFinding{
 				Severity: "~",
@@ -2000,7 +2077,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
@@ -2264,6 +2341,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 // Skip if clients.APIGatewayV2 == nil. Per-API errors → truncated.
 func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.APIGatewayV2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -2283,6 +2361,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			truncated = true
 			continue
 		}
+		fieldUpdates[apiID] = map[string]string{"stages_count": strconv.Itoa(len(out.Items))}
 		var summaries []string
 		var rows []resource.FindingRow
 
@@ -2347,7 +2426,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	}
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
@@ -2557,6 +2636,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 // Skip when clients.CodeArtifact == nil.
 func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.CodeArtifact == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -2583,6 +2663,24 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if repoName == "" || domainName == "" {
 			continue
 		}
+		key := r.ID
+		if key == "" {
+			key = repoName
+		}
+		// Count packages in this repository (optional — only if the client supports ListPackages).
+		if listPkgAPI, ok := clients.CodeArtifact.(CodeArtifactListPackagesAPI); ok {
+			pkgInput := &codeartifact.ListPackagesInput{
+				Domain:     aws.String(domainName),
+				Repository: aws.String(repoName),
+			}
+			if domainOwner != "" {
+				pkgInput.DomainOwner = aws.String(domainOwner)
+			}
+			pkgOut, pkgErr := listPkgAPI.ListPackages(ctx, pkgInput)
+			if pkgErr == nil {
+				fieldUpdates[key] = map[string]string{"package_count": strconv.Itoa(len(pkgOut.Packages))}
+			}
+		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
 			Domain:     aws.String(domainName),
 			Repository: aws.String(repoName),
@@ -2591,10 +2689,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			input.DomainOwner = aws.String(domainOwner)
 		}
 		out, err := clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
-		key := r.ID
-		if key == "" {
-			key = repoName
-		}
 		if err != nil {
 			var notFound *codeartifacttypes.ResourceNotFoundException
 			if errors.As(err, &notFound) {
@@ -2625,7 +2719,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
@@ -2760,16 +2854,18 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
-// EnrichWAFLogging calls GetLoggingConfiguration and ListResourcesForWebACL per WebACL
+// EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
 // (cap EnrichmentCap) and raises findings for:
 //   - GetLoggingConfiguration returns WAFNonexistentItemException → "~" finding
 //     "no logging configuration"
 //   - ListResourcesForWebACL returns empty ResourceArns → "~" finding
 //     "WebACL not associated with any resources (orphan)"
 //
+// Also writes FieldUpdates["rules_summary"] = "<N> rules BLOCK" or "0 rules ALLOW".
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) → Truncated.
 func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.WAFv2 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -2822,6 +2918,39 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			})
 		}
 
+		// Compute rules_summary by fetching the full WebACL (optional — only if the
+		// client implements WAFv2GetWebACLAPI, which production clients do but test
+		// fakes focused on logging may not).
+		rulesSummary := "0 rules"
+		if getACLAPI, ok := clients.WAFv2.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
+			scope := r.Fields["scope"]
+			if scope == "" {
+				scope = "REGIONAL"
+			}
+			getOut, gerr := getACLAPI.GetWebACL(ctx, &wafv2svc.GetWebACLInput{
+				Name:  aws.String(r.Fields["name"]),
+				Id:    aws.String(r.Fields["id"]),
+				Scope: wafv2types.Scope(scope),
+			})
+			if gerr == nil && getOut.WebACL != nil {
+				blockCount := 0
+				for _, rule := range getOut.WebACL.Rules {
+					if rule.Action != nil && rule.Action.Block != nil {
+						blockCount++
+					}
+				}
+				total := len(getOut.WebACL.Rules)
+				if total == 0 {
+					rulesSummary = "0 rules"
+				} else {
+					rulesSummary = fmt.Sprintf("%d/%d BLOCK", blockCount, total)
+				}
+			}
+		}
+		fieldUpdates[r.ID] = map[string]string{
+			"rules_summary": rulesSummary,
+		}
+
 		if len(rows) == 0 {
 			continue
 		}
@@ -2832,7 +2961,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 	}
 	// All WAF logging findings are severity "~" (informational).
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -2914,6 +3043,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
+	fieldUpdates := make(map[string]map[string]string)
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -2938,7 +3068,14 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			truncated = true
 			continue
 		}
+		riskVal := ""
+		// Check if the policy is not attached to any entity — orphan.
+		attachCount := r.Fields["attachment_count"]
+		if attachCount == "0" {
+			riskVal = "ORPHAN"
+		}
 		if isAdminStarPolicy(doc) {
+			riskVal = "ADMIN_ALL"
 			findings[r.ID] = resource.EnrichmentFinding{
 				Severity: "!",
 				Summary:  "admin star (CIS IAM.16)",
@@ -2949,8 +3086,11 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			}
 			issueCount++
 		}
+		fieldUpdates[r.ID] = map[string]string{
+			"risk": riskVal,
+		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy

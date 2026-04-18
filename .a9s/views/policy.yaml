@@ -5,6 +5,9 @@ list:
   Type:
     key: policy_type
     width: 10
+  Risk:
+    key: risk
+    width: 14
   Attached:
     key: attachment_count
     width: 10

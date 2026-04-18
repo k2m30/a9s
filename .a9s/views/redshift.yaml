@@ -5,6 +5,9 @@ list:
   Status:
     path: ClusterStatus
     width: 14
+  Pending:
+    path: PendingModifiedValues.NodeType
+    width: 14
   Node Type:
     path: NodeType
     width: 16
