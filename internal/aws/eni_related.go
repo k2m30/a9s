@@ -38,7 +38,7 @@ func init() {
 func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -60,7 +60,7 @@ func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -70,7 +70,7 @@ func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkENISG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 	if len(raw.Groups) == 0 {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -99,7 +99,7 @@ func checkENISG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
 }
@@ -109,7 +109,7 @@ func checkENISG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
 	if raw.Association == nil || raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
@@ -136,7 +136,7 @@ func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.ApproximateZero("eip")
 	}
 	return relatedResult("eip", ids)
 }
@@ -286,7 +286,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -322,7 +322,7 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", ids)
 }

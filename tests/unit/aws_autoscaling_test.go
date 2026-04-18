@@ -11,6 +11,7 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -162,5 +163,297 @@ func TestFetchAutoScalingGroups_EmptyResponse(t *testing.T) {
 	}
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Attention-signal field population tests (Wave 1 ASG fields)
+// ---------------------------------------------------------------------------
+
+func TestFetchAutoScalingGroupsPage_PopulatesInstancesUnhealthyCount(t *testing.T) {
+	mock := &mockASGDescribeAutoScalingGroupsClient{
+		output: &autoscaling.DescribeAutoScalingGroupsOutput{
+			AutoScalingGroups: []asgtypes.AutoScalingGroup{
+				{
+					AutoScalingGroupName: aws.String("prod-web-asg"),
+					MinSize:              aws.Int32(2),
+					MaxSize:              aws.Int32(10),
+					DesiredCapacity:      aws.Int32(4),
+					Instances: []asgtypes.Instance{
+						{InstanceId: aws.String("i-0001"), HealthStatus: aws.String("Healthy"), LifecycleState: "InService"},
+						{InstanceId: aws.String("i-0002"), HealthStatus: aws.String("Unhealthy"), LifecycleState: "InService"},
+						{InstanceId: aws.String("i-0003"), HealthStatus: aws.String("Unhealthy"), LifecycleState: "InService"},
+						{InstanceId: aws.String("i-0004"), HealthStatus: aws.String("Healthy"), LifecycleState: "InService"},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	got := result.Resources[0].Fields["instances_unhealthy_count"]
+	if got != "2" {
+		t.Errorf("Fields[\"instances_unhealthy_count\"]: expected %q, got %q", "2", got)
+	}
+}
+
+func TestFetchAutoScalingGroupsPage_PopulatesInServiceCount(t *testing.T) {
+	mock := &mockASGDescribeAutoScalingGroupsClient{
+		output: &autoscaling.DescribeAutoScalingGroupsOutput{
+			AutoScalingGroups: []asgtypes.AutoScalingGroup{
+				{
+					AutoScalingGroupName: aws.String("prod-api-asg"),
+					MinSize:              aws.Int32(2),
+					MaxSize:              aws.Int32(8),
+					DesiredCapacity:      aws.Int32(4),
+					Instances: []asgtypes.Instance{
+						{InstanceId: aws.String("i-0001"), HealthStatus: aws.String("Healthy"), LifecycleState: "InService"},
+						{InstanceId: aws.String("i-0002"), HealthStatus: aws.String("Healthy"), LifecycleState: "InService"},
+						{InstanceId: aws.String("i-0003"), HealthStatus: aws.String("Healthy"), LifecycleState: "Pending"},
+						{InstanceId: aws.String("i-0004"), HealthStatus: aws.String("Unhealthy"), LifecycleState: "Terminating"},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	got := result.Resources[0].Fields["in_service_count"]
+	if got != "2" {
+		t.Errorf("Fields[\"in_service_count\"]: expected %q, got %q", "2", got)
+	}
+}
+
+func TestFetchAutoScalingGroupsPage_PopulatesSuspendedProcesses(t *testing.T) {
+	mock := &mockASGDescribeAutoScalingGroupsClient{
+		output: &autoscaling.DescribeAutoScalingGroupsOutput{
+			AutoScalingGroups: []asgtypes.AutoScalingGroup{
+				{
+					AutoScalingGroupName: aws.String("worker-asg"),
+					MinSize:              aws.Int32(1),
+					MaxSize:              aws.Int32(5),
+					DesiredCapacity:      aws.Int32(3),
+					SuspendedProcesses: []asgtypes.SuspendedProcess{
+						{ProcessName: aws.String("Launch"), SuspensionReason: aws.String("User suspended the process")},
+						{ProcessName: aws.String("HealthCheck"), SuspensionReason: aws.String("User suspended the process")},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	got := result.Resources[0].Fields["suspended_processes"]
+	if got != "Launch,HealthCheck" {
+		t.Errorf("Fields[\"suspended_processes\"]: expected %q, got %q", "Launch,HealthCheck", got)
+	}
+}
+
+func TestFetchAutoScalingGroupsPage_ZeroInstances(t *testing.T) {
+	mock := &mockASGDescribeAutoScalingGroupsClient{
+		output: &autoscaling.DescribeAutoScalingGroupsOutput{
+			AutoScalingGroups: []asgtypes.AutoScalingGroup{
+				{
+					AutoScalingGroupName: aws.String("empty-asg"),
+					MinSize:              aws.Int32(0),
+					MaxSize:              aws.Int32(10),
+					DesiredCapacity:      aws.Int32(0),
+					Instances:            []asgtypes.Instance{},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	r := result.Resources[0]
+	if got := r.Fields["instances_unhealthy_count"]; got != "0" {
+		t.Errorf("Fields[\"instances_unhealthy_count\"]: expected %q, got %q", "0", got)
+	}
+	if got := r.Fields["in_service_count"]; got != "0" {
+		t.Errorf("Fields[\"in_service_count\"]: expected %q, got %q", "0", got)
+	}
+}
+
+func TestFetchAutoScalingGroupsPage_NoSuspendedProcesses(t *testing.T) {
+	mock := &mockASGDescribeAutoScalingGroupsClient{
+		output: &autoscaling.DescribeAutoScalingGroupsOutput{
+			AutoScalingGroups: []asgtypes.AutoScalingGroup{
+				{
+					AutoScalingGroupName: aws.String("healthy-asg"),
+					MinSize:              aws.Int32(2),
+					MaxSize:              aws.Int32(10),
+					DesiredCapacity:      aws.Int32(4),
+					SuspendedProcesses:   []asgtypes.SuspendedProcess{},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	// Key must exist and be empty string, not missing.
+	got, ok := result.Resources[0].Fields["suspended_processes"]
+	if !ok {
+		t.Error("Fields[\"suspended_processes\"] key is missing; expected empty string")
+	} else if got != "" {
+		t.Errorf("Fields[\"suspended_processes\"]: expected %q, got %q", "", got)
+	}
+}
+
+func TestFetchAutoScalingGroupsPage_RegistersAttentionFields(t *testing.T) {
+	keys := resource.GetFieldKeys("asg")
+	if keys == nil {
+		t.Fatal("no field keys registered for \"asg\"")
+	}
+
+	required := []string{"instances_unhealthy_count", "in_service_count", "suspended_processes"}
+	keySet := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		keySet[k] = true
+	}
+
+	for _, want := range required {
+		if !keySet[want] {
+			t.Errorf("registered field keys for \"asg\" missing %q; got: %v", want, keys)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Color function tests for ASG attention rules
+// ---------------------------------------------------------------------------
+
+func TestColorASG_BrokenWhenInServiceBelowMinSize(t *testing.T) {
+	td := resource.FindResourceType("asg")
+	if td == nil {
+		t.Fatal("asg type not registered")
+	}
+
+	r := resource.Resource{
+		Fields: map[string]string{
+			"min_size":        "4",
+			"in_service_count": "2",
+			"instances_unhealthy_count": "0",
+			"suspended_processes":       "",
+			"status":                    "",
+		},
+	}
+
+	got := td.Color(r)
+	if got != resource.ColorBroken {
+		t.Errorf("Color with in_service_count=2 < min_size=4: expected ColorBroken (%v), got %v", resource.ColorBroken, got)
+	}
+}
+
+func TestColorASG_WarningWhenUnhealthyInstances(t *testing.T) {
+	td := resource.FindResourceType("asg")
+	if td == nil {
+		t.Fatal("asg type not registered")
+	}
+
+	r := resource.Resource{
+		Fields: map[string]string{
+			"min_size":                  "2",
+			"in_service_count":          "2",
+			"instances_unhealthy_count": "1",
+			"suspended_processes":       "",
+			"status":                    "",
+		},
+	}
+
+	got := td.Color(r)
+	if got != resource.ColorWarning {
+		t.Errorf("Color with instances_unhealthy_count=1: expected ColorWarning (%v), got %v", resource.ColorWarning, got)
+	}
+}
+
+func TestColorASG_WarningWhenSuspendedLaunch(t *testing.T) {
+	td := resource.FindResourceType("asg")
+	if td == nil {
+		t.Fatal("asg type not registered")
+	}
+
+	cases := []struct {
+		name      string
+		suspended string
+	}{
+		{"Launch", "Launch"},
+		{"Terminate", "Terminate"},
+		{"HealthCheck", "HealthCheck"},
+		{"Launch_and_HealthCheck", "Launch,HealthCheck"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := resource.Resource{
+				Fields: map[string]string{
+					"min_size":                  "2",
+					"in_service_count":          "2",
+					"instances_unhealthy_count": "0",
+					"suspended_processes":       tc.suspended,
+					"status":                    "",
+				},
+			}
+			got := td.Color(r)
+			if got != resource.ColorWarning {
+				t.Errorf("Color with suspended_processes=%q: expected ColorWarning (%v), got %v", tc.suspended, resource.ColorWarning, got)
+			}
+		})
+	}
+}
+
+func TestColorASG_HealthyWhenAllGood(t *testing.T) {
+	td := resource.FindResourceType("asg")
+	if td == nil {
+		t.Fatal("asg type not registered")
+	}
+
+	r := resource.Resource{
+		Fields: map[string]string{
+			"min_size":                  "2",
+			"in_service_count":          "4",
+			"instances_unhealthy_count": "0",
+			"suspended_processes":       "",
+			"status":                    "",
+		},
+	}
+
+	got := td.Color(r)
+	if got != resource.ColorHealthy {
+		t.Errorf("Color with all-healthy fields: expected ColorHealthy (%v), got %v", resource.ColorHealthy, got)
 	}
 }

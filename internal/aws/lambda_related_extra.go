@@ -103,7 +103,7 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.ApproximateZero("apigw")
 	}
 	return relatedResult("apigw", ids)
 }
@@ -138,7 +138,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	_ = cftypes.DistributionSummary{}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 	return relatedResult("cf", ids)
 }
@@ -296,7 +296,7 @@ func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }
@@ -337,7 +337,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.ApproximateZero("tg")
 	}
 	return relatedResult("tg", ids)
 }
@@ -359,7 +359,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
 	}
 	if subList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 	topicSet := make(map[string]struct{})
 	for _, subRes := range subList {
@@ -382,7 +382,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, t)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }
@@ -417,7 +417,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.ApproximateZero("sns-sub")
 	}
 	return relatedResult("sns-sub", ids)
 }
@@ -453,7 +453,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", ids)
 }
@@ -488,7 +488,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -499,7 +499,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
@@ -533,7 +533,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", ids)
 }
@@ -544,7 +544,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
@@ -576,7 +576,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.ApproximateZero("ssm")
 	}
 	return relatedResult("ssm", ids)
 }

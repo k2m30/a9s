@@ -40,7 +40,7 @@ func init() {
 func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 
 	subnetIDs := make(map[string]bool)
@@ -68,7 +68,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
@@ -78,7 +78,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
 	natIDs := make(map[string]bool)
@@ -106,7 +106,7 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -116,7 +116,7 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
 	}
 
 	igwIDs := make(map[string]bool)
@@ -144,7 +144,7 @@ func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.ApproximateZero("igw")
 	}
 	return relatedResult("igw", ids)
 }
@@ -177,7 +177,7 @@ func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -207,7 +207,7 @@ func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	eniIDs := make(map[string]bool)
 	for _, route := range rtb.Routes {
@@ -233,7 +233,7 @@ func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -243,7 +243,7 @@ func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
 	}
 	tgwIDs := make(map[string]bool)
 	for _, route := range rtb.Routes {
@@ -269,7 +269,7 @@ func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+		return resource.ApproximateZero("tgw")
 	}
 	return relatedResult("tgw", ids)
 }
@@ -300,7 +300,7 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", ids)
 }

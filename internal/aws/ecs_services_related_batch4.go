@@ -245,6 +245,9 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 // matches the task definition family of this service.
 // NeedsTargetCache: true.
 func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
+	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}

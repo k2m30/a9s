@@ -50,7 +50,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
+		return resource.ApproximateZero("ebs")
 	}
 	return relatedResult("ebs", ids)
 }
@@ -84,7 +84,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.ApproximateZero("dbi")
 	}
 	return relatedResult("dbi", ids)
 }
@@ -119,7 +119,7 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", ids)
 }

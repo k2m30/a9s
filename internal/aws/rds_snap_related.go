@@ -39,7 +39,7 @@ func checkRDSSnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.ApproximateZero("dbi")
 	}
 	return relatedResult("dbi", ids)
 }
@@ -79,7 +79,7 @@ func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }

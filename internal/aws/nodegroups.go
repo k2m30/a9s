@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -14,7 +15,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size", "health_issues_count", "health_issues"})
+	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size", "health_issues_count", "health_issues", "image_id"})
 
 	resource.RegisterRelated("ng", []resource.RelatedDef{
 		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true},
@@ -82,7 +83,11 @@ func init() {
 				if err != nil || descOutput.Nodegroup == nil {
 					continue
 				}
-				resources = append(resources, buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup))
+				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
+				if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+					res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+				}
+				resources = append(resources, res)
 			}
 		}
 
@@ -104,16 +109,24 @@ func init() {
 	})
 }
 
-// FetchNodeGroups performs a three-step fetch:
+// FetchNodeGroups performs a four-step fetch:
 // 1. ListClusters to get cluster names (paginated)
 // 2. ListNodegroups per cluster to get node group names (paginated)
 // 3. DescribeNodegroup per node group to get full details
+// 4. DescribeLaunchTemplateVersions for nodegroups with custom LaunchTemplates to resolve image_id
+//
+// The ltVersionsAPI parameter is optional (variadic). When omitted or nil, image_id is left empty.
 func FetchNodeGroups(
 	ctx context.Context,
 	listClustersAPI EKSListClustersAPI,
 	listNodegroupsAPI EKSListNodegroupsAPI,
 	describeNodegroupAPI EKSDescribeNodegroupAPI,
+	ltVersionsAPIs ...EC2DescribeLaunchTemplateVersionsAPI,
 ) ([]resource.Resource, error) {
+	var ltVersionsAPI EC2DescribeLaunchTemplateVersionsAPI
+	if len(ltVersionsAPIs) > 0 {
+		ltVersionsAPI = ltVersionsAPIs[0]
+	}
 	// Step 1: List all clusters (paginated)
 	var allClusters []string
 	var clusterNextToken *string
@@ -170,11 +183,41 @@ func FetchNodeGroups(
 			if descOutput.Nodegroup == nil {
 				continue
 			}
-			resources = append(resources, buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup))
+			res := buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup)
+			// Step 4: Resolve image_id from custom LaunchTemplate (non-fatal on error)
+			if descOutput.Nodegroup.LaunchTemplate != nil && descOutput.Nodegroup.LaunchTemplate.Id != nil {
+				imageID := resolveNGImageID(ctx, ltVersionsAPI, descOutput.Nodegroup.LaunchTemplate)
+				res.Fields["image_id"] = imageID
+			}
+			resources = append(resources, res)
 		}
 	}
 
 	return resources, nil
+}
+
+// resolveNGImageID calls DescribeLaunchTemplateVersions for the given LaunchTemplateSpecification
+// and returns the ImageId from the first version found. Returns "" on any error or missing data.
+func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) string {
+	if api == nil || lt == nil || lt.Id == nil {
+		return ""
+	}
+	version := "$Default"
+	if lt.Version != nil && *lt.Version != "" {
+		version = *lt.Version
+	}
+	out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+		LaunchTemplateId: lt.Id,
+		Versions:         []string{version},
+	})
+	if err != nil || out == nil || len(out.LaunchTemplateVersions) == 0 {
+		return ""
+	}
+	data := out.LaunchTemplateVersions[0].LaunchTemplateData
+	if data == nil || data.ImageId == nil {
+		return ""
+	}
+	return *data.ImageId
 }
 
 // buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.

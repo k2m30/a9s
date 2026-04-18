@@ -118,7 +118,7 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }
