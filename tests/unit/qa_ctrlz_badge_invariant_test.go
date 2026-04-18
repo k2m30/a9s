@@ -17,6 +17,7 @@ package unit
 import (
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -131,31 +132,17 @@ func ctrlZInvariantResources() []resource.Resource {
 	}
 }
 
-// ctrlZRegisteredShortNames returns the short names of registered resource
-// types. Uses the public FindResourceType path by enumerating known names;
-// collected from grep output over internal/resource/*.go. If a new resource
-// type is added to the registry without being added here, the test for it
-// simply won't run — but the broad test below catches regressions in the
-// filter logic itself.
+// ctrlZRegisteredShortNames returns short names of all registered resource
+// types from the registry. Using the registry directly ensures new types are
+// automatically covered by the invariant test.
 func ctrlZRegisteredShortNames() []string {
-	return []string{
-		// Compute
-		"ec2", "asg", "ami", "ebs", "ebs-snap", "eip", "eni",
-		// Networking / LB
-		"vpc", "sg", "subnet", "elb", "tg",
-		// Data
-		"s3", "rds", "dbi", "dbc", "docdb", "docdb-snap", "redis", "ddb",
-		// Serverless / Containers
-		"lambda", "ecs", "ecs-svc", "ecs-task", "ecr", "eks",
-		// DevOps
-		"cb", "pipeline", "sfn", "glue",
-		// Observability / Ops
-		"alarm", "cwlogs", "eb", "eb-rule",
-		// Security
-		"iam-user", "iam-role", "secrets", "kms", "acm", "wafv2",
-		// Misc
-		"apigw", "route53", "cf", "cfn", "codeartifact", "efs", "athena", "backup",
+	types := resource.AllResourceTypes()
+	names := make([]string, 0, len(types))
+	for _, td := range types {
+		names = append(names, td.ShortName)
 	}
+	sort.Strings(names)
+	return names
 }
 
 // TestCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes asserts, for every

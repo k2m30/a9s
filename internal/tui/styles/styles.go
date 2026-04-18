@@ -33,6 +33,14 @@ var (
 	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
 	StatusCheckOk     lipgloss.Style // GREEN (ok values in detail view)
 
+	// FindingSection styles for enrichment section headers in the detail view.
+	FindingSectionStopped lipgloss.Style // bold + red — used for "!" tier sections
+	FindingSectionPending lipgloss.Style // bold + yellow — used for "~" tier sections
+	FindingSectionDefault lipgloss.Style // bold — used for sections with no tier
+
+	// BannerInfo is the style for informational banners in the resource list view.
+	BannerInfo lipgloss.Style
+
 	HelpCatStyle         lipgloss.Style
 	HelpKeyStyle         lipgloss.Style
 	HelpDescStyle        lipgloss.Style
@@ -131,6 +139,10 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.Style{}
 	StatusCheckWarn = lipgloss.Style{}
 	StatusCheckOk = lipgloss.Style{}
+	FindingSectionStopped = lipgloss.Style{}
+	FindingSectionPending = lipgloss.Style{}
+	FindingSectionDefault = lipgloss.Style{}
+	BannerInfo = lipgloss.Style{}
 	HelpCatStyle = lipgloss.Style{}
 	HelpKeyStyle = lipgloss.Style{}
 	HelpDescStyle = lipgloss.Style{}
@@ -188,4 +200,8 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
 	StatusCheckWarn = lipgloss.NewStyle().Foreground(ColPending)
 	StatusCheckOk = lipgloss.NewStyle().Foreground(ColRunning)
+	FindingSectionStopped = lipgloss.NewStyle().Bold(true).Foreground(ColStopped)
+	FindingSectionPending = lipgloss.NewStyle().Bold(true).Foreground(ColPending)
+	FindingSectionDefault = lipgloss.NewStyle().Bold(true)
+	BannerInfo = lipgloss.NewStyle().Foreground(ColPending).Italic(true)
 }

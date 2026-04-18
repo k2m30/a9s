@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -56,8 +57,6 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ecrsvc "github.com/aws/aws-sdk-go-v2/service/ecr"
-	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -119,7 +118,7 @@ var EnricherRegistry = map[string]Enricher{
 	"acm":      {Fn: EnrichACMCertificate, Priority: 100},
 	"cf":       {Fn: EnrichCloudFrontDistribution, Priority: 100},
 	"apigw":    {Fn: EnrichAPIGatewayStage, Priority: 100},
-	"cfn":      {Fn: EnrichCFNStackEvents, Priority: 100},
+	"cfn":      {Fn: EnrichCFNCombined, Priority: 100},
 	"ecr":          {Fn: EnrichECRRepository, Priority: 100},
 	"codeartifact": {Fn: EnrichCodeArtifactRepository, Priority: 100},
 	"athena":       {Fn: EnrichAthenaWorkGroup, Priority: 100},
@@ -167,6 +166,10 @@ var EnricherRegistry = map[string]Enricher{
 	"redis":      {Fn: NoOpEnricher, Priority: 100},
 	"rtb":        {Fn: NoOpEnricher, Priority: 100},
 	"secrets":    {Fn: NoOpEnricher, Priority: 100},
+	// sg uses NoOpEnricher because sg.go's fetcher already computes
+	// dangerous_open_count and wide_open at fetch time. The Color func reads
+	// those fields. Pragmatic in-fetcher Wave 2; the registry entry exists for
+	// contract conformance.
 	"sg":         {Fn: NoOpEnricher, Priority: 100},
 	"sns-sub":    {Fn: NoOpEnricher, Priority: 100},
 	"ssm":        {Fn: NoOpEnricher, Priority: 100},
@@ -189,16 +192,6 @@ func NoOpEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (
 
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.
 const EnrichmentCap = 50
-
-// arnSuffix extracts the last colon-delimited segment from an ARN.
-// For "arn:aws:rds:region:account:db:instance-id" it returns "instance-id".
-func arnSuffix(arn string) string {
-	idx := strings.LastIndex(arn, ":")
-	if idx < 0 {
-		return arn
-	}
-	return arn[idx+1:]
-}
 
 // isInstanceARN returns true when the RDS ARN targets a DB instance
 // (resource-type segment = "db"), not a cluster, snapshot, or other resource.
@@ -298,9 +291,11 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 		if key == "" {
-			key = arnSuffix(arn)
-		}
-		if key == "" {
+			// No probeID matched — this maintenance action targets a resource
+			// not in the current input slice (e.g. dispatched for dbc, ARN is
+			// for an instance; or page truncation evicted it). Skip rather
+			// than emit a finding keyed by an ID that has no corresponding
+			// row, which would inflate unifiedIssueCount above len(input).
 			continue
 		}
 		findings[key] = resource.EnrichmentFinding{
@@ -309,7 +304,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: out.Marker != nil, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: out.Marker != nil, Findings: findings}, nil
 }
 
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (1 call, all volumes)
@@ -988,7 +983,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -1030,7 +1025,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap)
@@ -1198,7 +1193,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
@@ -1271,7 +1266,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
 // EnrichECSServices is a Wave 2 enricher for ECS services.
@@ -2401,6 +2396,31 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	return EnricherResult{IssueCount: len(findings), Truncated: truncated, Findings: findings}, nil
 }
 
+// EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
+// CFNStackEvents provides "!" findings for recent resource failures; EnrichCFNDrift
+// adds "~" findings for stacks that have drifted from their template.
+// On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
+// IssueCount = CFNStackEvents.IssueCount (drift adds 0). Truncated = either truncated.
+func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	eventsResult, err := EnrichCFNStackEvents(ctx, clients, resources)
+	if err != nil {
+		return EnricherResult{}, err
+	}
+	driftResult, err := EnrichCFNDrift(ctx, clients, resources)
+	if err != nil {
+		return EnricherResult{}, err
+	}
+	merged := make(map[string]resource.EnrichmentFinding, len(eventsResult.Findings)+len(driftResult.Findings))
+	// Drift findings go in first; stack-events findings overwrite on conflict.
+	maps.Copy(merged, driftResult.Findings)
+	maps.Copy(merged, eventsResult.Findings)
+	return EnricherResult{
+		IssueCount: eventsResult.IssueCount,
+		Truncated:  eventsResult.Truncated || driftResult.Truncated,
+		Findings:   merged,
+	}, nil
+}
+
 // EnrichCFNDrift calls DescribeStacks per stack (up to EnrichmentCap stacks) to
 // read DriftInformation.StackDriftStatus. A status of DRIFTED produces a "~" finding
 // "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
@@ -2455,84 +2475,26 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
 }
 
-// EnrichECRRepository calls DescribeImageScanFindings for each ECR repository (up to
-// EnrichmentCap repos). It reads ImageScanFindings.FindingSeverityCounts directly:
-//   - CRITICAL > 0 → "!" finding "critical vulnerabilities: <count>"
-//   - HIGH > 0 (and no CRITICAL) → "~" finding "high vulnerabilities: <count>"
+// DISABLED: EnrichECRRepository previously called DescribeImageScanFindings for each
+// ECR repository, but DescribeImageScanFindings requires both RepositoryName AND
+// ImageId — calling it with only RepositoryName fails with a validation error on
+// every invocation. The correct approach is: ListImages → per-image
+// DescribeImageScanFindings. Returning empty findings instead of perpetually
+// erroring on every ECR repository.
 //
-// ScanNotFoundException (scan never ran) is silently skipped — Truncated is NOT set.
-// Any other API error causes the repo to be skipped with Truncated=true.
+// TODO: implement properly with ListImages → DescribeImageScanFindings per
+// image. Current single-call form is broken (DescribeImageScanFindings
+// requires ImageId). Returning empty findings instead of perpetually
+// erroring on every ECR repository.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	if clients.ECR == nil {
-		return EnricherResult{Findings: findings}, nil
-	}
-	truncated := len(resources) > EnrichmentCap
-	issueCount := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
-		repoName := r.Fields["repository_name"]
-		if repoName == "" {
-			repoName = r.ID
-		}
-		if repoName == "" {
-			continue
-		}
-		out, err := clients.ECR.DescribeImageScanFindings(ctx, &ecrsvc.DescribeImageScanFindingsInput{
-			RepositoryName: aws.String(repoName),
-		})
-		if err != nil {
-			// ScanNotFoundException means the scan has never run — normal operational
-			// state, silently skip without marking Truncated.
-			var scanNotFound *ecrtypes.ScanNotFoundException
-			if errors.As(err, &scanNotFound) {
-				continue
-			}
-			truncated = true
-			continue
-		}
-		if out.ImageScanFindings == nil {
-			continue
-		}
-		counts := out.ImageScanFindings.FindingSeverityCounts
-		critical := counts["CRITICAL"]
-		high := counts["HIGH"]
-		if critical == 0 && high == 0 {
-			continue
-		}
-		key := r.ID
-		if key == "" {
-			key = repoName
-		}
-		if critical > 0 {
-			rows := []resource.FindingRow{
-				{Label: "CRITICAL", Value: fmt.Sprintf("%d", critical), Tier: "!"},
-			}
-			if high > 0 {
-				rows = append(rows, resource.FindingRow{Label: "HIGH", Value: fmt.Sprintf("%d", high), Tier: "~"})
-			}
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  fmt.Sprintf("critical vulnerabilities: %d", critical),
-				Rows:     rows,
-			}
-			issueCount++
-		} else {
-			// high > 0, critical == 0
-			rows := []resource.FindingRow{
-				{Label: "HIGH", Value: fmt.Sprintf("%d", high), Tier: "~"},
-			}
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  fmt.Sprintf("high vulnerabilities: %d", high),
-				Rows:     rows,
-			}
-			// "~" severity does not contribute to IssueCount.
-		}
-	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+	// TODO: implement properly with ListImages → DescribeImageScanFindings per
+	// image. Current single-call form is broken (DescribeImageScanFindings
+	// requires ImageId). Returning empty findings instead of perpetually
+	// erroring on every ECR repository.
+	_ = ctx
+	_ = clients
+	_ = resources
+	return EnricherResult{Findings: map[string]resource.EnrichmentFinding{}}, nil
 }
 
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at

@@ -511,6 +511,13 @@ func (m *DetailModel) injectEnrichmentSection() {
 		m.injectSFNLatestExecution()
 	case "glue":
 		m.injectGlueLatestRun()
+	default:
+		// Generic fallback: any non-zero finding gets a "Background Check" section
+		// so users see something for resource types whose enricher exists in the
+		// registry but doesn't have a per-type renderer here.
+		if m.enrichmentFinding != nil {
+			m.appendFindingSection("Background Check", "BackgroundCheck")
+		}
 	}
 }
 
@@ -659,12 +666,14 @@ func (m DetailModel) renderFromFieldList() string {
 		} else {
 			switch {
 			case item.IsSection:
-				sectionStyle := lipgloss.NewStyle().Bold(true)
+				var sectionStyle lipgloss.Style
 				switch item.ColorTier {
 				case "!":
-					sectionStyle = sectionStyle.Foreground(styles.ColStopped)
+					sectionStyle = styles.FindingSectionStopped
 				case "~":
-					sectionStyle = sectionStyle.Foreground(styles.ColPending)
+					sectionStyle = styles.FindingSectionPending
+				default:
+					sectionStyle = styles.FindingSectionDefault
 				}
 				line = " " + sectionStyle.Render(item.Key)
 			case item.IsHeader:

@@ -177,8 +177,11 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 	if _, ok := result.Findings["vpc-00000002"]; ok {
 		t.Error("vpc-00000002 must NOT appear in Findings — it has an ACTIVE flow log")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0 (~ findings do not contribute to badge)", result.IssueCount)
+	}
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (finding is produced even when IssueCount is 0)", len(result.Findings))
 	}
 }
 
