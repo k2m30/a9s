@@ -101,11 +101,14 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 
 	// Temporarily replace the dbi enricher with one that always errors.
 	original := awsclient.EnricherRegistry["dbi"]
-	awsclient.EnricherRegistry["dbi"] = func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.EnricherResult, error) {
-		return awsclient.EnricherResult{}, fmt.Errorf("simulated enricher failure")
+	awsclient.EnricherRegistry["dbi"] = awsclient.Enricher{
+		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.EnricherResult, error) {
+			return awsclient.EnricherResult{}, fmt.Errorf("simulated enricher failure")
+		},
+		Priority: original.Priority,
 	}
 	t.Cleanup(func() {
-		if original != nil {
+		if original.Fn != nil {
 			awsclient.EnricherRegistry["dbi"] = original
 		} else {
 			delete(awsclient.EnricherRegistry, "dbi")
@@ -168,7 +171,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	original := awsclient.EnricherRegistry["dbi"]
 	delete(awsclient.EnricherRegistry, "dbi")
 	t.Cleanup(func() {
-		if original != nil {
+		if original.Fn != nil {
 			awsclient.EnricherRegistry["dbi"] = original
 		}
 	})
