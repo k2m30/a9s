@@ -122,7 +122,7 @@ func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	if clusterID == "" {
 		if truncated {
-			return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+			return resource.ApproximateZero("dbc")
 		}
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 	}
