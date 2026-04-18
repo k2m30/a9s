@@ -11,6 +11,9 @@ list:
   State:
     path: State
     width: 12
+  Last Error:
+    path: LastError.Message
+    width: 32
   VPC ID:
     path: VpcId
     width: 24
