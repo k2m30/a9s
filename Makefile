@@ -60,7 +60,7 @@ cover: coverage
 #   ExecuteCommandConfiguration — ECS cluster struct field read via NavigableField, not an API call
 verify-readonly:
 	@echo "Checking for write API calls in internal/aws/..."
-	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z]' internal/aws/*.go \
+	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z][A-Za-z0-9]*(' internal/aws/*.go \
 		| grep -v '_test.go' \
 		| grep -v 'errors.go' \
 		| grep -v 'interfaces.go' \
