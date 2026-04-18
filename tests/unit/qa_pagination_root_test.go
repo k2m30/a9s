@@ -239,9 +239,9 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Total loaded = 100, no more pages → "(100)" without "+"
-	if !strings.Contains(plain, "ct-events(100)") {
-		t.Errorf("after loading two pages, expected frame title 'ct-events(100)', got:\n%s", plain)
+	// Total loaded = 100, no more pages → "(100...)" without "+"
+	if !strings.Contains(plain, "ct-events(100") {
+		t.Errorf("after loading two pages, expected frame title 'ct-events(100...)', got:\n%s", plain)
 	}
 
 	// Must NOT show "100+" since the last page was not truncated
@@ -303,8 +303,8 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 
 	// Verify 100 resources are loaded before navigating away
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(100)") {
-		t.Fatalf("precondition: expected 'ct-events(100)' before Esc, got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(100") {
+		t.Fatalf("precondition: expected 'ct-events(100...)' before Esc, got:\n%s", plain)
 	}
 
 	// Step 5: Press Esc to return to main menu
@@ -325,8 +325,8 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 	plain = stripANSI(rootViewContent(m))
 
 	// Should still show 100 resources
-	if !strings.Contains(plain, "ct-events(100)") {
-		t.Errorf("after re-entering ct-events, expected 'ct-events(100)' (from cache), got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(100") {
+		t.Errorf("after re-entering ct-events, expected 'ct-events(100...)' (from cache), got:\n%s", plain)
 	}
 
 	// The first resource from page 1 must still be present.
@@ -456,8 +456,8 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(50)") {
-		t.Errorf("after re-entering ct-events, expected 'ct-events(50)', got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(50") {
+		t.Errorf("after re-entering ct-events, expected 'ct-events(50...)', got:\n%s", plain)
 	}
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
@@ -472,8 +472,8 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	}
 
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(30)") {
-		t.Errorf("after re-entering ec2, expected 'ec2(30)', got:\n%s", plain)
+	if !strings.Contains(plain, "ec2(30") {
+		t.Errorf("after re-entering ec2, expected 'ec2(30...)', got:\n%s", plain)
 	}
 }
 

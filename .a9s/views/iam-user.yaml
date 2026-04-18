@@ -2,6 +2,12 @@ list:
   User Name:
     path: UserName
     width: 32
+  MFA:
+    key: mfa
+    width: 5
+  Risk:
+    key: risk
+    width: 14
   User ID:
     path: UserId
     width: 22

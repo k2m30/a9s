@@ -11,6 +11,10 @@ list:
   Status:
     path: DBInstanceStatus
     width: 14
+  CIS:
+    path: DBInstanceStatus
+    key: cis_flags
+    width: 24
   Class:
     path: DBInstanceClass
     width: 16

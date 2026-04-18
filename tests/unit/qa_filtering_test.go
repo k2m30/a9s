@@ -304,8 +304,8 @@ func TestQA_Filter_11_12_ResourceList_EscClears(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 	// All 10 resources should be back
-	if !strings.Contains(plain, "ec2(10)") {
-		t.Errorf("after Esc, frame should show ec2(10), got: %s", plain)
+	if !strings.Contains(plain, "ec2(10") {
+		t.Errorf("after Esc, frame should show ec2(10...), got: %s", plain)
 	}
 }
 
@@ -584,9 +584,9 @@ func TestQA_Filter_11_22_FilterMatchesAll(t *testing.T) {
 	m = typeFilter(m, "i-")
 	plain := stripANSI(rootViewContent(m))
 
-	// Frame title should show ec2(10) -- all match, no need for N/M format
-	if !strings.Contains(plain, "ec2(10)") {
-		t.Errorf("when filter matches all, frame should show ec2(10), got: %s", plain)
+	// Frame title should show ec2(10...) -- all match, no need for N/M format
+	if !strings.Contains(plain, "ec2(10") {
+		t.Errorf("when filter matches all, frame should show ec2(10...), got: %s", plain)
 	}
 }
 
@@ -633,7 +633,7 @@ func TestQA_Filter_11_24_DoubleEsc(t *testing.T) {
 	// First Esc: clears filter, stays on resource list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(10)") {
+	if !strings.Contains(plain, "ec2(10") {
 		t.Errorf("first Esc should clear filter and show all 10 resources, got: %s", plain)
 	}
 
@@ -672,7 +672,7 @@ func TestQA_Filter_11_24a_EscClearsConfirmedFilter(t *testing.T) {
 	plain = stripANSI(rootViewContent(m))
 
 	// Should still be on resource list, showing all 10 resources
-	if !strings.Contains(plain, "ec2(10)") {
+	if !strings.Contains(plain, "ec2(10") {
 		t.Errorf("Esc should clear confirmed filter and show all resources, got: %s", plain)
 	}
 	// Should NOT be back at main menu

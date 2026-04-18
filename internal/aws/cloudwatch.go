@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold"})
+	resource.RegisterFieldKeys("alarm", []string{"alarm_name", "state", "metric_name", "namespace", "threshold", "actions_count"})
 
 	resource.RegisterPaginated("alarm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -24,7 +25,24 @@ func init() {
 	resource.RegisterRelated("alarm", []resource.RelatedDef{
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true},
+		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkAlarmAPIGW},
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkAlarmCB},
+		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkAlarmDBI},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAlarmEC2},
+		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkAlarmECS},
+		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkAlarmEKS},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAlarmKMS},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkAlarmLambda},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAlarmLogs},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmS3},
+		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmSFN},
+		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
 	})
+
+	// cwtypes.MetricAlarm: Dimensions[].Value may reference EC2/RDS/ELB IDs but Dimensions
+	// is heterogeneous — a single FieldPath cannot map to one target type. AlarmActions/OKActions
+	// contain SNS ARNs, already handled by checkAlarmSNS. No single-type NavigableField applicable.
 }
 
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and returns all
@@ -85,16 +103,19 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
 		}
 
+		actionsCount := len(alarm.AlarmActions) + len(alarm.OKActions) + len(alarm.InsufficientDataActions)
+
 		r := resource.Resource{
 			ID:     alarmName,
 			Name:   alarmName,
 			Status: stateValue,
 			Fields: map[string]string{
-				"alarm_name":  alarmName,
-				"state":       stateValue,
-				"metric_name": metricName,
-				"namespace":   namespace,
-				"threshold":   threshold,
+				"alarm_name":    alarmName,
+				"state":         stateValue,
+				"metric_name":   metricName,
+				"namespace":     namespace,
+				"threshold":     threshold,
+				"actions_count": strconv.Itoa(actionsCount),
 			},
 			RawStruct: alarm,
 		}

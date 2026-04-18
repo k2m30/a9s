@@ -15,6 +15,7 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "num_workers", Title: "Workers", Width: 9, Sortable: true},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "glue_runs",
 				Key:            "enter",
@@ -33,6 +34,18 @@ func dataResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 				{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
+			},
+			// Athena WorkGroup State per ListWorkGroups: ENABLED | DISABLED.
+			// DISABLED workgroups can't run queries — admin has turned them off.
+			// We surface that as a warning so a curious operator notices.
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ENABLED":
+					return ColorHealthy
+				case "DISABLED":
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 	}

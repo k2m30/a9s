@@ -24,7 +24,19 @@ func init() {
 	resource.RegisterRelated("pipeline", []resource.RelatedDef{
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkPipelineCFN, NeedsTargetCache: false},
+		{TargetType: "codeartifact", DisplayName: "CodeArtifact", Checker: checkPipelineCodeartifact, NeedsTargetCache: false},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkPipelineEbRule, NeedsTargetCache: false},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkPipelineECR, NeedsTargetCache: false},
+		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkPipelineECSSvc, NeedsTargetCache: false},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkPipelineKMS, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkPipelineLambda, NeedsTargetCache: false},
+		{TargetType: "s3", DisplayName: "S3 Buckets (artifacts)", Checker: checkPipelineS3, NeedsTargetCache: false},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkPipelineSNS, NeedsTargetCache: false},
 	})
+
+	// cptypes.PipelineSummary (list response): no navigable fields — RoleArn and
+	// ArtifactStore are only on GetPipelineOutput, not the list summary struct used as RawStruct.
 }
 
 // FetchCodePipelines calls the CodePipeline ListPipelines API and converts

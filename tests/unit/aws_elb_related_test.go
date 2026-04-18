@@ -281,19 +281,64 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- elb→cfn: undeterminable from cache (no tags in list API), returns Count: 0 ---
+// --- elb→cfn: requires DescribeTags per ELB (outside cache budget) ---
 
-func TestRelated_ELB_CFN_ReturnsZero(t *testing.T) {
+// TestRelated_ELB_CFN_Unknown: valid ELB → Count: -1 (tags not in DescribeLoadBalancers).
+func TestRelated_ELB_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-prod-web",
 		Name: "acme-prod-web",
+		Fields: map[string]string{
+			"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/abcdef1234567890",
+		},
 	}
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: tags via DescribeTags per ELB)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
+}
+
+// TestRelated_ELB_CFN_EmptyInput: no identity → Count: 0.
+func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
+	source := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := elbCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty identity)", result.Count)
+	}
+}
+
+// --- elb→r53: requires per-zone ListResourceRecordSets (outside cache budget) ---
+
+// TestRelated_ELB_R53_Unknown: ELB with dns_name → Count: -1 (records per-zone).
+func TestRelated_ELB_R53_Unknown(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme-prod-web",
+		Name: "acme-prod-web",
+		Fields: map[string]string{
+			"dns_name": "acme-prod-web-1234.us-east-1.elb.amazonaws.com",
+		},
+	}
+	checker := elbCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
+	}
+	if result.TargetType != "r53" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
+	}
+}
+
+// TestRelated_ELB_R53_EmptyInput: no dns_name → Count: 0.
+func TestRelated_ELB_R53_EmptyInput(t *testing.T) {
+	source := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := elbCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty dns_name)", result.Count)
 	}
 }

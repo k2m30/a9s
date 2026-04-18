@@ -3,15 +3,20 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("asg", []string{"asg_name", "min_size", "max_size", "desired", "instances", "status"})
+	resource.RegisterFieldKeys("asg", []string{
+		"asg_name", "min_size", "max_size", "desired", "instances", "status",
+		"instances_unhealthy_count", "in_service_count", "suspended_processes",
+	})
 
 	resource.RegisterPaginated("asg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -27,6 +32,18 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
 		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
+		{TargetType: "ami", DisplayName: "AMI", Checker: checkASGAMI, NeedsTargetCache: false},
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkASGELB, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkASGRole, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG, NeedsTargetCache: false},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkASGSNS, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkASGVPC, NeedsTargetCache: false},
+	})
+
+	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs
+	resource.RegisterNavigableFields("asg", []resource.NavigableField{
+		{FieldPath: "TargetGroupARNs", TargetType: "tg"},
+		{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
 	})
 }
 
@@ -93,17 +110,39 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			status = *asg.Status
 		}
 
+		unhealthyCount := 0
+		inServiceCount := 0
+		for _, inst := range asg.Instances {
+			if inst.HealthStatus != nil && *inst.HealthStatus == "Unhealthy" {
+				unhealthyCount++
+			}
+			if inst.LifecycleState == autoscalingtypes.LifecycleStateInService {
+				inServiceCount++
+			}
+		}
+
+		var suspendedNames []string
+		for _, sp := range asg.SuspendedProcesses {
+			if sp.ProcessName != nil {
+				suspendedNames = append(suspendedNames, *sp.ProcessName)
+			}
+		}
+		suspendedProcesses := strings.Join(suspendedNames, ",")
+
 		r := resource.Resource{
 			ID:     asgName,
 			Name:   asgName,
 			Status: status,
 			Fields: map[string]string{
-				"asg_name":  asgName,
-				"min_size":  minSize,
-				"max_size":  maxSize,
-				"desired":   desired,
-				"instances": instances,
-				"status":    status,
+				"asg_name":                  asgName,
+				"min_size":                  minSize,
+				"max_size":                  maxSize,
+				"desired":                   desired,
+				"instances":                 instances,
+				"status":                    status,
+				"instances_unhealthy_count": fmt.Sprintf("%d", unhealthyCount),
+				"in_service_count":          fmt.Sprintf("%d", inServiceCount),
+				"suspended_processes":       suspendedProcesses,
 			},
 			RawStruct: asg,
 		}

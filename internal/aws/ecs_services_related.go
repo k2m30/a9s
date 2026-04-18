@@ -18,9 +18,28 @@ func init() {
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster},
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkECSSvcTargetGroups},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSSvcAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSSvcCTEvents, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule, NeedsTargetCache: true},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTasks, NeedsTargetCache: true},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSSvcSecrets},
+		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN, NeedsTargetCache: true},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC, NeedsTargetCache: true},
+	})
+
+	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
+	resource.RegisterNavigableFields("ecs-svc", []resource.NavigableField{
+		{FieldPath: "ClusterArn", TargetType: "ecs"},
+		{FieldPath: "RoleArn", TargetType: "role"},
+		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.Subnets", TargetType: "subnet"},
+		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.SecurityGroups", TargetType: "sg"},
+		{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
 	})
 }
 
@@ -104,7 +123,7 @@ func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -146,7 +165,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -160,7 +179,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 	if len(raw.LoadBalancers) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
@@ -183,7 +202,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
 	// Step 3: collect ELB ARNs from matched TGs.
@@ -228,7 +247,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncatedELB {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -239,7 +258,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 	taskDefARN := ""
 	if raw.TaskDefinition != nil {
@@ -273,9 +292,30 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
+}
+
+// checkECSSvcSG extracts security group IDs from the ECS Service's
+// NetworkConfiguration.AwsvpcConfiguration.SecurityGroups slice (awsvpc mode).
+// Pattern F — no cache needed.
+func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	if raw.NetworkConfiguration == nil ||
+		raw.NetworkConfiguration.AwsvpcConfiguration == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	var ids []string
+	for _, sgID := range raw.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups {
+		if sgID != "" {
+			ids = append(ids, sgID)
+		}
+	}
+	return relatedResult("sg", ids)
 }
 
 // ecsSvcRelatedResources returns the resource list for target from cache or fetches
@@ -289,3 +329,27 @@ func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.Res
 	}
 	return resources, isTruncated, err
 }
+
+
+// checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
+// The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
+// the last segment after "/".
+func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
+	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *raw.RoleArn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+
+
+
+
+
+
+

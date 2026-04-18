@@ -164,19 +164,6 @@ func TestRelated_SES_R53_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- ses→cfn: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_SES_CFN_ReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acmecorp.com",
-		Name: "acmecorp.com",
-	}
-	checker := sesCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
-	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-	}
-}
+// TestRelated_SES_CFN_ReturnsUnknown was deleted: ses→cfn is in the Explicitly
+// excluded list (unanimous sometimes — tag-heuristic only).
+// See docs/related-resources.md "Explicitly excluded" section.

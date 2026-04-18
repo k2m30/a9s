@@ -58,6 +58,22 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1706000000000),
 		},
+		// Issue: RetentionInDays=nil → Warning (log group never expires, unbounded cost)
+		{
+			LogGroupName: aws.String("/app/custom/no-retention"),
+			Arn:          aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/custom/no-retention:*"),
+			StoredBytes:  aws.Int64(5368709120),
+			// RetentionInDays intentionally omitted (nil) = "Never Expire"
+			CreationTime: aws.Int64(1672531200000), // 2023-01-01 — old, growing forever
+		},
+		// Issue: storedBytes=0 AND creationTime >90d ago → Warning (orphaned / stale log group)
+		{
+			LogGroupName:    aws.String("/app/legacy/orphan-old"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/legacy/orphan-old:*"),
+			StoredBytes:     aws.Int64(0),
+			RetentionInDays: aws.Int32(7),
+			CreationTime:    aws.Int64(1688169600000), // 2023-07-01 — no data written in months
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

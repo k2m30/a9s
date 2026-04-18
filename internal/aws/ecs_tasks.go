@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "status", "task_definition", "launch_type", "cpu", "memory"})
+	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status"})
 
 	resource.RegisterPaginated("ecs-task", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -100,6 +100,9 @@ func FetchECSTasksPage(
 				memory = *task.Memory
 			}
 
+			stopCode := string(task.StopCode)
+			healthStatus := string(task.HealthStatus)
+
 			r := resource.Resource{
 				ID:     taskID,
 				Name:   taskID,
@@ -108,6 +111,9 @@ func FetchECSTasksPage(
 					"task_id":         taskID,
 					"cluster":         clusterName,
 					"status":          status,
+					"last_status":     status,
+					"stop_code":       stopCode,
+					"health_status":   healthStatus,
 					"task_definition": taskDefinition,
 					"launch_type":     launchType,
 					"cpu":             cpu,

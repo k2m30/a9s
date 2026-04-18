@@ -27,8 +27,15 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true},
 		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true},
 		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true},
-		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCFR53},
+		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCfR53},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCfAlarm, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCfLogs},
 	})
+
+	// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname
+	// (e.g. bucket.s3.amazonaws.com), not a bucket name ID; all relationships handled by
+	// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
 }
 
 // FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts

@@ -26,3 +26,12 @@ func (f *CloudFrontFake) ListDistributions(_ context.Context, _ *cloudfront.List
 		},
 	}, nil
 }
+
+// GetDistributionConfig returns an empty config for demo mode.
+// Wave 2 enrichment uses this to check viewer/origin protocol policies;
+// returning an empty config produces no findings in demo mode.
+func (f *CloudFrontFake) GetDistributionConfig(_ context.Context, _ *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
+	return &cloudfront.GetDistributionConfigOutput{
+		DistributionConfig: &cftypes.DistributionConfig{},
+	}, nil
+}

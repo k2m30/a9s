@@ -8,6 +8,9 @@ list:
   Status:
     path: KeyState
     width: 12
+  Rotation:
+    key: rotation_enabled
+    width: 10
   Description:
     path: Description
     width: 36

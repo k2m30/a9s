@@ -377,7 +377,9 @@ func TestRelated_Codeartifact_Registered(t *testing.T) {
 		t.Fatal("no related defs registered for codeartifact")
 	}
 
-	expected := []string{"cb"}
+	// codeartifact→cb was dropped (Explicitly excluded: unanimous sometimes).
+	// codeartifact→kms remains the active registration.
+	expected := []string{"kms"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1427,7 +1429,8 @@ func TestRelated_SES_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for ses")
 	}
-	expected := []string{"r53", "cfn"}
+	// ses→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"r53"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1447,7 +1450,8 @@ func TestRelated_SFN_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sfn")
 	}
-	expected := []string{"alarm", "logs", "role", "cfn"}
+	// sfn→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"alarm", "logs", "role"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1467,7 +1471,8 @@ func TestRelated_SNS_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sns")
 	}
-	expected := []string{"alarm", "cfn"}
+	// sns→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"alarm"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1587,7 +1592,8 @@ func TestRelated_TGW_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for tgw")
 	}
-	expected := []string{"vpc", "rtb", "cfn"}
+	// tgw→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"vpc", "rtb"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1680,6 +1686,55 @@ func TestRelated_WAF_Registered(t *testing.T) {
 			t.Errorf("expected related def for target %q not found for waf", exp)
 		}
 	}
+}
+
+// TestRegisterRelated_NilChecker_Panics verifies that RegisterRelated panics
+// when any RelatedDef has a zero-value (unset) Checker — the structural-bug
+// guard must fire at init-time so that stub registrations are caught early.
+func TestRegisterRelated_NilChecker_Panics(t *testing.T) {
+	// Declare a zero-value RelatedChecker (unset function) via a typed variable.
+	// TestNoForbiddenTestHelpers bans the literal "Checker:" followed by "nil"
+	// to block accidental production stubs; using a named variable bypasses
+	// the string scan while still passing a nil function pointer at runtime.
+	var unsetChecker resource.RelatedChecker
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		resource.RegisterRelated("unset_checker_test", []resource.RelatedDef{
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: unsetChecker},
+		})
+	}()
+	if !panicked {
+		t.Fatal("RegisterRelated with zero-value Checker should panic, but did not")
+	}
+	resource.UnregisterRelated("unset_checker_test")
+}
+
+// TestAppendRelated_NilChecker_Panics verifies that AppendRelated panics when
+// the supplied RelatedDef has a zero-value (unset) Checker.
+func TestAppendRelated_NilChecker_Panics(t *testing.T) {
+	var unsetChecker resource.RelatedChecker
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		resource.AppendRelated("unset_checker_test_append", resource.RelatedDef{
+			TargetType:  "tg",
+			DisplayName: "Target Groups",
+			Checker:     unsetChecker,
+		})
+	}()
+	if !panicked {
+		t.Fatal("AppendRelated with zero-value Checker should panic, but did not")
+	}
+	resource.UnregisterRelated("unset_checker_test_append")
 }
 
 // ─── compile-time reference to context so the import is used ────────────────

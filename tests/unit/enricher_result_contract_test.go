@@ -1,0 +1,63 @@
+package unit
+
+// enricher_result_contract_test.go — Structural contract tests for EnricherResult.
+//
+// These tests pin the required fields of EnricherResult. They fail with compile
+// errors until the field exists in internal/aws/interfaces.go.
+//
+// Tests:
+//   1. TruncatedIDs field exists with type map[string]bool.
+//   2. Truncated (bool) back-compat — still present with unchanged type.
+//   3. Zero-value construction is legal; callers must init maps before writing.
+
+import (
+	"reflect"
+	"testing"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+)
+
+// TestEnricherResult_HasTruncatedIDsField verifies that EnricherResult carries a
+// TruncatedIDs field of type map[string]bool. Fails with a compile error on the
+// field reference until the coder adds it.
+func TestEnricherResult_HasTruncatedIDsField(t *testing.T) {
+	rt := reflect.TypeOf(awsclient.EnricherResult{})
+	f, ok := rt.FieldByName("TruncatedIDs")
+	if !ok {
+		t.Fatal("EnricherResult is missing required field TruncatedIDs — add it to internal/aws/interfaces.go")
+	}
+	want := reflect.TypeOf(map[string]bool{})
+	if f.Type != want {
+		t.Errorf("TruncatedIDs has type %v, want %v", f.Type, want)
+	}
+}
+
+// TestEnricherResult_Truncated_BackCompat verifies that the existing Truncated bool
+// field is still present with its original type. This guards against regressions
+// where a refactor removes or renames the field used by all existing enrichers.
+func TestEnricherResult_Truncated_BackCompat(t *testing.T) {
+	rt := reflect.TypeOf(awsclient.EnricherResult{})
+	f, ok := rt.FieldByName("Truncated")
+	if !ok {
+		t.Fatal("EnricherResult.Truncated field is missing — must not be removed (back-compat)")
+	}
+	if f.Type.Kind() != reflect.Bool {
+		t.Errorf("Truncated has kind %v, want bool", f.Type.Kind())
+	}
+}
+
+// TestEnricherResult_ZeroValueNilMaps_IsLegalConstruction documents that constructing a
+// zero-value EnricherResult{} is legal (does not panic) but callers MUST initialize
+// TruncatedIDs before writing to it. This is a compile-time legality guard — no
+// assertions are needed beyond successful construction and return.
+func TestEnricherResult_ZeroValueNilMaps_IsLegalConstruction(t *testing.T) {
+	// Zero-value construction must not panic.
+	_ = func() awsclient.EnricherResult {
+		r := awsclient.EnricherResult{}
+		// Reading nil map is legal in Go.
+		_ = r.TruncatedIDs["any-key"]
+		_ = r.Truncated
+		return r
+	}()
+	// If this test compiles and runs without panic, the contract is satisfied.
+}

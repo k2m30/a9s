@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -162,51 +162,125 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwLambda tests (stub — Count=0, data not available from GetApis)
+// checkApigwLambda tests (requires GetIntegrations per API — outside budget)
 // ---------------------------------------------------------------------------
 
-// TestRelated_APIGW_Lambda_AlwaysZero verifies that checkApigwLambda returns
-// Count=0 regardless of input. Lambda integration targets are not available
-// in the GetApis list response.
-func TestRelated_APIGW_Lambda_AlwaysZero(t *testing.T) {
+// TestRelated_APIGW_Lambda_Unknown: valid API → Count: -1 (integrations via GetIntegrations).
+func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "api-abc123",
 		Name:   "my-api",
 		Fields: map[string]string{},
 	}
-
 	checker := apigwCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub: Lambda integration not available from list API)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: integration targets via GetIntegrations)", result.Count)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
 	}
 }
 
+// TestRelated_APIGW_Lambda_EmptyInput: empty API id → Count: 0.
+func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	}
+}
+
 // ---------------------------------------------------------------------------
-// checkApigwWAF tests (stub — Count=0, data not available from GetApis)
+// checkApigwWAF tests (requires ListResourcesForWebACL per Web ACL — outside budget)
 // ---------------------------------------------------------------------------
 
-// TestRelated_APIGW_WAF_AlwaysZero verifies that checkApigwWAF returns
-// Count=0 regardless of input. WAF Web ACL associations are not available
-// in the GetApis list response.
-func TestRelated_APIGW_WAF_AlwaysZero(t *testing.T) {
+// TestRelated_APIGW_WAF_Unknown: valid API → Count: -1 (Web ACL links resolved from WAF side).
+func TestRelated_APIGW_WAF_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "api-abc123",
 		Name:   "my-api",
 		Fields: map[string]string{},
 	}
-
 	checker := apigwCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub: WAF association not available from list API)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown: WAF associations require ListResourcesForWebACL)", result.Count)
 	}
 	if result.TargetType != "waf" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "waf")
+	}
+}
+
+// TestRelated_APIGW_WAF_EmptyInput: empty API id → Count: 0.
+func TestRelated_APIGW_WAF_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "waf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkApigwKMS tests (Pattern C: GetIntegrations + GetFunction per Lambda).
+// ---------------------------------------------------------------------------
+
+// TestRelated_Apigw_KMS_Match verifies that an API with a Lambda integration
+// whose FunctionConfiguration carries a KMSKeyArn yields Count=1.
+func TestRelated_Apigw_KMS_Match(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-1234-5678-abcd-111111111111"
+	const fnName = "my-function"
+
+	res := resource.Resource{
+		ID:     "abc123",
+		Name:   "my-api",
+		Fields: map[string]string{},
+	}
+	clients := &awsclient.ServiceClients{
+		APIGatewayV2: newFakeAPIGWV2WithLambdaIntegration(fnName),
+		Lambda:       newFakeLambdaWithKMSKey(keyARN),
+	}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
+	}
+	if result.ResourceIDs[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
+		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs[0])
+	}
+}
+
+// TestRelated_Apigw_KMS_EmptyInput verifies that an empty API ID returns Count=0
+// without calling any API.
+func TestRelated_Apigw_KMS_EmptyInput(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
+	}
+}
+
+// TestRelated_Apigw_KMS_WrongRawStructType verifies that nil clients returns
+// Count=-1 (GetIntegrations cannot proceed).
+func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
+	res := resource.Resource{
+		ID:     "abc123",
+		Fields: map[string]string{},
+	}
+	checker := apigwCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

@@ -1,5 +1,32 @@
 package resource
 
+import (
+	"strings"
+	"time"
+)
+
+// rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
+// Used by dbi and dbc types which share the same status vocabulary.
+func rdsInstanceColor(status string) Color {
+	switch status {
+	case "available":
+		return ColorHealthy
+	case "creating", "modifying", "backing-up", "rebooting", "upgrading",
+		"renaming", "resetting-master-credentials", "storage-optimization",
+		"starting", "stopping":
+		return ColorWarning
+	case "stopped", "restore-error", "storage-full", "failed":
+		return ColorBroken
+	case "deleting":
+		return ColorWarning
+	}
+	// incompatible-* and inaccessible-encryption-credentials patterns
+	if strings.HasPrefix(status, "incompatible-") || strings.HasPrefix(status, "inaccessible-") {
+		return ColorBroken
+	}
+	return ColorHealthy
+}
+
 func databasesResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -13,9 +40,47 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				{Key: "cis_flags", Title: "CIS", Width: 24, Sortable: false},
 				{Key: "class", Title: "Class", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				// Prefer "status" (set by fetcher); fall back to legacy "db_instance_status".
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Fields["db_instance_status"]
+				}
+				base := rdsInstanceColor(status)
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// CIS RDS.2: publicly accessible → Warning.
+				if r.Fields["publicly_accessible"] == "true" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// CIS RDS.3: unencrypted storage → Warning.
+				if r.Fields["storage_encrypted"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No deletion protection → Warning.
+				if r.Fields["deletion_protection"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No automated backups (BackupRetentionPeriod == 0) → Warning.
+				if r.Fields["backup_retention_period"] == "0" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "dbi_events",
@@ -34,6 +99,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 				{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "s3_objects",
 				Key:            "enter",
@@ -55,6 +121,33 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "nodes", Title: "Nodes", Width: 8, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 			},
+			Color: func(r Resource) Color {
+				base := ColorHealthy
+				switch r.Fields["status"] {
+				case "available":
+					base = ColorHealthy
+				case "creating", "modifying", "snapshotting", "deleting", "rebooting cluster nodes":
+					base = ColorWarning
+				case "create-failed", "restore-failed", "incompatible-network":
+					base = ColorBroken
+				case "deleted":
+					base = ColorDim
+				}
+				if base == ColorBroken {
+					return base
+				}
+				// AutomaticFailover != enabled on a multi-AZ replication group → Warning
+				// (per docs/attention-signals.md). Populated by the redis fetcher after
+				// the CacheCluster → ReplicationGroup migration. Empty values are
+				// treated as unknown (no penalty) so legacy fixtures are unaffected.
+				af := r.Fields["automatic_failover"]
+				if r.Fields["multi_az"] == "enabled" && af != "" && af != "enabled" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
+			},
 		},
 		{
 			Name:          "DB Clusters",
@@ -68,6 +161,38 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				base := rdsInstanceColor(r.Fields["status"])
+				// No writer member → cluster cannot accept writes → Broken.
+				// has_writer == "false" is populated by the fetcher; "" (legacy/unset)
+				// is treated as unknown and not penalised.
+				if r.Fields["has_writer"] == "false" {
+					base = ColorBroken
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// No deletion protection → Warning.
+				if r.Fields["deletion_protection"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// Unencrypted storage → Warning.
+				if r.Fields["storage_encrypted"] == "false" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				// No automated backups → Warning.
+				if r.Fields["backup_retention_period"] == "0" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
 			},
 		},
 		{
@@ -83,6 +208,22 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "size_bytes", Title: "Size", Width: 14, Sortable: true},
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				// Prefer "status" (set by fetcher); fall back to legacy "table_status".
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Fields["table_status"]
+				}
+				switch status {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				case "INACCESSIBLE_ENCRYPTION_CREDENTIALS", "ARCHIVED", "ARCHIVING":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "OpenSearch Domains",
@@ -96,6 +237,54 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "instance_type", Title: "Instance Type", Width: 22, Sortable: true},
 				{Key: "instance_count", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
+			},
+			// OpenSearch DomainStatus per docs/attention-signals.md.
+			// Precedence: terminal/admin (Dim) overridden by Broken; Broken overrides Warning.
+			// Field contract:
+			//   - domain_processing_status: from DescribeDomains.DomainProcessingStatus
+			//     (always populated by the fetcher; "Isolated" → Broken)
+			//   - cluster_health: Red/Yellow/Green from CloudWatch (Wave 3, not yet
+			//     implemented — branch kept for forward-compatibility, currently never fires)
+			Color: func(r Resource) Color {
+				if r.Fields["deleted"] == "true" {
+					return ColorDim
+				}
+				color := ColorHealthy
+				switch r.Fields["cluster_health"] {
+				case "Red":
+					color = ColorBroken
+				case "Yellow":
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				if r.Fields["domain_processing_status"] == "Isolated" {
+					color = ColorBroken
+				}
+				if r.Fields["processing"] == "true" || r.Fields["upgrade_processing"] == "true" {
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				switch r.Fields["status"] {
+				case "failed", "FAILED", "error", "ERROR":
+					color = ColorBroken
+				case "creating", "CREATING", "updating", "UPDATING", "deleting", "DELETING":
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				if r.Fields["service_software_update_available"] == "true" {
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				if r.Fields["encryption_at_rest_enabled"] == "false" {
+					if color < ColorWarning {
+						color = ColorWarning
+					}
+				}
+				return color
 			},
 		},
 		{
@@ -112,6 +301,47 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "db_name", Title: "Database", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
+			Color: func(r Resource) Color {
+				// Base color from ClusterStatus.
+				var base Color
+				switch r.Fields["status"] {
+				case "available":
+					base = ColorHealthy
+				case "creating", "modifying", "resizing", "rebooting", "renaming", "deleting":
+					base = ColorWarning
+				case "incompatible-hsm", "incompatible-network", "incompatible-parameters",
+					"incompatible-restore", "hardware-failure", "storage-full":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// ClusterAvailabilityStatus upgrades.
+				switch r.Fields["cluster_availability_status"] {
+				case "Unavailable", "Failed":
+					return ColorBroken
+				case "Maintenance", "Modifying":
+					if base == ColorHealthy {
+						base = ColorWarning
+					}
+				}
+				// Re-check after availability upgrade.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// Publicly accessible → upgrade to Warning.
+				if r.Fields["publicly_accessible"] == "true" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				// Unencrypted → upgrade to Warning.
+				if r.Fields["encrypted"] == "false" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				return base
+			},
 		},
 		{
 			Name:          "EFS File Systems",
@@ -126,6 +356,22 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "performance_mode", Title: "Perf Mode", Width: 16, Sortable: true},
 				{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				base := ColorHealthy
+				switch r.Fields["life_cycle_state"] {
+				case "available":
+					base = ColorHealthy
+				case "creating", "updating", "deleting":
+					base = ColorWarning
+				case "error":
+					base = ColorBroken
+				}
+				// Unreachable FS: no mount targets → upgrade to Broken.
+				if r.Fields["mount_targets"] == "0" {
+					base = ColorBroken
+				}
+				return base
 			},
 		},
 		{
@@ -142,6 +388,23 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				status := r.Fields["status"]
+				c := ColorHealthy
+				switch {
+				case status == "failed":
+					c = ColorBroken
+				case strings.HasPrefix(status, "incompatible-"):
+					c = ColorBroken
+				case status == "creating" || status == "copying":
+					c = ColorWarning
+				}
+				// CIS RDS.4: unencrypted snapshot → warning (Broken takes precedence)
+				if c != ColorBroken && r.Fields["encrypted"] == "false" {
+					c = ColorWarning
+				}
+				return c
+			},
 		},
 		{
 			Name:          "DocDB Snapshots",
@@ -157,6 +420,29 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "snapshot_create_time", Title: "Created", Width: 22, Sortable: true},
 				{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				status := r.Fields["status"]
+				c := ColorHealthy
+				switch status {
+				case "failed":
+					c = ColorBroken
+				case "creating":
+					c = ColorWarning
+				}
+				// Unencrypted snapshot → warning
+				if c != ColorBroken && r.Fields["storage_encrypted"] == "false" {
+					c = ColorWarning
+				}
+				// Long-lived manual snapshot (>365 days) → warning (cost signal)
+				if c != ColorBroken && r.Fields["snapshot_type"] == "manual" {
+					if ts, err := time.Parse("2006-01-02 15:04", r.Fields["snapshot_create_time"]); err == nil {
+						if time.Since(ts) > 365*24*time.Hour {
+							c = ColorWarning
+						}
+					}
+				}
+				return c
 			},
 		},
 	}

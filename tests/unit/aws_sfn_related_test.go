@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -232,9 +233,11 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- sfn→role: undeterminable from cache, returns Count: 0 ---
+// --- sfn→role: undeterminable — StateMachineListItem has no RoleArn field ---
 
-func TestRelated_SFN_Role_ReturnsZero(t *testing.T) {
+// TestRelated_SFN_Role_EmptyARN verifies that with no ARN on the source resource,
+// sfn→role short-circuits to Count=0 (no lookup attempted).
+func TestRelated_SFN_Role_EmptyARN(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
 		Name: "order-fulfillment-workflow",
@@ -242,26 +245,95 @@ func TestRelated_SFN_Role_ReturnsZero(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+		t.Errorf("Count = %d, want 0 (empty ARN short-circuit)", result.Count)
 	}
 	if result.TargetType != "role" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
 	}
 }
 
-// --- sfn→cfn: undeterminable from cache, returns Count: 0 ---
-
-func TestRelated_SFN_CFN_ReturnsZero(t *testing.T) {
+// TestRelated_SFN_Role_NilClients verifies that with nil clients (cannot call
+// DescribeStateMachine), sfn→role reports Count=-1 (unknown).
+func TestRelated_SFN_Role_NilClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
 		Name: "order-fulfillment-workflow",
+		Fields: map[string]string{
+			"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+		},
 	}
-	checker := sfnCheckerByTarget(t, "cfn")
+	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients — describe unavailable)", result.Count)
 	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+}
+
+// TestRelated_SFN_CFN_ReturnsUnknown was deleted: sfn→cfn is in the Explicitly
+// excluded list (unanimous sometimes — tag-heuristic only).
+// See docs/related-resources.md "Explicitly excluded" section.
+
+// ---------------------------------------------------------------------------
+// checkSFNEbRule — Pattern C: ListRuleNamesByTarget on state machine ARN
+// ---------------------------------------------------------------------------
+
+// TestRelated_SFN_EbRule_Match verifies that when the fake EventBridge returns
+// 3 rule names, Count=3 and all 3 names are in ResourceIDs.
+func TestRelated_SFN_EbRule_Match(t *testing.T) {
+	src := resource.Resource{
+		ID:   "order-fulfillment-workflow",
+		Name: "order-fulfillment-workflow",
+		Fields: map[string]string{
+			"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		EventBridge: &fakeEventBridgeUS1{
+			ruleNames: []string{"rule-start", "rule-monitor", "rule-retry"},
+		},
+	}
+	checker := sfnCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 3 {
+		t.Errorf("Count = %d, want 3", result.Count)
+	}
+	if len(result.ResourceIDs) != 3 {
+		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs)
+	}
+}
+
+// TestRelated_SFN_EbRule_Empty verifies that a state machine with no ARN
+// field returns Count=0.
+func TestRelated_SFN_EbRule_Empty(t *testing.T) {
+	src := resource.Resource{
+		ID:     "order-fulfillment-workflow",
+		Name:   "order-fulfillment-workflow",
+		Fields: map[string]string{},
+	}
+	checker := sfnCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ARN field)", result.Count)
+	}
+}
+
+// TestRelated_SFN_EbRule_WrongRawStruct verifies that nil clients with a valid
+// ARN field returns Count=-1 (no EventBridge client available).
+func TestRelated_SFN_EbRule_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:   "order-fulfillment-workflow",
+		Name: "order-fulfillment-workflow",
+		Fields: map[string]string{
+			"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow",
+		},
+		RawStruct: "not-a-state-machine",
+	}
+	checker := sfnCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

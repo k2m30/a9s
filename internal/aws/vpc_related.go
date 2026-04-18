@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -21,6 +22,8 @@ func init() {
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVPCRTB, NeedsTargetCache: true},
 		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkVPCVPCE, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkVPCCFN, NeedsTargetCache: false},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCENI, NeedsTargetCache: true},
+		{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW, NeedsTargetCache: false},
 	})
 }
 
@@ -47,7 +50,7 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
@@ -75,7 +78,7 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
 }
@@ -103,7 +106,7 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -136,7 +139,7 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -164,7 +167,7 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -192,7 +195,7 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.ApproximateZero("igw")
 	}
 	return relatedResult("igw", ids)
 }
@@ -220,7 +223,7 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }
@@ -248,7 +251,7 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", ids)
 }
@@ -265,6 +268,78 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	return relatedResult("cfn", []string{stackName})
+}
+
+// checkVPCENI searches the eni cache for network interfaces whose vpc_id
+// matches this VPC's ID.
+func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := vpcIDFromResource(res)
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+	}
+
+	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "eni")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+	}
+	if list == nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+	}
+	var ids []string
+	for _, r := range list {
+		if r.Fields["vpc_id"] == vpcID {
+			ids = append(ids, r.ID)
+			continue
+		}
+		eni, ok := assertStruct[ec2types.NetworkInterface](r.RawStruct)
+		if ok && eni.VpcId != nil && *eni.VpcId == vpcID {
+			ids = append(ids, r.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("eni")
+	}
+	return relatedResult("eni", ids)
+}
+
+// checkVPCTGW reports transit gateways attached to this VPC.
+// Pattern C: one ec2:DescribeTransitGatewayAttachments call filtered by the
+// VPC resource-id; deduplicate TransitGatewayId across the attachments.
+func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := vpcIDFromResource(res)
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EC2 == nil {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+	}
+	resIDName := "resource-id"
+	resTypeName := "resource-type"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
+		return c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
+			Filters: []ec2types.Filter{
+				{Name: &resIDName, Values: []string{vpcID}},
+				{Name: &resTypeName, Values: []string{"vpc"}},
+			},
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1, Err: err}
+	}
+	seen := make(map[string]bool)
+	var ids []string
+	for _, att := range out.TransitGatewayAttachments {
+		if att.TransitGatewayId == nil || *att.TransitGatewayId == "" {
+			continue
+		}
+		if seen[*att.TransitGatewayId] {
+			continue
+		}
+		seen[*att.TransitGatewayId] = true
+		ids = append(ids, *att.TransitGatewayId)
+	}
+	return relatedResult("tgw", ids)
 }
 
 // vpcIDFromResource extracts the VPC ID from a VPC resource.
@@ -287,3 +362,5 @@ func vpcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+

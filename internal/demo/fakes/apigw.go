@@ -21,3 +21,10 @@ func NewAPIGW() *APIGWFake {
 func (f *APIGWFake) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error) {
 	return &apigatewayv2.GetApisOutput{Items: f.fix.APIs}, nil
 }
+
+// GetStages returns an empty stage list for demo mode.
+// Wave 2 enrichment uses this to check throttling and access-log settings;
+// returning no stages produces no findings in demo mode.
+func (f *APIGWFake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
+	return &apigatewayv2.GetStagesOutput{}, nil
+}

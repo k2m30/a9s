@@ -114,10 +114,37 @@ type Model struct {
 	preSuppliedClients *awsclient.ServiceClients
 
 	noCache         bool
+	isDemo          bool     // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 	availabilityGen int      // incremented on profile/region switch to cancel stale probes
 	availQueue      []string // resource short names remaining to probe
 	availChecked    int      // number probed so far in current gen
 	availTotal      int      // total types to probe in current gen
+
+	// Issue count enrichment (Wave 2)
+	probeResources map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
+	enrichQueue    []string                       // resource types pending Wave 2 enrichment
+	enrichmentGen  int                            // session-wide generation counter for enrichment (profile/region switch)
+	enrichChecked  int                            // number of enrichment probes completed in current gen
+	enrichTotal    int                            // total enrichment probes to run in current gen
+
+	// Enrichment finding state (feature 018-enrichment-visibility).
+	// enrichmentFindings[shortName][resourceID] = EnrichmentFinding for resources
+	// with Wave 2 findings. Populated by handleEnrichmentChecked on success;
+	// cleared per-type when a rerun starts; cleared entirely on profile/region switch.
+	enrichmentFindings map[string]map[string]resource.EnrichmentFinding
+	// enrichmentRan[shortName] == true only after Wave 2 completed successfully
+	// for that type in this session. Distinct from menu.issueKnown (cached counts).
+	// Banner visibility keys off this signal.
+	enrichmentRan map[string]bool
+	// enrichmentTypeGen[shortName] is a per-type generation counter. Bumped on
+	// every rerun (startup Wave 2 dispatch, menu Ctrl+R, top-level list Ctrl+R).
+	// Stamped on EnrichmentCheckedMsg and (when non-zero) on ResourcesLoadedMsg
+	// from the wrapped Ctrl+R-for-rerun fetch. Handlers discard messages whose
+	// TypeGen doesn't match the current per-type gen.
+	enrichmentTypeGen map[string]int
+	// enrichmentTruncatedIDs[shortName][resourceID] = true when the enricher could
+	// not fully inspect that resource (per-resource API error or page cap).
+	enrichmentTruncatedIDs map[string]map[string]bool
 
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
@@ -214,6 +241,16 @@ func WithDemo(enabled bool) Option {
 		m.preSuppliedClients = demo.NewServiceClients()
 		m.profile = demo.DemoProfile
 		m.region = demo.DemoRegion
+		m.isDemo = true
+	}
+}
+
+// WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
+// Set by the --demo CLI bootstrap path. Distinct from WithNoCache which only
+// disables disk persistence.
+func WithIsDemo(demo bool) Option {
+	return func(m *Model) {
+		m.isDemo = demo
 	}
 }
 
@@ -264,20 +301,24 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		profile:       profile,
-		region:        region,
-		keys:          k,
-		stack:         []views.View{&menu},
-		cmdInput:      ti,
-		viewConfig:    cfg,
-		configErr:     cfgErr,
-		activeTheme:   "tokyo-night.yaml",
-		resourceCache: make(map[string]*resourceCacheEntry),
-		relatedCache:  newRelatedCacheLRU(maxRelatedCacheEntries),
-		relatedGen:    1, // start at 1 so Generation=0 (unset) is always stale and rejected
-		enrichGen:     1, // same convention as relatedGen
-		appCtx:        ctx,
-		appCancel:     cancel,
+		profile:            profile,
+		region:             region,
+		keys:               k,
+		stack:              []views.View{&menu},
+		cmdInput:           ti,
+		viewConfig:         cfg,
+		configErr:          cfgErr,
+		activeTheme:        "tokyo-night.yaml",
+		resourceCache:      make(map[string]*resourceCacheEntry),
+		relatedCache:       newRelatedCacheLRU(maxRelatedCacheEntries),
+		relatedGen:         1, // start at 1 so Generation=0 (unset) is always stale and rejected
+		enrichGen:          1, // same convention as relatedGen
+		enrichmentFindings:     make(map[string]map[string]resource.EnrichmentFinding),
+		enrichmentRan:          make(map[string]bool),
+		enrichmentTypeGen:      make(map[string]int),
+		enrichmentTruncatedIDs: make(map[string]map[string]bool),
+		appCtx:                 ctx,
+		appCancel:          cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -296,6 +337,13 @@ func (m Model) Cancel() {
 	if m.appCancel != nil {
 		m.appCancel()
 	}
+}
+
+// EnrichmentGen returns the current session-wide enrichment generation counter.
+// This accessor is used by tests to capture the pre-switch gen value and verify
+// that post-switch messages carrying the old gen are correctly discarded.
+func (m Model) EnrichmentGen() int {
+	return m.enrichmentGen
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
@@ -427,7 +475,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cursorPos:     rl.CursorPosition(),
 						hScrollOffset: rl.HScrollOffset(),
 					}
-					return updatedModel, cmd
 				}
 			} else if msg.ResourceType != "" && !msg.Append {
 				// Active view is not a ResourceList for this type (e.g., detail or menu).
@@ -438,6 +485,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						resources: msg.Resources,
 					}
 				}
+			}
+			// Enrichment rerun tail: when the fetch was dispatched by
+			// the Ctrl+R-for-rerun path, the message carries a non-zero
+			// TypeGen token. Seed probeResources and dispatch
+			// probeEnrichment only when the token still matches the
+			// current per-type gen (i.e. not superseded by a later
+			// Ctrl+R press). Normal fetches carry TypeGen==0 and are
+			// unaffected.
+			// NOTE: This check runs regardless of which view is currently active —
+			// the user may have navigated away from the resource list before the
+			// fetch returned, but the rerun must still fire.
+			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.enrichmentTypeGen[msg.ResourceType] {
+				if updatedModel.probeResources == nil {
+					updatedModel.probeResources = make(map[string][]resource.Resource)
+				}
+				updatedModel.probeResources[msg.ResourceType] = msg.Resources
+				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.enrichmentGen))
 			}
 			return updatedModel, cmd
 		}
@@ -452,6 +516,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityCheckedMsg:
 		return m.handleAvailabilityChecked(msg)
+	case messages.EnrichmentCheckedMsg:
+		return m.handleEnrichmentChecked(msg)
 	case messages.EnrichDetailMsg:
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResultMsg:
@@ -630,6 +696,20 @@ func (m *Model) popView() bool {
 					if !newTrunc || !known || newCount > curCount {
 						menu.SetAvailability(shortName, newCount)
 						menu.SetTruncated(shortName, newTrunc)
+					}
+					// Sync-back issue count with only-increase guard (T036, FR-022).
+					// The list's Status-based issueCount may be lower than the menu's
+					// enriched count. Never overwrite a higher enriched count.
+					newIssues := rl.IssueCount()
+					curIssues := menu.GetIssueCounts()[shortName]
+					curIssueTrunc := menu.GetIssueTruncated()[shortName]
+					switch {
+					case newIssues > curIssues:
+						// higher enriched count from rl: take it
+						menu.SetIssues(shortName, newIssues, newTrunc)
+					case newIssues == curIssues && curIssueTrunc && !newTrunc:
+						// count confirmed but stale "+" must clear
+						menu.SetIssues(shortName, newIssues, false)
 					}
 				}
 			}

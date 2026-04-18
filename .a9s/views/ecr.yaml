@@ -11,6 +11,15 @@ list:
   Scan:
     path: ImageScanningConfiguration.ScanOnPush
     width: 6
+  Critical:
+    key: critical_vulns
+    width: 8
+  High:
+    key: high_vulns
+    width: 6
+  Scanned:
+    key: images_scanned
+    width: 8
   Created:
     path: CreatedAt
     width: 22

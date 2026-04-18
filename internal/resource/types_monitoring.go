@@ -1,5 +1,10 @@
 package resource
 
+import (
+	"strconv"
+	"time"
+)
+
 func monitoringResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -15,6 +20,21 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "metric_name", Title: "Metric", Width: 24, Sortable: true},
 				{Key: "namespace", Title: "Namespace", Width: 24, Sortable: true},
 				{Key: "threshold", Title: "Threshold", Width: 12, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ALARM":
+					return ColorBroken
+				case "INSUFFICIENT_DATA":
+					return ColorWarning
+				case "OK":
+					actionsCount, err := strconv.Atoi(r.Fields["actions_count"])
+					if err != nil || actionsCount == 0 {
+						return ColorWarning
+					}
+					return ColorHealthy
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "alarm_history",
@@ -35,6 +55,28 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "retention_days", Title: "Retention", Width: 10, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
 			},
+			// Color: Warning for no retention, no KMS key (CIS CW.7), or orphan (0 bytes, >90d old).
+			// Precedence: any Warning condition → ColorWarning; otherwise ColorHealthy.
+			// retention_days is "" when no retention policy is set.
+			// kms_key_id is "" when no KMS key is configured.
+			// stored_bytes is "0 B" when the log group holds no data.
+			// creation_time is stored as "2006-01-02 15:04".
+			Color: func(r Resource) Color {
+				if r.Fields["retention_days"] == "" {
+					return ColorWarning
+				}
+				if r.Fields["kms_key_id"] == "" {
+					return ColorWarning
+				}
+				if r.Fields["stored_bytes"] == "0 B" {
+					ct := r.Fields["creation_time"]
+					t, err := time.Parse("2006-01-02 15:04", ct)
+					if err == nil && time.Since(t) > 90*24*time.Hour {
+						return ColorWarning
+					}
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "log_streams",
 				Key:            "enter",
@@ -54,6 +96,25 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "home_region", Title: "Home Region", Width: 16, Sortable: true},
 				{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				// GetTrailStatus: IsLogging=false = trail not capturing events (broken).
+				// LatestDeliveryError = S3 delivery failing (broken).
+				// LogFileValidationEnabled=false = warning per CIS CT.2.
+				if r.Fields["is_logging"] == "false" {
+					return ColorBroken
+				}
+				if r.Fields["latest_delivery_error"] != "" && r.Fields["latest_delivery_error"] != "-" {
+					return ColorBroken
+				}
+				switch r.Fields["status"] {
+				case "failed", "FAILED", "error", "ERROR":
+					return ColorBroken
+				}
+				if r.Fields["log_file_validation_enabled"] == "false" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:      "CloudTrail Events",
@@ -69,6 +130,16 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "resource_name", Title: "Resource Name", Width: 24, Sortable: true},
 				{Key: "read_only", Title: "Read Only", Width: 10, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Status {
+				case "ct-danger":
+					return ColorBroken
+				case "ct-attention":
+					return ColorWarning
+				}
+				return ColorDim
+			},
+			ExcludeFromIssueBadge: true,
 		},
 	}
 }

@@ -38,3 +38,9 @@ func (f *SecretsFake) GetSecretValue(_ context.Context, input *secretsmanager.Ge
 		SecretString: aws.String(val),
 	}, nil
 }
+
+// GetResourcePolicy returns an empty policy — demo mode does not model
+// Secrets Manager resource policies.
+func (f *SecretsFake) GetResourcePolicy(_ context.Context, _ *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
+	return &secretsmanager.GetResourcePolicyOutput{}, nil
+}

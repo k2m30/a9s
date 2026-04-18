@@ -241,10 +241,19 @@ func (m *DetailModel) buildFieldList() {
 		}
 		// Parse failure or missing JSON → fall through to legacy flat path
 	}
-	var detailPaths []string
+	// Extract detail field definitions; split into path-form and key-form.
+	var detailFields []config.DetailField
 	if m.viewConfig != nil {
 		vd := config.GetViewDef(m.viewConfig, m.resourceType)
-		detailPaths = vd.Detail
+		detailFields = vd.Detail
+	}
+	// Build the []string slice of Path values for ExtractFieldList (path-form only).
+	// Key-form fields (df.Key != "") live in Fields[] and are injected after.
+	var detailPaths []string
+	for _, df := range detailFields {
+		if df.Path != "" {
+			detailPaths = append(detailPaths, df.Path)
+		}
 	}
 	navFields := resource.GetNavigableFields(m.resourceType)
 	navMap := make(map[string]string, len(navFields))
@@ -291,9 +300,53 @@ func (m *DetailModel) buildFieldList() {
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
+		m.injectEnrichmentSection()
 		return
 	}
-	items := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
+	// Build items from path-form fields.
+	pathItems := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
+
+	// Build a map from path → slice of FieldItems for O(1) lookup when interleaving.
+	pathItemsByPath := make(map[string][]fieldpath.FieldItem, len(detailPaths))
+	for _, item := range pathItems {
+		p := item.Path
+		pathItemsByPath[p] = append(pathItemsByPath[p], item)
+	}
+
+	// Build the final ordered items list preserving detailFields order.
+	// Key-form fields are injected as plain key-value rows.
+	// Path-form fields use the items extracted by ExtractFieldList.
+	var items []fieldpath.FieldItem
+	emittedPath := make(map[string]bool, len(detailPaths))
+	for _, df := range detailFields {
+		if df.Key != "" {
+			// Key-form: read from Fields[].
+			val := "-"
+			if v, ok := m.res.Fields[df.Key]; ok && v != "" {
+				val = v
+			}
+			items = append(items, fieldpath.FieldItem{
+				Key:   df.DisplayLabel(),
+				Value: val,
+				Path:  df.Key,
+			})
+		} else if !emittedPath[df.Path] {
+			// Path-form: emit all FieldItems with this path (may be header + sub-fields).
+			// When df.Label is set, override the first (header) item's label so the
+			// user-provided "label:" in YAML actually shows up. Sub-field labels are
+			// derived from the struct shape and are not overridden.
+			emittedPath[df.Path] = true
+			pathItems := pathItemsByPath[df.Path]
+			if df.Label != "" && len(pathItems) > 0 {
+				// Clone to avoid mutating the cached slice — pathItemsByPath may be
+				// referenced again on re-render.
+				pathItems = append([]fieldpath.FieldItem(nil), pathItems...)
+				pathItems[0].Key = df.Label
+			}
+			items = append(items, pathItems...)
+		}
+	}
+
 	// Post-process: annotate sub-fields that match a navigable path.
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
 	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId
@@ -363,6 +416,7 @@ func (m *DetailModel) buildFieldList() {
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()
 	}
+	m.injectEnrichmentSection()
 }
 
 // extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
@@ -408,7 +462,7 @@ func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
 }
 
 // statusCheckTier maps an EC2 status check value to a ColorTier string
-// for deferred styling via RowColorStyle in the render path.
+// for deferred styling via TierColorStyle in the render path.
 func statusCheckTier(status string) string {
 	switch status {
 	case "ok":
@@ -491,6 +545,100 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	m.fieldList = result
 }
 
+// injectEnrichmentSection dispatches to the per-type enrichment injector based on
+// m.resourceType. Types without a Wave 2 enricher (e.g. ec2, ddb) are not dispatched.
+func (m *DetailModel) injectEnrichmentSection() {
+	switch m.resourceType {
+	case "dbi", "rds":
+		m.injectRDSPendingMaintenance()
+	case "ebs":
+		m.injectEBSVolumeStatus()
+	case "cb":
+		m.injectCodeBuildLatestBuild()
+	case "tg":
+		m.injectTargetGroupHealth()
+	case "pipeline":
+		m.injectPipelineStageFailure()
+	case "sfn":
+		m.injectSFNLatestExecution()
+	case "glue":
+		m.injectGlueLatestRun()
+	default:
+		// Generic fallback: any non-zero finding gets a "Background Check" section
+		// so users see something for resource types whose enricher exists in the
+		// registry but doesn't have a per-type renderer here.
+		if m.enrichmentFinding != nil {
+			m.appendFindingSection("Background Check", "BackgroundCheck")
+		}
+	}
+}
+
+// appendFindingSection appends a named section header and one row per FindingRow
+// to m.fieldList. Returns immediately when finding is nil. When Rows is empty
+// but Summary is set, falls back to rendering Summary as a single data row.
+func (m *DetailModel) appendFindingSection(header, pathKey string) {
+	if m.enrichmentFinding == nil {
+		return
+	}
+	rows := m.enrichmentFinding.Rows
+	if len(rows) == 0 {
+		if m.enrichmentFinding.Summary == "" {
+			return
+		}
+		rows = []resource.FindingRow{{Label: "Summary", Value: m.enrichmentFinding.Summary}}
+	}
+	items := make([]fieldpath.FieldItem, 0, 1+len(rows))
+	items = append(items, fieldpath.FieldItem{
+		IsSection: true,
+		Key:       header,
+		Path:      pathKey,
+		ColorTier: m.enrichmentFinding.Severity,
+	})
+	for _, row := range rows {
+		tier := row.Tier
+		if tier == "" {
+			tier = m.enrichmentFinding.Severity
+		}
+		items = append(items, fieldpath.FieldItem{
+			IsSubField:  true,
+			IndentLevel: 1,
+			Key:         row.Label,
+			Value:       row.Value,
+			Path:        pathKey,
+			ColorTier:   tier,
+		})
+	}
+	m.fieldList = append(m.fieldList, items...)
+}
+
+func (m *DetailModel) injectRDSPendingMaintenance() {
+	m.appendFindingSection("Pending Maintenance", "PendingMaintenance")
+}
+
+func (m *DetailModel) injectEBSVolumeStatus() {
+	m.appendFindingSection("Volume Health", "VolumeHealth")
+}
+
+func (m *DetailModel) injectCodeBuildLatestBuild() {
+	m.appendFindingSection("Latest Build", "LatestBuild")
+}
+
+func (m *DetailModel) injectTargetGroupHealth() {
+	m.appendFindingSection("Target Health", "TargetHealth")
+}
+
+func (m *DetailModel) injectPipelineStageFailure() {
+	m.appendFindingSection("Pipeline State", "PipelineState")
+}
+
+func (m *DetailModel) injectSFNLatestExecution() {
+	m.appendFindingSection("Latest Execution", "LatestExecution")
+}
+
+func (m *DetailModel) injectGlueLatestRun() {
+	m.appendFindingSection("Latest Run", "LatestRun")
+}
+
 // subFieldIndent returns the left margin for a sub-field at the given indent level.
 // Level 1 = 5 spaces, level 2 = 7 spaces, level 3 = 9 spaces, etc.
 // This preserves hierarchical YAML indentation in the detail view.
@@ -551,7 +699,7 @@ func (m DetailModel) renderFromFieldList() string {
 			// labels remain legible on selection background across themes.
 			switch {
 			case item.IsSection:
-				line = " " + item.Key // cursor on a section header: plain, no color (cursor skip is handled in detail.go)
+				line = " " + item.Key // cursor on section header: plain text (cursor skip handled in detail.go)
 			case item.IsHeader:
 				line = " " + item.Key + ":"
 			case item.IsSubField:
@@ -570,7 +718,16 @@ func (m DetailModel) renderFromFieldList() string {
 		} else {
 			switch {
 			case item.IsSection:
-				line = " " + lipgloss.NewStyle().Bold(true).Render(item.Key)
+				var sectionStyle lipgloss.Style
+				switch item.ColorTier {
+				case "!":
+					sectionStyle = styles.FindingSectionStopped
+				case "~":
+					sectionStyle = styles.FindingSectionPending
+				default:
+					sectionStyle = styles.FindingSectionDefault
+				}
+				line = " " + sectionStyle.Render(item.Key)
 			case item.IsHeader:
 				line = " " + styles.DetailSection.Render(item.Key+":")
 			case item.IsSubField:
@@ -584,7 +741,7 @@ func (m DetailModel) renderFromFieldList() string {
 				if item.Key != item.Value {
 					val := item.Value
 					if item.ColorTier != "" {
-						val = styles.RowColorStyle(item.ColorTier).Render(val)
+						val = styles.TierColorStyle(item.ColorTier).Render(val)
 					}
 					line = indent + styles.DetailKey.Render(item.Key+":") + " " + val
 					break
@@ -597,7 +754,7 @@ func (m DetailModel) renderFromFieldList() string {
 				label := styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW))
 				var value string
 				if item.ColorTier != "" {
-					value = styles.RowColorStyle(item.ColorTier).Render(item.Value)
+					value = styles.TierColorStyle(item.ColorTier).Render(item.Value)
 				} else {
 					value = styles.DetailVal.Render(item.Value)
 				}

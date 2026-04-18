@@ -9,7 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // applySortAndFilter re-applies filter and then sorts the filtered results.
@@ -229,9 +228,21 @@ func (m ResourceListModel) FilterText() string {
 	return m.filterText
 }
 
-// AttentionOnly returns the current state of the ctrl+z attention filter.
+// AttentionOnly reports whether the ctrl+z attention filter is active.
 func (m ResourceListModel) AttentionOnly() bool {
-	return m.attentionOnly
+	return m.IsEnabled()
+}
+
+// IssueCount returns the number of resources with issue status (red/yellow).
+// Recomputed whenever allResources changes via applySortAndFilter().
+func (m ResourceListModel) IssueCount() int {
+	return m.issueCount
+}
+
+// SetShowIssueBadge enables the "issues:N" badge in FrameTitle.
+// Set by main menu navigation for top-level resource lists.
+func (m *ResourceListModel) SetShowIssueBadge(v bool) {
+	m.showIssueBadge = v
 }
 
 // handleChildKey iterates through the typeDef's Children looking for a match
@@ -332,21 +343,50 @@ func (m ResourceListModel) FrameTitle() string {
 		return name + "(" + totalStr + " loading...)"
 	}
 
-	if m.filterText != "" && filtered != total {
-		title := name + "(" + itoa(filtered) + "/" + totalStr + ")"
-		if m.titleSuffix != "" {
-			title += m.titleSuffix
-		}
-		if m.attentionOnly {
-			title += " [!]"
-		}
-		return title
+	isAttention := m.IsEnabled()
+	hasTextFilter := m.filterText != "" && filtered != total
+	// Use unified Wave-1 + Wave-2 count when enrichment has run; fall back to Wave-1 only.
+	ic := m.issueCount
+	if m.enrichmentIssueCount > 0 {
+		ic = m.enrichmentIssueCount
 	}
-	title := name + "(" + totalStr + ")"
+	issueStr := itoa(ic)
+	// "+" suffix when count is a lower bound: either list pagination is
+	// truncated (more pages unread) or Wave 2 enrichment returned truncated.
+	if ic > 0 && (truncated || m.enrichmentTruncated) {
+		issueStr = itoa(ic) + "+"
+	}
+
+	var title string
+	switch {
+	case hasTextFilter && isAttention:
+		// text filter + ctrl+z: name(filtered of total) [!]
+		// filtered is already the intersection of both filters
+		title = name + "(" + itoa(filtered) + " of " + totalStr + ")"
+	case hasTextFilter:
+		// text filter only: name(filtered/total) — no issue badge
+		title = name + "(" + itoa(filtered) + "/" + totalStr + ")"
+	case isAttention:
+		// ctrl+z only: name(N of total) [!]
+		attentionVisible := len(m.filteredResources)
+		title = name + "(" + itoa(attentionVisible) + " of " + totalStr + ")"
+	default:
+		// No filters: show issue count if > 0 and badge is enabled.
+		if ic > 0 && m.showIssueBadge {
+			issueWord := "issues"
+			if ic == 1 {
+				issueWord = "issue"
+			}
+			title = name + "(" + totalStr + "/" + issueStr + " " + issueWord + ")"
+		} else {
+			title = name + "(" + totalStr + ")"
+		}
+	}
+
 	if m.titleSuffix != "" {
 		title += m.titleSuffix
 	}
-	if m.attentionOnly {
+	if isAttention {
 		title += " [!]"
 	}
 	return title
@@ -457,11 +497,18 @@ func (m *ResourceListModel) applyFilter() {
 	}
 	result := FilterResources(m.filterText, base)
 
-	// §7 attention filter — hide dim rows when toggle is on.
-	if m.attentionOnly {
+	// §7 attention filter — show only attention-worthy rows when toggle is on.
+	// "Attention-worthy" = issue-colored rows (stopped/failed/pending/etc. that
+	// feed the "N issues" badge) PLUS ct-event severities (ct-attention /
+	// ct-danger). Previously this used !IsDimRowColor which kept healthy
+	// running rows too, producing a "25 of 27 [!]" display when the badge
+	// claimed "11 issues" on the same data — a user-visible inconsistency.
+	// The badge-count invariant: on any resource list showing "N issues",
+	// ctrl+z reveals exactly N rows.
+	if m.IsEnabled() {
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
-			if !styles.IsDimRowColor(r.Status) {
+			if m.typeDef.ResolveColor(r).IsIssue() {
 				kept = append(kept, r)
 			}
 		}
@@ -470,6 +517,16 @@ func (m *ResourceListModel) applyFilter() {
 
 	m.filteredResources = result
 	m.scroll.SetTotal(len(m.filteredResources))
+
+	// Recompute issue count from allResources (not filtered — represents the full page).
+	ic := 0
+	for _, r := range m.allResources {
+		if m.typeDef.ResolveColor(r).IsIssue() {
+			ic++
+		}
+	}
+	m.issueCount = ic
+
 }
 
 // FilterResources returns resources matching the query (case-insensitive).

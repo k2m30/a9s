@@ -6,10 +6,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -335,5 +337,258 @@ func TestRelated_NG_ASG_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	}
+}
+
+// --- AMI checker tests (Pattern A — EC2.DescribeLaunchTemplateVersions) ---
+
+func ngSrcResourceWithLaunchTemplate(ltID, ltVersion string) resource.Resource {
+	return resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{
+			"cluster_name": "acme-prod",
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			ClusterName:   aws.String("acme-prod"),
+			LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+				Id:      aws.String(ltID),
+				Version: aws.String(ltVersion),
+			},
+		},
+	}
+}
+
+// TestRelated_NG_AMI_Match verifies that an AMI ID from the launch template
+// version is returned as Count=1.
+func TestRelated_NG_AMI_Match(t *testing.T) {
+	const ltID = "lt-abc12345"
+	const amiID = "ami-0a1b2c3d4e5f60001"
+
+	fakeEC2 := newFakeEC2WithLaunchTemplateVersions([]ec2types.LaunchTemplateVersion{
+		{
+			LaunchTemplateId: aws.String(ltID),
+			LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+				ImageId: aws.String(amiID),
+			},
+		},
+	})
+	clients := &awsclient.ServiceClients{EC2: fakeEC2}
+	res := ngSrcResourceWithLaunchTemplate(ltID, "1")
+
+	checker := ngCheckerByTarget(t, "ami")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != amiID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, amiID)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_NG_AMI_Empty verifies that a node group without a custom launch
+// template (managed NG) produces Count=0.
+func TestRelated_NG_AMI_Empty(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName:  aws.String("general-pool"),
+			ClusterName:    aws.String("acme-prod"),
+			LaunchTemplate: nil, // managed NG — no custom LT
+		},
+	}
+	fakeEC2 := &fakeEC2Batch2{}
+	clients := &awsclient.ServiceClients{EC2: fakeEC2}
+
+	checker := ngCheckerByTarget(t, "ami")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (managed NG, no launch template)", result.Count)
+	}
+}
+
+// TestRelated_NG_AMI_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count=-1 (defensive guard).
+func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "general-pool",
+		RawStruct: "not-a-nodegroup",
+	}
+	checker := ngCheckerByTarget(t, "ami")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// --- EBS checker tests (Pattern A — ASG.DescribeAutoScalingGroups + EC2.DescribeInstances) ---
+
+func ngSrcResourceWithASG(asgName string) resource.Resource {
+	return resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{
+			"cluster_name": "acme-prod",
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			ClusterName:   aws.String("acme-prod"),
+			Resources: &ekstypes.NodegroupResources{
+				AutoScalingGroups: []ekstypes.AutoScalingGroup{
+					{Name: aws.String(asgName)},
+				},
+			},
+		},
+	}
+}
+
+// TestRelated_NG_EBS_Match verifies the two-hop path (ASG → EC2.DescribeInstances)
+// completes without error when ASG returns one instance. fakeEC2Batch2 returns
+// empty DescribeInstances so Count=0 — the integration path covers real BDM counts.
+func TestRelated_NG_EBS_Match(t *testing.T) {
+	const asgName = "eks-acme-prod-ng-general-asg"
+
+	fakeASG := newFakeASGWithGroups([]asgtypes.AutoScalingGroup{
+		{
+			AutoScalingGroupName: aws.String(asgName),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0a1b2c3d4e5f60001")},
+			},
+		},
+	})
+	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2Batch2{}}
+	res := ngSrcResourceWithASG(asgName)
+
+	checker := ngCheckerByTarget(t, "ebs")
+	result := checker(context.Background(), clients, res, nil)
+
+	// fakeEC2Batch2.DescribeInstances returns empty → no BDMs found.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty EC2 stub returns no BDMs)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_NG_EBS_Empty verifies that a node group with no ASG returns Count=0.
+func TestRelated_NG_EBS_Empty(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			ClusterName:   aws.String("acme-prod"),
+			Resources:     nil, // no ASGs at all
+		},
+	}
+	clients := &awsclient.ServiceClients{AutoScaling: &fakeASGBatch2{}, EC2: &fakeEC2Batch2{}}
+
+	checker := ngCheckerByTarget(t, "ebs")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no ASG resources)", result.Count)
+	}
+}
+
+// TestRelated_NG_EBS_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count=-1 (defensive guard).
+func TestRelated_NG_EBS_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "general-pool",
+		RawStruct: "not-a-nodegroup",
+	}
+	checker := ngCheckerByTarget(t, "ebs")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// --- Subnet checker tests (Pattern F — direct field read from Nodegroup.Subnets) ---
+
+// TestRelated_NG_Subnet_Match verifies that two subnets in Nodegroup.Subnets
+// produce Count=2 with both IDs in ResourceIDs.
+func TestRelated_NG_Subnet_Match(t *testing.T) {
+	const sub1 = "subnet-0a1b2c3d4e5f60001"
+	const sub2 = "subnet-0a1b2c3d4e5f60002"
+
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			ClusterName:   aws.String("acme-prod"),
+			Subnets:       []string{sub1, sub2},
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2", result.Count)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	for _, want := range []string{sub1, sub2} {
+		if !seen[want] {
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+		}
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_NG_Subnet_Empty verifies that a node group with no subnets
+// produces Count=0.
+func TestRelated_NG_Subnet_Empty(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			ClusterName:   aws.String("acme-prod"),
+			Subnets:       []string{},
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty Subnets)", result.Count)
+	}
+}
+
+// TestRelated_NG_Subnet_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count=-1 (defensive guard).
+func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "general-pool",
+		RawStruct: "not-a-nodegroup",
+	}
+	checker := ngCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

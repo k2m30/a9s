@@ -360,81 +360,123 @@ func TestQA_RDS_ListData_RowCount(t *testing.T) {
 }
 
 // ===========================================================================
-// A.4 Status Coloring
+// A.4 Status Coloring — uses per-type Color func via styles.ColorStyle
 // ===========================================================================
 
+// rdsColorResource returns a minimal RDS Resource for a given db_instance_status value.
+func rdsColorResource(dbStatus string) resource.Resource {
+	return resource.Resource{
+		ID:     "db-test-001",
+		Status: dbStatus,
+		Fields: map[string]string{"db_instance_status": dbStatus},
+	}
+}
+
 func TestQA_RDS_StatusColor_Available(t *testing.T) {
-	// RowColorStyle("available") should use ColRunning (green #9ece6a).
-	style := styles.RowColorStyle("available")
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
+	r := rdsColorResource("available")
+	style := styles.ColorStyle(td.Color(r))
 	rendered := style.Render("test-available")
-	if !strings.Contains(rendered, "9ece6a") {
-		// If the style system is active, it should apply color.
-		// In NO_COLOR mode it won't. We verify the style function returns non-nil.
-		if styles.NoColorActive() {
-			t.Skip("NO_COLOR is set, skipping color assertion")
-		}
-		// Check that the rendered output is styled (has ANSI codes).
-		if rendered == "test-available" {
-			t.Error("RowColorStyle('available') should apply green color styling")
-		}
+	if styles.NoColorActive() {
+		t.Skip("NO_COLOR is set, skipping color assertion")
+	}
+	if rendered == "test-available" {
+		t.Error("ColorStyle(rds.Color({available})) should apply green color styling")
+	}
+	if style.GetForeground() != styles.ColRunning {
+		t.Errorf("rds available: expected ColRunning foreground, got %v", style.GetForeground())
 	}
 }
 
 func TestQA_RDS_StatusColor_Stopped(t *testing.T) {
-	style := styles.RowColorStyle("stopped")
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
+	r := rdsColorResource("stopped")
+	style := styles.ColorStyle(td.Color(r))
 	rendered := style.Render("test-stopped")
 	if styles.NoColorActive() {
 		t.Skip("NO_COLOR is set, skipping color assertion")
 	}
 	if rendered == "test-stopped" {
-		t.Error("RowColorStyle('stopped') should apply red color styling")
+		t.Error("ColorStyle(rds.Color({stopped})) should apply red color styling")
 	}
 }
 
 func TestQA_RDS_StatusColor_Creating(t *testing.T) {
-	style := styles.RowColorStyle("creating")
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
+	r := rdsColorResource("creating")
+	style := styles.ColorStyle(td.Color(r))
 	rendered := style.Render("test-creating")
 	if styles.NoColorActive() {
 		t.Skip("NO_COLOR is set, skipping color assertion")
 	}
 	if rendered == "test-creating" {
-		t.Error("RowColorStyle('creating') should apply yellow color styling")
+		t.Error("ColorStyle(rds.Color({creating})) should apply yellow color styling")
 	}
 }
 
 func TestQA_RDS_StatusColor_Modifying(t *testing.T) {
-	style := styles.RowColorStyle("modifying")
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
+	r := rdsColorResource("modifying")
+	style := styles.ColorStyle(td.Color(r))
 	rendered := style.Render("test-modifying")
 	if styles.NoColorActive() {
 		t.Skip("NO_COLOR is set, skipping color assertion")
 	}
 	if rendered == "test-modifying" {
-		t.Error("RowColorStyle('modifying') should apply yellow color styling")
+		t.Error("ColorStyle(rds.Color({modifying})) should apply yellow color styling")
 	}
 }
 
 func TestQA_RDS_StatusColor_Failed(t *testing.T) {
-	style := styles.RowColorStyle("failed")
+	os.Unsetenv("NO_COLOR")
+	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
+	r := rdsColorResource("failed")
+	style := styles.ColorStyle(td.Color(r))
 	rendered := style.Render("test-failed")
 	if styles.NoColorActive() {
 		t.Skip("NO_COLOR is set, skipping color assertion")
 	}
 	if rendered == "test-failed" {
-		t.Error("RowColorStyle('failed') should apply red color styling")
+		t.Error("ColorStyle(rds.Color({failed})) should apply red color styling")
 	}
 }
 
 func TestQA_RDS_StatusColor_AvailableAndStoppedDifferent(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
 
-	availStyle := styles.RowColorStyle("available")
-	stopStyle := styles.RowColorStyle("stopped")
+	availStyle := styles.ColorStyle(td.Color(rdsColorResource("available")))
+	stopStyle := styles.ColorStyle(td.Color(rdsColorResource("stopped")))
 
-	availRendered := availStyle.Render("X")
-	stopRendered := stopStyle.Render("X")
-
-	if availRendered == stopRendered {
+	if availStyle.Render("X") == stopStyle.Render("X") {
 		t.Error("available and stopped should have different coloring")
 	}
 }
@@ -442,9 +484,13 @@ func TestQA_RDS_StatusColor_AvailableAndStoppedDifferent(t *testing.T) {
 func TestQA_RDS_StatusColor_AvailableAndCreatingDifferent(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
+	td := resource.FindResourceType("rds")
+	if td == nil {
+		t.Fatal("rds resource type not found")
+	}
 
-	availStyle := styles.RowColorStyle("available")
-	createStyle := styles.RowColorStyle("creating")
+	availStyle := styles.ColorStyle(td.Color(rdsColorResource("available")))
+	createStyle := styles.ColorStyle(td.Color(rdsColorResource("creating")))
 
 	if availStyle.Render("X") == createStyle.Render("X") {
 		t.Error("available and creating should have different coloring")

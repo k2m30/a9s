@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -14,11 +15,75 @@ import (
 
 func init() {
 	resource.RegisterRelated("sqs", []resource.RelatedDef{
-		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
 		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
+		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS, NeedsTargetCache: true},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
 	})
+
+	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
+	// RedrivePolicy are embedded in the Attributes string map, not struct fields; no NavigableField path applies.
+}
+
+// checkSQSSNS resolves the SNS topics publishing to this queue by scanning the
+// sns-sub cache: any subscription with protocol=sqs and Endpoint matching this
+// queue's ARN maps back to its topic_arn. Pattern C — reverse two-hop.
+func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	queueARN := ""
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		queueARN = raw.Attributes["QueueArn"]
+	}
+	queueName := res.ID
+	if queueARN == "" && queueName == "" {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+	}
+
+	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+	}
+	if subList == nil {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+	}
+
+	topicSet := make(map[string]struct{})
+	for _, sub := range subList {
+		if sub.Fields["protocol"] != "sqs" {
+			continue
+		}
+		endpoint := sub.Fields["endpoint"]
+		if endpoint == "" {
+			continue
+		}
+		match := false
+		if queueARN != "" && strings.Contains(endpoint, queueARN) {
+			match = true
+		} else if queueName != "" && strings.HasSuffix(endpoint, ":"+queueName) {
+			match = true
+		}
+		if !match {
+			continue
+		}
+		if ta := sub.Fields["topic_arn"]; ta != "" {
+			topicSet[ta] = struct{}{}
+		}
+	}
+
+	if len(topicSet) == 0 {
+		if truncated {
+			return resource.ApproximateZero("sns")
+		}
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+	}
+
+	var ids []string
+	for arn := range topicSet {
+		ids = append(ids, arn)
+	}
+	return relatedResult("sns", ids)
 }
 
 // checkSQSSNSSub searches the sns-sub cache for subscriptions where protocol=sqs
@@ -60,7 +125,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.ApproximateZero("sns-sub")
 	}
 	return relatedResult("sns-sub", ids)
 }
@@ -100,7 +165,7 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -182,7 +247,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.ApproximateZero("sqs")
 	}
 	return relatedResult("sqs", ids)
 }
@@ -198,6 +263,7 @@ func sqsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
 
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
 // triggered by this SQS queue (Pattern A — direct API call).
@@ -230,3 +296,46 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	return relatedResult("lambda", ids)
 }
+
+// checkSQSKMS is a stub. The SQS RawStruct is a flat Fields map (QueueUrl +
+// Attributes string values) — KmsMasterKeyId is embedded in the Attributes
+// string map rather than a typed struct field, so it cannot be extracted via
+// assertStruct. Use res.Fields["kms_key_id"] or KmsMasterKeyId attribute directly.
+func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	keyID := res.Fields["kms_key_id"]
+	if keyID == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
+// checkSQSEbRule resolves EventBridge rules that target this SQS queue.
+// Pattern C: one events:ListRuleNamesByTarget call using the queue ARN.
+// Queue ARN is read from SQSQueueAttributesRow.Attributes["QueueArn"].
+// Count = len(RuleNames).
+func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	queueARN := ""
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		queueARN = raw.Attributes["QueueArn"]
+	}
+	if queueARN == "" {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
+		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &queueARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+	}
+	return relatedResult("eb-rule", out.RuleNames)
+}
+
+

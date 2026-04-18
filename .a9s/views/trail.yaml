@@ -2,6 +2,12 @@ list:
   Trail Name:
     path: Name
     width: 28
+  Logging:
+    key: is_logging
+    width: 10
+  Last Error:
+    key: latest_delivery_error
+    width: 32
   S3 Bucket:
     path: S3BucketName
     width: 28
@@ -23,3 +29,5 @@ detail:
   - IncludeGlobalServiceEvents
   - KmsKeyId
   - CloudWatchLogsLogGroupArn
+  - { key: is_logging, label: "Logging" }
+  - { key: latest_delivery_error, label: "Latest Delivery Error" }

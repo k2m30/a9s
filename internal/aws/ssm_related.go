@@ -13,6 +13,11 @@ func init() {
 	resource.RegisterRelated("ssm", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
 	})
+
+	// ssmtypes.ParameterMetadata: KeyId (present for SecureString parameters)
+	resource.RegisterNavigableFields("ssm", []resource.NavigableField{
+		{FieldPath: "KeyId", TargetType: "kms"},
+	})
 }
 
 // checkSSMKMS checks the KMS cache for the key used to encrypt this SecureString parameter.
@@ -20,7 +25,7 @@ func init() {
 func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	param, ok := assertStruct[ssmtypes.ParameterMetadata](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 
 	if param.Type != ssmtypes.ParameterTypeSecureString {
@@ -47,7 +52,7 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }

@@ -57,7 +57,7 @@ func twoFieldNavConfig() *config.ViewsConfig {
 	return &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"VpcId", "InstanceType"},
+				Detail: []config.DetailField{{Path: "VpcId"}, {Path: "InstanceType"}},
 			},
 		},
 	}
@@ -198,7 +198,7 @@ func TestDetail_007_SubField_RendersKeyAndValue(t *testing.T) {
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"Tags"},
+				Detail: []config.DetailField{{Path: "Tags"}},
 			},
 		},
 	}

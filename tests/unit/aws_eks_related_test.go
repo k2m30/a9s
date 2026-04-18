@@ -5,11 +5,15 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -334,5 +338,228 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	}
+}
+
+// --- AMI checker tests (Pattern A — EKS.ListNodegroups + EKS.DescribeNodegroup + EC2.DescribeLaunchTemplateVersions) ---
+
+func eksClusterSrcResource() resource.Resource {
+	return resource.Resource{
+		ID:   "acme-services",
+		Name: "acme-services",
+		Fields: map[string]string{},
+		RawStruct: &ekstypes.Cluster{
+			Name: aws.String("acme-services"),
+		},
+	}
+}
+
+// TestRelated_EKS_AMI_Match verifies that two distinct AMI IDs resolved via
+// node group launch templates produce Count=2 with both IDs in ResourceIDs.
+func TestRelated_EKS_AMI_Match(t *testing.T) {
+	const ltID = "lt-aaa111"
+	const ami1 = "ami-0a1b2c3d4e5f60001"
+	const ami2 = "ami-0a1b2c3d4e5f60002"
+
+	eksNodegroups := map[string]*ekstypes.Nodegroup{
+		"ng-general": {
+			NodegroupName: aws.String("ng-general"),
+			ClusterName:   aws.String("acme-services"),
+			LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+				Id:      aws.String(ltID),
+				Version: aws.String("1"),
+			},
+		},
+		"ng-gpu": {
+			NodegroupName: aws.String("ng-gpu"),
+			ClusterName:   aws.String("acme-services"),
+			LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+				Id:      aws.String(ltID),
+				Version: aws.String("2"),
+			},
+		},
+	}
+	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-general", "ng-gpu"}, eksNodegroups)
+
+	// DescribeLaunchTemplateVersions returns a different AMI per call (matched by version).
+	callCount := 0
+	fakeEC2 := &fakeEC2Batch2{
+		describeLaunchTemplateVersionsFn: func(input *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+			callCount++
+			amiID := ami1
+			if len(input.Versions) > 0 && input.Versions[0] == "2" {
+				amiID = ami2
+			}
+			return &ec2.DescribeLaunchTemplateVersionsOutput{
+				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+					{
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							ImageId: aws.String(amiID),
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	clients := &awsclient.ServiceClients{EKS: fakeEKS, EC2: fakeEC2}
+	res := eksClusterSrcResource()
+
+	checker := eksCheckerByTarget(t, "ami")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	for _, want := range []string{ami1, ami2} {
+		if !seen[want] {
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+		}
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_EKS_AMI_Empty verifies that node groups without a launch template
+// (managed NGs) produce Count=0 (SSM-based AMI resolution is deferred).
+func TestRelated_EKS_AMI_Empty(t *testing.T) {
+	eksNodegroups := map[string]*ekstypes.Nodegroup{
+		"ng-managed": {
+			NodegroupName:  aws.String("ng-managed"),
+			ClusterName:    aws.String("acme-services"),
+			LaunchTemplate: nil, // no custom LT — managed NG
+		},
+	}
+	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-managed"}, eksNodegroups)
+	fakeEC2 := &fakeEC2Batch2{}
+	clients := &awsclient.ServiceClients{EKS: fakeEKS, EC2: fakeEC2}
+	res := eksClusterSrcResource()
+
+	checker := eksCheckerByTarget(t, "ami")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (managed NG — no custom LT)", result.Count)
+	}
+}
+
+// TestRelated_EKS_AMI_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count=-1 (defensive guard, assertStruct fails).
+func TestRelated_EKS_AMI_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "acme-services",
+		RawStruct: "not-a-cluster",
+	}
+	checker := eksCheckerByTarget(t, "ami")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// --- EC2 checker tests (Pattern A — EKS.ListNodegroups + EKS.DescribeNodegroup + ASG.DescribeAutoScalingGroups) ---
+
+// TestRelated_EKS_EC2_Match verifies that instance IDs gathered via node group
+// ASGs produce Count=N with all IDs in ResourceIDs.
+func TestRelated_EKS_EC2_Match(t *testing.T) {
+	const asgName = "eks-acme-services-ng-general-asg"
+	const inst1 = "i-0a1b2c3d4e5f60001"
+	const inst2 = "i-0a1b2c3d4e5f60002"
+
+	eksNodegroups := map[string]*ekstypes.Nodegroup{
+		"ng-general": {
+			NodegroupName: aws.String("ng-general"),
+			ClusterName:   aws.String("acme-services"),
+			Resources: &ekstypes.NodegroupResources{
+				AutoScalingGroups: []ekstypes.AutoScalingGroup{
+					{Name: aws.String(asgName)},
+				},
+			},
+		},
+	}
+	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-general"}, eksNodegroups)
+	fakeASG := newFakeASGWithGroups([]asgtypes.AutoScalingGroup{
+		{
+			AutoScalingGroupName: aws.String(asgName),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String(inst1)},
+				{InstanceId: aws.String(inst2)},
+			},
+		},
+	})
+	clients := &awsclient.ServiceClients{EKS: fakeEKS, AutoScaling: fakeASG}
+	res := eksClusterSrcResource()
+
+	checker := eksCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2; ResourceIDs: %v", result.Count, result.ResourceIDs)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	for _, want := range []string{inst1, inst2} {
+		if !seen[want] {
+			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
+		}
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected Err: %v", result.Err)
+	}
+}
+
+// TestRelated_EKS_EC2_Empty verifies that node groups with no ASG instances
+// produce Count=0.
+func TestRelated_EKS_EC2_Empty(t *testing.T) {
+	const asgName = "eks-acme-services-ng-general-asg"
+
+	eksNodegroups := map[string]*ekstypes.Nodegroup{
+		"ng-general": {
+			NodegroupName: aws.String("ng-general"),
+			ClusterName:   aws.String("acme-services"),
+			Resources: &ekstypes.NodegroupResources{
+				AutoScalingGroups: []ekstypes.AutoScalingGroup{
+					{Name: aws.String(asgName)},
+				},
+			},
+		},
+	}
+	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-general"}, eksNodegroups)
+	fakeASG := newFakeASGWithGroups([]asgtypes.AutoScalingGroup{
+		{
+			AutoScalingGroupName: aws.String(asgName),
+			Instances:            []asgtypes.Instance{}, // no instances yet (scaling down)
+		},
+	})
+	clients := &awsclient.ServiceClients{EKS: fakeEKS, AutoScaling: fakeASG}
+	res := eksClusterSrcResource()
+
+	checker := eksCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no instances)", result.Count)
+	}
+}
+
+// TestRelated_EKS_EC2_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count=-1 (defensive guard, assertStruct fails).
+func TestRelated_EKS_EC2_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "acme-services",
+		RawStruct: "not-a-cluster",
+	}
+	checker := eksCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

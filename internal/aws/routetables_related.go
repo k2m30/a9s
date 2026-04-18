@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -16,6 +17,10 @@ func init() {
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "Associations.SubnetId", TargetType: "subnet"},
 		{FieldPath: "Routes.NatGatewayId", TargetType: "nat"},
+		{FieldPath: "Routes.GatewayId", TargetType: "igw"},
+		{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
+		{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
+		{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
 	})
 
 	resource.RegisterRelated("rtb", []resource.RelatedDef{
@@ -23,6 +28,10 @@ func init() {
 		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkRTBNAT, NeedsTargetCache: true},
 		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRTBCFN, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRTBVPC},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkRTBENI, NeedsTargetCache: true},
+		{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkRTBTGW, NeedsTargetCache: true},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkRTBVPCE, NeedsTargetCache: true},
 	})
 }
 
@@ -31,7 +40,7 @@ func init() {
 func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 
 	subnetIDs := make(map[string]bool)
@@ -59,7 +68,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
@@ -69,7 +78,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
 	natIDs := make(map[string]bool)
@@ -97,7 +106,7 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -107,7 +116,7 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
 	}
 
 	igwIDs := make(map[string]bool)
@@ -135,7 +144,7 @@ func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.ApproximateZero("igw")
 	}
 	return relatedResult("igw", ids)
 }
@@ -168,7 +177,7 @@ func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -183,6 +192,119 @@ func rtbCFNStackName(res resource.Resource) string {
 	return tagValue(rtb.Tags, "aws:cloudformation:stack-name")
 }
 
+// checkRTBVPC returns the VPC this route table belongs to (Pattern F).
+// Reads vpc_id from Fields which is populated by the route tables fetcher.
+func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
+}
+
+// checkRTBENI searches the eni cache for interfaces referenced by this route
+// table's routes via Routes[].NetworkInterfaceId.
+func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+	}
+	eniIDs := make(map[string]bool)
+	for _, route := range rtb.Routes {
+		if route.NetworkInterfaceId != nil && *route.NetworkInterfaceId != "" {
+			eniIDs[*route.NetworkInterfaceId] = true
+		}
+	}
+	if len(eniIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+	}
+
+	eniList, truncated, err := rtbRelatedResources(ctx, clients, cache, "eni")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+	}
+	if eniList == nil {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+	}
+	var ids []string
+	for _, eniRes := range eniList {
+		if eniIDs[eniRes.ID] {
+			ids = append(ids, eniRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("eni")
+	}
+	return relatedResult("eni", ids)
+}
+
+// checkRTBTGW searches the tgw cache for transit gateways referenced by this
+// route table's routes via Routes[].TransitGatewayId.
+func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
+	}
+	tgwIDs := make(map[string]bool)
+	for _, route := range rtb.Routes {
+		if route.TransitGatewayId != nil && *route.TransitGatewayId != "" {
+			tgwIDs[*route.TransitGatewayId] = true
+		}
+	}
+	if len(tgwIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
+	}
+
+	tgwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "tgw")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1, Err: err}
+	}
+	if tgwList == nil {
+		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+	}
+	var ids []string
+	for _, tgwRes := range tgwList {
+		if tgwIDs[tgwRes.ID] {
+			ids = append(ids, tgwRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("tgw")
+	}
+	return relatedResult("tgw", ids)
+}
+
+// checkRTBVPCE searches the vpce cache for Gateway-type VPC endpoints that
+// reference this route table via VpcEndpoint.RouteTableIds.
+func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	rtbID := res.ID
+	if rtbID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+	}
+
+	vpceList, truncated, err := rtbRelatedResources(ctx, clients, cache, "vpce")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+	}
+	if vpceList == nil {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+	}
+	var ids []string
+	for _, vpceRes := range vpceList {
+		vpceRaw, ok := assertStruct[ec2types.VpcEndpoint](vpceRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if slices.Contains(vpceRaw.RouteTableIds, rtbID) {
+			ids = append(ids, vpceRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("vpce")
+	}
+	return relatedResult("vpce", ids)
+}
+
 // rtbRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
 func rtbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -194,3 +316,6 @@ func rtbRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+
+

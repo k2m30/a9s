@@ -1,7 +1,11 @@
 // issue232_truncation_contract_test.go contains specification-driven tests for
-// issue #232: EC2 related checkers must return Count=-1 (unknown) when the
-// cache is truncated and 0 local matches are found. A partial page cannot be
-// treated as a definitive zero.
+// issue #232: EC2 related checkers must return {Count:0, Approximate:true} (via
+// resource.ApproximateZero) when the cache is truncated and 0 local matches are
+// found. A partial page cannot be treated as a definitive zero.
+//
+// New contract (Batch B): truncated-zero produces {Count:0, Approximate:true} —
+// the honest lower bound — not Count=-1 (unknown). See resource.ApproximateZero
+// and resource.ValidateRelatedResult (related.go:34-38, 101-114) for the contract.
 //
 // Tests 1-4 FAIL against pre-fix code (ASG, EIP, NodeGroups, CT-Events discard
 // the isTruncated return value). Tests 5-10 must always PASS.
@@ -43,10 +47,12 @@ var trunc232Instance = resource.Resource{
 // Tests 1-4: buggy checkers — MUST fail against pre-fix code
 // ---------------------------------------------------------------------------
 
-// TestContract_TruncatedZeroMatch_ASG_ReturnsUnknown verifies that the ASG
-// checker returns Count=-1 when the cache entry is truncated and no ASG in the
-// partial list contains the instance.
-func TestContract_TruncatedZeroMatch_ASG_ReturnsUnknown(t *testing.T) {
+// TestContract_TruncatedZeroMatch_ASG_ReturnsApproximate verifies that the ASG
+// checker returns {Count:0, Approximate:true} (resource.ApproximateZero) when the
+// cache entry is truncated and no ASG in the partial list contains the instance.
+// See related.go:34-38 for the Approximate contract and ValidateRelatedResult for
+// the invariant that Approximate==true requires Count>=0.
+func TestContract_TruncatedZeroMatch_ASG_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"asg": {
 			IsTruncated: true,
@@ -67,15 +73,25 @@ func TestContract_TruncatedZeroMatch_ASG_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("ASG checker with truncated cache and 0 matches: want Count=-1, got Count=%d (bug: isTruncated return value is discarded)", got.Count)
+	if got.Count != 0 {
+		t.Errorf("ASG checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("ASG checker with truncated cache and 0 matches: want Approximate=true, got false")
+	}
+	if got.TargetType != "asg" {
+		t.Errorf("ASG checker: want TargetType=%q, got %q", "asg", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("ASG checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
-// TestContract_TruncatedZeroMatch_EIP_ReturnsUnknown verifies that the EIP
-// checker returns Count=-1 when the cache entry is truncated and no EIP in the
-// partial list is associated with the instance.
-func TestContract_TruncatedZeroMatch_EIP_ReturnsUnknown(t *testing.T) {
+// TestContract_TruncatedZeroMatch_EIP_ReturnsApproximate verifies that the EIP
+// checker returns {Count:0, Approximate:true} (resource.ApproximateZero) when the
+// cache entry is truncated and no EIP in the partial list is associated with the
+// instance. See related.go:34-38 and ValidateRelatedResult for the contract.
+func TestContract_TruncatedZeroMatch_EIP_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"eip": {
 			IsTruncated: true,
@@ -94,19 +110,30 @@ func TestContract_TruncatedZeroMatch_EIP_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("EIP checker with truncated cache and 0 matches: want Count=-1, got Count=%d (bug: isTruncated return value is discarded)", got.Count)
+	if got.Count != 0 {
+		t.Errorf("EIP checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("EIP checker with truncated cache and 0 matches: want Approximate=true, got false")
+	}
+	if got.TargetType != "eip" {
+		t.Errorf("EIP checker: want TargetType=%q, got %q", "eip", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("EIP checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
-// TestContract_TruncatedZeroMatch_NodeGroups_ReturnsUnknown verifies that the
-// NodeGroups checker returns Count=-1 when the cache entry is truncated and
-// the only node group in the partial list belongs to a different cluster.
+// TestContract_TruncatedZeroMatch_NodeGroups_ReturnsApproximate verifies that
+// the NodeGroups checker returns {Count:0, Approximate:true} (resource.ApproximateZero)
+// when the cache entry is truncated and the only node group in the partial list
+// belongs to a different cluster.
 //
 // The instance has tag eks:cluster-name=cluster-A; the fixture NG has
 // ClusterName=cluster-B so the checker skips it via the clusterName != rawClusterName
-// guard — but because the cache is truncated it cannot conclude there are 0 NGs.
-func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsUnknown(t *testing.T) {
+// guard — but because the cache is truncated it returns the honest lower bound, not -1.
+// See related.go:34-38 and ValidateRelatedResult for the Approximate contract.
+func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ng": {
 			IsTruncated: true,
@@ -129,14 +156,26 @@ func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Count=-1, got Count=%d (bug: isTruncated return value is discarded)", got.Count)
+	if got.Count != 0 {
+		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("NodeGroups checker with truncated cache and 0 matches: want Approximate=true, got false")
+	}
+	if got.TargetType != "ng" {
+		t.Errorf("NodeGroups checker: want TargetType=%q, got %q", "ng", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("NodeGroups checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
 // TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown verifies that
 // the CloudTrail events checker returns Count=-1 when the cache entry is
 // truncated and no event in the partial list references the instance.
+// Note: ct-events uses FetchFilter-based navigation and returns Count=-1 (not
+// ApproximateZero) on truncated-zero, because the FetchFilter enables filtered
+// re-fetch from the navigation layer. Batch B did not migrate this checker.
 func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ct-events": {
@@ -159,7 +198,10 @@ func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
 	if got.Count != -1 {
-		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want Count=-1, got Count=%d (bug: isTruncated return value is discarded)", got.Count)
+		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	}
+	if got.TargetType != "ct-events" {
+		t.Errorf("CloudTrail events checker: want TargetType=%q, got %q", "ct-events", got.TargetType)
 	}
 }
 
@@ -227,9 +269,10 @@ func TestContract_TruncatedWithMatch_EIP_ReturnsCount(t *testing.T) {
 // Tests 7-10: regression pins for already-correct checkers
 // ---------------------------------------------------------------------------
 
-// TestContract_TruncatedZeroMatch_TG_ReturnsUnknown pins the correct behavior
-// of the target-group checker, which already handles truncation properly.
-func TestContract_TruncatedZeroMatch_TG_ReturnsUnknown(t *testing.T) {
+// TestContract_TruncatedZeroMatch_TG_ReturnsApproximate pins the correct behavior
+// of the target-group checker under the new approximate-zero contract.
+// resource.ApproximateZero returns {Count:0, Approximate:true}; see related.go:34-38.
+func TestContract_TruncatedZeroMatch_TG_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"tg": {
 			IsTruncated: true,
@@ -248,14 +291,24 @@ func TestContract_TruncatedZeroMatch_TG_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("TG checker (regression pin) with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("TG checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("TG checker (regression pin): want Approximate=true, got false")
+	}
+	if got.TargetType != "tg" {
+		t.Errorf("TG checker: want TargetType=%q, got %q", "tg", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("TG checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
-// TestContract_TruncatedZeroMatch_Alarm_ReturnsUnknown pins the correct behavior
-// of the CloudWatch alarm checker, which already handles truncation properly.
-func TestContract_TruncatedZeroMatch_Alarm_ReturnsUnknown(t *testing.T) {
+// TestContract_TruncatedZeroMatch_Alarm_ReturnsApproximate pins the correct behavior
+// of the CloudWatch alarm checker under the new approximate-zero contract.
+// resource.ApproximateZero returns {Count:0, Approximate:true}; see related.go:34-38.
+func TestContract_TruncatedZeroMatch_Alarm_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"alarm": {
 			IsTruncated: true,
@@ -276,15 +329,25 @@ func TestContract_TruncatedZeroMatch_Alarm_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("Alarm checker (regression pin) with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("Alarm checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("Alarm checker (regression pin): want Approximate=true, got false")
+	}
+	if got.TargetType != "alarm" {
+		t.Errorf("Alarm checker: want TargetType=%q, got %q", "alarm", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("Alarm checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
-// TestContract_TruncatedZeroMatch_CFN_ReturnsUnknown pins the correct behavior
-// of the CloudFormation checker, which already handles truncation properly.
+// TestContract_TruncatedZeroMatch_CFN_ReturnsApproximate pins the correct behavior
+// of the CloudFormation checker under the new approximate-zero contract.
 // The instance has stack-name=stack-trunc; the fixture stack has a different name.
-func TestContract_TruncatedZeroMatch_CFN_ReturnsUnknown(t *testing.T) {
+// resource.ApproximateZero returns {Count:0, Approximate:true}; see related.go:34-38.
+func TestContract_TruncatedZeroMatch_CFN_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": {
 			IsTruncated: true,
@@ -302,16 +365,26 @@ func TestContract_TruncatedZeroMatch_CFN_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("CFN checker (regression pin) with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("CFN checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("CFN checker (regression pin): want Approximate=true, got false")
+	}
+	if got.TargetType != "cfn" {
+		t.Errorf("CFN checker: want TargetType=%q, got %q", "cfn", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("CFN checker result failed ValidateRelatedResult: %v", err)
 	}
 }
 
-// TestContract_TruncatedZeroMatch_EBSSnap_ReturnsUnknown pins the correct behavior
-// of the EBS snapshot checker, which already handles truncation properly.
+// TestContract_TruncatedZeroMatch_EBSSnap_ReturnsApproximate pins the correct behavior
+// of the EBS snapshot checker under the new approximate-zero contract.
 // The instance has one attached volume (vol-trunc-abc); the snapshot in the
 // truncated cache references a different volume.
-func TestContract_TruncatedZeroMatch_EBSSnap_ReturnsUnknown(t *testing.T) {
+// resource.ApproximateZero returns {Count:0, Approximate:true}; see related.go:34-38.
+func TestContract_TruncatedZeroMatch_EBSSnap_ReturnsApproximate(t *testing.T) {
 	instanceWithVolume := resource.Resource{
 		ID: "i-test-trunc",
 		RawStruct: ec2types.Instance{
@@ -340,7 +413,16 @@ func TestContract_TruncatedZeroMatch_EBSSnap_ReturnsUnknown(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	got := checker(context.Background(), nil, instanceWithVolume, cache)
 
-	if got.Count != -1 {
-		t.Errorf("EBSSnap checker (regression pin) with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("EBSSnap checker (regression pin) with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("EBSSnap checker (regression pin): want Approximate=true, got false")
+	}
+	if got.TargetType != "ebs-snap" {
+		t.Errorf("EBSSnap checker: want TargetType=%q, got %q", "ebs-snap", got.TargetType)
+	}
+	if err := resource.ValidateRelatedResult(got); err != nil {
+		t.Errorf("EBSSnap checker result failed ValidateRelatedResult: %v", err)
 	}
 }

@@ -35,6 +35,65 @@ func GetFieldKeys(shortName string) []string {
 	return fieldKeyRegistry[shortName]
 }
 
+// enricherFieldKeysRegistry stores field keys produced by enrichers
+// (Wave 2 FieldUpdates) per resource short name. Keys declared here are
+// additive to keys in fieldKeyRegistry (fetcher-produced).
+//
+// The test TestColumnKeysHaveProducers asserts every ResourceTypeDef.Columns[].Key
+// appears in at least one of: fetcher keys, enricher keys, or the documented
+// allowlist for intentionally-blank columns.
+var enricherFieldKeysRegistry = map[string][]string{}
+
+// RegisterEnricherFieldKeys declares the set of Resource.Fields keys that an
+// enricher writes via EnricherResult.FieldUpdates for the given resource short
+// name. Multiple enrichers may target the same type; keys are unioned.
+//
+// Call from enrichment.go package init() or from each Enrich* function body
+// (idempotent — duplicates are deduplicated).
+func RegisterEnricherFieldKeys(shortName string, keys []string) {
+	existing := enricherFieldKeysRegistry[shortName]
+	seen := make(map[string]bool, len(existing))
+	for _, k := range existing {
+		seen[k] = true
+	}
+	for _, k := range keys {
+		if !seen[k] {
+			existing = append(existing, k)
+			seen[k] = true
+		}
+	}
+	enricherFieldKeysRegistry[shortName] = existing
+}
+
+// GetEnricherFieldKeys returns the accumulated enricher field keys for the
+// given resource short name, or nil if none are registered.
+func GetEnricherFieldKeys(shortName string) []string {
+	return enricherFieldKeysRegistry[shortName]
+}
+
+// GetAllFieldKeys returns the union of fetcher-registered field keys and
+// enricher-registered field keys for the given short name.
+func GetAllFieldKeys(shortName string) []string {
+	fetcher := GetFieldKeys(shortName)
+	enricher := GetEnricherFieldKeys(shortName)
+	if len(enricher) == 0 {
+		return fetcher
+	}
+	out := make([]string, 0, len(fetcher)+len(enricher))
+	out = append(out, fetcher...)
+	seen := make(map[string]bool, len(fetcher))
+	for _, k := range fetcher {
+		seen[k] = true
+	}
+	for _, k := range enricher {
+		if !seen[k] {
+			out = append(out, k)
+			seen[k] = true
+		}
+	}
+	return out
+}
+
 // fieldAliasBuiltins holds aliases registered by init() functions in aws/*.go.
 // These are permanent and never removed by UnregisterFieldAliases.
 var fieldAliasBuiltins = map[string]map[string]string{}

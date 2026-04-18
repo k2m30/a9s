@@ -35,6 +35,7 @@ type DetailModel struct {
 	pendingRelatedDispatch   bool // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
 	fieldList           []fieldpath.FieldItem // structured field data; nil = not yet computed
 	fieldCursor         int                   // index into fieldList for navigable cursor
+	enrichmentFinding   *resource.EnrichmentFinding // nil when no finding; rendered at top of detail view when non-nil
 }
 
 // NewDetail creates a DetailModel for the given resource.

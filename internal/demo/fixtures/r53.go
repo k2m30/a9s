@@ -46,6 +46,17 @@ func NewR53Fixtures() *R53Fixtures {
 					PrivateZone: false,
 				},
 			},
+			// Issue: ResourceRecordSetCount=2 → Warning (only NS+SOA, no real records — likely unused zone)
+			{
+				Id:                     aws.String("/hostedzone/Z3456789012ABCDEFGHIJ"),
+				Name:                   aws.String("unused-zone.example.com."),
+				CallerReference:        aws.String("2025-09-15T00:00:00Z"),
+				ResourceRecordSetCount: aws.Int64(2),
+				Config: &r53types.HostedZoneConfig{
+					Comment:     aws.String("Abandoned zone — only default NS and SOA records remain"),
+					PrivateZone: false,
+				},
+			},
 		},
 		RecordSets: map[string][]r53types.ResourceRecordSet{
 			"/hostedzone/Z0123456789ABCDEFGHIJ": {
@@ -138,6 +149,25 @@ func NewR53Fixtures() *R53Fixtures {
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String("ns-777.awsdns-33.net.")},
 						{Value: aws.String("ns-888.awsdns-44.org.")},
+					},
+				},
+			},
+			"/hostedzone/Z3456789012ABCDEFGHIJ": {
+				{
+					Name: aws.String("unused-zone.example.com."),
+					Type: r53types.RRTypeNs,
+					TTL:  aws.Int64(172800),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("ns-999.awsdns-99.com.")},
+						{Value: aws.String("ns-111.awsdns-11.net.")},
+					},
+				},
+				{
+					Name: aws.String("unused-zone.example.com."),
+					Type: r53types.RRTypeSoa,
+					TTL:  aws.Int64(900),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("ns-999.awsdns-99.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400")},
 					},
 				},
 			},

@@ -2,6 +2,9 @@ list:
   Plan Name:
     path: BackupPlanName
     width: 32
+  Last Status:
+    key: last_status
+    width: 14
   Plan ID:
     path: BackupPlanId
     width: 38

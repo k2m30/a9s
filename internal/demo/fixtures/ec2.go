@@ -45,6 +45,7 @@ const (
 	fixtProdAPIInternalSGID     = "sg-0bbb222222222222b"
 	fixtProdRDSSGID             = "sg-0ccc333333333333c"
 	fixtProdDBProxySGID         = "sg-0ddd444444444444d"
+	fixtStagingDefaultSGID      = "sg-0fff888888888888f"
 	fixtProdAMIID1              = "ami-0a1b2c3d4e5f60001"
 	fixtProdAMIID2              = "ami-0a1b2c3d4e5f60002"
 	fixtProdAMIID3              = "ami-0a1b2c3d4e5f60003"
@@ -160,6 +161,21 @@ var namedExtras = map[string]instExtras{
 		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1b",
 		securityGroups: []ec2types.GroupIdentifier{
 			{GroupId: aws.String(fixtProdAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	// Staging VPC instances — must use staging SG, not prod web-ALB SG.
+	"i-0a1b2c3d4e5f60030": {
+		imageID: fixtProdAMIID2, keyName: "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtStagingDefaultSGID), GroupName: aws.String("staging-default-sg")},
+		},
+	},
+	"i-0a1b2c3d4e5f60031": {
+		imageID: fixtProdAMIID2, keyName: "acme-staging-keypair",
+		architecture: ec2types.ArchitectureValuesArm64, az: "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtStagingDefaultSGID), GroupName: aws.String("staging-default-sg")},
 		},
 	},
 }
@@ -292,6 +308,9 @@ func makeInstance(
 			Key:   aws.String("kubernetes.io/cluster/" + fixtProdEKSClusterName),
 			Value: aws.String("owned"),
 		})
+		inst.NetworkInterfaces = []ec2types.InstanceNetworkInterface{
+			{NetworkInterfaceId: aws.String("eni-0aaa111111111111a")},
+		}
 	}
 	if instanceID == "i-0a1b2c3d4e5f60003" {
 		inst.Tags = append(inst.Tags,
@@ -345,6 +364,8 @@ func buildReservations() []ec2types.Reservation {
 		{"i-0a1b2c3d4e5f60008", "ml-trainer-gpu", "stopping", ec2types.InstanceTypeG4dnXlarge, "10.0.5.30", "", fixtProdVPCID, fixtStagingSubnetA, time.Date(2026, 2, 14, 22, 0, 0, 0, time.UTC), ec2types.InstanceLifecycleTypeSpot},
 		{"i-0a1b2c3d4e5f60009", "temp-load-test", "shutting-down", ec2types.InstanceTypeC5Large, "10.0.3.55", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 20, 16, 30, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60010", "old-migration-worker", "terminated", ec2types.InstanceTypeT3Small, "", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 8, 1, 12, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60030", "dev-sandbox-01", "stopped", ec2types.InstanceTypeT3Medium, "10.1.0.20", "", fixtStagingVPCID, fixtStagingSubnetA, time.Date(2025, 10, 12, 7, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60031", "dev-sandbox-02", "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
 	}
 
 	var reservations []ec2types.Reservation
@@ -563,7 +584,7 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 		},
 		{
-			GroupId:     aws.String("sg-0ddd444444444444d"),
+			GroupId:     aws.String("sg-0eee555555555555e"),
 			GroupName:   aws.String("acme-bastion-sg"),
 			VpcId:       aws.String(fixtProdVPCID),
 			Description: aws.String("Bastion host SSH access"),
@@ -585,6 +606,30 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			},
 		},
 		{
+			GroupId:     aws.String(fixtProdDBProxySGID),
+			GroupName:   aws.String("acme-db-proxy-sg"),
+			VpcId:       aws.String(fixtProdVPCID),
+			Description: aws.String("RDS Proxy security group — allows DB access from app tier"),
+			OwnerId:     aws.String("123456789012"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(5432),
+					ToPort:     aws.Int32(5432),
+					UserIdGroupPairs: []ec2types.UserIdGroupPair{
+						{GroupId: aws.String(fixtProdAPIInternalSGID), Description: aws.String("API internal tier")},
+					},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-db-proxy-sg")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
 			GroupId:     aws.String("sg-0fff888888888888f"),
 			GroupName:   aws.String("staging-default-sg"),
 			VpcId:       aws.String(fixtStagingVPCID),
@@ -593,6 +638,82 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-default-sg")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// SSH open to 0.0.0.0/0 → Risk column shows PORTS:22
+		{
+			GroupId:          aws.String("sg-0public0ssh000001"),
+			GroupName:        aws.String("public-ssh-bad"),
+			VpcId:            aws.String(fixtProdVPCID),
+			Description:      aws.String("Misconfigured SG — SSH open to the world"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/sg-0public0ssh000001"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(22),
+					ToPort:     aws.Int32(22),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("public-ssh-bad")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// DB ports open to 0.0.0.0/0 → Risk column shows PORTS:3306,5432
+		{
+			GroupId:          aws.String("sg-0public0db0000002"),
+			GroupName:        aws.String("public-db-very-bad"),
+			VpcId:            aws.String(fixtProdVPCID),
+			Description:      aws.String("Misconfigured SG — DB ports open to the world"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/sg-0public0db0000002"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(3306),
+					ToPort:     aws.Int32(3306),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				},
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(5432),
+					ToPort:     aws.Int32(5432),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("public-db-very-bad")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// Protocol -1 open to 0.0.0.0/0 → Risk column shows WIDE_OPEN
+		{
+			GroupId:          aws.String("sg-0wide0open0000003"),
+			GroupName:        aws.String("wide-open-everything"),
+			VpcId:            aws.String(fixtProdVPCID),
+			Description:      aws.String("Critically misconfigured SG — all traffic open to the world"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/sg-0wide0open0000003"),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("-1"),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("wide-open-everything")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 	}
@@ -894,6 +1015,34 @@ func buildNatGateways() []ec2types.NatGateway {
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-nat")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// State=FAILED with FailureCode → Failure column shows "InsufficientFreeAddressesInSubnet"
+		{
+			NatGatewayId:     aws.String("nat-0failed111111111d"),
+			VpcId:            aws.String(fixtStagingVPCID),
+			SubnetId:         aws.String(fixtStagingSubnetB),
+			State:            ec2types.NatGatewayStateFailed,
+			ConnectivityType: ec2types.ConnectivityTypePublic,
+			CreateTime:       aws.Time(time.Date(2026, 4, 10, 9, 0, 0, 0, time.UTC)),
+			FailureCode:      aws.String("InsufficientFreeAddressesInSubnet"),
+			FailureMessage:   aws.String("Subnet has insufficient free addresses to create the requested number of Network Interfaces"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("nat-failed-no-addresses")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// State=PENDING → Warning, no failure info
+		{
+			NatGatewayId:     aws.String("nat-0pending11111111e"),
+			VpcId:            aws.String(fixtProdVPCID),
+			SubnetId:         aws.String(fixtProdPublicSubnetA),
+			State:            ec2types.NatGatewayStatePending,
+			ConnectivityType: ec2types.ConnectivityTypePublic,
+			CreateTime:       aws.Time(time.Date(2026, 4, 18, 8, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("nat-pending")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 	}
@@ -1374,6 +1523,33 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60006")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("new-db-volume")}},
 		},
+		// Orphan: Available, no attachments, 45 days old → attention signal
+		{
+			VolumeId: aws.String("vol-0orphan00000000a1"), State: ec2types.VolumeStateAvailable,
+			Size: aws.Int32(80), VolumeType: ec2types.VolumeTypeGp2, Iops: aws.Int32(240),
+			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1a"),
+			CreateTime:  aws.Time(time.Now().AddDate(0, 0, -45)),
+			Attachments: nil,
+			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("old-orphan-vol")}},
+		},
+		// Error state → Broken
+		{
+			VolumeId: aws.String("vol-0error00000000b2"), State: ec2types.VolumeStateError,
+			Size: aws.Int32(200), VolumeType: ec2types.VolumeTypeGp3, Iops: aws.Int32(3000),
+			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1c"),
+			CreateTime:  aws.Time(time.Now().AddDate(0, 0, -10)),
+			Attachments: nil,
+			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-restore-vol")}},
+		},
+		// Unencrypted InUse → CIS EC2.7 violation
+		{
+			VolumeId: aws.String("vol-0unenc00000000c3"), State: ec2types.VolumeStateInUse,
+			Size: aws.Int32(50), VolumeType: ec2types.VolumeTypeGp2, Iops: aws.Int32(150),
+			Encrypted: aws.Bool(false), AvailabilityZone: aws.String("us-east-1a"),
+			CreateTime:  aws.Time(time.Now().AddDate(0, -6, 0)),
+			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60002")}},
+			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("legacy-unencrypted-vol")}},
+		},
 	}
 }
 
@@ -1418,6 +1594,35 @@ func buildSnapshots() []ec2types.Snapshot {
 			StartTime: aws.Time(t4), Progress: aws.String("23%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{},
+		},
+		// Old automated snapshot (400+ days) → stale / attention signal
+		{
+			SnapshotId: aws.String("snap-completed-old00a"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
+			Encrypted: aws.Bool(true), Description: aws.String("Created automatically by data lifecycle manager"),
+			StartTime: aws.Time(time.Now().AddDate(-1, -1, -5)), // ~400 days ago
+			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("dlm-auto-old-snap")}},
+		},
+		// Error state + unencrypted → CIS EC2.1 violation
+		{
+			SnapshotId:  aws.String("snap-error000000000b"), State: ec2types.SnapshotStateError,
+			VolumeId:    aws.String("vol-0a1b2c3d4e5f60003"), VolumeSize: aws.Int32(100),
+			Encrypted:   aws.Bool(false), Description: aws.String("Failed backup — disk I/O error during snapshot"),
+			StartTime:   aws.Time(time.Now().AddDate(0, 0, -3)),
+			Progress:    aws.String("0%"), OwnerId: aws.String("123456789012"),
+			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-backup-snap")}},
+		},
+		// Orphan snap: references a deleted volume
+		{
+			SnapshotId: aws.String("snap-orphan00000000c"), State: ec2types.SnapshotStateCompleted,
+			VolumeId:   aws.String("vol-deleted-original"), VolumeSize: aws.Int32(200),
+			Encrypted:  aws.Bool(true), Description: aws.String("Snapshot of deleted volume — orphaned"),
+			StartTime:  aws.Time(time.Now().AddDate(0, -2, 0)),
+			Progress:   aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId:   aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
+			Tags:       []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphan-snap")}},
 		},
 	}
 }
@@ -1487,6 +1692,38 @@ func buildImages() []ec2types.Image {
 			EnaSupport: aws.Bool(true),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-bastion-x86-v3.0.0-deprecated")},
+			},
+		},
+		// Deprecated (DeprecationTime in the past) → Warning
+		{
+			ImageId: aws.String("ami-0deprecated0ubuntu1"), Name: aws.String("acme-ubuntu-20-04-deprecated"),
+			State: ec2types.ImageStateAvailable, Architecture: ec2types.ArchitectureValuesX8664,
+			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
+			RootDeviceName: aws.String("/dev/sda1"), Hypervisor: ec2types.HypervisorTypeXen,
+			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
+			CreationDate:    aws.String("2023-01-15T09:00:00.000Z"),
+			DeprecationTime: aws.String(time.Now().AddDate(0, -3, 0).UTC().Format("2006-01-02T15:04:05.000Z")),
+			Public:          aws.Bool(false),
+			OwnerId:         aws.String("123456789012"),
+			Description:     aws.String("Ubuntu 20.04 LTS — deprecated in favour of 22.04"),
+			EnaSupport:      aws.Bool(true),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-ubuntu-20-04-deprecated")},
+			},
+		},
+		// Failed build → Broken
+		{
+			ImageId: aws.String("ami-0failed0build00002"), Name: aws.String("acme-app-build-failed"),
+			State: ec2types.ImageStateFailed, Architecture: ec2types.ArchitectureValuesX8664,
+			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
+			RootDeviceName: aws.String("/dev/xvda"), Hypervisor: ec2types.HypervisorTypeXen,
+			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
+			CreationDate: aws.String("2026-04-10T07:30:00.000Z"), Public: aws.Bool(false),
+			OwnerId: aws.String("123456789012"), Description: aws.String("CI build failed — root device snapshot error"),
+			EnaSupport: aws.Bool(true),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-app-build-failed")},
+				{Key: aws.String("Environment"), Value: aws.String("ci")},
 			},
 		},
 	}

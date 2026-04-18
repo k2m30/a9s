@@ -34,3 +34,24 @@ func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.Describe
 	}
 	return &dynamodb.DescribeTableOutput{Table: tbl}, nil
 }
+
+func (f *DynamoDBFake) DescribeContinuousBackups(_ context.Context, input *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+	name := aws.ToString(input.TableName)
+	if _, ok := f.fix.Tables[name]; !ok {
+		return nil, fmt.Errorf("ResourceNotFoundException: table %q not found", name)
+	}
+	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
+}
+
+// DescribeKinesisStreamingDestination returns Kinesis streaming destinations for the given table.
+func (f *DynamoDBFake) DescribeKinesisStreamingDestination(_ context.Context, input *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+	name := aws.ToString(input.TableName)
+	dests, ok := f.fix.KinesisDestinations[name]
+	if !ok {
+		return &dynamodb.DescribeKinesisStreamingDestinationOutput{TableName: input.TableName}, nil
+	}
+	return &dynamodb.DescribeKinesisStreamingDestinationOutput{
+		TableName:                    input.TableName,
+		KinesisDataStreamDestinations: dests,
+	}, nil
+}

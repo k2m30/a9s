@@ -48,7 +48,17 @@ func init() {
 		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true},
 		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},
+		{TargetType: "ami", DisplayName: "AMI", Checker: checkEC2AMI},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEC2ENI},
+		{TargetType: "subnet", DisplayName: "Subnet", Checker: checkEC2Subnet},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEC2KMS, NeedsTargetCache: true},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEC2Logs, NeedsTargetCache: true},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true},
 	})
 
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
@@ -57,12 +67,14 @@ func init() {
 		{FieldPath: "ImageId", TargetType: "ami"},
 		{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
+		{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
+		{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
 	})
 }
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
 // of instances. Used by existing tests and the legacy fetcher.
-func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]resource.Resource, error) {
+func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
 	for {
@@ -81,7 +93,7 @@ func FetchEC2Instances(ctx context.Context, api EC2DescribeInstancesAPI) ([]reso
 
 // FetchEC2InstancesPage calls the EC2 DescribeInstances API and returns
 // a single page of instances. Pass an empty continuationToken for the first page.
-func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, continuationToken string) (resource.FetchResult, error) {
+func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeInstancesInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -144,6 +156,15 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 				lifecycle = string(inst.InstanceLifecycle)
 			}
 
+			imageID := ""
+			if inst.ImageId != nil {
+				imageID = *inst.ImageId
+			}
+			vpcID := ""
+			if inst.VpcId != nil {
+				vpcID = *inst.VpcId
+			}
+
 			r := resource.Resource{
 				ID:     instanceID,
 				Name:   name,
@@ -157,6 +178,8 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 					"public_ip":   publicIP,
 					"launch_time": launchTime,
 					"lifecycle":   lifecycle,
+					"image_id":    imageID,
+					"vpc_id":      vpcID,
 				},
 				RawStruct: inst,
 			}
@@ -197,7 +220,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2DescribeInstancesAPI, con
 // enrichEC2StatusChecks calls DescribeInstanceStatus for the page's resources
 // and merges system_status/instance_status into each resource's Fields map.
 // Errors are silently ignored (graceful degradation per design spec).
-func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, resources []resource.Resource) {
+func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI, resources []resource.Resource) {
 	// Collect instance IDs.
 	ids := make([]string, 0, len(resources))
 	for _, r := range resources {
@@ -243,17 +266,33 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstancesAPI, res
 		}
 	}
 
-	// Merge status fields into resources.
+	// Merge status fields into resources and promote Status for running instances.
 	for i, r := range resources {
 		if pair, ok := statusMap[r.ID]; ok {
 			if resources[i].Fields == nil {
 				resources[i].Fields = make(map[string]string)
 			}
-			if pair[0] != "" {
-				resources[i].Fields["system_status"] = pair[0]
+			sysStatus := pair[0]
+			instStatus := pair[1]
+			if sysStatus != "" {
+				resources[i].Fields["system_status"] = sysStatus
 			}
-			if pair[1] != "" {
-				resources[i].Fields["instance_status"] = pair[1]
+			if instStatus != "" {
+				resources[i].Fields["instance_status"] = instStatus
+			}
+			// Promote Resource.Status for running instances only.
+			// A running instance whose status checks report "impaired" or
+			// "initializing" must surface as an issue in the menu badge and
+			// ctrl+z filter. We promote Status so the Color func's fallback path
+			// (via r.Status) also works for test doubles without a Color func.
+			if resources[i].Fields["state"] == "running" {
+				if sysStatus == "impaired" || instStatus == "impaired" {
+					resources[i].Status = "impaired"
+				} else if sysStatus == "initializing" || instStatus == "initializing" {
+					if resources[i].Status != "impaired" { // impaired has priority
+						resources[i].Status = "initializing"
+					}
+				}
 			}
 		}
 	}

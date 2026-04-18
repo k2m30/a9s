@@ -13,6 +13,9 @@ list:
   State:
     path: State
     width: 12
+  Failure:
+    path: FailureCode
+    width: 22
   Public IP:
     key: public_ip
     width: 16

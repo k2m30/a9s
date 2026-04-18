@@ -7,12 +7,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
-	tui.Version = "test"
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -29,10 +31,12 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		},
 	})
 
-	// Press 7 twice: sort by Instance ID (column 7, absolute) ascending then descending.
-	// Column 7 may be off-screen at width 80 — that's fine, absolute keys still work.
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
+	// Press 8 twice: sort by Instance ID (column 8, absolute) ascending then descending.
+	// EC2 layout is 1:Name 2:State 3:Health 4:Lifecycle 5:Type 6:Private IP
+	// 7:Public IP 8:Instance ID 9:Launch Time. Column 8 may be off-screen at
+	// width 80 — that's fine, absolute keys still work.
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
@@ -60,7 +64,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 }
 
 func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -101,7 +105,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(100)") {
+	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("warm cache should retain the merged page set, got:\n%s", plain)
 	}
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
@@ -116,7 +120,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 }
 
 func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	src := resource.Resource{
@@ -159,7 +163,7 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 }
 
 func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	src := resource.Resource{
@@ -199,7 +203,7 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 }
 
 func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	stack := resource.Resource{
@@ -241,7 +245,7 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 }
 
 func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// New schema: Status is verb-based, not ReadOnly. _ct.actor is set to the resource

@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -9,7 +10,9 @@ import (
 type RelatedDef struct {
 	TargetType       string         // target resource short name (e.g., "tg", "alarm")
 	DisplayName      string         // right-column row label (e.g., "Target Groups")
-	Checker          RelatedChecker // async checker function (may be nil for stubs)
+	// TODO(no-middle-state): a registered RelatedDef must have a real Checker.
+	// Treat nil as a structural bug, not as a supported "stub" state.
+	Checker          RelatedChecker // async checker function
 	NeedsTargetCache bool           // true if checker reads target type from ResourceCache
 }
 
@@ -19,7 +22,24 @@ type NavigableField struct {
 	TargetType string // resource short name (e.g., "vpc")
 }
 
-// RelatedCheckResult is returned by a RelatedChecker.
+// RelatedCheckResult is returned by a RelatedChecker and carries all state
+// needed by the right-column panel to display a row and navigate on Enter.
+//
+// Semantics (FR-008 / FR-014):
+//
+//   - Count == -1: unknown — the checker could not determine a count (wrong
+//     RawStruct type, nil clients, API error, or a stubbed checker). The UI
+//     renders "?" for the row.
+//   - Count == 0: definitively zero related resources of this type. The UI
+//     dims the row.
+//   - Count >= 1: confirmed N related resources. The UI highlights the row.
+//   - Approximate == true: Count was derived from a truncated cache page; more
+//     matches may exist beyond the cached window. The UI renders "N+" (or
+//     "0+"). Only valid on reverse-scan checkers (NeedsTargetCache: true);
+//     forward checkers MUST leave this false. Invariant: Approximate == true ⇒
+//     Count >= 0.
+//   - FetchFilter non-nil: navigation drill-in should use a server-side
+//     filtered paginated fetcher rather than a relatedIDSet jump.
 type RelatedCheckResult struct {
 	TargetType  string   // echoed from RelatedDef.TargetType
 	Count       int      // -1 = unknown; 0+ = count
@@ -27,6 +47,9 @@ type RelatedCheckResult struct {
 	Err         error    // non-nil = error
 	// FetchFilter when non-nil signals navigation to use a server-side filtered fetcher instead of relatedIDSet.
 	FetchFilter map[string]string
+	// Approximate is true when Count was derived from a truncated reverse-scan cache entry.
+	// Pairs only with Count >= 0; UI renders "N+" / "0+". Forward checkers MUST leave this false.
+	Approximate bool
 }
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
@@ -47,15 +70,95 @@ type ResourceCache map[string]ResourceCacheEntry
 // RelatedChecker returns a count of related resources of a specific type.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
 
+// ValidateRelatedResult sanity-checks that a checker's result is internally
+// consistent with its declared TargetType. Catches bugs where a checker
+// scans the wrong cache (e.g., returning ecs-task IDs as TargetType "ecs").
+//
+// Returns the first violation as an error, or nil if the result is consistent.
+// Currently checks:
+//   - TargetType is non-empty
+//   - When Count > 0, ResourceIDs is non-empty
+//   - When Count is -1, no IDs are populated
+//   - When Approximate is true, Count must be >= 0 (never paired with -1)
+//
+// This is intended for test invariants and optional debug-mode runtime checks,
+// not for production error returns. The drill-in path can additionally cross-
+// check that returned IDs exist in the target-type's cache (out of scope here).
+func ValidateRelatedResult(r RelatedCheckResult) error {
+	if r.TargetType == "" {
+		return fmt.Errorf("RelatedCheckResult: empty TargetType")
+	}
+	if r.Count > 0 && len(r.ResourceIDs) == 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType, r.Count)
+	}
+	if r.Count == -1 && len(r.ResourceIDs) > 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=-1 but %d ResourceIDs present", r.TargetType, len(r.ResourceIDs))
+	}
+	if r.Approximate && r.Count < 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true paired with Count=%d (must be >=0)", r.TargetType, r.Count)
+	}
+	return nil
+}
+
+// ApproximateZero returns a RelatedCheckResult representing "the checker scanned
+// a truncated cache, found no matches in what was visible, but additional matches
+// may exist beyond the cached window." Renders in the UI as "0+". This is the
+// honest answer for reverse-scan checkers when `truncated && len(ids)==0`.
+//
+// Prefer this over `{Count: -1}` which means "unknown" and renders as a dead-
+// ended dim row.
+func ApproximateZero(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{
+		TargetType:  targetType,
+		Count:       0,
+		Approximate: true,
+	}
+}
+
+// UnknownRelated returns a RelatedCheckResult representing "the checker
+// could not determine the count because a prerequisite lookup failed". The
+// most common case is a two-hop checker (snapshot → source DB instance →
+// cluster) where the SOURCE was not found in a truncated intermediate cache,
+// so the hop to the TARGET was never attempted. Renders as "?".
+//
+// Distinct from ApproximateZero: ApproximateZero says "we scanned the target
+// cache and found 0 matches (more may exist)". UnknownRelated says "we could
+// not perform the scan at all". Distinct from the raw Count:-1 anti-pattern
+// because this is a deliberate, audited unknown state (the count-minus-one
+// guard test accepts this helper as an approved site).
+func UnknownRelated(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, Count: -1}
+}
+
+// NoopChecker is a stub RelatedChecker suitable for tests that exercise
+// registry wiring (RegisterRelated / AppendRelated / GetRelated) without
+// exercising real related-resource logic. Production code MUST NOT use it:
+// RegisterRelated panics if any RelatedDef is registered with a nil Checker,
+// but production tests using this explicit stub satisfy the guard while
+// remaining free of test-specific behavior.
+func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
+	return RelatedCheckResult{}
+}
+
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
 
 // navigableFieldRegistry maps resource short names to their navigable field definitions.
 var navigableFieldRegistry = map[string][]NavigableField{}
 
-// RegisterRelated stores related definitions for the given resource short name.
+// RegisterRelated stores related definitions for the given resource short
+// name. Panics at init-time if any RelatedDef has a nil Checker or empty
+// TargetType — a nil Checker is a structural bug, not a supported stub state.
 // Replaces any existing entry.
 func RegisterRelated(shortName string, defs []RelatedDef) {
+	for _, d := range defs {
+		if d.Checker == nil {
+			panic(fmt.Sprintf("RegisterRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, d.TargetType))
+		}
+		if d.TargetType == "" {
+			panic(fmt.Sprintf("RegisterRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+		}
+	}
 	relatedRegistry[shortName] = defs
 }
 
@@ -101,8 +204,16 @@ func UnregisterNavigableFields(shortName string) {
 
 // AppendRelated adds a single RelatedDef to the existing registration for shortName.
 // If the target type is already present, it is a no-op (prevents duplicates).
-// If no registration exists yet, it creates a new one.
+// If no registration exists yet, it creates a new one. Panics at init-time if
+// def.Checker is nil or def.TargetType is empty — a nil Checker is a
+// structural bug, not a supported stub state.
 func AppendRelated(shortName string, def RelatedDef) {
+	if def.Checker == nil {
+		panic(fmt.Sprintf("AppendRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, def.TargetType))
+	}
+	if def.TargetType == "" {
+		panic(fmt.Sprintf("AppendRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+	}
 	existing := relatedRegistry[shortName]
 	for _, d := range existing {
 		if d.TargetType == def.TargetType {

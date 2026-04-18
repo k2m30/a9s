@@ -12,12 +12,41 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ---------------------------------------------------------------------------
+// SSM fake for ec2→ssm checker tests (package unit — inline fake)
+// ---------------------------------------------------------------------------
+
+type fakeSSMEC2 struct {
+	instanceInfoOutput *ssm.DescribeInstanceInformationOutput
+	instanceInfoErr    error
+}
+
+func (f *fakeSSMEC2) DescribeParameters(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
+	return &ssm.DescribeParametersOutput{}, nil
+}
+
+func (f *fakeSSMEC2) GetParameter(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	return &ssm.GetParameterOutput{}, nil
+}
+
+func (f *fakeSSMEC2) DescribeInstanceInformation(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
+	if f.instanceInfoErr != nil {
+		return nil, f.instanceInfoErr
+	}
+	if f.instanceInfoOutput != nil {
+		return f.instanceInfoOutput, nil
+	}
+	return &ssm.DescribeInstanceInformationOutput{}, nil
+}
 
 func ec2CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
@@ -315,10 +344,11 @@ func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
 
 // TestResourceCacheEntry_IsTruncated_Propagates verifies that when the cache
 // has IsTruncated=true for a target type and no matching resources are found,
-// the related checker returns Count=-1 ("?") rather than Count=0.
+// the related checker returns {Count:0, Approximate:true} (resource.ApproximateZero —
+// the honest lower bound) rather than a definitive Count=0.
 //
-// Failing with current code because ResourceCacheEntry type doesn't exist yet
-// (Phase 1: #218 ResourceCache type change).
+// New contract (Batch B): truncated-zero produces {Count:0, Approximate:true}.
+// See related.go:34-38 (Approximate semantics) and ValidateRelatedResult.
 func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-truncated-test",
@@ -329,7 +359,7 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	}
 
 	// Cache has alarm data but it's truncated — and none of the alarms match
-	// this instance. The checker should return Count=-1 (unknown) not Count=0.
+	// this instance. The checker should return {Count:0, Approximate:true} (honest lower bound).
 	cache := resource.ResourceCache{
 		"alarm": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -349,8 +379,11 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	got := checker(context.Background(), nil, instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("alarm checker with truncated cache and 0 matches: want Approximate=true, got false")
 	}
 }
 
@@ -1146,5 +1179,72 @@ func TestRelated_EC2_CTEvents_EmptySourceID(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkEC2SSM — Pattern C: live SSM:DescribeInstanceInformation API call
+// ---------------------------------------------------------------------------
+
+// TestRelated_EC2_SSM_Match verifies that an EC2 instance managed by SSM
+// returns Count=1 with the instance ID in ResourceIDs.
+func TestRelated_EC2_SSM_Match(t *testing.T) {
+	src := resource.Resource{
+		ID: "i-0abc1234",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc1234"),
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		SSM: &fakeSSMEC2{
+			instanceInfoOutput: &ssm.DescribeInstanceInformationOutput{
+				InstanceInformationList: []ssmtypes.InstanceInformation{
+					{InstanceId: aws.String("i-0abc1234")},
+				},
+			},
+		},
+	}
+	checker := ec2CheckerByTarget(t, "ssm")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [i-0abc1234]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_EC2_SSM_Empty verifies that an EC2 instance with an empty
+// instance ID returns Count=0 without calling the API.
+func TestRelated_EC2_SSM_Empty(t *testing.T) {
+	src := resource.Resource{
+		ID:        "",
+		RawStruct: ec2types.Instance{},
+	}
+	checker := ec2CheckerByTarget(t, "ssm")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty instance ID)", result.Count)
+	}
+}
+
+// TestRelated_EC2_SSM_WrongRawStruct verifies that a resource with a non-Instance
+// RawStruct but a non-empty ID with nil clients returns Count=-1 (ec2Identity
+// falls back to res.ID; SSM client unavailable).
+func TestRelated_EC2_SSM_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "i-0abc1234",
+		RawStruct: "not-an-instance",
+	}
+	checker := ec2CheckerByTarget(t, "ssm")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients, non-Instance RawStruct)", result.Count)
 	}
 }

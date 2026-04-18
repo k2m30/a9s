@@ -6,7 +6,7 @@ import (
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	"github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -34,7 +34,7 @@ func sqsPaymentRes() resource.Resource {
 			"queue_name": "payment-processing",
 			"queue_url":  "https://sqs.us-east-1.amazonaws.com/123456789012/payment-processing",
 		},
-		RawStruct: aws.SQSQueueAttributesRow{
+		RawStruct: awsclient.SQSQueueAttributesRow{
 			QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/payment-processing",
 			QueueName: "payment-processing",
 			Attributes: map[string]string{
@@ -202,5 +202,80 @@ func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
 	result := checker(context.Background(), nil, res, nil)
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkSQSEbRule — Pattern C: ListRuleNamesByTarget on queue ARN
+// ---------------------------------------------------------------------------
+
+// TestRelated_SQS_EbRule_Match verifies that a queue with a QueueArn attribute,
+// and a fake EventBridge returning 3 rule names, yields Count=3.
+func TestRelated_SQS_EbRule_Match(t *testing.T) {
+	src := resource.Resource{
+		ID:   "payment-processing",
+		Name: "payment-processing",
+		Fields: map[string]string{
+			"queue_arn": "arn:aws:sqs:us-east-1:123456789012:payment-processing",
+		},
+		RawStruct: awsclient.SQSQueueAttributesRow{
+			QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/payment-processing",
+			QueueName: "payment-processing",
+			Attributes: map[string]string{
+				"QueueArn": "arn:aws:sqs:us-east-1:123456789012:payment-processing",
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		EventBridge: &fakeEventBridgeUS1{
+			ruleNames: []string{"rule-order", "rule-payment", "rule-dlq"},
+		},
+	}
+	checker := sqsCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 3 {
+		t.Errorf("Count = %d, want 3", result.Count)
+	}
+	if len(result.ResourceIDs) != 3 {
+		t.Errorf("ResourceIDs = %v, want 3 entries", result.ResourceIDs)
+	}
+}
+
+// TestRelated_SQS_EbRule_Empty verifies that a queue with an empty QueueArn
+// attribute returns Count=0.
+func TestRelated_SQS_EbRule_Empty(t *testing.T) {
+	src := resource.Resource{
+		ID:   "payment-processing",
+		Name: "payment-processing",
+		RawStruct: awsclient.SQSQueueAttributesRow{
+			QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/payment-processing",
+			QueueName: "payment-processing",
+			Attributes: map[string]string{
+				"QueueArn": "",
+			},
+		},
+	}
+	checker := sqsCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty QueueArn)", result.Count)
+	}
+}
+
+// TestRelated_SQS_EbRule_WrongRawStruct verifies that a non-SQSQueueAttributesRow
+// RawStruct returns Count=0 (assertStruct fails, queueARN is empty).
+func TestRelated_SQS_EbRule_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "payment-processing",
+		RawStruct: "not-an-sqs-row",
+	}
+	checker := sqsCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	// When assertStruct fails, queueARN stays ""; empty QueueArn → Count=0.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct, empty QueueArn fallback)", result.Count)
 	}
 }

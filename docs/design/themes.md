@@ -1,5 +1,7 @@
 # Themes — Implementation Plan
 
+> Note: references to `RowColorStyle()` in this file are historical. Current API: `styles.ColorStyle(resource.Color)` via `ResourceTypeDef.ResolveColor(r)`. See `docs/architecture.md` Row Coloring.
+
 **Status:** Implemented
 **Priority:** Medium
 **Depends on:** None (standalone feature)

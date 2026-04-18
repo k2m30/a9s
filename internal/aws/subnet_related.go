@@ -3,6 +3,8 @@ package aws
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -22,6 +24,11 @@ func init() {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSubnetELB, NeedsTargetCache: true},
 		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkSubnetRTB, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSubnetCFN, NeedsTargetCache: false},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkSubnetVPC},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkSubnetASG, NeedsTargetCache: true},
+		{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkSubnetEFS},
+		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkSubnetEKS, NeedsTargetCache: true},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkSubnetVPCE, NeedsTargetCache: true},
 	})
 }
 
@@ -53,7 +60,7 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -86,7 +93,7 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -114,7 +121,7 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -149,7 +156,7 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -199,7 +206,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, mainRTBID)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }
@@ -218,6 +225,143 @@ func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.
 	return relatedResult("cfn", []string{stackName})
 }
 
+// checkSubnetVPC returns the VPC this subnet belongs to (Pattern F).
+// Reads vpc_id from Fields which is populated by the subnet fetcher.
+func checkSubnetVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
+}
+
+// checkSubnetASG scans the ASG cache for groups whose VPCZoneIdentifier
+// references this subnet (comma-separated subnet ids).
+func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	subnetID := res.ID
+	if subnetID == "" {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+	}
+
+	asgList, truncated, err := subnetRelatedResources(ctx, clients, cache, "asg")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+	}
+	if asgList == nil {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+	}
+
+	var ids []string
+	for _, asgRes := range asgList {
+		zones := asgRes.Fields["vpc_zone_identifier"]
+		if zones == "" {
+			zones = asgRes.Fields["subnets"]
+		}
+		if zones == "" {
+			continue
+		}
+		if slices.Contains(splitCSV(zones), subnetID) {
+			ids = append(ids, asgRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("asg")
+	}
+	return relatedResult("asg", ids)
+}
+
+// checkSubnetEFS reports EFS file systems mounted into this subnet.
+// EFS mount targets are listed per-file-system by DescribeMountTargets; the
+// EFS list cache carries only FileSystemDescription which lacks mount targets.
+// Determining the relationship requires DescribeMountTargets per file system —
+// outside the 1-call budget. Returns Count: -1.
+func checkSubnetEFS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
+		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
+	}
+	return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+}
+
+// checkSubnetEKS reports EKS clusters whose VpcConfig.SubnetIds includes
+// this subnet. Scans the eks cache looking at the subnets field.
+func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	subnetID := res.ID
+	if subnetID == "" {
+		return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
+	}
+
+	eksList, truncated, err := subnetRelatedResources(ctx, clients, cache, "eks")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eks", Count: -1, Err: err}
+	}
+	if eksList == nil {
+		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+	}
+
+	var ids []string
+	for _, eksRes := range eksList {
+		subs := eksRes.Fields["subnets"]
+		if subs == "" {
+			subs = eksRes.Fields["subnet_ids"]
+		}
+		if subs == "" {
+			continue
+		}
+		if slices.Contains(splitCSV(subs), subnetID) {
+			ids = append(ids, eksRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("eks")
+	}
+	return relatedResult("eks", ids)
+}
+
+// checkSubnetVPCE reports VPC endpoints whose SubnetIds include this subnet
+// (interface-type endpoints). Scans the vpce cache.
+func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	subnetID := res.ID
+	if subnetID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
+	}
+
+	vpceList, truncated, err := subnetRelatedResources(ctx, clients, cache, "vpce")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+	}
+	if vpceList == nil {
+		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+	}
+
+	var ids []string
+	for _, vpceRes := range vpceList {
+		vpceRaw, ok := assertStruct[ec2types.VpcEndpoint](vpceRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if slices.Contains(vpceRaw.SubnetIds, subnetID) {
+			ids = append(ids, vpceRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("vpce")
+	}
+	return relatedResult("vpce", ids)
+}
+
+// splitCSV splits a comma-separated list and trims whitespace from each element.
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // subnetRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
 func subnetRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -229,3 +373,7 @@ func subnetRelatedResources(ctx context.Context, clients any, cache resource.Res
 	}
 	return resources, isTruncated, err
 }
+
+
+
+

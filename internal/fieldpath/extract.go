@@ -428,10 +428,11 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 			val = "-"
 		}
 
-		// Check navigability for this path
+		// Check navigability for this path — only when a real value exists.
+		// Absent values ("-") must not be navigable (dead affordance).
 		targetType := ""
 		isNavigable := false
-		if navigable != nil {
+		if navigable != nil && val != "-" && val != "" {
 			if tt, ok := navigable[path]; ok {
 				targetType = tt
 				isNavigable = true

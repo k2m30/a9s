@@ -84,6 +84,63 @@ func NewCloudFrontFixtures() *CloudFrontFixtures {
 				Comment:          aws.String("Staging distribution (being configured)"),
 				LastModifiedTime: aws.Time(time.Date(2026, 3, 21, 9, 0, 0, 0, time.UTC)),
 			},
+			// Issue: Enabled=false → Dim (distribution deliberately disabled)
+			{
+				Id:         aws.String("E4D5E6F7G8H9I0"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E4D5E6F7G8H9I0"),
+				DomainName: aws.String("d444444defghi1.cloudfront.net"),
+				Status:     aws.String("Deployed"),
+				Enabled:    aws.Bool(false),
+				Aliases: &cftypes.Aliases{
+					Quantity: aws.Int32(1),
+					Items:    []string{"legacy-cdn.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-legacy"),
+							DomainName: aws.String("acme-legacy-assets.s3.amazonaws.com"),
+						},
+					},
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("Legacy distribution — disabled pending decommission"),
+				LastModifiedTime: aws.Time(time.Date(2025, 11, 1, 14, 0, 0, 0, time.UTC)),
+			},
+			// Issue: ViewerCertificate.MinimumProtocolVersion=TLSv1 → Warning (weak TLS)
+			{
+				Id:         aws.String("E5E6F7G8H9I0J1"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E5E6F7G8H9I0J1"),
+				DomainName: aws.String("d555555efghij2.cloudfront.net"),
+				Status:     aws.String("Deployed"),
+				Enabled:    aws.Bool(true),
+				Aliases: &cftypes.Aliases{
+					Quantity: aws.Int32(1),
+					Items:    []string{"old-api.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("alb-old-api"),
+							DomainName: aws.String("old-api-alb-9876543210.us-east-1.elb.amazonaws.com"),
+						},
+					},
+				},
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("alb-old-api"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyAllowAll,
+				},
+				ViewerCertificate: &cftypes.ViewerCertificate{
+					// Weak minimum TLS version — should be TLSv1.2_2021
+					MinimumProtocolVersion: cftypes.MinimumProtocolVersionTLSv1,
+					SSLSupportMethod:       cftypes.SSLSupportMethodSniOnly,
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("Legacy API distribution with weak TLS configuration"),
+				LastModifiedTime: aws.Time(time.Date(2025, 6, 10, 10, 0, 0, 0, time.UTC)),
+			},
 		},
 	}
 }

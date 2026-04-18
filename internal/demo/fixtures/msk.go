@@ -56,6 +56,45 @@ func NewMSKFixtures() *MSKFixtures {
 				CurrentVersion: aws.String("K1INITIAL"),
 				CreationTime:   aws.Time(mustParseMSKTime("2026-03-20T16:00:00+00:00")),
 			},
+			// Issue: State=FAILED → Broken (cluster in unrecoverable failure state)
+			{
+				ClusterName:    aws.String("msk-failed"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-failed/d1e2f3a4"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateFailed,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-12-01T10:00:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Issue: State=REBOOTING_BROKER → Warning (broker maintenance in progress)
+			{
+				ClusterName:    aws.String("msk-rebooting"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-rebooting/b5c6d7e8"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateRebootingBroker,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-07-15T14:30:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "prod",
+					"Team":        "data",
+				},
+			},
 		},
 	}
 }

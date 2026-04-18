@@ -81,9 +81,13 @@ func detailConfigForType(typeName string) *config.ViewsConfig {
 	if !ok {
 		return cfg
 	}
+	detailFields := make([]config.DetailField, len(paths))
+	for i, p := range paths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	return &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
-			typeName: {Detail: paths},
+			typeName: {Detail: detailFields},
 		},
 	}
 }

@@ -37,6 +37,14 @@ type ResourcesLoadedMsg struct {
 	Resources    []resource.Resource
 	Pagination   *resource.PaginationMeta // nil when result has no pagination info
 	Append       bool                     // true = append to existing list
+	// TypeGen is the enrichment-rerun token. 0 on normal fetches (no rerun
+	// intent). Non-zero only when the message originates from the
+	// Ctrl+R-for-rerun wrapped fetch: it carries the per-type enrichment
+	// generation captured at dispatch time. The ResourcesLoadedMsg handler
+	// applies the list update unconditionally, then — after its existing
+	// write-through block — checks this field; if it matches the current
+	// per-type gen, it seeds probeResources and dispatches probeEnrichment.
+	TypeGen int
 }
 
 // LoadMoreMsg triggers loading the next page of a paginated resource list.
@@ -174,9 +182,12 @@ type RelatedNavigateMsg struct {
 // Entries maps resource short names to resource counts.
 // Only entries with a successful check (no error) are included.
 type AvailabilityCacheLoadedMsg struct {
-	Entries   map[string]int  // shortName -> resource count
-	Truncated map[string]bool // shortName -> true if truncated
-	Expired   bool            // true if cache was beyond TTL
+	Entries        map[string]int  // shortName -> resource count
+	Truncated      map[string]bool // shortName -> true if truncated
+	Expired        bool            // true if cache was beyond TTL
+	IssueCounts    map[string]int  // shortName -> cached issue count
+	IssueTruncated map[string]bool // shortName -> true if issue count was truncated
+	IssueKnown     map[string]bool // shortName -> true if issue count was probed (vs unknown)
 }
 
 // AvailabilityPrefetchedMsg is returned by the synchronous prefetch path in
@@ -184,8 +195,12 @@ type AvailabilityCacheLoadedMsg struct {
 // AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
 // are already populated.
 type AvailabilityPrefetchedMsg struct {
-	Entries   map[string]int  // shortName -> resource count
-	Truncated map[string]bool // shortName -> true if truncated
+	Entries        map[string]int                 // shortName -> resource count
+	Truncated      map[string]bool                // shortName -> true if truncated
+	IssueCounts    map[string]int                 // shortName -> issue-status resource count
+	IssueTruncated map[string]bool                // shortName -> true if issue count is lower bound
+	Resources      map[string][]resource.Resource // shortName -> retained first-page resources for Wave 2
+	Gen            int                            // availabilityGen captured at dispatch — stale if != current
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
@@ -196,6 +211,31 @@ type AvailabilityCheckedMsg struct {
 	Truncated    bool  // true if count is from a truncated first page
 	Err          error // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          int   // generation counter -- ignore if != current availabilityGen
+	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
+	Resources    []resource.Resource // retained first-page resources for Wave 2 enricher consumption
+}
+
+// EnrichmentCheckedMsg reports one resource type's Wave 2 enrichment result.
+type EnrichmentCheckedMsg struct {
+	ResourceType string
+	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
+	Truncated    bool // whether the enrichment count is a lower bound
+	// Findings is the per-resource finding map for this type, keyed by
+	// resource.Resource.ID. Populated on success; nil/empty when Err != nil.
+	// May include findings for resources off-page (account-wide enrichers).
+	Findings map[string]resource.EnrichmentFinding
+	// FieldUpdates carries per-resource Fields[] mutations to merge into
+	// cached rows. Keyed by resource ID then by field key. Nil when the
+	// enricher produced no field updates.
+	FieldUpdates map[string]map[string]string
+	// TruncatedIDs carries the per-resource truncation signal from the enricher.
+	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the
+	// enricher could not fully inspect them (per-resource API error or page cap).
+	TruncatedIDs map[string]bool
+	Err          error // enrichment error (nil on success)
+	Gen          int   // session-wide generation counter (stale probe protection; profile/region switch)
+	TypeGen      int   // per-type generation counter; bumped on every rerun for that type. Stale
+	// results whose TypeGen doesn't match the current per-type gen are discarded.
 }
 
 // IdentityLoadedMsg is sent when the caller identity has been fetched.

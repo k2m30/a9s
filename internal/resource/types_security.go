@@ -1,5 +1,10 @@
 package resource
 
+import (
+	"strings"
+	"time"
+)
+
 func securityResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -14,6 +19,14 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				doc := r.Fields["assume_role_policy_document"]
+				if doc != "" &&
+					(strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`)) {
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{
 				{
@@ -37,6 +50,12 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				if r.Fields["attachment_count"] == "0" && r.Fields["is_attachable"] == "true" {
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "IAM Users",
@@ -50,6 +69,24 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "path", Title: "Path", Width: 20, Sortable: true},
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
+			},
+			// Color: console password set AND last used >90d ago → Warning.
+			// has_console_password defaults to "false" at fetch time; the Wave 2
+			// EnrichIAMUserMFA enricher sets it to "true" when GetLoginProfile succeeds.
+			// password_last_used is stored as "2006-01-02 15:04" or "Never".
+			Color: func(r Resource) Color {
+				if r.Fields["has_console_password"] != "true" {
+					return ColorHealthy
+				}
+				plu := r.Fields["password_last_used"]
+				t, err := time.Parse("2006-01-02 15:04", plu)
+				if err != nil {
+					return ColorHealthy
+				}
+				if time.Since(t) > 90*24*time.Hour {
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -65,6 +102,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{
 				{
 					ChildType:      "iam_group_members",
@@ -85,6 +123,7 @@ func securityResourceTypes() []ResourceTypeDef {
 				{Key: "id", Title: "ID", Width: 38, Sortable: true},
 				{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 	}
 }

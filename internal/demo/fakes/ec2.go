@@ -5,6 +5,7 @@ package fakes
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -145,6 +146,51 @@ func (f *EC2Fake) DescribeImages(_ context.Context, input *ec2.DescribeImagesInp
 		}
 	}
 	return &ec2.DescribeImagesOutput{Images: out}, nil
+}
+
+// DescribeVolumeStatus is a stub for the Wave 2 enrichment interface.
+func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error) {
+	return &ec2.DescribeVolumeStatusOutput{}, nil
+}
+
+// DescribeFlowLogs is a stub for the Wave 2 enrichment interface.
+// Returns empty flow logs so all demo VPCs appear without active flow logs.
+func (f *EC2Fake) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInput, _ ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error) {
+	return &ec2.DescribeFlowLogsOutput{}, nil
+}
+
+// DescribeTransitGatewayVpcAttachments returns an empty but non-nil output.
+// The demo mode does not exercise tgw→vpc related-panel behavior; this stub
+// exists solely so EC2Fake satisfies the EC2API aggregate interface.
+func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, _ *ec2.DescribeTransitGatewayVpcAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
+	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{}, nil
+}
+
+// DescribeTransitGatewayRouteTables is a no-op stub satisfying EC2DescribeTransitGatewayRouteTablesAPI.
+// Demo mode does not model TGW route tables.
+func (f *EC2Fake) DescribeTransitGatewayRouteTables(_ context.Context, _ *ec2.DescribeTransitGatewayRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayRouteTablesOutput, error) {
+	return &ec2.DescribeTransitGatewayRouteTablesOutput{}, nil
+}
+
+// DescribeLaunchTemplateVersions returns launch template version data for known demo LTs.
+// The EKS prod nodegroup references lt-0eks111111111111a with a pinned AMI.
+func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+	if input.LaunchTemplateId == nil || *input.LaunchTemplateId != "lt-0eks111111111111a" {
+		return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
+	}
+	return &ec2.DescribeLaunchTemplateVersionsOutput{
+		LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+			{
+				LaunchTemplateId:   input.LaunchTemplateId,
+				VersionNumber:      aws.Int64(1),
+				LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+					ImageId:          aws.String("ami-0eks111111111111a"),
+					InstanceType:     ec2types.InstanceTypeM5Large,
+					SecurityGroupIds: []string{"sg-0eks111111111111e"},
+				},
+			},
+		},
+	}, nil
 }
 
 // toSet converts a string slice into a lookup map.

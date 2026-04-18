@@ -288,6 +288,13 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 		},
 	}
 
+	filter := helpGroup{
+		title: "FILTER",
+		bindings: []helpBinding{
+			{m.keys.ToggleAttentionOnly.Help().Key, "Toggle attention filter (hide healthy/dim rows)"},
+		},
+	}
+
 	other := helpGroup{
 		title: "OTHER",
 		bindings: []helpBinding{
@@ -300,7 +307,7 @@ func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
 		},
 	}
 
-	return append([]helpGroup{nav, actions, sortGroup, other}, m.commandsGroup())
+	return append([]helpGroup{nav, actions, sortGroup, filter, other}, m.commandsGroup())
 }
 
 func (m HelpModel) detailGroups() []helpGroup {

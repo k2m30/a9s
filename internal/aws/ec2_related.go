@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"sort"
+	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -12,6 +13,8 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -31,6 +34,9 @@ func assertStruct[T any](v any) (T, bool) {
 
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
 func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+	}
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
@@ -63,13 +69,16 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.ApproximateZero("tg")
 	}
 	return relatedResult("tg", ids)
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
 func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -95,13 +104,16 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
 
 // checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
 func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
@@ -127,13 +139,16 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
 	_, _, stackName := ec2Identity(res)
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -157,13 +172,16 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
 
 // checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
 func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
@@ -187,7 +205,7 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.ApproximateZero("eip")
 	}
 	return relatedResult("eip", ids)
 }
@@ -209,6 +227,9 @@ func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // Returns Count=-1 (unknown) when the cache is truncated and no match was found
 // in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
@@ -250,14 +271,15 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }
 
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
-// instance. Returns Count=-1 (unknown) when the cache is truncated and no match
-// was found in the partial list.
+// instance. Returns Count=-1 (unknown) when the cache is truncated — the partial
+// list cannot yield a definitive count. FetchFilter["ResourceName"] is always set
+// so the caller can do a filtered re-fetch.
 func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
@@ -318,9 +340,25 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.ApproximateZero("ebs-snap")
 	}
 	return relatedResult("ebs-snap", ids)
+}
+
+// checkEC2SG extracts security group IDs from the EC2 Instance's SecurityGroups slice.
+// Pattern F — no cache needed.
+func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+	var ids []string
+	for _, sg := range raw.SecurityGroups {
+		if sg.GroupId != nil && *sg.GroupId != "" {
+			ids = append(ids, *sg.GroupId)
+		}
+	}
+	return relatedResult("sg", ids)
 }
 
 // ec2RelatedResources returns the resource list for target from cache or by
@@ -404,6 +442,40 @@ func ec2Tags(res resource.Resource) map[string]string {
 	return tags
 }
 
+// checkEC2SSM checks whether this EC2 instance is managed by SSM by calling
+// ssm:DescribeInstanceInformation filtered by InstanceIds (Pattern C: 1 API call).
+// If the response contains at least one entry the instance is SSM-managed and
+// the instance ID is returned as the single resource ID.
+func checkEC2SSM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, _, _ := ec2Identity(res)
+	if instanceID == "" {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.SSM == nil {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+	}
+	api, ok := c.SSM.(SSMDescribeInstanceInformationAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+	}
+	filterKey := "InstanceIds"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ssm.DescribeInstanceInformationOutput, error) {
+		return api.DescribeInstanceInformation(ctx, &ssm.DescribeInstanceInformationInput{
+			Filters: []ssmtypes.InstanceInformationStringFilter{
+				{Key: &filterKey, Values: []string{instanceID}},
+			},
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1, Err: err}
+	}
+	if len(out.InstanceInformationList) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+	return relatedResult("ssm", []string{instanceID})
+}
+
 func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID string) bool {
 	for _, rr := range event.Resources {
 		if rr.ResourceName != nil && *rr.ResourceName == instanceID {
@@ -438,4 +510,37 @@ func tagValue(tags []ec2types.Tag, key string) string {
 	}
 	return ""
 }
+
+// checkEC2VPC returns the VPC this EC2 instance runs in (Pattern F).
+// Reads vpc_id from Fields which is populated by the EC2 fetcher.
+func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	}
+	return relatedResult("vpc", []string{vpcID})
+}
+
+// checkEC2Role extracts the IAM instance profile role name from the EC2 Instance's
+// IamInstanceProfile.Arn field. The instance profile ARN has the form
+// arn:aws:iam::ACCOUNT:instance-profile/ROLE-NAME; the role name is the last
+// segment after "/".
+func checkEC2Role(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok || inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil || *inst.IamInstanceProfile.Arn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *inst.IamInstanceProfile.Arn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+
+
+
+
+
+
 

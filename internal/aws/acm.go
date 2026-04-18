@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use"})
+	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"})
 
 	resource.RegisterPaginated("acm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -22,8 +23,8 @@ func init() {
 	})
 
 	resource.RegisterRelated("acm", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
 		{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true},
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
 		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW},
 		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53},
 	})
@@ -84,6 +85,21 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			inUse = "true"
 		}
 
+		// Compute days_left until certificate expiry.
+		// Format: "<N> days" for future expiry, "expired" for past expiry.
+		// Check NotAfter against now directly so sub-day past expiry shows
+		// "expired" rather than truncating to "0 days".
+		daysLeft := ""
+		if cert.NotAfter != nil {
+			now := time.Now()
+			if !cert.NotAfter.After(now) {
+				daysLeft = "expired"
+			} else {
+				d := int(cert.NotAfter.Sub(now).Hours() / 24)
+				daysLeft = fmt.Sprintf("%d days", d)
+			}
+		}
+
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
@@ -94,6 +110,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 				"type":        certType,
 				"not_after":   notAfter,
 				"in_use":      inUse,
+				"days_left":   daysLeft,
 			},
 			RawStruct: cert,
 		}
