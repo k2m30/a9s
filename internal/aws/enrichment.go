@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
+	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -449,7 +450,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 			unmatchedIDs = append(unmatchedIDs, volID)
 			continue
 		}
-		if v.VolumeStatus == nil || v.VolumeStatus.Status == "ok" {
+		if v.VolumeStatus == nil || v.VolumeStatus.Status == ec2types.VolumeStatusInfoStatusOk {
 			continue
 		}
 		ioState := string(v.VolumeStatus.Status)
@@ -690,7 +691,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		}
 		lastStatus := "OK"
 		for _, stage := range out.StageStates {
-			if stage.LatestExecution == nil || stage.LatestExecution.Status != "Failed" {
+			if stage.LatestExecution == nil || stage.LatestExecution.Status != cptypes.StageExecutionStatusFailed {
 				continue
 			}
 			stageName := ""
@@ -707,7 +708,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 				if action.LatestExecution == nil {
 					continue
 				}
-				if action.LatestExecution.Status != "Failed" {
+				if action.LatestExecution.Status != cptypes.ActionExecutionStatusFailed {
 					continue
 				}
 				if action.LatestExecution.ErrorDetails != nil && action.LatestExecution.ErrorDetails.Message != nil {
@@ -2464,7 +2465,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			continue
 		}
 		fieldUpdates[r.ID] = map[string]string{
-			"subs_count": strconv.Itoa(len(subs)),
+			"subs_count": resource.FormatExact(len(subs)),
 		}
 		if len(subs) == 0 {
 			findings[r.ID] = resource.EnrichmentFinding{
@@ -3292,7 +3293,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				nextToken = pkgOut.NextToken
 			}
 			if total >= 0 {
-				fieldUpdates[key] = map[string]string{"package_count": strconv.Itoa(total)}
+				fieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
 			}
 		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
@@ -3985,6 +3986,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		memberTruncated := false
 		var groupMarker *string
 		memberPages := 0
+		memberFirstCallErrd := false
 		for {
 			if memberPages >= PerParentPageCap {
 				memberTruncated = true
@@ -3995,12 +3997,17 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				GroupName: aws.String(groupName),
 				Marker:    groupMarker,
 			})
-			memberPages++
 			if err != nil {
 				truncated = true
 				truncatedIDs[r.ID] = true
+				if memberPages == 0 {
+					memberFirstCallErrd = true
+				} else {
+					memberTruncated = true
+				}
 				break
 			}
+			memberPages++
 			allUsers = append(allUsers, groupOut.Users...)
 			if groupOut.IsTruncated {
 				groupMarker = groupOut.Marker
@@ -4008,16 +4015,13 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				break
 			}
 		}
-		if memberPages == 0 {
-			// GetGroup errored on the first call; skip this group.
-			continue
-		}
 
 		// Paginate attached policies.
 		var allAttached []iamtypes.AttachedPolicy
 		attachedTruncated := false
 		var attachedMarker *string
 		attachedPages := 0
+		attachedFirstCallErrd := false
 		for {
 			if attachedPages >= PerParentPageCap {
 				attachedTruncated = true
@@ -4028,12 +4032,17 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				GroupName: aws.String(groupName),
 				Marker:    attachedMarker,
 			})
-			attachedPages++
 			if err != nil {
 				truncated = true
 				truncatedIDs[r.ID] = true
+				if attachedPages == 0 {
+					attachedFirstCallErrd = true
+				} else {
+					attachedTruncated = true
+				}
 				break
 			}
+			attachedPages++
 			allAttached = append(allAttached, attachedOut.AttachedPolicies...)
 			if attachedOut.IsTruncated {
 				attachedMarker = attachedOut.Marker
@@ -4041,15 +4050,13 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				break
 			}
 		}
-		if attachedPages == 0 {
-			continue
-		}
 
 		// Paginate inline policies.
 		var allInline []string
 		inlineTruncated := false
 		var inlineMarker *string
 		inlinePages := 0
+		inlineFirstCallErrd := false
 		for {
 			if inlinePages >= PerParentPageCap {
 				inlineTruncated = true
@@ -4060,12 +4067,17 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				GroupName: aws.String(groupName),
 				Marker:    inlineMarker,
 			})
-			inlinePages++
 			if err != nil {
 				truncated = true
 				truncatedIDs[r.ID] = true
+				if inlinePages == 0 {
+					inlineFirstCallErrd = true
+				} else {
+					inlineTruncated = true
+				}
 				break
 			}
+			inlinePages++
 			allInline = append(allInline, inlineOut.PolicyNames...)
 			if inlineOut.IsTruncated {
 				inlineMarker = inlineOut.Marker
@@ -4073,7 +4085,9 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				break
 			}
 		}
-		if inlinePages == 0 {
+
+		// If any first call failed, we have no data at all — skip findings for this group.
+		if memberFirstCallErrd || attachedFirstCallErrd || inlineFirstCallErrd {
 			continue
 		}
 

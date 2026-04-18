@@ -39,6 +39,12 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if requestedAlias == rt.ShortName {
 			requestedAlias = ""
 		}
+		// Enrichment maps (findings, truncated, unmatched) and the menu's
+		// issue maps are keyed by the CANONICAL ShortName. NavigateMsg may
+		// carry an alias (e.g. "rds" → ShortName "dbi"); look up under the
+		// canonical name so alias navigation shows the same enrichment state
+		// as canonical navigation.
+		canon := rt.ShortName
 		// Check resource cache before creating a new view and fetching.
 		if entry, ok := m.resourceCache[msg.ResourceType]; ok {
 			rl := views.NewResourceListFromCache(
@@ -56,10 +62,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			// Wire enrichment state so markers reflect current findings.
 			issueCount, issueTrunc := 0, false
 			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				issueCount = menu.GetIssueCounts()[msg.ResourceType]
-				issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
+				issueCount = menu.GetIssueCounts()[canon]
+				issueTrunc = menu.GetIssueTruncated()[canon]
 			}
-			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[msg.ResourceType])
+			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[canon])
+			rl.SetTruncatedIDs(m.enrichmentTruncatedIDs[canon])
 			m.pushView(&rl)
 			return m, nil
 		}
@@ -72,10 +79,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// Wire enrichment state so markers reflect current findings.
 		issueCount, issueTrunc := 0, false
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			issueCount = menu.GetIssueCounts()[msg.ResourceType]
-			issueTrunc = menu.GetIssueTruncated()[msg.ResourceType]
+			issueCount = menu.GetIssueCounts()[canon]
+			issueTrunc = menu.GetIssueTruncated()[canon]
 		}
-		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[msg.ResourceType])
+		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[canon])
+		rl.SetTruncatedIDs(m.enrichmentTruncatedIDs[canon])
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
 		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
@@ -330,7 +338,17 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 		m.enrichmentRan = make(map[string]bool)
 		m.enrichmentTypeGen = make(map[string]int)
+		m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
+		m.enrichmentUnmatchedIDs = make(map[string][]string)
 		m.probeResources = make(map[string][]resource.Resource)
+		// Reset the menu's view-side state (availability, issue counts,
+		// unmatched badges) in lockstep with the model-side maps above. If
+		// an enricher now fails before SetUnmatched is called for a type,
+		// the stale "(N unattributable)" badge from the previous run must
+		// not persist.
+		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+			menu.ClearAvailability()
+		}
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
@@ -383,11 +401,21 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			tok := m.enrichmentTypeGen[rt]
 			delete(m.enrichmentFindings, rt)
 			delete(m.enrichmentRan, rt)
+			// Clear per-resource truncation/unmatched markers too: if the
+			// refresh errors out, stale "?" prefixes and "(N unattributable)"
+			// badges must not persist across the rerun. Same rationale as the
+			// findings clear above.
+			delete(m.enrichmentTruncatedIDs, rt)
+			delete(m.enrichmentUnmatchedIDs, rt)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale markers
 			// would remain visible until the rerun completes (and indefinitely if
 			// the refresh errors out).
 			rl.SetEnrichmentState(0, false, nil)
+			rl.SetTruncatedIDs(nil)
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				menu.SetUnmatched(rt, nil)
+			}
 			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
 			return m, cmd
 		}
@@ -681,6 +709,12 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		// Persist findings and mark enrichment as ran for this type.
 		m.enrichmentFindings[msg.ResourceType] = msg.Findings
 		m.enrichmentRan[msg.ResourceType] = true
+		// Always replace, including with empty/nil maps — a successful rerun
+		// that returns zero TruncatedIDs / UnmatchedIDs MUST clear the prior
+		// run's markers. Using `if len > 0` would leave stale "?" rows /
+		// unattributable badges from a previous attempt.
+		m.enrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
+		m.enrichmentUnmatchedIDs[msg.ResourceType] = msg.UnmatchedIDs
 
 		// Merge FieldUpdates into probeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that
@@ -723,11 +757,13 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			}
 			menu.SetIssues(msg.ResourceType, unified, issueTruncated)
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
+			menu.SetUnmatched(msg.ResourceType, msg.UnmatchedIDs)
 
 			// Live-update ALL ResourceListModel views in the stack showing this type.
 			for _, v := range m.stack {
 				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
 					rl.SetEnrichmentState(unified, issueTruncated, msg.Findings)
+					rl.SetTruncatedIDs(msg.TruncatedIDs)
 				}
 			}
 		}

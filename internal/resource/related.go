@@ -115,15 +115,50 @@ func ApproximateZero(targetType string) RelatedCheckResult {
 	}
 }
 
+// UnknownRelated returns a RelatedCheckResult representing "the checker
+// could not determine the count because a prerequisite lookup failed". The
+// most common case is a two-hop checker (snapshot → source DB instance →
+// cluster) where the SOURCE was not found in a truncated intermediate cache,
+// so the hop to the TARGET was never attempted. Renders as "?".
+//
+// Distinct from ApproximateZero: ApproximateZero says "we scanned the target
+// cache and found 0 matches (more may exist)". UnknownRelated says "we could
+// not perform the scan at all". Distinct from the raw Count:-1 anti-pattern
+// because this is a deliberate, audited unknown state (the count-minus-one
+// guard test accepts this helper as an approved site).
+func UnknownRelated(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, Count: -1}
+}
+
+// NoopChecker is a stub RelatedChecker suitable for tests that exercise
+// registry wiring (RegisterRelated / AppendRelated / GetRelated) without
+// exercising real related-resource logic. Production code MUST NOT use it:
+// RegisterRelated panics if any RelatedDef is registered with a nil Checker,
+// but production tests using this explicit stub satisfy the guard while
+// remaining free of test-specific behavior.
+func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
+	return RelatedCheckResult{}
+}
+
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
 
 // navigableFieldRegistry maps resource short names to their navigable field definitions.
 var navigableFieldRegistry = map[string][]NavigableField{}
 
-// RegisterRelated stores related definitions for the given resource short name.
+// RegisterRelated stores related definitions for the given resource short
+// name. Panics at init-time if any RelatedDef has a nil Checker or empty
+// TargetType — a nil Checker is a structural bug, not a supported stub state.
 // Replaces any existing entry.
 func RegisterRelated(shortName string, defs []RelatedDef) {
+	for _, d := range defs {
+		if d.Checker == nil {
+			panic(fmt.Sprintf("RegisterRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, d.TargetType))
+		}
+		if d.TargetType == "" {
+			panic(fmt.Sprintf("RegisterRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+		}
+	}
 	relatedRegistry[shortName] = defs
 }
 
@@ -169,8 +204,16 @@ func UnregisterNavigableFields(shortName string) {
 
 // AppendRelated adds a single RelatedDef to the existing registration for shortName.
 // If the target type is already present, it is a no-op (prevents duplicates).
-// If no registration exists yet, it creates a new one.
+// If no registration exists yet, it creates a new one. Panics at init-time if
+// def.Checker is nil or def.TargetType is empty — a nil Checker is a
+// structural bug, not a supported stub state.
 func AppendRelated(shortName string, def RelatedDef) {
+	if def.Checker == nil {
+		panic(fmt.Sprintf("AppendRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, def.TargetType))
+	}
+	if def.TargetType == "" {
+		panic(fmt.Sprintf("AppendRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+	}
 	existing := relatedRegistry[shortName]
 	for _, d := range existing {
 		if d.TargetType == def.TargetType {

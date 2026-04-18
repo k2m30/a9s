@@ -340,6 +340,8 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 	m.enrichmentRan = make(map[string]bool)
 	m.enrichmentTypeGen = make(map[string]int)
+	m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
+	m.enrichmentUnmatchedIDs = make(map[string][]string)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}
@@ -376,6 +378,8 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 	m.enrichmentRan = make(map[string]bool)
 	m.enrichmentTypeGen = make(map[string]int)
+	m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
+	m.enrichmentUnmatchedIDs = make(map[string][]string)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}

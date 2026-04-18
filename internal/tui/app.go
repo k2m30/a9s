@@ -142,6 +142,12 @@ type Model struct {
 	// from the wrapped Ctrl+R-for-rerun fetch. Handlers discard messages whose
 	// TypeGen doesn't match the current per-type gen.
 	enrichmentTypeGen map[string]int
+	// enrichmentTruncatedIDs[shortName][resourceID] = true when the enricher could
+	// not fully inspect that resource (per-resource API error or page cap).
+	enrichmentTruncatedIDs map[string]map[string]bool
+	// enrichmentUnmatchedIDs[shortName] carries API identifiers the enricher could
+	// not normalize to a Resource.ID. Surfaced in the main-menu badge.
+	enrichmentUnmatchedIDs map[string][]string
 
 	resourceCache map[string]*resourceCacheEntry
 	relatedCache  *relatedCacheLRU
@@ -310,10 +316,12 @@ func New(profile, region string, opts ...Option) Model {
 		relatedCache:       newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:         1, // start at 1 so Generation=0 (unset) is always stale and rejected
 		enrichGen:          1, // same convention as relatedGen
-		enrichmentFindings: make(map[string]map[string]resource.EnrichmentFinding),
-		enrichmentRan:      make(map[string]bool),
-		enrichmentTypeGen:  make(map[string]int),
-		appCtx:             ctx,
+		enrichmentFindings:     make(map[string]map[string]resource.EnrichmentFinding),
+		enrichmentRan:          make(map[string]bool),
+		enrichmentTypeGen:      make(map[string]int),
+		enrichmentTruncatedIDs: make(map[string]map[string]bool),
+		enrichmentUnmatchedIDs: make(map[string][]string),
+		appCtx:                 ctx,
 		appCancel:          cancel,
 	}
 	for _, opt := range opts {
