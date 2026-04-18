@@ -10,6 +10,75 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DetailField references a single line in the detail view. Exactly one of
+// Path or Key is set:
+//   - Path = SDK struct field path (resolved via reflection on RawStruct)
+//   - Key  = Resource.Fields[] map key (e.g. fetcher-populated "is_logging")
+//
+// Label is optional — when empty, the renderer derives a label from
+// Path (last segment) or Key (humanized).
+type DetailField struct {
+	Path  string `yaml:"path"`
+	Key   string `yaml:"key"`
+	Label string `yaml:"label"`
+}
+
+// String returns the canonical identifier (Path if set, else Key).
+// Used for tests and debug logging that don't care which form it is.
+func (d DetailField) String() string {
+	if d.Path != "" {
+		return d.Path
+	}
+	return d.Key
+}
+
+// DisplayLabel returns the user-facing label, falling back to Path's last
+// segment or Key.
+func (d DetailField) DisplayLabel() string {
+	if d.Label != "" {
+		return d.Label
+	}
+	if d.Path != "" {
+		if idx := strings.LastIndex(d.Path, "."); idx >= 0 {
+			return d.Path[idx+1:]
+		}
+		return d.Path
+	}
+	return d.Key
+}
+
+// UnmarshalYAML accepts both string-form ("- TrailARN") and map-form
+// ("- {key: is_logging, label: Logging}").
+func (d *DetailField) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		d.Path = value.Value
+		return nil
+	case yaml.MappingNode:
+		// Use a temporary type to avoid infinite recursion on UnmarshalYAML.
+		var tmp struct {
+			Path  string `yaml:"path"`
+			Key   string `yaml:"key"`
+			Label string `yaml:"label"`
+		}
+		if err := value.Decode(&tmp); err != nil {
+			return fmt.Errorf("decoding detail field: %w", err)
+		}
+		d.Path = tmp.Path
+		d.Key = tmp.Key
+		d.Label = tmp.Label
+		if d.Path == "" && d.Key == "" {
+			return fmt.Errorf("detail field requires either path or key")
+		}
+		if d.Path != "" && d.Key != "" {
+			return fmt.Errorf("detail field cannot have both path and key")
+		}
+		return nil
+	default:
+		return fmt.Errorf("expected scalar or mapping for detail field, got kind %d", value.Kind)
+	}
+}
+
 // ViewsConfig is the top-level YAML structure parsed from views.yaml.
 type ViewsConfig struct {
 	Views map[string]ViewDef `yaml:"views"`
@@ -17,8 +86,18 @@ type ViewsConfig struct {
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
-	List   []ListColumn `yaml:"-"`
-	Detail []string     `yaml:"detail"`
+	List   []ListColumn  `yaml:"-"`
+	Detail []DetailField `yaml:"-"`
+}
+
+// DetailStrings returns the canonical string identifiers of all DetailFields
+// (Path if set, else Key). Useful for test assertions and debug logging.
+func DetailStrings(fields []DetailField) []string {
+	s := make([]string, len(fields))
+	for i, df := range fields {
+		s[i] = df.String()
+	}
+	return s
 }
 
 // ListColumn is a named column with its configuration, preserving YAML map order.
@@ -54,7 +133,7 @@ func (v *ViewDef) UnmarshalYAML(value *yaml.Node) error {
 			v.List = cols
 
 		case "detail":
-			var details []string
+			var details []DetailField
 			if err := val.Decode(&details); err != nil {
 				return fmt.Errorf("decoding detail: %w", err)
 			}

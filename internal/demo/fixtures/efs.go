@@ -84,6 +84,28 @@ func NewEFSFixtures() *EFSFixtures {
 					{Key: aws.String("Environment"), Value: aws.String("staging")},
 				},
 			},
+			// Issue: LifeCycleState=available, NumberOfMountTargets=0 → Broken (orphaned file system)
+			{
+				FileSystemId:         aws.String("fs-0jkl444444444444d"),
+				FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0jkl444444444444d"),
+				Name:                 aws.String("efs-orphan"),
+				LifeCycleState:       efstypes.LifeCycleStateAvailable,
+				PerformanceMode:      efstypes.PerformanceModeGeneralPurpose,
+				ThroughputMode:       efstypes.ThroughputModeBursting,
+				Encrypted:            aws.Bool(true),
+				KmsKeyId:             aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+				NumberOfMountTargets: 0,
+				CreationTime:         aws.Time(mustParseEFSTime("2025-02-10T08:00:00+00:00")),
+				CreationToken:        aws.String("efs-orphan"),
+				OwnerId:              aws.String("123456789012"),
+				SizeInBytes: &efstypes.FileSystemSize{
+					Value: 1073741824,
+				},
+				Tags: []efstypes.Tag{
+					{Key: aws.String("Name"), Value: aws.String("efs-orphan")},
+					{Key: aws.String("Environment"), Value: aws.String("prod")},
+				},
+			},
 		},
 	}
 }

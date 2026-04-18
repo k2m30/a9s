@@ -25,6 +25,7 @@ type rightColumnRow struct {
 	fetchFilter map[string]string // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
+	approximate bool // true when count was derived from a truncated cache; UI renders "N+"
 }
 
 type rightColumnModel struct {
@@ -110,6 +111,7 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 			m.rows[targetIdx].count = msg.Result.Count
 			m.rows[targetIdx].resourceIDs = msg.Result.ResourceIDs
 			m.rows[targetIdx].fetchFilter = msg.Result.FetchFilter
+			m.rows[targetIdx].approximate = msg.Result.Approximate
 		}
 		// Keep selection on an actionable row when possible.
 		m.ensureCursorValid()
@@ -235,9 +237,15 @@ func (m rightColumnModel) View() string {
 			case row.count == -1:
 				rowText = "  " + row.displayName
 				rowStyle = styles.DimText
+			case row.count == 0 && row.approximate:
+				rowText = "  " + row.displayName + " (0+)"
+				rowStyle = styles.RowNormal
 			case row.count == 0:
 				rowText = "  " + row.displayName + " (0)"
 				rowStyle = styles.DimText
+			case row.approximate:
+				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + "+)"
+				rowStyle = styles.RowNormal
 			default:
 				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + ")"
 				rowStyle = styles.RowNormal
@@ -299,9 +307,19 @@ func isActionableRow(row rightColumnRow) bool {
 	if row.loading || row.err != nil {
 		return false
 	}
-	// Count=-1 with a FetchFilter means "navigate — server-side fetch determines real count".
+	if len(row.fetchFilter) > 0 {
+		// Any row with a server-side filter is navigable — the fetch determines
+		// the real count.
+		return true
+	}
 	if row.count == -1 {
-		return len(row.fetchFilter) > 0
+		// Unknown without a fetchFilter → not drillable.
+		return false
+	}
+	if row.approximate {
+		// 0+ or N+ — reverse-scan lower bound. Navigable to the target-type
+		// list; the target list view can filter client-side.
+		return true
 	}
 	return row.count > 0
 }

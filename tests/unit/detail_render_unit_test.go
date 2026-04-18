@@ -26,10 +26,14 @@ import (
 // specifies the given detail paths, with the resource Fields map supplied.
 func buildDetailWithConfig(t *testing.T, fields map[string]string, detailPaths []string) views.DetailModel {
 	t.Helper()
+	detailFields := make([]config.DetailField, len(detailPaths))
+	for i, p := range detailPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"testtype": {
-				Detail: detailPaths,
+				Detail: detailFields,
 			},
 		},
 	}
@@ -62,10 +66,14 @@ func buildDetailFieldsOnly(t *testing.T, fields map[string]string) views.DetailM
 // buildDetailWithRawStruct creates a DetailModel with a RawStruct and a config.
 func buildDetailWithRawStruct(t *testing.T, rawStruct any, detailPaths []string) views.DetailModel {
 	t.Helper()
+	detailFields := make([]config.DetailField, len(detailPaths))
+	for i, p := range detailPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"testtype": {
-				Detail: detailPaths,
+				Detail: detailFields,
 			},
 		},
 	}

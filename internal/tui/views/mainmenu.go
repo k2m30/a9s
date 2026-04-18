@@ -44,6 +44,14 @@ type MainMenuModel struct {
 	// Both zero means "not checking" or "done".
 	availChecked int
 	availTotal   int
+
+	// Issue tracking — parallel to availability maps.
+	AttentionFilter                   // ctrl+z toggle for issue filter
+	issueCounts    map[string]int     // per-type issue counts (red/yellow statuses)
+	issueKnown     map[string]bool    // per-type: true = probed, absent = unknown
+	issueTruncated map[string]bool    // per-type: true = issue count is lower bound
+	enrichChecked  int                // Wave 2 enrichment progress
+	enrichTotal    int                // Wave 2 total enrichment probes
 }
 
 // NewMainMenu returns an initialized MainMenuModel with all registered resource types.
@@ -106,6 +114,10 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 					}
 				}
 			}
+		case key.Matches(msg, m.keys.ToggleAttentionOnly):
+			m.Toggle()
+			m.applyFilter()
+			m.scroll.SetCursor(0)
 		}
 		// Keep cursor visible in the viewport using render-line positions.
 		m.adjustScroll()
@@ -170,7 +182,8 @@ func (m *MainMenuModel) skipUnavailable(direction int) {
 	cur = start - direction
 	for cur >= 0 && cur < total {
 		item := m.filteredItems[cur]
-		if count, known := m.availability[item.ShortName]; !known || count > 0 {
+		isTruncated := m.truncated != nil && m.truncated[item.ShortName]
+		if count, known := m.availability[item.ShortName]; !known || count > 0 || isTruncated {
 			m.scroll.SetCursor(cur)
 			return
 		}
@@ -209,7 +222,7 @@ func (m *MainMenuModel) buildRenderLines() []renderLine {
 
 // View renders the menu items. Caller wraps in RenderFrame.
 // Only lines within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
-func (m MainMenuModel) View() string {
+func (m *MainMenuModel) View() string {
 	if len(m.filteredItems) == 0 {
 		return "No resource types"
 	}
@@ -261,6 +274,7 @@ func (m MainMenuModel) View() string {
 					nameStr += countSuffix
 				}
 			}
+			nameStr += m.issueBadge(item.ShortName)
 			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
 
 			// Selected row: full highlight, alias stays dimmed.
@@ -284,6 +298,7 @@ func (m MainMenuModel) View() string {
 				}
 				nameStr += countSuffix
 			}
+			nameStr += m.issueBadge(item.ShortName)
 			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
 
 			isTruncated := m.truncated != nil && m.truncated[item.ShortName]
@@ -314,15 +329,26 @@ func (m *MainMenuModel) SetSize(w, h int) {
 func (m MainMenuModel) FrameTitle() string {
 	total := len(m.allItems)
 	filtered := len(m.filteredItems)
-	if m.filterText != "" {
-		return "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+	var title string
+	switch {
+	case m.filterText != "" || m.IsEnabled():
+		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+	default:
+		title = "resource-types(" + itoa(total) + ")"
 	}
-	return "resource-types(" + itoa(total) + ")"
+	if m.IsEnabled() {
+		title += " [!]"
+	}
+	if m.enrichTotal > 0 && m.enrichChecked < m.enrichTotal {
+		title += " [enriching " + itoa(m.enrichChecked) + "/" + itoa(m.enrichTotal) + "]"
+	}
+	return title
 }
 
 // BottomHints implements Hintable for MainMenuModel.
 func (m MainMenuModel) BottomHints() []layout.KeyHint {
 	return []layout.KeyHint{
+		{Key: "ctrl+z", Desc: "Issues only"},
 		{Key: "ctrl+r", Desc: "Refresh"},
 	}
 }
@@ -367,12 +393,19 @@ func (m *MainMenuModel) SetAvailability(shortName string, count int) {
 	m.availability[shortName] = count
 }
 
-// ClearAvailability resets all availability state (e.g., on profile/region switch).
+// ClearAvailability resets all availability and issue state (e.g., on profile/region switch).
 func (m *MainMenuModel) ClearAvailability() {
 	m.availability = nil
 	m.truncated = nil
 	m.availChecked = 0
 	m.availTotal = 0
+	// Clear issue state too — stale badges from a previous account must not survive.
+	m.issueCounts = nil
+	m.issueKnown = nil
+	m.issueTruncated = nil
+	m.enrichChecked = 0
+	m.enrichTotal = 0
+	m.applyFilter() // re-apply so ctrl+z visibility reflects the cleared state
 }
 
 // GetAvailability returns a copy of the availability map for cache persistence.
@@ -412,24 +445,165 @@ func (m *MainMenuModel) SetCheckProgress(checked, total int) {
 	m.availTotal = total
 }
 
+// SetIssues updates the issue count for a resource type and marks it as known.
+func (m *MainMenuModel) SetIssues(shortName string, count int, truncated bool) {
+	if m.issueCounts == nil {
+		m.issueCounts = make(map[string]int)
+	}
+	if m.issueKnown == nil {
+		m.issueKnown = make(map[string]bool)
+	}
+	if m.issueTruncated == nil {
+		m.issueTruncated = make(map[string]bool)
+	}
+	m.issueCounts[shortName] = count
+	m.issueKnown[shortName] = true
+	m.issueTruncated[shortName] = truncated
+	// Reapply filter so ctrl+z quad-state reflects the new issue data.
+	m.applyFilter()
+}
+
+// SetIssuesFromCache bulk-loads issue counts from cache, respecting known flags.
+func (m *MainMenuModel) SetIssuesFromCache(counts map[string]int, truncated map[string]bool, known map[string]bool) {
+	if m.issueCounts == nil {
+		m.issueCounts = make(map[string]int)
+	}
+	if m.issueKnown == nil {
+		m.issueKnown = make(map[string]bool)
+	}
+	if m.issueTruncated == nil {
+		m.issueTruncated = make(map[string]bool)
+	}
+	for name, k := range known {
+		if k {
+			m.issueCounts[name] = counts[name]
+			m.issueKnown[name] = true
+			m.issueTruncated[name] = truncated[name]
+		}
+	}
+	// Reapply filter so ctrl+z quad-state reflects the cached issue data.
+	m.applyFilter()
+}
+
+// GetIssueCounts returns a copy of the per-type issue count map for cache persistence.
+// Returns nil if no issue data has been set.
+func (m *MainMenuModel) GetIssueCounts() map[string]int {
+	if m.issueCounts == nil {
+		return nil
+	}
+	cp := make(map[string]int, len(m.issueCounts))
+	maps.Copy(cp, m.issueCounts)
+	return cp
+}
+
+// GetIssueTruncated returns a copy of the per-type issue truncation map for cache persistence.
+// Returns nil if no truncation data has been set.
+func (m *MainMenuModel) GetIssueTruncated() map[string]bool {
+	if m.issueTruncated == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.issueTruncated))
+	maps.Copy(cp, m.issueTruncated)
+	return cp
+}
+
+// GetIssueKnown returns a copy of the per-type issue known map for cache persistence.
+// Returns nil if no known data has been set.
+func (m *MainMenuModel) GetIssueKnown() map[string]bool {
+	if m.issueKnown == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(m.issueKnown))
+	maps.Copy(cp, m.issueKnown)
+	return cp
+}
+
+// SetEnrichProgress updates the Wave 2 enrichment progress counters.
+func (m *MainMenuModel) SetEnrichProgress(checked, total int) {
+	m.enrichChecked = checked
+	m.enrichTotal = total
+}
+
+// issueBadge returns the " issues:N" or " issues:N+" suffix for a resource type.
+// Returns empty string if no issues are known.
+func (m MainMenuModel) issueBadge(shortName string) string {
+	var badge string
+	if m.issueKnown[shortName] {
+		count := m.issueCounts[shortName]
+		if count > 0 {
+			badge = " issues:" + itoa(count)
+			if m.issueTruncated[shortName] {
+				badge += "+"
+			}
+		}
+	}
+	return badge
+}
+
+// isVisibleUnderIssueFilter determines whether a resource type should be
+// visible when the ctrl+z issue filter is active.
+//
+// Tri-state visibility (evaluated in order):
+//  1. ExcludeFromIssueBadge types (e.g. ct-events) — never probed; hide always.
+//  2. Unknown (not yet probed) — show ONLY while no type has been probed yet
+//     (true cold-start). Once any probe has reported, unknown → hide so the
+//     user sees a focused issues-only view instead of the whole unknown menu.
+//  3. Has issues → show; zero + not truncated → hide (CONFIRMED zero);
+//     zero + truncated → show (LOWER BOUND — unread pages may hold issues).
+//
+// Per docs/attention-signals.md, every registered resource type has at least
+// a Wave 1 or Wave 2 signal; there is no "always healthy" class.
+func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
+	td := resource.FindResourceType(shortName)
+	if td != nil && td.ExcludeFromIssueBadge {
+		return false
+	}
+	if !m.issueKnown[shortName] {
+		// Cold-start: no probe has reported anywhere → keep everything visible
+		// so the user isn't greeted with an empty menu. Once any probe lands,
+		// the filter tightens to "known-issue only".
+		return len(m.issueKnown) == 0
+	}
+	if m.issueCounts[shortName] > 0 {
+		return true
+	}
+	// Zero issues — truncated count is a LOWER BOUND; unread pages may carry
+	// issues, so keep the type visible so the user can drill in.
+	return m.issueTruncated[shortName]
+}
+
 // applyFilter filters allItems into filteredItems by case-insensitive substring match.
 // Requires at least 2 characters to actually filter; single chars are too ambiguous
 // for the short list of resource types.
 func (m *MainMenuModel) applyFilter() {
 	m.renderLinesCache = nil
+
+	// First pass: text filter.
+	var result []resource.ResourceTypeDef
 	if len(m.filterText) < 2 {
-		m.filteredItems = m.allItems
-		m.scroll.SetTotal(len(m.filteredItems))
-		return
-	}
-	q := strings.ToLower(m.filterText)
-	result := make([]resource.ResourceTypeDef, 0)
-	for _, item := range m.allItems {
-		if strings.Contains(strings.ToLower(item.Name), q) ||
-			strings.Contains(strings.ToLower(item.ShortName), q) {
-			result = append(result, item)
+		result = m.allItems
+	} else {
+		q := strings.ToLower(m.filterText)
+		result = make([]resource.ResourceTypeDef, 0)
+		for _, item := range m.allItems {
+			if strings.Contains(strings.ToLower(item.Name), q) ||
+				strings.Contains(strings.ToLower(item.ShortName), q) {
+				result = append(result, item)
+			}
 		}
 	}
+
+	// Second pass: issue filter (ctrl+z) — quad-state visibility.
+	if m.IsEnabled() {
+		filtered := make([]resource.ResourceTypeDef, 0, len(result))
+		for _, item := range result {
+			if m.isVisibleUnderIssueFilter(item.ShortName) {
+				filtered = append(filtered, item)
+			}
+		}
+		result = filtered
+	}
+
 	m.filteredItems = result
 	m.scroll.SetTotal(len(m.filteredItems))
 }

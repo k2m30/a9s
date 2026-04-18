@@ -598,8 +598,8 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 // all 11 missing registrations are added to ct_events.go.
 func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	expected := []string{
-		"role", "iam-user", "ec2", "s3", "s3_objects", "lambda",
-		"rds", "kms", "secrets", "vpce", "sg", "ddb", "cfn",
+		"role", "iam-user", "ec2", "s3", "lambda",
+		"dbi", "kms", "secrets", "vpce", "sg", "ddb", "cfn", "trail",
 	}
 
 	defs := resource.GetRelated("ct-events")

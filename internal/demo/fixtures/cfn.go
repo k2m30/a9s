@@ -77,9 +77,98 @@ func NewCFNFixtures() *CFNFixtures {
 			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-monitoring/44444444-4444-4444-4444-444444444444"),
 			RoleARN:         aws.String(prodCIDeployRoleARN),
 		},
+		{
+			StackName:           aws.String("acme-legacy-api"),
+			StackStatus:         cfntypes.StackStatusRollbackComplete,
+			StackStatusReason:   aws.String("The following resource(s) failed to create: [ApiFunction]. Rollback requested by user."),
+			CreationTime:        aws.Time(mustParseCFNTime("2026-03-21T11:00:00+00:00")),
+			LastUpdatedTime:     aws.Time(mustParseCFNTime("2026-03-21T11:47:00+00:00")),
+			Description:         aws.String("Legacy API migration stack — initial deployment rolled back"),
+			StackId:             aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-legacy-api/55555555-5555-5555-5555-555555555555"),
+			RoleARN:             aws.String(prodCIDeployRoleARN),
+			Capabilities:        []cfntypes.Capability{cfntypes.CapabilityCapabilityIam},
+			DriftInformation: &cfntypes.StackDriftInformation{
+				StackDriftStatus: cfntypes.StackDriftStatusNotChecked,
+			},
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Team"), Value: aws.String("backend")},
+			},
+		},
+		// Drifted stack → Warning (drift detection triggered 2 days ago)
+		{
+			StackName:       aws.String("stack-drifted-prod"),
+			StackStatus:     cfntypes.StackStatusUpdateComplete,
+			CreationTime:    aws.Time(mustParseCFNTime("2025-05-01T09:00:00+00:00")),
+			LastUpdatedTime: aws.Time(mustParseCFNTime("2026-04-10T12:00:00+00:00")),
+			Description:     aws.String("Production services stack — detected drift from expected configuration"),
+			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-drifted-prod/66666666-6666-6666-6666-666666666666"),
+			RoleARN:         aws.String(prodCIDeployRoleARN),
+			DriftInformation: &cfntypes.StackDriftInformation{
+				StackDriftStatus:   cfntypes.StackDriftStatusDrifted,
+				LastCheckTimestamp: aws.Time(time.Now().AddDate(0, 0, -2)),
+			},
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Team"), Value: aws.String("platform")},
+			},
+		},
+		// Stuck UPDATE_IN_PROGRESS (started >2h ago) → Broken
+		{
+			StackName:       aws.String("stack-stuck-update"),
+			StackStatus:     cfntypes.StackStatusUpdateInProgress,
+			CreationTime:    aws.Time(mustParseCFNTime("2025-08-15T14:00:00+00:00")),
+			LastUpdatedTime: aws.Time(time.Now().Add(-3 * time.Hour)),
+			Description:     aws.String("Database migration stack — update stalled on RDS parameter group change"),
+			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/stack-stuck-update/77777777-7777-7777-7777-777777777777"),
+			RoleARN:         aws.String(prodCIDeployRoleARN),
+			DriftInformation: &cfntypes.StackDriftInformation{
+				StackDriftStatus: cfntypes.StackDriftStatusInSync,
+			},
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Team"), Value: aws.String("data")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{
+		"acme-legacy-api": {
+			{
+				EventId:              aws.String("evt-legacy-001"),
+				StackName:            aws.String("acme-legacy-api"),
+				Timestamp:            aws.Time(mustParseCFNTime("2026-03-21T11:00:00+00:00")),
+				LogicalResourceId:    aws.String("acme-legacy-api"),
+				ResourceType:         aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateInProgress,
+				ResourceStatusReason: aws.String("User Initiated"),
+			},
+			{
+				EventId:              aws.String("evt-legacy-002"),
+				StackName:            aws.String("acme-legacy-api"),
+				Timestamp:            aws.Time(mustParseCFNTime("2026-03-21T11:20:00+00:00")),
+				LogicalResourceId:    aws.String("ApiFunction"),
+				ResourceType:         aws.String("AWS::Lambda::Function"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
+				ResourceStatusReason: aws.String("Resource handler returned message: \"Layer arn:aws:lambda:us-east-1:123456789012:layer:legacy-utils:3 does not exist.\" (HandlerErrorCode: NotFound)"),
+			},
+			{
+				EventId:           aws.String("evt-legacy-003"),
+				StackName:         aws.String("acme-legacy-api"),
+				Timestamp:         aws.Time(mustParseCFNTime("2026-03-21T11:25:00+00:00")),
+				LogicalResourceId: aws.String("acme-legacy-api"),
+				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:    cfntypes.ResourceStatusRollbackInProgress,
+			},
+			{
+				EventId:           aws.String("evt-legacy-004"),
+				StackName:         aws.String("acme-legacy-api"),
+				Timestamp:         aws.Time(mustParseCFNTime("2026-03-21T11:47:00+00:00")),
+				LogicalResourceId: aws.String("acme-legacy-api"),
+				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+				ResourceStatus:    cfntypes.ResourceStatusRollbackComplete,
+			},
+		},
 		"acme-vpc-stack": {
 			{
 				EventId:              aws.String("evt-001"),
@@ -102,6 +191,29 @@ func NewCFNFixtures() *CFNFixtures {
 	}
 
 	stackResources := map[string][]cfntypes.StackResourceSummary{
+		"acme-legacy-api": {
+			{
+				LogicalResourceId:    aws.String("ApiFunction"),
+				ResourceType:         aws.String("AWS::Lambda::Function"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
+				ResourceStatusReason: aws.String("Layer does not exist"),
+				LastUpdatedTimestamp:  aws.Time(mustParseCFNTime("2026-03-21T11:20:00+00:00")),
+			},
+			{
+				LogicalResourceId:   aws.String("ApiGateway"),
+				PhysicalResourceId:  aws.String("abc123xyz"),
+				ResourceType:        aws.String("AWS::ApiGatewayV2::Api"),
+				ResourceStatus:      cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseCFNTime("2026-03-21T11:10:00+00:00")),
+			},
+			{
+				LogicalResourceId:   aws.String("FunctionRole"),
+				PhysicalResourceId:  aws.String("acme-legacy-api-FunctionRole-1A2B3C"),
+				ResourceType:        aws.String("AWS::IAM::Role"),
+				ResourceStatus:      cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(mustParseCFNTime("2026-03-21T11:05:00+00:00")),
+			},
+		},
 		"acme-vpc-stack": {
 			{
 				LogicalResourceId:  aws.String("VPC"),

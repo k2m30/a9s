@@ -88,6 +88,27 @@ func NewSSMFixtures() *SSMFixtures {
 			Description:      aws.String("Latest approved AMI for staging"),
 			DataType:         aws.String("aws:ec2:image"),
 		},
+		// Issue: Type=SecureString AND LastModifiedDate>365d → Warning (stale encrypted parameter)
+		{
+			Name:             aws.String("/acme/legacy/db/password"),
+			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/legacy/db/password"),
+			Type:             ssmtypes.ParameterTypeSecureString,
+			Version:          1,
+			LastModifiedDate: aws.Time(mustParseSSMTime("2024-09-01T09:00:00+00:00")),
+			Description:      aws.String("Legacy database password — not rotated in over a year"),
+			KeyId:            aws.String("alias/aws/ssm"),
+			DataType:         aws.String("text"),
+		},
+		// Issue: Type=String AND name suffix=/password → Warning (plaintext sensitive value)
+		{
+			Name:             aws.String("/acme/shared/thirdparty-api-token"),
+			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/thirdparty-api-token"),
+			Type:             ssmtypes.ParameterTypeString,
+			Version:          2,
+			LastModifiedDate: aws.Time(mustParseSSMTime("2025-11-20T14:00:00+00:00")),
+			Description:      aws.String("Third-party API token stored as plaintext — should be SecureString"),
+			DataType:         aws.String("text"),
+		},
 	}
 
 	for i := range 18 {

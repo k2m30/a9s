@@ -103,7 +103,7 @@ func TestDemoIAMFake_ListPolicies_HonorsLocalScope(t *testing.T) {
 
 func TestDemoExpectedTopLevelCounts_Policy_ExcludesAWSManaged(t *testing.T) {
 	counts := fixtures.ExpectedTopLevelCounts()
-	if got, want := counts["policy"], 22; got != want {
+	if got, want := counts["policy"], 24; got != want {
 		t.Fatalf("policy count = %d, want %d", got, want)
 	}
 }

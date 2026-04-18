@@ -8,6 +8,9 @@ list:
   Status:
     path: Status
     width: 14
+  Issues:
+    key: health_issues
+    width: 28
   Instance Types:
     path: InstanceTypes
     width: 20
@@ -35,3 +38,4 @@ detail:
   - Tags
   - Health
   - CreatedAt
+  - { key: health_issues, label: "Health Issues" }

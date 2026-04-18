@@ -149,7 +149,7 @@ func TestContentDetail_ViewWithRawStructAndConfig(t *testing.T) {
 	viewCfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"InstanceId", "InstanceType"},
+				Detail: []config.DetailField{{Path: "InstanceId"}, {Path: "InstanceType"}},
 			},
 		},
 	}

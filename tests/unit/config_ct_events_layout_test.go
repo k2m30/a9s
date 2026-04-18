@@ -74,8 +74,8 @@ func TestCTEventsViewLayout_DetailFieldsMatchDesignSpec(t *testing.T) {
 	}
 
 	for i, want := range wantDetail {
-		if vd.Detail[i] != want {
-			t.Errorf("detail field %d = %q, want %q (§8 detail field list)", i, vd.Detail[i], want)
+		if vd.Detail[i].String() != want {
+			t.Errorf("detail field %d = %q, want %q (§8 detail field list)", i, vd.Detail[i].String(), want)
 		}
 	}
 }

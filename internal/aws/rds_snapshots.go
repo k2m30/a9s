@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -11,15 +12,19 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created"})
+	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "encrypted"})
 
 	resource.RegisterRelated("rds-snap", []resource.RelatedDef{
 		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkRDSSnapDBI, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkRDSSnapKMS, NeedsTargetCache: true},
+		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkRDSSnapDBC},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkRDSSnapBackup},
 	})
 
 	resource.RegisterNavigableFields("rds-snap", []resource.NavigableField{
 		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 
 	resource.RegisterPaginated("rds-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -97,6 +102,11 @@ func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 			created = snap.SnapshotCreateTime.Format("2006-01-02 15:04")
 		}
 
+		encrypted := "false"
+		if snap.Encrypted != nil {
+			encrypted = strconv.FormatBool(*snap.Encrypted)
+		}
+
 		r := resource.Resource{
 			ID:     snapshotID,
 			Name:   snapshotID,
@@ -108,6 +118,7 @@ func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 				"engine":        engine,
 				"snapshot_type": snapshotType,
 				"created":       created,
+				"encrypted":     encrypted,
 			},
 			RawStruct: snap,
 		}

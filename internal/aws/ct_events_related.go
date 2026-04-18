@@ -33,7 +33,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.ApproximateZero("iam-user")
 	}
 	return relatedResult("iam-user", ids)
 }
@@ -62,7 +62,7 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.ApproximateZero("role")
 	}
 	return relatedResult("role", ids)
 }
@@ -230,7 +230,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", matched)
 }
@@ -279,38 +279,12 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", matched)
 }
 
-// checkCtEventsS3Objects extracts S3 object keys from the CloudTrail event.
-// Note: s3_objects is a child type; the RelatedDef is registered for completeness
-// per §7b.10 but navigation is not supported (FindResourceType will not resolve it).
-func checkCtEventsS3Objects(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3_objects", Count: 0}
-	}
 
-	ids := extractCTResourceIDs(event, "AWS::S3::Object")
-
-	if len(ids) == 0 {
-		parsed := parseCTEventJSON(event.CloudTrailEvent)
-		if parsed != nil {
-			req, _ := parsed["requestParameters"].(map[string]any)
-			bucket := ctJSONString(req, "bucketName")
-			key := ctJSONString(req, "key")
-			if bucket != "" && key != "" {
-				ids = append(ids, bucket+"|"+key)
-			} else if key != "" {
-				ids = append(ids, key)
-			}
-		}
-	}
-
-	return relatedResult("s3_objects", ids)
-}
 
 // checkCtEventsLambda extracts Lambda function names from the CloudTrail event.
 func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -360,17 +334,20 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", matched)
 }
 
 // checkCtEventsRDS extracts RDS instance/cluster identifiers from the CloudTrail event.
-// TargetType is "rds" which is an alias for the "dbi" resource type.
+// TargetType is "dbi" — the canonical short name for RDS DB instances. FetchRelatedTarget
+// and the related-resource cache are keyed by canonical short names, so this checker
+// MUST use "dbi" for every cache lookup and result construction (not "rds", which is an
+// alias without a registered paginated fetcher).
 func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
 	var ids []string
@@ -403,15 +380,15 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "rds")
+	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1, Err: err}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -427,9 +404,9 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1}
+		return resource.ApproximateZero("dbi")
 	}
-	return relatedResult("rds", matched)
+	return relatedResult("dbi", matched)
 }
 
 // checkCtEventsKMS extracts KMS key IDs from the CloudTrail event.
@@ -480,7 +457,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", matched)
 }
@@ -538,7 +515,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", matched)
 }
@@ -583,7 +560,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", matched)
 }
@@ -632,7 +609,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", matched)
 }
@@ -681,7 +658,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.ApproximateZero("ddb")
 	}
 	return relatedResult("ddb", matched)
 }
@@ -778,6 +755,69 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 	}
 }
 
+// checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail
+// event. Trail resources appear either in the event's Resources slice as
+// AWS::CloudTrail::Trail entries or inline in the CloudTrailEvent JSON
+// requestParameters as "name"/"trailName"/"trailARN" for API calls that act
+// on a trail (e.g. CreateTrail, UpdateTrail, PutEventSelectors, StartLogging).
+// The extracted names/ARNs are then matched against the trail cache.
+func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+	}
+
+	ids := extractCTResourceIDs(event, "AWS::CloudTrail::Trail")
+
+	if len(ids) == 0 {
+		parsed := parseCTEventJSON(event.CloudTrailEvent)
+		if parsed != nil {
+			req, _ := parsed["requestParameters"].(map[string]any)
+			for _, key := range []string{"name", "trailName", "trailARN", "trailArn"} {
+				if v := ctJSONString(req, key); v != "" {
+					// If this looks like a full ARN, extract the trail name suffix.
+					name := v
+					if idx := strings.LastIndex(v, "/"); idx >= 0 && idx < len(v)-1 {
+						name = v[idx+1:]
+					}
+					ids = append(ids, name)
+				}
+			}
+		}
+	}
+
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
+	}
+
+	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "trail")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
+	}
+	if resourceList == nil {
+		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+	}
+
+	wantSet := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		wantSet[id] = struct{}{}
+	}
+	var matched []string
+	for _, r := range resourceList {
+		if _, ok := wantSet[r.ID]; ok {
+			matched = append(matched, r.ID)
+			continue
+		}
+		if _, ok := wantSet[r.Name]; ok {
+			matched = append(matched, r.ID)
+		}
+	}
+	if len(matched) == 0 && truncated {
+		return resource.ApproximateZero("trail")
+	}
+	return relatedResult("trail", matched)
+}
+
 // checkCtEventsCFN extracts CloudFormation stack names from the CloudTrail event.
 func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
@@ -822,7 +862,8 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", matched)
 }
+

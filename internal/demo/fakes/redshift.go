@@ -21,3 +21,15 @@ func NewRedshift() *RedshiftFake {
 func (f *RedshiftFake) DescribeClusters(_ context.Context, _ *redshift.DescribeClustersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClustersOutput, error) {
 	return &redshift.DescribeClustersOutput{Clusters: f.fix.Clusters}, nil
 }
+
+// DescribeLoggingStatus returns a zero LoggingStatus — demo mode does not
+// model Redshift audit-log configuration.
+func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, _ *redshift.DescribeLoggingStatusInput, _ ...func(*redshift.Options)) (*redshift.DescribeLoggingStatusOutput, error) {
+	return &redshift.DescribeLoggingStatusOutput{}, nil
+}
+
+// DescribeClusterSubnetGroups returns an empty list — demo mode does not
+// model Redshift cluster subnet groups.
+func (f *RedshiftFake) DescribeClusterSubnetGroups(_ context.Context, _ *redshift.DescribeClusterSubnetGroupsInput, _ ...func(*redshift.Options)) (*redshift.DescribeClusterSubnetGroupsOutput, error) {
+	return &redshift.DescribeClusterSubnetGroupsOutput{}, nil
+}

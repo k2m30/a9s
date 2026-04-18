@@ -50,8 +50,8 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 
 	// Confirm the data is present before Esc.
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(50)") {
-		t.Fatalf("precondition: expected 'ct-events(50)' before profile switch, got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(50") {
+		t.Fatalf("precondition: expected 'ct-events(50...)' before profile switch, got:\n%s", plain)
 	}
 
 	// Step 2: press Esc back to main menu.
@@ -102,8 +102,8 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 
 	// Confirm data is present.
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(50)") {
-		t.Fatalf("precondition: expected 'ct-events(50)' before region switch, got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(50") {
+		t.Fatalf("precondition: expected 'ct-events(50...)' before region switch, got:\n%s", plain)
 	}
 
 	// Step 2: press Esc back to main menu.
@@ -266,8 +266,8 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 
 	// Confirm 100 items are shown.
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ct-events(100)") {
-		t.Fatalf("precondition: expected 'ct-events(100)' after page 2, got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(100") {
+		t.Fatalf("precondition: expected 'ct-events(100...)' after page 2, got:\n%s", plain)
 	}
 
 	// Step 5: Press Esc — cache must now store 100 combined items.
@@ -287,8 +287,8 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	plain = stripANSI(rootViewContent(m))
 
 	// KEY ASSERTION: must show 100 combined items, not just 50.
-	if !strings.Contains(plain, "ct-events(100)") {
-		t.Errorf("after re-entering ct-events, expected 'ct-events(100)' (both pages cached), got:\n%s", plain)
+	if !strings.Contains(plain, "ct-events(100") {
+		t.Errorf("after re-entering ct-events, expected 'ct-events(100...)' (both pages cached), got:\n%s", plain)
 	}
 
 	// Verify first-page items are still present after the cache update.

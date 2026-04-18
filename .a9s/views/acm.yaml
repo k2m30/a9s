@@ -5,6 +5,9 @@ list:
   Status:
     path: Status
     width: 14
+  Days Left:
+    key: days_left
+    width: 10
   Type:
     path: Type
     width: 14

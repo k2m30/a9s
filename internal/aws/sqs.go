@@ -28,7 +28,11 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchSQSQueuesPage(ctx, c.SQS, c.SQS, continuationToken)
+		listAPI, ok := c.SQS.(SQSListQueuesAPI)
+		if !ok {
+			return resource.FetchResult{}, fmt.Errorf("SQS client does not support ListQueues")
+		}
+		return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
 	})
 }
 

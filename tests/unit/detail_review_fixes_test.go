@@ -68,9 +68,9 @@ func makeDetailNarrow(t *testing.T) views.DetailModel {
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{
-					"InstanceId", "VpcId", "SubnetId", "ImageId", "InstanceType",
-					"State", "LaunchTime", "Platform", "Architecture", "Tags",
+				Detail: []config.DetailField{
+					{Path: "InstanceId"}, {Path: "VpcId"}, {Path: "SubnetId"}, {Path: "ImageId"}, {Path: "InstanceType"},
+					{Path: "State"}, {Path: "LaunchTime"}, {Path: "Platform"}, {Path: "Architecture"}, {Path: "Tags"},
 				},
 			},
 		},
@@ -308,7 +308,7 @@ func TestDetail_FieldCursorDown_TwoFieldsClamps(t *testing.T) {
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"InstanceId", "VpcId"},
+				Detail: []config.DetailField{{Path: "InstanceId"}, {Path: "VpcId"}},
 			},
 		},
 	}

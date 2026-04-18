@@ -170,7 +170,7 @@ func main() {
 		if region == "" {
 			region = demo.DemoRegion
 		}
-		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
+		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true), tui.WithIsDemo(true))
 	} else if noCache {
 		extraOpts = append(extraOpts, tui.WithNoCache(true))
 	}

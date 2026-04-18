@@ -121,8 +121,8 @@ func TestQA_EC2_A2_1_FrameTitleShowsResourceTypeAndCount(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
-		t.Errorf("A.2.1: frame title should show 'ec2(6)', got: %s", plain)
+	if !strings.Contains(plain, "ec2(6") {
+		t.Errorf("A.2.1: frame title should show 'ec2(6...)', got: %s", plain)
 	}
 }
 
@@ -351,37 +351,55 @@ func TestQA_EC2_A7_2_SortByNameDescending(t *testing.T) {
 }
 
 func TestQA_EC2_A7_3_SortByIDAscending(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	m := newEC2ListModel(t)
+	// Widen the window so the last columns are not shrunk and the sort arrow
+	// fits in the column header.
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 40})
 
-	// Press 7 to sort by Instance ID ascending (column 6 = Instance ID, 1-indexed key "7")
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
-
-	plain := stripANSI(rootViewContent(m))
-
-	if !strings.Contains(plain, "7:Instance ID\u2191") {
-		t.Error("A.7.3: Instance ID column header should show ascending indicator with prefix 7:Instance ID↑")
-	}
-}
-
-func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
-	m := newEC2ListModel(t)
-
-	// Press 8 to sort by age ascending (column 7 = Launch Time, 1-indexed key "8")
+	// Press 8 to sort by Instance ID ascending.
+	// EC2 layout (defaults): 1:Name 2:State 3:Health 4:Lifecycle 5:Type
+	// 6:Private IP 7:Public IP 8:Instance ID 9:Launch Time.
 	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "8:Launch Time\u2191") {
-		t.Error("A.7.5: Launch Time column header should show ascending indicator with prefix 8:Launch Time↑")
+	if !strings.Contains(plain, "8:Instance ID\u2191") {
+		t.Error("A.7.3: Instance ID column header should show ascending indicator with prefix 8:Instance ID↑")
+	}
+}
+
+func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	m := newEC2ListModel(t)
+	// Widen the window so the last column is not shrunk and the sort arrow
+	// fits in the "Launch Time" header (the rightmost column).
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 40})
+
+	// Press 9 to sort by age ascending (column 9 = Launch Time under the
+	// 9-column defaults EC2 layout).
+	m, _ = rootApplyMsg(m, rootKeyPress("9"))
+
+	plain := stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "9:Launch Time\u2191") {
+		t.Error("A.7.5: Launch Time column header should show ascending indicator with prefix 9:Launch Time↑")
 	}
 }
 
 func TestQA_EC2_A7_7_SortIndicatorExactlyOneColumn(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	m := newEC2ListModel(t)
 
-	// Sort by name first (col 0, key "1"), then switch to ID (col 6, key "7")
+	// Sort by name first (col 0, key "1"), then switch to ID (col 7, key "8").
 	m, _ = rootApplyMsg(m, rootKeyPress("1"))
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -538,8 +556,8 @@ func TestQA_EC2_A8_11_EscClearsFilter(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
-		t.Errorf("A.8.11: after Esc, frame title should revert to 'ec2(6)', got: %s", plain)
+	if !strings.Contains(plain, "ec2(6") {
+		t.Errorf("A.8.11: after Esc, frame title should revert to 'ec2(6...)', got: %s", plain)
 	}
 	if !strings.Contains(plain, "? for help") {
 		t.Error("A.8.11: after Esc, header should revert to '? for help'")
@@ -570,7 +588,7 @@ func TestQA_EC2_A9_5_EscCancelsCommandMode(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Error("A.9.5: Esc during command mode should stay on EC2 list")
 	}
 	if !strings.Contains(plain, "? for help") {
@@ -842,7 +860,7 @@ func TestQA_EC2_B8_3_EscFromDetailReturnsToList(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("B.8.3: Esc from detail should return to EC2 list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1015,7 +1033,7 @@ func TestQA_EC2_C6_1_EscFromYAMLReturnsToList(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("C.6.1: Esc from YAML should return to EC2 list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1100,7 +1118,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 		Resources:    fixtureEC2Instances(),
 	})
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: should be at EC2 list")
 	}
 
@@ -1112,7 +1130,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	}
 	plain = stripANSI(rootViewContent(m))
 	// Detail view should show fields
-	if strings.Contains(plain, "ec2(6)") {
+	if strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: should have left the list view")
 	}
 
@@ -1137,7 +1155,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	// Esc back to list
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: Esc from detail should return to EC2 list")
 	}
 
@@ -1167,7 +1185,7 @@ func TestQA_EC2_D2_ListToYAMLAndBack(t *testing.T) {
 	// Esc should return to list, not detail
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "ec2(6)") {
+	if !strings.Contains(plain, "ec2(6") {
 		t.Errorf("D.2: Esc from YAML should return to list, got: %s", plain[:min(200, len(plain))])
 	}
 }
@@ -1233,7 +1251,7 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 
-	if strings.Contains(plain, "ec2(6)") {
+	if strings.Contains(plain, "ec2(6") {
 		t.Error("D.8: Esc from YAML should return to detail, not list")
 	}
 	if strings.Contains(plain, "yaml") {

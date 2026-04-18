@@ -113,6 +113,46 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 		},
 	}
 
+	// Issue: State=active_impaired → Warning (partial AZ failure)
+	lbs = append(lbs, elbv2types.LoadBalancer{
+		LoadBalancerName: aws.String("elb-active-impaired"),
+		LoadBalancerArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/elb-active-impaired/1111aaaa2222bbbb"),
+		DNSName:          aws.String("elb-active-impaired-1234567890.us-east-1.elb.amazonaws.com"),
+		Type:             elbv2types.LoadBalancerTypeEnumApplication,
+		Scheme:           elbv2types.LoadBalancerSchemeEnumInternetFacing,
+		State: &elbv2types.LoadBalancerState{
+			Code:   elbv2types.LoadBalancerStateEnumActiveImpaired,
+			Reason: aws.String("A registered instance is in an Availability Zone that is not enabled for the load balancer."),
+		},
+		VpcId:         aws.String(fixtELBProdVPCID),
+		IpAddressType: elbv2types.IpAddressTypeIpv4,
+		SecurityGroups: []string{"sg-0aaa111111111111a"},
+		CreatedTime:    aws.Time(time.Date(2025, 10, 5, 11, 0, 0, 0, time.UTC)),
+		AvailabilityZones: []elbv2types.AvailabilityZone{
+			{SubnetId: aws.String(fixtELBSubnetA), ZoneName: aws.String("us-east-1a")},
+		},
+	})
+
+	// Issue: State=failed → Broken (load balancer provisioning failed)
+	lbs = append(lbs, elbv2types.LoadBalancer{
+		LoadBalancerName: aws.String("elb-failed"),
+		LoadBalancerArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/elb-failed/3333cccc4444dddd"),
+		DNSName:          aws.String("elb-failed-9876543210.us-east-1.elb.amazonaws.com"),
+		Type:             elbv2types.LoadBalancerTypeEnumApplication,
+		Scheme:           elbv2types.LoadBalancerSchemeEnumInternetFacing,
+		State: &elbv2types.LoadBalancerState{
+			Code:   elbv2types.LoadBalancerStateEnumFailed,
+			Reason: aws.String("Load balancer creation failed due to subnet configuration error."),
+		},
+		VpcId:         aws.String(fixtELBProdVPCID),
+		IpAddressType: elbv2types.IpAddressTypeIpv4,
+		SecurityGroups: []string{"sg-0aaa111111111111a"},
+		CreatedTime:    aws.Time(time.Date(2026, 4, 10, 14, 30, 0, 0, time.UTC)),
+		AvailabilityZones: []elbv2types.AvailabilityZone{
+			{SubnetId: aws.String(fixtELBSubnetA), ZoneName: aws.String("us-east-1a")},
+		},
+	})
+
 	// Generate additional ELBs
 	names := []string{
 		"api-services-alb", "data-pipeline-nlb", "monitoring-alb", "ci-build-alb",

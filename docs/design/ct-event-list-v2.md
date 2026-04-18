@@ -1,5 +1,7 @@
 # CloudTrail Events List View — Design v2
 
+> Note: references to `styles.RowColorStyle` / `IsDimRowColor` in this file are historical. Current API: `styles.ColorStyle(resource.Color)` via `ResourceTypeDef.ResolveColor(r)`. See `docs/architecture.md` Row Coloring.
+
 Status: **proposed, awaiting approval**. Supersedes the coloring, sorting,
 target extraction, and filter sections of `ct-event-list.md` once approved.
 Tear-down of the existing per-cell ANSI composition is part of this spec.

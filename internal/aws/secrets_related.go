@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -15,8 +17,22 @@ func init() {
 	resource.RegisterRelated("secrets", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
+		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: true},
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB, NeedsTargetCache: true},
+		{TargetType: "codeartifact", DisplayName: "CodeArtifact Domains", Checker: checkSecretsCodeArtifact},
+		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB, NeedsTargetCache: true},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask, NeedsTargetCache: true},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkSecretsRole},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSecretsSNS},
+	})
+
+	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
+	// RotationLambdaARN (full ARN — UI resolves function name suffix to lambda cache)
+	resource.RegisterNavigableFields("secrets", []resource.NavigableField{
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
 	})
 }
 
@@ -26,7 +42,7 @@ func init() {
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -59,7 +75,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }
@@ -71,7 +87,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -98,16 +114,9 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
-}
-
-// checkSecretsDBI returns Count: 0 because the RDS instance associated with a
-// secret is not captured in the SecretListEntry — the relationship cannot be
-// determined from cache alone.
-func checkSecretsDBI(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 }
 
 // checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name
@@ -138,7 +147,7 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -158,6 +167,47 @@ func secretsCFNStackName(res resource.Resource) string {
 	return ""
 }
 
+// checkSecretsDBI does a reverse lookup — scans the dbi cache for DBInstance
+// entries whose MasterUserSecret.SecretArn matches this secret's ARN (Pattern C).
+func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	secretARN := ""
+	if raw, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct); ok && raw.ARN != nil {
+		secretARN = *raw.ARN
+	}
+	if secretARN == "" {
+		secretARN = res.Fields["arn"]
+	}
+	if secretARN == "" {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
+	}
+
+	dbiList, truncated, err := secretsRelatedResources(ctx, clients, cache, "dbi")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+	}
+	if dbiList == nil {
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+	}
+
+	var ids []string
+	for _, dbRes := range dbiList {
+		db, ok := assertStruct[rdstypes.DBInstance](dbRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil {
+			continue
+		}
+		if *db.MasterUserSecret.SecretArn == secretARN {
+			ids = append(ids, dbRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("dbi")
+	}
+	return relatedResult("dbi", ids)
+}
+
 // secretsRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func secretsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -168,4 +218,68 @@ func secretsRelatedResources(ctx context.Context, clients any, cache resource.Re
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// secretIdentifiers returns the (arn, name) pair for the source secret,
+// preferring the raw struct's ARN/Name over Fields.
+func secretIdentifiers(res resource.Resource) (arn, name string) {
+	if raw, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct); ok {
+		if raw.ARN != nil {
+			arn = *raw.ARN
+		}
+		if raw.Name != nil {
+			name = *raw.Name
+		}
+	}
+	if arn == "" {
+		arn = res.Fields["arn"]
+	}
+	if name == "" {
+		name = res.Name
+	}
+	if name == "" {
+		name = res.ID
+	}
+	return arn, name
+}
+
+// checkSecretsCB does a reverse lookup — scans the cb (CodeBuild) cache for
+// projects whose Environment.EnvironmentVariables contains a SECRETS_MANAGER
+// variable whose Value references this secret's ARN or name.
+func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	secretARN, secretName := secretIdentifiers(res)
+	if secretARN == "" && secretName == "" {
+		return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
+	}
+
+	cbList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cb")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cb", Count: -1, Err: err}
+	}
+	if cbList == nil {
+		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+	}
+
+	var ids []string
+	for _, cbRes := range cbList {
+		proj, ok := assertStruct[cbtypes.Project](cbRes.RawStruct)
+		if !ok || proj.Environment == nil {
+			continue
+		}
+		for _, ev := range proj.Environment.EnvironmentVariables {
+			if ev.Type != cbtypes.EnvironmentVariableTypeSecretsManager || ev.Value == nil {
+				continue
+			}
+			val := *ev.Value
+			if (secretARN != "" && val == secretARN) ||
+				(secretName != "" && (val == secretName || strings.HasPrefix(val, secretName+":"))) {
+				ids = append(ids, cbRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("cb")
+	}
+	return relatedResult("cb", ids)
 }

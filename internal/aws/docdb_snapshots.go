@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("docdb-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type"})
+	resource.RegisterFieldKeys("docdb-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type", "storage_encrypted"})
 
 	resource.RegisterPaginated("docdb-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -24,6 +25,14 @@ func init() {
 	resource.RegisterRelated("docdb-snap", []resource.RelatedDef{
 		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDocdbSnapVPC},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDocdbSnapBackup},
+	})
+
+	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId
+	resource.RegisterNavigableFields("docdb-snap", []resource.NavigableField{
+		{FieldPath: "VpcId", TargetType: "vpc"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 }
 
@@ -98,6 +107,11 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 			storageType = *snapshot.StorageType
 		}
 
+		storageEncrypted := "false"
+		if snapshot.StorageEncrypted != nil {
+			storageEncrypted = strconv.FormatBool(*snapshot.StorageEncrypted)
+		}
+
 		r := resource.Resource{
 			ID:     snapshotID,
 			Name:   snapshotID,
@@ -110,6 +124,7 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,
 				"storage_type":         storageType,
+				"storage_encrypted":    storageEncrypted,
 			},
 			RawStruct: snapshot,
 		}

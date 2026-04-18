@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
@@ -19,7 +18,7 @@ import (
 // TestQA_EKS_ListColumns verifies the EKS cluster list displays all expected
 // columns: Cluster Name, Version, Status, Endpoint, Platform Version.
 func TestQA_EKS_ListColumns(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to EKS resource list
@@ -98,10 +97,12 @@ func TestQA_EKS_ListColumnsFromTypeDef(t *testing.T) {
 }
 
 // TestQA_EKS_StatusColoring_Active verifies that ACTIVE status uses green
-// coloring (#9ece6a), matching the "running" category in RowColorStyle.
+// coloring (#9ece6a), matching the ColorHealthy category (ColRunning).
 func TestQA_EKS_StatusColoring_Active(t *testing.T) {
-	style := styles.RowColorStyle("ACTIVE")
-	rendered := style.Render("ACTIVE row content")
+	eksTd := resource.FindResourceType("eks")
+	activeRes := resource.Resource{ID: "cluster-1", Status: "ACTIVE"}
+	activeStyle := styles.ColorStyle(eksTd.Color(activeRes))
+	rendered := activeStyle.Render("ACTIVE row content")
 
 	// The rendered text should contain ANSI color codes (non-empty styling applied)
 	if rendered == "ACTIVE row content" {
@@ -109,9 +110,10 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 	}
 
 	// Verify green color (#9ece6a) is applied — same as ColRunning
-	// RowColorStyle maps "active" to ColRunning which is green
-	runningStyled := styles.RowColorStyle("running").Render("test")
-	activeStyled := styles.RowColorStyle("ACTIVE").Render("test")
+	// ACTIVE maps to ColorHealthy which is the same color as running
+	runningRes := resource.Resource{ID: "cluster-2", Status: "running"}
+	runningStyled := styles.ColorStyle(eksTd.Color(runningRes)).Render("test")
+	activeStyled := styles.ColorStyle(eksTd.Color(activeRes)).Render("test")
 
 	// Both should produce the same ANSI styling since they map to the same color
 	if stripANSI(runningStyled) != stripANSI(activeStyled) {
@@ -121,7 +123,7 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 
 // TestQA_EKS_FrameTitle verifies the frame title shows eks-clusters(<count>).
 func TestQA_EKS_FrameTitle(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -149,7 +151,7 @@ func TestQA_EKS_FrameTitle(t *testing.T) {
 // TestQA_EKS_DetailView verifies pressing Enter on an EKS cluster opens
 // the detail view with the cluster name in the frame title.
 func TestQA_EKS_DetailView(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to EKS
@@ -180,7 +182,7 @@ func TestQA_EKS_DetailView(t *testing.T) {
 // TestQA_EKS_DetailViewFields verifies the detail view renders key-value
 // pairs from the EKS cluster's Fields map.
 func TestQA_EKS_DetailViewFields(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
@@ -207,7 +209,7 @@ func TestQA_EKS_DetailViewFields(t *testing.T) {
 // TestQA_EKS_YAMLView verifies pressing y on an EKS cluster opens the
 // YAML view with "yaml" in the frame title.
 func TestQA_EKS_YAMLView(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
@@ -229,7 +231,7 @@ func TestQA_EKS_YAMLView(t *testing.T) {
 // TestQA_EKS_YAMLViewContainsData verifies the YAML view renders
 // cluster data as YAML key-value pairs.
 func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
@@ -256,7 +258,7 @@ func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 // TestQA_Secrets_ListColumns verifies the Secrets Manager list displays all
 // expected columns: Secret Name, Description, Last Accessed, Last Changed, Rotation.
 func TestQA_Secrets_ListColumns(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to Secrets Manager resource list
@@ -288,7 +290,7 @@ func TestQA_Secrets_ListColumns(t *testing.T) {
 	// "Description" title matches "description" key but the fixture values are
 	// empty strings, so no visible data rows for the default 80-col terminal.
 	// The frame title "secrets(5)" confirms all 5 resources were loaded.
-	if !strings.Contains(plain, "secrets(5)") {
+	if !strings.Contains(plain, "secrets(5") {
 		t.Errorf("Secrets list frame title should show 'secrets(5)', got: %s", plain)
 	}
 }
@@ -333,7 +335,7 @@ func TestQA_Secrets_ListColumnsFromTypeDef(t *testing.T) {
 
 // TestQA_Secrets_FrameTitle verifies the frame title shows secrets(<count>).
 func TestQA_Secrets_FrameTitle(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -349,8 +351,8 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "secrets(5)") {
-		t.Errorf("frame title should contain 'secrets(5)', got: %s", plain)
+	if !strings.Contains(plain, "secrets(5") {
+		t.Errorf("frame title should contain 'secrets(5', got: %s", plain)
 	}
 }
 
@@ -361,7 +363,7 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 // TestQA_Secrets_XKeyTriggersReveal verifies that pressing x on the secrets
 // resource list produces a command (fetching the secret value).
 func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to Secrets Manager
@@ -388,7 +390,7 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnEC2 verifies that pressing x on the EC2
 // instance list does nothing -- no view change, no error, no command.
 func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to EC2 resource list
@@ -421,7 +423,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnRDS verifies that pressing x on the RDS
 // instance list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -445,7 +447,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnS3 verifies that pressing x on the S3
 // bucket list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -469,7 +471,7 @@ func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnEKS verifies that pressing x on the EKS
 // cluster list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -493,7 +495,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnRedis verifies that pressing x on the
 // ElastiCache Redis list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -517,7 +519,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnDocDB verifies that pressing x on the
 // DocumentDB cluster list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -545,7 +547,7 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 // TestQA_Secrets_RevealViewShowsSecretValue verifies that the reveal view
 // displays the secret value after receiving ValueRevealedMsg.
 func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to secrets list first
@@ -583,7 +585,7 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 // TestQA_Secrets_RevealHeaderWarning verifies the reveal view displays a
 // persistent red warning in the header: "Secret visible -- press esc to close".
 func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
@@ -624,7 +626,7 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 // TestQA_Secrets_RevealCopyReturnsCmd verifies that pressing c on the reveal
 // view returns a command (to copy the secret value to clipboard).
 func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
@@ -657,7 +659,7 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 // TestQA_Secrets_EscapeFromRevealReturnsToList verifies that pressing Escape
 // on the reveal view returns to the secrets list.
 func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
@@ -691,7 +693,7 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	plain = stripANSI(rootViewContent(m))
 
 	// Should be back at secrets list
-	if !strings.Contains(plain, "secrets(5)") {
+	if !strings.Contains(plain, "secrets(5") {
 		t.Errorf("after Escape from reveal, should return to secrets list with 'secrets(5)', got: %s", plain)
 	}
 
@@ -712,7 +714,7 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 
 // TestQA_Secrets_DetailView verifies the detail view shows secret metadata.
 func TestQA_Secrets_DetailView(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
@@ -736,7 +738,7 @@ func TestQA_Secrets_DetailView(t *testing.T) {
 
 // TestQA_Secrets_YAMLView verifies the YAML view shows secret metadata.
 func TestQA_Secrets_YAMLView(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
@@ -758,7 +760,7 @@ func TestQA_Secrets_YAMLView(t *testing.T) {
 // TestQA_Secrets_YAMLViewContainsData verifies the YAML view renders secret
 // metadata as YAML key-value pairs.
 func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
@@ -782,7 +784,7 @@ func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
 // TestQA_Secrets_XKeyDoesNothingOnMainMenu verifies that pressing x on the
 // main menu does nothing (handleReveal checks for resourceList != nil).
 func TestQA_Secrets_XKeyDoesNothingOnMainMenu(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	contentBefore := rootViewContent(m)
@@ -806,7 +808,7 @@ func TestQA_Secrets_XKeyDoesNothingOnMainMenu(t *testing.T) {
 // TestQA_EKS_EscapeFromDetailReturnsToList verifies pressing Escape on the
 // detail view pops back to the EKS list.
 func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -839,7 +841,7 @@ func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 // TestQA_EKS_EscapeFromYAMLReturnsToList verifies pressing Escape on the
 // YAML view (opened from list) pops back to the EKS list.
 func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{
@@ -877,7 +879,7 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 // list returns a non-nil command (to fetch the parameter value).
 // Before #104 this returned nil because only "secrets" was wired.
 func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to SSM resource list.
@@ -905,7 +907,7 @@ func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 // displays the SSM parameter value after receiving ValueRevealedMsg with
 // ResourceType "ssm".
 func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
-	tui.Version = "0.6.0"
+	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
 	// Navigate to SSM parameter list first.

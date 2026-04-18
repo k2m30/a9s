@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -63,20 +64,36 @@ func TestRelated_ACM_Registered(t *testing.T) {
 	}
 }
 
-// --- acm→elb: undeterminable from cache, returns Count: 0 ---
+// --- acm→elb: requires DescribeListeners per ELB (outside cache budget) ---
 
-func TestRelated_ACM_ELB_ReturnsZero(t *testing.T) {
+// TestRelated_ACM_ELB_NilClients: real cert RawStruct → Count: -1 when clients
+// are nil (API call is the only way to resolve).
+func TestRelated_ACM_ELB_NilClients(t *testing.T) {
 	source := resource.Resource{
-		ID:   "arn:aws:acm::111122223333:certificate/abc-123",
+		ID:   "example.com",
 		Name: "example.com",
+		RawStruct: acmtypes.CertificateSummary{
+			CertificateArn: aws.String("arn:aws:acm:us-east-1:111122223333:certificate/abc-123"),
+			DomainName:     aws.String("example.com"),
+		},
 	}
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown when no clients available)", result.Count)
 	}
 	if result.TargetType != "elb" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	}
+}
+
+// TestRelated_ACM_ELB_EmptyInput: empty cert identity → Count: 0 (nothing to look up).
+func TestRelated_ACM_ELB_EmptyInput(t *testing.T) {
+	source := resource.Resource{ID: "", Name: ""}
+	checker := acmCheckerByTarget(t, "elb")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
 	}
 }
 
@@ -189,36 +206,68 @@ func TestRelated_ACM_CF_EmptyCertARN(t *testing.T) {
 	}
 }
 
-// --- acm→apigw: undeterminable from cache, returns Count: 0 ---
+// --- acm→apigw: requires GetDomainNames (outside cache budget) ---
 
-func TestRelated_ACM_APIGW_ReturnsZero(t *testing.T) {
+// TestRelated_ACM_APIGW_NilClients: real cert RawStruct → Count: -1 when
+// clients are nil (acm:DescribeCertificate is the source of truth).
+func TestRelated_ACM_APIGW_NilClients(t *testing.T) {
 	source := resource.Resource{
-		ID:   "arn:aws:acm::111122223333:certificate/abc-123",
+		ID:   "example.com",
 		Name: "example.com",
+		RawStruct: acmtypes.CertificateSummary{
+			CertificateArn: aws.String("arn:aws:acm:us-east-1:111122223333:certificate/abc-123"),
+			DomainName:     aws.String("example.com"),
+		},
 	}
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown when no clients available)", result.Count)
 	}
 	if result.TargetType != "apigw" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "apigw")
 	}
 }
 
-// --- acm→r53: undeterminable from cache, returns Count: 0 ---
+// TestRelated_ACM_APIGW_EmptyInput: empty cert identity → Count: 0.
+func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
+	source := resource.Resource{ID: "", Name: ""}
+	checker := acmCheckerByTarget(t, "apigw")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
+	}
+}
 
-func TestRelated_ACM_R53_ReturnsZero(t *testing.T) {
+// --- acm→r53: requires per-zone ListResourceRecordSets (outside cache budget) ---
+
+// TestRelated_ACM_R53_NilClients: real cert RawStruct → Count: -1 when
+// clients are nil (acm:DescribeCertificate is the source of truth).
+func TestRelated_ACM_R53_NilClients(t *testing.T) {
 	source := resource.Resource{
-		ID:   "arn:aws:acm::111122223333:certificate/abc-123",
+		ID:   "example.com",
 		Name: "example.com",
+		RawStruct: acmtypes.CertificateSummary{
+			CertificateArn: aws.String("arn:aws:acm:us-east-1:111122223333:certificate/abc-123"),
+			DomainName:     aws.String("example.com"),
+		},
 	}
 	checker := acmCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (unknown when no clients available)", result.Count)
 	}
 	if result.TargetType != "r53" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
+	}
+}
+
+// TestRelated_ACM_R53_EmptyInput: empty cert identity → Count: 0.
+func TestRelated_ACM_R53_EmptyInput(t *testing.T) {
+	source := resource.Resource{ID: "", Name: ""}
+	checker := acmCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty cert identity)", result.Count)
 	}
 }

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
+		// IsTruncated: populated from first-page result; loaders stop at page 1.
 		return messages.ResourcesLoadedMsg{
 			ResourceType: resourceType,
 			Resources:    result.Resources,
@@ -317,18 +319,31 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 		}
 		entries := make(map[string]int, len(cf.Resources))
 		truncated := make(map[string]bool)
+		issueCounts := make(map[string]int)
+		issueTruncated := make(map[string]bool)
+		issueKnown := make(map[string]bool)
 		for name, entry := range cf.Resources {
 			if entry.Error == "" {
 				entries[name] = entry.Count
 				if entry.Truncated {
 					truncated[name] = true
 				}
+				if entry.IssuesKnown {
+					issueCounts[name] = entry.Issues
+					issueKnown[name] = true
+					if entry.IssuesTruncated {
+						issueTruncated[name] = true
+					}
+				}
 			}
 		}
 		return messages.AvailabilityCacheLoadedMsg{
-			Entries:   entries,
-			Truncated: truncated,
-			Expired:   cf.IsExpired(cache.DefaultTTL),
+			Entries:        entries,
+			Truncated:      truncated,
+			Expired:        cf.IsExpired(cache.DefaultTTL),
+			IssueCounts:    issueCounts,
+			IssueTruncated: issueTruncated,
+			IssueKnown:     issueKnown,
 		}
 	}
 }
@@ -371,12 +386,22 @@ func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
 			}
 		}
 		truncated := result.Pagination != nil && result.Pagination.IsTruncated
+		// Count issue-status resources (red/yellow only, not green/dim).
+		issues := 0
+		td := resource.FindResourceType(shortName)
+		for _, r := range result.Resources {
+			if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
+				issues++
+			}
+		}
 		return messages.AvailabilityCheckedMsg{
 			ResourceType: shortName,
 			HasResources: len(result.Resources) > 0,
 			Count:        len(result.Resources),
 			Truncated:    truncated,
 			Gen:          gen,
+			Issues:       issues,
+			Resources:    result.Resources,
 		}
 	}
 }
@@ -390,12 +415,18 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 	profile := m.profile
 	region := m.region
 
-	// Collect availability and truncation from main menu
+	// Collect availability, truncation, and issue counts from main menu.
 	var entries map[string]int
 	var truncatedMap map[string]bool
+	var issueCounts map[string]int
+	var issueTruncated map[string]bool
+	var issueKnown map[string]bool
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		entries = menu.GetAvailability()
 		truncatedMap = menu.GetTruncated()
+		issueCounts = menu.GetIssueCounts()
+		issueTruncated = menu.GetIssueTruncated()
+		issueKnown = menu.GetIssueKnown()
 	}
 	if entries == nil {
 		return nil
@@ -413,7 +444,13 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 			if truncatedMap != nil {
 				trunc = truncatedMap[name]
 			}
-			cf.Resources[name] = cache.Entry{HasResources: count > 0, Count: count, Truncated: trunc}
+			e := cache.Entry{HasResources: count > 0, Count: count, Truncated: trunc}
+			if issueKnown[name] {
+				e.Issues = issueCounts[name]
+				e.IssuesKnown = true
+				e.IssuesTruncated = issueTruncated[name]
+			}
+			cf.Resources[name] = e
 		}
 		// Best-effort save — don't flash errors for cache write failures
 		_ = cache.Save(cf)
@@ -428,29 +465,155 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 func (m *Model) demoPrefetchCounts() tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
+	gen := m.availabilityGen
 	return func() tea.Msg {
 		allNames := resource.AllShortNames()
 		entries := make(map[string]int, len(allNames))
 		truncated := make(map[string]bool)
-		ctx, cancel := context.WithTimeout(appCtx, 30*time.Second)
-		defer cancel()
+		issueCounts := make(map[string]int, len(allNames))
+		issueTruncated := make(map[string]bool)
+		retainedResources := make(map[string][]resource.Resource, len(allNames))
 		for _, shortName := range allNames {
+			// Stop early if the app context is done (shutdown or profile/region switch).
+			if appCtx.Err() != nil {
+				break
+			}
 			pf := resource.GetPaginatedFetcher(shortName)
 			if pf == nil {
 				continue
 			}
-			result, err := pf(ctx, clients, "")
+			perFetchCtx, perFetchCancel := context.WithTimeout(appCtx, 5*time.Second)
+			result, err := pf(perFetchCtx, clients, "")
+			perFetchCancel()
 			if err != nil {
 				continue
 			}
 			entries[shortName] = len(result.Resources)
-			if result.Pagination != nil && result.Pagination.IsTruncated {
+			isTrunc := result.Pagination != nil && result.Pagination.IsTruncated
+			if isTrunc {
 				truncated[shortName] = true
+				issueTruncated[shortName] = true
 			}
+			// Count issue-status resources (red/yellow only).
+			issues := 0
+			td := resource.FindResourceType(shortName)
+			for _, r := range result.Resources {
+				if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
+					issues++
+				}
+			}
+			issueCounts[shortName] = issues
+			// Retain first-page resources for Wave 2 enricher consumption.
+			retainedResources[shortName] = result.Resources
 		}
 		return messages.AvailabilityPrefetchedMsg{
-			Entries:   entries,
-			Truncated: truncated,
+			Entries:        entries,
+			Truncated:      truncated,
+			IssueCounts:    issueCounts,
+			IssueTruncated: issueTruncated,
+			Resources:      retainedResources,
+			Gen:            gen,
+		}
+	}
+}
+
+// refreshResourceListWithEnrichmentRerun wraps the ordinary refresh fetch for
+// a top-level list so that the ResourcesLoadedMsg it produces carries an
+// enrichment-rerun token. The token is captured at Ctrl+R dispatch time and
+// stamped into the message; the ResourcesLoadedMsg handler in app.go checks
+// TypeGen in its tail branch to decide whether to seed probeResources and
+// dispatch probeEnrichment. APIErrorMsg and any other message pass through
+// unchanged.
+func (m *Model) refreshResourceListWithEnrichmentRerun(
+	rl views.ResourceListModel, tok int,
+) tea.Cmd {
+	inner := m.refreshResourceList(rl)
+	return func() tea.Msg {
+		msg := inner()
+		if loaded, ok := msg.(messages.ResourcesLoadedMsg); ok {
+			loaded.TypeGen = tok
+			return loaded
+		}
+		return msg
+	}
+}
+
+// buildEnrichQueue returns resource types that have registered enrichers AND
+// have retained probe resources, sorted by declarative priority from
+// EnricherRegistry[name].Priority (lower values first), then alphabetically
+// within the same priority tier. Priority is metadata on the registry entry:
+// 10 = batchable (cheap, run first), 100 = default per-resource enricher.
+func (m *Model) buildEnrichQueue() []string {
+	type pair struct {
+		name     string
+		priority int
+	}
+
+	var ps []pair
+	for name, e := range awsclient.EnricherRegistry {
+		if _, ok := m.probeResources[name]; !ok {
+			continue
+		}
+		ps = append(ps, pair{name: name, priority: e.Priority})
+	}
+	sort.Slice(ps, func(i, j int) bool {
+		if ps[i].priority != ps[j].priority {
+			return ps[i].priority < ps[j].priority
+		}
+		return ps[i].name < ps[j].name // stable: alphabetical within priority
+	})
+	queue := make([]string, len(ps))
+	for i, p := range ps {
+		queue[i] = p.name
+	}
+	return queue
+}
+
+// probeEnrichment returns a tea.Cmd that runs the registered enricher for a
+// resource type and returns an EnrichmentCheckedMsg.
+// typeGen is the per-type generation counter captured at dispatch time; it is
+// embedded in the message so handleEnrichmentChecked can drop stale results.
+func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
+	clients := m.clients
+	appCtx := m.appCtx
+	resources := m.probeResources[shortName]
+	enricherFn := awsclient.EnricherRegistry[shortName].Fn
+	typeGen := m.enrichmentTypeGen[shortName]
+	if enricherFn == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		if clients == nil {
+			return messages.EnrichmentCheckedMsg{
+				ResourceType: shortName,
+				Err:          fmt.Errorf("AWS clients not initialized"),
+				Gen:          gen,
+				TypeGen:      typeGen,
+			}
+		}
+		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
+		defer cancel()
+
+		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.EnricherResult, error) {
+			return enricherFn(ctx, clients, resources)
+		})
+		if err != nil {
+			return messages.EnrichmentCheckedMsg{
+				ResourceType: shortName,
+				Err:          err,
+				Gen:          gen,
+				TypeGen:      typeGen,
+			}
+		}
+		return messages.EnrichmentCheckedMsg{
+			ResourceType: shortName,
+			Issues:       result.IssueCount,
+			Truncated:    result.Truncated,
+			Findings:     result.Findings,
+			FieldUpdates: result.FieldUpdates,
+			TruncatedIDs: result.TruncatedIDs,
+			Gen:          gen,
+			TypeGen:      typeGen,
 		}
 	}
 }

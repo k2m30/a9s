@@ -56,26 +56,44 @@ func athenaCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 }
 
 // ---------------------------------------------------------------------------
-// checkAthenaS3 tests (stub — Count=0, S3 location not in WorkGroupSummary)
+// checkAthenaS3 tests — reads Fields["result_output_location"] populated by
+// GetWorkGroup enrichment. Without enrichment, Count: -1 (unknown).
 // ---------------------------------------------------------------------------
 
-// TestRelated_Athena_S3_AlwaysZero verifies that checkAthenaS3 returns Count=0
-// regardless of input. The S3 output location is not available in the
-// WorkGroupSummary list response.
-func TestRelated_Athena_S3_AlwaysZero(t *testing.T) {
+func TestRelated_Athena_S3_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "primary",
 		Name:   "primary",
 		Fields: map[string]string{},
 	}
-
 	checker := athenaCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (stub: S3 location not available from list API)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count)
 	}
 	if result.TargetType != "s3" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "s3")
 	}
 }
+
+// NOTE: The athena→s3 "Found" path now makes a live GetWorkGroup API call
+// (Pattern C). Verifying a positive match requires a mocked *ServiceClients
+// whose Athena satisfies AthenaGetWorkGroupAPI — set up in the integration
+// test suite. Unit tests cover the nil-clients path (above) and the
+// s3://-URI parser via bucketFromS3URI in its own test.
+
+func TestRelated_Athena_KMS_Unknown(t *testing.T) {
+	res := resource.Resource{
+		ID:     "primary",
+		Name:   "primary",
+		Fields: map[string]string{},
+	}
+	checker := athenaCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count)
+	}
+}
+
+// Same pattern for athena→kms: the positive match now requires a mocked
+// GetWorkGroup response. See integration tests.

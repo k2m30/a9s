@@ -7,20 +7,22 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Queue Name", Path: "", Key: "queue_name", Width: 36},
 				{Title: "Messages", Path: "", Key: "approx_messages", Width: 10},
 				{Title: "In Flight", Path: "", Key: "approx_not_visible", Width: 10},
+				{Title: "DLQ", Key: "dlq", Width: 5},
 				{Title: "Delay", Path: "", Key: "delay_seconds", Width: 8},
 				{Title: "Queue URL", Path: "", Key: "queue_url", Width: 50},
 			},
-			Detail: []string{
-				"QueueUrl", "Attributes",
+			Detail: []DetailField{
+				{Path: "QueueUrl"}, {Path: "Attributes"},
 			},
 		},
 		"sns": {
 			List: []ListColumn{
 				{Title: "Topic Name", Path: "TopicArn", Width: 40},
+				{Title: "Subs", Key: "subs_count", Width: 6},
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
 			},
-			Detail: []string{
-				"TopicArn",
+			Detail: []DetailField{
+				{Path: "TopicArn"},
 			},
 		},
 		"sns-sub": {
@@ -28,25 +30,27 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Topic ARN", Path: "TopicArn", Width: 48},
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
+				{Title: "Confirmed", Path: "SubscriptionArn", Width: 22},
 				{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60},
 			},
-			Detail: []string{
-				"SubscriptionArn", "TopicArn", "Protocol",
-				"Endpoint", "Owner",
+			Detail: []DetailField{
+				{Path: "SubscriptionArn"}, {Path: "TopicArn"}, {Path: "Protocol"},
+				{Path: "Endpoint"}, {Path: "Owner"},
 			},
 		},
 		"eb-rule": {
 			List: []ListColumn{
 				{Title: "Rule Name", Path: "Name", Width: 28},
 				{Title: "State", Path: "State", Width: 10},
+				{Title: "Targets", Key: "target_count", Width: 8},
 				{Title: "Event Bus", Path: "EventBusName", Width: 18},
 				{Title: "Schedule", Path: "ScheduleExpression", Width: 24},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
-			Detail: []string{
-				"Name", "Arn", "State", "Description",
-				"EventBusName", "ScheduleExpression", "EventPattern",
-				"ManagedBy", "RoleArn",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Arn"}, {Path: "State"}, {Path: "Description"},
+				{Path: "EventBusName"}, {Path: "ScheduleExpression"}, {Path: "EventPattern"},
+				{Path: "ManagedBy"}, {Path: "RoleArn"},
 			},
 		},
 		"eb_rule_targets": {
@@ -56,11 +60,11 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Resource", Key: "resource_type_name", Width: 28},
 				{Title: "Input", Key: "input_summary", Width: 36},
 			},
-			Detail: []string{
-				"Id", "Arn", "RoleArn", "Input", "InputPath", "InputTransformer",
-				"DeadLetterConfig", "RetryPolicy", "SqsParameters", "EcsParameters",
-				"KinesisParameters", "BatchParameters", "HttpParameters",
-				"SageMakerPipelineParameters", "RedshiftDataParameters", "AppSyncParameters",
+			Detail: []DetailField{
+				{Path: "Id"}, {Path: "Arn"}, {Path: "RoleArn"}, {Path: "Input"}, {Path: "InputPath"}, {Path: "InputTransformer"},
+				{Path: "DeadLetterConfig"}, {Path: "RetryPolicy"}, {Path: "SqsParameters"}, {Path: "EcsParameters"},
+				{Path: "KinesisParameters"}, {Path: "BatchParameters"}, {Path: "HttpParameters"},
+				{Path: "SageMakerPipelineParameters"}, {Path: "RedshiftDataParameters"}, {Path: "AppSyncParameters"},
 			},
 		},
 		"kinesis": {
@@ -70,9 +74,9 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Mode", Path: "StreamModeDetails.StreamMode", Width: 14},
 				{Title: "Created", Path: "StreamCreationTimestamp", Width: 22},
 			},
-			Detail: []string{
-				"StreamName", "StreamARN", "StreamStatus",
-				"StreamModeDetails", "StreamCreationTimestamp",
+			Detail: []DetailField{
+				{Path: "StreamName"}, {Path: "StreamARN"}, {Path: "StreamStatus"},
+				{Path: "StreamModeDetails"}, {Path: "StreamCreationTimestamp"},
 			},
 		},
 		"msk": {
@@ -82,21 +86,22 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "State", Path: "State", Width: 14},
 				{Title: "Version", Path: "CurrentVersion", Width: 14},
 			},
-			Detail: []string{
-				"ClusterName", "ClusterArn", "ClusterType", "State",
-				"CurrentVersion", "CreationTime", "Provisioned", "Serverless",
-				"Tags",
+			Detail: []DetailField{
+				{Path: "ClusterName"}, {Path: "ClusterArn"}, {Path: "ClusterType"}, {Path: "State"},
+				{Path: "CurrentVersion"}, {Path: "CreationTime"}, {Path: "Provisioned"}, {Path: "Serverless"},
+				{Path: "Tags"},
 			},
 		},
 		"sfn": {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 36},
 				{Title: "Type", Path: "Type", Width: 10},
+				{Title: "Last Run", Key: "last_run", Width: 18},
 				{Title: "ARN", Path: "StateMachineArn", Width: 60},
 				{Title: "Created", Path: "CreationDate", Width: 22},
 			},
-			Detail: []string{
-				"Name", "StateMachineArn", "Type", "CreationDate",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "StateMachineArn"}, {Path: "Type"}, {Path: "CreationDate"},
 			},
 		},
 		"sns_subscriptions": {
@@ -106,9 +111,9 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Status", Key: "confirmation_status", Width: 18},
 				{Title: "Owner", Key: "owner", Width: 14},
 			},
-			Detail: []string{
-				"SubscriptionArn", "TopicArn", "Protocol",
-				"Endpoint", "Owner",
+			Detail: []DetailField{
+				{Path: "SubscriptionArn"}, {Path: "TopicArn"}, {Path: "Protocol"},
+				{Path: "Endpoint"}, {Path: "Owner"},
 			},
 		},
 		"sfn_execution_history": {
@@ -118,23 +123,23 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "State", Key: "state_name", Width: 24},
 				{Title: "Detail", Key: "event_detail", Width: 40},
 			},
-			Detail: []string{
-				"Timestamp", "Type", "Id", "PreviousEventId",
-				"ActivityFailedEventDetails", "ActivityScheduleFailedEventDetails",
-				"ActivityScheduledEventDetails", "ActivityStartedEventDetails",
-				"ActivitySucceededEventDetails", "ActivityTimedOutEventDetails",
-				"ExecutionAbortedEventDetails", "ExecutionFailedEventDetails",
-				"ExecutionStartedEventDetails", "ExecutionSucceededEventDetails",
-				"ExecutionTimedOutEventDetails",
-				"LambdaFunctionFailedEventDetails", "LambdaFunctionScheduledEventDetails",
-				"LambdaFunctionStartFailedEventDetails", "LambdaFunctionSucceededEventDetails",
-				"LambdaFunctionTimedOutEventDetails",
-				"TaskFailedEventDetails", "TaskScheduledEventDetails",
-				"TaskStartedEventDetails", "TaskStartFailedEventDetails",
-				"TaskSubmitFailedEventDetails", "TaskSubmittedEventDetails",
-				"TaskSucceededEventDetails", "TaskTimedOutEventDetails",
-				"MapRunFailedEventDetails", "MapRunStartedEventDetails",
-				"StateEnteredEventDetails", "StateExitedEventDetails",
+			Detail: []DetailField{
+				{Path: "Timestamp"}, {Path: "Type"}, {Path: "Id"}, {Path: "PreviousEventId"},
+				{Path: "ActivityFailedEventDetails"}, {Path: "ActivityScheduleFailedEventDetails"},
+				{Path: "ActivityScheduledEventDetails"}, {Path: "ActivityStartedEventDetails"},
+				{Path: "ActivitySucceededEventDetails"}, {Path: "ActivityTimedOutEventDetails"},
+				{Path: "ExecutionAbortedEventDetails"}, {Path: "ExecutionFailedEventDetails"},
+				{Path: "ExecutionStartedEventDetails"}, {Path: "ExecutionSucceededEventDetails"},
+				{Path: "ExecutionTimedOutEventDetails"},
+				{Path: "LambdaFunctionFailedEventDetails"}, {Path: "LambdaFunctionScheduledEventDetails"},
+				{Path: "LambdaFunctionStartFailedEventDetails"}, {Path: "LambdaFunctionSucceededEventDetails"},
+				{Path: "LambdaFunctionTimedOutEventDetails"},
+				{Path: "TaskFailedEventDetails"}, {Path: "TaskScheduledEventDetails"},
+				{Path: "TaskStartedEventDetails"}, {Path: "TaskStartFailedEventDetails"},
+				{Path: "TaskSubmitFailedEventDetails"}, {Path: "TaskSubmittedEventDetails"},
+				{Path: "TaskSucceededEventDetails"}, {Path: "TaskTimedOutEventDetails"},
+				{Path: "MapRunFailedEventDetails"}, {Path: "MapRunStartedEventDetails"},
+				{Path: "StateEnteredEventDetails"}, {Path: "StateExitedEventDetails"},
 			},
 		},
 		"sfn_executions": {
@@ -145,12 +150,12 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Stop Date", Path: "StopDate", Width: 22},
 				{Title: "Duration", Key: "duration", Width: 12},
 			},
-			Detail: []string{
-				"ExecutionArn", "Name", "Status",
-				"StartDate", "StopDate",
-				"StateMachineArn", "StateMachineAliasArn", "StateMachineVersionArn",
-				"MapRunArn", "ItemCount",
-				"RedriveCount", "RedriveDate",
+			Detail: []DetailField{
+				{Path: "ExecutionArn"}, {Path: "Name"}, {Path: "Status"},
+				{Path: "StartDate"}, {Path: "StopDate"},
+				{Path: "StateMachineArn"}, {Path: "StateMachineAliasArn"}, {Path: "StateMachineVersionArn"},
+				{Path: "MapRunArn"}, {Path: "ItemCount"},
+				{Path: "RedriveCount"}, {Path: "RedriveDate"},
 			},
 		},
 	}
