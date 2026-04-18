@@ -83,7 +83,7 @@ func (m ResourceListModel) resolveColumns() []listCol {
 					sortPath: lc.SortPath,
 				}
 			}
-			return cols
+			return applySortKeyPrefixWidths(cols)
 		}
 	}
 
@@ -111,7 +111,7 @@ func (m ResourceListModel) resolveColumns() []listCol {
 					sortPath: lc.SortPath,
 				}
 			}
-			return cols
+			return applySortKeyPrefixWidths(cols)
 		}
 	}
 
@@ -138,6 +138,30 @@ func (m ResourceListModel) resolveColumns() []listCol {
 			}
 		}
 		cols[i] = lc
+	}
+	return applySortKeyPrefixWidths(cols)
+}
+
+// applySortKeyPrefixWidths auto-grows the first 10 columns' widths to fit the
+// "N:Title" sort-key prefix produced by colHeaderTitle. Without this, columns
+// declared with Width < len("N:Title") would truncate the header (e.g.
+// "5:Instanc…" at width=10) and hide the sort hint. The architectural rule:
+// any sortable column (positions 0-9) MUST reserve enough room for its prefix.
+// Columns beyond position 9 have no prefix and keep their declared width.
+func applySortKeyPrefixWidths(cols []listCol) []listCol {
+	for i := range cols {
+		if i >= 10 {
+			break
+		}
+		displayNum := i + 1
+		if displayNum == 10 {
+			displayNum = 0
+		}
+		prefix := fmt.Sprintf("%d:", displayNum)
+		minWidth := len([]rune(prefix)) + len([]rune(cols[i].title))
+		if cols[i].width < minWidth {
+			cols[i].width = minWidth
+		}
 	}
 	return cols
 }
@@ -186,8 +210,9 @@ func (m ResourceListModel) renderHeaderRow(cols []listCol) string {
 // colHeaderTitle returns the column title with a position number prefix and
 // sort indicator. absIdx is the 0-based absolute column index (accounting for
 // hScrollOffset). Position numbers 1-9 correspond to keys "1"-"9"; position 10
-// shows as "0". The prefix is only shown when len("N:"+title) <= c.width so
-// that narrow columns remain legible (fall back to plain title when there is no room).
+// shows as "0". The prefix is always shown for columns 0-9 — PadOrTrunc in
+// renderHeaders will truncate the rendered text if it exceeds the column width,
+// so a truncated "5:Ins" is still more informative than a full "Instances↓".
 func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 	title := c.title
 	// Append sort glyph if this is the active sort column.
@@ -198,17 +223,14 @@ func (m ResourceListModel) colHeaderTitle(c listCol, absIdx int) string {
 			title += "\u2193"
 		}
 	}
-	// Add position number prefix (1-based, max 10 columns for sort),
-	// only when the prefixed title fits within the column width.
+	// Add position number prefix (1-based, max 10 columns for sort).
+	// Always emit the prefix; narrow columns get truncated by PadOrTrunc.
 	if absIdx < 10 {
 		displayNum := absIdx + 1 // 0-based → 1-based
 		if displayNum == 10 {
 			displayNum = 0 // key "0" = column 10
 		}
-		prefixed := fmt.Sprintf("%d:%s", displayNum, title)
-		if len([]rune(prefixed)) <= c.width {
-			return prefixed
-		}
+		return fmt.Sprintf("%d:%s", displayNum, title)
 	}
 	return title
 }

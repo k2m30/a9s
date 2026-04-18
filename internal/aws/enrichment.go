@@ -249,7 +249,6 @@ func NoOpEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (
 	return EnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},
-		UnmatchedIDs: []string{},
 		IssueCount:   0,
 		Truncated:    false,
 	}, nil
@@ -287,9 +286,8 @@ func formatDate(t interface{ Format(string) string }) string {
 func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.RDS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	type maintenanceAction = rds.DescribePendingMaintenanceActionsOutput
 	var allPages []*maintenanceAction
@@ -306,7 +304,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+			return EnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allPages = append(allPages, out)
 		if out.Marker == nil {
@@ -387,8 +385,6 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 				// No probeID matched — this maintenance action targets a resource
 				// not in the current input slice (e.g. dispatched for dbc, ARN is
 				// for an instance; or page truncation evicted it). Append to
-				// unmatchedIDs for explicit telemetry instead of silently dropping.
-				unmatchedIDs = append(unmatchedIDs, arn)
 				continue
 			}
 			findings[key] = resource.EnrichmentFinding{
@@ -398,7 +394,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (account-wide, paginated) and returns
@@ -407,9 +403,8 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -432,7 +427,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+			return EnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allVolumeStatuses = append(allVolumeStatuses, out.VolumeStatuses...)
 		if out.NextToken == nil {
@@ -447,7 +442,6 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		volID := *v.VolumeId
 		// Track unmatched: API returned a volume not in the input resources slice.
 		if len(knownIDs) > 0 && !knownIDs[volID] {
-			unmatchedIDs = append(unmatchedIDs, volID)
 			continue
 		}
 		if v.VolumeStatus == nil || v.VolumeStatus.Status == ec2types.VolumeStatusInfoStatusOk {
@@ -484,7 +478,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
@@ -494,9 +488,8 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CodeBuild == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	names := make([]string, 0, len(resources))
 	for _, r := range resources {
@@ -505,7 +498,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(names) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
@@ -530,13 +523,13 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(buildIDs) == 0 {
-		return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+		return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 		Ids: buildIDs,
 	})
 	if err != nil {
-		return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+		return EnricherResult{TruncatedIDs: truncatedIDs}, err
 	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
@@ -590,7 +583,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 		fieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
@@ -600,9 +593,8 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ELBv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -655,7 +647,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
@@ -665,9 +657,8 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CodePipeline == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -728,7 +719,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		}
 		fieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
@@ -738,9 +729,8 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.SFN == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -791,7 +781,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
@@ -803,9 +793,8 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.Backup == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	var allJobs []backuptypes.BackupJob
 	var nextToken *string
@@ -821,7 +810,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+			return EnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allJobs = append(allJobs, out.BackupJobs...)
 		if out.NextToken == nil {
@@ -892,7 +881,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSESAccount calls GetAccount once (account-wide) and returns a Finding
@@ -901,13 +890,12 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.SESv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
 	if err != nil {
-		return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+		return EnricherResult{TruncatedIDs: truncatedIDs}, err
 	}
 	if out.EnforcementStatus != nil {
 		switch *out.EnforcementStatus {
@@ -945,7 +933,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: false, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: false, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
@@ -956,9 +944,8 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource
 func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -982,7 +969,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, err
+			return EnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allInstanceStatuses = append(allInstanceStatuses, out.InstanceStatuses...)
 		if out.NextToken == nil {
@@ -1001,7 +988,6 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		id := *is.InstanceId
 		// Track unmatched: API returned an instance not in the input resources slice.
 		if len(knownIDs) > 0 && !knownIDs[id] {
-			unmatchedIDs = append(unmatchedIDs, id)
 			continue
 		}
 
@@ -1074,7 +1060,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
@@ -1083,9 +1069,8 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.AutoScaling == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1138,7 +1123,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
@@ -1148,9 +1133,8 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.Glue == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1197,7 +1181,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
@@ -1207,9 +1191,8 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.DynamoDB == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1254,7 +1237,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichRedisReplicationGroup calls DescribeReplicationGroups (account-wide, paginated)
@@ -1273,9 +1256,8 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ElastiCache == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build set of resource IDs (CacheClusterIds) we know about so we don't
 	// emit FieldUpdates for clusters not in the current list.
@@ -1298,7 +1280,7 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 		if err != nil {
 			// ElastiCache errors on this call are non-fatal — return an empty result
 			// rather than propagating (enricher is best-effort for field updates).
-			return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+			return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 		}
 		for _, rg := range out.ReplicationGroups {
 			af := strings.ToLower(string(rg.AutomaticFailover))
@@ -1318,7 +1300,7 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 		}
 		marker = out.Marker
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -1330,9 +1312,8 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.KMS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1371,7 +1352,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
@@ -1381,9 +1362,8 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EFS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1449,7 +1429,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			break // first finding per FS is sufficient
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
@@ -1461,9 +1441,8 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1558,7 +1537,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			findings[tgwID] = *worst
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (cap EnrichmentCap)
@@ -1569,9 +1548,8 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1636,7 +1614,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			"flow_logs": flowLogsVal,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
@@ -1650,9 +1628,8 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.S3 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1722,7 +1699,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			fieldUpdates[name] = map[string]string{"public_access": "RISK"}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichECSServices is a Wave 2 enricher for ECS services.
@@ -1735,9 +1712,8 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
@@ -1866,7 +1842,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichECSClusters is a Wave 2 enricher for ECS clusters.
@@ -1881,9 +1857,8 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	clusterNames := make([]string, 0, len(resources))
@@ -1965,7 +1940,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 
 	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
 	// do not contribute to the attention menu badge.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.
@@ -1979,9 +1954,8 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	// Group task ARNs by cluster ARN.
@@ -2083,7 +2057,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
@@ -2095,9 +2069,8 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.EventBridge == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -2222,7 +2195,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 	}
 
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
@@ -2233,9 +2206,8 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ElasticBeanstalk == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2281,7 +2253,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
@@ -2292,9 +2264,8 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ELBv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2349,7 +2320,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
@@ -2359,9 +2330,8 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.SQS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2417,7 +2387,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
@@ -2427,9 +2397,8 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.SNS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2498,7 +2467,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
@@ -2511,9 +2480,8 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.MSK == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2563,7 +2531,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // isMSKVersionOutdated returns true when the given Kafka version string is below the
@@ -2611,9 +2579,8 @@ func parseVersionPart(s string) (int, error) {
 func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.ACM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	now := time.Now()
@@ -2667,7 +2634,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 			// "~" is informational — not counted in IssueCount.
 		}
 	}
-	return EnricherResult{IssueCount: bangCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: bangCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)
@@ -2681,9 +2648,8 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CloudFront == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2756,7 +2722,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	}
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
@@ -2773,9 +2739,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.APIGatewayV2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2882,7 +2847,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	}
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
@@ -2893,9 +2858,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CloudFormation == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2963,7 +2927,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			Rows:     failedRows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
@@ -3001,15 +2965,10 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 	mergedTruncatedIDs := make(map[string]bool, len(eventsResult.TruncatedIDs)+len(driftResult.TruncatedIDs))
 	maps.Copy(mergedTruncatedIDs, eventsResult.TruncatedIDs)
 	maps.Copy(mergedTruncatedIDs, driftResult.TruncatedIDs)
-	// Merge UnmatchedIDs: concatenate both slices.
-	mergedUnmatchedIDs := make([]string, 0, len(eventsResult.UnmatchedIDs)+len(driftResult.UnmatchedIDs))
-	mergedUnmatchedIDs = append(mergedUnmatchedIDs, eventsResult.UnmatchedIDs...)
-	mergedUnmatchedIDs = append(mergedUnmatchedIDs, driftResult.UnmatchedIDs...)
 	return EnricherResult{
 		IssueCount:   eventsResult.IssueCount,
 		Truncated:    eventsResult.Truncated || driftResult.Truncated,
 		TruncatedIDs: mergedTruncatedIDs,
-		UnmatchedIDs: mergedUnmatchedIDs,
 		Findings:     merged,
 		FieldUpdates: mergedUpdates,
 	}, nil
@@ -3023,9 +2982,8 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CloudFormation == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3072,7 +3030,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 	// "~" findings do not contribute to IssueCount per the EnricherResult contract.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // ECRImagesCapPerRepo is the maximum number of images scanned per repository
@@ -3097,14 +3055,13 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients == nil || clients.ECR == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	listAPI, okL := clients.ECR.(ECRListImagesAPI)
 	scanAPI, okS := clients.ECR.(ECRDescribeImageScanFindingsAPI)
 	if !okL || !okS {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -3220,7 +3177,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
@@ -3236,9 +3193,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CodeArtifact == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
@@ -3335,7 +3291,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
@@ -3352,9 +3308,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.Athena == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3415,7 +3370,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 		// "~" severity does not contribute to IssueCount.
 	}
-	return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
@@ -3429,9 +3384,8 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.Route53 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3473,7 +3427,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 	// All Route53 findings are severity "~" (informational).
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
@@ -3489,9 +3443,8 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.WAFv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3587,7 +3540,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 	}
 	// All WAF logging findings are severity "~" (informational).
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -3600,13 +3553,12 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getRoleAPI, ok := clients.IAM.(IAMGetRoleAPI)
 	if !ok {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3649,7 +3601,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
@@ -3663,14 +3615,13 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getPolicyAPI, ok1 := clients.IAM.(IAMGetPolicyAPI)
 	getPolicyVersionAPI, ok2 := clients.IAM.(IAMGetPolicyVersionAPI)
 	if !ok1 || !ok2 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
@@ -3722,7 +3673,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			"risk": riskVal,
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy
@@ -3814,15 +3765,14 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	loginProfileAPI, ok1 := clients.IAM.(IAMGetLoginProfileAPI)
 	mfaAPI, ok2 := clients.IAM.(IAMListMFADevicesAPI)
 	accessKeyAPI, ok3 := clients.IAM.(IAMListAccessKeysAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -3942,7 +3892,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -3957,15 +3907,14 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getGroupAPI, ok1 := clients.IAM.(IAMGetGroupAPI)
 	attachedPoliciesAPI, ok2 := clients.IAM.(IAMListAttachedGroupPoliciesAPI)
 	inlinePoliciesAPI, ok3 := clients.IAM.(IAMListGroupPoliciesAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -4128,7 +4077,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 	// Group findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
@@ -4145,13 +4094,12 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
-	unmatchedIDs := []string{}
 	if clients.CloudWatchLogs == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	metricFiltersAPI, ok := clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI)
 	if !ok {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs}, nil
+		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
 	// always succeeds for valid clients. However, test fakes that embed the interface
@@ -4226,7 +4174,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		}
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, UnmatchedIDs: unmatchedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic
