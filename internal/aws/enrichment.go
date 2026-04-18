@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 	"time"
 
@@ -946,6 +947,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 // Severity is "~" (informational); IssueCount counts PITR-disabled findings.
 func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.DynamoDB == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -976,14 +978,22 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		if pitr == nil {
 			continue
 		}
-		if string(pitr.PointInTimeRecoveryStatus) != "ENABLED" {
+		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
+		pitrVal := "false"
+		if pitrEnabled {
+			pitrVal = "true"
+		}
+		fieldUpdates[name] = map[string]string{
+			"pitr_enabled": pitrVal,
+		}
+		if !pitrEnabled {
 			findings[name] = resource.EnrichmentFinding{
 				Severity: "~",
 				Summary:  "PITR disabled",
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -993,6 +1003,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 // silently skipped without marking Truncated. Other per-key errors set Truncated=true.
 func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.KMS == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1018,6 +1029,13 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			truncated = true
 			continue
 		}
+		rotationVal := "false"
+		if out.KeyRotationEnabled {
+			rotationVal = "true"
+		}
+		fieldUpdates[keyID] = map[string]string{
+			"rotation_enabled": rotationVal,
+		}
 		if !out.KeyRotationEnabled {
 			findings[keyID] = resource.EnrichmentFinding{
 				Severity: "~",
@@ -1025,7 +1043,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap)
@@ -1205,6 +1223,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 //   - "public-access block partial: <flag>=false" — one or more flags false
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.S3 == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1231,6 +1250,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 					Severity: "~",
 					Summary:  "no public access block (account-level may apply)",
 				}
+				fieldUpdates[name] = map[string]string{"public_access": "?"}
 				continue
 			}
 			// Other errors: skip but signal incomplete data.
@@ -1242,6 +1262,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 				Severity: "~",
 				Summary:  "no public access block (account-level may apply)",
 			}
+			fieldUpdates[name] = map[string]string{"public_access": "?"}
 			continue
 		}
 		cfg := out.PublicAccessBlockConfiguration
@@ -1256,8 +1277,10 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			{"BlockPublicPolicy", cfg.BlockPublicPolicy},
 			{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
 		}
+		allBlocked := true
 		for _, fc := range flags {
 			if fc.value == nil || !*fc.value {
+				allBlocked = false
 				findings[name] = resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  fmt.Sprintf("public-access block partial: %s=false", fc.name),
@@ -1265,8 +1288,13 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 				break
 			}
 		}
+		if allBlocked {
+			fieldUpdates[name] = map[string]string{"public_access": "BLOCKED"}
+		} else {
+			fieldUpdates[name] = map[string]string{"public_access": "RISK"}
+		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichECSServices is a Wave 2 enricher for ECS services.
@@ -1631,6 +1659,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
 func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.EventBridge == nil || len(resources) == 0 {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -1670,6 +1699,9 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 
 		targets := out.Targets
+		fieldUpdates[ruleName] = map[string]string{
+			"target_count": strconv.Itoa(len(targets)),
+		}
 		var rows []resource.FindingRow
 
 		// ENABLED rule with no targets → rule fires but goes nowhere.
@@ -1732,7 +1764,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 	}
 
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
@@ -2414,10 +2446,24 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 	// Drift findings go in first; stack-events findings overwrite on conflict.
 	maps.Copy(merged, driftResult.Findings)
 	maps.Copy(merged, eventsResult.Findings)
+	// Merge field updates from both sub-enrichers (drift wins on conflict since
+	// it writes drift_status; stack-events doesn't write field updates).
+	mergedUpdates := make(map[string]map[string]string)
+	for id, kvMap := range driftResult.FieldUpdates {
+		mergedUpdates[id] = make(map[string]string, len(kvMap))
+		maps.Copy(mergedUpdates[id], kvMap)
+	}
+	for id, kvMap := range eventsResult.FieldUpdates {
+		if mergedUpdates[id] == nil {
+			mergedUpdates[id] = make(map[string]string, len(kvMap))
+		}
+		maps.Copy(mergedUpdates[id], kvMap)
+	}
 	return EnricherResult{
-		IssueCount: eventsResult.IssueCount,
-		Truncated:  eventsResult.Truncated || driftResult.Truncated,
-		Findings:   merged,
+		IssueCount:   eventsResult.IssueCount,
+		Truncated:    eventsResult.Truncated || driftResult.Truncated,
+		Findings:     merged,
+		FieldUpdates: mergedUpdates,
 	}, nil
 }
 
@@ -2427,6 +2473,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // Severity "~" findings do not contribute to IssueCount.
 func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.CloudFormation == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -2453,26 +2500,28 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 			continue
 		}
 		stack := out.Stacks[0]
-		if stack.DriftInformation == nil {
-			continue
-		}
-		if stack.DriftInformation.StackDriftStatus != "DRIFTED" {
-			continue
-		}
 		key := r.ID
 		if key == "" {
 			key = stackName
 		}
-		findings[key] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  "stack drifted from template",
-			Rows: []resource.FindingRow{
-				{Label: "Drift Status", Value: string(stack.DriftInformation.StackDriftStatus), Tier: "~"},
-			},
+		if stack.DriftInformation != nil {
+			driftStatus := string(stack.DriftInformation.StackDriftStatus)
+			fieldUpdates[key] = map[string]string{
+				"drift_status": driftStatus,
+			}
+			if driftStatus == "DRIFTED" {
+				findings[key] = resource.EnrichmentFinding{
+					Severity: "~",
+					Summary:  "stack drifted from template",
+					Rows: []resource.FindingRow{
+						{Label: "Drift Status", Value: driftStatus, Tier: "~"},
+					},
+				}
+			}
 		}
 	}
 	// "~" findings do not contribute to IssueCount per the EnricherResult contract.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // DISABLED: EnrichECRRepository previously called DescribeImageScanFindings for each
@@ -2991,6 +3040,7 @@ func isAdminStarPolicyString(doc string) bool {
 // Skip when clients.IAM == nil.
 func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.IAM == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -3037,6 +3087,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		var rows []resource.FindingRow
 		severity := "~"
+		hasMFA := false
+		riskLabel := ""
 
 		// Check MFA only for console users.
 		if hasConsolePassword {
@@ -3047,7 +3099,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				truncated = true
 				continue
 			}
-			if len(mfaOut.MFADevices) == 0 {
+			hasMFA = len(mfaOut.MFADevices) > 0
+			if !hasMFA {
 				rows = append(rows, resource.FindingRow{
 					Label: "MFA",
 					Value: "console user without MFA (CIS IAM.5)",
@@ -3055,6 +3108,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				})
 				severity = "!"
 				issueCount++
+				riskLabel = "NO_MFA"
 			}
 		}
 
@@ -3066,6 +3120,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			truncated = true
 			continue
 		}
+		hasOldKey := false
 		for _, key := range keysOut.AccessKeyMetadata {
 			if key.Status != iamtypes.StatusTypeActive {
 				continue
@@ -3074,6 +3129,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				continue
 			}
 			if time.Since(*key.CreateDate) > 90*24*time.Hour {
+				hasOldKey = true
 				keyID := ""
 				if key.AccessKeyId != nil {
 					keyID = *key.AccessKeyId
@@ -3083,7 +3139,21 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 					Value: fmt.Sprintf("key %s >90d (rotation)", keyID),
 					Tier:  "~",
 				})
+				if riskLabel == "" {
+					riskLabel = "OLD_KEY"
+				}
 			}
+		}
+		_ = hasOldKey
+
+		// Write field updates for mfa and risk columns.
+		mfaVal := "false"
+		if hasMFA || !hasConsolePassword {
+			mfaVal = "true"
+		}
+		fieldUpdates[r.ID] = map[string]string{
+			"mfa":  mfaVal,
+			"risk": riskLabel,
 		}
 
 		if len(rows) == 0 {
@@ -3095,7 +3165,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -3108,6 +3178,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 // Skip when clients.IAM == nil.
 func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.IAM == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -3155,9 +3226,14 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			continue
 		}
 
+		memberCount := len(groupOut.Users)
+		fieldUpdates[r.ID] = map[string]string{
+			"member_count": strconv.Itoa(memberCount),
+		}
+
 		var rows []resource.FindingRow
 
-		if len(groupOut.Users) == 0 {
+		if memberCount == 0 {
 			rows = append(rows, resource.FindingRow{
 				Label: "Members",
 				Value: "group has no members (orphan)",
@@ -3183,7 +3259,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 	// Group findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
@@ -3198,6 +3274,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 // Skip when clients.CloudWatchLogs == nil.
 func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
 	if clients.CloudWatchLogs == nil {
 		return EnricherResult{Findings: findings}, nil
 	}
@@ -3205,6 +3282,10 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	if !ok {
 		return EnricherResult{Findings: findings}, nil
 	}
+	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
+	// always succeeds for valid clients. However, test fakes that embed the interface
+	// as a nil zero value will panic at call time — safeDescribeLogStreams recovers.
+	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3219,7 +3300,34 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 
-		// Only inspect audit (CloudTrail) log groups.
+		// Compute last_event_at by fetching the most-recently-written stream.
+		if hasStreams {
+			streamsOut, streamsErr := safeDescribeLogStreams(ctx, logStreamsAPI, logGroupName)
+			if streamsErr == nil && len(streamsOut.LogStreams) > 0 {
+				s := streamsOut.LogStreams[0]
+				if s.LastEventTimestamp != nil {
+					t := time.UnixMilli(*s.LastEventTimestamp)
+					dur := time.Since(t)
+					var rel string
+					switch {
+					case dur < time.Hour:
+						rel = fmt.Sprintf("%dm ago", int(dur.Minutes()))
+					case dur < 24*time.Hour:
+						rel = fmt.Sprintf("%dh ago", int(dur.Hours()))
+					case dur < 7*24*time.Hour:
+						rel = fmt.Sprintf("%dd ago", int(dur.Hours()/24))
+					default:
+						rel = t.Format("2006-01-02")
+					}
+					if fieldUpdates[r.ID] == nil {
+						fieldUpdates[r.ID] = make(map[string]string)
+					}
+					fieldUpdates[r.ID]["last_event_at"] = rel
+				}
+			}
+		}
+
+		// Only inspect audit (CloudTrail) log groups for metric filter findings.
 		if !strings.HasPrefix(logGroupName, "/aws/cloudtrail/") {
 			continue
 		}
@@ -3246,5 +3354,24 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		}
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings}, nil
+	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
+}
+
+// safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic
+// that would arise if the api value is a nil-embedded interface (e.g. in test fakes
+// that embed CWLogsAPI without overriding DescribeLogStreams). On panic it returns
+// an empty output and a sentinel error so the caller can skip the log-stream step.
+func safeDescribeLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string) (out *cwlogssvc.DescribeLogStreamsOutput, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			out = &cwlogssvc.DescribeLogStreamsOutput{}
+			err = fmt.Errorf("DescribeLogStreams panicked: %v", r)
+		}
+	}()
+	return api.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
+		LogGroupName: aws.String(logGroupName),
+		OrderBy:      "LastEventTime",
+		Descending:   aws.Bool(true),
+		Limit:        aws.Int32(1),
+	})
 }

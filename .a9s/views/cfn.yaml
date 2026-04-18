@@ -5,6 +5,9 @@ list:
   Status:
     path: StackStatus
     width: 24
+  Drift:
+    key: drift_status
+    width: 14
   Reason:
     path: StackStatusReason
     width: 32

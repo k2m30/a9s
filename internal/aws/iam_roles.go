@@ -2,8 +2,10 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -12,7 +14,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document"})
+	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document", "trust_wildcard", "trust_summary"})
 
 	resource.RegisterPaginated("role", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -94,17 +96,22 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			}
 		}
 
+		// Detect wildcard principal in trust policy.
+		trustWildcard, trustSummary := parseTrustWildcard(assumeRolePolicyDoc)
+
 		r := resource.Resource{
 			ID:     roleName,
 			Name:   roleName,
 			Status: "",
 			Fields: map[string]string{
-				"role_name":                    roleName,
-				"role_id":                      roleID,
-				"path":                         path,
-				"create_date":                  createDate,
-				"description":                  description,
-				"assume_role_policy_document":  assumeRolePolicyDoc,
+				"role_name":                   roleName,
+				"role_id":                     roleID,
+				"path":                        path,
+				"create_date":                 createDate,
+				"description":                 description,
+				"assume_role_policy_document": assumeRolePolicyDoc,
+				"trust_wildcard":              trustWildcard,
+				"trust_summary":               trustSummary,
 			},
 			RawStruct: role,
 		}
@@ -133,4 +140,59 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// parseTrustWildcard examines a decoded AssumeRolePolicyDocument JSON string
+// and returns ("true"/"false", "WILDCARD"/"") indicating whether the policy
+// has a Statement with Principal.AWS == "*" and no Condition.StringEquals.sts:ExternalId.
+func parseTrustWildcard(doc string) (trustWildcard, trustSummary string) {
+	if doc == "" {
+		return "false", ""
+	}
+	var policy struct {
+		Statement []struct {
+			Principal struct {
+				AWS any `json:"AWS"`
+			} `json:"Principal"`
+			Condition map[string]any `json:"Condition"`
+		} `json:"Statement"`
+	}
+	if err := json.Unmarshal([]byte(doc), &policy); err != nil {
+		return "false", ""
+	}
+	for _, stmt := range policy.Statement {
+		hasWildcard := false
+		switch v := stmt.Principal.AWS.(type) {
+		case string:
+			if v == "*" {
+				hasWildcard = true
+			}
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok && s == "*" {
+					hasWildcard = true
+					break
+				}
+			}
+		}
+		if !hasWildcard {
+			continue
+		}
+		// Check for mitigating condition.
+		hasExternalID := false
+		if cond, ok := stmt.Condition["StringEquals"]; ok {
+			if condMap, ok := cond.(map[string]any); ok {
+				for k := range condMap {
+					if strings.EqualFold(k, "sts:externalid") {
+						hasExternalID = true
+						break
+					}
+				}
+			}
+		}
+		if !hasExternalID {
+			return "true", "WILDCARD"
+		}
+	}
+	return "false", ""
 }

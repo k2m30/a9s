@@ -5,6 +5,9 @@ list:
   Last Used:
     path: RoleLastUsed.LastUsedDate
     width: 22
+  Trust:
+    key: trust_summary
+    width: 12
   Path:
     path: Path
     width: 20

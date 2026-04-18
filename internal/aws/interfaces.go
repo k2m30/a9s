@@ -1431,6 +1431,13 @@ type EnricherResult struct {
 	IssueCount int
 	Truncated  bool
 	Findings   map[string]resource.EnrichmentFinding
+	// FieldUpdates carries per-resource Fields[] mutations the enricher wants
+	// merged into the cached row. Keyed by resource ID, then by field key.
+	// Used by list columns and Color funcs that need access to Wave-2-derived
+	// data without subscribing to the Findings stream separately.
+	// MUST NOT be nil if the enricher writes any updates; use
+	// make(map[string]map[string]string).
+	FieldUpdates map[string]map[string]string
 }
 
 // EnricherFunc is a pluggable function that makes additional API calls for a
