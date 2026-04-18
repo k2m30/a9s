@@ -25,6 +25,9 @@ func TestRedisColor(t *testing.T) {
 		{name: "rebooting", status: "rebooting cluster nodes", want: resource.ColorWarning},
 		{name: "restore_failed", status: "restore-failed", want: resource.ColorBroken},
 		{name: "incompatible_network", status: "incompatible-network", want: resource.ColorBroken},
+		// create-failed is documented in attention-signals.md but missing from
+		// the current Color switch — falls through to ColorHealthy. Real bug.
+		{name: "create_failed", status: "create-failed", want: resource.ColorBroken},
 		{name: "deleted", status: "deleted", want: resource.ColorDim},
 		{name: "empty", status: "", want: resource.ColorHealthy},
 	}

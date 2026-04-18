@@ -27,6 +27,7 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -164,7 +165,7 @@ var EnricherRegistry = map[string]Enricher{
 	"opensearch": {Fn: NoOpEnricher, Priority: 100},
 	"rds-snap":   {Fn: NoOpEnricher, Priority: 100},
 	"redshift":   {Fn: NoOpEnricher, Priority: 100},
-	"redis":      {Fn: NoOpEnricher, Priority: 100},
+	"redis":      {Fn: EnrichRedisReplicationGroup, Priority: 100},
 	"rtb":        {Fn: NoOpEnricher, Priority: 100},
 	"secrets":    {Fn: NoOpEnricher, Priority: 100},
 	// sg uses NoOpEnricher because sg.go's fetcher already computes
@@ -1041,6 +1042,49 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 	}
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
+}
+
+// EnrichRedisReplicationGroup calls DescribeReplicationGroups (account-wide, 1 call)
+// and writes per-CacheCluster Field updates so the redis list view can show the
+// AutomaticFailover and MultiAZ signals that live on the replication-group
+// shape (not on the CacheCluster shape the redis fetcher currently wraps).
+//
+// For each ReplicationGroup, every entry in MemberClusters[] is the
+// CacheClusterId of a member. The redis fetcher's resource ID == CacheClusterId,
+// so we write FieldUpdates[memberClusterID]["automatic_failover"] and ["multi_az"].
+//
+// No Findings are produced (Wave-1 Color func reads the fields directly).
+// Severity stays "~" via the Color func when applicable.
+func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
+	if clients.ElastiCache == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	out, err := clients.ElastiCache.DescribeReplicationGroups(ctx, &elasticache.DescribeReplicationGroupsInput{})
+	if err != nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	// Build set of resource IDs (CacheClusterIds) we know about so we don't
+	// emit FieldUpdates for clusters not in the current list.
+	known := make(map[string]struct{}, len(resources))
+	for _, r := range resources {
+		known[r.ID] = struct{}{}
+	}
+	for _, rg := range out.ReplicationGroups {
+		af := strings.ToLower(string(rg.AutomaticFailover))
+		multi := strings.ToLower(string(rg.MultiAZ))
+		for _, member := range rg.MemberClusters {
+			if _, ok := known[member]; !ok {
+				continue
+			}
+			fieldUpdates[member] = map[string]string{
+				"automatic_failover": af,
+				"multi_az":           multi,
+			}
+		}
+	}
+	return EnricherResult{IssueCount: 0, Truncated: false, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)

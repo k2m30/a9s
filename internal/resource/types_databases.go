@@ -122,17 +122,31 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				base := ColorHealthy
 				switch r.Fields["status"] {
 				case "available":
-					return ColorHealthy
+					base = ColorHealthy
 				case "creating", "modifying", "snapshotting", "deleting", "rebooting cluster nodes":
-					return ColorWarning
-				case "restore-failed", "incompatible-network":
-					return ColorBroken
+					base = ColorWarning
+				case "create-failed", "restore-failed", "incompatible-network":
+					base = ColorBroken
 				case "deleted":
-					return ColorDim
+					base = ColorDim
 				}
-				return ColorHealthy
+				if base == ColorBroken {
+					return base
+				}
+				// AutomaticFailover != enabled on a multi-AZ replication group → Warning
+				// (per docs/attention-signals.md). Populated by the redis fetcher after
+				// the CacheCluster → ReplicationGroup migration. Empty values are
+				// treated as unknown (no penalty) so legacy fixtures are unaffected.
+				af := r.Fields["automatic_failover"]
+				if r.Fields["multi_az"] == "enabled" && af != "" && af != "enabled" {
+					if base < ColorWarning {
+						base = ColorWarning
+					}
+				}
+				return base
 			},
 		},
 		{
