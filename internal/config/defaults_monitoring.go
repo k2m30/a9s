@@ -27,6 +27,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Size", Key: "stored_bytes", SortPath: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
+				{Title: "Last Event", Key: "last_event_at", Width: 22},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
 			},
 			Detail: []DetailField{

@@ -223,9 +223,13 @@ type EnrichmentCheckedMsg struct {
 	// resource.Resource.ID. Populated on success; nil/empty when Err != nil.
 	// May include findings for resources off-page (account-wide enrichers).
 	Findings map[string]resource.EnrichmentFinding
-	Err      error // enrichment error (nil on success)
-	Gen      int   // session-wide generation counter (stale probe protection; profile/region switch)
-	TypeGen  int   // per-type generation counter; bumped on every rerun for that type. Stale
+	// FieldUpdates carries per-resource Fields[] mutations to merge into
+	// cached rows. Keyed by resource ID then by field key. Nil when the
+	// enricher produced no field updates.
+	FieldUpdates map[string]map[string]string
+	Err          error // enrichment error (nil on success)
+	Gen          int   // session-wide generation counter (stale probe protection; profile/region switch)
+	TypeGen      int   // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 }
 

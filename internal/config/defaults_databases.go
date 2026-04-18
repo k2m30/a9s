@@ -28,6 +28,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Bucket Name", Path: "Name", Width: 36},
 				{Title: "Region", Path: "BucketRegion", Width: 14},
 				{Title: "Creation Date", Path: "CreationDate", Width: 22},
+				{Title: "Public Access", Path: "Name", Key: "public_access", Width: 14},
 			},
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "BucketArn"}, {Path: "BucketRegion"}, {Path: "CreationDate"},
@@ -64,6 +65,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Version", Path: "EngineVersion", Width: 10},
 				{Title: "Status", Path: "Status", Width: 14},
 				{Title: "Instances", Path: "DBClusterMembers", Width: 10},
+				{Title: "Writer", Path: "EngineVersion", Key: "writer_count", Width: 7},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 			},
 			Detail: []DetailField{
@@ -81,6 +83,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Items", Path: "ItemCount", Width: 12},
 				{Title: "Size", Key: "size_bytes", SortPath: "TableSizeBytes", Width: 14},
 				{Title: "Billing", Path: "BillingModeSummary.BillingMode", Width: 16},
+				{Title: "PITR", Key: "pitr_enabled", Width: 6},
 			},
 			Detail: []DetailField{
 				{Path: "TableName"}, {Path: "TableArn"}, {Path: "TableId"}, {Path: "TableStatus"},

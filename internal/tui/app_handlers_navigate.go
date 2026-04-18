@@ -682,6 +682,28 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		m.enrichmentFindings[msg.ResourceType] = msg.Findings
 		m.enrichmentRan[msg.ResourceType] = true
 
+		// Merge FieldUpdates into probeResources so the cached rows carry
+		// Wave-2-derived fields. These are then visible to list columns that
+		// reference the updated keys.
+		if len(msg.FieldUpdates) > 0 {
+			slice := m.probeResources[msg.ResourceType]
+			for i := range slice {
+				if updates, ok := msg.FieldUpdates[slice[i].ID]; ok {
+					if slice[i].Fields == nil {
+						slice[i].Fields = make(map[string]string, len(updates))
+					}
+					maps.Copy(slice[i].Fields, updates)
+				}
+			}
+			m.probeResources[msg.ResourceType] = slice
+			// Also propagate into any active ResourceListModel for this type.
+			for _, v := range m.stack {
+				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
+					rl.ApplyFieldUpdates(msg.FieldUpdates)
+				}
+			}
+		}
+
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			// Wave 2 is authoritative: compute distinct-instance count across both waves.
 			td := resource.FindResourceType(msg.ResourceType)
