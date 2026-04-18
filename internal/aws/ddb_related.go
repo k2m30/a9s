@@ -4,7 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
@@ -72,6 +74,73 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 
 
+
+// checkDdbBackup resolves AWS Backup recovery points for this DynamoDB table
+// via backup:ListRecoveryPointsByResource (Pattern C: 1 API call).
+// The table ARN is read from res.Fields["arn"]. Count = number of recovery points.
+func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	tableARN := res.Fields["arn"]
+	if tableARN == "" {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Backup == nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListRecoveryPointsByResourceOutput, error) {
+		return api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{ResourceArn: &tableARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, rp := range out.RecoveryPoints {
+		if rp.RecoveryPointArn != nil && *rp.RecoveryPointArn != "" {
+			ids = append(ids, *rp.RecoveryPointArn)
+		}
+	}
+	return relatedResult("backup", ids)
+}
+
+// checkDdbKinesis resolves Kinesis Data Streams connected to this DynamoDB table
+// via dynamodb:DescribeKinesisStreamingDestination (Pattern C: 1 API call).
+// KinesisDataStreamDestinations[].StreamArn values are returned as resource IDs.
+func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	tableName := res.ID
+	if tableName == "" {
+		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.DynamoDB == nil {
+		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+	}
+	api, ok := c.DynamoDB.(DynamoDBDescribeKinesisStreamingDestinationAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+		return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{TableName: &tableName})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, dest := range out.KinesisDataStreamDestinations {
+		if dest.StreamArn != nil && *dest.StreamArn != "" {
+			// Extract stream name from ARN (last ":" segment).
+			parts := strings.Split(*dest.StreamArn, "/")
+			name := parts[len(parts)-1]
+			if name != "" {
+				ids = append(ids, name)
+			}
+		}
+	}
+	return relatedResult("kinesis", ids)
+}
 
 // ddbRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ddbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

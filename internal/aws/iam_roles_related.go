@@ -28,7 +28,6 @@ func init() {
 		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS, NeedsTargetCache: true},
 		{TargetType: "iam-group", DisplayName: "IAM Groups (via AssumeRolePolicy)", Checker: checkRoleIamGroup, NeedsTargetCache: false},
 		{TargetType: "iam-user", DisplayName: "IAM Users (via AssumeRolePolicy)", Checker: checkRoleIamUser, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Keys (policies grant)", Checker: checkRoleKMS, NeedsTargetCache: false},
 	})
 }
 

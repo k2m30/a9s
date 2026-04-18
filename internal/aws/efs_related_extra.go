@@ -6,8 +6,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -148,6 +150,44 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
 	}
 	return relatedResult("vpc", ids)
+}
+
+// checkEFSBackup resolves AWS Backup recovery points for this EFS file system via
+// backup:ListRecoveryPointsByResource (Pattern A: 1 API call).
+// The EFS ARN is read from FileSystemArn in RawStruct.
+func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+	}
+	fsARN := *fs.FileSystemArn
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Backup == nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListRecoveryPointsByResourceOutput, error) {
+		return api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{
+			ResourceArn: &fsARN,
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+	}
+	var ids []string
+	for _, rp := range out.RecoveryPoints {
+		if rp.RecoveryPointArn != nil && *rp.RecoveryPointArn != "" {
+			ids = append(ids, *rp.RecoveryPointArn)
+		}
+	}
+	return relatedResult("backup", ids)
 }
 
 // keep lambdatypes imported (used by checkEFSLambda in efs_related.go).

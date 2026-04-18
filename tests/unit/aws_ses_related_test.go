@@ -164,23 +164,6 @@ func TestRelated_SES_R53_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- ses→cfn: undeterminable — sesv2.IdentityInfo has no Tags field ---
-
-// TestRelated_SES_CFN_ReturnsUnknown verifies that the ses→cfn checker reports Count=-1
-// because the SES v2 IdentityInfo RawStruct carries no Tags — determining CloudFormation
-// stack membership would require ListTagsForResource per identity (N+1), which is
-// intentionally not implemented.
-func TestRelated_SES_CFN_ReturnsUnknown(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acmecorp.com",
-		Name: "acmecorp.com",
-	}
-	checker := sesCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (undeterminable — no Tags on IdentityInfo)", result.Count)
-	}
-	if result.TargetType != "cfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
-	}
-}
+// TestRelated_SES_CFN_ReturnsUnknown was deleted: ses→cfn is in the Explicitly
+// excluded list (unanimous sometimes — tag-heuristic only).
+// See docs/related-resources.md "Explicitly excluded" section.

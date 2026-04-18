@@ -13,9 +13,6 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkSNSSubECS, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSSubKMS, NeedsTargetCache: false},
-		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkSNSSubPolicy, NeedsTargetCache: false},
 	})
 
 	resource.RegisterNavigableFields("sns-sub", []resource.NavigableField{

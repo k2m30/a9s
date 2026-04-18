@@ -122,8 +122,8 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			continue
 		}
 		arn := *rp.RecoveryPointArn
-		if idx := strings.Index(arn, ":recovery-point:"); idx >= 0 {
-			ids = append(ids, arn[idx+len(":recovery-point:"):])
+		if _, after, ok := strings.Cut(arn, ":recovery-point:"); ok {
+			ids = append(ids, after)
 		}
 	}
 	return relatedResult("backup", ids)

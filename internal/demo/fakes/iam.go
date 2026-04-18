@@ -222,3 +222,9 @@ func (f *IAMFake) ListMFADevices(_ context.Context, _ *iam.ListMFADevicesInput, 
 func (f *IAMFake) ListAccessKeys(_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
 	return &iam.ListAccessKeysOutput{AccessKeyMetadata: []iamtypes.AccessKeyMetadata{}}, nil
 }
+
+// GetInstanceProfile is a no-op stub for demo mode.
+// Demo mode fixture ASGs/EB environments do not reference named instance profiles.
+func (f *IAMFake) GetInstanceProfile(_ context.Context, _ *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
+	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
+}

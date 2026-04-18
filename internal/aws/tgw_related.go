@@ -3,9 +3,14 @@ package aws
 
 import (
 	"context"
+	"errors"
 
+	smithy "github.com/aws/smithy-go"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -23,12 +28,6 @@ func init() {
 			DisplayName:      "Route Tables",
 			Checker:          checkTGWRTB,
 			NeedsTargetCache: true,
-		},
-		{
-			TargetType:       "cfn",
-			DisplayName:      "CloudFormation",
-			Checker:          checkTGWCFN,
-			NeedsTargetCache: false,
 		},
 		{
 			TargetType:       "role",
@@ -89,20 +88,6 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResult("vpc", ids)
 }
 
-// checkTGWCFN checks the transit gateway's tags for aws:cloudformation:stack-name.
-// No cache access needed — the tag carries the stack name directly.
-func checkTGWCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
-	}
-	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
-	if stackName == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-	}
-	return relatedResult("cfn", []string{stackName})
-}
-
 // checkTGWRTB checks the rtb cache for route tables that have routes
 // targeting this transit gateway (Pattern C).
 func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -138,17 +123,41 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("rtb", ids)
 }
 
-// checkTGWRole reports the IAM role that TGW assumes for cross-account/service
-// attachments. Transit Gateways themselves do not carry a service role in
-// DescribeTransitGateways output — role-based attachments are per-attachment
-// configuration and would require DescribeTransitGatewayAttachments with
-// per-attachment resolution — outside the 1-call budget.
-// Returns Count: -1 (unknown).
-func checkTGWRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkTGWRole checks whether the Transit Gateway service-linked role (SLR)
+// "AWSServiceRoleForVPCTransitGateway" exists via iam:GetRole.
+// Count: 1 with the role ARN if found; Count: 0 if the role does not exist
+// (NoSuchEntity); Count: -1 on unexpected errors.
+func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.IAM == nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+
+	const slrName = "AWSServiceRoleForVPCTransitGateway"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetRoleOutput, error) {
+		return getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String(slrName),
+		})
+	})
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntity" {
+			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		}
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
+	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	return relatedResult("role", []string{*out.Role.Arn})
 }
 
 // checkTGWSubnet reports subnets this transit gateway is attached to via VPC

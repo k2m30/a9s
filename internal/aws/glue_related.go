@@ -289,11 +289,10 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 			continue
 		}
 		// ARN: arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-suffix
-		idx := strings.Index(v, ":secret:")
-		if idx < 0 {
+		_, name, ok := strings.Cut(v, ":secret:")
+		if !ok {
 			continue
 		}
-		name := v[idx+len(":secret:"):]
 		if name == "" {
 			continue
 		}
