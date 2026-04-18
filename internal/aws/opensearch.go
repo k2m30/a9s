@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("opensearch", []string{"domain_name", "engine_version", "instance_type", "instance_count", "endpoint"})
+	resource.RegisterFieldKeys("opensearch", []string{"domain_name", "engine_version", "instance_type", "instance_count", "endpoint", "domain_processing_status"})
 
 	resource.RegisterPaginated("opensearch", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -99,9 +99,9 @@ func FetchOpenSearchDomains(
 		if domain.Deleted != nil && *domain.Deleted {
 			deleted = "true"
 		}
-		clusterHealth := ""
+		processingStatus := ""
 		if domain.DomainProcessingStatus != "" {
-			clusterHealth = string(domain.DomainProcessingStatus)
+			processingStatus = string(domain.DomainProcessingStatus)
 		}
 		status := "available"
 		if deleted == "true" {
@@ -124,7 +124,7 @@ func FetchOpenSearchDomains(
 				"processing":         processing,
 				"upgrade_processing": upgradeProcessing,
 				"deleted":            deleted,
-				"cluster_health":     clusterHealth,
+				"domain_processing_status": processingStatus,
 			},
 			RawStruct: domain,
 		}

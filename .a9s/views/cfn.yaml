@@ -5,6 +5,9 @@ list:
   Status:
     path: StackStatus
     width: 24
+  Reason:
+    path: StackStatusReason
+    width: 32
   Created:
     path: CreationTime
     width: 22

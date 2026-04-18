@@ -826,6 +826,12 @@ func TestQA_ListViewColumns_EKS(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			if col.Path == "" {
+				// Key-only columns (resolved via Resource.Fields[col.Key]) have no SDK
+				// struct path. Skip path-based extraction; the field-key resolution
+				// path is exercised by other tests.
+				t.Skip("path-less column — key-based, see Fields[] resolution test")
+			}
 			result := fieldpath.ExtractScalar(cluster, col.Path)
 			if result == "" {
 				t.Errorf("ExtractScalar(%q) returned empty for realistic EKS Cluster", col.Path)

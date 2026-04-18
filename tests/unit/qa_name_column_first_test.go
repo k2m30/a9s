@@ -100,27 +100,48 @@ func TestResourceTypeDef_NameColumnFirst(t *testing.T) {
 // Column count preservation: swapping columns must not add or remove columns
 // ---------------------------------------------------------------------------
 
-// expectedColumnCounts lists the number of columns each resource type should
-// have. This ensures the fix only swaps order, it does not add/remove columns.
-var expectedColumnCounts = map[string]int{
-	"sg":    4,
-	"vpc":   5,
+// expectedConfigColumnCounts lists the number of columns each resource type
+// should have in its YAML-driven config default view. These counts include
+// attention columns added in Round 1 (nat +1 Failure, sg +1 Open).
+var expectedConfigColumnCounts = map[string]int{
+	"sg":     5,
+	"vpc":    5,
 	"subnet": 7,
-	"rtb":   5,
-	"nat":   6,
-	"igw":   4,
-	"eip":   6,
-	"vpce":  5,
-	"tgw":   5,
-	"eni":   6,
-	"r53":   5,
-	"cf":    6,
-	"apigw": 5,
-	"efs":   6,
+	"rtb":    5,
+	"nat":    7,
+	"igw":    4,
+	"eip":    6,
+	"vpce":   5,
+	"tgw":    5,
+	"eni":    6,
+	"r53":    5,
+	"cf":     6,
+	"apigw":  5,
+	"efs":    6,
+}
+
+// expectedTypeDefColumnCounts lists the number of columns in the Go type
+// definition (resource.FindResourceType). These may differ from config counts
+// when YAML views have been updated ahead of the type definitions.
+var expectedTypeDefColumnCounts = map[string]int{
+	"sg":     4,
+	"vpc":    5,
+	"subnet": 7,
+	"rtb":    5,
+	"nat":    6,
+	"igw":    4,
+	"eip":    6,
+	"vpce":   5,
+	"tgw":    5,
+	"eni":    6,
+	"r53":    5,
+	"cf":     6,
+	"apigw":  5,
+	"efs":    6,
 }
 
 func TestConfigDefaultViewDef_ColumnCountPreserved(t *testing.T) {
-	for shortName, wantCount := range expectedColumnCounts {
+	for shortName, wantCount := range expectedConfigColumnCounts {
 		t.Run(shortName, func(t *testing.T) {
 			vd := config.DefaultViewDef(shortName)
 			if len(vd.List) != wantCount {
@@ -132,7 +153,7 @@ func TestConfigDefaultViewDef_ColumnCountPreserved(t *testing.T) {
 }
 
 func TestResourceTypeDef_ColumnCountPreserved(t *testing.T) {
-	for shortName, wantCount := range expectedColumnCounts {
+	for shortName, wantCount := range expectedTypeDefColumnCounts {
 		t.Run(shortName, func(t *testing.T) {
 			rt := resource.FindResourceType(shortName)
 			if rt == nil {

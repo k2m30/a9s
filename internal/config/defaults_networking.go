@@ -40,6 +40,7 @@ func networkingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Group Name", Path: "GroupName", Width: 28},
 				{Title: "Group ID", Path: "GroupId", Width: 24},
+				{Title: "Risk", Key: "risk_summary", Width: 22},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
@@ -99,6 +100,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Subnet ID", Path: "SubnetId", Width: 26},
 				{Title: "State", Path: "State", Width: 12},
+				{Title: "Failure", Path: "FailureCode", Width: 22},
 				{Title: "Public IP", Path: "", Key: "public_ip", Width: 16},
 			},
 			Detail: []string{
