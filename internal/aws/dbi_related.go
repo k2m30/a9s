@@ -104,7 +104,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -137,7 +137,7 @@ func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rds-snap", Count: -1}
+		return resource.ApproximateZero("rds-snap")
 	}
 	return relatedResult("rds-snap", ids)
 }
@@ -167,7 +167,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -217,7 +217,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", ids)
 }
@@ -257,7 +257,7 @@ func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+		return resource.ApproximateZero("dbc")
 	}
 	return relatedResult("dbc", ids)
 }

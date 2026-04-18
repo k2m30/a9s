@@ -70,6 +70,9 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 // NeedsTargetCache: true; sets Approximate and FetchFilter.
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "eb", Count: 0}
+	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.RelatedCheckResult{TargetType: "eb", Count: -1}
 	}
@@ -142,6 +145,9 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 // NeedsTargetCache: true; sets Approximate.
 func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
 	}

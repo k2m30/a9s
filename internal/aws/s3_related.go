@@ -130,7 +130,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -233,7 +233,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+		return resource.ApproximateZero("athena")
 	}
 	return relatedResult("athena", ids)
 }
@@ -263,7 +263,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.ApproximateZero("glue")
 	}
 	return relatedResult("glue", ids)
 }
@@ -292,7 +292,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
 }
@@ -321,7 +321,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.ApproximateZero("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
 }
@@ -350,7 +350,7 @@ func checkS3IAMUser(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.ApproximateZero("iam-user")
 	}
 	return relatedResult("iam-user", ids)
 }
@@ -379,7 +379,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.ApproximateZero("r53")
 	}
 	return relatedResult("r53", ids)
 }
@@ -407,7 +407,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.ApproximateZero("role")
 	}
 	return relatedResult("role", ids)
 }
@@ -436,7 +436,7 @@ func checkS3WAF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.ApproximateZero("waf")
 	}
 	return relatedResult("waf", ids)
 }
@@ -472,7 +472,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+		return resource.ApproximateZero("trail")
 	}
 	return relatedResult("trail", ids)
 }
@@ -516,7 +516,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 	return relatedResult("cf", ids)
 }

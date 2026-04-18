@@ -10,7 +10,11 @@ package unit
 // IsTruncated from `entry.pagination != nil`, which is nil because step 2 skipped it.
 //
 // Result: After one empty-but-truncated cold miss, all subsequent related checks
-// see IsTruncated=false and report Count=0 instead of Count=-1 (unknown).
+// see IsTruncated=false and report a definitive Count=0 instead of the honest
+// lower bound {Count:0, Approximate:true} (resource.ApproximateZero).
+//
+// New contract (Batch B): truncated-zero produces {Count:0, Approximate:true} via
+// resource.ApproximateZero. See related.go:34-38 and ValidateRelatedResult.
 //
 // Three-step corruption path (from the issue):
 //   1. app_related.go:67-71 correctly captures IsTruncated=true even on empty Resources
@@ -76,7 +80,7 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 
 // execRelatedCheckAndCollectTGResult feeds a RelatedCheckStartedMsg to the model
 // and synchronously executes all resulting cmds, collecting the "tg" RelatedCheckResultMsg.
-// Returns (count, found).
+// Returns (result, found).
 //
 // In non-demo mode, handleRelatedCheckStarted:
 //  1. Calls buildResourceCacheSnapshot() — reads from m.resourceCache (set by write-back)
@@ -84,9 +88,10 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 //  3. Returns a tea.BatchMsg of cmds, each returning RelatedCheckResultMsg
 //
 // Executing the "tg" cmd reveals what IsTruncated the write-back persisted:
-//   IsTruncated=true (correct)  → checker returns Count=-1 (unknown)
-//   IsTruncated=false (bug)     → checker returns Count=0 (wrong definitive zero)
-func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResource resource.Resource) (count int, found bool) {
+//
+//	IsTruncated=true (correct)  → checker returns {Count:0, Approximate:true} (honest lower bound)
+//	IsTruncated=false (bug)     → checker returns {Count:0, Approximate:false} (wrong definitive zero)
+func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResource resource.Resource) (result resource.RelatedCheckResult, found bool) {
 	t.Helper()
 
 	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
@@ -100,16 +105,16 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 	// Execute the batch. tea.Batch returns a cmd that, when called, returns tea.BatchMsg.
 	rawMsg := batchCmd()
 	if rawMsg == nil {
-		return -1, false
+		return resource.RelatedCheckResult{Count: -1}, false
 	}
 
 	batchMsg, ok := rawMsg.(tea.BatchMsg)
 	if !ok {
 		// Single cmd, not a batch — handle it.
-		if result, ok2 := rawMsg.(messages.RelatedCheckResultMsg); ok2 && result.Result.TargetType == "tg" {
-			return result.Result.Count, true
+		if r, ok2 := rawMsg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "tg" {
+			return r.Result, true
 		}
-		return -1, false
+		return resource.RelatedCheckResult{Count: -1}, false
 	}
 
 	for _, cmd := range batchMsg {
@@ -120,23 +125,28 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 		if msg == nil {
 			continue
 		}
-		if result, ok2 := msg.(messages.RelatedCheckResultMsg); ok2 && result.Result.TargetType == "tg" {
-			return result.Result.Count, true
+		if r, ok2 := msg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "tg" {
+			return r.Result, true
 		}
 	}
-	return -1, false
+	return resource.RelatedCheckResult{Count: -1}, false
 }
 
 // TestContract_EmptyTruncatedPage_PreservesIsTruncated is the core bug test for issue #233.
 //
 // Contract: When CachedPages carries {Resources:[], IsTruncated:true}, the write-back
 // in app.go:378-387 MUST persist IsTruncated=true so that the next checker call
-// (via buildResourceCacheSnapshot) returns Count=-1 (unknown), not Count=0.
+// (via buildResourceCacheSnapshot) returns {Count:0, Approximate:true}
+// (resource.ApproximateZero — the honest lower bound), not a definitive Count=0.
+//
+// New contract (Batch B): truncated-zero path → {Count:0, Approximate:true}.
+// See related.go:34-38 (Approximate semantics) and ApproximateZero (related.go:101-114).
 //
 // Execution path:
-//   RelatedCheckResultMsg{CachedPages:{"tg":{[],true}}} → app.go:378-387 write-back
-//   → RelatedCheckStartedMsg → handleRelatedCheckStarted → buildResourceCacheSnapshot()
-//   → checkEC2TargetGroups sees cache["tg"].IsTruncated → must be true → Count=-1
+//
+//	RelatedCheckResultMsg{CachedPages:{"tg":{[],true}}} → app.go:378-387 write-back
+//	→ RelatedCheckStartedMsg → handleRelatedCheckStarted → buildResourceCacheSnapshot()
+//	→ checkEC2TargetGroups sees cache["tg"].IsTruncated → must be true → {Count:0, Approximate:true}
 //
 // This test FAILS with current code because app.go:383 guards persistence with
 // `len(entry.Resources) > 0`, silently dropping IsTruncated on empty pages.
@@ -151,8 +161,9 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      -1, // unknown because the page was truncated
+			TargetType:  "tg",
+			Count:       0,
+			Approximate: true, // honest lower bound: page was truncated
 		},
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
@@ -165,22 +176,24 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	// Step 2: Trigger a fresh related check to observe what the write-back persisted.
 	// handleRelatedCheckStarted calls buildResourceCacheSnapshot() which reads
 	// m.resourceCache["tg"].pagination to reconstruct IsTruncated.
-	// If the write-back preserved it: IsTruncated=true → Count=-1 (correct)
-	// If the write-back dropped it:   IsTruncated=false → Count=0 (bug)
-	count, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	// If the write-back preserved it: IsTruncated=true → {Count:0, Approximate:true} (correct)
+	// If the write-back dropped it:   IsTruncated=false → {Count:0, Approximate:false} (bug)
+	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg — cannot verify write-back contract")
 	}
 
-	// EXPECTED after fix: Count=-1 (empty page was truncated; can't conclude zero)
-	// ACTUAL with bug:    Count=0 (IsTruncated dropped; empty list treated as complete)
-	if count != -1 {
+	// EXPECTED after fix: {Count:0, Approximate:true} (IsTruncated=true preserved from write-back)
+	// ACTUAL with bug:    {Count:0, Approximate:false} (IsTruncated dropped; treated as complete)
+	if got.Count != 0 {
+		t.Errorf("BUG #233: empty-but-truncated write-back: want Count=0, got Count=%d", got.Count)
+	}
+	if !got.Approximate {
 		t.Fatalf("BUG #233: empty-but-truncated CachedPages write-back corrupted IsTruncated. "+
-			"Expected TG checker Count=-1 (unknown — IsTruncated=true preserved from write-back), "+
-			"got Count=%d. "+
+			"Expected TG checker Approximate=true (IsTruncated=true preserved from write-back), "+
+			"got Approximate=false. "+
 			"Root cause: app.go:383 guard `len(entry.Resources) > 0` drops pagination "+
-			"when the first page is empty, so buildResourceCacheSnapshot reconstructs IsTruncated=false.",
-			count)
+			"when the first page is empty, so buildResourceCacheSnapshot reconstructs IsTruncated=false.")
 	}
 }
 
@@ -188,7 +201,8 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 //
 // Contract: When CachedPages has 1+ Resources AND IsTruncated=true, the write-back
 // correctly persists IsTruncated (app.go:383 guard passes because len > 0).
-// The TG checker must return Count=-1 when no match is found in the partial list.
+// The TG checker must return {Count:0, Approximate:true} (resource.ApproximateZero)
+// when no match is found in the partial list. See related.go:34-38.
 //
 // This test PASSES with current code — the bug only affects the empty-page case.
 func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
@@ -197,13 +211,14 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 
 	// Write-back: 1 resource + IsTruncated=true.
 	// The TG has no relationship to firstInstance. Without truncation → Count=0.
-	// With IsTruncated=true → Count=-1 (can't rule out a match in unseen pages).
+	// With IsTruncated=true → {Count:0, Approximate:true} (honest lower bound).
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      -1,
+			TargetType:  "tg",
+			Count:       0,
+			Approximate: true,
 		},
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
@@ -213,12 +228,15 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		},
 	})
 
-	count, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg")
 	}
-	if count != -1 {
-		t.Errorf("control: non-empty truncated cache must produce Count=-1 (unknown); got Count=%d", count)
+	if got.Count != 0 {
+		t.Errorf("control: non-empty truncated cache must produce Count=0 (approximate lower bound); got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("control: non-empty truncated cache must produce Approximate=true; got false")
 	}
 }
 
@@ -248,19 +266,24 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 		},
 	})
 
-	count, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg")
 	}
-	if count != 0 {
-		t.Errorf("negative control: complete empty cache must produce Count=0 (definitive zero); got Count=%d", count)
+	if got.Count != 0 {
+		t.Errorf("negative control: complete empty cache must produce Count=0 (definitive zero); got Count=%d", got.Count)
+	}
+	if got.Approximate {
+		t.Errorf("negative control: complete empty cache must produce Approximate=false; got true")
 	}
 }
 
 // TestContract_EmptyTruncatedPage_CheckerBehavior_Direct directly validates
 // the TG checker's IsTruncated handling in isolation. This test confirms that
-// the checker itself correctly returns Count=-1 on an empty-but-truncated entry,
-// and Count=0 on an empty-but-complete entry.
+// the checker itself correctly returns {Count:0, Approximate:true}
+// (resource.ApproximateZero) on an empty-but-truncated entry, and a definitive
+// {Count:0, Approximate:false} on an empty-but-complete entry.
+// See related.go:34-38 and ApproximateZero (related.go:101-114).
 //
 // When this test passes but TestContract_EmptyTruncatedPage_PreservesIsTruncated fails,
 // the bug is definitively in the write-back (app.go:383), not in the checker.
@@ -275,7 +298,7 @@ func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
 	instance := ec2Res[0]
 	checker := ec2CheckerByTarget(t, "tg")
 
-	// Subtest 1: empty + truncated → must return Count=-1 (unknown)
+	// Subtest 1: empty + truncated → must return {Count:0, Approximate:true} (honest lower bound)
 	truncatedEmptyCache := resource.ResourceCache{
 		"tg": {
 			Resources:   []resource.Resource{},
@@ -283,11 +306,14 @@ func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
 		},
 	}
 	gotTruncated := checker(context.Background(), nil, instance, truncatedEmptyCache)
-	if gotTruncated.Count != -1 {
-		t.Errorf("checker with empty+truncated cache must return Count=-1; got Count=%d", gotTruncated.Count)
+	if gotTruncated.Count != 0 {
+		t.Errorf("checker with empty+truncated cache must return Count=0; got Count=%d", gotTruncated.Count)
+	}
+	if !gotTruncated.Approximate {
+		t.Errorf("checker with empty+truncated cache must return Approximate=true; got false")
 	}
 
-	// Subtest 2: empty + complete → must return Count=0 (definitive zero)
+	// Subtest 2: empty + complete → must return {Count:0, Approximate:false} (definitive zero)
 	completeEmptyCache := resource.ResourceCache{
 		"tg": {
 			Resources:   []resource.Resource{},
@@ -297,5 +323,8 @@ func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
 	gotComplete := checker(context.Background(), nil, instance, completeEmptyCache)
 	if gotComplete.Count != 0 {
 		t.Errorf("checker with empty+complete cache must return Count=0; got Count=%d", gotComplete.Count)
+	}
+	if gotComplete.Approximate {
+		t.Errorf("checker with empty+complete cache must return Approximate=false; got true")
 	}
 }

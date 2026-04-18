@@ -43,7 +43,7 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }
@@ -82,7 +82,7 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -121,7 +121,7 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.ApproximateZero("sqs")
 	}
 	return relatedResult("sqs", ids)
 }

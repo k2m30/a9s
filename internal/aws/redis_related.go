@@ -62,7 +62,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -134,7 +134,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -164,7 +164,7 @@ func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, _ re
 func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 	var names []string
 	for _, ldc := range cluster.LogDeliveryConfigurations {
@@ -205,7 +205,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -234,7 +234,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 	if cluster.NotificationConfiguration == nil || cluster.NotificationConfiguration.TopicArn == nil || *cluster.NotificationConfiguration.TopicArn == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
@@ -263,7 +263,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }
