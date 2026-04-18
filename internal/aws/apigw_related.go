@@ -27,7 +27,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
@@ -116,11 +116,11 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]apigwtypes.Integration, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return nil, errNoR53Client
+		return nil, errClientMissing
 	}
 	api, ok := c.APIGatewayV2.(APIGatewayV2GetIntegrationsAPI)
 	if !ok {
-		return nil, errNoR53Client
+		return nil, errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetIntegrationsOutput, error) {
 		return api.GetIntegrations(ctx, &apigatewayv2.GetIntegrationsInput{ApiId: &apiID})
@@ -141,7 +141,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
@@ -310,7 +310,7 @@ func checkApigwSFN(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1, Err: err}
@@ -355,7 +355,7 @@ func checkApigwSNS(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}

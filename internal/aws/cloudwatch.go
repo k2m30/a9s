@@ -103,7 +103,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
 		}
 
-		actionsCount := len(alarm.AlarmActions) + len(alarm.OKActions) + len(alarm.InsufficientDataActions)
+		actionsCount := len(alarm.AlarmActions)
 
 		r := resource.Resource{
 			ID:     alarmName,

@@ -146,3 +146,74 @@ func TestFetchCloudWatchAlarms_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
+
+// TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly verifies that the
+// actions_count field counts only AlarmActions, not OKActions or
+// InsufficientDataActions.
+//
+// CodeRabbit PR-273 finding: internal/aws/cloudwatch.go:106 sums all three
+// action slices, but docs/attention-signals.md specifies the alarm attention
+// signal keys off AlarmActions==[] only. Mixing in OKActions and
+// InsufficientDataActions inflates the count and masks alarms with no real
+// actions configured.
+func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
+	mock := &mockCloudWatchDescribeAlarmsClient{
+		output: &cloudwatch.DescribeAlarmsOutput{
+			MetricAlarms: []cwtypes.MetricAlarm{
+				{
+					// Only AlarmActions populated — count must be 1.
+					AlarmName:              aws.String("alarm-with-alarm-actions"),
+					StateValue:             cwtypes.StateValueOk,
+					AlarmActions:           []string{"arn:aws:sns:us-east-1:123456789012:my-topic"},
+					OKActions:              []string{},
+					InsufficientDataActions: []string{},
+				},
+				{
+					// Only OKActions populated — actions_count must be "0"
+					// because OKActions are not alarm-trigger actions.
+					AlarmName:              aws.String("alarm-no-alarm-actions-but-ok-actions"),
+					StateValue:             cwtypes.StateValueOk,
+					AlarmActions:           []string{},
+					OKActions:              []string{"arn:aws:sns:us-east-1:123456789012:ok-topic-1", "arn:aws:sns:us-east-1:123456789012:ok-topic-2"},
+					InsufficientDataActions: []string{},
+				},
+				{
+					// Only InsufficientDataActions populated — actions_count must be "0".
+					AlarmName:              aws.String("alarm-only-insufficient-data-actions"),
+					StateValue:             cwtypes.StateValueOk,
+					AlarmActions:           []string{},
+					OKActions:              []string{},
+					InsufficientDataActions: []string{"arn:aws:sns:us-east-1:123456789012:insuf-topic"},
+				},
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchCloudWatchAlarms(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 3 {
+		t.Fatalf("expected 3 resources, got %d", len(resources))
+	}
+
+	// alarm-with-alarm-actions: 1 AlarmAction → actions_count must be "1"
+	r0 := resources[0]
+	if r0.Fields["actions_count"] != "1" {
+		t.Errorf("alarm-with-alarm-actions: actions_count = %q, want %q", r0.Fields["actions_count"], "1")
+	}
+
+	// alarm-no-alarm-actions-but-ok-actions: 0 AlarmActions → actions_count must be "0"
+	// (NOT "2" which would result from counting OKActions too)
+	r1 := resources[1]
+	if r1.Fields["actions_count"] != "0" {
+		t.Errorf("alarm-no-alarm-actions-but-ok-actions: actions_count = %q, want %q (OKActions must not be counted)", r1.Fields["actions_count"], "0")
+	}
+
+	// alarm-only-insufficient-data-actions: 0 AlarmActions → actions_count must be "0"
+	// (NOT "1" which would result from counting InsufficientDataActions too)
+	r2 := resources[2]
+	if r2.Fields["actions_count"] != "0" {
+		t.Errorf("alarm-only-insufficient-data-actions: actions_count = %q, want %q (InsufficientDataActions must not be counted)", r2.Fields["actions_count"], "0")
+	}
+}
