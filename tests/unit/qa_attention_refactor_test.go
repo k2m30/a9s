@@ -16,8 +16,12 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// attentionEC2TypeDef returns a minimal ResourceTypeDef for EC2 instances.
+// attentionEC2TypeDef returns the registered EC2 resource type so attention
+// filter tests use the real Color callback rather than fallbackColor.
 func attentionEC2TypeDef() resource.ResourceTypeDef {
+	if td := resource.FindResourceType("ec2"); td != nil {
+		return *td
+	}
 	return resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
 }
 

@@ -753,7 +753,19 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
 // Two findings on the same instance count as one.
+//
+// Invariant: result ≤ len(wave1Resources). Findings keyed by IDs not present
+// in wave1Resources are skipped (orphans) — they would otherwise inflate the
+// badge above the visible row count, e.g. an enricher dispatched for cluster
+// type writing instance-keyed findings.
 func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]resource.EnrichmentFinding) int {
+	if td.ExcludeFromIssueBadge {
+		return 0
+	}
+	knownIDs := make(map[string]struct{}, len(wave1Resources))
+	for _, r := range wave1Resources {
+		knownIDs[r.ID] = struct{}{}
+	}
 	ids := make(map[string]struct{})
 	for _, r := range wave1Resources {
 		if td.ResolveColor(r).IsIssue() {
@@ -761,7 +773,9 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 		}
 	}
 	for id := range findings {
-		ids[id] = struct{}{}
+		if _, ok := knownIDs[id]; ok {
+			ids[id] = struct{}{}
+		}
 	}
 	return len(ids)
 }
