@@ -36,6 +36,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Domain Name", Path: "DomainName", Width: 40},
 				{Title: "Status", Path: "Status", Width: 14},
+				{Title: "Days Left", Key: "days_left", Width: 10},
 				{Title: "Type", Path: "Type", Width: 14},
 				{Title: "Expires", Path: "NotAfter", Width: 22},
 				{Title: "In Use", Path: "InUse", Width: 8},
@@ -52,6 +53,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 				{Title: "Name", Path: "Name", Width: 28},
 				{Title: "API ID", Path: "ApiId", Width: 14},
 				{Title: "Protocol", Path: "ProtocolType", Width: 12},
+				{Title: "Stages", Key: "stages_count", Width: 7},
 				{Title: "Endpoint", Path: "ApiEndpoint", Width: 50},
 				{Title: "Description", Path: "Description", Width: 30},
 			},

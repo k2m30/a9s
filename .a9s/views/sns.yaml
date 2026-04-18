@@ -2,6 +2,9 @@ list:
   Topic Name:
     path: TopicArn
     width: 40
+  Subs:
+    key: subs_count
+    width: 6
   Topic ARN:
     path: TopicArn
     width: 60

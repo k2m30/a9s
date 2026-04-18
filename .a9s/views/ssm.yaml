@@ -5,6 +5,9 @@ list:
   Type:
     path: Type
     width: 14
+  Risk:
+    key: risk
+    width: 10
   Version:
     path: Version
     width: 8

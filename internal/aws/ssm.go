@@ -3,6 +3,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -11,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description"})
+	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description", "risk"})
 	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients any, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
@@ -85,6 +87,15 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			description = *param.Description
 		}
 
+		// Compute risk: STALE if SecureString older than 365d; PLAINTEXT if String with sensitive name
+		risk := ""
+		lowerName := strings.ToLower(paramName)
+		if paramType == "SecureString" && param.LastModifiedDate != nil && time.Since(*param.LastModifiedDate) > 365*24*time.Hour {
+			risk = "STALE"
+		} else if paramType == "String" && (strings.Contains(lowerName, "/password") || strings.Contains(lowerName, "/secret") || strings.Contains(lowerName, "/token")) {
+			risk = "PLAINTEXT"
+		}
+
 		r := resource.Resource{
 			ID:     paramName,
 			Name:   paramName,
@@ -95,6 +106,7 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 				"version":       version,
 				"last_modified": lastModified,
 				"description":   description,
+				"risk":          risk,
 			},
 			RawStruct: param,
 		}

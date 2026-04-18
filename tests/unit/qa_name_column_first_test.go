@@ -105,18 +105,18 @@ func TestResourceTypeDef_NameColumnFirst(t *testing.T) {
 // attention columns added in Round 1 (nat +1 Failure, sg +1 Open).
 var expectedConfigColumnCounts = map[string]int{
 	"sg":     5,
-	"vpc":    5,
+	"vpc":    6, // +1 Flow Logs (attention signal column)
 	"subnet": 8,
-	"rtb":    5,
+	"rtb":    6, // +1 Blackholes (attention signal column)
 	"nat":    7,
 	"igw":    4,
-	"eip":    6,
+	"eip":    7, // +1 State/status (attention signal column)
 	"vpce":   6,
-	"tgw":    5,
+	"tgw":    6, // +1 Att Issues (attention signal column)
 	"eni":    6,
 	"r53":    5,
 	"cf":     8,
-	"apigw":  5,
+	"apigw":  6, // +1 Stages (attention signal column)
 	"efs":    6,
 }
 

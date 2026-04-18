@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period"})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period", "cis_flags"})
 
 	resource.RegisterRelated("dbi", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
@@ -136,6 +137,22 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
 		}
 
+		// Compute CIS compliance flags.
+		var cisFlags []string
+		if publiclyAccessible == "true" {
+			cisFlags = append(cisFlags, "PUB")
+		}
+		if storageEncrypted == "false" {
+			cisFlags = append(cisFlags, "UNENC")
+		}
+		if backupRetentionPeriod == "0" {
+			cisFlags = append(cisFlags, "NOBKP")
+		}
+		if deletionProtection == "false" {
+			cisFlags = append(cisFlags, "NOPROT")
+		}
+		cisFlagsVal := strings.Join(cisFlags, "|")
+
 		r := resource.Resource{
 			ID:     dbIdentifier,
 			Name:   dbIdentifier,
@@ -153,6 +170,7 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 				"storage_encrypted":       storageEncrypted,
 				"deletion_protection":     deletionProtection,
 				"backup_retention_period": backupRetentionPeriod,
+				"cis_flags":               cisFlagsVal,
 			},
 			RawStruct: db,
 		}

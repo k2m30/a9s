@@ -8,6 +8,9 @@ list:
   In Flight:
     key: approx_not_visible
     width: 10
+  DLQ:
+    key: dlq
+    width: 5
   Delay:
     key: delay_seconds
     width: 8
