@@ -37,6 +37,7 @@ func dataDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Workgroup", Path: "Name", Width: 28},
 				{Title: "State", Path: "State", Width: 12},
+				{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12},
 				{Title: "Description", Path: "Description", Width: 30},
 				{Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
 			},

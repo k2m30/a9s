@@ -5,6 +5,9 @@ list:
   State:
     path: StateValue
     width: 12
+  Actions On:
+    path: ActionsEnabled
+    width: 10
   Metric:
     path: MetricName
     width: 24
