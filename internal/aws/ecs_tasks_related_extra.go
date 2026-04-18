@@ -120,16 +120,15 @@ func checkECSTaskECR(_ context.Context, _ any, res resource.Resource, _ resource
 		if !strings.Contains(img, ".dkr.ecr.") {
 			continue
 		}
-		slash := strings.Index(img, "/")
-		if slash < 0 {
+		_, repo, ok := strings.Cut(img, "/")
+		if !ok {
 			continue
 		}
-		repo := img[slash+1:]
-		if colon := strings.Index(repo, ":"); colon >= 0 {
-			repo = repo[:colon]
+		if before, _, hasSep := strings.Cut(repo, ":"); hasSep {
+			repo = before
 		}
-		if at := strings.Index(repo, "@"); at >= 0 {
-			repo = repo[:at]
+		if before, _, hasSep := strings.Cut(repo, "@"); hasSep {
+			repo = before
 		}
 		if repo != "" {
 			seen[repo] = struct{}{}
@@ -165,6 +164,86 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	return relatedResult("eni", ids)
+}
+
+// checkECSTaskSecrets scans ContainerDefinitions[].Secrets[].ValueFrom for secretsmanager ARNs.
+// Pattern F — no AWS call needed; all data is in RawStruct (ecstypes.TaskDefinition).
+// NOTE: The registration in ecs_tasks_related.go passes ecstypes.Task, but the Secrets
+// field lives on TaskDefinition. The fetcher stores the TaskDefinition in the Resource
+// RawStruct (res.RawStruct may be *ecstypes.TaskDefinition). Try both types.
+func checkECSTaskSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	var containers []ecstypes.ContainerDefinition
+	if td, ok := assertStruct[ecstypes.TaskDefinition](res.RawStruct); ok {
+		containers = td.ContainerDefinitions
+	} else if task, ok := assertStruct[ecstypes.Task](res.RawStruct); ok {
+		// ecstypes.Task does not carry ContainerDefinitions — return 0.
+		_ = task
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	} else {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+	}
+
+	seen := make(map[string]struct{})
+	for _, c := range containers {
+		for _, s := range c.Secrets {
+			if s.ValueFrom == nil || *s.ValueFrom == "" {
+				continue
+			}
+			if strings.HasPrefix(*s.ValueFrom, "arn:aws:secretsmanager:") {
+				seen[*s.ValueFrom] = struct{}{}
+			}
+		}
+	}
+	var ids []string
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+	return relatedResult("secrets", ids)
+}
+
+// checkECSTaskSSM scans ContainerDefinitions[].Secrets[].ValueFrom for SSM parameter ARNs.
+// Pattern F — no AWS call needed; all data is in RawStruct.
+// Returns SSM parameter names extracted from the ARN suffix after "/".
+func checkECSTaskSSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	var containers []ecstypes.ContainerDefinition
+	if td, ok := assertStruct[ecstypes.TaskDefinition](res.RawStruct); ok {
+		containers = td.ContainerDefinitions
+	} else if task, ok := assertStruct[ecstypes.Task](res.RawStruct); ok {
+		_ = task
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	} else {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+	}
+
+	// SSM parameter ARN form: arn:aws:ssm:<region>:<account>:parameter/<name>
+	const ssmPrefix = "arn:aws:ssm:"
+	const paramPart = ":parameter/"
+	seen := make(map[string]struct{})
+	for _, c := range containers {
+		for _, s := range c.Secrets {
+			if s.ValueFrom == nil || *s.ValueFrom == "" {
+				continue
+			}
+			v := *s.ValueFrom
+			if !strings.HasPrefix(v, ssmPrefix) {
+				continue
+			}
+			if _, after, found := strings.Cut(v, paramPart); found && after != "" {
+				seen[after] = struct{}{}
+			}
+		}
+	}
+	var ids []string
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+	return relatedResult("ssm", ids)
 }
 
 // checkECSTaskSG extracts security group IDs from task.Attachments (awsvpc). Pattern F.

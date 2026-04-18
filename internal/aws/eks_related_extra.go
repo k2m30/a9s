@@ -5,7 +5,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -101,6 +106,160 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("ct-events", ids)
 }
 
+// checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.
+// For each node group: if LaunchTemplate is set, call ec2:DescribeLaunchTemplateVersions
+// to get LaunchTemplateData.ImageId. Managed NGs without a LT use AmiType+ReleaseVersion
+// — SSM resolution is deferred; those return no AMI. Returns distinct AMI IDs.
+func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+	}
+	clusterName := res.ID
+	if clusterName == "" && cluster.Name != nil {
+		clusterName = *cluster.Name
+	}
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+	}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EKS == nil {
+		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+	}
+
+	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
+		return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+			ClusterName: aws.String(clusterName),
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+	}
+
+	amiSet := make(map[string]struct{})
+	for _, ngName := range ngOut.Nodegroups {
+		descOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+				ClusterName:   aws.String(clusterName),
+				NodegroupName: aws.String(ngName),
+			})
+		})
+		if err != nil || descOut.Nodegroup == nil {
+			continue
+		}
+		ng := descOut.Nodegroup
+		if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
+			// Managed NG without custom LT — AMI resolution via SSM deferred.
+			continue
+		}
+
+		version := aws.String("$Latest")
+		if ng.LaunchTemplate.Version != nil && *ng.LaunchTemplate.Version != "" {
+			version = ng.LaunchTemplate.Version
+		}
+		ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+			return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+				LaunchTemplateId: ng.LaunchTemplate.Id,
+				Versions:         []string{*version},
+			})
+		})
+		if err != nil {
+			continue
+		}
+		for _, v := range ltOut.LaunchTemplateVersions {
+			if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
+				amiSet[*v.LaunchTemplateData.ImageId] = struct{}{}
+			}
+		}
+	}
+
+	var ids []string
+	for id := range amiSet {
+		ids = append(ids, id)
+	}
+	return relatedResult("ami", ids)
+}
+
+// checkEKSEC2 resolves EC2 instances running in this EKS cluster via node group ASGs.
+// For each node group: get Resources.AutoScalingGroups, then call
+// autoscaling:DescribeAutoScalingGroups to read Instances[].InstanceId.
+func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+	clusterName := res.ID
+	if clusterName == "" && cluster.Name != nil {
+		clusterName = *cluster.Name
+	}
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EKS == nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
+		return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+			ClusterName: aws.String(clusterName),
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+	}
+
+	var asgNames []string
+	for _, ngName := range ngOut.Nodegroups {
+		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+				ClusterName:   aws.String(clusterName),
+				NodegroupName: aws.String(ngName),
+			})
+		})
+		if descErr != nil || descOut.Nodegroup == nil || descOut.Nodegroup.Resources == nil {
+			continue
+		}
+		for _, asg := range descOut.Nodegroup.Resources.AutoScalingGroups {
+			if asg.Name != nil && *asg.Name != "" {
+				asgNames = append(asgNames, *asg.Name)
+			}
+		}
+	}
+
+	if len(asgNames) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+	if c.AutoScaling == nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
+		return c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
+			AutoScalingGroupNames: asgNames,
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+	}
+
+	seen := make(map[string]struct{})
+	for _, asg := range asgOut.AutoScalingGroups {
+		for _, inst := range asg.Instances {
+			if inst.InstanceId != nil && *inst.InstanceId != "" {
+				seen[*inst.InstanceId] = struct{}{}
+			}
+		}
+	}
+	var ids []string
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	return relatedResult("ec2", ids)
+}
+
 // eksRelatedResourcesExtra — companion helper so we don't duplicate the
 // pattern from eks_related.go.
 func eksRelatedResourcesExtra(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -112,3 +271,6 @@ func eksRelatedResourcesExtra(ctx context.Context, clients any, cache resource.R
 	}
 	return resources, isTruncated, err
 }
+
+// autoscalingEC2InstanceID is a local type helper to keep ec2types in scope.
+var _ ec2types.Instance

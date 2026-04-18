@@ -65,8 +65,11 @@ func ResolveRelatedNavigate(msg messages.RelatedNavigateMsg, cache map[string][]
 		}
 	}
 
-	// FetchFilter path: use server-side filtered fetcher.
-	if len(msg.FetchFilter) > 0 {
+	// FetchFilter path: only honor when a filtered paginated fetcher is registered
+	// for the target type. Otherwise fall through to the standard RelatedIDs path
+	// — checker may have populated FetchFilter as a hint but the runtime cannot
+	// dispatch without a registered fetcher.
+	if len(msg.FetchFilter) > 0 && resource.GetFilteredPaginatedFetcher(msg.TargetType) != nil {
 		return NavigationResult{
 			Kind:        KindFilteredList,
 			TargetType:  msg.TargetType,

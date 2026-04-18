@@ -171,13 +171,12 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ r
 			continue
 		}
 		// ARN form: arn:aws:dynamodb:region:account:table/NAME/stream/TIMESTAMP
-		idx := strings.Index(arn, "table/")
-		if idx < 0 {
+		_, rest, ok := strings.Cut(arn, "table/")
+		if !ok {
 			continue
 		}
-		rest := arn[idx+len("table/"):]
-		if slash := strings.Index(rest, "/"); slash >= 0 {
-			rest = rest[:slash]
+		if before, _, hasSep := strings.Cut(rest, "/"); hasSep {
+			rest = before
 		}
 		if rest != "" {
 			seen[rest] = struct{}{}

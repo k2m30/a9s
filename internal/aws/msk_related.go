@@ -278,11 +278,8 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ 
 	for _, arn := range out.SecretArnList {
 		// Secret ARN: arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-suffix
 		// The cache key is the secret name (last segment after ":secret:").
-		if idx := strings.Index(arn, ":secret:"); idx >= 0 {
-			name := arn[idx+len(":secret:"):]
-			if name != "" {
-				ids = append(ids, name)
-			}
+		if _, name, ok := strings.Cut(arn, ":secret:"); ok && name != "" {
+			ids = append(ids, name)
 		}
 	}
 	return relatedResult("secrets", ids)

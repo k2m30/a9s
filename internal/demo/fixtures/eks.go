@@ -138,6 +138,15 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					MaxSize:     aws.Int32(8),
 					DesiredSize: aws.Int32(3),
 				},
+				Resources: &ekstypes.NodegroupResources{
+					AutoScalingGroups: []ekstypes.AutoScalingGroup{
+						{Name: aws.String("eks-acme-prod-ng-general")},
+					},
+				},
+				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+					Id:      aws.String("lt-0eks111111111111a"),
+					Version: aws.String("1"),
+				},
 				CreatedAt:   aws.Time(mustTime("2025-03-05T12:00:00Z")),
 				ModifiedAt:  aws.Time(mustTime("2026-02-10T08:30:00Z")),
 				ReleaseVersion: aws.String("1.29.3-20240322"),

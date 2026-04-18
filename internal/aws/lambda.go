@@ -69,15 +69,10 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkLambdaSNS, NeedsTargetCache: true},
 		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkLambdaSNSSub, NeedsTargetCache: true},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkLambdaS3, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkLambdaELB},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkLambdaEC2},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkLambdaASG},
 		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkLambdaECR},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkLambdaENI, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkLambdaSecrets, NeedsTargetCache: true},
 		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkLambdaSSM, NeedsTargetCache: true},
-		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkLambdaSFN},
-		{TargetType: "r53", DisplayName: "Route53 Zones", Checker: checkLambdaR53},
 	})
 }
 

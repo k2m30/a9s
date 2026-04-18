@@ -260,8 +260,8 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 			name := arn
 			if idx := strings.LastIndex(arn, ":function:"); idx >= 0 {
 				rest := arn[idx+len(":function:"):]
-				if colon := strings.Index(rest, ":"); colon >= 0 {
-					name = rest[:colon]
+				if before, _, ok := strings.Cut(rest, ":"); ok {
+					name = before
 				} else {
 					name = rest
 				}

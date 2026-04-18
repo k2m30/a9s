@@ -29,3 +29,9 @@ func (f *EventBridgeFake) ListTargetsByRule(_ context.Context, input *eventbridg
 	}
 	return &eventbridge.ListTargetsByRuleOutput{Targets: f.fix.TargetsByRule[ruleName]}, nil
 }
+
+// ListRuleNamesByTarget is a no-op stub satisfying EventBridgeListRuleNamesByTargetAPI.
+// Demo mode does not model EventBridge rules-by-target lookups.
+func (f *EventBridgeFake) ListRuleNamesByTarget(_ context.Context, _ *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
+	return &eventbridge.ListRuleNamesByTargetOutput{}, nil
+}

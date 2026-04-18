@@ -10,9 +10,66 @@ import (
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// checkApigwKMS resolves KMS keys referenced by this API's Lambda integrations.
+// Weak pair (3-sometimes/2-no consensus). API Gateway has no direct KMS field;
+// we follow Lambda integrations as a best effort.
+// Pattern C: one GetIntegrations call + per-Lambda-target GetFunction call.
+// Extracts KMSKeyArn from each Lambda integration's FunctionConfiguration.
+func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	apiID := res.ID
+	if apiID == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	items, err := apigwListIntegrations(ctx, clients, apiID)
+	if err != nil {
+		if errors.Is(err, errNoR53Client) {
+			return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Lambda == nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	seen := make(map[string]struct{})
+	for _, item := range items {
+		if item.IntegrationUri == nil || !strings.Contains(*item.IntegrationUri, ":function:") {
+			continue
+		}
+		// Extract function name from the integration URI.
+		uri := *item.IntegrationUri
+		idx := strings.LastIndex(uri, ":function:")
+		rest := uri[idx+len(":function:"):]
+		if slash := strings.Index(rest, "/"); slash >= 0 {
+			rest = rest[:slash]
+		}
+		if colon := strings.Index(rest, ":"); colon >= 0 {
+			rest = rest[:colon]
+		}
+		if rest == "" {
+			continue
+		}
+		out, lerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambdapkg.GetFunctionOutput, error) {
+			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &rest})
+		})
+		if lerr != nil || out == nil || out.Configuration == nil {
+			continue
+		}
+		if out.Configuration.KMSKeyArn != nil && *out.Configuration.KMSKeyArn != "" {
+			seen[arnLastSegment(*out.Configuration.KMSKeyArn)] = struct{}{}
+		}
+	}
+	return relatedResult("kms", mapKeys(seen))
+}
 
 // checkApigwLogs searches the logs cache for log groups associated with this
 // API Gateway by naming convention:
@@ -175,37 +232,6 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
 	}
 	return relatedResult("alarm", ids)
-}
-
-// checkApigwKMS reports KMS keys used by this API Gateway.
-//
-// Count: 0 is definitive here. The apigw fetcher lists HTTP and WebSocket APIs
-// via apigatewayv2:GetApis, which returns apigatewayv2types.Api. That struct
-// has no KMS field, no encryption field, and no tag that points at a CMK.
-// None of the other apigatewayv2 types reachable from an Api (Stage,
-// Integration, DomainName, Route, Authorizer, VpcLink) carry a KMS reference
-// either — API Gateway V2 encrypts stored data with AWS-managed keys only and
-// exposes no customer-managed-CMK option. There is therefore no 1-call (or
-// any) AWS API that can link an HTTP/WebSocket API to a KMS key; the
-// relationship does not exist in the service model.
-//
-// Implementation: inspect res.RawStruct. If it is the expected
-// apigatewayv2types.Api, return Count: 0 (definitive — no KMS fields to
-// check). If RawStruct is some other type (mis-registration), also return
-// Count: 0 rather than asserting; the answer for apigw→kms is still 0 by the
-// reasoning above, but the type mismatch would prevent any per-instance
-// extraction anyway.
-func checkApigwKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-	}
-	// Inspect RawStruct: the apigw fetcher populates apigatewayv2types.Api.
-	// We don't need any field from it (none exist), but asserting the type
-	// guards against future RawStruct changes being silently accepted.
-	if _, ok := assertStruct[apigwtypes.Api](res.RawStruct); !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 }
 
 // checkApigwCF reports CloudFront distributions fronting this API. Distribution

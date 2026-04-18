@@ -46,8 +46,8 @@ func TestEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 			t.Errorf("EnricherRegistry missing entry for %q", shortName)
 			continue
 		}
-		if fn == nil {
-			t.Errorf("EnricherRegistry[%q] is nil — must be a non-nil EnricherFunc", shortName)
+		if fn.Fn == nil {
+			t.Errorf("EnricherRegistry[%q].Fn is nil — must be a non-nil EnricherFunc", shortName)
 		}
 	}
 }

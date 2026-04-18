@@ -1,6 +1,13 @@
 # a9s Architecture Guide
 
-This document is the first thing you should read when joining the project. It covers the current runtime architecture, the intended boundaries between layers, and the design rules that new code should follow.
+> **DESCRIPTIVE GUIDE.** This document describes the current implementation state.
+> For normative architecture rules (how the system should be designed), see
+> [architecture-intended.md](./architecture-intended.md). When the two disagree,
+> architecture-intended.md is authoritative.
+
+This document is the first thing you should read when joining the project. It covers the current runtime architecture.
+
+For the normative "how it should be" version used to compare intended design against implementation, see [`architecture-intended.md`](./architecture-intended.md).
 
 ## What is a9s?
 

@@ -174,7 +174,7 @@ func TestAttentionSignalsDoc(t *testing.T) {
 
 			// Assertion 3: Wave 2 non-empty → registered enricher.
 			if !isNoneCell(row.Wave2) {
-				if awsclient.EnricherRegistry[row.ShortName] == nil {
+				if _, ok := awsclient.EnricherRegistry[row.ShortName]; !ok {
 					t.Errorf("docs Wave 2 signal for %q but no entry in awsclient.EnricherRegistry", row.ShortName)
 				}
 			}

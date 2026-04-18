@@ -284,7 +284,28 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		},
 	}
 
-	// Generate 18 more functions to reach 25 total.
+	// Add one container-image function to demonstrate ECR→Lambda relationship.
+	// checkECRLambda matches any lambda with PackageType=Image as potentially using an ECR repo.
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:  aws.String("api-service-runner"),
+		FunctionArn:   aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-service-runner"),
+		Role:          aws.String(lambdaProdRoleARN),
+		MemorySize:    aws.Int32(512),
+		Timeout:       aws.Int32(30),
+		Description:   aws.String("Container-image Lambda running the API service from ECR"),
+		LastModified:  aws.String("2026-03-20T10:00:00+00:00"),
+		CodeSize:      0,
+		State:         lambdatypes.StateActive,
+		PackageType:   lambdatypes.PackageTypeImage,
+		Architectures: []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/api-service-runner"),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
+	// Generate 18 more functions to reach 26 total (including the image function above).
 	for i := range 18 {
 		name := lambdaNamePool[i]
 		rt := lambdaRuntimePool[i]

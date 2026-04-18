@@ -12,15 +12,19 @@ type ASGFixtures struct {
 	AutoScalingGroups []asgtypes.AutoScalingGroup
 	// Activities maps ASG name → []Activity.
 	Activities map[string][]asgtypes.Activity
+	// LaunchConfigurations maps LC name → LaunchConfiguration.
+	LaunchConfigurations map[string]asgtypes.LaunchConfiguration
 }
 
 // NewASGFixtures builds and returns a fully-populated ASGFixtures struct.
 func NewASGFixtures() *ASGFixtures {
 	groups := buildASGGroups()
 	activities := buildASGActivities()
+	lcs := buildLaunchConfigurations()
 	return &ASGFixtures{
-		AutoScalingGroups: groups,
-		Activities:        activities,
+		AutoScalingGroups:    groups,
+		Activities:           activities,
+		LaunchConfigurations: lcs,
 	}
 }
 
@@ -34,15 +38,16 @@ const (
 func buildASGGroups() []asgtypes.AutoScalingGroup {
 	return []asgtypes.AutoScalingGroup{
 		{
-			AutoScalingGroupName: aws.String("acme-web-prod-asg"),
-			AutoScalingGroupARN:  aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:11111111-1111-1111-1111-111111111111:autoScalingGroupName/acme-web-prod-asg"),
-			MinSize:              aws.Int32(2),
-			MaxSize:              aws.Int32(10),
-			DesiredCapacity:      aws.Int32(4),
-			HealthCheckType:      aws.String("ELB"),
-			HealthCheckGracePeriod: aws.Int32(300),
-			VPCZoneIdentifier:    aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
-			CreatedTime:          aws.Time(mustTime("2025-01-15T10:00:00Z")),
+			AutoScalingGroupName:    aws.String("acme-web-prod-asg"),
+			AutoScalingGroupARN:     aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:11111111-1111-1111-1111-111111111111:autoScalingGroupName/acme-web-prod-asg"),
+			MinSize:                 aws.Int32(2),
+			MaxSize:                 aws.Int32(10),
+			DesiredCapacity:         aws.Int32(4),
+			HealthCheckType:         aws.String("ELB"),
+			HealthCheckGracePeriod:  aws.Int32(300),
+			LaunchConfigurationName: aws.String("acme-web-prod-lc"),
+			VPCZoneIdentifier:       aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
+			CreatedTime:             aws.Time(mustTime("2025-01-15T10:00:00Z")),
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Service"), Value: aws.String("web")},
@@ -123,6 +128,22 @@ func buildASGActivities() map[string][]asgtypes.Activity {
 		result[name] = buildActivitiesFor(name)
 	}
 	return result
+}
+
+// buildLaunchConfigurations returns a map of LC name → LaunchConfiguration for demo mode.
+// Only the LC referenced by acme-web-prod-asg is populated; it carries the AMI and SG IDs
+// needed by checkASGAMI and checkASGSG in demo mode.
+func buildLaunchConfigurations() map[string]asgtypes.LaunchConfiguration {
+	return map[string]asgtypes.LaunchConfiguration{
+		"acme-web-prod-lc": {
+			LaunchConfigurationName: aws.String("acme-web-prod-lc"),
+			ImageId:                 aws.String("ami-0abcdef1234567890"),
+			InstanceType:            aws.String("m5.large"),
+			SecurityGroups:          []string{"sg-0web111111111111w"},
+			KeyName:                 aws.String("acme-prod-key"),
+			CreatedTime:             aws.Time(mustTime("2025-01-10T09:00:00Z")),
+		},
+	}
 }
 
 func buildActivitiesFor(asgName string) []asgtypes.Activity {

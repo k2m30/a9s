@@ -352,6 +352,9 @@ func (s *stubGroupPolicyIAM) ListMFADevices(_ context.Context, _ *iam.ListMFADev
 func (s *stubGroupPolicyIAM) ListAccessKeys(_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
 	panic("stubGroupPolicyIAM.ListAccessKeys called unexpectedly")
 }
+func (s *stubGroupPolicyIAM) GetInstanceProfile(_ context.Context, _ *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
+	panic("stubGroupPolicyIAM.GetInstanceProfile called unexpectedly")
+}
 
 // compile-time check
 var _ awsclient.IAMAPI = (*stubGroupPolicyIAM)(nil)

@@ -13,9 +13,7 @@ import (
 func init() {
 	resource.RegisterRelated("backup", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkBackupEBRule},
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkBackupKMS},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkBackupLogs},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkBackupSNS},
 	})
 }

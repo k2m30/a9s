@@ -47,3 +47,31 @@ func (f *ASGFake) DescribeScalingActivities(_ context.Context, input *autoscalin
 	}
 	return &autoscaling.DescribeScalingActivitiesOutput{Activities: f.fix.Activities[asgName]}, nil
 }
+
+// DescribeLaunchConfigurations returns launch configurations by name from fixture data.
+// If no names are requested, all known LCs are returned.
+func (f *ASGFake) DescribeLaunchConfigurations(_ context.Context, input *autoscaling.DescribeLaunchConfigurationsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
+	var result []asgtypes.LaunchConfiguration
+	if len(input.LaunchConfigurationNames) == 0 {
+		for _, lc := range f.fix.LaunchConfigurations {
+			result = append(result, lc)
+		}
+		return &autoscaling.DescribeLaunchConfigurationsOutput{LaunchConfigurations: result}, nil
+	}
+	for _, name := range input.LaunchConfigurationNames {
+		if lc, ok := f.fix.LaunchConfigurations[name]; ok {
+			result = append(result, lc)
+		}
+	}
+	return &autoscaling.DescribeLaunchConfigurationsOutput{LaunchConfigurations: result}, nil
+}
+
+// DescribeNotificationConfigurations is a no-op stub for demo mode.
+func (f *ASGFake) DescribeNotificationConfigurations(_ context.Context, _ *autoscaling.DescribeNotificationConfigurationsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeNotificationConfigurationsOutput, error) {
+	return &autoscaling.DescribeNotificationConfigurationsOutput{}, nil
+}
+
+// DescribeLifecycleHooks is a no-op stub for demo mode.
+func (f *ASGFake) DescribeLifecycleHooks(_ context.Context, _ *autoscaling.DescribeLifecycleHooksInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeLifecycleHooksOutput, error) {
+	return &autoscaling.DescribeLifecycleHooksOutput{}, nil
+}

@@ -32,3 +32,15 @@ func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, _ *
 func (f *CodeArtifactFake) DescribeRepository(_ context.Context, _ *codeartifact.DescribeRepositoryInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeRepositoryOutput, error) {
 	return &codeartifact.DescribeRepositoryOutput{}, nil
 }
+
+// GetDomainPermissionsPolicy is a no-op stub satisfying CodeArtifactGetDomainPermissionsPolicyAPI.
+// Demo mode does not model CodeArtifact domain permissions policies.
+func (f *CodeArtifactFake) GetDomainPermissionsPolicy(_ context.Context, _ *codeartifact.GetDomainPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetDomainPermissionsPolicyOutput, error) {
+	return &codeartifact.GetDomainPermissionsPolicyOutput{}, nil
+}
+
+// DescribeDomain is a no-op stub satisfying CodeArtifactDescribeDomainAPI.
+// Demo mode does not model CodeArtifact domain KMS encryption keys.
+func (f *CodeArtifactFake) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
+	return &codeartifact.DescribeDomainOutput{}, nil
+}

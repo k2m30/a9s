@@ -313,6 +313,11 @@ type SSMGetParameterAPI interface {
 	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 }
 
+// SSMDescribeInstanceInformationAPI defines the interface for the SSM DescribeInstanceInformation operation.
+type SSMDescribeInstanceInformationAPI interface {
+	DescribeInstanceInformation(ctx context.Context, params *ssm.DescribeInstanceInformationInput, optFns ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error)
+}
+
 // DDBListTablesAPI defines the interface for the DynamoDB ListTables operation.
 type DDBListTablesAPI interface {
 	ListTables(ctx context.Context, params *dynamodb.ListTablesInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error)
@@ -326,6 +331,11 @@ type DDBDescribeTableAPI interface {
 // DynamoDBDescribeContinuousBackupsAPI defines the interface for the DynamoDB DescribeContinuousBackups operation.
 type DynamoDBDescribeContinuousBackupsAPI interface {
 	DescribeContinuousBackups(ctx context.Context, params *dynamodb.DescribeContinuousBackupsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error)
+}
+
+// DynamoDBDescribeKinesisStreamingDestinationAPI defines the interface for the DynamoDB DescribeKinesisStreamingDestination operation.
+type DynamoDBDescribeKinesisStreamingDestinationAPI interface {
+	DescribeKinesisStreamingDestination(ctx context.Context, params *dynamodb.DescribeKinesisStreamingDestinationInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error)
 }
 
 // EC2DescribeAddressesAPI defines the interface for the EC2 DescribeAddresses operation.
@@ -482,6 +492,12 @@ type ECRDescribeRepositoriesAPI interface {
 	DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
 }
 
+// ECRGetRepositoryPolicyAPI defines the interface for the ECR GetRepositoryPolicy operation.
+// Used by checkECRRole to extract IAM roles from the repository's resource-based policy.
+type ECRGetRepositoryPolicyAPI interface {
+	GetRepositoryPolicy(ctx context.Context, params *ecr.GetRepositoryPolicyInput, optFns ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error)
+}
+
 // ECRDescribeImagesAPI defines the interface for the ECR DescribeImages operation.
 type ECRDescribeImagesAPI interface {
 	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
@@ -511,6 +527,11 @@ type EventBridgeListRulesAPI interface {
 // EventBridgeListTargetsByRuleAPI defines the interface for the EventBridge ListTargetsByRule operation.
 type EventBridgeListTargetsByRuleAPI interface {
 	ListTargetsByRule(ctx context.Context, params *eventbridge.ListTargetsByRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error)
+}
+
+// EventBridgeListRuleNamesByTargetAPI defines the interface for the EventBridge ListRuleNamesByTarget operation.
+type EventBridgeListRuleNamesByTargetAPI interface {
+	ListRuleNamesByTarget(ctx context.Context, params *eventbridge.ListRuleNamesByTargetInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error)
 }
 
 // SFNListStateMachinesAPI defines the interface for the SFN ListStateMachines operation.
@@ -579,6 +600,11 @@ type EBDescribeEnvironmentsAPI interface {
 	DescribeEnvironments(ctx context.Context, params *elasticbeanstalk.DescribeEnvironmentsInput, optFns ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error)
 }
 
+// EBDescribeApplicationVersionsAPI defines the interface for the Elastic Beanstalk DescribeApplicationVersions operation.
+type EBDescribeApplicationVersionsAPI interface {
+	DescribeApplicationVersions(ctx context.Context, params *elasticbeanstalk.DescribeApplicationVersionsInput, optFns ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error)
+}
+
 // SESv2ListEmailIdentitiesAPI defines the interface for the SES v2 ListEmailIdentities operation.
 type SESv2ListEmailIdentitiesAPI interface {
 	ListEmailIdentities(ctx context.Context, params *sesv2.ListEmailIdentitiesInput, optFns ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error)
@@ -587,6 +613,11 @@ type SESv2ListEmailIdentitiesAPI interface {
 // SESv2GetAccountAPI defines the interface for the SES v2 GetAccount operation.
 type SESv2GetAccountAPI interface {
 	GetAccount(ctx context.Context, params *sesv2.GetAccountInput, optFns ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error)
+}
+
+// SESv2GetConfigurationSetEventDestinationsAPI defines the interface for the SES v2 GetConfigurationSetEventDestinations operation.
+type SESv2GetConfigurationSetEventDestinationsAPI interface {
+	GetConfigurationSetEventDestinations(ctx context.Context, params *sesv2.GetConfigurationSetEventDestinationsInput, optFns ...func(*sesv2.Options)) (*sesv2.GetConfigurationSetEventDestinationsOutput, error)
 }
 
 // RedshiftDescribeClustersAPI defines the interface for the Redshift DescribeClusters operation.
@@ -664,6 +695,16 @@ type KMSListAliasesAPI interface {
 // KMSGetKeyRotationStatusAPI defines the interface for the KMS GetKeyRotationStatus operation.
 type KMSGetKeyRotationStatusAPI interface {
 	GetKeyRotationStatus(ctx context.Context, params *kms.GetKeyRotationStatusInput, optFns ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error)
+}
+
+// KMSListGrantsAPI defines the interface for the KMS ListGrants operation.
+type KMSListGrantsAPI interface {
+	ListGrants(ctx context.Context, params *kms.ListGrantsInput, optFns ...func(*kms.Options)) (*kms.ListGrantsOutput, error)
+}
+
+// KMSGetKeyPolicyAPI defines the interface for the KMS GetKeyPolicy operation.
+type KMSGetKeyPolicyAPI interface {
+	GetKeyPolicy(ctx context.Context, params *kms.GetKeyPolicyInput, optFns ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error)
 }
 
 // MSKListClustersV2API defines the interface for the Kafka ListClustersV2 operation.
@@ -888,8 +929,14 @@ type WAFv2ListResourcesForWebACLAPI interface {
 	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
 }
 
-// EC2API is the aggregate interface covering all 16 EC2 operations used by a9s fetchers.
-// *ec2.Client structurally satisfies this interface; the EC2 fake must implement all 16 methods.
+// EC2DescribeTransitGatewayRouteTablesAPI defines the interface for the EC2
+// DescribeTransitGatewayRouteTables operation.
+type EC2DescribeTransitGatewayRouteTablesAPI interface {
+	DescribeTransitGatewayRouteTables(ctx context.Context, params *ec2.DescribeTransitGatewayRouteTablesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayRouteTablesOutput, error)
+}
+
+// EC2API is the aggregate interface covering all EC2 operations used by a9s fetchers.
+// *ec2.Client structurally satisfies this interface.
 type EC2API interface {
 	EC2DescribeInstancesAPI
 	EC2DescribeVpcsAPI
@@ -902,14 +949,16 @@ type EC2API interface {
 	EC2DescribeTransitGatewaysAPI
 	EC2DescribeTransitGatewayAttachmentsAPI
 	EC2DescribeTransitGatewayVpcAttachmentsAPI
+	EC2DescribeTransitGatewayRouteTablesAPI
 	EC2DescribeVpcEndpointsAPI
 	EC2DescribeNetworkInterfacesAPI
 	EC2DescribeVolumesAPI
 	EC2DescribeSnapshotsAPI
 	EC2DescribeImagesAPI
-	EC2DescribeInstanceStatusAPI // Wave 2 enrichment
-	EC2DescribeVolumeStatusAPI   // Wave 2 enrichment
-	EC2DescribeFlowLogsAPI       // Wave 2 enrichment
+	EC2DescribeInstanceStatusAPI        // Wave 2 enrichment
+	EC2DescribeVolumeStatusAPI          // Wave 2 enrichment
+	EC2DescribeFlowLogsAPI              // Wave 2 enrichment
+	EC2DescribeLaunchTemplateVersionsAPI // asg→ami, asg→role, asg→sg
 }
 
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
@@ -953,6 +1002,7 @@ type DynamoDBAPI interface {
 	DDBListTablesAPI
 	DDBDescribeTableAPI
 	DynamoDBDescribeContinuousBackupsAPI
+	DynamoDBDescribeKinesisStreamingDestinationAPI
 }
 
 // DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
@@ -998,6 +1048,9 @@ type EKSAPI interface {
 type ASGAPI interface {
 	ASGDescribeAutoScalingGroupsAPI
 	ASGDescribeScalingActivitiesAPI
+	ASGDescribeLaunchConfigurationsAPI
+	ASGDescribeNotificationConfigurationsAPI
+	ASGDescribeLifecycleHooksAPI
 }
 
 // ElasticBeanstalkAPI is the aggregate interface covering all ElasticBeanstalk operations used by a9s fetchers.
@@ -1007,6 +1060,7 @@ type ElasticBeanstalkAPI interface {
 	ElasticBeanstalkDescribeEnvironmentHealthAPI // Wave 2 enrichment
 	EBDescribeConfigurationSettingsAPI
 	EBDescribeEnvironmentResourcesAPI
+	EBDescribeApplicationVersionsAPI
 }
 
 // ELBv2API is the aggregate interface covering all ELBv2 operations used by a9s fetchers.
@@ -1043,6 +1097,7 @@ type IAMAPI interface {
 	IAMGetLoginProfileAPI
 	IAMListMFADevicesAPI
 	IAMListAccessKeysAPI
+	IAMGetInstanceProfileAPI // asg→role, eb→role via IamInstanceProfile
 }
 
 // WAFv2API is the aggregate interface covering all WAFv2 operations used by a9s fetchers.
@@ -1066,6 +1121,7 @@ type SecretsManagerAPI interface {
 type SSMAPI interface {
 	SSMDescribeParametersAPI
 	SSMGetParameterAPI
+	SSMDescribeInstanceInformationAPI
 }
 
 // KMSAPI is the aggregate interface covering all KMS operations used by a9s fetchers.
@@ -1075,6 +1131,8 @@ type KMSAPI interface {
 	KMSDescribeKeyAPI
 	KMSListAliasesAPI
 	KMSGetKeyRotationStatusAPI
+	KMSListGrantsAPI
+	KMSGetKeyPolicyAPI
 }
 
 // Route53API is the aggregate interface covering all Route53 operations used by a9s fetchers.
@@ -1137,6 +1195,7 @@ type ECRAPI interface {
 	ECRDescribeRepositoriesAPI
 	ECRDescribeImagesAPI
 	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
+	ECRGetRepositoryPolicyAPI       // related-panel: ecr→role
 }
 
 // CodeArtifactGetRepositoryPermissionsPolicyAPI defines the interface for the CodeArtifact
@@ -1145,12 +1204,25 @@ type CodeArtifactGetRepositoryPermissionsPolicyAPI interface {
 	GetRepositoryPermissionsPolicy(ctx context.Context, params *codeartifact.GetRepositoryPermissionsPolicyInput, optFns ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error)
 }
 
+// CodeArtifactGetDomainPermissionsPolicyAPI defines the interface for the CodeArtifact GetDomainPermissionsPolicy operation.
+type CodeArtifactGetDomainPermissionsPolicyAPI interface {
+	GetDomainPermissionsPolicy(ctx context.Context, params *codeartifact.GetDomainPermissionsPolicyInput, optFns ...func(*codeartifact.Options)) (*codeartifact.GetDomainPermissionsPolicyOutput, error)
+}
+
+// CodeArtifactDescribeDomainAPI defines the interface for the CodeArtifact DescribeDomain operation.
+// Used by checkCodeartifactKMS to resolve the KMS encryption key for the repository's domain.
+type CodeArtifactDescribeDomainAPI interface {
+	DescribeDomain(ctx context.Context, params *codeartifact.DescribeDomainInput, optFns ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error)
+}
+
 // CodeArtifactAPI is the aggregate interface covering all CodeArtifact operations used by a9s fetchers.
 // *codeartifact.Client structurally satisfies this interface.
 type CodeArtifactAPI interface {
 	CodeArtifactListRepositoriesAPI
 	CodeArtifactGetRepositoryPermissionsPolicyAPI // Wave 2 enrichment
 	CodeArtifactDescribeRepositoryAPI
+	CodeArtifactGetDomainPermissionsPolicyAPI
+	CodeArtifactDescribeDomainAPI
 }
 
 // CloudWatchAPI is the aggregate interface covering all CloudWatch operations used by a9s fetchers.
@@ -1192,6 +1264,7 @@ type SNSAPI interface {
 type EventBridgeAPI interface {
 	EventBridgeListRulesAPI
 	EventBridgeListTargetsByRuleAPI
+	EventBridgeListRuleNamesByTargetAPI
 }
 
 // KinesisAPI is the aggregate interface covering all Kinesis operations used by a9s fetchers.
@@ -1270,6 +1343,7 @@ type SESv2API interface {
 	SESv2ListEmailIdentitiesAPI
 	SESv2GetAccountAPI
 	SESv2GetEmailIdentityAPI
+	SESv2GetConfigurationSetEventDestinationsAPI
 }
 
 // EFSAPI is the aggregate interface covering all EFS operations used by a9s fetchers.
@@ -1392,4 +1466,29 @@ type EBDescribeEnvironmentResourcesAPI interface {
 // SNSGetSubscriptionAttributesAPI for sns-sub→kms and sns-sub→policy.
 type SNSGetSubscriptionAttributesAPI interface {
 	GetSubscriptionAttributes(ctx context.Context, params *sns.GetSubscriptionAttributesInput, optFns ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error)
+}
+
+// ASGDescribeLaunchConfigurationsAPI for asg→ami, asg→role, asg→sg via LaunchConfiguration.
+type ASGDescribeLaunchConfigurationsAPI interface {
+	DescribeLaunchConfigurations(ctx context.Context, params *autoscaling.DescribeLaunchConfigurationsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeLaunchConfigurationsOutput, error)
+}
+
+// ASGDescribeNotificationConfigurationsAPI for asg→sns via NotificationConfigurations.
+type ASGDescribeNotificationConfigurationsAPI interface {
+	DescribeNotificationConfigurations(ctx context.Context, params *autoscaling.DescribeNotificationConfigurationsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeNotificationConfigurationsOutput, error)
+}
+
+// ASGDescribeLifecycleHooksAPI for asg→sns via LifecycleHooks.NotificationTargetARN.
+type ASGDescribeLifecycleHooksAPI interface {
+	DescribeLifecycleHooks(ctx context.Context, params *autoscaling.DescribeLifecycleHooksInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeLifecycleHooksOutput, error)
+}
+
+// EC2DescribeLaunchTemplateVersionsAPI for asg→ami, asg→role, asg→sg via LaunchTemplate.
+type EC2DescribeLaunchTemplateVersionsAPI interface {
+	DescribeLaunchTemplateVersions(ctx context.Context, params *ec2.DescribeLaunchTemplateVersionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error)
+}
+
+// IAMGetInstanceProfileAPI for asg→role and eb→role via IamInstanceProfile.
+type IAMGetInstanceProfileAPI interface {
+	GetInstanceProfile(ctx context.Context, params *iam.GetInstanceProfileInput, optFns ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error)
 }

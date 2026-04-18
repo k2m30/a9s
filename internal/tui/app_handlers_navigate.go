@@ -640,9 +640,12 @@ func (m *Model) startEnrichment() tea.Cmd {
 		menu.SetEnrichProgress(0, m.enrichTotal)
 	}
 
-	// Fire first batch (up to 4), bumping per-type gen before each dispatch.
+	// Dispatch all enrichers at once so priority ordering is observable in a
+	// single cmd tree. Each probe is independent; results arrive as individual
+	// EnrichmentCheckedMsg values. handleEnrichmentChecked drains any residual
+	// queue entries added by future requeue operations.
 	var cmds []tea.Cmd
-	for i := 0; i < 4 && len(m.enrichQueue) > 0; i++ {
+	for len(m.enrichQueue) > 0 {
 		name := m.enrichQueue[0]
 		m.enrichQueue = m.enrichQueue[1:]
 		// Clear-on-rerun-start: bump type gen, wipe stale findings and ran flag.

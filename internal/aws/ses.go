@@ -23,18 +23,11 @@ func init() {
 
 	resource.RegisterRelated("ses", []resource.RelatedDef{
 		{TargetType: "r53", DisplayName: "Route 53 (DNS)", Checker: checkSESR53, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSESCFN, NeedsTargetCache: true},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkSESAcm, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSESAlarm, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSESEbRule, NeedsTargetCache: true},
 		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkSESKinesis, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSESKMS, NeedsTargetCache: false},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSESLambda, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSESLogs, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSESRole, NeedsTargetCache: false},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkSESS3, NeedsTargetCache: true},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSESSns, NeedsTargetCache: true},
-		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkSESTrail, NeedsTargetCache: true},
 	})
 }
 

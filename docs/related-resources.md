@@ -43,71 +43,71 @@
 | Type | AWS API | Expected related targets |
 |------|---------|--------------------------|
 | `acm` | [API_CertificateDetail](https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html) | `apigw`, `cf`, `ct-events`, `elb`, `r53` |
-| `alarm` | [API_MetricAlarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html) | `apigw`, `asg`, `cb`, `ct-events`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `role`, `s3`, `sfn`, `sns`, `waf` |
+| `alarm` | [API_MetricAlarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html) | `apigw`, `asg`, `cb`, `ct-events`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `s3`, `sfn`, `sns`, `waf` |
 | `ami` | [API_Image](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html) | `asg`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`, `ng` |
 | `apigw` | [apis](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html) | `acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `r53`, `role`, `sfn`, `sns`, `vpce`, `waf` |
-| `asg` | [API_AutoScalingGroup](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html) | `alarm`, `ami`, `cfn`, `ct-events`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc` |
+| `asg` | [API_AutoScalingGroup](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html) | `alarm`, `ami`, `ct-events`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc` |
 | `athena` | [API_WorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html) | `ct-events`, `glue`, `kms`, `logs`, `role`, `s3` |
-| `backup` | [API_BackupPlan](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html) | `ct-events`, `eb-rule`, `kms`, `logs`, `role`, `sns` |
+| `backup` | [API_BackupPlan](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html) | `ct-events`, `kms`, `role`, `sns` |
 | `cb` | [API_Project](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html) | `alarm`, `ct-events`, `ecr`, `kms`, `logs`, `pipeline`, `role`, `s3`, `secrets`, `sg`, `ssm`, `subnet`, `vpc` |
 | `cf` | [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) | `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf` |
 | `cfn` | [API_Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html) | `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns` |
-| `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `acm`, `cb`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `r53`, `role`, `waf` |
+| `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `ct-events`, `kms` |
 | `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
 | `dbc` | [API_DBCluster](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html) | `alarm`, `ct-events`, `dbi`, `docdb-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc` |
 | `dbi` | [API_DBInstance](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html) | `alarm`, `ct-events`, `dbc`, `eni`, `kms`, `logs`, `rds-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
-| `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `secrets`, `sns`, `vpce` |
+| `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `vpce` |
 | `docdb-snap` | [API_DBClusterSnapshot](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html) | `backup`, `ct-events`, `dbc`, `kms`, `vpc` |
 | `eb` | [API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg` |
 | `eb-rule` | [API_Rule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html) | `ct-events`, `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs` |
 | `ebs` | [API_Volume](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms` |
 | `ebs-snap` | [API_Snapshot](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html) | `ami`, `backup`, `ct-events`, `ebs`, `ec2`, `kms` |
 | `ec2` | [API_Instance](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html) | `alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc` |
-| `ecr` | [API_Repository](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html) | `cb`, `cfn`, `ct-events`, `eb-rule`, `ecs`, `ecs-task`, `eks`, `kms`, `lambda`, `pipeline`, `role` |
+| `ecr` | [API_Repository](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html) | `cb`, `cfn`, `ct-events`, `eb-rule`, `ecs-task`, `kms`, `lambda`, `pipeline`, `role` |
 | `ecs` | [API_Cluster](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `ecs-task`, `kms`, `logs` |
-| `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cf`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `r53`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
-| `ecs-task` | [API_Task](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html) | `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `kms`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet` |
+| `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
+| `ecs-task` | [API_Task](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html) | `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet` |
 | `efs` | [API_FileSystemDescription](https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ec2`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc` |
-| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `kms`, `logs`, `nat` |
-| `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `acm`, `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `ecr`, `iam-user`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
-| `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `logs`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
+| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat` |
+| `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
+| `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
 | `eni` | [API_NetworkInterface](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html) | `ct-events`, `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce` |
 | `glue` | [API_Job](https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html) | `alarm`, `athena`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets` |
 | `iam-group` | [API_Group](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html) | `ct-events`, `iam-user`, `policy` |
-| `iam-user` | [API_User](https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html) | `ct-events`, `iam-group`, `kms`, `policy`, `role` |
+| `iam-user` | [API_User](https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html) | `ct-events`, `iam-group`, `policy` |
 | `igw` | [API_InternetGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html) | `ct-events`, `rtb`, `vpc` |
-| `kinesis` | [API_StreamDescription](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html) | `alarm`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `kms`, `lambda`, `logs` |
+| `kinesis` | [API_StreamDescription](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html) | `alarm`, `cfn`, `ct-events`, `ddb`, `kms`, `lambda` |
 | `kms` | [API_KeyMetadata](https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html) | `ct-events`, `dbi`, `ebs`, `role`, `s3`, `secrets` |
-| `lambda` | [API_FunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html) | `alarm`, `apigw`, `asg`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ec2`, `ecr`, `efs`, `elb`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `r53`, `role`, `s3`, `secrets`, `sfn`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc` |
+| `lambda` | [API_FunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html) | `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc` |
 | `logs` | [API_LogGroup](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html) | `alarm`, `apigw`, `ct-events`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3` |
 | `msk` | [v1-clusters](https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html) | `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
 | `nat` | [API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html) | `alarm`, `ct-events`, `eip`, `eni`, `rtb`, `subnet`, `vpc` |
-| `ng` | [API_Nodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html) | `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `kms`, `role`, `sg`, `subnet` |
-| `opensearch` | [API_DomainStatus](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html) | `acm`, `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `sg`, `subnet`, `vpc` |
-| `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `logs`, `role`, `s3`, `sns` |
+| `ng` | [API_Nodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html) | `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet` |
+| `opensearch` | [API_DomainStatus](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html) | `acm`, `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `sg`, `subnet`, `vpc` |
+| `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns` |
 | `policy` | [API_Policy](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html) | `ct-events`, `iam-group`, `iam-user`, `role` |
 | `r53` | [API_HostedZone](https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html) | `acm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`, `s3`, `vpc` |
 | `rds-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbc`, `dbi`, `kms` |
 | `redis` | [API_ReplicationGroup](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `secrets`, `sg`, `sns`, `subnet`, `vpc` |
 | `redshift` | [API_Cluster](https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
-| `role` | [API_Role](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html) | `ct-events`, `ec2`, `eks`, `glue`, `iam-group`, `iam-user`, `kms`, `lambda`, `ng`, `policy` |
+| `role` | [API_Role](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html) | `ct-events`, `ec2`, `eks`, `glue`, `iam-group`, `iam-user`, `lambda`, `ng`, `policy` |
 | `rtb` | [API_RouteTable](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html) | `cfn`, `ct-events`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce` |
 | `s3` | [API_ListBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html) | `athena`, `backup`, `cf`, `cfn`, `ct-events`, `eb-rule`, `glue`, `iam-user`, `kms`, `lambda`, `logs`, `r53`, `role`, `sns`, `sqs`, `trail`, `waf` |
-| `secrets` | [API_SecretListEntry](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `dbi`, `eb`, `ecr`, `ecs-task`, `kms`, `lambda`, `logs`, `pipeline`, `role`, `s3`, `sns` |
-| `ses` | [API_IdentityInfo](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html) | `acm`, `alarm`, `cfn`, `ct-events`, `eb-rule`, `kinesis`, `kms`, `lambda`, `logs`, `r53`, `role`, `s3`, `sns`, `trail` |
-| `sfn` | [API_StateMachineListItem](https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `kms`, `lambda`, `logs`, `role` |
+| `secrets` | [API_SecretListEntry](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `dbi`, `eb`, `ecs-task`, `kms`, `lambda`, `logs`, `role`, `sns` |
+| `ses` | [API_IdentityInfo](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html) | `ct-events`, `eb-rule`, `kinesis`, `lambda`, `r53`, `s3`, `sns` |
+| `sfn` | [API_StateMachineListItem](https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `logs`, `role` |
 | `sg` | [API_SecurityGroup](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `lambda`, `sg`, `vpc` |
-| `sns` | [API_Topic](https://docs.aws.amazon.com/sns/latest/api/API_Topic.html) | `alarm`, `cfn`, `ct-events`, `kms`, `role`, `sns-sub` |
-| `sns-sub` | [API_Subscription](https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html) | `ct-events`, `ecs`, `kms`, `lambda`, `policy`, `sns`, `sqs` |
-| `sqs` | [API_GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `role`, `sns`, `sns-sub`, `sqs` |
+| `sns` | [API_Topic](https://docs.aws.amazon.com/sns/latest/api/API_Topic.html) | `alarm`, `ct-events`, `kms`, `role`, `sns-sub` |
+| `sns-sub` | [API_Subscription](https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html) | `ct-events`, `lambda`, `sns`, `sqs` |
+| `sqs` | [API_GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `sns`, `sns-sub`, `sqs` |
 | `ssm` | [API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html) | `ct-events`, `kms` |
 | `subnet` | [API_Subnet](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html) | `asg`, `cfn`, `ct-events`, `ec2`, `efs`, `eks`, `elb`, `eni`, `nat`, `rtb`, `vpc`, `vpce` |
-| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `kms`, `lambda`, `logs`, `rds-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
-| `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `cfn`, `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
+| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `rds-snap`, `sg`, `subnet`, `vpc` |
+| `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
 | `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `acm`, `alarm`, `cf`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
-| `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`, `role` |
+| `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs` |
 
 ## Per-target reasoning
 
@@ -139,7 +139,6 @@ AWS API: https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Me
 - **`kms`** — Alarms on KMS key usage.
 - **`lambda`** — Common alarm dimension: Lambda Errors/Throttles/Duration.
 - **`logs`** — Metric-filter-driven alarms point at log groups.
-- **`role`** — Alarm actions may target scaling roles.
 - **`s3`** — S3 request metrics alarm dimension.
 - **`sfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sns`** — MetricAlarm.AlarmActions / OKActions — SNS topics notified.
@@ -166,7 +165,7 @@ AWS API: https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html
 - **`cf`** — APIGW often fronted by CloudFront.
 - **`ct-events`** — Audit trail for API changes.
 - **`elb`** — VpcLink NLB backend.
-- **`kms`** — Access-log encryption / backend secrets.
+- **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn).
 - **`lambda`** — Lambda integrations.
 - **`logs`** — API access log destination.
 - **`r53`** — R53 alias records for custom domains.
@@ -181,18 +180,17 @@ AWS API: https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html
 AWS API: https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html
 
 - **`alarm`** — Alarms that trigger scaling policies.
-- **`ami`** — LaunchTemplate/LaunchConfig AMI.
-- **`cfn`** — CloudFormation stack that created the ASG.
+- **`ami`** — LaunchConfiguration.ImageId or LaunchTemplate.LaunchTemplateData.ImageId — AMI used by instances.
 - **`ct-events`** — Audit trail for scaling events / config changes.
 - **`ec2`** — Instances the ASG currently manages.
-- **`elb`** — ASG targets may register with ELB (legacy) or via TG.
+- **`elb`** — AutoScalingGroup.LoadBalancerNames (classic ELBs) + TargetGroupARNs → DescribeTargetGroups.LoadBalancerArns (ALB/NLB).
 - **`ng`** — EKS node groups wrap ASGs; shown when parent node group exists.
-- **`role`** — LaunchTemplate IAM instance profile.
-- **`sg`** — LaunchTemplate SGs.
-- **`sns`** — Lifecycle-hook notifications.
+- **`role`** — AutoScalingGroup.ServiceLinkedRoleARN + LaunchConfiguration/Template IamInstanceProfile → GetInstanceProfile roles.
+- **`sg`** — LaunchConfiguration.SecurityGroups or LaunchTemplate.SecurityGroupIds / NetworkInterfaces[].Groups.
+- **`sns`** — DescribeNotificationConfigurations.TopicARN + DescribeLifecycleHooks.NotificationTargetARN (SNS-only).
 - **`subnet`** — AutoScalingGroup.VPCZoneIdentifier — subnets the ASG launches into.
 - **`tg`** — AutoScalingGroup.TargetGroupARNs — TGs the ASG registers instances with.
-- **`vpc`** — VPCZoneIdentifier implies VPC parent.
+- **`vpc`** — AutoScalingGroup.VPCZoneIdentifier → DescribeSubnets.VpcId — VPC(s) the ASG operates in.
 
 ### `athena`
 
@@ -210,9 +208,7 @@ AWS API: https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.ht
 AWS API: https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html
 
 - **`ct-events`** — Audit trail for plan/selection/job events.
-- **`eb-rule`** — Failure events via EventBridge.
 - **`kms`** — Recovery-point encryption key.
-- **`logs`** — Job logs.
 - **`role`** — Backup service role used for restore jobs.
 - **`sns`** — Vault notifications.
 
@@ -263,16 +259,8 @@ AWS API: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_S
 
 AWS API: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html
 
-- **`acm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`cb`** — CodeBuild projects consuming this repo.
 - **`ct-events`** — Audit trail for repo policy/package events.
-- **`kinesis`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`kms`** — Repo EncryptionKey.
-- **`lambda`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`r53`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`role`** — Domain authorization role.
-- **`waf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 
 ### `ct-events`
 
@@ -325,8 +313,6 @@ AWS API: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Tabl
 - **`kms`** — SSEDescription.KMSMasterKeyArn — table encryption key.
 - **`lambda`** — Lambdas consuming DDB Streams from this table.
 - **`logs`** — ContributorInsights / Streams logs.
-- **`secrets`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`sns`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`vpce`** — Gateway endpoint for DynamoDB.
 
 ### `docdb-snap`
@@ -344,16 +330,16 @@ AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClus
 AWS API: https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html
 
 - **`alarm`** — Health alarms.
-- **`asg`** — Environment's backing ASG.
-- **`cfn`** — Beanstalk creates a CloudFormation stack per environment.
+- **`asg`** — Environment's backing ASG (elasticbeanstalk:environment-name tag on ASG).
+- **`cfn`** — Beanstalk creates a CloudFormation stack per environment (awseb-{envId}-stack prefix).
 - **`ct-events`** — Audit trail for environment config changes.
-- **`ec2`** — Instances running the environment.
-- **`elb`** — Environment's load balancer.
-- **`logs`** — Environment log groups.
-- **`role`** — Env service role.
-- **`s3`** — Application versions in S3.
-- **`sg`** — Env instance SGs.
-- **`tg`** — Target group attached to env ALB.
+- **`ec2`** — Instances running the environment (elasticbeanstalk:environment-name tag on EC2 instances).
+- **`elb`** — DescribeEnvironmentResources.EnvironmentResources.LoadBalancers[].Name — ELB(s) fronting this environment.
+- **`logs`** — Log groups prefixed /aws/elasticbeanstalk/{envName}/.
+- **`role`** — DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/IamInstanceProfile → GetInstanceProfile roles; aws:elasticbeanstalk:environment/ServiceRole.
+- **`s3`** — DescribeApplicationVersions.ApplicationVersions[].SourceBundle.S3Bucket — buckets holding application version bundles.
+- **`sg`** — DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/SecurityGroups and aws:elbv2:loadbalancer/SecurityGroups.
+- **`tg`** — DescribeEnvironmentResources.LoadBalancers[].Name → elbv2:DescribeListeners → DefaultActions/ForwardConfig TargetGroupArn.
 
 ### `eb-rule`
 
@@ -425,7 +411,6 @@ AWS API: https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repositor
 - **`eb-rule`** — Image-scan EventBridge events.
 - **`ecs`** — ECS services pulling from this repo.
 - **`ecs-task`** — Task defs pull from repo.
-- **`eks`** — EKS pods pull from repo.
 - **`kms`** — EncryptionConfiguration.KmsKey.
 - **`lambda`** — Lambda functions using container image from this repo.
 - **`pipeline`** — Pipelines pushing to this repo.
@@ -450,7 +435,6 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.h
 AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html
 
 - **`alarm`** — Service alarms (CPU/Memory/PendingTasks).
-- **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — CloudFormation stack that created the service.
 - **`ct-events`** — Audit trail for service changes.
 - **`eb-rule`** — Scheduled tasks are EB-driven.
@@ -459,7 +443,6 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.h
 - **`ecs-task`** — Running tasks for this service.
 - **`elb`** — Load balancer fronting the service (via TG).
 - **`logs`** — Task container logs.
-- **`r53`** — ServiceRegistries → R53 service discovery.
 - **`role`** — Service.RoleArn / task-level roles.
 - **`secrets`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -479,7 +462,6 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html
 - **`ecs`** — Parent cluster.
 - **`ecs-svc`** — Owning service (Task.Group = 'service:<name>').
 - **`eni`** — Task ENI (awsvpc mode).
-- **`kms`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`logs`** — CloudWatch Log Groups receiving container logs.
 - **`role`** — Task / execution role.
 - **`secrets`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -517,7 +499,6 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html
 - **`ecs-svc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ecs-task`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`eni`** — Associated ENI.
-- **`kms`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`nat`** — NAT gateway consuming this EIP.
 
@@ -525,15 +506,12 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html
 
 AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html
 
-- **`acm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`alarm`** — CloudWatch alarms on cluster/control-plane metrics.
 - **`ami`** — AMIs applied to worker nodes.
 - **`asg`** — Backing ASG.
 - **`cfn`** — CloudFormation stack that created the cluster.
 - **`ct-events`** — Audit trail for cluster config changes.
 - **`ec2`** — Worker-node instances.
-- **`ecr`** — Pod images pulled from ECR.
-- **`iam-user`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`kms`** — EncryptionConfig.Provider.KeyArn.
 - **`logs`** — Control-plane log groups /aws/eks/<cluster>/cluster.
 - **`ng`** — Node groups attached to the cluster.
@@ -552,7 +530,6 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 - **`cfn`** — CloudFormation stack that created the LB.
 - **`ct-events`** — Audit trail for LB config changes.
 - **`eni`** — LB creates ENIs per AZ.
-- **`logs`** — Access logs → CW Logs or S3.
 - **`r53`** — Route 53 alias/records pointing at this LB.
 - **`s3`** — Access-log S3 destination.
 - **`sg`** — Attached security groups (ALB only).
@@ -604,9 +581,7 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html
 
 - **`ct-events`** — Audit trail for user actions and credential changes.
 - **`iam-group`** — Groups the user belongs to.
-- **`kms`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`policy`** — Attached managed policies.
-- **`role`** — Role trust may reference user principals.
 
 ### `igw`
 
@@ -624,10 +599,8 @@ AWS API: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescr
 - **`cfn`** — CloudFormation stack that created the stream.
 - **`ct-events`** — Audit trail for stream changes.
 - **`ddb`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`eb-rule`** — Kinesis as EB-rule target.
 - **`kms`** — StreamDescription.KeyId — stream-encryption key.
 - **`lambda`** — Lambda consumers of the stream.
-- **`logs`** — Enhanced monitoring / Firehose logs.
 
 ### `kms`
 
@@ -646,26 +619,21 @@ AWS API: https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration
 
 - **`alarm`** — Errors/Throttles/Duration alarms watching the function.
 - **`apigw`** — API Gateway integrations.
-- **`asg`** — Mentioned by 3/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — CloudFormation stack that created the function.
 - **`ct-events`** — Audit trail for function config changes.
 - **`ddb`** — DDB Streams triggers.
 - **`eb-rule`** — EventBridge rules with this function as a target.
-- **`ec2`** — Mentioned by 3/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ecr`** — Container-image Lambda.
 - **`efs`** — FileSystemConfigs.
-- **`elb`** — ALB target type = Lambda.
 - **`eni`** — Lambda-in-VPC ENIs.
 - **`kinesis`** — Kinesis event-source mapping.
 - **`kms`** — Env-var encryption key.
 - **`logs`** — CloudWatch Log Groups /aws/lambda/<name> where function logs land.
 - **`msk`** — MSK event-source mapping.
-- **`r53`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`role`** — FunctionConfiguration.Role — execution permissions.
 - **`s3`** — S3 event-source mapping.
 - **`secrets`** — Secrets accessed at runtime.
-- **`sfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sg`** — FunctionConfiguration.VpcConfig.SecurityGroupIds — function ENI SGs.
 - **`sns`** — SNS event source mapping.
 - **`sns-sub`** — SNS subscriptions delivering to the function.
@@ -720,16 +688,15 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.h
 
 AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html
 
-- **`ami`** — Worker AMI.
+- **`ami`** — Nodegroup LaunchTemplate ImageId via ec2:DescribeLaunchTemplateVersions.
 - **`asg`** — Nodegroup.Resources.AutoScalingGroups — backing ASG.
 - **`ct-events`** — Audit trail for nodegroup changes.
-- **`ebs`** — Worker EBS volumes.
+- **`ebs`** — ASG → instances → ec2:DescribeInstances BlockDeviceMappings.Ebs.VolumeId.
 - **`ec2`** — Worker-node instances.
 - **`eks`** — Parent EKS cluster.
-- **`kms`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`role`** — Nodegroup.NodeRole — IAM role nodes assume.
 - **`sg`** — RemoteAccess.SourceSecurityGroups.
-- **`subnet`** — Nodegroup.Subnets — subnets worker nodes land in.
+- **`subnet`** — Nodegroup.Subnets[] (direct field).
 
 ### `opensearch`
 
@@ -741,7 +708,6 @@ AWS API: https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_
 - **`ct-events`** — Audit trail for domain config changes.
 - **`kms`** — EncryptionAtRestOptions.KmsKeyId.
 - **`logs`** — Slow/index/audit log destinations.
-- **`role`** — AdvancedSecurityOptions master user role.
 - **`sg`** — VPCOptions.SecurityGroupIds — domain ENI SGs.
 - **`subnet`** — VPCOptions.SubnetIds — domain ENI subnets.
 - **`vpc`** — VPCOptions.VPCId — attached VPC (if any).
@@ -759,7 +725,6 @@ AWS API: https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_Pipeli
 - **`ecs-svc`** — Deploy to ECS.
 - **`kms`** — Artifact-store encryption key.
 - **`lambda`** — Invoke Lambda action.
-- **`logs`** — Execution logs.
 - **`role`** — Pipeline service role.
 - **`s3`** — Artifact store bucket.
 - **`sns`** — Approval SNS topic.
@@ -837,7 +802,6 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html
 - **`glue`** — Glue jobs assuming this role.
 - **`iam-group`** — Trust relationships may reference groups.
 - **`iam-user`** — Trust may include user principals.
-- **`kms`** — Roles granted Decrypt on keys.
 - **`lambda`** — Lambdas executing as this role.
 - **`ng`** — EKS node groups assuming this role.
 - **`policy`** — Attached managed policies.
@@ -882,47 +846,36 @@ AWS API: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html
 
 AWS API: https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html
 
-- **`cb`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`cfn`** — CloudFormation stack that created the secret.
-- **`codeartifact`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`cb`** — Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix.
+- **`cfn`** — SecretListEntry.Tags["aws:cloudformation:stack-name"] matched against CFN stack cache.
+- **`codeartifact`** — Heuristic: secret Name or Tags contain "codeartifact" (no direct AWS API).
 - **`ct-events`** — Audit trail for secret rotation/access.
-- **`dbi`** — RDS instances consuming this secret as master credentials.
-- **`eb`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`ecr`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`ecs-task`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`kms`** — SecretListEntry.KmsKeyId — encryption key.
-- **`lambda`** — SecretListEntry.RotationLambdaARN — rotation function.
-- **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`pipeline`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`role`** — Rotation lambda execution role.
-- **`s3`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`sns`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`dbi`** — Reverse-scan: DBInstance.MasterUserSecret.SecretArn == this secret's ARN.
+- **`eb`** — Reverse-scan: elasticbeanstalk:DescribeConfigurationSettings OptionSettings[].Value contains `{{resolve:secretsmanager:<ARN>`.
+- **`ecs-task`** — Reverse-scan: TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN or RepositoryCredentials.CredentialsParameter==ARN.
+- **`kms`** — SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache.
+- **`lambda`** — SecretListEntry.RotationLambdaARN — function name suffix matched against Lambda cache.
+- **`logs`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.LoggingConfig.LogGroup (or default /aws/lambda/<name>).
+- **`role`** — secretsmanager:GetResourcePolicy → Statement[].Principal.AWS role ARNs; RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.Role.
+- **`sns`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.DeadLetterConfig.TargetArn if SNS ARN.
 
 ### `ses`
 
 AWS API: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html
 
-- **`acm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`alarm`** — Bounce/complaint rate alarms.
-- **`cfn`** — CloudFormation stack that created the identity.
 - **`ct-events`** — Audit trail for identity changes.
-- **`eb-rule`** — SES event publishing via EventBridge.
-- **`kinesis`** — Event publishing to Firehose.
-- **`kms`** — Configuration-set encryption.
-- **`lambda`** — Inbound-rule Lambda action.
-- **`logs`** — Event destinations → CW Logs.
-- **`r53`** — Route 53 records used for DKIM / domain verification.
-- **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`s3`** — Receipt-rule store-to-S3 action.
-- **`sns`** — Event destinations → SNS.
-- **`trail`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`eb-rule`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → EventBridgeDestination.EventBusArn.
+- **`kinesis`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → KinesisFirehoseDestination.DeliveryStreamArn (Firehose, not Kinesis Data Streams).
+- **`lambda`** — ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn (SES v1 only; not available via SESv2 SDK — returns 0).
+- **`r53`** — Identity domain (or domain portion of email address) matched against Route 53 hosted zone names.
+- **`s3`** — ses:DescribeActiveReceiptRuleSet → S3Action.BucketName (SES v1 only; not available via SESv2 SDK — returns 0).
+- **`sns`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn.
 
 ### `sfn`
 
 AWS API: https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html
 
 - **`alarm`** — Execution-failure alarms.
-- **`cfn`** — CloudFormation stack that created the state machine.
 - **`ct-events`** — Audit trail for state-machine changes.
 - **`eb-rule`** — EventBridge rules with this state machine as target.
 - **`kms`** — Execution-data encryption.
@@ -948,7 +901,6 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGrou
 AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Topic.html
 
 - **`alarm`** — Topic delivery/failure alarms.
-- **`cfn`** — CloudFormation stack that created the topic.
 - **`ct-events`** — Audit trail for topic changes.
 - **`kms`** — KmsMasterKeyId (SSE-KMS).
 - **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -959,10 +911,7 @@ AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Topic.html
 AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html
 
 - **`ct-events`** — Audit trail for subscription changes.
-- **`ecs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`kms`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`lambda`** — Lambda endpoint subscriber.
-- **`policy`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sns`** — Parent topic.
 - **`sqs`** — SQS endpoint subscriber.
 
@@ -975,7 +924,6 @@ AWS API: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/A
 - **`eb-rule`** — EB-rule target queue.
 - **`kms`** — KmsMasterKeyId (SSE-KMS).
 - **`lambda`** — Lambda event-source mappings consuming this queue.
-- **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sns`** — SQS subscribed to SNS topic.
 - **`sns-sub`** — SNS subscriptions delivering to this queue.
 - **`sqs`** — DLQ reference / RedriveTarget.
@@ -1018,12 +966,9 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 - **`ec2`** — Instance targets.
 - **`ecs-svc`** — ECS services routing to this TG.
 - **`elb`** — Load balancers using this TG.
-- **`kms`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`lambda`** — Lambda targets.
 - **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`rds-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`role`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`secrets`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`subnet`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`vpc`** — TargetGroup.VpcId.
@@ -1032,7 +977,6 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 
 AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html
 
-- **`cfn`** — CloudFormation stack that created the TGW.
 - **`ct-events`** — Audit trail for attachment changes.
 - **`role`** — Cross-account RAM share roles.
 - **`rtb`** — VPC route tables with routes targeting this TGW.
@@ -1096,4 +1040,80 @@ AWS API: https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html
 - **`ct-events`** — Audit trail for ACL rule changes.
 - **`elb`** — ALBs with this WebACL attached.
 - **`logs`** — Logging configuration → CW Logs.
-- **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+
+## Explicitly excluded
+
+> **Do not re-add.** These 58 parent→related pairs were audited by five
+> independent DevOps reviewers and found to have no implementable linkage in
+> the AWS API surface (beyond heuristic reverse-scans that would lie to users
+> with false positives or silent zeros). See
+> [related-panel-devops-consensus.md](./historical/019-related-panel/related-panel-devops-consensus.md)
+> for the evidence trail. Re-adding any of these pairs requires new AWS API
+> evidence cited per the Policy section at the top of this file.
+
+### Unanimous `no` (13)
+
+- `codeartifact` → `acm` — no ACM integration for CodeArtifact domains/repositories.
+- `codeartifact` → `kinesis` — no Kinesis integration.
+- `codeartifact` → `lambda` — no direct Lambda integration with CodeArtifact.
+- `codeartifact` → `logs` — no native CloudWatch Logs integration; CloudTrail data events only.
+- `codeartifact` → `r53` — endpoints are AWS-managed; no Route 53 records required.
+- `codeartifact` → `waf` — endpoints are not WAF-protectable.
+- `ddb` → `secrets` — DynamoDB has no direct Secrets Manager association; any usage is app-level.
+- `eip` → `kms` — Elastic IPs have no KMS association.
+- `lambda` → `asg` — Lambda functions don't reference Auto Scaling Groups.
+- `secrets` → `ecr` — no direct linkage between a secret and an ECR repository.
+- `secrets` → `s3` — no direct linkage between a secret and an S3 bucket.
+- `tg` → `kms` — target groups have no IAM-key or KMS attribute.
+- `tg` → `secrets` — target groups have no secret attribute.
+
+### Unanimous `sometimes` — no first-class AWS field (41)
+
+- `alarm` → `role` — no direct role field on alarms; any linkage is indirect via action ARNs (SSM automation, SNS-subscribed Lambda).
+- `asg` → `cfn` — no direct CFN field; recovery is tag-heuristic only (`aws:cloudformation:stack-name`).
+- `backup` → `eb-rule` — only reverse scan: iterate EventBridge rules for `source: aws.backup` pattern.
+- `backup` → `logs` — no direct Backup→Logs API; CloudTrail-mediated at best.
+- `codeartifact` → `cb` — no direct API; requires scanning CodeBuild projects' buildspecs/env vars for domain references.
+- `codeartifact` → `role` — only via `GetDomain/RepositoryPermissionsPolicy` parse (indirect).
+- `ecr` → `ecs` — no first-class ECR→ECS-cluster API; use `ecr` → `ecs-task` for the actual linkage via task definitions.
+- `ecr` → `eks` — no AWS API; requires Kubernetes API access per cluster.
+- `ecs-svc` → `cf` — no direct ECS service → CloudFront link.
+- `ecs-svc` → `r53` — service discovery registries are indirect.
+- `ecs-task` → `kms` — no direct KMS reference on a task; indirect via execution role + log group encryption.
+- `eks` → `acm` — no direct cert attachment on an EKS cluster.
+- `eks` → `ecr` — image resolution lives in Kubernetes, not the EKS API.
+- `eks` → `iam-user` — `aws-auth` ConfigMap resolution lives in the cluster, not the EKS API.
+- `elb` → `logs` — access logs go to S3 by default; CW Logs linkage is via attributes, not first-class.
+- `iam-user` → `kms` — no direct key-user attribute on a user.
+- `iam-user` → `role` — indirect via trust policies across all roles; reverse scan only.
+- `kinesis` → `eb-rule` — reverse scan of EventBridge rules.
+- `kinesis` → `logs` — indirect via subscription filters / Firehose.
+- `lambda` → `ec2` — no direct EC2 link on a Lambda function.
+- `lambda` → `elb` — only via ALB target group (`tg`), not a direct ELB attribute.
+- `lambda` → `sfn` — no direct SFN attribute on a function.
+- `ng` → `kms` — no direct KMS field on a node group.
+- `opensearch` → `role` — advanced-security master user is a policy pivot, not a role field.
+- `pipeline` → `logs` — execution logs go to CloudTrail events, not a first-class log group.
+- `role` → `kms` — no direct KMS attribute on a role; indirect via attached policies.
+- `secrets` → `pipeline` — no direct CodePipeline linkage.
+- `ses` → `acm` — SES uses DKIM, not ACM, for domain identities.
+- `ses` → `alarm` — alarms are general reverse-scan of CloudWatch alarms with SES dimensions.
+- `ses` → `cfn` — tag-heuristic only.
+- `ses` → `kms` — configuration set / identity encryption is AWS-managed by default.
+- `ses` → `logs` — event destinations go to Firehose/SNS/EventBridge, not CW Logs directly.
+- `ses` → `role` — role usage is embedded in receipt-rule actions / Firehose destinations.
+- `ses` → `trail` — CloudTrail data events link is indirect.
+- `sfn` → `cfn` — tag-heuristic only.
+- `sns` → `cfn` — tag-heuristic only.
+- `sns-sub` → `kms` — subscription-level encryption is topic-level, not subscription-level.
+- `sns-sub` → `policy` — subscription policies are attributes, not standalone policies.
+- `sqs` → `role` — no direct role on a queue; indirect via queue policy.
+- `tgw` → `cfn` — tag-heuristic only.
+- `waf` → `role` — WAF logging role is embedded in Firehose destination.
+
+### Majority `no` / 0 yes (4)
+
+- `ddb` → `sns` — no direct DDB→SNS API; event notifications go via Streams + Lambda or EventBridge Pipes.
+- `lambda` → `r53` — no native linkage; custom domains go via API Gateway / CloudFront.
+- `sns-sub` → `ecs` — SNS subscriptions don't target ECS clusters/services directly.
+- `tg` → `role` — no IAM role attribute on target groups.

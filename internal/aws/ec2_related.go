@@ -13,6 +13,8 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -419,6 +421,40 @@ func ec2Tags(res resource.Resource) map[string]string {
 		tags[*tag.Key] = *tag.Value
 	}
 	return tags
+}
+
+// checkEC2SSM checks whether this EC2 instance is managed by SSM by calling
+// ssm:DescribeInstanceInformation filtered by InstanceIds (Pattern C: 1 API call).
+// If the response contains at least one entry the instance is SSM-managed and
+// the instance ID is returned as the single resource ID.
+func checkEC2SSM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	instanceID, _, _ := ec2Identity(res)
+	if instanceID == "" {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.SSM == nil {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+	}
+	api, ok := c.SSM.(SSMDescribeInstanceInformationAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+	}
+	filterKey := "InstanceIds"
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ssm.DescribeInstanceInformationOutput, error) {
+		return api.DescribeInstanceInformation(ctx, &ssm.DescribeInstanceInformationInput{
+			Filters: []ssmtypes.InstanceInformationStringFilter{
+				{Key: &filterKey, Values: []string{instanceID}},
+			},
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1, Err: err}
+	}
+	if len(out.InstanceInformationList) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+	return relatedResult("ssm", []string{instanceID})
 }
 
 func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID string) bool {
