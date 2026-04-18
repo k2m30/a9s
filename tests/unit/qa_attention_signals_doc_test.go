@@ -141,6 +141,10 @@ func parseAttentionSignalsDoc(path string) ([]attentionSignalRow, error) {
 
 // TestAttentionSignalsDoc enforces the attention-signals.md golden contract
 // against the live resource registry and enricher registry.
+//
+// TODO(no-middle-state): this is intentionally a registration/wiring guard, not
+// a completeness proof. Passing here does not mean the documented signal is
+// populated, surfaced in the UI, or tested under partial-data semantics.
 func TestAttentionSignalsDoc(t *testing.T) {
 	docPath := attentionSignalsDocPath(t)
 	rows, err := parseAttentionSignalsDoc(docPath)

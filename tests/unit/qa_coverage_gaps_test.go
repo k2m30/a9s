@@ -221,9 +221,12 @@ func TestEnricherRegistry_AllExpectedKeys(t *testing.T) {
 func TestEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
 	// Per docs/attention-signals.md, EVERY registered resource type has an
 	// EnricherRegistry entry (real or NoOpEnricher). The doc-grounded test
-	// TestAttentionSignalsDoc enforces the full contract — this test only
+	// TestAttentionSignalsDoc enforces the registration contract — this test only
 	// asserts there are no entries for shortNames that are not registered as
 	// resource types.
+	//
+	// TODO(no-middle-state): avoid calling this the "full contract". Registration
+	// is necessary, but it does not prove that the feature is fully implemented.
 	for key := range awsclient.EnricherRegistry {
 		if resource.FindResourceType(key) == nil {
 			t.Errorf("EnricherRegistry has entry for %q but no such ResourceTypeDef is registered", key)

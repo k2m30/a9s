@@ -33,7 +33,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.ApproximateZero("iam-user")
 	}
 	return relatedResult("iam-user", ids)
 }
@@ -62,7 +62,7 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.ApproximateZero("role")
 	}
 	return relatedResult("role", ids)
 }

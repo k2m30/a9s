@@ -39,7 +39,7 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }
@@ -69,7 +69,7 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.ApproximateZero("ecs-task")
 	}
 	return relatedResult("ecs-task", ids)
 }
@@ -98,7 +98,7 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -132,7 +132,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, v)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.ApproximateZero("vpc")
 	}
 	return relatedResult("vpc", ids)
 }

@@ -30,6 +30,9 @@ linters:
         path: '_test\.go$'
       - linters: [gocritic]
         path: '_test\.go$'
+      - linters: [govet]
+        text: 'unusedwrite'
+        path: '_test\.go$'
 
   settings:
     govet:

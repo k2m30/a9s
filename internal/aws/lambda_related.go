@@ -18,7 +18,7 @@ import (
 func checkLambdaRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
 	if fn.Role == nil || *fn.Role == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -79,7 +79,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -119,7 +119,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -265,7 +265,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -376,7 +376,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.ApproximateZero("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
 }

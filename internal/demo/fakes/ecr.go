@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -34,6 +35,23 @@ func (f *ECRFake) DescribeImages(_ context.Context, input *ecr.DescribeImagesInp
 // Returns an empty response (no scan findings) for all repositories.
 func (f *ECRFake) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
 	return &ecr.DescribeImageScanFindingsOutput{}, nil
+}
+
+// ListImages returns image identifiers for the requested repository from fixture data.
+// Satisfies ECRListImagesAPI for Wave 2 enrichment in demo mode.
+func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ...func(*ecr.Options)) (*ecr.ListImagesOutput, error) {
+	var repoName string
+	if input != nil && input.RepositoryName != nil {
+		repoName = *input.RepositoryName
+	}
+	images := f.fix.Images[repoName]
+	ids := make([]ecrtypes.ImageIdentifier, 0, len(images))
+	for _, img := range images {
+		if img.ImageDigest != nil {
+			ids = append(ids, ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest})
+		}
+	}
+	return &ecr.ListImagesOutput{ImageIds: ids}, nil
 }
 
 // GetRepositoryPolicy is a no-op stub satisfying ECRGetRepositoryPolicyAPI.

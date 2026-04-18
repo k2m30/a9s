@@ -34,6 +34,9 @@ func assertStruct[T any](v any) (T, bool) {
 
 // checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
 func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+	}
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
@@ -66,13 +69,16 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.ApproximateZero("tg")
 	}
 	return relatedResult("tg", ids)
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
 func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -98,13 +104,16 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
 
 // checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
 func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
@@ -130,13 +139,16 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
 	_, _, stackName := ec2Identity(res)
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -160,13 +172,16 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
 
 // checkEC2EIP checks the cache for Elastic IPs associated with this EC2 instance.
 func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
@@ -190,7 +205,7 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.ApproximateZero("eip")
 	}
 	return relatedResult("eip", ids)
 }
@@ -212,6 +227,9 @@ func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // Returns Count=-1 (unknown) when the cache is truncated and no match was found
 // in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.RawStruct == nil {
+		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
+	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
@@ -253,14 +271,15 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }
 
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
-// instance. Returns Count=-1 (unknown) when the cache is truncated and no match
-// was found in the partial list.
+// instance. Returns Count=-1 (unknown) when the cache is truncated — the partial
+// list cannot yield a definitive count. FetchFilter["ResourceName"] is always set
+// so the caller can do a filtered re-fetch.
 func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
@@ -321,7 +340,7 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.ApproximateZero("ebs-snap")
 	}
 	return relatedResult("ebs-snap", ids)
 }

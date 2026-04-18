@@ -15,7 +15,7 @@ import (
 func checkNATVPC(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	if raw.VpcId == nil || *raw.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -32,7 +32,7 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, cache resource
 		}
 	}
 	if entry.IsTruncated {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.ApproximateZero("vpc")
 	}
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
@@ -42,7 +42,7 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, cache resource
 func checkNATSubnet(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -59,7 +59,7 @@ func checkNATSubnet(_ context.Context, _ any, res resource.Resource, cache resou
 		}
 	}
 	if entry.IsTruncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }
@@ -98,7 +98,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }
@@ -108,7 +108,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNATEIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
 	allocIDs := make(map[string]struct{})
 	for _, addr := range raw.NatGatewayAddresses {
@@ -141,7 +141,7 @@ func checkNATEIP(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.ApproximateZero("eip")
 	}
 	return relatedResult("eip", ids)
 }
@@ -151,7 +151,7 @@ func checkNATEIP(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNATENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	eniIDs := make(map[string]struct{})
 	for _, addr := range raw.NatGatewayAddresses {
@@ -177,7 +177,7 @@ func checkNATENI(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -217,7 +217,7 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }

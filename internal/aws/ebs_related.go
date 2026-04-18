@@ -44,7 +44,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.ApproximateZero("ebs-snap")
 	}
 	return relatedResult("ebs-snap", ids)
 }
@@ -99,7 +99,7 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -110,7 +110,7 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	stackName := ""
 	for _, tag := range vol.Tags {
@@ -143,7 +143,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }

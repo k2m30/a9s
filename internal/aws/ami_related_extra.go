@@ -13,15 +13,13 @@ import (
 // checkAMICFN scans AMI tags for aws:cloudformation:stack-name and matches
 // the cfn cache.
 func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	img, ok := assertStruct[ec2types.Image](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
-	}
 	stackName := ""
-	for _, t := range img.Tags {
-		if t.Key != nil && *t.Key == "aws:cloudformation:stack-name" && t.Value != nil {
-			stackName = *t.Value
-			break
+	if img, ok := assertStruct[ec2types.Image](res.RawStruct); ok {
+		for _, t := range img.Tags {
+			if t.Key != nil && *t.Key == "aws:cloudformation:stack-name" && t.Value != nil {
+				stackName = *t.Value
+				break
+			}
 		}
 	}
 	if stackName == "" {
@@ -41,7 +39,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -100,7 +98,7 @@ func checkAMING(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }

@@ -21,9 +21,11 @@ import (
 
 // TestBuildResourceCacheSnapshot_IncludesTruncation verifies that when
 // IsTruncated=true is set in a ResourceCacheEntry passed to a related checker,
-// the checker returns Count=-1 (unknown) when 0 local matches are found,
-// rather than Count=0 (definitely none).
+// the checker returns {Count:0, Approximate:true} (resource.ApproximateZero —
+// the honest lower bound) when 0 local matches are found, rather than a
+// definitive {Count:0, Approximate:false}.
 //
+// See related.go:34-38 (Approximate semantics) and ValidateRelatedResult.
 // This test covers the IsTruncated propagation path from cache → checker.
 func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 	instance := resource.Resource{
@@ -53,8 +55,11 @@ func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, truncatedCache)
 
-	if result.Count != -1 {
-		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Count=-1, got Count=%d", result.Count)
+	if result.Count != 0 {
+		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Count=0, got Count=%d", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("alarm checker with truncated cache (IsTruncated=true) and 0 local matches: want Approximate=true, got false")
 	}
 }
 

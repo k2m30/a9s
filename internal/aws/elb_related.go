@@ -49,7 +49,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.ApproximateZero("tg")
 	}
 	return relatedResult("tg", ids)
 }
@@ -97,7 +97,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -252,7 +252,7 @@ func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 	return relatedResult("cf", ids)
 }
@@ -299,7 +299,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
