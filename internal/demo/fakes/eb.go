@@ -39,3 +39,9 @@ func (f *EBFake) DescribeConfigurationSettings(_ context.Context, _ *elasticbean
 func (f *EBFake) DescribeEnvironmentResources(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentResourcesInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
 	return &elasticbeanstalk.DescribeEnvironmentResourcesOutput{}, nil
 }
+
+// DescribeApplicationVersions is a no-op stub satisfying EBDescribeApplicationVersionsAPI.
+// Demo mode does not model Elastic Beanstalk application versions.
+func (f *EBFake) DescribeApplicationVersions(_ context.Context, _ *elasticbeanstalk.DescribeApplicationVersionsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error) {
+	return &elasticbeanstalk.DescribeApplicationVersionsOutput{}, nil
+}

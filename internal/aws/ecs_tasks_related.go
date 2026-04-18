@@ -21,7 +21,6 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSTaskEC2},
 		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSTaskECR},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkECSTaskENI},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkECSTaskKMS},
 		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSTaskSecrets},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
 		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM},

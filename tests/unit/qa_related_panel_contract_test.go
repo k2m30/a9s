@@ -297,3 +297,86 @@ func TestRelatedPanel_TargetTypesAreRegistered(t *testing.T) {
 		}
 	})
 }
+
+// parseExcludedPairs parses the "## Explicitly excluded" section from
+// docs/related-resources.md and returns a map[parent]map[target]struct{}.
+//
+// Bullet format (within the section):
+//
+//	- `<parent>` → `<target>` — <rationale>
+//
+// The three sub-sections ("Unanimous `no`", "Unanimous `sometimes`", "Majority `no`")
+// are parsed transparently — only the bullet pattern matters.
+func parseExcludedPairs(doc string) map[string]map[string]struct{} {
+	out := make(map[string]map[string]struct{})
+	lines := strings.Split(doc, "\n")
+	inSection := false
+	sectionRE := regexp.MustCompile(`^##\s+Explicitly excluded\s*$`)
+	h2RE := regexp.MustCompile(`^##\s+`)
+	// matches: - `<parent>` → `<target>` —
+	bulletRE := regexp.MustCompile("^-\\s+`([a-z0-9-]+)`\\s+→\\s+`([a-z0-9-]+)`\\s+—")
+	for _, ln := range lines {
+		if !inSection {
+			if sectionRE.MatchString(ln) {
+				inSection = true
+			}
+			continue
+		}
+		// A new H2 (other than ourselves) ends the section.
+		if h2RE.MatchString(ln) && !sectionRE.MatchString(ln) {
+			break
+		}
+		m := bulletRE.FindStringSubmatch(ln)
+		if m == nil {
+			continue
+		}
+		parent, target := m[1], m[2]
+		if out[parent] == nil {
+			out[parent] = make(map[string]struct{})
+		}
+		out[parent][target] = struct{}{}
+	}
+	return out
+}
+
+// TestRelatedPanel_NoExcludedPairsRegistered is the T109 regression guard.
+//
+// It parses the "Explicitly excluded" section of docs/related-resources.md and
+// asserts that none of the 57 listed parent→target pairs appear in any
+// RegisterRelated call. Re-adding an excluded pair without removing it from the
+// doc first will cause this test to fail with a clear message.
+//
+// The total count of excluded pairs is also asserted so that accidental
+// deletions from the doc are caught.
+func TestRelatedPanel_NoExcludedPairsRegistered(t *testing.T) {
+	raw, err := os.ReadFile(goldenDocPath(t))
+	if err != nil {
+		t.Fatalf("reading golden doc: %v", err)
+	}
+	excluded := parseExcludedPairs(string(raw))
+
+	// Count the total excluded entries and verify the doc still has all 58.
+	total := 0
+	for _, targets := range excluded {
+		total += len(targets)
+	}
+	const wantTotal = 58
+	if total != wantTotal {
+		t.Errorf("Explicitly excluded section has %d entries, want %d — was a pair accidentally added or removed from docs/related-resources.md?", total, wantTotal)
+	}
+
+	// For each excluded (parent, target) pair, assert no registration exists.
+	for parent, targets := range excluded {
+		defs := resource.GetRelated(parent)
+		for _, def := range defs {
+			if _, excluded := targets[def.TargetType]; excluded {
+				t.Errorf(
+					"parent %q has registration for %q but that pair is in the Explicitly excluded section — "+
+						"remove the registration or remove the pair from the Explicitly excluded section of "+
+						"docs/related-resources.md (with AWS-API evidence citation per the Policy section)",
+					parent, def.TargetType,
+				)
+			}
+		}
+	}
+}

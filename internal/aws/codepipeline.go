@@ -31,7 +31,6 @@ func init() {
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkPipelineECSSvc, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkPipelineKMS, NeedsTargetCache: false},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkPipelineLambda, NeedsTargetCache: false},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkPipelineLogs, NeedsTargetCache: false},
 		{TargetType: "s3", DisplayName: "S3 Buckets (artifacts)", Checker: checkPipelineS3, NeedsTargetCache: false},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkPipelineSNS, NeedsTargetCache: false},
 	})

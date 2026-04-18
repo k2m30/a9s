@@ -722,16 +722,15 @@ var relatedSmokeTable = []smokeTestCase{
 			},
 			RawStruct: ec2types.TransitGateway{},
 		},
-		expectedLabels: []string{"VPCs", "Route Tables", "CloudFormation"},
+		// tgw→cfn dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+		expectedLabels: []string{"VPCs", "Route Tables"},
 		deliveries: []smokeDelivery{
 			{"rtb", 1, []string{"rtb-0aaa111111111111a"}},
 			{"vpc", 0, nil},
-			{"cfn", 0, nil},
 		},
 		zeroDeliveries: []smokeDelivery{
 			{"rtb", 0, nil},
 			{"vpc", 0, nil},
-			{"cfn", 0, nil},
 		},
 		firstNavTarget: "rtb",
 		s06: func(t *testing.T) {
@@ -741,7 +740,7 @@ var relatedSmokeTable = []smokeTestCase{
 			for i := range defs {
 				defMap[defs[i].TargetType] = &defs[i]
 			}
-			for _, targetType := range []string{"vpc", "cfn", "rtb"} {
+			for _, targetType := range []string{"vpc", "rtb"} {
 				def, found := defMap[targetType]
 				if !found {
 					t.Errorf("TGW-S06: related def for %q not registered", targetType)

@@ -184,8 +184,8 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, _ r
 		}
 		arn := *rp.RecoveryPointArn
 		// Recovery-point ARN: arn:aws:backup:REGION:ACCOUNT:recovery-point:ID
-		if idx := strings.Index(arn, ":recovery-point:"); idx >= 0 {
-			ids = append(ids, arn[idx+len(":recovery-point:"):])
+		if _, after, ok := strings.Cut(arn, ":recovery-point:"); ok {
+			ids = append(ids, after)
 		}
 	}
 	return relatedResult("backup", ids)

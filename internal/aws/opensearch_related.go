@@ -24,7 +24,6 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
 		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkOpenSearchRole},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId

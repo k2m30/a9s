@@ -33,12 +33,9 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEKSRole},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEKSSubnet},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkEKSACM},
 		{TargetType: "ami", DisplayName: "AMI", Checker: checkEKSAMI},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkEKSECR},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkEKSIAMUser},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEKSCTEvents, NeedsTargetCache: true},
 	})
 }
