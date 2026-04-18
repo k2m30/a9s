@@ -32,3 +32,4 @@ detail:
   - Identity
   - CreatedAt
   - Tags
+  - { key: health_issues, label: "Health Issues" }

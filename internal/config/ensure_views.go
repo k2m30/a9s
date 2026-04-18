@@ -34,8 +34,16 @@ func GenerateViewYAML(v ViewDef) []byte {
 			b.WriteString("\n")
 		}
 		b.WriteString("detail:\n")
-		for _, d := range v.Detail {
-			fmt.Fprintf(&b, "  - %s\n", d)
+		for _, df := range v.Detail {
+			if df.Key != "" {
+				if df.Label != "" {
+					fmt.Fprintf(&b, "  - { key: %s, label: %q }\n", df.Key, df.Label)
+				} else {
+					fmt.Fprintf(&b, "  - { key: %s }\n", df.Key)
+				}
+			} else {
+				fmt.Fprintf(&b, "  - %s\n", df.Path)
+			}
 		}
 	}
 

@@ -38,3 +38,4 @@ detail:
   - Tags
   - Health
   - CreatedAt
+  - { key: health_issues, label: "Health Issues" }

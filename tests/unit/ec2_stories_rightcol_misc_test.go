@@ -93,7 +93,7 @@ func ec2StoryDetailWithConfig(t *testing.T, width, height int, withDefs bool) (v
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"InstanceId", "VpcId", "SubnetId"},
+				Detail: []config.DetailField{{Path: "InstanceId"}, {Path: "VpcId"}, {Path: "SubnetId"}},
 			},
 		},
 	}

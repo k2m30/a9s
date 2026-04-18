@@ -31,7 +31,7 @@ func DefaultConfig() *ViewsConfig {
 	for k, v := range defaultViews.Views {
 		cols := make([]ListColumn, len(v.List))
 		copy(cols, v.List)
-		detail := make([]string, len(v.Detail))
+		detail := make([]DetailField, len(v.Detail))
 		copy(detail, v.Detail)
 		cp.Views[k] = ViewDef{List: cols, Detail: detail}
 	}
@@ -48,7 +48,7 @@ func DefaultViewDef(shortName string) ViewDef {
 	// Return a copy so callers cannot mutate the package-level defaults.
 	cols := make([]ListColumn, len(v.List))
 	copy(cols, v.List)
-	detail := make([]string, len(v.Detail))
+	detail := make([]DetailField, len(v.Detail))
 	copy(detail, v.Detail)
 	return ViewDef{List: cols, Detail: detail}
 }

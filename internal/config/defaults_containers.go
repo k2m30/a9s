@@ -11,10 +11,11 @@ func containersDefaultViews() map[string]ViewDef {
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 				{Title: "Platform Version", Path: "PlatformVersion", Width: 18},
 			},
-			Detail: []string{
-				"Name", "Version", "Status", "Endpoint",
-				"PlatformVersion", "Arn", "RoleArn", "KubernetesNetworkConfig",
-				"ResourcesVpcConfig", "Logging", "Identity", "CreatedAt", "Tags",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Version"}, {Path: "Status"}, {Path: "Endpoint"},
+				{Path: "PlatformVersion"}, {Path: "Arn"}, {Path: "RoleArn"}, {Path: "KubernetesNetworkConfig"},
+				{Path: "ResourcesVpcConfig"}, {Path: "Logging"}, {Path: "Identity"}, {Path: "CreatedAt"}, {Path: "Tags"},
+				{Key: "health_issues", Label: "Health Issues"},
 			},
 		},
 		"ng": {
@@ -26,12 +27,13 @@ func containersDefaultViews() map[string]ViewDef {
 				{Title: "Instance Types", Path: "InstanceTypes", Width: 20},
 				{Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
 			},
-			Detail: []string{
-				"NodegroupName", "ClusterName", "Status", "InstanceTypes",
-				"AmiType", "CapacityType", "DiskSize", "ScalingConfig",
-				"NodeRole", "NodegroupArn", "ReleaseVersion", "Version",
-				"Subnets", "LaunchTemplate", "Labels", "Taints",
-				"Tags", "Health", "CreatedAt",
+			Detail: []DetailField{
+				{Path: "NodegroupName"}, {Path: "ClusterName"}, {Path: "Status"}, {Path: "InstanceTypes"},
+				{Path: "AmiType"}, {Path: "CapacityType"}, {Path: "DiskSize"}, {Path: "ScalingConfig"},
+				{Path: "NodeRole"}, {Path: "NodegroupArn"}, {Path: "ReleaseVersion"}, {Path: "Version"},
+				{Path: "Subnets"}, {Path: "LaunchTemplate"}, {Path: "Labels"}, {Path: "Taints"},
+				{Path: "Tags"}, {Path: "Health"}, {Path: "CreatedAt"},
+				{Key: "health_issues", Label: "Health Issues"},
 			},
 		},
 	}

@@ -60,9 +60,13 @@ func makeEC2DetailWithFields(t *testing.T, fieldValues map[string]string, detail
 		Name:   "web-prod-01",
 		Fields: fieldValues,
 	}
+	detailFields := make([]config.DetailField, len(detailPaths))
+	for i, p := range detailPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
-			"ec2": {Detail: detailPaths},
+			"ec2": {Detail: detailFields},
 		},
 	}
 	k := keys.Default()
@@ -81,9 +85,13 @@ func makeEC2DetailWithRaw(t *testing.T, inst ec2types.Instance, fieldValues map[
 		Fields:    fieldValues,
 		RawStruct: inst,
 	}
+	detailFields := make([]config.DetailField, len(detailPaths))
+	for i, p := range detailPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
-			"ec2": {Detail: detailPaths},
+			"ec2": {Detail: detailFields},
 		},
 	}
 	k := keys.Default()

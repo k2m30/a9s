@@ -10,11 +10,11 @@ func secretsDefaultViews() map[string]ViewDef {
 				{Title: "Last Changed", Path: "LastChangedDate", Width: 18},
 				{Title: "Rotation", Path: "RotationEnabled", Width: 10},
 			},
-			Detail: []string{
-				"Name", "Description", "LastAccessedDate", "LastChangedDate",
-				"RotationEnabled", "ARN", "KmsKeyId",
-				"CreatedDate", "LastRotatedDate", "RotationLambdaARN",
-				"RotationRules", "PrimaryRegion", "Tags",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Description"}, {Path: "LastAccessedDate"}, {Path: "LastChangedDate"},
+				{Path: "RotationEnabled"}, {Path: "ARN"}, {Path: "KmsKeyId"},
+				{Path: "CreatedDate"}, {Path: "LastRotatedDate"}, {Path: "RotationLambdaARN"},
+				{Path: "RotationRules"}, {Path: "PrimaryRegion"}, {Path: "Tags"},
 			},
 		},
 		"ssm": {
@@ -25,10 +25,10 @@ func secretsDefaultViews() map[string]ViewDef {
 				{Title: "Last Modified", Path: "LastModifiedDate", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
-			Detail: []string{
-				"Name", "Type", "Version", "LastModifiedDate",
-				"LastModifiedUser", "Description", "KeyId",
-				"Tier", "DataType", "AllowedPattern",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Type"}, {Path: "Version"}, {Path: "LastModifiedDate"},
+				{Path: "LastModifiedUser"}, {Path: "Description"}, {Path: "KeyId"},
+				{Path: "Tier"}, {Path: "DataType"}, {Path: "AllowedPattern"},
 			},
 		},
 		"kms": {
@@ -38,11 +38,11 @@ func secretsDefaultViews() map[string]ViewDef {
 				{Title: "Status", Path: "KeyState", Width: 12},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
-			Detail: []string{
-				"KeyId", "Arn", "Description", "KeyState",
-				"KeyUsage", "KeySpec", "KeyManager", "Enabled",
-				"CreationDate", "Origin", "MultiRegion",
-				"EncryptionAlgorithms", "SigningAlgorithms",
+			Detail: []DetailField{
+				{Path: "KeyId"}, {Path: "Arn"}, {Path: "Description"}, {Path: "KeyState"},
+				{Path: "KeyUsage"}, {Path: "KeySpec"}, {Path: "KeyManager"}, {Path: "Enabled"},
+				{Path: "CreationDate"}, {Path: "Origin"}, {Path: "MultiRegion"},
+				{Path: "EncryptionAlgorithms"}, {Path: "SigningAlgorithms"},
 			},
 		},
 	}

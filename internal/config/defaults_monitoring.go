@@ -10,14 +10,14 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Namespace", Path: "Namespace", Width: 24},
 				{Title: "Threshold", Path: "Threshold", Width: 12},
 			},
-			Detail: []string{
-				"AlarmName", "AlarmArn", "StateValue", "StateReason",
-				"StateUpdatedTimestamp", "StateTransitionedTimestamp",
-				"MetricName", "Namespace", "Statistic", "Period",
-				"EvaluationPeriods", "DatapointsToAlarm", "Threshold",
-				"ComparisonOperator", "TreatMissingData", "Dimensions",
-				"AlarmDescription", "AlarmActions", "OKActions",
-				"InsufficientDataActions", "ActionsEnabled",
+			Detail: []DetailField{
+				{Path: "AlarmName"}, {Path: "AlarmArn"}, {Path: "StateValue"}, {Path: "StateReason"},
+				{Path: "StateUpdatedTimestamp"}, {Path: "StateTransitionedTimestamp"},
+				{Path: "MetricName"}, {Path: "Namespace"}, {Path: "Statistic"}, {Path: "Period"},
+				{Path: "EvaluationPeriods"}, {Path: "DatapointsToAlarm"}, {Path: "Threshold"},
+				{Path: "ComparisonOperator"}, {Path: "TreatMissingData"}, {Path: "Dimensions"},
+				{Path: "AlarmDescription"}, {Path: "AlarmActions"}, {Path: "OKActions"},
+				{Path: "InsufficientDataActions"}, {Path: "ActionsEnabled"},
 			},
 		},
 		"logs": {
@@ -28,11 +28,11 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 				{Title: "Created", Path: "", Key: "creation_time", Width: 16},
 			},
-			Detail: []string{
-				"LogGroupName", "LogGroupArn", "LogGroupClass",
-				"StoredBytes", "RetentionInDays", "MetricFilterCount",
-				"DeletionProtectionEnabled", "CreationTime",
-				"KmsKeyId", "DataProtectionStatus",
+			Detail: []DetailField{
+				{Path: "LogGroupName"}, {Path: "LogGroupArn"}, {Path: "LogGroupClass"},
+				{Path: "StoredBytes"}, {Path: "RetentionInDays"}, {Path: "MetricFilterCount"},
+				{Path: "DeletionProtectionEnabled"}, {Path: "CreationTime"},
+				{Path: "KmsKeyId"}, {Path: "DataProtectionStatus"},
 			},
 		},
 		"trail": {
@@ -44,11 +44,13 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Home Region", Path: "HomeRegion", Width: 16},
 				{Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},
 			},
-			Detail: []string{
-				"Name", "TrailARN", "S3BucketName", "HomeRegion",
-				"IsMultiRegionTrail", "IsOrganizationTrail",
-				"LogFileValidationEnabled", "IncludeGlobalServiceEvents",
-				"KmsKeyId", "CloudWatchLogsLogGroupArn",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "TrailARN"}, {Path: "S3BucketName"}, {Path: "HomeRegion"},
+				{Path: "IsMultiRegionTrail"}, {Path: "IsOrganizationTrail"},
+				{Path: "LogFileValidationEnabled"}, {Path: "IncludeGlobalServiceEvents"},
+				{Path: "KmsKeyId"}, {Path: "CloudWatchLogsLogGroupArn"},
+				{Key: "is_logging", Label: "Logging"},
+				{Key: "latest_delivery_error", Label: "Latest Delivery Error"},
 			},
 		},
 		// Child views for monitoring resources
@@ -58,9 +60,9 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Type", Key: "history_item_type", Width: 18},
 				{Title: "Summary", Key: "history_summary", Width: 60},
 			},
-			Detail: []string{
-				"Timestamp", "HistoryItemType", "HistorySummary",
-				"HistoryData", "AlarmName", "AlarmType",
+			Detail: []DetailField{
+				{Path: "Timestamp"}, {Path: "HistoryItemType"}, {Path: "HistorySummary"},
+				{Path: "HistoryData"}, {Path: "AlarmName"}, {Path: "AlarmType"},
 			},
 		},
 		"log_streams": {
@@ -69,10 +71,10 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Last Event", Path: "", Key: "last_event", Width: 22},
 				{Title: "First Event", Path: "", Key: "first_event", Width: 22},
 			},
-			Detail: []string{
-				"LogStreamName", "Arn", "CreationTime",
-				"FirstEventTimestamp", "LastEventTimestamp",
-				"LastIngestionTime", "UploadSequenceToken",
+			Detail: []DetailField{
+				{Path: "LogStreamName"}, {Path: "Arn"}, {Path: "CreationTime"},
+				{Path: "FirstEventTimestamp"}, {Path: "LastEventTimestamp"},
+				{Path: "LastIngestionTime"}, {Path: "UploadSequenceToken"},
 			},
 		},
 		"log_events": {
@@ -80,8 +82,8 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "Timestamp", Path: "", Key: "timestamp", Width: 22},
 				{Title: "Message", Path: "", Key: "message", Width: 120},
 			},
-			Detail: []string{
-				"Timestamp", "Message", "IngestionTime", "EventId",
+			Detail: []DetailField{
+				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"}, {Path: "EventId"},
 			},
 		},
 		"ct-events": {
@@ -94,10 +96,10 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Title: "TARGET", Key: "_ct.target", Width: 36},
 				{Title: "OUTCOME", Key: "_ct.outcome", Width: 14},
 			},
-			Detail: []string{
-				"EventId", "EventName", "EventTime", "EventSource",
-				"Username", "ReadOnly", "AccessKeyId",
-				"Resources", "CloudTrailEvent",
+			Detail: []DetailField{
+				{Path: "EventId"}, {Path: "EventName"}, {Path: "EventTime"}, {Path: "EventSource"},
+				{Path: "Username"}, {Path: "ReadOnly"}, {Path: "AccessKeyId"},
+				{Path: "Resources"}, {Path: "CloudTrailEvent"},
 			},
 		},
 	}

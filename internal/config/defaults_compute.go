@@ -13,13 +13,13 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Instance ID", Path: "InstanceId", Width: 20},
 				{Title: "Launch Time", Path: "LaunchTime", Width: 22},
 			},
-			Detail: []string{
-				"InstanceId", "State", "InstanceType", "InstanceLifecycle", "ImageId",
-				"KeyName", "Placement",
-				"VpcId", "SubnetId", "PrivateIpAddress", "PrivateDnsName",
-				"PublicIpAddress", "IamInstanceProfile",
-				"SecurityGroups", "BlockDeviceMappings", "EbsOptimized", "MetadataOptions",
-				"LaunchTime", "Architecture", "Platform", "Tags",
+			Detail: []DetailField{
+				{Path: "InstanceId"}, {Path: "State"}, {Path: "InstanceType"}, {Path: "InstanceLifecycle"}, {Path: "ImageId"},
+				{Path: "KeyName"}, {Path: "Placement"},
+				{Path: "VpcId"}, {Path: "SubnetId"}, {Path: "PrivateIpAddress"}, {Path: "PrivateDnsName"},
+				{Path: "PublicIpAddress"}, {Path: "IamInstanceProfile"},
+				{Path: "SecurityGroups"}, {Path: "BlockDeviceMappings"}, {Path: "EbsOptimized"}, {Path: "MetadataOptions"},
+				{Path: "LaunchTime"}, {Path: "Architecture"}, {Path: "Platform"}, {Path: "Tags"},
 			},
 		},
 		"ecs": {
@@ -30,12 +30,12 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Pending", Path: "PendingTasksCount", Width: 9},
 				{Title: "Services", Path: "ActiveServicesCount", Width: 10},
 			},
-			Detail: []string{
-				"ClusterName", "ClusterArn", "Status",
-				"RunningTasksCount", "PendingTasksCount",
-				"ActiveServicesCount", "RegisteredContainerInstancesCount",
-				"CapacityProviders", "DefaultCapacityProviderStrategy",
-				"Settings", "Tags",
+			Detail: []DetailField{
+				{Path: "ClusterName"}, {Path: "ClusterArn"}, {Path: "Status"},
+				{Path: "RunningTasksCount"}, {Path: "PendingTasksCount"},
+				{Path: "ActiveServicesCount"}, {Path: "RegisteredContainerInstancesCount"},
+				{Path: "CapacityProviders"}, {Path: "DefaultCapacityProviderStrategy"},
+				{Path: "Settings"}, {Path: "Tags"},
 			},
 		},
 		"ecs-svc": {
@@ -47,13 +47,13 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Running", Path: "RunningCount", Width: 9},
 				{Title: "Launch Type", Path: "LaunchType", Width: 12},
 			},
-			Detail: []string{
-				"ServiceName", "ServiceArn", "ClusterArn", "Status",
-				"DesiredCount", "RunningCount", "PendingCount", "LaunchType",
-				"TaskDefinition", "DeploymentConfiguration", "Deployments",
-				"NetworkConfiguration", "LoadBalancers", "Events",
-				"PlatformVersion", "SchedulingStrategy", "EnableExecuteCommand",
-				"RoleArn", "CreatedAt", "Tags",
+			Detail: []DetailField{
+				{Path: "ServiceName"}, {Path: "ServiceArn"}, {Path: "ClusterArn"}, {Path: "Status"},
+				{Path: "DesiredCount"}, {Path: "RunningCount"}, {Path: "PendingCount"}, {Path: "LaunchType"},
+				{Path: "TaskDefinition"}, {Path: "DeploymentConfiguration"}, {Path: "Deployments"},
+				{Path: "NetworkConfiguration"}, {Path: "LoadBalancers"}, {Path: "Events"},
+				{Path: "PlatformVersion"}, {Path: "SchedulingStrategy"}, {Path: "EnableExecuteCommand"},
+				{Path: "RoleArn"}, {Path: "CreatedAt"}, {Path: "Tags"},
 			},
 		},
 		"ecs-task": {
@@ -66,14 +66,14 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "CPU", Path: "Cpu", Width: 6},
 				{Title: "Memory", Path: "Memory", Width: 8},
 			},
-			Detail: []string{
-				"TaskArn", "ClusterArn", "LastStatus", "DesiredStatus",
-				"TaskDefinitionArn", "LaunchType", "Cpu", "Memory",
-				"Group", "StartedBy", "StartedAt", "StoppedAt",
-				"StoppedReason", "StopCode", "HealthStatus",
-				"Connectivity", "PlatformVersion", "PlatformFamily",
-				"AvailabilityZone", "Containers", "Attachments",
-				"EnableExecuteCommand", "Tags",
+			Detail: []DetailField{
+				{Path: "TaskArn"}, {Path: "ClusterArn"}, {Path: "LastStatus"}, {Path: "DesiredStatus"},
+				{Path: "TaskDefinitionArn"}, {Path: "LaunchType"}, {Path: "Cpu"}, {Path: "Memory"},
+				{Path: "Group"}, {Path: "StartedBy"}, {Path: "StartedAt"}, {Path: "StoppedAt"},
+				{Path: "StoppedReason"}, {Path: "StopCode"}, {Path: "HealthStatus"},
+				{Path: "Connectivity"}, {Path: "PlatformVersion"}, {Path: "PlatformFamily"},
+				{Path: "AvailabilityZone"}, {Path: "Containers"}, {Path: "Attachments"},
+				{Path: "EnableExecuteCommand"}, {Path: "Tags"},
 			},
 		},
 		"lambda": {
@@ -85,13 +85,13 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "State", Path: "State", Width: 10},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
-			Detail: []string{
-				"FunctionName", "FunctionArn", "Runtime", "Handler",
-				"MemorySize", "Timeout", "EphemeralStorage", "CodeSize",
-				"Description", "Role", "PackageType", "Architectures",
-				"State", "LastUpdateStatus", "LastUpdateStatusReason",
-				"Environment", "VpcConfig", "DeadLetterConfig",
-				"TracingConfig", "Layers", "LoggingConfig", "LastModified",
+			Detail: []DetailField{
+				{Path: "FunctionName"}, {Path: "FunctionArn"}, {Path: "Runtime"}, {Path: "Handler"},
+				{Path: "MemorySize"}, {Path: "Timeout"}, {Path: "EphemeralStorage"}, {Path: "CodeSize"},
+				{Path: "Description"}, {Path: "Role"}, {Path: "PackageType"}, {Path: "Architectures"},
+				{Path: "State"}, {Path: "LastUpdateStatus"}, {Path: "LastUpdateStatusReason"},
+				{Path: "Environment"}, {Path: "VpcConfig"}, {Path: "DeadLetterConfig"},
+				{Path: "TracingConfig"}, {Path: "Layers"}, {Path: "LoggingConfig"}, {Path: "LastModified"},
 			},
 		},
 		"asg": {
@@ -103,14 +103,14 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Instances", Path: "Instances", Width: 10},
 				{Title: "Status", Path: "Status", Width: 12},
 			},
-			Detail: []string{
-				"AutoScalingGroupName", "AutoScalingGroupARN",
-				"MinSize", "MaxSize", "DesiredCapacity",
-				"AvailabilityZones", "LaunchConfigurationName",
-				"HealthCheckType", "HealthCheckGracePeriod",
-				"TargetGroupARNs", "LoadBalancerNames",
-				"SuspendedProcesses", "TerminationPolicies",
-				"VPCZoneIdentifier", "CreatedTime", "Tags",
+			Detail: []DetailField{
+				{Path: "AutoScalingGroupName"}, {Path: "AutoScalingGroupARN"},
+				{Path: "MinSize"}, {Path: "MaxSize"}, {Path: "DesiredCapacity"},
+				{Path: "AvailabilityZones"}, {Path: "LaunchConfigurationName"},
+				{Path: "HealthCheckType"}, {Path: "HealthCheckGracePeriod"},
+				{Path: "TargetGroupARNs"}, {Path: "LoadBalancerNames"},
+				{Path: "SuspendedProcesses"}, {Path: "TerminationPolicies"},
+				{Path: "VPCZoneIdentifier"}, {Path: "CreatedTime"}, {Path: "Tags"},
 			},
 		},
 		"eb": {
@@ -121,12 +121,12 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Health", Path: "Health", Width: 10},
 				{Title: "Version", Path: "VersionLabel", Width: 16},
 			},
-			Detail: []string{
-				"EnvironmentName", "EnvironmentId", "ApplicationName",
-				"Status", "Health", "HealthStatus",
-				"VersionLabel", "SolutionStackName", "PlatformArn",
-				"EndpointURL", "CNAME", "DateCreated", "DateUpdated",
-				"EnvironmentArn",
+			Detail: []DetailField{
+				{Path: "EnvironmentName"}, {Path: "EnvironmentId"}, {Path: "ApplicationName"},
+				{Path: "Status"}, {Path: "Health"}, {Path: "HealthStatus"},
+				{Path: "VersionLabel"}, {Path: "SolutionStackName"}, {Path: "PlatformArn"},
+				{Path: "EndpointURL"}, {Path: "CNAME"}, {Path: "DateCreated"}, {Path: "DateUpdated"},
+				{Path: "EnvironmentArn"},
 			},
 		},
 		"asg_activities": {
@@ -136,10 +136,10 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Description", Key: "description", Width: 50},
 				{Title: "Cause", Key: "cause", Width: 40},
 			},
-			Detail: []string{
-				"ActivityId", "StartTime", "EndTime", "StatusCode", "StatusMessage",
-				"Description", "Cause", "Details", "Progress",
-				"AutoScalingGroupName", "AutoScalingGroupARN", "AutoScalingGroupState",
+			Detail: []DetailField{
+				{Path: "ActivityId"}, {Path: "StartTime"}, {Path: "EndTime"}, {Path: "StatusCode"}, {Path: "StatusMessage"},
+				{Path: "Description"}, {Path: "Cause"}, {Path: "Details"}, {Path: "Progress"},
+				{Path: "AutoScalingGroupName"}, {Path: "AutoScalingGroupARN"}, {Path: "AutoScalingGroupState"},
 			},
 		},
 		// Child views for compute resources
@@ -152,12 +152,12 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Started At", Key: "started_at", Width: 22},
 				{Title: "Stopped Reason", Key: "stopped_reason", Width: 40},
 			},
-			Detail: []string{
-				"TaskArn", "ClusterArn", "LastStatus", "DesiredStatus",
-				"HealthStatus", "TaskDefinitionArn", "StartedAt", "StoppedAt",
-				"StoppedReason", "StopCode", "LaunchType", "PlatformVersion",
-				"Cpu", "Memory", "Group", "StartedBy",
-				"Containers", "Attachments", "Tags",
+			Detail: []DetailField{
+				{Path: "TaskArn"}, {Path: "ClusterArn"}, {Path: "LastStatus"}, {Path: "DesiredStatus"},
+				{Path: "HealthStatus"}, {Path: "TaskDefinitionArn"}, {Path: "StartedAt"}, {Path: "StoppedAt"},
+				{Path: "StoppedReason"}, {Path: "StopCode"}, {Path: "LaunchType"}, {Path: "PlatformVersion"},
+				{Path: "Cpu"}, {Path: "Memory"}, {Path: "Group"}, {Path: "StartedBy"},
+				{Path: "Containers"}, {Path: "Attachments"}, {Path: "Tags"},
 			},
 		},
 		"ecs_svc_events": {
@@ -165,8 +165,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Timestamp", Key: "timestamp", Width: 22},
 				{Title: "Message", Key: "message", Width: 120},
 			},
-			Detail: []string{
-				"Id", "CreatedAt", "Message",
+			Detail: []DetailField{
+				{Path: "Id"}, {Path: "CreatedAt"}, {Path: "Message"},
 			},
 		},
 		"ecs_svc_logs": {
@@ -175,8 +175,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Stream", Key: "stream_short", Width: 20},
 				{Title: "Message", Key: "message", Width: 120},
 			},
-			Detail: []string{
-				"Timestamp", "Message", "IngestionTime", "EventId", "LogStreamName",
+			Detail: []DetailField{
+				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"}, {Path: "EventId"}, {Path: "LogStreamName"},
 			},
 		},
 		"lambda_invocations": {
@@ -188,11 +188,11 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Memory", Key: "memory_used", SortKey: "memory_used_mb_raw", Width: 16},
 				{Title: "Cold Start", Key: "cold_start", Width: 12},
 			},
-			Detail: []string{
-				"request_id", "timestamp", "status",
-				"duration_ms", "billed_duration_ms",
-				"memory_size_mb", "memory_used_mb",
-				"init_duration_ms", "xray_trace_id",
+			Detail: []DetailField{
+				{Path: "request_id"}, {Path: "timestamp"}, {Path: "status"},
+				{Path: "duration_ms"}, {Path: "billed_duration_ms"},
+				{Path: "memory_size_mb"}, {Path: "memory_used_mb"},
+				{Path: "init_duration_ms"}, {Path: "xray_trace_id"},
 			},
 		},
 		"lambda_invocation_logs": {
@@ -200,8 +200,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Timestamp", Key: "timestamp", Width: 22},
 				{Title: "Message", Key: "message", Width: 120},
 			},
-			Detail: []string{
-				"timestamp", "message",
+			Detail: []DetailField{
+				{Path: "timestamp"}, {Path: "message"},
 			},
 		},
 		"ebs": {
@@ -217,11 +217,11 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "AZ", Path: "AvailabilityZone", Width: 16},
 				{Title: "Created", Path: "CreateTime", Width: 18},
 			},
-			Detail: []string{
-				"VolumeId", "State", "Size", "VolumeType", "Iops", "Throughput",
-				"Encrypted", "KmsKeyId", "MultiAttachEnabled",
-				"AvailabilityZone", "CreateTime",
-				"Attachments", "Tags",
+			Detail: []DetailField{
+				{Path: "VolumeId"}, {Path: "State"}, {Path: "Size"}, {Path: "VolumeType"}, {Path: "Iops"}, {Path: "Throughput"},
+				{Path: "Encrypted"}, {Path: "KmsKeyId"}, {Path: "MultiAttachEnabled"},
+				{Path: "AvailabilityZone"}, {Path: "CreateTime"},
+				{Path: "Attachments"}, {Path: "Tags"},
 			},
 		},
 		"ebs-snap": {
@@ -236,10 +236,10 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Started", Path: "StartTime", Width: 18},
 				{Title: "Progress", Path: "Progress", Width: 10},
 			},
-			Detail: []string{
-				"SnapshotId", "State", "VolumeId", "VolumeSize",
-				"Description", "Encrypted", "KmsKeyId",
-				"OwnerId", "Progress", "StartTime", "Tags",
+			Detail: []DetailField{
+				{Path: "SnapshotId"}, {Path: "State"}, {Path: "VolumeId"}, {Path: "VolumeSize"},
+				{Path: "Description"}, {Path: "Encrypted"}, {Path: "KmsKeyId"},
+				{Path: "OwnerId"}, {Path: "Progress"}, {Path: "StartTime"}, {Path: "Tags"},
 			},
 		},
 		"ami": {
@@ -253,14 +253,14 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "CreationDate", Width: 22},
 				{Title: "Public", Path: "Public", Width: 8},
 			},
-			Detail: []string{
-				"ImageId", "Name", "State", "Description",
-				"Architecture", "PlatformDetails", "UsageOperation",
-				"Hypervisor", "ImageOwnerAlias", "RootDeviceName", "RootDeviceType",
-				"SriovNetSupport", "VirtualizationType", "EnaSupport", "BootMode",
-				"CreationDate", "DeprecationTime", "Public",
-				"OwnerId", "ImageLocation",
-				"BlockDeviceMappings", "Tags",
+			Detail: []DetailField{
+				{Path: "ImageId"}, {Path: "Name"}, {Path: "State"}, {Path: "Description"},
+				{Path: "Architecture"}, {Path: "PlatformDetails"}, {Path: "UsageOperation"},
+				{Path: "Hypervisor"}, {Path: "ImageOwnerAlias"}, {Path: "RootDeviceName"}, {Path: "RootDeviceType"},
+				{Path: "SriovNetSupport"}, {Path: "VirtualizationType"}, {Path: "EnaSupport"}, {Path: "BootMode"},
+				{Path: "CreationDate"}, {Path: "DeprecationTime"}, {Path: "Public"},
+				{Path: "OwnerId"}, {Path: "ImageLocation"},
+				{Path: "BlockDeviceMappings"}, {Path: "Tags"},
 			},
 		},
 	}
