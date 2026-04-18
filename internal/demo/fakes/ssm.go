@@ -40,3 +40,9 @@ func (f *SSMFake) GetParameter(_ context.Context, input *ssm.GetParameterInput, 
 		},
 	}, nil
 }
+
+// DescribeInstanceInformation is a no-op stub satisfying SSMDescribeInstanceInformationAPI.
+// Demo mode does not model SSM managed instances.
+func (f *SSMFake) DescribeInstanceInformation(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
+	return &ssm.DescribeInstanceInformationOutput{}, nil
+}

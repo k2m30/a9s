@@ -21,13 +21,10 @@ func init() {
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: true},
 		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB, NeedsTargetCache: true},
 		{TargetType: "codeartifact", DisplayName: "CodeArtifact Domains", Checker: checkSecretsCodeArtifact},
-		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkSecretsECR},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask},
+		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB, NeedsTargetCache: true},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask, NeedsTargetCache: true},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs},
-		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkSecretsPipeline},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkSecretsRole},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkSecretsS3},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSecretsSNS},
 	})
 

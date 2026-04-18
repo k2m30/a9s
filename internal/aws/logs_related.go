@@ -114,10 +114,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
 	}
 	rest := strings.TrimPrefix(logGroupName, prefix)
-	apiID := rest
-	if idx := strings.Index(rest, "/"); idx >= 0 {
-		apiID = rest[:idx]
-	}
+	apiID, _, _ := strings.Cut(rest, "/")
 	if apiID == "" {
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
 	}
@@ -222,11 +219,8 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _
 		}
 		arn := *f.DestinationArn
 		// Kinesis stream ARN: arn:aws:kinesis:REGION:ACCOUNT:stream/NAME
-		if idx := strings.Index(arn, ":stream/"); idx >= 0 {
-			name := arn[idx+len(":stream/"):]
-			if name != "" {
-				ids = append(ids, name)
-			}
+		if _, name, ok := strings.Cut(arn, ":stream/"); ok && name != "" {
+			ids = append(ids, name)
 		}
 	}
 	return relatedResult("kinesis", ids)
@@ -252,10 +246,9 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		arn := *f.DestinationArn
 		// S3 bucket ARN: arn:aws:s3:::bucket-name
-		if strings.HasPrefix(arn, "arn:aws:s3:::") {
-			name := strings.TrimPrefix(arn, "arn:aws:s3:::")
-			if idx := strings.Index(name, "/"); idx >= 0 {
-				name = name[:idx]
+		if name, ok := strings.CutPrefix(arn, "arn:aws:s3:::"); ok {
+			if before, _, hasSep := strings.Cut(name, "/"); hasSep {
+				name = before
 			}
 			if name != "" {
 				ids = append(ids, name)

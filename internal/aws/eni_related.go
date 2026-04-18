@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -316,11 +317,8 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		if !vOk {
 			continue
 		}
-		for _, niID := range vpceRaw.NetworkInterfaceIds {
-			if niID == eniID {
-				ids = append(ids, vpceRes.ID)
-				break
-			}
+		if slices.Contains(vpceRaw.NetworkInterfaceIds, eniID) {
+			ids = append(ids, vpceRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {

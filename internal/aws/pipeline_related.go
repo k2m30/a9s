@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -202,7 +203,6 @@ func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _
 	}
 	addKey(p.ArtifactStore)
 	for _, st := range p.ArtifactStores {
-		st := st
 		addKey(&st)
 	}
 	return relatedResult("kms", mapKeys(seen))
@@ -244,7 +244,6 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	addBucket(p.ArtifactStore)
 	for _, st := range p.ArtifactStores {
-		st := st
 		addBucket(&st)
 	}
 	// Also include S3 deploy action buckets.
@@ -292,4 +291,29 @@ func mapKeys(m map[string]struct{}) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// checkPipelineEbRule resolves EventBridge rules that target this CodePipeline pipeline.
+// Pattern C: one events:ListRuleNamesByTarget call using the pipeline ARN from
+// res.Fields["arn"]. Count = len(RuleNames).
+func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	pipelineARN := res.Fields["arn"]
+	if pipelineARN == "" {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
+		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &pipelineARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+	}
+	return relatedResult("eb-rule", out.RuleNames)
 }
