@@ -284,6 +284,56 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		},
 	}
 
+	// Issue: State=Pending → Warning (deployment in progress)
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String("lambda-pending-deploy"),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:lambda-pending-deploy"),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimeNodejs20x,
+		MemorySize:       aws.Int32(256),
+		Timeout:          aws.Int32(30),
+		Handler:          aws.String("index.handler"),
+		Description:      aws.String("New function deployment in progress — not yet active"),
+		LastModified:     aws.String("2026-04-18T08:00:00+00:00"),
+		CodeSize:         1048576,
+		State:            lambdatypes.StatePending,
+		StateReason:      aws.String("The function is being created"),
+		StateReasonCode:  lambdatypes.StateReasonCodeCreating,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/lambda-pending-deploy"),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusInProgress,
+	})
+
+	// Issue: State=Inactive → Dim (function has not been invoked in a long time)
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String("lambda-inactive-runtime"),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:lambda-inactive-runtime"),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(128),
+		Timeout:          aws.Int32(15),
+		Handler:          aws.String("handler.lambda_handler"),
+		Description:      aws.String("Idle function — placed in Inactive state by Lambda after extended non-use"),
+		LastModified:     aws.String("2025-10-01T10:00:00+00:00"),
+		CodeSize:         524288,
+		State:            lambdatypes.StateInactive,
+		StateReason:      aws.String("The function has not been used for an extended period"),
+		StateReasonCode:  lambdatypes.StateReasonCodeIdle,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/lambda-inactive-runtime"),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// Add one container-image function to demonstrate ECR→Lambda relationship.
 	// checkECRLambda matches any lambda with PackageType=Image as potentially using an ECR repo.
 	fns = append(fns, lambdatypes.FunctionConfiguration{

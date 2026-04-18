@@ -73,9 +73,41 @@ func NewCodeBuildFixtures() *CodeBuildFixtures {
 			LastModified: aws.Time(mustParseCBTime("2026-03-10T08:00:00+00:00")),
 			Created:      aws.Time(mustParseCBTime("2025-04-20T14:30:00+00:00")),
 		},
+		// Issue: latest build status=FAILED → Broken (build pipeline broken)
+		{
+			Name:        aws.String("acme-integration-tests"),
+			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-integration-tests"),
+			Description: aws.String("Integration test suite runner"),
+			ServiceRole: aws.String(prodCBRoleARN),
+			Source: &cbtypes.ProjectSource{
+				Type: cbtypes.SourceTypeGithub,
+			},
+			LastModified: aws.Time(mustParseCBTime("2026-04-17T22:10:00+00:00")),
+			Created:      aws.Time(mustParseCBTime("2025-08-05T10:00:00+00:00")),
+		},
 	}
 
 	buildsByProject := map[string][]cbtypes.Build{
+		// Issue: latest build status=FAILED → Broken
+		"acme-integration-tests": {
+			{
+				Id:                    aws.String("acme-integration-tests:build-38"),
+				Arn:                   aws.String("arn:aws:codebuild:us-east-1:123456789012:build/acme-integration-tests:build-38"),
+				BuildNumber:           aws.Int64(38),
+				BuildStatus:           cbtypes.StatusTypeFailed,
+				StartTime:             aws.Time(mustParseCBTime("2026-04-17T22:05:00+00:00")),
+				EndTime:               aws.Time(mustParseCBTime("2026-04-17T22:09:47+00:00")),
+				CurrentPhase:          aws.String("COMPLETED"),
+				SourceVersion:         aws.String("b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"),
+				ResolvedSourceVersion: aws.String("b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"),
+				Initiator:             aws.String("codepipeline/acme-api-deploy"),
+				ProjectName:           aws.String("acme-integration-tests"),
+				Logs: &cbtypes.LogsLocation{
+					GroupName:  aws.String("/aws/codebuild/acme-integration-tests"),
+					StreamName: aws.String("build-38/acme-integration-tests"),
+				},
+			},
+		},
 		"acme-api-build": {
 			{
 				Id:                    aws.String("acme-api-build:build-142"),

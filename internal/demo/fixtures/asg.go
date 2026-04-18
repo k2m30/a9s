@@ -112,6 +112,47 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("general-pool")},
 			},
 		},
+		// Issue: MinSize=5, Instances count < MinSize → Broken (underprovisioned)
+		{
+			AutoScalingGroupName:   aws.String("asg-underprovisioned"),
+			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:66666666-6666-6666-6666-666666666666:autoScalingGroupName/asg-underprovisioned"),
+			MinSize:                aws.Int32(5),
+			MaxSize:                aws.Int32(10),
+			DesiredCapacity:        aws.Int32(5),
+			HealthCheckType:        aws.String("EC2"),
+			HealthCheckGracePeriod: aws.Int32(300),
+			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
+			CreatedTime:            aws.Time(mustTime("2025-06-01T10:00:00Z")),
+			// Only 2 instances running while MinSize=5
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0aaa111111111111a"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0bbb222222222222b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
+			Tags: []asgtypes.TagDescription{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Service"), Value: aws.String("api-worker")},
+			},
+		},
+		// Issue: SuspendedProcesses includes Launch + HealthCheck → Warning (scaling disabled)
+		{
+			AutoScalingGroupName:   aws.String("asg-suspended"),
+			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:77777777-7777-7777-7777-777777777777:autoScalingGroupName/asg-suspended"),
+			MinSize:                aws.Int32(1),
+			MaxSize:                aws.Int32(5),
+			DesiredCapacity:        aws.Int32(2),
+			HealthCheckType:        aws.String("ELB"),
+			HealthCheckGracePeriod: aws.Int32(120),
+			VPCZoneIdentifier:      aws.String(asgSubnetA),
+			CreatedTime:            aws.Time(mustTime("2025-04-20T08:00:00Z")),
+			SuspendedProcesses: []asgtypes.SuspendedProcess{
+				{ProcessName: aws.String("Launch"), SuspensionReason: aws.String("User suspended the process")},
+				{ProcessName: aws.String("HealthCheck"), SuspensionReason: aws.String("User suspended the process")},
+			},
+			Tags: []asgtypes.TagDescription{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Service"), Value: aws.String("batch-processor")},
+			},
+		},
 	}
 }
 
