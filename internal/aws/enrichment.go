@@ -46,6 +46,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -672,11 +673,18 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		return EnricherResult{}, err
 	}
 	cutoff := time.Now().Add(-24 * time.Hour)
+	// Track newest job per plan regardless of age — last_status reflects the
+	// most-recent execution even for weekly/monthly schedules. Findings (the
+	// issue signal) still gate on the 24h cutoff.
+	type jobRef struct {
+		state    backuptypes.BackupJobState
+		createAt time.Time
+	}
+	latestByPlan := make(map[string]jobRef)
 	for _, job := range out.BackupJobs {
-		if job.CreationDate == nil || job.CreationDate.Before(cutoff) {
+		if job.CreationDate == nil {
 			continue
 		}
-		// Determine the key from BackupPlanId (via CreatedBy) or fall back to BackupJobId.
 		key := ""
 		if job.CreatedBy != nil && job.CreatedBy.BackupPlanId != nil && *job.CreatedBy.BackupPlanId != "" {
 			key = *job.CreatedBy.BackupPlanId
@@ -686,7 +694,13 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		if key == "" {
 			continue
 		}
-		// First failure wins — skip if already recorded.
+		if existing, ok := latestByPlan[key]; !ok || job.CreationDate.After(existing.createAt) {
+			latestByPlan[key] = jobRef{state: job.State, createAt: *job.CreationDate}
+		}
+		if job.CreationDate.Before(cutoff) {
+			continue
+		}
+		// First failure wins — skip if already recorded as a finding.
 		if _, exists := findings[key]; exists {
 			continue
 		}
@@ -700,7 +714,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 					{Label: "State", Value: string(job.State), Tier: "!"},
 				},
 			}
-			fieldUpdates[key] = map[string]string{"last_status": string(job.State)}
 		case backuptypes.BackupJobStatePartial:
 			findings[key] = resource.EnrichmentFinding{
 				Severity: "~",
@@ -709,12 +722,12 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 					{Label: "State", Value: string(job.State), Tier: "~"},
 				},
 			}
-			fieldUpdates[key] = map[string]string{"last_status": "PARTIAL"}
-		default:
-			if _, ok := fieldUpdates[key]; !ok {
-				fieldUpdates[key] = map[string]string{"last_status": "OK"}
-			}
 		}
+	}
+	// Emit last_status once per plan based on the newest job seen, regardless
+	// of whether that job triggered a finding.
+	for key, ref := range latestByPlan {
+		fieldUpdates[key] = map[string]string{"last_status": string(ref.state)}
 	}
 	issueCount := 0
 	for _, f := range findings {
@@ -2079,14 +2092,29 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		if topicARN == "" {
 			continue
 		}
-		out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
-			TopicArn: aws.String(topicARN),
-		})
-		if err != nil {
-			truncated = true
+		// Walk all pages so subs_count is exact for topics with >100 subscribers.
+		var subs []snstypes.Subscription
+		var nextToken *string
+		pagedErr := false
+		for {
+			out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
+				TopicArn:  aws.String(topicARN),
+				NextToken: nextToken,
+			})
+			if err != nil {
+				truncated = true
+				pagedErr = true
+				break
+			}
+			subs = append(subs, out.Subscriptions...)
+			if out.NextToken == nil || *out.NextToken == "" {
+				break
+			}
+			nextToken = out.NextToken
+		}
+		if pagedErr {
 			continue
 		}
-		subs := out.Subscriptions
 		fieldUpdates[r.ID] = map[string]string{
 			"subs_count": strconv.Itoa(len(subs)),
 		}
@@ -2712,17 +2740,32 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			key = repoName
 		}
 		// Count packages in this repository (optional — only if the client supports ListPackages).
+		// Walks all pages via NextToken so the count is exact, not first-page only.
 		if listPkgAPI, ok := clients.CodeArtifact.(CodeArtifactListPackagesAPI); ok {
-			pkgInput := &codeartifact.ListPackagesInput{
-				Domain:     aws.String(domainName),
-				Repository: aws.String(repoName),
+			total := 0
+			var nextToken *string
+			for {
+				pkgInput := &codeartifact.ListPackagesInput{
+					Domain:     aws.String(domainName),
+					Repository: aws.String(repoName),
+					NextToken:  nextToken,
+				}
+				if domainOwner != "" {
+					pkgInput.DomainOwner = aws.String(domainOwner)
+				}
+				pkgOut, pkgErr := listPkgAPI.ListPackages(ctx, pkgInput)
+				if pkgErr != nil {
+					total = -1 // signal partial
+					break
+				}
+				total += len(pkgOut.Packages)
+				if pkgOut.NextToken == nil || *pkgOut.NextToken == "" {
+					break
+				}
+				nextToken = pkgOut.NextToken
 			}
-			if domainOwner != "" {
-				pkgInput.DomainOwner = aws.String(domainOwner)
-			}
-			pkgOut, pkgErr := listPkgAPI.ListPackages(ctx, pkgInput)
-			if pkgErr == nil {
-				fieldUpdates[key] = map[string]string{"package_count": strconv.Itoa(len(pkgOut.Packages))}
+			if total >= 0 {
+				fieldUpdates[key] = map[string]string{"package_count": strconv.Itoa(total)}
 			}
 		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
