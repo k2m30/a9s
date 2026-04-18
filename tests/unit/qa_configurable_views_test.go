@@ -309,7 +309,8 @@ func TestQA_DetailViewPaths_S3Bucket(t *testing.T) {
 	bucket := realisticS3Bucket()
 	vd := config.DefaultViewDef("s3")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(bucket, path)
 			if result == "" {
@@ -331,7 +332,8 @@ func TestQA_NilFields_S3Bucket(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(bucket, path)
@@ -508,7 +510,8 @@ func TestQA_DetailViewPaths_EC2(t *testing.T) {
 	inst := realisticEC2Instance()
 	vd := config.DefaultViewDef("ec2")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(inst, path)
 			if result == "" {
@@ -550,7 +553,8 @@ func TestQA_NilFields_EC2(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(inst, path)
@@ -609,7 +613,8 @@ func TestQA_DetailViewPaths_RDS(t *testing.T) {
 	// fieldpath can't resolve "Tags" on the struct (falls back to Fields map in production).
 	knownMismatches := map[string]bool{"Tags": true}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(db, path)
 			if result == "" {
@@ -650,7 +655,8 @@ func TestQA_NilFields_RDS(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(db, path)
@@ -693,7 +699,8 @@ func TestQA_DetailViewPaths_Redis(t *testing.T) {
 	cluster := realisticRedisCacheCluster()
 	vd := config.DefaultViewDef("redis")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(cluster, path)
 			if result == "" {
@@ -724,7 +731,8 @@ func TestQA_NilFields_Redis(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(cluster, path)
@@ -777,7 +785,8 @@ func TestQA_DetailViewPaths_DocDB(t *testing.T) {
 	cluster := realisticDocDBCluster()
 	vd := config.DefaultViewDef("dbc")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(cluster, path)
 			if result == "" {
@@ -808,7 +817,8 @@ func TestQA_NilFields_DocDB(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(cluster, path)
@@ -855,7 +865,11 @@ func TestQA_DetailViewPaths_EKS(t *testing.T) {
 	cluster := realisticEKSCluster()
 	vd := config.DefaultViewDef("eks")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		if df.Key != "" {
+			continue // key-form fields live in Fields[], not in the SDK struct
+		}
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(cluster, path)
 			if result == "" {
@@ -886,7 +900,8 @@ func TestQA_NilFields_EKS(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(cluster, path)
@@ -927,7 +942,8 @@ func TestQA_DetailViewPaths_Secrets(t *testing.T) {
 	secret := realisticSecretListEntry()
 	vd := config.DefaultViewDef("secrets")
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run(path, func(t *testing.T) {
 			result := fieldpath.ExtractSubtree(secret, path)
 			if result == "" {
@@ -957,7 +973,8 @@ func TestQA_NilFields_Secrets(t *testing.T) {
 		})
 	}
 
-	for _, path := range vd.Detail {
+	for _, df := range vd.Detail {
+		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
 			_ = fieldpath.ExtractSubtree(secret, path)

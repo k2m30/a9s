@@ -38,7 +38,7 @@ func navViewConfig() *config.ViewsConfig {
 	return &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"VpcId", "InstanceType"},
+				Detail: []config.DetailField{{Path: "VpcId"}, {Path: "InstanceType"}},
 			},
 		},
 	}

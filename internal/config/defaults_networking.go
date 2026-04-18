@@ -11,11 +11,11 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
-			Detail: []string{
-				"LoadBalancerName", "LoadBalancerArn", "DNSName", "Type",
-				"Scheme", "State", "VpcId", "AvailabilityZones",
-				"SecurityGroups", "IpAddressType", "CanonicalHostedZoneId",
-				"CreatedTime",
+			Detail: []DetailField{
+				{Path: "LoadBalancerName"}, {Path: "LoadBalancerArn"}, {Path: "DNSName"}, {Path: "Type"},
+				{Path: "Scheme"}, {Path: "State"}, {Path: "VpcId"}, {Path: "AvailabilityZones"},
+				{Path: "SecurityGroups"}, {Path: "IpAddressType"}, {Path: "CanonicalHostedZoneId"},
+				{Path: "CreatedTime"},
 			},
 		},
 		"tg": {
@@ -27,13 +27,13 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Target Type", Path: "TargetType", Width: 12},
 				{Title: "Health Check", Path: "HealthCheckPath", Width: 24},
 			},
-			Detail: []string{
-				"TargetGroupName", "TargetGroupArn", "Port", "Protocol",
-				"ProtocolVersion", "VpcId", "TargetType", "HealthCheckPath",
-				"HealthCheckPort", "HealthCheckProtocol", "HealthCheckEnabled",
-				"HealthCheckIntervalSeconds", "HealthCheckTimeoutSeconds",
-				"HealthyThresholdCount", "UnhealthyThresholdCount",
-				"Matcher", "LoadBalancerArns",
+			Detail: []DetailField{
+				{Path: "TargetGroupName"}, {Path: "TargetGroupArn"}, {Path: "Port"}, {Path: "Protocol"},
+				{Path: "ProtocolVersion"}, {Path: "VpcId"}, {Path: "TargetType"}, {Path: "HealthCheckPath"},
+				{Path: "HealthCheckPort"}, {Path: "HealthCheckProtocol"}, {Path: "HealthCheckEnabled"},
+				{Path: "HealthCheckIntervalSeconds"}, {Path: "HealthCheckTimeoutSeconds"},
+				{Path: "HealthyThresholdCount"}, {Path: "UnhealthyThresholdCount"},
+				{Path: "Matcher"}, {Path: "LoadBalancerArns"},
 			},
 		},
 		"sg": {
@@ -44,10 +44,11 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
-			Detail: []string{
-				"GroupId", "GroupName", "VpcId", "Description",
-				"OwnerId", "SecurityGroupArn", "IpPermissions",
-				"IpPermissionsEgress", "Tags",
+			Detail: []DetailField{
+				{Path: "GroupId"}, {Path: "GroupName"}, {Path: "VpcId"}, {Path: "Description"},
+				{Path: "OwnerId"}, {Path: "SecurityGroupArn"}, {Path: "IpPermissions"},
+				{Path: "IpPermissionsEgress"}, {Path: "Tags"},
+				{Key: "risk_summary", Label: "Risk Summary"},
 			},
 		},
 		"vpc": {
@@ -58,10 +59,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "Default", Path: "IsDefault", Width: 9},
 			},
-			Detail: []string{
-				"VpcId", "CidrBlock", "State", "IsDefault",
-				"InstanceTenancy", "DhcpOptionsId", "OwnerId",
-				"CidrBlockAssociationSet", "Ipv6CidrBlockAssociationSet", "Tags",
+			Detail: []DetailField{
+				{Path: "VpcId"}, {Path: "CidrBlock"}, {Path: "State"}, {Path: "IsDefault"},
+				{Path: "InstanceTenancy"}, {Path: "DhcpOptionsId"}, {Path: "OwnerId"},
+				{Path: "CidrBlockAssociationSet"}, {Path: "Ipv6CidrBlockAssociationSet"}, {Path: "Tags"},
 			},
 		},
 		"subnet": {
@@ -74,10 +75,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 			},
-			Detail: []string{
-				"SubnetId", "VpcId", "CidrBlock", "AvailabilityZone",
-				"AvailabilityZoneId", "State", "AvailableIpAddressCount",
-				"MapPublicIpOnLaunch", "DefaultForAz", "SubnetArn", "OwnerId", "Tags",
+			Detail: []DetailField{
+				{Path: "SubnetId"}, {Path: "VpcId"}, {Path: "CidrBlock"}, {Path: "AvailabilityZone"},
+				{Path: "AvailabilityZoneId"}, {Path: "State"}, {Path: "AvailableIpAddressCount"},
+				{Path: "MapPublicIpOnLaunch"}, {Path: "DefaultForAz"}, {Path: "SubnetArn"}, {Path: "OwnerId"}, {Path: "Tags"},
 			},
 		},
 		"rtb": {
@@ -88,9 +89,9 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Routes", Path: "", Key: "routes_count", Width: 8},
 				{Title: "Assoc.", Path: "", Key: "associations_count", Width: 8},
 			},
-			Detail: []string{
-				"RouteTableId", "VpcId", "Routes", "Associations",
-				"OwnerId", "Tags",
+			Detail: []DetailField{
+				{Path: "RouteTableId"}, {Path: "VpcId"}, {Path: "Routes"}, {Path: "Associations"},
+				{Path: "OwnerId"}, {Path: "Tags"},
 			},
 		},
 		"nat": {
@@ -103,10 +104,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Failure", Path: "FailureCode", Width: 22},
 				{Title: "Public IP", Path: "", Key: "public_ip", Width: 16},
 			},
-			Detail: []string{
-				"NatGatewayId", "VpcId", "SubnetId", "State",
-				"ConnectivityType", "NatGatewayAddresses", "CreateTime",
-				"FailureCode", "FailureMessage", "Tags",
+			Detail: []DetailField{
+				{Path: "NatGatewayId"}, {Path: "VpcId"}, {Path: "SubnetId"}, {Path: "State"},
+				{Path: "ConnectivityType"}, {Path: "NatGatewayAddresses"}, {Path: "CreateTime"},
+				{Path: "FailureCode"}, {Path: "FailureMessage"}, {Path: "Tags"},
 			},
 		},
 		"igw": {
@@ -116,8 +117,8 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "", Key: "vpc_id", Width: 24},
 				{Title: "State", Path: "", Key: "state", Width: 12},
 			},
-			Detail: []string{
-				"InternetGatewayId", "Attachments", "OwnerId", "Tags",
+			Detail: []DetailField{
+				{Path: "InternetGatewayId"}, {Path: "Attachments"}, {Path: "OwnerId"}, {Path: "Tags"},
 			},
 		},
 		"eip": {
@@ -129,10 +130,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Instance", Path: "InstanceId", Width: 20},
 				{Title: "Domain", Path: "Domain", Width: 8},
 			},
-			Detail: []string{
-				"AllocationId", "PublicIp", "AssociationId", "InstanceId",
-				"Domain", "NetworkBorderGroup", "SubnetId",
-				"PrivateIpAddress", "NetworkInterfaceId", "Tags",
+			Detail: []DetailField{
+				{Path: "AllocationId"}, {Path: "PublicIp"}, {Path: "AssociationId"}, {Path: "InstanceId"},
+				{Path: "Domain"}, {Path: "NetworkBorderGroup"}, {Path: "SubnetId"},
+				{Path: "PrivateIpAddress"}, {Path: "NetworkInterfaceId"}, {Path: "Tags"},
 			},
 		},
 		"vpce": {
@@ -143,12 +144,12 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "State", Path: "State", Width: 12},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
-			Detail: []string{
-				"VpcEndpointId", "ServiceName", "VpcEndpointType",
-				"State", "VpcId", "SubnetIds", "NetworkInterfaceIds",
-				"RouteTableIds", "Groups", "PrivateDnsEnabled",
-				"PolicyDocument", "CreationTimestamp",
-				"OwnerId", "Tags",
+			Detail: []DetailField{
+				{Path: "VpcEndpointId"}, {Path: "ServiceName"}, {Path: "VpcEndpointType"},
+				{Path: "State"}, {Path: "VpcId"}, {Path: "SubnetIds"}, {Path: "NetworkInterfaceIds"},
+				{Path: "RouteTableIds"}, {Path: "Groups"}, {Path: "PrivateDnsEnabled"},
+				{Path: "PolicyDocument"}, {Path: "CreationTimestamp"},
+				{Path: "OwnerId"}, {Path: "Tags"},
 			},
 		},
 		"tgw": {
@@ -159,10 +160,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Owner", Path: "OwnerId", Width: 14},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
-			Detail: []string{
-				"TransitGatewayId", "TransitGatewayArn", "State",
-				"OwnerId", "Description", "Options",
-				"CreationTime", "Tags",
+			Detail: []DetailField{
+				{Path: "TransitGatewayId"}, {Path: "TransitGatewayArn"}, {Path: "State"},
+				{Path: "OwnerId"}, {Path: "Description"}, {Path: "Options"},
+				{Path: "CreationTime"}, {Path: "Tags"},
 			},
 		},
 		"eni": {
@@ -174,14 +175,14 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 				{Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 			},
-			Detail: []string{
-				"NetworkInterfaceId", "Status", "InterfaceType",
-				"VpcId", "SubnetId", "AvailabilityZone",
-				"PrivateIpAddress", "PrivateDnsName",
-				"MacAddress", "Description", "OwnerId",
-				"RequesterId", "RequesterManaged",
-				"SourceDestCheck", "Groups", "Attachment",
-				"Association", "TagSet",
+			Detail: []DetailField{
+				{Path: "NetworkInterfaceId"}, {Path: "Status"}, {Path: "InterfaceType"},
+				{Path: "VpcId"}, {Path: "SubnetId"}, {Path: "AvailabilityZone"},
+				{Path: "PrivateIpAddress"}, {Path: "PrivateDnsName"},
+				{Path: "MacAddress"}, {Path: "Description"}, {Path: "OwnerId"},
+				{Path: "RequesterId"}, {Path: "RequesterManaged"},
+				{Path: "SourceDestCheck"}, {Path: "Groups"}, {Path: "Attachment"},
+				{Path: "Association"}, {Path: "TagSet"},
 			},
 		},
 		// Child views for networking resources
@@ -194,9 +195,9 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "SSL Policy", Path: "SslPolicy", Width: 24},
 				{Title: "Certificate", Key: "certificate_short", Width: 32},
 			},
-			Detail: []string{
-				"ListenerArn", "Port", "Protocol", "DefaultActions",
-				"SslPolicy", "Certificates", "AlpnPolicy", "MutualAuthentication",
+			Detail: []DetailField{
+				{Path: "ListenerArn"}, {Path: "Port"}, {Path: "Protocol"}, {Path: "DefaultActions"},
+				{Path: "SslPolicy"}, {Path: "Certificates"}, {Path: "AlpnPolicy"}, {Path: "MutualAuthentication"},
 			},
 		},
 		"elb_listener_rules": {
@@ -206,8 +207,8 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Action", Key: "action_type", Width: 16},
 				{Title: "Target", Key: "action_target", Width: 32},
 			},
-			Detail: []string{
-				"RuleArn", "Priority", "Conditions", "Actions", "IsDefault",
+			Detail: []DetailField{
+				{Path: "RuleArn"}, {Path: "Priority"}, {Path: "Conditions"}, {Path: "Actions"}, {Path: "IsDefault"},
 			},
 		},
 		"tg_health": {
@@ -219,10 +220,10 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Reason", Key: "reason", Width: 28},
 				{Title: "Description", Key: "description", Width: 36},
 			},
-			Detail: []string{
-				"Target.Id", "Target.Port", "Target.AvailabilityZone",
-				"TargetHealth.State", "TargetHealth.Reason", "TargetHealth.Description",
-				"HealthCheckPort", "AnomalyDetection",
+			Detail: []DetailField{
+				{Path: "Target.Id"}, {Path: "Target.Port"}, {Path: "Target.AvailabilityZone"},
+				{Path: "TargetHealth.State"}, {Path: "TargetHealth.Reason"}, {Path: "TargetHealth.Description"},
+				{Path: "HealthCheckPort"}, {Path: "AnomalyDetection"},
 			},
 		},
 	}

@@ -241,10 +241,19 @@ func (m *DetailModel) buildFieldList() {
 		}
 		// Parse failure or missing JSON → fall through to legacy flat path
 	}
-	var detailPaths []string
+	// Extract detail field definitions; split into path-form and key-form.
+	var detailFields []config.DetailField
 	if m.viewConfig != nil {
 		vd := config.GetViewDef(m.viewConfig, m.resourceType)
-		detailPaths = vd.Detail
+		detailFields = vd.Detail
+	}
+	// Build the []string slice of Path values for ExtractFieldList (path-form only).
+	// Key-form fields (df.Key != "") live in Fields[] and are injected after.
+	var detailPaths []string
+	for _, df := range detailFields {
+		if df.Path != "" {
+			detailPaths = append(detailPaths, df.Path)
+		}
 	}
 	navFields := resource.GetNavigableFields(m.resourceType)
 	navMap := make(map[string]string, len(navFields))
@@ -294,7 +303,40 @@ func (m *DetailModel) buildFieldList() {
 		m.injectEnrichmentSection()
 		return
 	}
-	items := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
+	// Build items from path-form fields.
+	pathItems := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
+
+	// Build a map from path → slice of FieldItems for O(1) lookup when interleaving.
+	pathItemsByPath := make(map[string][]fieldpath.FieldItem, len(detailPaths))
+	for _, item := range pathItems {
+		p := item.Path
+		pathItemsByPath[p] = append(pathItemsByPath[p], item)
+	}
+
+	// Build the final ordered items list preserving detailFields order.
+	// Key-form fields are injected as plain key-value rows.
+	// Path-form fields use the items extracted by ExtractFieldList.
+	var items []fieldpath.FieldItem
+	emittedPath := make(map[string]bool, len(detailPaths))
+	for _, df := range detailFields {
+		if df.Key != "" {
+			// Key-form: read from Fields[].
+			val := "-"
+			if v, ok := m.res.Fields[df.Key]; ok && v != "" {
+				val = v
+			}
+			items = append(items, fieldpath.FieldItem{
+				Key:   df.DisplayLabel(),
+				Value: val,
+				Path:  df.Key,
+			})
+		} else if !emittedPath[df.Path] {
+			// Path-form: emit all FieldItems with this path (may be header + sub-fields).
+			emittedPath[df.Path] = true
+			items = append(items, pathItemsByPath[df.Path]...)
+		}
+	}
+
 	// Post-process: annotate sub-fields that match a navigable path.
 	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
 	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId

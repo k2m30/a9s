@@ -45,7 +45,9 @@ func TestConfigDefaultViewDef_R53Records_DetailPaths(t *testing.T) {
 	// Verify key detail fields are present
 	wantPaths := []string{"Name", "Type", "TTL", "ResourceRecords", "AliasTarget"}
 	for _, want := range wantPaths {
-		found := slices.Contains(vd.Detail, want)
+		found := slices.ContainsFunc(vd.Detail, func(df config.DetailField) bool {
+			return df.String() == want
+		})
 		if !found {
 			t.Errorf("r53_records default Detail missing path %q", want)
 		}

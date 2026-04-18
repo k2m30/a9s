@@ -827,10 +827,10 @@ func TestConfigDefaultViewDef_SFNExecutionHistory(t *testing.T) {
 			t.Error("expected non-empty Detail paths for sfn_execution_history")
 		}
 		// Check for key detail fields
-		detailStr := strings.Join(vd.Detail, ",")
+		detailStr := strings.Join(config.DetailStrings(vd.Detail), ",")
 		for _, expected := range []string{"Timestamp", "Type", "Id"} {
 			if !strings.Contains(detailStr, expected) {
-				t.Errorf("Detail should contain %q, got %v", expected, vd.Detail)
+				t.Errorf("Detail should contain %q, got %v", expected, config.DetailStrings(vd.Detail))
 			}
 		}
 	})

@@ -29,3 +29,5 @@ detail:
   - IncludeGlobalServiceEvents
   - KmsKeyId
   - CloudWatchLogsLogGroupArn
+  - { key: is_logging, label: "Logging" }
+  - { key: latest_delivery_error, label: "Latest Delivery Error" }

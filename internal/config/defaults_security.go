@@ -10,11 +10,11 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "CreateDate", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},
 			},
-			Detail: []string{
-				"RoleName", "RoleId", "Arn", "Path",
-				"CreateDate", "Description", "MaxSessionDuration",
-				"RoleLastUsed", "PermissionsBoundary",
-				"AssumeRolePolicyDocument", "Tags",
+			Detail: []DetailField{
+				{Path: "RoleName"}, {Path: "RoleId"}, {Path: "Arn"}, {Path: "Path"},
+				{Path: "CreateDate"}, {Path: "Description"}, {Path: "MaxSessionDuration"},
+				{Path: "RoleLastUsed"}, {Path: "PermissionsBoundary"},
+				{Path: "AssumeRolePolicyDocument"}, {Path: "Tags"},
 			},
 		},
 		"policy": {
@@ -25,12 +25,12 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Path", Key: "path", Width: 20},
 				{Title: "Created", Key: "create_date", Width: 22},
 			},
-			Detail: []string{
-				"PolicyName", "PolicyId", "Arn", "Path",
-				"AttachmentCount", "PermissionsBoundaryUsageCount",
-				"IsAttachable", "DefaultVersionId",
-				"CreateDate", "UpdateDate", "Description", "Tags",
-				"Document",
+			Detail: []DetailField{
+				{Path: "PolicyName"}, {Path: "PolicyId"}, {Path: "Arn"}, {Path: "Path"},
+				{Path: "AttachmentCount"}, {Path: "PermissionsBoundaryUsageCount"},
+				{Path: "IsAttachable"}, {Path: "DefaultVersionId"},
+				{Path: "CreateDate"}, {Path: "UpdateDate"}, {Path: "Description"}, {Path: "Tags"},
+				{Path: "Document"},
 			},
 		},
 		"iam-user": {
@@ -41,10 +41,10 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "CreateDate", Width: 22},
 				{Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22},
 			},
-			Detail: []string{
-				"UserName", "UserId", "Arn", "Path",
-				"CreateDate", "PasswordLastUsed",
-				"PermissionsBoundary", "Tags",
+			Detail: []DetailField{
+				{Path: "UserName"}, {Path: "UserId"}, {Path: "Arn"}, {Path: "Path"},
+				{Path: "CreateDate"}, {Path: "PasswordLastUsed"},
+				{Path: "PermissionsBoundary"}, {Path: "Tags"},
 			},
 		},
 		"iam-group": {
@@ -55,8 +55,8 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Created", Path: "CreateDate", Width: 22},
 				{Title: "ARN", Path: "Arn", Width: 60},
 			},
-			Detail: []string{
-				"GroupName", "GroupId", "Arn", "Path", "CreateDate",
+			Detail: []DetailField{
+				{Path: "GroupName"}, {Path: "GroupId"}, {Path: "Arn"}, {Path: "Path"}, {Path: "CreateDate"},
 			},
 		},
 		"waf": {
@@ -65,8 +65,8 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "ID", Path: "Id", Width: 38},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
-			Detail: []string{
-				"Name", "Id", "ARN", "Description", "LockToken",
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Id"}, {Path: "ARN"}, {Path: "Description"}, {Path: "LockToken"},
 			},
 		},
 		// Child views for security resources
@@ -76,8 +76,8 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Policy ARN", Key: "policy_arn", Width: 56},
 				{Title: "Type", Key: "policy_type", Width: 10},
 			},
-			Detail: []string{
-				"PolicyName", "PolicyArn", "PolicyType", "Document",
+			Detail: []DetailField{
+				{Path: "PolicyName"}, {Path: "PolicyArn"}, {Path: "PolicyType"}, {Path: "Document"},
 			},
 		},
 		"iam_group_members": {
@@ -87,10 +87,10 @@ func securityDefaultViews() map[string]ViewDef {
 				{Title: "Created", Key: "create_date", Width: 22},
 				{Title: "Password Last Used", Key: "password_last_used", Width: 22},
 			},
-			Detail: []string{
-				"UserName", "UserId", "Arn", "Path",
-				"CreateDate", "PasswordLastUsed",
-				"PermissionsBoundary", "Tags",
+			Detail: []DetailField{
+				{Path: "UserName"}, {Path: "UserId"}, {Path: "Arn"}, {Path: "Path"},
+				{Path: "CreateDate"}, {Path: "PasswordLastUsed"},
+				{Path: "PermissionsBoundary"}, {Path: "Tags"},
 			},
 		},
 	}
