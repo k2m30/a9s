@@ -126,13 +126,22 @@ func FetchInlinePolicyDocument(ctx context.Context, api IAMGetRolePolicyAPI, rol
 
 func decodePolicyDocument(encoded string) (any, error) {
 	// IAM returns percent-encoded documents per RFC 3986.
-	// Use PathUnescape (not QueryUnescape) to avoid treating + as space.
+	// PathUnescape preserves literal '+' in policy documents (e.g. regex patterns);
+	// QueryUnescape treats '+' as space (used in some SDK mock/test encodings).
+	// Try PathUnescape first; fall back to QueryUnescape when the result is not valid JSON.
 	decoded, err := url.PathUnescape(encoded)
 	if err != nil {
 		return nil, fmt.Errorf("URL decode: %w", err)
 	}
 	var doc any
 	if err := json.Unmarshal([]byte(decoded), &doc); err != nil {
+		// PathUnescape left '+' as literal '+', making the JSON invalid.
+		// Retry with QueryUnescape which converts '+' to space.
+		if decoded2, err2 := url.QueryUnescape(encoded); err2 == nil {
+			if err3 := json.Unmarshal([]byte(decoded2), &doc); err3 == nil {
+				return doc, nil
+			}
+		}
 		return nil, fmt.Errorf("JSON parse: %w", err)
 	}
 	return doc, nil

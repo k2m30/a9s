@@ -117,9 +117,9 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 
 			// First: check that configured paths actually resolve against the struct
 			if res.RawStruct != nil {
-				for _, path := range vd.Detail {
-					val := fieldpath.ExtractSubtree(res.RawStruct, path)
-					t.Logf("  %s.%s = %q", shortName, path, truncateStr(val, 60))
+				for _, df := range vd.Detail {
+					val := fieldpath.ExtractSubtree(res.RawStruct, df.String())
+					t.Logf("  %s.%s = %q", shortName, df.String(), truncateStr(val, 60))
 				}
 			}
 
@@ -130,17 +130,17 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 			plain := stripAnsi(view)
 
 			// Every configured detail path should appear as a label in the view
-			for _, path := range vd.Detail {
+			for _, df := range vd.Detail {
 				// The path name (or a truncated version) should be visible.
 				// PadOrTrunc receives "path:" (len+1), truncates to 22 with ellipsis.
 				// So if len(path)+1 > 22 (i.e. len >= 22), the label gets truncated.
-				label := path
+				label := df.DisplayLabel()
 				if len(label) >= 22 {
 					label = label[:20] // PadOrTrunc truncates "path:" to 22 visible chars
 				}
 				if !strings.Contains(plain, label) {
 					t.Errorf("detail view for %s missing field %q in output:\n%s",
-						shortName, path, plain[:min(500, len(plain))])
+						shortName, df.String(), plain[:min(500, len(plain))])
 				}
 			}
 		})

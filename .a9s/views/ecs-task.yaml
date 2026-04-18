@@ -8,6 +8,12 @@ list:
   Status:
     path: LastStatus
     width: 12
+  Stop Code:
+    path: StopCode
+    width: 24
+  Health:
+    path: HealthStatus
+    width: 12
   Task Definition:
     path: TaskDefinitionArn
     width: 30

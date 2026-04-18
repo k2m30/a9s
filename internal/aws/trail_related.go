@@ -16,10 +16,15 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true},
 		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTrailKMS, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTrailRole},
 	})
 
 	resource.RegisterNavigableFields("trail", []resource.NavigableField{
 		{FieldPath: "S3BucketName", TargetType: "s3"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "SnsTopicARN", TargetType: "sns"},
+		{FieldPath: "CloudWatchLogsLogGroupArn", TargetType: "logs"},
+		{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
 	})
 }
 
@@ -47,7 +52,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", ids)
 }
@@ -82,7 +87,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -111,7 +116,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }
@@ -144,9 +149,24 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
+}
+
+// checkTrailRole extracts the IAM role name from the trail's CloudWatchLogsRoleArn.
+// ARN format: arn:aws:iam::ACCOUNT:role/ROLE-NAME
+// Pattern F — no cache needed.
+func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
+	if !ok || trail.CloudWatchLogsRoleArn == nil || *trail.CloudWatchLogsRoleArn == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	arn := *trail.CloudWatchLogsRoleArn
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
+		return relatedResult("role", []string{arn[idx+1:]})
+	}
+	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
 // trailRelatedResources returns the resource list for target from cache or by fetching the first page.

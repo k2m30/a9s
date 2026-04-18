@@ -1,5 +1,34 @@
 package resource
 
+import (
+	"strconv"
+	"strings"
+	"time"
+)
+
+// deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
+// has end-of-lifed per docs/attention-signals.md.
+var deprecatedLambdaRuntimes = map[string]struct{}{
+	"nodejs":          {},
+	"nodejs4.3":       {},
+	"nodejs6.10":      {},
+	"nodejs8.10":      {},
+	"nodejs10.x":      {},
+	"nodejs12.x":      {},
+	"nodejs14.x":      {},
+	"python2.7":       {},
+	"python3.6":       {},
+	"python3.7":       {},
+	"ruby2.5":         {},
+	"ruby2.7":         {},
+	"dotnetcore1.0":   {},
+	"dotnetcore2.0":   {},
+	"dotnetcore2.1":   {},
+	"dotnetcore3.1":   {},
+	"java8":           {},
+	"go1.x":           {},
+}
+
 func computeResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -18,6 +47,58 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "instance_id", Title: "Instance ID", Width: 20, Sortable: true},
 				{Key: "launch_time", Title: "Launch Time", Width: 22, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				sys := r.Fields["system_status"]
+				inst := r.Fields["instance_status"]
+				if sys == "impaired" || inst == "impaired" {
+					return ColorBroken
+				}
+				if sys == "initializing" || inst == "initializing" {
+					return ColorWarning
+				}
+				// Prefer Fields["state"] (set by real fetcher); fall back to r.Status
+				// for test doubles and synthetic resources that only set Status.
+				state := r.Fields["state"]
+				if state == "" {
+					state = r.Status
+				}
+				switch state {
+				case "running", "":
+					return ColorHealthy
+				case "pending", "shutting-down", "stopping":
+					return ColorWarning
+				case "stopped":
+					// Server.* reason code means AWS forced the stop (capacity issue) → Broken.
+					if strings.HasPrefix(r.Fields["state_reason_code"], "Server.") {
+						return ColorBroken
+					}
+					// User-initiated or default stop → Warning (intentional, not broken).
+					return ColorWarning
+				case "terminated":
+					return ColorDim
+				}
+				// Delegate unknown states to the shared fallback classifier so generic
+				// status strings (e.g. "failed", "error", "creating") are handled correctly.
+				return fallbackColor(state)
+			},
+			CellDecorators: map[string]func(Resource, string) string{
+				"state": func(r Resource, v string) string {
+					// Only decorate a running instance — the prefix signals that a
+					// background status check is degrading a nominally-up instance.
+					if v != "running" {
+						return v
+					}
+					sys := r.Fields["system_status"]
+					inst := r.Fields["instance_status"]
+					if sys == "impaired" || inst == "impaired" {
+						return "! " + v
+					}
+					if sys == "initializing" || inst == "initializing" {
+						return "~ " + v
+					}
+					return v
+				},
+			},
 		},
 		{
 			Name:          "ECS Services",
@@ -32,6 +113,26 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "desired_count", Title: "Desired", Width: 9, Sortable: true},
 				{Key: "running_count", Title: "Running", Width: 9, Sortable: true},
 				{Key: "launch_type", Title: "Launch Type", Width: 12, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "INACTIVE":
+					return ColorBroken
+				case "DRAINING":
+					return ColorWarning
+				}
+				running := r.Fields["running_count"]
+				desired := r.Fields["desired_count"]
+				if desired == "0" || desired == "" {
+					return ColorHealthy
+				}
+				if running == "0" {
+					return ColorBroken
+				}
+				if running != desired {
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{
 				{
@@ -67,6 +168,17 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "pending_tasks", Title: "Pending", Width: 9, Sortable: true},
 				{Key: "services_count", Title: "Services", Width: 10, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "PROVISIONING", "DEPROVISIONING":
+					return ColorWarning
+				case "FAILED", "INACTIVE":
+					return ColorBroken
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "ECS Tasks",
@@ -83,6 +195,25 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "cpu", Title: "CPU", Width: 6, Sortable: true},
 				{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				// health_status == UNHEALTHY overrides everything (Broken wins).
+				if r.Fields["health_status"] == "UNHEALTHY" {
+					return ColorBroken
+				}
+				switch r.Fields["last_status"] {
+				case "RUNNING":
+					return ColorHealthy
+				case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
+					return ColorWarning
+				case "STOPPED":
+					sc := r.Fields["stop_code"]
+					if sc != "" && sc != "UserInitiated" {
+						return ColorBroken
+					}
+					return ColorDim
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "Lambda Functions",
@@ -97,6 +228,40 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "timeout", Title: "Timeout", Width: 8, Sortable: true},
 				{Key: "handler", Title: "Handler", Width: 30, Sortable: false},
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				// Compute state-based color first.
+				var stateColor Color
+				switch r.Fields["state"] {
+				case "Active":
+					stateColor = ColorHealthy
+				case "Pending":
+					stateColor = ColorWarning
+				case "Inactive":
+					stateColor = ColorDim
+				case "Failed":
+					stateColor = ColorBroken
+				default:
+					stateColor = ColorHealthy
+				}
+				// Override signals — Broken wins over Warning wins over Dim.
+				// last_update_status=Failed → Broken.
+				if r.Fields["last_update_status"] == "Failed" {
+					return ColorBroken
+				}
+				// Deprecated runtime → Broken.
+				if _, ok := deprecatedLambdaRuntimes[r.Fields["runtime"]]; ok {
+					return ColorBroken
+				}
+				// State-based Broken is already set; return it before Warning upgrades.
+				if stateColor == ColorBroken {
+					return ColorBroken
+				}
+				// No dead-letter queue → Warning (unless already Broken).
+				if r.Fields["dlq_target_arn"] == "" {
+					return ColorWarning
+				}
+				return stateColor
 			},
 			Children: []ChildViewDef{
 				{
@@ -121,6 +286,40 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				// status="" → Healthy; "Delete in progress" → Warning (transitional, noteworthy).
+				status := r.Fields["status"]
+				if status == "Delete in progress" {
+					return ColorWarning
+				}
+
+				// InService count below minimum → Broken.
+				inService := r.Fields["in_service_count"]
+				minSz := r.Fields["min_size"]
+				if inService != "" && minSz != "" {
+					inSvc, err1 := strconv.Atoi(inService)
+					minSzInt, err2 := strconv.Atoi(minSz)
+					if err1 == nil && err2 == nil && inSvc < minSzInt {
+						return ColorBroken
+					}
+				}
+
+				// Any unhealthy instances → Warning.
+				if unhealthy := r.Fields["instances_unhealthy_count"]; unhealthy != "" {
+					if n, err := strconv.Atoi(unhealthy); err == nil && n > 0 {
+						return ColorWarning
+					}
+				}
+
+				// Critical suspended processes → Warning.
+				if sp := r.Fields["suspended_processes"]; sp != "" {
+					if strings.Contains(sp, "Launch") || strings.Contains(sp, "Terminate") || strings.Contains(sp, "HealthCheck") {
+						return ColorWarning
+					}
+				}
+
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{
 				{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 			},
@@ -137,6 +336,43 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 				{Key: "health", Title: "Health", Width: 10, Sortable: true},
 				{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				// Environment health takes precedence over status when available.
+				// Grey means EB hasn't collected health data yet — treat as transitional Warning.
+				var healthColor Color
+				healthSet := true
+				switch r.Fields["health"] {
+				case "Red":
+					healthColor = ColorBroken
+				case "Yellow":
+					healthColor = ColorWarning
+				case "Grey":
+					healthColor = ColorWarning
+				case "Green":
+					healthColor = ColorHealthy
+				default:
+					healthSet = false
+					healthColor = ColorHealthy
+				}
+				// status==Terminated → Dim overrides Healthy or unknown health,
+				// but does NOT downgrade a Broken signal.
+				if r.Fields["status"] == "Terminated" && healthColor != ColorBroken {
+					return ColorDim
+				}
+				if healthSet {
+					return healthColor
+				}
+				// Fall back to status when health is not set.
+				switch r.Fields["status"] {
+				case "Ready":
+					return ColorHealthy
+				case "Launching", "Updating":
+					return ColorWarning
+				case "Terminating":
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -157,6 +393,39 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "az", Title: "AZ", Width: 16, Sortable: true},
 				{Key: "created", Title: "Created", Width: 18, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				// Base color from volume state.
+				var base Color
+				switch r.Fields["state"] {
+				case "in-use":
+					base = ColorHealthy
+				case "available":
+					base = ColorHealthy
+					// Orphan check: unattached and older than 7 days.
+					if r.Fields["attached_to"] == "" {
+						if t, err := time.Parse("2006-01-02 15:04", r.Fields["created"]); err == nil {
+							if time.Since(t) > 7*24*time.Hour {
+								base = ColorWarning
+							}
+						}
+					}
+				case "creating", "deleting":
+					base = ColorWarning
+				case "error":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return ColorBroken
+				}
+				// Unencrypted → upgrade to Warning (CIS EC2.7).
+				if r.Fields["encrypted"] == "false" && base == ColorHealthy {
+					base = ColorWarning
+				}
+				return base
+			},
 		},
 		{
 			Name:          "EBS Snapshots",
@@ -175,6 +444,43 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "started", Title: "Started", Width: 18, Sortable: true},
 				{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 			},
+			Color: func(r Resource) Color {
+				// Base color from snapshot state.
+				var base Color
+				switch r.Fields["state"] {
+				case "completed":
+					base = ColorHealthy
+				case "pending":
+					base = ColorWarning
+				case "error", "recoverable", "recovering":
+					base = ColorBroken
+				default:
+					base = ColorHealthy
+				}
+				// Do not downgrade Broken.
+				if base == ColorBroken {
+					return base
+				}
+				// CIS EC2.1 — unencrypted snapshot.
+				if r.Fields["encrypted"] == "false" {
+					return ColorWarning
+				}
+				// Long-lived automated snapshot (> 365 days).
+				if started, err := time.Parse(time.RFC3339, r.Fields["started"]); err == nil {
+					if time.Since(started) > 365*24*time.Hour {
+						desc := r.Fields["description"]
+						if strings.HasPrefix(desc, "Created by CreateImage") ||
+							strings.Contains(strings.ToLower(desc), "automated") {
+							return ColorWarning
+						}
+					}
+				}
+				// Orphaned snapshot — source volume is gone.
+				if strings.HasPrefix(r.Fields["volume_id"], "vol-") && r.Fields["volume_orphan"] == "true" {
+					return ColorWarning
+				}
+				return base
+			},
 		},
 		{
 			Name:          "AMIs",
@@ -191,6 +497,38 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "root_device_type", Title: "Root Device", Width: 14, Sortable: true},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 				{Key: "public", Title: "Public", Width: 8, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				// Compute state-based color first.
+				var stateColor Color
+				switch r.Fields["state"] {
+				case "available":
+					stateColor = ColorHealthy
+				case "pending", "transient":
+					stateColor = ColorWarning
+				case "failed", "error", "invalid":
+					stateColor = ColorBroken
+				case "deregistered", "disabled":
+					// Admin terminal states — dim, not broken.
+					stateColor = ColorDim
+				default:
+					stateColor = ColorHealthy
+				}
+				// Broken wins over everything.
+				if stateColor == ColorBroken {
+					return ColorBroken
+				}
+				// Deprecated AMI (deprecation_time is in the past) → Warning.
+				if depStr := r.Fields["deprecation_time"]; depStr != "" {
+					if depTime, err := time.Parse(time.RFC3339, depStr); err == nil {
+						if time.Now().After(depTime) {
+							if stateColor != ColorDim {
+								return ColorWarning
+							}
+						}
+					}
+				}
+				return stateColor
 			},
 			StubCreator: func(id string) Resource {
 				return Resource{

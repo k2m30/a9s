@@ -7,7 +7,10 @@ import (
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -20,9 +23,15 @@ func init() {
 	resource.RegisterRelated("efs", []resource.RelatedDef{
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup},
+		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2, NeedsTargetCache: true},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask, NeedsTargetCache: true},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true},
 	})
 }
 
@@ -79,7 +88,7 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -99,11 +108,6 @@ func efsCFNStackName(res resource.Resource) string {
 	return ""
 }
 
-// checkEFSLambda returns Count: 0 because Lambda EFS mount point configurations
-// are not available in the list API — the relationship cannot be determined from cache.
-func checkEFSLambda(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-}
 
 // checkEFSSG finds security groups for this EFS file system by scanning the ENI
 // cache for mount-target ENIs whose Description contains the filesystem ID (Pattern C).
@@ -142,7 +146,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
 }
@@ -182,7 +186,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
@@ -198,3 +202,105 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
+
+// checkEFSLambda finds Lambda functions that mount this EFS file system via
+// FileSystemConfigs. Lambda FileSystemConfigs carry EFS *access-point* ARNs,
+// not filesystem ARNs, so the link requires resolving the filesystem's access
+// points via efs:DescribeAccessPoints (Pattern A + C): collect this file
+// system's access point ARNs, then scan the lambda cache for
+// FunctionConfiguration.FileSystemConfigs entries whose Arn is in that set.
+// Returns Count: -1 when no live EFS client is available to list access points.
+func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	fsID := res.ID
+	if fsID == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.EFS == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	apOut, err := c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
+		FileSystemId: &fsID,
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	apARNs := make(map[string]struct{})
+	for _, ap := range apOut.AccessPoints {
+		if ap.AccessPointArn != nil && *ap.AccessPointArn != "" {
+			apARNs[*ap.AccessPointArn] = struct{}{}
+		}
+	}
+	if len(apARNs) == 0 {
+		// No access points exist for this filesystem — no Lambda can mount it.
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	lambdaList, truncated, err := efsRelatedResources(ctx, clients, cache, "lambda")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if lambdaList == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	var ids []string
+	for _, lRes := range lambdaList {
+		fn, ok := assertStruct[lambdatypes.FunctionConfiguration](lRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, cfg := range fn.FileSystemConfigs {
+			if cfg.Arn == nil {
+				continue
+			}
+			if _, matched := apARNs[*cfg.Arn]; matched {
+				ids = append(ids, lRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("lambda")
+	}
+	return relatedResult("lambda", ids)
+}
+
+// checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
+// Pattern C+reverse: iterate cache["ecs-task"]; for each task definition check
+// Volumes[].EfsVolumeConfiguration.FileSystemId == parent filesystem ID.
+// NeedsTargetCache: true.
+func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	fsID := res.ID
+	if fsID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+	}
+
+	entry, ok := cache["ecs-task"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ecs-task"}
+	}
+
+	var ids []string
+	for _, tRes := range entry.Resources {
+		td, ok := assertStruct[ecstypes.TaskDefinition](tRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, v := range td.Volumes {
+			if v.EfsVolumeConfiguration != nil &&
+				v.EfsVolumeConfiguration.FileSystemId != nil &&
+				*v.EfsVolumeConfiguration.FileSystemId == fsID {
+				ids = append(ids, tRes.ID)
+				break
+			}
+		}
+	}
+	result := relatedResult("ecs-task", ids)
+	result.Approximate = entry.IsTruncated
+	return result
+}
+
+

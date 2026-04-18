@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state"})
+	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state", "attachments_count"})
 
 	resource.RegisterNavigableFields("igw", []resource.NavigableField{
 		{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
@@ -97,10 +97,11 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			Name:   name,
 			Status: state,
 			Fields: map[string]string{
-				"igw_id": igwID,
-				"name":   name,
-				"vpc_id": vpcID,
-				"state":  state,
+				"igw_id":            igwID,
+				"name":              name,
+				"vpc_id":            vpcID,
+				"state":             state,
+				"attachments_count": fmt.Sprintf("%d", len(igw.Attachments)),
 			},
 			RawStruct: igw,
 		}

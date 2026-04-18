@@ -223,34 +223,56 @@ func TestRelated_S3_CF_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- s3→lambda: undeterminable from cache, returns Count: 0 ---
+// --- checkS3Lambda (forward: notification_lambda ARN → function name) ---
 
-func TestRelated_S3_Lambda_ReturnsZero(t *testing.T) {
+func TestRelated_S3_Lambda_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:   "data-pipeline-logs",
 		Name: "data-pipeline-logs",
+		Fields: map[string]string{
+			"notification_lambda": "arn:aws:lambda:us-east-1:123456789012:function:process-pipeline-events",
+		},
 	}
 	checker := s3CheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-pipeline-events" {
+		t.Errorf("ResourceIDs = %v, want [process-pipeline-events]", result.ResourceIDs)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
 	}
 }
 
-// --- s3→cfn: undeterminable from cache, returns Count: 0 ---
+func TestRelated_S3_Lambda_NoNotification(t *testing.T) {
+	source := resource.Resource{
+		ID:   "data-pipeline-logs",
+		Name: "data-pipeline-logs",
+		Fields: map[string]string{
+			"notification_lambda": "",
+		},
+	}
+	checker := s3CheckerByTarget(t, "lambda")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no lambda notification)", result.Count)
+	}
+}
 
-func TestRelated_S3_CFN_ReturnsZero(t *testing.T) {
+// --- checkS3CFN: undeterminable without GetBucketTagging, returns Count: -1 ---
+
+func TestRelated_S3_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "data-pipeline-logs",
 		Name: "data-pipeline-logs",
 	}
 	checker := s3CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (undeterminable from cache)", result.Count)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (tags need GetBucketTagging enrichment)", result.Count)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")

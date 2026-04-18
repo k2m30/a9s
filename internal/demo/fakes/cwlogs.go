@@ -55,3 +55,8 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 	}
 	return &cloudwatchlogs.FilterLogEventsOutput{Events: filtered}, nil
 }
+
+// DescribeMetricFilters returns an empty list for all log groups in demo mode.
+func (f *CWLogsFake) DescribeMetricFilters(_ context.Context, _ *cloudwatchlogs.DescribeMetricFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeMetricFiltersOutput, error) {
+	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: []cwlogstypes.MetricFilter{}}, nil
+}

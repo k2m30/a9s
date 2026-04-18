@@ -1,5 +1,7 @@
 package resource
 
+import "strings"
+
 func messagingResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -15,6 +17,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "delay_seconds", Title: "Delay", Width: 8, Sortable: true},
 				{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 		{
 			Name:          "SNS Topics",
@@ -26,6 +29,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
 				{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "sns_subscriptions",
 				Key:            "enter",
@@ -45,6 +49,20 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 				{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
 			},
+			// SNS ListSubscriptions returns SubscriptionArn="PendingConfirmation"
+			// for subscriptions that haven't been confirmed. Those endpoints
+			// receive nothing until the owner clicks the confirm link — worth
+			// surfacing. "Deleted" subscriptions are dimmed.
+			Color: func(r Resource) Color {
+				switch r.Fields["subscription_arn"] {
+				case "PendingConfirmation":
+					return ColorWarning
+				case "Deleted":
+					return ColorDim
+				default:
+					return ColorHealthy
+				}
+			},
 		},
 		{
 			Name:          "EventBridge Rules",
@@ -58,6 +76,16 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "event_bus", Title: "Event Bus", Width: 18, Sortable: true},
 				{Key: "schedule", Title: "Schedule", Width: 24, Sortable: false},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				switch strings.ToUpper(r.Fields["state"]) {
+				case "ENABLED", "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS":
+					return ColorHealthy
+				case "DISABLED":
+					// DISABLED is an administrative action, not a fault.
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "eb_rule_targets",
@@ -78,6 +106,21 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "stream_mode", Title: "Mode", Width: 14, Sortable: true},
 				{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["stream_status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				}
+				switch r.Fields["status"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "DELETING":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "MSK Clusters",
@@ -90,6 +133,17 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "cluster_type", Title: "Type", Width: 14, Sortable: true},
 				{Key: "state", Title: "State", Width: 14, Sortable: true},
 				{Key: "version", Title: "Version", Width: 14, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["state"] {
+				case "ACTIVE":
+					return ColorHealthy
+				case "CREATING", "UPDATING", "MAINTENANCE", "REBOOTING_BROKER", "HEALING":
+					return ColorWarning
+				case "FAILED":
+					return ColorBroken
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -104,6 +158,8 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "arn", Title: "ARN", Width: 60, Sortable: false},
 				{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
 			},
+			// StateMachineListItem has no status field; DescribeStateMachine would be needed for real color.
+			Color: func(r Resource) Color { return ColorHealthy },
 			Children: []ChildViewDef{{
 				ChildType:      "sfn_executions",
 				Key:            "enter",

@@ -48,7 +48,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+		return resource.ApproximateZero("ecs-svc")
 	}
 	return relatedResult("ecs-svc", ids)
 }
@@ -82,7 +82,7 @@ func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -123,10 +123,32 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
+
+// checkECSKMS extracts the KMS key from the ECS Cluster's
+// Configuration.ExecuteCommandConfiguration.KmsKeyId field.
+// Returns the key ID (last segment after "/"). Pattern F — no cache needed.
+func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if !ok || cluster.Configuration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == nil ||
+		*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
+
+
+
 
 // ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

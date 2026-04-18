@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn"})
+	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn", "status"})
 	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients any, resourceID string) (string, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
@@ -88,6 +89,17 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			rotationEnabled = "Yes"
 		}
 
+		// Compute status: DELETED > OVERDUE > DORMANT > OK
+		secretStatus := "OK"
+		switch {
+		case secret.DeletedDate != nil:
+			secretStatus = "DELETED"
+		case secret.RotationEnabled != nil && *secret.RotationEnabled && secret.NextRotationDate != nil && time.Now().After(*secret.NextRotationDate):
+			secretStatus = "OVERDUE"
+		case secret.LastAccessedDate != nil && time.Since(*secret.LastAccessedDate) > 180*24*time.Hour:
+			secretStatus = "DORMANT"
+		}
+
 		r := resource.Resource{
 			ID:     secretName,
 			Name:   secretName,
@@ -99,6 +111,7 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 				"last_changed":     lastChanged,
 				"rotation_enabled": rotationEnabled,
 				"arn":              aws.ToString(secret.ARN),
+				"status":           secretStatus,
 			},
 			RawStruct: secret,
 		}

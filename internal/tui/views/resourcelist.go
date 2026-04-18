@@ -1,6 +1,8 @@
 package views
 
 import (
+	"fmt"
+	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -31,7 +33,9 @@ type ResourceListModel struct {
 	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
 	filterText           string
-	attentionOnly        bool                // §7: ctrl+z toggle — when true, hide dim/neutral rows
+	AttentionFilter                          // §7: ctrl+z toggle — when enabled, hide dim/neutral rows
+	issueCount           int                 // count of IsIssueRowColor() resources; recomputed in applySortAndFilter
+	showIssueBadge       bool                // when true, FrameTitle shows "issues:N" badge; set by main menu navigation
 	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
 	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
 	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
@@ -56,6 +60,15 @@ type ResourceListModel struct {
 	// positions are invalidated. Full invalidation happens when data, filter,
 	// sort, width, or hScroll changes.
 	styledRowCache map[int]string
+
+	// enrichment state — populated by SetEnrichmentState.
+	enrichmentIssueCount int                                   // unified Wave-1 + Wave-2 distinct-instance count
+	enrichmentTruncated  bool                                  // true if enrichment count is a lower bound
+	findingsByID         map[string]resource.EnrichmentFinding // this type's per-resource findings
+	// truncatedByID is populated by SetTruncatedIDs. Resources in this set
+	// had their enrichment truncated (per-resource API error or page cap) and
+	// are rendered with a "?" prefix in the identity column.
+	truncatedByID map[string]bool
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -129,7 +142,7 @@ func NewResourceListFromCache(
 		hScrollOffset: hScrollOffset,
 		loading:       false,
 		keys:          k,
-		attentionOnly: attentionOnly,
+		AttentionFilter: AttentionFilter{enabled: attentionOnly},
 	}
 	m.applySortAndFilter()
 	m.updateSortColKey()
@@ -296,7 +309,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.ToggleAttentionOnly):
-			m.attentionOnly = !m.attentionOnly
+			m.Toggle()
 			m.applySortAndFilter()
 			m.scroll.SetCursor(0)
 			m.styledRowCache = nil
@@ -382,7 +395,14 @@ func (m *ResourceListModel) View() string {
 		return "No resources found"
 	}
 
-	cols := m.resolveColumns()
+	fullCols := m.resolveColumns()
+
+	// Resolve marker column index on the FULL (unsliced) column list so that
+	// horizontal scrolling cannot move the marker to a different semantic column
+	// (e.g. State.Name path matching "Name" when Name itself is scrolled off).
+	fullMarkerColIdx := resolveIdentityColumn(fullCols, m.typeDef)
+
+	cols := fullCols
 
 	// Apply horizontal scroll: skip hScrollOffset columns from the left.
 	if m.hScrollOffset > 0 && m.hScrollOffset < len(cols) {
@@ -401,6 +421,19 @@ func (m *ResourceListModel) View() string {
 	// Render header row.
 	headerLine := m.renderHeaderRow(cols)
 
+	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
+	// column index. If the identity column is scrolled off-screen or truncated out,
+	// set to -1 so renderDataRow skips the marker entirely rather than falling back
+	// to the first visible column (which would jump the dot to State/Type/etc.).
+	// Must be computed here (before VisibleWindow) so findingsBanner can use it.
+	markerColIdx := -1
+	if fullMarkerColIdx >= m.hScrollOffset {
+		candidate := fullMarkerColIdx - m.hScrollOffset
+		if candidate < len(cols) && cols[candidate].key == fullCols[fullMarkerColIdx].key && cols[candidate].path == fullCols[fullMarkerColIdx].path {
+			markerColIdx = candidate
+		}
+	}
+
 	// Determine visible row count: height minus column header row (1).
 	// Frame borders are already excluded from m.height by the root model.
 	visibleRows := max(m.height-1, 1)
@@ -411,10 +444,29 @@ func (m *ResourceListModel) View() string {
 		visibleRows--
 	}
 
+	// Reserve one row for the enrichment banner when it will be shown.
+	// A banner appears when: truncation flag is set, OR any findings exist
+	// (some may be off-viewport or have their marker hidden by hscroll).
+	// We conservatively reserve a row any time banner content is possible;
+	// this prevents the total line count from exceeding m.height.
+	mightShowBanner := m.enrichmentTruncated || len(m.findingsByID) > 0
+	if mightShowBanner && visibleRows > 1 {
+		visibleRows--
+	}
+
 	// Determine the window of rows to display, keeping cursor centered.
 	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
 
 	var sb strings.Builder
+
+	// Banner: surface enrichment findings that aren't visible as row markers
+	// in the current viewport (off-viewport, filtered-out, or ~-severity types
+	// where row color doesn't signal the issue alone).
+	if banner := m.findingsBanner(startRow, endRow, markerColIdx); banner != "" {
+		sb.WriteString(banner)
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(headerLine)
 
 	for i := startRow; i < endRow; i++ {
@@ -428,9 +480,9 @@ func (m *ResourceListModel) View() string {
 			if isSelected {
 				base = styles.RowSelected
 			} else {
-				base = styles.RowColorStyle(r.Status)
+				base = styles.ColorStyle(m.typeDef.ResolveColor(r))
 			}
-			styled = m.renderDataRow(cols, r, base, m.width, isSelected)
+			styled = m.renderDataRow(cols, r, base, m.width, isSelected, markerColIdx)
 			if m.styledRowCache == nil {
 				m.styledRowCache = make(map[int]string)
 			}
@@ -455,6 +507,99 @@ func (m *ResourceListModel) View() string {
 	}
 
 	return sb.String()
+}
+
+// findingsBanner returns a one-line banner summarizing enrichment findings
+// that are not visible as row markers in the rendered viewport
+// [startRow, endRow). A finding is "visible" only if its resource ID is on
+// a row that is currently rendered to screen AND the marker column is visible
+// (markerColIdx >= 0). When markerColIdx == -1 (identity column scrolled
+// off-screen), all viewport-row findings are treated as hidden because the
+// row marker is suppressed by renderDataRow.
+//
+// Returns "" when every finding maps to a visible row with a visible marker
+// and the truncation flag is unset.
+func (m *ResourceListModel) findingsBanner(startRow, endRow, markerColIdx int) string {
+	// Allow through when truncated even with zero findings/issueCount — the
+	// user must know the count is a lower bound.
+	if m.enrichmentIssueCount == 0 && len(m.findingsByID) == 0 && !m.enrichmentTruncated {
+		return ""
+	}
+	if startRow < 0 {
+		startRow = 0
+	}
+	if endRow > len(m.filteredResources) {
+		endRow = len(m.filteredResources)
+	}
+	// Count findings that have a visible row marker.
+	// When markerColIdx == -1 the identity column is off-screen, so
+	// renderDataRow suppresses the marker on every row — treat all as hidden.
+	visibleWithFinding := 0
+	if markerColIdx >= 0 {
+		for i := startRow; i < endRow; i++ {
+			if _, ok := m.findingsByID[m.filteredResources[i].ID]; ok {
+				visibleWithFinding++
+			}
+		}
+	}
+	hidden := len(m.findingsByID) - visibleWithFinding
+	if hidden <= 0 && !m.enrichmentTruncated {
+		return ""
+	}
+	var parts []string
+	if hidden > 0 {
+		parts = append(parts, fmt.Sprintf("%d background-check finding(s) off-viewport or on filtered/unloaded rows", hidden))
+	}
+	if m.enrichmentTruncated {
+		parts = append(parts, "count is a lower bound (truncated)")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return styles.BannerInfo.Render("ⓘ " + strings.Join(parts, "; "))
+}
+
+// SetEnrichmentState stores Wave 2 enrichment results for this resource type.
+// issueCount is the unified Wave-1 + Wave-2 distinct-instance count (R2/R3 source of truth).
+// truncated indicates a lower-bound count; findings is the per-resource finding map.
+// Invalidates the styled row cache because findings affect marker rendering.
+func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]resource.EnrichmentFinding) {
+	m.enrichmentIssueCount = issueCount
+	m.enrichmentTruncated = truncated
+	m.findingsByID = findings
+	m.styledRowCache = nil
+}
+
+// ApplyFieldUpdates merges Wave-2-derived field values into the in-memory
+// resource slices. Keyed by resource ID, then by field key. Invalidates the
+// styled row cache so the new values appear on the next render.
+func (m *ResourceListModel) ApplyFieldUpdates(updates map[string]map[string]string) {
+	if len(updates) == 0 {
+		return
+	}
+	for i := range m.allResources {
+		if kvMap, ok := updates[m.allResources[i].ID]; ok {
+			if m.allResources[i].Fields == nil {
+				m.allResources[i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(m.allResources[i].Fields, kvMap)
+		}
+	}
+	for i := range m.filteredResources {
+		if kvMap, ok := updates[m.filteredResources[i].ID]; ok {
+			if m.filteredResources[i].Fields == nil {
+				m.filteredResources[i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(m.filteredResources[i].Fields, kvMap)
+		}
+	}
+	m.styledRowCache = nil
+}
+
+// SetTruncatedIDs stores the per-resource truncation set for this resource type.
+func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {
+	m.truncatedByID = truncatedIDs
+	m.styledRowCache = nil
 }
 
 // InvalidateStyleCache clears the styled row cache, forcing re-render

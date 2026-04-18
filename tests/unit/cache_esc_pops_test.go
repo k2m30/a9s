@@ -129,11 +129,13 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 
 	view := stripANSI(rootViewContent(m))
 
-	// The frame title includes the resource count, e.g. "EC2(5)" or "ec2(5)".
-	// With the bug, it would show "EC2(1)" or "ec2(1)" (the poisoned count).
-	expectedCountStr := fmt.Sprintf("(%d)", fullCount)
-	poisonedCountStr := fmt.Sprintf("(%d)", len(partialList))
+	// The frame title includes the resource count prefix, e.g. "ec2(5" or "ec2(5/N issues)".
+	// With the bug, it would show "ec2(1" (the poisoned count).
+	expectedCountStr := fmt.Sprintf("(%d", fullCount)
+	poisonedCountStr := fmt.Sprintf("(%d", len(partialList))
 
+	// The poisoned count prefix must not appear unless it also matches the full count prefix
+	// (they could coincide when fullCount == len(partialList), but that never happens here).
 	if strings.Contains(view, poisonedCountStr) && !strings.Contains(view, expectedCountStr) {
 		t.Fatalf(
 			"BUG: cache was poisoned by related-navigation list — EC2 list shows count %s "+

@@ -205,8 +205,8 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"sqs", "sqs"}:     "Dead Letter Queues",
 
 		// sns
+		// sns→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"sns", "alarm"}:   "CloudWatch Alarms",
-		{"sns", "cfn"}:     "CloudFormation",
 		{"sns", "sns-sub"}: "Subscriptions",
 
 		// sns-sub
@@ -303,10 +303,10 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"glue", "logs"}:  "Log Groups",
 
 		// sfn (Step Functions)
+		// sfn→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"sfn", "alarm"}:   "CloudWatch Alarms",
 		{"sfn", "logs"}:    "Log Groups",
 		{"sfn", "role"}:    "IAM Role",
-		{"sfn", "cfn"}:     "CloudFormation",
 		{"sfn", "eb-rule"}: "EventBridge Rules",
 
 		// ddb (DynamoDB)
@@ -344,8 +344,8 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"efs", "subnet"}: "Subnets",
 
 		// ses
+		// ses→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"ses", "r53"}: "Route 53 (DNS)",
-		{"ses", "cfn"}: "CloudFormation",
 
 		// athena
 		{"athena", "s3"}:  "S3 Buckets (results)",
@@ -377,7 +377,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"opensearch", "logs"}:  "Log Groups",
 
 		// codeartifact
-		{"codeartifact", "cb"}: "CodeBuild Projects",
+		// codeartifact→cb dropped (Explicitly excluded: unanimous sometimes — no first-class AWS field).
 
 		// ct-events (CloudTrail Events)
 		{"ct-events", "role"}:     "IAM Roles",

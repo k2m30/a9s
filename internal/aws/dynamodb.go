@@ -22,9 +22,18 @@ func init() {
 	})
 
 	resource.RegisterRelated("ddb", []resource.RelatedDef{
-		{TargetType: "kms",    DisplayName: "KMS Key",           Checker: checkDdbKMS},
-		{TargetType: "lambda", DisplayName: "Lambda Functions",  Checker: checkDdbLambda},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda},
+		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDdbBackup},
+		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs, NeedsTargetCache: true},
+		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkDdbVPCE, NeedsTargetCache: true},
+	})
+
+	// ddbtypes.TableDescription: SSEDescription.KMSMasterKeyArn
+	resource.RegisterNavigableFields("ddb", []resource.NavigableField{
+		{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
 	})
 }
 

@@ -118,10 +118,14 @@ func jsonExpandDetailModel(fields map[string]string, detailPaths []string) views
 		Name:   "test",
 		Fields: fields,
 	}
+	detailFields := make([]config.DetailField, len(detailPaths))
+	for i, p := range detailPaths {
+		detailFields[i] = config.DetailField{Path: p}
+	}
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: detailPaths,
+				Detail: detailFields,
 			},
 		},
 	}
@@ -199,7 +203,7 @@ func TestQA_JSONExpand_YAMLView_Unaffected(t *testing.T) {
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
-				Detail: []string{"Policy"},
+				Detail: []config.DetailField{{Path: "Policy"}},
 			},
 		},
 	}

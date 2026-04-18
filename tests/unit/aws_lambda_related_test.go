@@ -260,3 +260,67 @@ func TestRelated_Lambda_CFN_IsStub(t *testing.T) {
 	}
 	t.Error("expected related def for target cfn not found for lambda")
 }
+
+// ---------------------------------------------------------------------------
+// checkLambdaECR — Pattern F: no API call, reads PackageType + image_uri field
+// ---------------------------------------------------------------------------
+
+// TestRelated_Lambda_ECR_Match verifies that a container-image Lambda with an
+// image URI field returns Count=1 with the repository name.
+func TestRelated_Lambda_ECR_Match(t *testing.T) {
+	src := resource.Resource{
+		ID:   "my-image-function",
+		Name: "my-image-function",
+		Fields: map[string]string{
+			"image_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo:latest",
+		},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-image-function"),
+			PackageType:  lambdatypes.PackageTypeImage,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-ecr-repo" {
+		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Lambda_ECR_Empty verifies that a Zip-packaged Lambda returns
+// Count=0 (no ECR involvement).
+func TestRelated_Lambda_ECR_Empty(t *testing.T) {
+	src := resource.Resource{
+		ID:   "my-zip-function",
+		Name: "my-zip-function",
+		Fields: map[string]string{},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-zip-function"),
+			PackageType:  lambdatypes.PackageTypeZip,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (Zip package type, no ECR)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_ECR_WrongRawStruct verifies that a resource with a
+// non-FunctionConfiguration RawStruct returns Count=-1.
+func TestRelated_Lambda_ECR_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "my-function",
+		RawStruct: "not-a-function-configuration",
+	}
+	checker := lambdaCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}

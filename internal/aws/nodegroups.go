@@ -3,9 +3,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -13,18 +15,23 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"})
+	resource.RegisterFieldKeys("ng", []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size", "health_issues_count", "health_issues", "image_id"})
 
 	resource.RegisterRelated("ng", []resource.RelatedDef{
 		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkNGRole, NeedsTargetCache: true},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkNGASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkNGEC2, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkNGSG},
+		{TargetType: "ami", DisplayName: "AMI", Checker: checkNGAMI},
+		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkNGEBS},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNGSubnet},
 	})
 
 	resource.RegisterNavigableFields("ng", []resource.NavigableField{
 		{FieldPath: "ClusterName", TargetType: "eks"},
 		{FieldPath: "NodeRole", TargetType: "role"},
+		{FieldPath: "Subnets", TargetType: "subnet"},
 	})
 
 	resource.RegisterPaginated("ng", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -76,7 +83,11 @@ func init() {
 				if err != nil || descOutput.Nodegroup == nil {
 					continue
 				}
-				resources = append(resources, buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup))
+				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
+				if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+					res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+				}
+				resources = append(resources, res)
 			}
 		}
 
@@ -98,16 +109,24 @@ func init() {
 	})
 }
 
-// FetchNodeGroups performs a three-step fetch:
+// FetchNodeGroups performs a four-step fetch:
 // 1. ListClusters to get cluster names (paginated)
 // 2. ListNodegroups per cluster to get node group names (paginated)
 // 3. DescribeNodegroup per node group to get full details
+// 4. DescribeLaunchTemplateVersions for nodegroups with custom LaunchTemplates to resolve image_id
+//
+// The ltVersionsAPI parameter is optional (variadic). When omitted or nil, image_id is left empty.
 func FetchNodeGroups(
 	ctx context.Context,
 	listClustersAPI EKSListClustersAPI,
 	listNodegroupsAPI EKSListNodegroupsAPI,
 	describeNodegroupAPI EKSDescribeNodegroupAPI,
+	ltVersionsAPIs ...EC2DescribeLaunchTemplateVersionsAPI,
 ) ([]resource.Resource, error) {
+	var ltVersionsAPI EC2DescribeLaunchTemplateVersionsAPI
+	if len(ltVersionsAPIs) > 0 {
+		ltVersionsAPI = ltVersionsAPIs[0]
+	}
 	// Step 1: List all clusters (paginated)
 	var allClusters []string
 	var clusterNextToken *string
@@ -164,11 +183,41 @@ func FetchNodeGroups(
 			if descOutput.Nodegroup == nil {
 				continue
 			}
-			resources = append(resources, buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup))
+			res := buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup)
+			// Step 4: Resolve image_id from custom LaunchTemplate (non-fatal on error)
+			if descOutput.Nodegroup.LaunchTemplate != nil && descOutput.Nodegroup.LaunchTemplate.Id != nil {
+				imageID := resolveNGImageID(ctx, ltVersionsAPI, descOutput.Nodegroup.LaunchTemplate)
+				res.Fields["image_id"] = imageID
+			}
+			resources = append(resources, res)
 		}
 	}
 
 	return resources, nil
+}
+
+// resolveNGImageID calls DescribeLaunchTemplateVersions for the given LaunchTemplateSpecification
+// and returns the ImageId from the first version found. Returns "" on any error or missing data.
+func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) string {
+	if api == nil || lt == nil || lt.Id == nil {
+		return ""
+	}
+	version := "$Default"
+	if lt.Version != nil && *lt.Version != "" {
+		version = *lt.Version
+	}
+	out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+		LaunchTemplateId: lt.Id,
+		Versions:         []string{version},
+	})
+	if err != nil || out == nil || len(out.LaunchTemplateVersions) == 0 {
+		return ""
+	}
+	data := out.LaunchTemplateVersions[0].LaunchTemplateData
+	if data == nil || data.ImageId == nil {
+		return ""
+	}
+	return *data.ImageId
 }
 
 // buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.
@@ -191,16 +240,28 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		desiredSize = fmt.Sprintf("%d", *ng.ScalingConfig.DesiredSize)
 	}
 
+	// Wave 2: health.issues[] — populated by DescribeNodegroup (called per node group in fetcher).
+	healthIssuesCount := 0
+	var issueCodes []string
+	if ng.Health != nil {
+		for _, issue := range ng.Health.Issues {
+			healthIssuesCount++
+			issueCodes = append(issueCodes, string(issue.Code))
+		}
+	}
+
 	return resource.Resource{
 		ID:     nodegroupName,
 		Name:   nodegroupName,
 		Status: status,
 		Fields: map[string]string{
-			"nodegroup_name": nodegroupName,
-			"cluster_name":   ngClusterName,
-			"status":         status,
-			"instance_types": instanceTypes,
-			"desired_size":   desiredSize,
+			"nodegroup_name":      nodegroupName,
+			"cluster_name":        ngClusterName,
+			"status":              status,
+			"instance_types":      instanceTypes,
+			"desired_size":        desiredSize,
+			"health_issues_count": strconv.Itoa(healthIssuesCount),
+			"health_issues":       strings.Join(issueCodes, ","),
 		},
 		RawStruct: ng,
 	}

@@ -175,6 +175,19 @@ func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersio
 	}, nil
 }
 
+func (f *IAMFake) GetRole(_ context.Context, input *iam.GetRoleInput, _ ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+	if input.RoleName == nil {
+		return nil, fmt.Errorf("GetRole: role name is required")
+	}
+	for i := range f.fix.Roles {
+		if f.fix.Roles[i].RoleName != nil && *f.fix.Roles[i].RoleName == *input.RoleName {
+			r := f.fix.Roles[i]
+			return &iam.GetRoleOutput{Role: &r}, nil
+		}
+	}
+	return nil, fmt.Errorf("GetRole: role %q not found", *input.RoleName)
+}
+
 func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
 	if input.RoleName == nil {
 		return nil, fmt.Errorf("GetRolePolicy: role name is required")
@@ -189,4 +202,29 @@ func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput
 		RoleName:       input.RoleName,
 		PolicyDocument: aws.String(doc),
 	}, nil
+}
+
+// GetLoginProfile returns NoSuchEntityException for all users in demo mode
+// (no demo users have a console password configured).
+func (f *IAMFake) GetLoginProfile(_ context.Context, input *iam.GetLoginProfileInput, _ ...func(*iam.Options)) (*iam.GetLoginProfileOutput, error) {
+	userName := aws.ToString(input.UserName)
+	return nil, &iamtypes.NoSuchEntityException{
+		Message: aws.String(fmt.Sprintf("Login Profile for User %s cannot be found.", userName)),
+	}
+}
+
+// ListMFADevices returns an empty list for all users in demo mode.
+func (f *IAMFake) ListMFADevices(_ context.Context, _ *iam.ListMFADevicesInput, _ ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error) {
+	return &iam.ListMFADevicesOutput{MFADevices: []iamtypes.MFADevice{}}, nil
+}
+
+// ListAccessKeys returns an empty list for all users in demo mode.
+func (f *IAMFake) ListAccessKeys(_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
+	return &iam.ListAccessKeysOutput{AccessKeyMetadata: []iamtypes.AccessKeyMetadata{}}, nil
+}
+
+// GetInstanceProfile is a no-op stub for demo mode.
+// Demo mode fixture ASGs/EB environments do not reference named instance profiles.
+func (f *IAMFake) GetInstanceProfile(_ context.Context, _ *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
+	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -17,6 +18,7 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSGEC2, NeedsTargetCache: true},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkSGENI, NeedsTargetCache: true},
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSGELB, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSGLambda, NeedsTargetCache: true},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSGCFN, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true},
 	})
@@ -66,7 +68,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -101,7 +103,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -133,7 +135,7 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -183,9 +185,44 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
+}
+
+// checkSGLambda scans the Lambda cache for functions whose VpcConfig.SecurityGroupIds
+// slice contains this security group's ID. Pattern C — reverse lookup.
+func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	sgID := res.ID
+	if sgID == "" {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	list, truncated, err := sgRelatedResources(ctx, clients, cache, "lambda")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if list == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	var ids []string
+	for _, r := range list {
+		fn, ok := assertStruct[lambdatypes.FunctionConfiguration](r.RawStruct)
+		if !ok {
+			continue
+		}
+		if fn.VpcConfig == nil {
+			continue
+		}
+		if slices.Contains(fn.VpcConfig.SecurityGroupIds, sgID) {
+			ids = append(ids, r.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("lambda")
+	}
+	return relatedResult("lambda", ids)
 }
 
 // sgReferencedInPermissions returns true if any IpPermission in the slice contains
@@ -212,3 +249,4 @@ func sgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
+

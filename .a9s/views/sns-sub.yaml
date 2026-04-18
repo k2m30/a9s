@@ -8,6 +8,9 @@ list:
   Endpoint:
     path: Endpoint
     width: 48
+  Confirmed:
+    path: SubscriptionArn
+    width: 22
   Subscription ARN:
     path: SubscriptionArn
     width: 60

@@ -3,15 +3,15 @@
  ACTION                                                                                                                                            │  IAM Users
  Event:                kms:RotateKey                                                                                                               │  EC2 Instances
  Category:             Management / AwsServiceEvent                                                                                                │  S3 Buckets
- TARGET                                                                                                                                            │  S3 Objects
- Key:                  2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b                                                                                        │  Lambda Functions
- CONTEXT                                                                                                                                           │  RDS Instances
- Region:               us-east-1                                                                                                                   │  KMS Keys
- Source IP:            AWS Internal                                                                                                                │  Secrets
- Recipient:            444444444444 (cross-account)                                                                                                │  VPC Endpoints
- Time:                 2026-04-07T02:00:07Z                                                                                                        │  Security Groups
- REQUEST                                                                                                                                           │  DynamoDB Tables
- backingKey:           true                                                                                                                        │  CloudFormation Stacks
+ TARGET                                                                                                                                            │  Lambda Functions
+ Key:                  2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b                                                                                        │  RDS Instances
+ CONTEXT                                                                                                                                           │  KMS Keys
+ Region:               us-east-1                                                                                                                   │  Secrets
+ Source IP:            AWS Internal                                                                                                                │  VPC Endpoints
+ Recipient:            444444444444 (cross-account)                                                                                                │  Security Groups
+ Time:                 2026-04-07T02:00:07Z                                                                                                        │  DynamoDB Tables
+ REQUEST                                                                                                                                           │  CloudFormation Stacks
+ backingKey:           true                                                                                                                        │  CloudTrail Trails
  rotationType:         AUTOMATIC                                                                                                                   │  CT events by AccessKeyId
                                                                                                                                                    │  CT events by Username
                                                                                                                                                    │  CT events by EventName

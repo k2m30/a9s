@@ -3,10 +3,14 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
 	"strings"
 
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -44,7 +48,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -76,7 +80,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.ApproximateZero("cb")
 	}
 	return relatedResult("cb", ids)
 }
@@ -109,7 +113,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -123,14 +127,123 @@ func ecrCFNStackName(res resource.Resource) string {
 	return res.Fields["cfn_stack_name"]
 }
 
-// ecrRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func ecrRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
+
+// checkECRKMS extracts the KMS key from the ECR Repository's
+// EncryptionConfiguration.KmsKey field. Returns the key ID (last segment after "/").
+// Pattern F — no cache needed.
+func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
+	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := *repo.EncryptionConfiguration.KmsKey
+	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
+		keyID = keyID[idx+1:]
+	}
+	return relatedResult("kms", []string{keyID})
+}
+
+
+
+
+
+
+// checkECREbRule is a reverse-scan checker for the ecr→eb-rule relationship.
+// Iterates cache["eb-rule"]; for each rule, checks if rule.EventPattern JSON
+// contains source: ["aws.ecr"] AND (detail.repository-name == repo name OR
+// resources containing the repo ARN). NeedsTargetCache: true.
+func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	repoName := ""
+	if repo.RepositoryName != nil {
+		repoName = *repo.RepositoryName
+	}
+	if repoName == "" {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+	repoARN := ""
+	if repo.RepositoryArn != nil {
+		repoARN = *repo.RepositoryArn
+	}
+
+	entry, ok := cache["eb-rule"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule"}
+	}
+
+	var ids []string
+	for _, ruleRes := range entry.Resources {
+		raw, ok := assertStruct[eventbridgetypes.Rule](ruleRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if raw.EventPattern == nil || *raw.EventPattern == "" {
+			continue
+		}
+		if ecrEbRuleMatches(*raw.EventPattern, repoName, repoARN) {
+			ids = append(ids, ruleRes.ID)
 		}
 	}
-	return resources, isTruncated, err
+	result := relatedResult("eb-rule", ids)
+	result.Approximate = entry.IsTruncated
+	return result
 }
+
+// ecrEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecr"]
+// and references the repository by name or ARN.
+func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
+	var p map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(pattern), &p); err != nil {
+		return false
+	}
+
+	// Check source includes "aws.ecr"
+	if src, ok := p["source"]; ok {
+		var sources []string
+		if err := json.Unmarshal(src, &sources); err != nil || !slices.Contains(sources, "aws.ecr") {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	// Check detail.repository-name or resources match.
+	// If a repository-name filter is present but doesn't match, return false.
+	// Only fall through to "no filter → broad match" when no filter key exists.
+	hasRepoFilter := false
+	if detail, ok := p["detail"]; ok {
+		var d map[string]json.RawMessage
+		if err := json.Unmarshal(detail, &d); err == nil {
+			if rn, ok := d["repository-name"]; ok {
+				hasRepoFilter = true
+				var names []string
+				if err := json.Unmarshal(rn, &names); err == nil && slices.Contains(names, repoName) {
+					return true
+				}
+			}
+		}
+	}
+	if repoARN != "" {
+		if resources, ok := p["resources"]; ok {
+			hasRepoFilter = true
+			var res []string
+			if err := json.Unmarshal(resources, &res); err == nil {
+				for _, r := range res {
+					if strings.Contains(r, repoARN) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	if hasRepoFilter {
+		// A filter existed but didn't match — not related.
+		return false
+	}
+	// Source matches aws.ecr with no repository filter — treat as broad match.
+	return true
+}
+

@@ -63,8 +63,8 @@ func TestConfigYAMLParsing(t *testing.T) {
 	}
 	wantDetail := []string{"instanceId", "state", "instanceType", "placement"}
 	for i, want := range wantDetail {
-		if ec2.Detail[i] != want {
-			t.Errorf("ec2.Detail[%d] = %q, want %q", i, ec2.Detail[i], want)
+		if ec2.Detail[i].String() != want {
+			t.Errorf("ec2.Detail[%d] = %q, want %q", i, ec2.Detail[i].String(), want)
 		}
 	}
 
@@ -372,8 +372,8 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 
 		// Check each detail path
 		for i, defPath := range defView.Detail {
-			if yamlView.Detail[i] != defPath {
-				t.Errorf("%s.Detail[%d]: yaml=%q, default=%q", name, i, yamlView.Detail[i], defPath)
+			if yamlView.Detail[i].String() != defPath.String() {
+				t.Errorf("%s.Detail[%d]: yaml=%q, default=%q", name, i, yamlView.Detail[i].String(), defPath.String())
 			}
 		}
 	}
