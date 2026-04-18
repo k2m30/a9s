@@ -227,6 +227,14 @@ type EnrichmentCheckedMsg struct {
 	// cached rows. Keyed by resource ID then by field key. Nil when the
 	// enricher produced no field updates.
 	FieldUpdates map[string]map[string]string
+	// TruncatedIDs carries the per-resource truncation signal from the enricher.
+	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the
+	// enricher could not fully inspect them (per-resource API error or page cap).
+	TruncatedIDs map[string]bool
+	// UnmatchedIDs carries API identifiers the enricher could not normalize to a
+	// Resource.ID. Surfaced in the main-menu badge as "N unattributable"
+	// telemetry so identity-mismatch regressions are visible.
+	UnmatchedIDs []string
 	Err          error // enrichment error (nil on success)
 	Gen          int   // session-wide generation counter (stale probe protection; profile/region switch)
 	TypeGen      int   // per-type generation counter; bumped on every rerun for that type. Stale

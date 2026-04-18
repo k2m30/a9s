@@ -65,6 +65,10 @@ type ResourceListModel struct {
 	enrichmentIssueCount int                                   // unified Wave-1 + Wave-2 distinct-instance count
 	enrichmentTruncated  bool                                  // true if enrichment count is a lower bound
 	findingsByID         map[string]resource.EnrichmentFinding // this type's per-resource findings
+	// truncatedByID is populated by SetTruncatedIDs. Resources in this set
+	// had their enrichment truncated (per-resource API error or page cap) and
+	// are rendered with a "?" prefix in the identity column.
+	truncatedByID map[string]bool
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -592,9 +596,14 @@ func (m *ResourceListModel) ApplyFieldUpdates(updates map[string]map[string]stri
 	m.styledRowCache = nil
 }
 
+// SetTruncatedIDs stores the per-resource truncation set for this resource type.
+func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {
+	m.truncatedByID = truncatedIDs
+	m.styledRowCache = nil
+}
+
 // InvalidateStyleCache clears the styled row cache, forcing re-render
 // with current styles. Called after theme changes.
 func (m *ResourceListModel) InvalidateStyleCache() {
 	m.styledRowCache = nil
 }
-
