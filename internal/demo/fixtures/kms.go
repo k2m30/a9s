@@ -64,6 +64,50 @@ func NewKMSFixtures() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)),
 			Enabled:      true,
 		},
+		// Disabled → Warning
+		{
+			KeyId:        aws.String("d4e5f6a7-bcde-1234-5678-aabbccddeeff"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/d4e5f6a7-bcde-1234-5678-aabbccddeeff"),
+			Description:  aws.String("Disabled encryption key — suspended pending audit"),
+			KeyState:     kmstypes.KeyStateDisabled,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2024, 3, 10, 8, 0, 0, 0, time.UTC)),
+			Enabled:      false,
+		},
+		// PendingDeletion → Broken
+		{
+			KeyId:        aws.String("e5f6a7b8-cdef-2345-6789-bbccddeeffe0"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/e5f6a7b8-cdef-2345-6789-bbccddeeffe0"),
+			Description:  aws.String("Key scheduled for deletion in 14 days"),
+			KeyState:     kmstypes.KeyStatePendingDeletion,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2024, 6, 20, 10, 0, 0, 0, time.UTC)),
+			Enabled:      false,
+		},
+		// Customer-managed key with no rotation (rotation status is a separate Wave-2 call)
+		{
+			KeyId:        aws.String("f6a7b8c9-def0-3456-789a-ccddeeff0011"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/f6a7b8c9-def0-3456-789a-ccddeeff0011"),
+			Description:  aws.String("Customer-managed CMK with rotation disabled"),
+			KeyState:     kmstypes.KeyStateEnabled,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2023, 11, 1, 12, 0, 0, 0, time.UTC)),
+			Enabled:      true,
+		},
+		// Unavailable → Broken
+		{
+			KeyId:        aws.String("a7b8c9d0-ef01-4567-89ab-ddeeff001122"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a7b8c9d0-ef01-4567-89ab-ddeeff001122"),
+			Description:  aws.String("Key unavailable — custom key store connection lost"),
+			KeyState:     kmstypes.KeyStateUnavailable,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
+			Enabled:      false,
+		},
 	}
 
 	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata))
@@ -91,6 +135,27 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-rotation-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-rotation-key"),
 			TargetKeyId: aws.String("2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
+		},
+		// Issue-state aliases
+		{
+			AliasName:   aws.String("alias/aws/disabled-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/aws/disabled-key"),
+			TargetKeyId: aws.String("d4e5f6a7-bcde-1234-5678-aabbccddeeff"),
+		},
+		{
+			AliasName:   aws.String("alias/pending-deletion-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/pending-deletion-key"),
+			TargetKeyId: aws.String("e5f6a7b8-cdef-2345-6789-bbccddeeffe0"),
+		},
+		{
+			AliasName:   aws.String("alias/no-rotation-cmk"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/no-rotation-cmk"),
+			TargetKeyId: aws.String("f6a7b8c9-def0-3456-789a-ccddeeff0011"),
+		},
+		{
+			AliasName:   aws.String("alias/unavailable-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/unavailable-key"),
+			TargetKeyId: aws.String("a7b8c9d0-ef01-4567-89ab-ddeeff001122"),
 		},
 	}
 

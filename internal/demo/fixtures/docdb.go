@@ -97,6 +97,56 @@ func buildDocDBClusters() []docdbtypes.DBCluster {
 			DBSubnetGroup:     aws.String("acme-docdb-subnet-group"),
 			ClusterCreateTime: aws.Time(mustTime("2025-11-05T08:30:00Z")),
 		},
+		// Issue: Status=failed → Broken (cluster provisioning or failover failed)
+		{
+			DBClusterIdentifier:   aws.String("dbc-failed"),
+			DBClusterArn:          aws.String("arn:aws:rds:us-east-1:123456789012:cluster:dbc-failed"),
+			Engine:                aws.String("docdb"),
+			EngineVersion:         aws.String("5.0.0"),
+			Status:                aws.String("failed"),
+			Endpoint:              aws.String("dbc-failed.cluster-c9xyz123.us-east-1.docdb.amazonaws.com"),
+			Port:                  aws.Int32(27017),
+			StorageEncrypted:      aws.Bool(true),
+			KmsKeyId:              aws.String(docdbKMSKeyID),
+			DeletionProtection:    aws.Bool(false),
+			BackupRetentionPeriod: aws.Int32(1),
+			DBClusterMembers:      []docdbtypes.DBClusterMember{},
+			MasterUsername:        aws.String("admin"),
+			MultiAZ:               aws.Bool(false),
+			VpcSecurityGroups: []docdbtypes.VpcSecurityGroupMembership{
+				{VpcSecurityGroupId: aws.String(docdbSGID), Status: aws.String("active")},
+			},
+			DBSubnetGroup:     aws.String("acme-docdb-subnet-group"),
+			ClusterCreateTime: aws.Time(mustTime("2026-04-10T12:00:00Z")),
+		},
+		// Issue: available but no member with IsClusterWriter=true → Broken (no primary)
+		{
+			DBClusterIdentifier:        aws.String("dbc-no-writer"),
+			DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:dbc-no-writer"),
+			Engine:                     aws.String("docdb"),
+			EngineVersion:              aws.String("5.0.0"),
+			Status:                     aws.String("available"),
+			Endpoint:                   aws.String("dbc-no-writer.cluster-c9xyz123.us-east-1.docdb.amazonaws.com"),
+			ReaderEndpoint:             aws.String("dbc-no-writer.cluster-ro-c9xyz123.us-east-1.docdb.amazonaws.com"),
+			Port:                       aws.Int32(27017),
+			StorageEncrypted:           aws.Bool(true),
+			KmsKeyId:                   aws.String(docdbKMSKeyID),
+			DeletionProtection:         aws.Bool(false),
+			BackupRetentionPeriod:      aws.Int32(7),
+			PreferredMaintenanceWindow: aws.String("sat:05:00-sat:06:00"),
+			// Both members are readers — no writer elected (post-failover edge case)
+			DBClusterMembers: []docdbtypes.DBClusterMember{
+				{DBInstanceIdentifier: aws.String("dbc-no-writer-01"), IsClusterWriter: aws.Bool(false)},
+				{DBInstanceIdentifier: aws.String("dbc-no-writer-02"), IsClusterWriter: aws.Bool(false)},
+			},
+			MasterUsername: aws.String("admin"),
+			MultiAZ:        aws.Bool(true),
+			VpcSecurityGroups: []docdbtypes.VpcSecurityGroupMembership{
+				{VpcSecurityGroupId: aws.String(docdbSGID), Status: aws.String("active")},
+			},
+			DBSubnetGroup:     aws.String("acme-docdb-subnet-group"),
+			ClusterCreateTime: aws.Time(mustTime("2025-09-01T08:00:00Z")),
+		},
 	}
 }
 

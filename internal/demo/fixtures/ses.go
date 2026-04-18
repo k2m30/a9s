@@ -32,6 +32,27 @@ func NewSESFixtures() *SESFixtures {
 				SendingEnabled:     false,
 				VerificationStatus: sesv2types.VerificationStatusPending,
 			},
+			// Issue: VerificationStatus=Pending → Warning (verification DNS record not yet detected)
+			{
+				IdentityName:       aws.String("staging.acmecorp.com"),
+				IdentityType:       sesv2types.IdentityTypeDomain,
+				SendingEnabled:     false,
+				VerificationStatus: sesv2types.VerificationStatusPending,
+			},
+			// Issue: VerificationStatus=Failed → Broken (domain verification definitively failed)
+			{
+				IdentityName:       aws.String("ses-failed.acmecorp.com"),
+				IdentityType:       sesv2types.IdentityTypeDomain,
+				SendingEnabled:     false,
+				VerificationStatus: sesv2types.VerificationStatusFailed,
+			},
+			// Issue: Success but SendingEnabled=false → Warning (verified but sending disabled)
+			{
+				IdentityName:       aws.String("suppressed@acmecorp.com"),
+				IdentityType:       sesv2types.IdentityTypeEmailAddress,
+				SendingEnabled:     false,
+				VerificationStatus: sesv2types.VerificationStatusSuccess,
+			},
 		},
 	}
 }

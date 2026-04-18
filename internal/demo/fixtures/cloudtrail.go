@@ -39,6 +39,9 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/security-audit-trail": {
 			IsLogging: aws.Bool(false),
 		},
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/legacy-validation-disabled": {
+			IsLogging: aws.Bool(true),
+		},
 	}
 }
 
@@ -99,6 +102,19 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			LogFileValidationEnabled:   aws.Bool(true),
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(true),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		// LogFileValidationEnabled=false → Wave-1 Warning
+		{
+			Name:                       aws.String("legacy-validation-disabled"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/legacy-validation-disabled"),
+			S3BucketName:               aws.String("legacy-audit-logs-bucket"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(false),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
 		},
 	}

@@ -93,6 +93,31 @@ func NewSecretsFixtures() *SecretsFixtures {
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2025, 3, 15, 9, 0, 0, 0, time.UTC)),
 		},
+		// Issue: RotationEnabled=true, LastRotatedDate=2025-09-01 (>2×30d=60d ago) → Broken (rotation failing)
+		{
+			Name:              aws.String("prod/app/rotation-broken"),
+			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/rotation-broken-YzAbCd"),
+			Description:       aws.String("API key with broken automatic rotation"),
+			LastAccessedDate:  aws.Time(time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:   aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:   aws.Bool(true),
+			LastRotatedDate:   aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
+			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-api-key"),
+			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
+			CreatedDate:       aws.Time(time.Date(2024, 8, 15, 10, 0, 0, 0, time.UTC)),
+			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+		},
+		// Issue: DeletedDate set → Warning (pending deletion, restore window)
+		{
+			Name:             aws.String("dev/deprecated/old-webhook-key"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:dev/deprecated/old-webhook-key-EfGhIj"),
+			Description:      aws.String("Deprecated webhook key scheduled for deletion"),
+			LastAccessedDate: aws.Time(time.Date(2025, 10, 15, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(false),
+			CreatedDate:      aws.Time(time.Date(2024, 3, 1, 8, 0, 0, 0, time.UTC)),
+			DeletedDate:      aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+		},
 	}
 
 	for i := range 18 {

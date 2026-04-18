@@ -168,6 +168,18 @@ func buildIAMRoles() []iamtypes.Role {
 		},
 	}
 
+	// Issue: AssumeRolePolicyDocument with Principal="*" without condition → Broken (wildcard trust)
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("wildcard-trust-role"),
+		RoleId:                   aws.String("AROAEXAMPLE777777777"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/wildcard-trust-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 8, 10, 12, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Legacy role with overly broad trust — any AWS principal can assume it"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole"}]}`),
+		MaxSessionDuration:       aws.Int32(3600),
+	})
+
 	// CT-event cross-reference roles for ctdetail nav tests
 	for _, rd := range []struct{ id, desc string }{
 		{"KarpenterNodeRole", "Karpenter node provisioner role (ct-events case A cross-ref)"},
@@ -286,6 +298,30 @@ func buildIAMPolicies() []iamtypes.Policy {
 		},
 	}
 
+	// Issue: AttachmentCount=0 → Warning (orphaned policy — never attached to any entity)
+	policies = append(policies, iamtypes.Policy{
+		PolicyName:       aws.String("orphan-unattached-policy"),
+		PolicyId:         aws.String("ANPAEXAMPLE555555555"),
+		Arn:              aws.String("arn:aws:iam::123456789012:policy/orphan-unattached-policy"),
+		AttachmentCount:  aws.Int32(0),
+		Path:             aws.String("/"),
+		CreateDate:       aws.Time(time.Date(2024, 5, 1, 11, 0, 0, 0, time.UTC)),
+		DefaultVersionId: aws.String("v1"),
+		Description:      aws.String("Legacy policy never attached — leftover from a decommissioned project"),
+	})
+
+	// Issue: wildcard Action+Resource → Broken (overly permissive policy)
+	policies = append(policies, iamtypes.Policy{
+		PolicyName:       aws.String("wildcard-allow-policy"),
+		PolicyId:         aws.String("ANPAEXAMPLE666666666"),
+		Arn:              aws.String("arn:aws:iam::123456789012:policy/wildcard-allow-policy"),
+		AttachmentCount:  aws.Int32(1),
+		Path:             aws.String("/"),
+		CreateDate:       aws.Time(time.Date(2024, 3, 20, 9, 0, 0, 0, time.UTC)),
+		DefaultVersionId: aws.String("v1"),
+		Description:      aws.String("Legacy admin policy with wildcard actions — should be replaced with least-privilege"),
+	})
+
 	// Generate 18 more policies
 	policyNames := []string{
 		"acme-ec2-describe", "acme-rds-connect", "acme-sqs-send", "acme-sns-publish",
@@ -351,6 +387,24 @@ func buildIAMUsers() []iamtypes.User {
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2026, 4, 7, 15, 10, 5, 0, time.UTC)),
 		},
+		// Issue: PasswordLastUsed >365d ago → Warning (dormant user, possible stale credential)
+		{
+			UserName:         aws.String("former-contractor"),
+			UserId:           aws.String("AIDAEXAMPLE666666666"),
+			Arn:              aws.String("arn:aws:iam::123456789012:user/former-contractor"),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2023, 1, 15, 9, 0, 0, 0, time.UTC)),
+			PasswordLastUsed: aws.Time(time.Date(2024, 6, 1, 14, 0, 0, 0, time.UTC)),
+		},
+		// Issue: PasswordLastUsed=nil (never logged in) with old CreateDate → Warning (unused console access)
+		{
+			UserName:   aws.String("legacy-service-user"),
+			UserId:     aws.String("AIDAEXAMPLE777777777"),
+			Arn:        aws.String("arn:aws:iam::123456789012:user/service-accounts/legacy-service-user"),
+			Path:       aws.String("/service-accounts/"),
+			CreateDate: aws.Time(time.Date(2022, 11, 10, 8, 0, 0, 0, time.UTC)),
+			// PasswordLastUsed omitted — user never logged in via console
+		},
 	}
 }
 
@@ -376,6 +430,14 @@ func buildIAMGroups() []iamtypes.Group {
 			Arn:        aws.String("arn:aws:iam::123456789012:group/readonly"),
 			Path:       aws.String("/"),
 			CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 10, 0, 0, time.UTC)),
+		},
+		// Issue: empty group (no users) → Warning (unused IAM group, potential access confusion)
+		{
+			GroupName:  aws.String("empty-group"),
+			GroupId:    aws.String("AGPAEXAMPLE444444444"),
+			Arn:        aws.String("arn:aws:iam::123456789012:group/empty-group"),
+			Path:       aws.String("/"),
+			CreateDate: aws.Time(time.Date(2024, 8, 15, 10, 0, 0, 0, time.UTC)),
 		},
 	}
 }
@@ -460,4 +522,9 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
 
 	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
+
+	// Issue role: wildcard trust — no external-id condition
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/orphan-unattached-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::acme-old-project-*/*"}]}`)
+
+	f.PolicyDocuments["arn:aws:iam::123456789012:policy/wildcard-allow-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}`)
 }

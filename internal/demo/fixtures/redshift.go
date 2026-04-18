@@ -74,6 +74,53 @@ func NewRedshiftFixtures() *RedshiftFixtures {
 					Port:    aws.Int32(5439),
 				},
 			},
+			// Issue: ClusterStatus=resizing → Warning (online resize in progress)
+			{
+				ClusterIdentifier:   aws.String("redshift-resizing"),
+				ClusterStatus:       aws.String("resizing"),
+				NodeType:            aws.String("ra3.xlplus"),
+				NumberOfNodes:       aws.Int32(4),
+				DBName:              aws.String("analytics"),
+				MasterUsername:      aws.String("admin"),
+				ClusterCreateTime:   aws.Time(mustParseRedshiftTime("2025-05-01T10:00:00+00:00")),
+				ClusterNamespaceArn: aws.String("arn:aws:redshift:us-east-1:123456789012:namespace:redshift-resizing"),
+				AvailabilityZone:    aws.String("us-east-1a"),
+				VpcId:               aws.String(redshiftProdVPCID),
+				Endpoint: &redshifttypes.Endpoint{
+					Address: aws.String("redshift-resizing.c9xyz123.us-east-1.redshift.amazonaws.com"),
+					Port:    aws.Int32(5439),
+				},
+			},
+			// Issue: ClusterStatus=incompatible-network → Broken (VPC routing broken)
+			{
+				ClusterIdentifier:   aws.String("redshift-incompatible-network"),
+				ClusterStatus:       aws.String("incompatible-network"),
+				NodeType:            aws.String("ra3.xlplus"),
+				NumberOfNodes:       aws.Int32(2),
+				DBName:              aws.String("prod"),
+				MasterUsername:      aws.String("admin"),
+				ClusterCreateTime:   aws.Time(mustParseRedshiftTime("2025-11-10T08:00:00+00:00")),
+				ClusterNamespaceArn: aws.String("arn:aws:redshift:us-east-1:123456789012:namespace:redshift-incompatible-network"),
+				AvailabilityZone:    aws.String("us-east-1b"),
+				VpcId:               aws.String(redshiftProdVPCID),
+			},
+			// Issue: ClusterStatus=storage-full → Broken (disk exhausted)
+			{
+				ClusterIdentifier:   aws.String("redshift-storage-full"),
+				ClusterStatus:       aws.String("storage-full"),
+				NodeType:            aws.String("dc2.large"),
+				NumberOfNodes:       aws.Int32(2),
+				DBName:              aws.String("dwh"),
+				MasterUsername:      aws.String("admin"),
+				ClusterCreateTime:   aws.Time(mustParseRedshiftTime("2025-08-20T14:00:00+00:00")),
+				ClusterNamespaceArn: aws.String("arn:aws:redshift:us-east-1:123456789012:namespace:redshift-storage-full"),
+				AvailabilityZone:    aws.String("us-east-1a"),
+				VpcId:               aws.String(redshiftProdVPCID),
+				Endpoint: &redshifttypes.Endpoint{
+					Address: aws.String("redshift-storage-full.c9xyz123.us-east-1.redshift.amazonaws.com"),
+					Port:    aws.Int32(5439),
+				},
+			},
 		},
 	}
 }

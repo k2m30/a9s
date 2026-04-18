@@ -117,6 +117,51 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "dev",
 			},
 		},
+		// Status=FAILED → Color:Broken
+		{
+			Name:    aws.String("acme-staging-failed"),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-staging-failed"),
+			Version: aws.String("1.29"),
+			Status:  ekstypes.ClusterStatusFailed,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:    aws.String(eksVPCID),
+				SubnetIds: []string{eksSubnetA, eksSubnetB},
+			},
+			CreatedAt: aws.Time(mustTime("2026-04-01T11:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "staging",
+			},
+		},
+		// Status=ACTIVE with Health.Issues → health_issues_count field triggers Broken
+		{
+			Name:    aws.String("acme-degraded-prod"),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-degraded-prod"),
+			Version: aws.String("1.28"),
+			Status:  ekstypes.ClusterStatusActive,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:    aws.String(eksVPCID),
+				SubnetIds: []string{eksSubnetA, eksSubnetB, eksSubnetC},
+			},
+			Health: &ekstypes.ClusterHealth{
+				Issues: []ekstypes.ClusterIssue{
+					{
+						Code:    ekstypes.ClusterIssueCodeConfigurationConflict,
+						Message: aws.String("Subnet subnet-0aaa111111111111a not found"),
+					},
+					{
+						Code:    ekstypes.ClusterIssueCodeAccessDenied,
+						Message: aws.String("Cluster role missing eks:DescribeCluster"),
+					},
+				},
+			},
+			CreatedAt: aws.Time(mustTime("2025-01-10T08:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "prod",
+				"Team":        "platform",
+			},
+		},
 	}
 }
 
@@ -178,6 +223,98 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 				Version:        aws.String("1.29"),
 				Tags: map[string]string{
 					"Environment": "staging",
+				},
+			},
+			// Status=UPDATING → Warning state (no health issues)
+			{
+				NodegroupName: aws.String("acme-staging-updating"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-staging/acme-staging-updating/fed09876"),
+				ClusterName:   aws.String("acme-staging"),
+				Status:        ekstypes.NodegroupStatusUpdating,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(30),
+				InstanceTypes: []string{"t3.medium"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(1),
+					MaxSize:     aws.Int32(4),
+					DesiredSize: aws.Int32(2),
+				},
+				CreatedAt:      aws.Time(mustTime("2025-06-20T10:00:00Z")),
+				ReleaseVersion: aws.String("1.30.0-20250101"),
+				Version:        aws.String("1.30"),
+				Tags: map[string]string{
+					"Environment": "staging",
+				},
+			},
+		},
+		// Degraded + Failed node groups under acme-prod
+		"acme-prod-issue-ngs": {
+			// Status=DEGRADED with InsufficientFreeAddresses issue → Broken
+			{
+				NodegroupName: aws.String("acme-prod-degraded-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-prod/acme-prod-degraded-pool/aaa11111"),
+				ClusterName:   aws.String("acme-prod"),
+				Status:        ekstypes.NodegroupStatusDegraded,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(50),
+				InstanceTypes: []string{"m5.xlarge"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(2),
+					MaxSize:     aws.Int32(6),
+					DesiredSize: aws.Int32(4),
+				},
+				Health: &ekstypes.NodegroupHealth{
+					Issues: []ekstypes.Issue{
+						{
+							Code:    ekstypes.NodegroupIssueCodeInsufficientFreeAddresses,
+							Message: aws.String("Subnet has run out of addresses"),
+						},
+					},
+				},
+				CreatedAt:      aws.Time(mustTime("2025-03-05T12:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Status=CREATE_FAILED with two issues → Broken
+			{
+				NodegroupName: aws.String("acme-prod-failed-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-prod/acme-prod-failed-pool/bbb22222"),
+				ClusterName:   aws.String("acme-prod"),
+				Status:        ekstypes.NodegroupStatusCreateFailed,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(50),
+				InstanceTypes: []string{"m5.2xlarge"},
+				Subnets:       []string{eksSubnetA, eksSubnetB, eksSubnetC},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(3),
+					MaxSize:     aws.Int32(10),
+					DesiredSize: aws.Int32(5),
+				},
+				Health: &ekstypes.NodegroupHealth{
+					Issues: []ekstypes.Issue{
+						{
+							Code:    ekstypes.NodegroupIssueCodeEc2LaunchTemplateVersionMismatch,
+							Message: aws.String("Launch template version mismatch detected"),
+						},
+						{
+							Code:    ekstypes.NodegroupIssueCodeAutoScalingGroupInvalidConfiguration,
+							Message: aws.String("Auto Scaling group configuration is invalid"),
+						},
+					},
+				},
+				CreatedAt:      aws.Time(mustTime("2026-04-10T08:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "prod",
 				},
 			},
 		},

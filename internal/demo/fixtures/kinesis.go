@@ -48,6 +48,16 @@ func NewKinesisFixtures() *KinesisFixtures {
 					StreamMode: kinesistypes.StreamModeOnDemand,
 				},
 			},
+			// Issue: StreamStatus=DELETING → Warning (stream being torn down)
+			{
+				StreamName:              aws.String("kinesis-deleting"),
+				StreamARN:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/kinesis-deleting"),
+				StreamStatus:            kinesistypes.StreamStatusDeleting,
+				StreamCreationTimestamp: aws.Time(mustParseKinesisTime("2025-01-10T10:00:00+00:00")),
+				StreamModeDetails: &kinesistypes.StreamModeDetails{
+					StreamMode: kinesistypes.StreamModeProvisioned,
+				},
+			},
 		},
 	}
 }

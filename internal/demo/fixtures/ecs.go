@@ -38,6 +38,7 @@ const (
 	ecsClusterArnServices = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"
 	ecsClusterArnBatch    = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"
 	ecsClusterArnStaging  = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-staging"
+	ecsClusterArnFailed   = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-failed"
 )
 
 var ecsServiceNamePool = []string{
@@ -110,6 +111,20 @@ func buildECSClusters() []ecstypes.Cluster {
 			},
 			Tags: []ecstypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// Issue: Status=FAILED → Broken
+		{
+			ClusterName:                       aws.String("acme-cluster-failed"),
+			ClusterArn:                        aws.String(ecsClusterArnFailed),
+			Status:                            aws.String("FAILED"),
+			RunningTasksCount:                 0,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               0,
+			RegisteredContainerInstancesCount: 0,
+			CapacityProviders:                 []string{"FARGATE"},
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 	}
@@ -221,6 +236,43 @@ func buildECSServices() []ecstypes.Service {
 			},
 		},
 	}
+
+	// Issue: Status=INACTIVE → Broken (service deregistered / stopped)
+	named = append(named, ecstypes.Service{
+		ServiceName:        aws.String("acme-svc-inactive"),
+		ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/acme-svc-inactive"),
+		ClusterArn:         aws.String(ecsClusterArnServices),
+		Status:             aws.String("INACTIVE"),
+		DesiredCount:       0,
+		RunningCount:       0,
+		PendingCount:       0,
+		LaunchType:         ecstypes.LaunchTypeFargate,
+		TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-inactive:1"),
+		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+		CreatedAt:          aws.Time(mustTime("2024-09-01T08:00:00Z")),
+		Tags: []ecstypes.Tag{
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
+	// Issue: ACTIVE but RunningCount < DesiredCount → Warning (underprovisioned)
+	named = append(named, ecstypes.Service{
+		ServiceName:        aws.String("acme-svc-degraded"),
+		ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/acme-svc-degraded"),
+		ClusterArn:         aws.String(ecsClusterArnServices),
+		Status:             aws.String("ACTIVE"),
+		DesiredCount:       5,
+		RunningCount:       2,
+		PendingCount:       0,
+		LaunchType:         ecstypes.LaunchTypeFargate,
+		TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-degraded:3"),
+		SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+		CreatedAt:          aws.Time(mustTime("2025-01-12T10:00:00Z")),
+		Tags: []ecstypes.Tag{
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+			{Key: aws.String("Team"), Value: aws.String("platform")},
+		},
+	})
 
 	// Generate 17 more services to reach 22 total.
 	for i := range 17 {
@@ -340,6 +392,42 @@ func buildECSTasks() []ecstypes.Task {
 			StoppedReason:     aws.String("Service draining"),
 			StopCode:          ecstypes.TaskStopCodeServiceSchedulerInitiated,
 			AvailabilityZone:  aws.String("us-east-1b"),
+		},
+		// Issue: lastStatus=STOPPED, StopCode=TaskFailedToStart → Broken
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/f6a1b2c3d4e5f60102030405"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("STOPPED"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/acme-svc-degraded:3"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("512"),
+			Memory:            aws.String("1024"),
+			Group:             aws.String("service:acme-svc-degraded"),
+			CreatedAt:         aws.Time(mustTime("2026-04-18T07:00:00Z")),
+			StoppedAt:         aws.Time(mustTime("2026-04-18T07:02:00Z")),
+			StoppedReason:     aws.String("Task failed to start: container runtime error"),
+			StopCode:          ecstypes.TaskStopCodeTaskFailedToStart,
+			HealthStatus:      ecstypes.HealthStatusUnknown,
+			AvailabilityZone:  aws.String("us-east-1a"),
+		},
+		// Issue: lastStatus=RUNNING, healthStatus=UNHEALTHY → Broken
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/a7b8c9d0e1f2a7b8c9d0e1f2"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("RUNNING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("512"),
+			Memory:            aws.String("1024"),
+			Group:             aws.String("service:api-gateway"),
+			StartedAt:         aws.Time(mustTime("2026-04-17T20:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusUnhealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1c"),
 		},
 	}
 }
