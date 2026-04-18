@@ -87,12 +87,15 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 
 		// Compute days_left until certificate expiry.
 		// Format: "<N> days" for future expiry, "expired" for past expiry.
+		// Check NotAfter against now directly so sub-day past expiry shows
+		// "expired" rather than truncating to "0 days".
 		daysLeft := ""
 		if cert.NotAfter != nil {
-			d := int(time.Until(*cert.NotAfter).Hours() / 24)
-			if d < 0 {
+			now := time.Now()
+			if !cert.NotAfter.After(now) {
 				daysLeft = "expired"
 			} else {
+				d := int(cert.NotAfter.Sub(now).Hours() / 24)
 				daysLeft = fmt.Sprintf("%d days", d)
 			}
 		}
