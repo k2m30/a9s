@@ -228,7 +228,6 @@ func (m ResourceListModel) FilterText() string {
 	return m.filterText
 }
 
-// AttentionOnly returns the current state of the ctrl+z attention filter.
 // AttentionOnly reports whether the ctrl+z attention filter is active.
 func (m ResourceListModel) AttentionOnly() bool {
 	return m.IsEnabled()

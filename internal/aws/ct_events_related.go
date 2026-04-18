@@ -340,11 +340,14 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 }
 
 // checkCtEventsRDS extracts RDS instance/cluster identifiers from the CloudTrail event.
-// TargetType is "rds" which is an alias for the "dbi" resource type.
+// TargetType is "dbi" — the canonical short name for RDS DB instances. FetchRelatedTarget
+// and the related-resource cache are keyed by canonical short names, so this checker
+// MUST use "dbi" for every cache lookup and result construction (not "rds", which is an
+// alias without a registered paginated fetcher).
 func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
 	var ids []string
@@ -377,15 +380,15 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "rds")
+	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1, Err: err}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -401,9 +404,9 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.ApproximateZero("rds")
+		return resource.ApproximateZero("dbi")
 	}
-	return relatedResult("rds", matched)
+	return relatedResult("dbi", matched)
 }
 
 // checkCtEventsKMS extracts KMS key IDs from the CloudTrail event.

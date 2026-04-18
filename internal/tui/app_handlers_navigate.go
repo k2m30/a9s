@@ -339,13 +339,9 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.enrichmentRan = make(map[string]bool)
 		m.enrichmentTypeGen = make(map[string]int)
 		m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
-		m.enrichmentUnmatchedIDs = make(map[string][]string)
 		m.probeResources = make(map[string][]resource.Resource)
-		// Reset the menu's view-side state (availability, issue counts,
-		// unmatched badges) in lockstep with the model-side maps above. If
-		// an enricher now fails before SetUnmatched is called for a type,
-		// the stale "(N unattributable)" badge from the previous run must
-		// not persist.
+		// Reset the menu's view-side state (availability, issue counts) in
+		// lockstep with the model-side maps above.
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			menu.ClearAvailability()
 		}
@@ -401,21 +397,15 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			tok := m.enrichmentTypeGen[rt]
 			delete(m.enrichmentFindings, rt)
 			delete(m.enrichmentRan, rt)
-			// Clear per-resource truncation/unmatched markers too: if the
-			// refresh errors out, stale "?" prefixes and "(N unattributable)"
-			// badges must not persist across the rerun. Same rationale as the
-			// findings clear above.
+			// Clear per-resource truncation markers too: if the refresh errors
+			// out, stale "?" prefixes must not persist across the rerun.
 			delete(m.enrichmentTruncatedIDs, rt)
-			delete(m.enrichmentUnmatchedIDs, rt)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale markers
 			// would remain visible until the rerun completes (and indefinitely if
 			// the refresh errors out).
 			rl.SetEnrichmentState(0, false, nil)
 			rl.SetTruncatedIDs(nil)
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				menu.SetUnmatched(rt, nil)
-			}
 			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
 			return m, cmd
 		}
@@ -558,6 +548,12 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 // main menu. Used in no-cache + pre-supplied-clients mode so counts appear
 // immediately without background probes.
 func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedMsg) (tea.Model, tea.Cmd) {
+	// Gen guard: drop stale results produced before a profile/region switch.
+	// Gen=0 is the zero value (pre-guard dispatch) — accepted unconditionally
+	// to preserve backwards-compatible test injection.
+	if msg.Gen != 0 && msg.Gen != m.availabilityGen {
+		return m, nil
+	}
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		for shortName, count := range msg.Entries {
 			menu.SetAvailability(shortName, count)
@@ -698,7 +694,10 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		return m, nil
 	}
 	// Per-type generation guard — drop stale probes superseded by a newer rerun.
-	if msg.TypeGen != m.enrichmentTypeGen[msg.ResourceType] {
+	// TypeGen=0 is the symmetric test-injection bypass (production always dispatches
+	// with TypeGen≥1 because startEnrichment bumps enrichmentTypeGen[name] before
+	// capturing typeGen in probeEnrichment).
+	if msg.TypeGen != 0 && msg.TypeGen != m.enrichmentTypeGen[msg.ResourceType] {
 		return m, nil
 	}
 
@@ -710,11 +709,9 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		m.enrichmentFindings[msg.ResourceType] = msg.Findings
 		m.enrichmentRan[msg.ResourceType] = true
 		// Always replace, including with empty/nil maps — a successful rerun
-		// that returns zero TruncatedIDs / UnmatchedIDs MUST clear the prior
-		// run's markers. Using `if len > 0` would leave stale "?" rows /
-		// unattributable badges from a previous attempt.
+		// MUST clear prior "?" row markers. Using `if len > 0` would leave
+		// stale markers from a previous attempt.
 		m.enrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
-		m.enrichmentUnmatchedIDs[msg.ResourceType] = msg.UnmatchedIDs
 
 		// Merge FieldUpdates into probeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that
@@ -730,6 +727,19 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 				}
 			}
 			m.probeResources[msg.ResourceType] = slice
+			// Persist FieldUpdates into resourceCache so that navigating away
+			// and back restores the Wave-2-derived fields (e.g. last_build,
+			// dlq, rotation_enabled) instead of rendering them blank.
+			if entry, ok := m.resourceCache[msg.ResourceType]; ok {
+				for i := range entry.resources {
+					if updates, ok := msg.FieldUpdates[entry.resources[i].ID]; ok {
+						if entry.resources[i].Fields == nil {
+							entry.resources[i].Fields = make(map[string]string, len(updates))
+						}
+						maps.Copy(entry.resources[i].Fields, updates)
+					}
+				}
+			}
 			// Also propagate into any active ResourceListModel for this type.
 			for _, v := range m.stack {
 				if rl, ok := v.(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
@@ -755,9 +765,14 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			if unified == 0 && len(msg.Findings) == 0 {
 				issueTruncated = false
 			}
+			// If resource count is already a lower bound (Wave 1 truncated), the
+			// issue count is also a lower bound — preserve that signal even when
+			// Wave 2 itself did not truncate.
+			if menu.GetTruncated()[msg.ResourceType] {
+				issueTruncated = true
+			}
 			menu.SetIssues(msg.ResourceType, unified, issueTruncated)
 			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
-			menu.SetUnmatched(msg.ResourceType, msg.UnmatchedIDs)
 
 			// Live-update ALL ResourceListModel views in the stack showing this type.
 			for _, v := range m.stack {

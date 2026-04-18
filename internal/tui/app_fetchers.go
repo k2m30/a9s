@@ -465,6 +465,7 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 func (m *Model) demoPrefetchCounts() tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
+	gen := m.availabilityGen
 	return func() tea.Msg {
 		allNames := resource.AllShortNames()
 		entries := make(map[string]int, len(allNames))
@@ -472,14 +473,18 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 		issueCounts := make(map[string]int, len(allNames))
 		issueTruncated := make(map[string]bool)
 		retainedResources := make(map[string][]resource.Resource, len(allNames))
-		ctx, cancel := context.WithTimeout(appCtx, 30*time.Second)
-		defer cancel()
 		for _, shortName := range allNames {
+			// Stop early if the app context is done (shutdown or profile/region switch).
+			if appCtx.Err() != nil {
+				break
+			}
 			pf := resource.GetPaginatedFetcher(shortName)
 			if pf == nil {
 				continue
 			}
-			result, err := pf(ctx, clients, "")
+			perFetchCtx, perFetchCancel := context.WithTimeout(appCtx, 5*time.Second)
+			result, err := pf(perFetchCtx, clients, "")
+			perFetchCancel()
 			if err != nil {
 				continue
 			}
@@ -507,6 +512,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			IssueCounts:    issueCounts,
 			IssueTruncated: issueTruncated,
 			Resources:      retainedResources,
+			Gen:            gen,
 		}
 	}
 }
@@ -606,7 +612,6 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 			Findings:     result.Findings,
 			FieldUpdates: result.FieldUpdates,
 			TruncatedIDs: result.TruncatedIDs,
-			UnmatchedIDs: result.UnmatchedIDs,
 			Gen:          gen,
 			TypeGen:      typeGen,
 		}

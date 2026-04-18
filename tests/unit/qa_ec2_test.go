@@ -351,37 +351,55 @@ func TestQA_EC2_A7_2_SortByNameDescending(t *testing.T) {
 }
 
 func TestQA_EC2_A7_3_SortByIDAscending(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	m := newEC2ListModel(t)
+	// Widen the window so the last columns are not shrunk and the sort arrow
+	// fits in the column header.
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 40})
 
-	// Press 7 to sort by Instance ID ascending (column 6 = Instance ID, 1-indexed key "7")
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
-
-	plain := stripANSI(rootViewContent(m))
-
-	if !strings.Contains(plain, "7:Instance ID\u2191") {
-		t.Error("A.7.3: Instance ID column header should show ascending indicator with prefix 7:Instance ID↑")
-	}
-}
-
-func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
-	m := newEC2ListModel(t)
-
-	// Press 8 to sort by age ascending (column 7 = Launch Time, 1-indexed key "8")
+	// Press 8 to sort by Instance ID ascending.
+	// EC2 layout (defaults): 1:Name 2:State 3:Health 4:Lifecycle 5:Type
+	// 6:Private IP 7:Public IP 8:Instance ID 9:Launch Time.
 	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "8:Launch Time\u2191") {
-		t.Error("A.7.5: Launch Time column header should show ascending indicator with prefix 8:Launch Time↑")
+	if !strings.Contains(plain, "8:Instance ID\u2191") {
+		t.Error("A.7.3: Instance ID column header should show ascending indicator with prefix 8:Instance ID↑")
+	}
+}
+
+func TestQA_EC2_A7_5_SortByAgeAscending(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	m := newEC2ListModel(t)
+	// Widen the window so the last column is not shrunk and the sort arrow
+	// fits in the "Launch Time" header (the rightmost column).
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 40})
+
+	// Press 9 to sort by age ascending (column 9 = Launch Time under the
+	// 9-column defaults EC2 layout).
+	m, _ = rootApplyMsg(m, rootKeyPress("9"))
+
+	plain := stripANSI(rootViewContent(m))
+
+	if !strings.Contains(plain, "9:Launch Time\u2191") {
+		t.Error("A.7.5: Launch Time column header should show ascending indicator with prefix 9:Launch Time↑")
 	}
 }
 
 func TestQA_EC2_A7_7_SortIndicatorExactlyOneColumn(t *testing.T) {
+	// Isolate from the user's ~/.a9s config so the built-in 9-column
+	// EC2 defaults apply deterministically on all platforms.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	m := newEC2ListModel(t)
 
-	// Sort by name first (col 0, key "1"), then switch to ID (col 6, key "7")
+	// Sort by name first (col 0, key "1"), then switch to ID (col 7, key "8").
 	m, _ = rootApplyMsg(m, rootKeyPress("1"))
-	m, _ = rootApplyMsg(m, rootKeyPress("7"))
+	m, _ = rootApplyMsg(m, rootKeyPress("8"))
 
 	plain := stripANSI(rootViewContent(m))
 

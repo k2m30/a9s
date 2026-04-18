@@ -195,11 +195,12 @@ type AvailabilityCacheLoadedMsg struct {
 // AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
 // are already populated.
 type AvailabilityPrefetchedMsg struct {
-	Entries        map[string]int                    // shortName -> resource count
-	Truncated      map[string]bool                   // shortName -> true if truncated
-	IssueCounts    map[string]int                    // shortName -> issue-status resource count
-	IssueTruncated map[string]bool                   // shortName -> true if issue count is lower bound
-	Resources      map[string][]resource.Resource    // shortName -> retained first-page resources for Wave 2
+	Entries        map[string]int                 // shortName -> resource count
+	Truncated      map[string]bool                // shortName -> true if truncated
+	IssueCounts    map[string]int                 // shortName -> issue-status resource count
+	IssueTruncated map[string]bool                // shortName -> true if issue count is lower bound
+	Resources      map[string][]resource.Resource // shortName -> retained first-page resources for Wave 2
+	Gen            int                            // availabilityGen captured at dispatch — stale if != current
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
@@ -231,10 +232,6 @@ type EnrichmentCheckedMsg struct {
 	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the
 	// enricher could not fully inspect them (per-resource API error or page cap).
 	TruncatedIDs map[string]bool
-	// UnmatchedIDs carries API identifiers the enricher could not normalize to a
-	// Resource.ID. Surfaced in the main-menu badge as "N unattributable"
-	// telemetry so identity-mismatch regressions are visible.
-	UnmatchedIDs []string
 	Err          error // enrichment error (nil on success)
 	Gen          int   // session-wide generation counter (stale probe protection; profile/region switch)
 	TypeGen      int   // per-type generation counter; bumped on every rerun for that type. Stale
