@@ -26,7 +26,7 @@ import (
 // EnricherRegistry — either a real enricher or NoOpEnricher.
 // Every documented Wave 2 row must have a registry entry per docs/attention-signals.md.
 func TestCFNRegisteredInEnricherRegistry(t *testing.T) {
-	if awsclient.EnricherRegistry["cfn"] == nil {
+	if _, ok := awsclient.EnricherRegistry["cfn"]; !ok {
 		t.Error("cfn must have an entry in EnricherRegistry per docs/attention-signals.md")
 	}
 }

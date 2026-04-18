@@ -6,9 +6,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	kmssvc "github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	secretsmanagertypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -293,5 +296,140 @@ func TestRelated_KMS_Secrets_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkKMSRole — Pattern C: GetKeyPolicy + ListGrants
+// ---------------------------------------------------------------------------
+
+// TestRelated_KMS_Role_Match verifies that grants with role ARNs in
+// GranteePrincipal are returned as resource IDs.
+func TestRelated_KMS_Role_Match(t *testing.T) {
+	const keyID = "a1b2c3d4-0001-0001-0001-000000000001"
+	roleARN1 := "arn:aws:iam::123456789012:role/my-ec2-role"
+	roleARN2 := "arn:aws:iam::123456789012:role/my-lambda-role"
+
+	src := resource.Resource{
+		ID:   keyID,
+		Name: "alias/my-key",
+	}
+	clients := &awsclient.ServiceClients{
+		KMS: newFakeKMSWithGrants([]kmstypes.GrantListEntry{
+			{GranteePrincipal: &roleARN1},
+			{GranteePrincipal: &roleARN2},
+		}),
+	}
+	checker := kmsCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	if !seen["my-ec2-role"] {
+		t.Errorf("ResourceIDs missing my-ec2-role; got %v", result.ResourceIDs)
+	}
+	if !seen["my-lambda-role"] {
+		t.Errorf("ResourceIDs missing my-lambda-role; got %v", result.ResourceIDs)
+	}
+}
+
+// TestRelated_KMS_Role_Empty verifies that a key with no grants and no
+// policy roles returns Count=0.
+func TestRelated_KMS_Role_Empty(t *testing.T) {
+	const keyID = "a1b2c3d4-0001-0001-0001-000000000002"
+
+	src := resource.Resource{
+		ID:   keyID,
+		Name: "alias/no-roles-key",
+	}
+	clients := &awsclient.ServiceClients{
+		KMS: newFakeKMSWithGrants([]kmstypes.GrantListEntry{}),
+	}
+	checker := kmsCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no role grants)", result.Count)
+	}
+}
+
+// TestRelated_KMS_Role_WrongRawStruct verifies that a key resource with an
+// empty ID returns Count=0 (short-circuit before API call).
+func TestRelated_KMS_Role_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "",
+		RawStruct: "not-a-kms-key",
+	}
+	checker := kmsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty key ID short-circuits)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fix 1: checkKMSRole error propagation — errors must return Count=-1
+// ---------------------------------------------------------------------------
+
+// TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne verifies that when
+// GetKeyPolicy returns AccessDeniedException the checker returns Count=-1 and
+// a non-nil Err, not silently swallowing the error.
+func TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne(t *testing.T) {
+	const keyID = "a1b2c3d4-0001-0001-0001-000000000099"
+
+	src := resource.Resource{
+		ID:   keyID,
+		Name: "alias/denied-key",
+	}
+	// GetKeyPolicy returns AccessDenied; ListGrants returns empty (never reached).
+	clients := &awsclient.ServiceClients{
+		KMS: &fakeKMSUS1{
+			getKeyPolicyErr: newAccessDeniedError(),
+		},
+	}
+	checker := kmsCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (GetKeyPolicy AccessDenied must propagate as -1)", result.Count)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want non-nil (AccessDenied error must not be swallowed)")
+	}
+}
+
+// TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne verifies that
+// when GetKeyPolicy succeeds with no role principals but ListGrants returns
+// AccessDeniedException, the checker returns Count=-1 and a non-nil Err.
+func TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne(t *testing.T) {
+	const keyID = "a1b2c3d4-0001-0001-0001-000000000100"
+
+	src := resource.Resource{
+		ID:   keyID,
+		Name: "alias/list-grants-denied-key",
+	}
+	// GetKeyPolicy returns an empty (non-nil) output with no policy JSON
+	// so the policy parse finds no role principals.
+	// ListGrants then returns AccessDenied.
+	clients := &awsclient.ServiceClients{
+		KMS: &fakeKMSUS1{
+			getKeyPolicyOut: &kmssvc.GetKeyPolicyOutput{},
+			listGrantsErr:   newAccessDeniedError(),
+		},
+	}
+	checker := kmsCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (ListGrants AccessDenied must propagate as -1)", result.Count)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want non-nil (ListGrants AccessDenied error must not be swallowed)")
 	}
 }

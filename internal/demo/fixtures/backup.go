@@ -10,6 +10,8 @@ import (
 // BackupFixtures holds typed fixture data for AWS Backup.
 type BackupFixtures struct {
 	Plans []backuptypes.BackupPlansListMember
+	// RecoveryPoints maps resource ARN → []RecoveryPointByResource.
+	RecoveryPoints map[string][]backuptypes.RecoveryPointByResource
 }
 
 func mustParseBackupTime(s string) time.Time {
@@ -17,9 +19,33 @@ func mustParseBackupTime(s string) time.Time {
 	return t
 }
 
+// buildBackupRecoveryPoints returns recovery point fixtures keyed by resource ARN.
+// The acme-shared-data EFS filesystem has recent daily recovery points demonstrating
+// the EFS→Backup related-panel relationship.
+func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResource {
+	efsARN := "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a"
+	return map[string][]backuptypes.RecoveryPointByResource{
+		efsARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-efs-daily-20260416"),
+				BackupVaultName:  aws.String("Default"),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T02:00:00+00:00")),
+			},
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-efs-daily-20260415"),
+				BackupVaultName:  aws.String("Default"),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T02:00:00+00:00")),
+			},
+		},
+	}
+}
+
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
 func NewBackupFixtures() *BackupFixtures {
 	return &BackupFixtures{
+		RecoveryPoints: buildBackupRecoveryPoints(),
 		Plans: []backuptypes.BackupPlansListMember{
 			{
 				BackupPlanName:    aws.String("acme-daily-backup"),

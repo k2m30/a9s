@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -20,7 +21,6 @@ func init() {
 		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role (Policy)", Checker: checkSQSRole, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
 	})
 
@@ -307,6 +307,35 @@ func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	return relatedResult("kms", []string{keyID})
+}
+
+// checkSQSEbRule resolves EventBridge rules that target this SQS queue.
+// Pattern C: one events:ListRuleNamesByTarget call using the queue ARN.
+// Queue ARN is read from SQSQueueAttributesRow.Attributes["QueueArn"].
+// Count = len(RuleNames).
+func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	queueARN := ""
+	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
+		queueARN = raw.Attributes["QueueArn"]
+	}
+	if queueARN == "" {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
+		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &queueARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+	}
+	return relatedResult("eb-rule", out.RuleNames)
 }
 
 
