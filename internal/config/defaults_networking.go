@@ -8,6 +8,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Type", Path: "Type", Width: 12},
 				{Title: "Scheme", Path: "Scheme", Width: 14},
 				{Title: "State", Path: "State.Code", Width: 12},
+				{Title: "State Reason", Path: "State.Reason", Width: 32},
 				{Title: "DNS Name", Path: "DNSName", Width: 48},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
@@ -73,6 +74,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 				{Title: "AZ", Path: "AvailabilityZone", Width: 14},
 				{Title: "State", Path: "State", Width: 12},
+				{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
 				{Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 			},
 			Detail: []DetailField{
@@ -142,6 +144,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
 				{Title: "Type", Path: "VpcEndpointType", Width: 12},
 				{Title: "State", Path: "State", Width: 12},
+				{Title: "Last Error", Path: "LastError.Message", Width: 32},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
 			},
 			Detail: []DetailField{

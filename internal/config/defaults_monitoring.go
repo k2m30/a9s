@@ -6,6 +6,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Alarm Name", Path: "AlarmName", Width: 36},
 				{Title: "State", Path: "StateValue", Width: 12},
+				{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
 				{Title: "Metric", Path: "MetricName", Width: 24},
 				{Title: "Namespace", Path: "Namespace", Width: 24},
 				{Title: "Threshold", Path: "Threshold", Width: 12},
