@@ -22,6 +22,7 @@ func securityDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Policy Name", Key: "policy_name", Width: 36},
 				{Title: "Type", Key: "policy_type", Width: 10},
+				{Title: "Risk", Key: "risk", Width: 14},
 				{Title: "Attached", Key: "attachment_count", Width: 10},
 				{Title: "Path", Key: "path", Width: 20},
 				{Title: "Created", Key: "create_date", Width: 22},
@@ -67,6 +68,7 @@ func securityDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 28},
 				{Title: "ID", Path: "Id", Width: 38},
+				{Title: "Rules", Key: "rules_summary", Width: 18},
 				{Title: "Description", Path: "Description", Width: 36},
 			},
 			Detail: []DetailField{

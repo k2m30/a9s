@@ -7,6 +7,9 @@ list:
   State:
     path: State
     width: 12
+  Att Issues:
+    key: att_status
+    width: 10
   Owner:
     path: OwnerId
     width: 14

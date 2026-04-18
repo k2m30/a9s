@@ -13,6 +13,9 @@ list:
   Default:
     path: IsDefault
     width: 9
+  Flow Logs:
+    key: flow_logs
+    width: 10
 
 detail:
   - VpcId

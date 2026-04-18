@@ -5,6 +5,7 @@ func dataDefaultViews() map[string]ViewDef {
 		"glue": {
 			List: []ListColumn{
 				{Title: "Job Name", Path: "Name", Width: 32},
+				{Title: "Last Run", Key: "last_run", Width: 14},
 				{Title: "Version", Path: "GlueVersion", Width: 10},
 				{Title: "Worker Type", Path: "WorkerType", Width: 14},
 				{Title: "Workers", Path: "NumberOfWorkers", Width: 9},

@@ -8,6 +8,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Engine", Path: "Engine", Width: 12},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
 				{Title: "Status", Path: "DBInstanceStatus", Width: 14},
+				{Title: "CIS", Path: "DBInstanceStatus", Key: "cis_flags", Width: 24},
 				{Title: "Class", Path: "DBInstanceClass", Width: 16},
 				{Title: "Endpoint", Path: "Endpoint.Address", Width: 40},
 				{Title: "Multi-AZ", Path: "MultiAZ", Width: 10},
@@ -64,6 +65,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
 				{Title: "Status", Path: "Status", Width: 14},
+				{Title: "CIS", Path: "Status", Key: "cis_flags", Width: 18},
 				{Title: "Instances", Path: "DBClusterMembers", Width: 10},
 				{Title: "Writer", Path: "EngineVersion", Key: "writer_count", Width: 7},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
@@ -116,6 +118,7 @@ func databasesDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Cluster ID", Path: "ClusterIdentifier", Width: 28},
 				{Title: "Status", Path: "ClusterStatus", Width: 14},
+				{Title: "Pending", Path: "PendingModifiedValues.NodeType", Width: 14},
 				{Title: "Node Type", Path: "NodeType", Width: 16},
 				{Title: "Nodes", Path: "NumberOfNodes", Width: 7},
 				{Title: "Database", Path: "DBName", Width: 16},

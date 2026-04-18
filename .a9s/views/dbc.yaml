@@ -8,6 +8,10 @@ list:
   Status:
     path: Status
     width: 14
+  CIS:
+    path: Status
+    key: cis_flags
+    width: 18
   Instances:
     path: DBClusterMembers
     width: 10

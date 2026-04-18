@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("eip", []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain"})
+	resource.RegisterFieldKeys("eip", []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain", "status"})
 
 	resource.RegisterPaginated("eip", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -71,6 +71,12 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 
 		domain := string(addr.Domain)
 
+		// Compute attachment status: UNATTACHED if no association/instance/NIC.
+		eipStatus := "ATTACHED"
+		if addr.AssociationId == nil && addr.InstanceId == nil && addr.NetworkInterfaceId == nil {
+			eipStatus = "UNATTACHED"
+		}
+
 		r := resource.Resource{
 			ID:     allocationID,
 			Name:   name,
@@ -82,6 +88,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 				"association_id": associationID,
 				"instance_id":    instanceID,
 				"domain":         domain,
+				"status":         eipStatus,
 			},
 			RawStruct:  addr,
 		}

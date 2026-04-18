@@ -5,6 +5,9 @@ list:
   Type:
     path: Type
     width: 10
+  Last Run:
+    key: last_run
+    width: 18
   ARN:
     path: StateMachineArn
     width: 60

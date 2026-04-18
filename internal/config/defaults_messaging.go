@@ -7,6 +7,7 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Queue Name", Path: "", Key: "queue_name", Width: 36},
 				{Title: "Messages", Path: "", Key: "approx_messages", Width: 10},
 				{Title: "In Flight", Path: "", Key: "approx_not_visible", Width: 10},
+				{Title: "DLQ", Key: "dlq", Width: 5},
 				{Title: "Delay", Path: "", Key: "delay_seconds", Width: 8},
 				{Title: "Queue URL", Path: "", Key: "queue_url", Width: 50},
 			},
@@ -17,6 +18,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sns": {
 			List: []ListColumn{
 				{Title: "Topic Name", Path: "TopicArn", Width: 40},
+				{Title: "Subs", Key: "subs_count", Width: 6},
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
 			},
 			Detail: []DetailField{
@@ -94,6 +96,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 36},
 				{Title: "Type", Path: "Type", Width: 10},
+				{Title: "Last Run", Key: "last_run", Width: 18},
 				{Title: "ARN", Path: "StateMachineArn", Width: 60},
 				{Title: "Created", Path: "CreationDate", Width: 22},
 			},

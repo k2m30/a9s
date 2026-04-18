@@ -40,6 +40,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				{Key: "cis_flags", Title: "CIS", Width: 24, Sortable: false},
 				{Key: "class", Title: "Class", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -12,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period"})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period", "cis_flags"})
 
 	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -129,6 +130,19 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
+		// Compute CIS compliance flags.
+		var cisFlags []string
+		if storageEncrypted == "false" {
+			cisFlags = append(cisFlags, "UNENC")
+		}
+		if backupRetentionPeriod == "0" {
+			cisFlags = append(cisFlags, "NOBKP")
+		}
+		if deletionProtection == "false" {
+			cisFlags = append(cisFlags, "NOPROT")
+		}
+		cisFlagsVal := strings.Join(cisFlags, "|")
+
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
@@ -145,6 +159,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 				"deletion_protection":     deletionProtection,
 				"storage_encrypted":       storageEncrypted,
 				"backup_retention_period": backupRetentionPeriod,
+				"cis_flags":               cisFlagsVal,
 			},
 			RawStruct: cluster,
 		}
