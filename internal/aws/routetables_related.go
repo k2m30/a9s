@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -294,11 +295,8 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		if !ok {
 			continue
 		}
-		for _, rid := range vpceRaw.RouteTableIds {
-			if rid == rtbID {
-				ids = append(ids, vpceRes.ID)
-				break
-			}
+		if slices.Contains(vpceRaw.RouteTableIds, rtbID) {
+			ids = append(ids, vpceRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {

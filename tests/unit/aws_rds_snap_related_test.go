@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -247,5 +249,83 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRDSSnapBackup — Pattern C: ListRecoveryPointsByResource on snapshot ARN
+// ---------------------------------------------------------------------------
+
+// TestRelated_RDSSnap_Backup_Match verifies that a snapshot with a known ARN,
+// and a Backup fake returning 2 recovery points, yields Count=2.
+func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
+	const snapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00"
+	rp1 := "arn:aws:backup:us-east-1:123456789012:recovery-point:00000001"
+	rp2 := "arn:aws:backup:us-east-1:123456789012:recovery-point:00000002"
+
+	src := resource.Resource{
+		ID:   "rds:mydb-2025-01-15-03-00",
+		Name: "rds:mydb-2025-01-15-03-00",
+		Fields: map[string]string{
+			"arn": snapARN,
+		},
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+			DBInstanceIdentifier: aws.String("mydb"),
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		Backup: newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{
+			{RecoveryPointArn: &rp1},
+			{RecoveryPointArn: &rp2},
+		}),
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+	if len(result.ResourceIDs) != 2 {
+		t.Errorf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
+	}
+}
+
+// TestRelated_RDSSnap_Backup_Empty verifies that a snapshot with no ARN field
+// and no DBSnapshotArn in RawStruct returns Count=0.
+func TestRelated_RDSSnap_Backup_Empty(t *testing.T) {
+	src := resource.Resource{
+		ID:     "rds:mydb-2025-01-15-03-00",
+		Name:   "rds:mydb-2025-01-15-03-00",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+			// No DBSnapshotArn set — empty ARN.
+		},
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty snapshot ARN)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_Backup_WrongRawStruct verifies that a snapshot with a
+// valid ARN field but nil clients returns Count=-1 (no Backup client).
+func TestRelated_RDSSnap_Backup_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:   "rds:mydb-2025-01-15-03-00",
+		Name: "rds:mydb-2025-01-15-03-00",
+		Fields: map[string]string{
+			"arn": "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00",
+		},
+		RawStruct: "not-a-snapshot",
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

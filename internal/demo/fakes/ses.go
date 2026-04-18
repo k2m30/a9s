@@ -30,3 +30,9 @@ func (f *SESFake) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...f
 func (f *SESFake) GetEmailIdentity(_ context.Context, _ *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
 	return &sesv2.GetEmailIdentityOutput{}, nil
 }
+
+// GetConfigurationSetEventDestinations is a no-op stub satisfying SESv2GetConfigurationSetEventDestinationsAPI.
+// Demo mode does not model SES configuration set event destinations.
+func (f *SESFake) GetConfigurationSetEventDestinations(_ context.Context, _ *sesv2.GetConfigurationSetEventDestinationsInput, _ ...func(*sesv2.Options)) (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
+	return &sesv2.GetConfigurationSetEventDestinationsOutput{}, nil
+}

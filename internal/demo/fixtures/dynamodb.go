@@ -14,6 +14,8 @@ type DynamoDBFixtures struct {
 	TableNames []string
 	// Tables maps table name → *ddbtypes.TableDescription (pointer, matching production fetcher).
 	Tables map[string]*ddbtypes.TableDescription
+	// KinesisDestinations maps table name → []KinesisDataStreamDestination.
+	KinesisDestinations map[string][]ddbtypes.KinesisDataStreamDestination
 }
 
 // NewDynamoDBFixtures builds and returns a fully-populated DynamoDBFixtures struct.
@@ -27,8 +29,23 @@ func NewDynamoDBFixtures() *DynamoDBFixtures {
 		tableMap[name] = tables[i]
 	}
 	return &DynamoDBFixtures{
-		TableNames: names,
-		Tables:     tableMap,
+		TableNames:          names,
+		Tables:              tableMap,
+		KinesisDestinations: buildDynamoDBKinesisDestinations(),
+	}
+}
+
+// buildDynamoDBKinesisDestinations returns Kinesis streaming destination fixtures.
+// acme-orders streams to the acme-orders-stream for real-time analytics.
+func buildDynamoDBKinesisDestinations() map[string][]ddbtypes.KinesisDataStreamDestination {
+	return map[string][]ddbtypes.KinesisDataStreamDestination{
+		"acme-orders": {
+			{
+				StreamArn:                   aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/acme-orders-stream"),
+				DestinationStatus:           ddbtypes.DestinationStatusActive,
+				DestinationStatusDescription: aws.String("Stream is active"),
+			},
+		},
 	}
 }
 

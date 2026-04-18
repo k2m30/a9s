@@ -377,7 +377,9 @@ func TestRelated_Codeartifact_Registered(t *testing.T) {
 		t.Fatal("no related defs registered for codeartifact")
 	}
 
-	expected := []string{"cb"}
+	// codeartifact→cb was dropped (Explicitly excluded: unanimous sometimes).
+	// codeartifact→kms remains the active registration.
+	expected := []string{"kms"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1427,7 +1429,8 @@ func TestRelated_SES_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for ses")
 	}
-	expected := []string{"r53", "cfn"}
+	// ses→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"r53"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1447,7 +1450,8 @@ func TestRelated_SFN_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sfn")
 	}
-	expected := []string{"alarm", "logs", "role", "cfn"}
+	// sfn→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"alarm", "logs", "role"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1467,7 +1471,8 @@ func TestRelated_SNS_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sns")
 	}
-	expected := []string{"alarm", "cfn"}
+	// sns→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"alarm"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {
@@ -1587,7 +1592,8 @@ func TestRelated_TGW_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for tgw")
 	}
-	expected := []string{"vpc", "rtb", "cfn"}
+	// tgw→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+	expected := []string{"vpc", "rtb"}
 	for _, exp := range expected {
 		found := false
 		for _, def := range defs {

@@ -21,7 +21,6 @@ func init() {
 		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkWAFAlarm},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkWAFRole},
 	})
 
 	// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.

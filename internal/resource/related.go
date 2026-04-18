@@ -19,7 +19,24 @@ type NavigableField struct {
 	TargetType string // resource short name (e.g., "vpc")
 }
 
-// RelatedCheckResult is returned by a RelatedChecker.
+// RelatedCheckResult is returned by a RelatedChecker and carries all state
+// needed by the right-column panel to display a row and navigate on Enter.
+//
+// Semantics (FR-008 / FR-014):
+//
+//   - Count == -1: unknown — the checker could not determine a count (wrong
+//     RawStruct type, nil clients, API error, or a stubbed checker). The UI
+//     renders "?" for the row.
+//   - Count == 0: definitively zero related resources of this type. The UI
+//     dims the row.
+//   - Count >= 1: confirmed N related resources. The UI highlights the row.
+//   - Approximate == true: Count was derived from a truncated cache page; more
+//     matches may exist beyond the cached window. The UI renders "N+" (or
+//     "0+"). Only valid on reverse-scan checkers (NeedsTargetCache: true);
+//     forward checkers MUST leave this false. Invariant: Approximate == true ⇒
+//     Count >= 0.
+//   - FetchFilter non-nil: navigation drill-in should use a server-side
+//     filtered paginated fetcher rather than a relatedIDSet jump.
 type RelatedCheckResult struct {
 	TargetType  string   // echoed from RelatedDef.TargetType
 	Count       int      // -1 = unknown; 0+ = count
@@ -27,6 +44,9 @@ type RelatedCheckResult struct {
 	Err         error    // non-nil = error
 	// FetchFilter when non-nil signals navigation to use a server-side filtered fetcher instead of relatedIDSet.
 	FetchFilter map[string]string
+	// Approximate is true when Count was derived from a truncated reverse-scan cache entry.
+	// Pairs only with Count >= 0; UI renders "N+" / "0+". Forward checkers MUST leave this false.
+	Approximate bool
 }
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus

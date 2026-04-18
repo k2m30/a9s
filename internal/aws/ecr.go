@@ -28,9 +28,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECRECS},
 		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
-		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkECREKS},
 		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
 	})

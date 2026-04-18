@@ -134,8 +134,8 @@ func bucketFromS3URI(uri string) string {
 		return ""
 	}
 	rest := uri[len(prefix):]
-	if idx := strings.Index(rest, "/"); idx >= 0 {
-		return rest[:idx]
+	if bucket, _, ok := strings.Cut(rest, "/"); ok {
+		return bucket
 	}
 	return rest
 }

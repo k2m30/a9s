@@ -47,7 +47,14 @@ func (f *BackupFake) GetBackupVaultNotifications(_ context.Context, _ *backup.Ge
 	return &backup.GetBackupVaultNotificationsOutput{}, nil
 }
 
-// ListRecoveryPointsByResource returns an empty list.
-func (f *BackupFake) ListRecoveryPointsByResource(_ context.Context, _ *backup.ListRecoveryPointsByResourceInput, _ ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error) {
-	return &backup.ListRecoveryPointsByResourceOutput{}, nil
+// ListRecoveryPointsByResource returns recovery points for the given resource ARN.
+func (f *BackupFake) ListRecoveryPointsByResource(_ context.Context, input *backup.ListRecoveryPointsByResourceInput, _ ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error) {
+	if input.ResourceArn == nil {
+		return &backup.ListRecoveryPointsByResourceOutput{}, nil
+	}
+	rps, ok := f.fix.RecoveryPoints[*input.ResourceArn]
+	if !ok {
+		return &backup.ListRecoveryPointsByResourceOutput{}, nil
+	}
+	return &backup.ListRecoveryPointsByResourceOutput{RecoveryPoints: rps}, nil
 }

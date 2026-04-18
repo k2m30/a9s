@@ -9,6 +9,8 @@
 - YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps
 - In-process demo fixture store (per resource type, loaded at startup)
 - In-memory session-scoped maps on root `Model` (findings cleared on profile/region switch; no disk persistence for findings themselves — cache format unchanged)
+- Go 1.26+ (CLAUDE.md) + AWS SDK Go v2 (service clients for autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, events/eventbridge, backup), Bubble Tea v2.0.2, Lipgloss v2.0.2, yaml.v3 (019-related-panel-checkers)
+- In-memory `resource.ResourceCache` (`map[string]ResourceCacheEntry`, each with `Resources []Resource` + `IsTruncated bool`) built by the background fetcher pool; no on-disk state changes in this feature (019-related-panel-checkers)
 
 ## Project Structure
 
@@ -168,6 +170,7 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+- 019-related-panel-checkers: Added Go 1.26+ (CLAUDE.md) + AWS SDK Go v2 (service clients for autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, events/eventbridge, backup), Bubble Tea v2.0.2, Lipgloss v2.0.2, yaml.v3
 
 - 018-enrichment-visibility: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
 - 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3

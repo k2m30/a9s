@@ -9,6 +9,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -28,7 +29,7 @@ func init() {
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2, NeedsTargetCache: true},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask},
+		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask, NeedsTargetCache: true},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true},
 	})
@@ -267,8 +268,39 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("lambda", ids)
 }
 
+// checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
+// Pattern C+reverse: iterate cache["ecs-task"]; for each task definition check
+// Volumes[].EfsVolumeConfiguration.FileSystemId == parent filesystem ID.
+// NeedsTargetCache: true.
+func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	fsID := res.ID
+	if fsID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+	}
 
+	entry, ok := cache["ecs-task"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ecs-task"}
+	}
 
-
+	var ids []string
+	for _, tRes := range entry.Resources {
+		td, ok := assertStruct[ecstypes.TaskDefinition](tRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, v := range td.Volumes {
+			if v.EfsVolumeConfiguration != nil &&
+				v.EfsVolumeConfiguration.FileSystemId != nil &&
+				*v.EfsVolumeConfiguration.FileSystemId == fsID {
+				ids = append(ids, tRes.ID)
+				break
+			}
+		}
+	}
+	result := relatedResult("ecs-task", ids)
+	result.Approximate = entry.IsTruncated
+	return result
+}
 
 

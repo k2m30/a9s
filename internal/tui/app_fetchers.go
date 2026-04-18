@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
+		// IsTruncated: populated from first-page result; loaders stop at page 1.
 		return messages.ResourcesLoadedMsg{
 			ResourceType: resourceType,
 			Resources:    result.Resources,
@@ -531,12 +533,16 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 }
 
 // buildEnrichQueue returns resource types that have registered enrichers AND
-// have retained probe resources. Ordered by priority: batchable first, per-resource last.
+// have retained probe resources. Priority types go first (batchable), then
+// all remaining EnricherRegistry entries in stable alphabetical order.
 func (m *Model) buildEnrichQueue() []string {
-	// Priority order matches the spec.
-	order := []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
+	// Priority order matches the spec (batchable first).
+	priority := []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
+	seen := map[string]bool{}
 	var queue []string
-	for _, name := range order {
+
+	// Priority types first.
+	for _, name := range priority {
 		if _, ok := awsclient.EnricherRegistry[name]; !ok {
 			continue
 		}
@@ -544,7 +550,24 @@ func (m *Model) buildEnrichQueue() []string {
 			continue
 		}
 		queue = append(queue, name)
+		seen[name] = true
 	}
+
+	// Then everything else in EnricherRegistry alphabetically.
+	var rest []string
+	for name := range awsclient.EnricherRegistry {
+		if !seen[name] {
+			rest = append(rest, name)
+		}
+	}
+	sort.Strings(rest)
+	for _, name := range rest {
+		if _, ok := m.probeResources[name]; !ok {
+			continue
+		}
+		queue = append(queue, name)
+	}
+
 	return queue
 }
 

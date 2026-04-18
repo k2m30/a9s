@@ -263,15 +263,15 @@ func TestRelated_ELB_R53_EmptyDNSReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SFN_EbRule_ReturnsUnknown verifies sfn→eb-rule reports Count=-1 because
-// the eb-rule list cache only carries ListRules output (no target list) — resolving
-// which rules target a given state machine would require ListTargetsByRule per rule (N+1).
-func TestRelated_SFN_EbRule_ReturnsUnknown(t *testing.T) {
+// TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN verifies sfn→eb-rule reports Count=0
+// when the state machine ARN field is empty. checkSFNEbRule uses a live
+// ListRuleNamesByTarget call; without an ARN there is nothing to look up.
+func TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "sfn", "eb-rule")
 	res := resource.Resource{ID: "my-state-machine", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
-		t.Errorf("expected Count=-1 (undeterminable — eb-rule cache lacks targets), got %d", got.Count)
+	if got.Count != 0 {
+		t.Errorf("expected Count=0 (no ARN — nothing to look up), got %d", got.Count)
 	}
 	if got.TargetType != "eb-rule" {
 		t.Errorf("expected TargetType=eb-rule, got %q", got.TargetType)

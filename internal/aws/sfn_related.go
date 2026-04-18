@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -226,5 +227,30 @@ func sfnRelatedResources(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	return resources, isTruncated, err
+}
+
+// checkSFNEbRule resolves EventBridge rules that target this state machine.
+// Pattern C: one events:ListRuleNamesByTarget call using the state machine ARN
+// from res.Fields["arn"]. Count = len(RuleNames).
+func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	sfnARN := res.Fields["arn"]
+	if sfnARN == "" {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
+		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &sfnARN})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+	}
+	return relatedResult("eb-rule", out.RuleNames)
 }
 
