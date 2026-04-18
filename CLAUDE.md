@@ -1,4 +1,5 @@
 # a9s Development Guidelines
+Your work will be review by Codex.
 
 ## GitHub
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs

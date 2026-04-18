@@ -29,6 +29,14 @@ func NewSNSFixtures() *SNSFixtures {
 			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications:a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
 			Owner:           aws.String("123456789012"),
 		},
+		// Issue: SubscriptionArn=="PendingConfirmation" → Warning (never confirmed)
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:order-events"),
+			Protocol:        aws.String("email"),
+			Endpoint:        aws.String("pending-recipient@partner.example.com"),
+			SubscriptionArn: aws.String("PendingConfirmation"),
+			Owner:           aws.String("123456789012"),
+		},
 		{
 			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
 			Protocol:        aws.String("lambda"),
@@ -54,8 +62,8 @@ func NewSNSFixtures() *SNSFixtures {
 
 	subsByTopic := map[string][]snstypes.Subscription{
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": subscriptions[:2],
-		"arn:aws:sns:us-east-1:123456789012:order-events":        subscriptions[2:3],
-		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[3:],
+		"arn:aws:sns:us-east-1:123456789012:order-events":        subscriptions[2:4],
+		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
 	}
 
 	return &SNSFixtures{

@@ -90,6 +90,67 @@ func NewACMFixtures() *ACMFixtures {
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
+			// Issue: Status=REVOKED → Broken (certificate revoked by CA)
+			{
+				DomainName:     aws.String("revoked.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/e5f6a7b8-9012-34ab-cdef-555555555555"),
+				Status:         acmtypes.CertificateStatusRevoked,
+				Type:           acmtypes.CertificateTypeImported,
+				NotAfter:       aws.Time(mustParseACMTime("2026-06-01T23:59:59+00:00")),
+				NotBefore:      aws.Time(mustParseACMTime("2025-06-01T00:00:00+00:00")),
+				InUse:          aws.Bool(false),
+				ImportedAt:     aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"revoked.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+			// Issue: Status=FAILED → Broken (DNS/email validation failed)
+			{
+				DomainName:     aws.String("validation-failed.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/f6a7b8c9-0123-45ab-cdef-666666666666"),
+				Status:         acmtypes.CertificateStatusFailed,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				InUse:          aws.Bool(false),
+				CreatedAt:      aws.Time(time.Date(2026, 3, 10, 9, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"validation-failed.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+			// Issue: Status=VALIDATION_TIMED_OUT → Broken (DNS record never added)
+			{
+				DomainName:     aws.String("timeout.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a7b8c9d0-1234-56ab-cdef-777777777777"),
+				Status:         acmtypes.CertificateStatusValidationTimedOut,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				InUse:          aws.Bool(false),
+				CreatedAt:      aws.Time(time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmEcSecp384r1,
+				SubjectAlternativeNameSummaries: []string{
+					"timeout.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+			// Issue: ISSUED but NotAfter in ~5 days → Broken (imminent expiry)
+			{
+				DomainName:     aws.String("expiring-soon.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/b8c9d0e1-2345-67ab-cdef-888888888888"),
+				Status:         acmtypes.CertificateStatusIssued,
+				Type:           acmtypes.CertificateTypeImported,
+				NotAfter:       aws.Time(mustParseACMTime("2026-04-23T23:59:59+00:00")),
+				NotBefore:      aws.Time(mustParseACMTime("2025-04-23T00:00:00+00:00")),
+				IssuedAt:       aws.Time(time.Date(2025, 4, 23, 10, 0, 0, 0, time.UTC)),
+				InUse:          aws.Bool(true),
+				ImportedAt:     aws.Time(time.Date(2025, 4, 23, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"expiring-soon.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
 		},
 	}
 }
