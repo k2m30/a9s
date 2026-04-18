@@ -40,7 +40,7 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }
@@ -70,7 +70,7 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.ApproximateZero("ecs-task")
 	}
 	result := relatedResult("ecs-task", ids)
 	result.Approximate = truncated

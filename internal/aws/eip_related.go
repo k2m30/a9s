@@ -96,7 +96,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }

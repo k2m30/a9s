@@ -52,7 +52,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", ids)
 }
@@ -87,7 +87,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -116,7 +116,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }
@@ -149,7 +149,7 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }

@@ -129,7 +129,13 @@ func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 		}
 	})
 
-	instance := resource.Resource{ID: "i-t003"}
+	instance := resource.Resource{
+		ID: "i-t003",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-t003"),
+			VpcId:      aws.String("vpc-t003"),
+		},
+	}
 	checker := ec2CheckerByTarget(t, "tg")
 	_ = checker(context.Background(), nil, instance, resource.ResourceCache{})
 
@@ -189,13 +195,11 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 }
 
 // T005: verifies that when the paginated fetcher returns a truncated first page with
-// zero matches for the given EC2 instance, the checker returns Count=-1 (unknown),
-// NOT Count=0 (definitive zero). This ensures partial pages are not treated as
-// conclusive negatives.
-// Currently FAILS because ec2RelatedResources calls FetchTargetGroups directly with
-// nil clients and early-returns (nil, false, nil) — never reaching the truncation path —
-// so the checker returns Count=0 instead of Count=-1.
-func TestEC2RelatedColdCache_TruncatedZeroMatch_CountIsUnknown(t *testing.T) {
+// zero matches for the given EC2 instance, the checker returns {Count: 0, Approximate: true}
+// (the ApproximateZero honest-lower-bound contract from internal/resource/related.go).
+// This ensures partial pages are not treated as conclusive negatives but ALSO preserve
+// the honest lower bound instead of dropping it as Count=-1 (unknown).
+func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources:  []resource.Resource{},
@@ -214,12 +218,24 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_CountIsUnknown(t *testing.T) {
 	})
 
 	// Use an instance with no matching TG — the truncated page contains zero entries,
-	// so a correct implementation must return Count=-1 (can't know the full picture).
-	instance := resource.Resource{ID: "i-no-matches"}
+	// so a correct implementation must return {Count: 0, Approximate: true} (ApproximateZero).
+	instance := resource.Resource{
+		ID: "i-no-matches",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-no-matches"),
+			VpcId:      aws.String("vpc-no-matches"),
+		},
+	}
 	checker := ec2CheckerByTarget(t, "tg")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if got.Count != -1 {
-		t.Errorf("T005: expected Count=-1 (unknown) when paginated result is truncated with zero matches; got Count=%d", got.Count)
+	if got.TargetType != "tg" {
+		t.Errorf("T005: expected TargetType=\"tg\"; got %q", got.TargetType)
+	}
+	if got.Count != 0 {
+		t.Errorf("T005: expected Count=0 (ApproximateZero lower bound) for truncated zero-match page; got Count=%d", got.Count)
+	}
+	if !got.Approximate {
+		t.Errorf("T005: expected Approximate=true for truncated zero-match page; got Approximate=false")
 	}
 }

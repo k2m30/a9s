@@ -45,7 +45,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 	seen := make(map[string]struct{})
 	for _, ngRes := range ngList {
@@ -69,7 +69,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
@@ -101,7 +101,7 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }

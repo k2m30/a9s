@@ -54,6 +54,9 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Title: "URI", Path: "RepositoryUri", Width: 60},
 				{Title: "Tag Mutability", Path: "ImageTagMutability", Width: 16},
 				{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6},
+				{Title: "Critical", Key: "critical_vulns", Width: 8},
+				{Title: "High", Key: "high_vulns", Width: 6},
+				{Title: "Scanned", Key: "images_scanned", Width: 8},
 				{Title: "Created", Path: "CreatedAt", Width: 22},
 			},
 			Detail: []DetailField{

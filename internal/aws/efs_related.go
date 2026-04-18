@@ -25,7 +25,7 @@ func init() {
 		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: true},
+		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2, NeedsTargetCache: true},
@@ -88,7 +88,7 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -146,7 +146,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
 }
@@ -186,7 +186,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
@@ -263,7 +263,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }

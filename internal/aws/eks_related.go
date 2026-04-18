@@ -70,7 +70,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }
@@ -104,7 +104,7 @@ func checkEKSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -141,7 +141,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -171,7 +171,7 @@ func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }

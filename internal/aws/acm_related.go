@@ -44,7 +44,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 	return relatedResult("cf", ids)
 }

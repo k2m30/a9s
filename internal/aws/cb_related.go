@@ -80,7 +80,7 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -190,7 +190,7 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -233,7 +233,7 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.ApproximateZero("ecr")
 	}
 	return relatedResult("ecr", ids)
 }
@@ -308,7 +308,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", ids)
 }

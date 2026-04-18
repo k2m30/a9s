@@ -46,7 +46,7 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -81,7 +81,7 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -133,7 +133,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.ApproximateZero("apigw")
 	}
 	return relatedResult("apigw", ids)
 }
@@ -171,7 +171,7 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.ApproximateZero("ecs-task")
 	}
 	return relatedResult("ecs-task", ids)
 }

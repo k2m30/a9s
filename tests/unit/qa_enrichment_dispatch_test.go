@@ -26,6 +26,9 @@ import (
 // enforced by TestAttentionSignalsDoc (per docs/attention-signals.md), so this
 // allowlist is no longer the source of truth — it's a regression pin for the
 // initial enricher set.
+//
+// TODO(no-middle-state): registry-pin tests like this catch absence, not
+// completeness. A feature can still be disabled, inert, or half-fed and pass.
 var originalIssue196Enrichers = []string{
 	"rds",
 	"dbi",
@@ -57,6 +60,9 @@ func TestEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 // Replaces the prior allowlist-based test — that was authoritative when only
 // 8 enrichers existed; now the doc-grounded contract (TestAttentionSignalsDoc)
 // is the source of truth.
+//
+// TODO(no-middle-state): this test proves only registry shape. Keep behavioral
+// tests for any feature that is claimed as implemented.
 func TestEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
 	for key := range awsclient.EnricherRegistry {
 		if resource.FindResourceType(key) == nil {

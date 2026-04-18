@@ -68,7 +68,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -103,7 +103,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -135,7 +135,7 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -185,7 +185,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", ids)
 }
@@ -220,7 +220,7 @@ func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }

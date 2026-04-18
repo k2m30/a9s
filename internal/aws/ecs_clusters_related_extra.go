@@ -51,7 +51,7 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
@@ -87,7 +87,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -123,7 +123,7 @@ func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }
@@ -156,7 +156,7 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.ApproximateZero("ecs-task")
 	}
 	return relatedResult("ecs-task", ids)
 }
@@ -184,7 +184,7 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }

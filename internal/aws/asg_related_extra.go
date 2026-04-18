@@ -71,7 +71,7 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.ApproximateZero("tg")
 	}
 	return relatedResult("tg", ids)
 }

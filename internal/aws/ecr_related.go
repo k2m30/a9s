@@ -48,7 +48,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -80,7 +80,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.ApproximateZero("cb")
 	}
 	return relatedResult("cb", ids)
 }
@@ -113,7 +113,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }

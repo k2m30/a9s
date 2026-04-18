@@ -172,7 +172,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 	return relatedResult("sns", ids)
 }

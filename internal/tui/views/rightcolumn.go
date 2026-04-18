@@ -239,7 +239,7 @@ func (m rightColumnModel) View() string {
 				rowStyle = styles.DimText
 			case row.count == 0 && row.approximate:
 				rowText = "  " + row.displayName + " (0+)"
-				rowStyle = styles.DimText
+				rowStyle = styles.RowNormal
 			case row.count == 0:
 				rowText = "  " + row.displayName + " (0)"
 				rowStyle = styles.DimText
@@ -307,9 +307,19 @@ func isActionableRow(row rightColumnRow) bool {
 	if row.loading || row.err != nil {
 		return false
 	}
-	// Count=-1 with a FetchFilter means "navigate — server-side fetch determines real count".
+	if len(row.fetchFilter) > 0 {
+		// Any row with a server-side filter is navigable — the fetch determines
+		// the real count.
+		return true
+	}
 	if row.count == -1 {
-		return len(row.fetchFilter) > 0
+		// Unknown without a fetchFilter → not drillable.
+		return false
+	}
+	if row.approximate {
+		// 0+ or N+ — reverse-scan lower bound. Navigable to the target-type
+		// list; the target list view can filter client-side.
+		return true
 	}
 	return row.count > 0
 }

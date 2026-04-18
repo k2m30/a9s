@@ -17,13 +17,11 @@ import (
 // checkNGEKS extracts ClusterName from the Node Group RawStruct and searches
 // the eks cache for a matching cluster by name.
 func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
-	}
 	clusterName := res.Fields["cluster_name"]
-	if ng.ClusterName != nil && *ng.ClusterName != "" {
-		clusterName = *ng.ClusterName
+	if ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct); ok {
+		if ng.ClusterName != nil && *ng.ClusterName != "" {
+			clusterName = *ng.ClusterName
+		}
 	}
 	if clusterName == "" {
 		return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
@@ -51,7 +49,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -84,7 +82,7 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -119,7 +117,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
@@ -128,18 +126,15 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 // group's name via "eks:nodegroup-name" and optionally "eks:cluster-name".
 // Pattern C: tag-based cache scan.
 func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
-	}
-
 	nodegroupName := res.Fields["nodegroup_name"]
 	clusterName := res.Fields["cluster_name"]
-	if ng.NodegroupName != nil && *ng.NodegroupName != "" {
-		nodegroupName = *ng.NodegroupName
-	}
-	if ng.ClusterName != nil && *ng.ClusterName != "" {
-		clusterName = *ng.ClusterName
+	if ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct); ok {
+		if ng.NodegroupName != nil && *ng.NodegroupName != "" {
+			nodegroupName = *ng.NodegroupName
+		}
+		if ng.ClusterName != nil && *ng.ClusterName != "" {
+			clusterName = *ng.ClusterName
+		}
 	}
 	if nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -171,7 +166,7 @@ func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		ids = append(ids, ec2Res.ID)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }

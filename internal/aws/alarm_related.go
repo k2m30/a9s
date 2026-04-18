@@ -50,7 +50,7 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 
 	var asgName string
@@ -79,7 +79,7 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }

@@ -43,7 +43,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.ApproximateZero("ami")
 	}
 	return relatedResult("ami", ids)
 }

@@ -59,7 +59,7 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -95,7 +95,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }

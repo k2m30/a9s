@@ -67,7 +67,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
 	}
 	if ebsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 
 	keySet := make(map[string]struct{})
@@ -100,7 +100,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }
@@ -128,7 +128,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }

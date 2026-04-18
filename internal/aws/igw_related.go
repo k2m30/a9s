@@ -15,7 +15,7 @@ import (
 func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -32,7 +32,7 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource
 		}
 	}
 	if entry.IsTruncated {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.ApproximateZero("vpc")
 	}
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
@@ -71,7 +71,7 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }

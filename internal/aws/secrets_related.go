@@ -42,7 +42,7 @@ func init() {
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -75,7 +75,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", ids)
 }
@@ -87,7 +87,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -114,7 +114,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -147,7 +147,7 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -203,7 +203,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.ApproximateZero("dbi")
 	}
 	return relatedResult("dbi", ids)
 }
@@ -279,7 +279,7 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.ApproximateZero("cb")
 	}
 	return relatedResult("cb", ids)
 }

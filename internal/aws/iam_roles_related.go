@@ -60,7 +60,7 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.ApproximateZero("eks")
 	}
 	return relatedResult("eks", ids)
 }
@@ -187,7 +187,7 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -217,7 +217,7 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.ApproximateZero("glue")
 	}
 	return relatedResult("glue", ids)
 }
@@ -247,7 +247,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }
@@ -318,7 +318,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }

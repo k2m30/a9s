@@ -22,7 +22,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("pipeline", []resource.RelatedDef{
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: true},
+		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkPipelineCFN, NeedsTargetCache: false},
 		{TargetType: "codeartifact", DisplayName: "CodeArtifact", Checker: checkPipelineCodeartifact, NeedsTargetCache: false},

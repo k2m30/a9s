@@ -10,7 +10,9 @@ import (
 type RelatedDef struct {
 	TargetType       string         // target resource short name (e.g., "tg", "alarm")
 	DisplayName      string         // right-column row label (e.g., "Target Groups")
-	Checker          RelatedChecker // async checker function (may be nil for stubs)
+	// TODO(no-middle-state): a registered RelatedDef must have a real Checker.
+	// Treat nil as a structural bug, not as a supported "stub" state.
+	Checker          RelatedChecker // async checker function
 	NeedsTargetCache bool           // true if checker reads target type from ResourceCache
 }
 
@@ -96,6 +98,21 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true paired with Count=%d (must be >=0)", r.TargetType, r.Count)
 	}
 	return nil
+}
+
+// ApproximateZero returns a RelatedCheckResult representing "the checker scanned
+// a truncated cache, found no matches in what was visible, but additional matches
+// may exist beyond the cached window." Renders in the UI as "0+". This is the
+// honest answer for reverse-scan checkers when `truncated && len(ids)==0`.
+//
+// Prefer this over `{Count: -1}` which means "unknown" and renders as a dead-
+// ended dim row.
+func ApproximateZero(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{
+		TargetType:  targetType,
+		Count:       0,
+		Approximate: true,
+	}
 }
 
 // relatedRegistry maps resource short names to their related resource definitions.

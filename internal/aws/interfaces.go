@@ -509,6 +509,13 @@ type ECRDescribeImageScanFindingsAPI interface {
 	DescribeImageScanFindings(ctx context.Context, params *ecr.DescribeImageScanFindingsInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error)
 }
 
+// ECRListImagesAPI defines the interface for the ECR ListImages operation.
+// Used by the Wave 2 EnrichECRRepository enricher to enumerate image IDs per repository
+// before calling DescribeImageScanFindings on each image.
+type ECRListImagesAPI interface {
+	ListImages(ctx context.Context, params *ecr.ListImagesInput, optFns ...func(*ecr.Options)) (*ecr.ListImagesOutput, error)
+}
+
 // EFSDescribeFileSystemsAPI defines the interface for the EFS DescribeFileSystems operation.
 type EFSDescribeFileSystemsAPI interface {
 	DescribeFileSystems(ctx context.Context, params *efs.DescribeFileSystemsInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error)

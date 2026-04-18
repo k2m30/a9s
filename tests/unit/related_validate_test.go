@@ -152,6 +152,9 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 // with no ResourceIDs when it falls back to the nil-clients path).
 //
 // Parent types scoped per ARCH-06 task: asg, ecr, ecs-svc, secrets, ses, kms, eb, eks.
+//
+// TODO(no-middle-state): this is a shape/invariant guard only. A checker can
+// still be inert, non-drillable, or fed by incomplete runtime data and pass.
 func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 	parentTypes := []string{"asg", "ecr", "ecs-svc", "secrets", "ses", "kms", "eb", "eks"}
 
@@ -170,12 +173,14 @@ func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 				t.Skipf("no RelatedDefs registered for %q — skipping (check registration)", parent)
 			}
 
-			for _, def := range defs {
-				def := def
-				if def.Checker == nil {
-					// Stub checkers with nil Checker are explicitly allowed — skip.
-					continue
-				}
+				for _, def := range defs {
+					def := def
+					if def.Checker == nil {
+						// TODO(no-middle-state): nil Checker is not an acceptable steady
+						// state for a registered relation. This legacy skip should become
+						// a hard failure once the remaining allowances are removed.
+						continue
+					}
 
 				t.Run(def.TargetType, func(t *testing.T) {
 					result := def.Checker(context.Background(), nil, dummyRes, emptyCache)

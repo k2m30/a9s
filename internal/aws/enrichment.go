@@ -54,16 +54,20 @@ import (
 	smithy "github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -88,7 +92,9 @@ type Enricher struct {
 //   - has a real Wave 2 enricher registered here (Wave 2 column non-empty), or
 //   - is registered with NoOpEnricher (Wave 2 column is "None" in the doc).
 //
-// Doc-grounded test TestAttentionSignalsDoc enforces this contract.
+// TODO(no-middle-state): TestAttentionSignalsDoc enforces registration only.
+// Do not treat a registered enricher as proof that Wave 2 is populated, visible
+// in the UI, or honest under partial data.
 var EnricherRegistry = map[string]Enricher{
 	// Priority 10 — batchable enrichers (cheap, run first)
 	"dbi":      {Fn: EnrichRDSDocDBMaintenance, Priority: 10},
@@ -195,6 +201,11 @@ func NoOpEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (
 
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.
 const EnrichmentCap = 50
+
+// PerParentPageCap limits per-parent pagination walks in enrichers to avoid
+// runaway enumeration on huge tenants. When hit, the emitted count is marked
+// with a "+" suffix to signal approximate.
+const PerParentPageCap = 10
 
 // isInstanceARN returns true when the RDS ARN targets a DB instance
 // (resource-type segment = "db"), not a cluster, snapshot, or other resource.
@@ -1805,28 +1816,47 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		eventBus := r.Fields["event_bus"]
 		state := strings.ToUpper(r.Fields["state"])
 
-		input := &eventbridge.ListTargetsByRuleInput{
-			Rule: aws.String(ruleName),
+		var targets []eventbridgetypes.Target
+		targetsTruncated := false
+		var targetsNextToken *string
+		targetPages := 0
+		for {
+			if targetPages >= PerParentPageCap {
+				targetsTruncated = true
+				break
+			}
+			pageInput := &eventbridge.ListTargetsByRuleInput{
+				Rule:      aws.String(ruleName),
+				NextToken: targetsNextToken,
+			}
+			if eventBus != "" {
+				pageInput.EventBusName = aws.String(eventBus)
+			}
+			out, err := clients.EventBridge.ListTargetsByRule(ctx, pageInput)
+			targetPages++
+			if err != nil {
+				truncated = true
+				break
+			}
+			targets = append(targets, out.Targets...)
+			if out.NextToken == nil {
+				break
+			}
+			targetsNextToken = out.NextToken
 		}
-		if eventBus != "" {
-			input.EventBusName = aws.String(eventBus)
-		}
-
-		out, err := clients.EventBridge.ListTargetsByRule(ctx, input)
 		checked++
-		if err != nil {
-			truncated = true
-			continue
-		}
 
-		targets := out.Targets
+		targetCountStr := strconv.Itoa(len(targets))
+		if targetsTruncated {
+			targetCountStr += "+"
+		}
 		fieldUpdates[ruleName] = map[string]string{
-			"target_count": strconv.Itoa(len(targets)),
+			"target_count": targetCountStr,
 		}
 		var rows []resource.FindingRow
 
 		// ENABLED rule with no targets → rule fires but goes nowhere.
-		if state == "ENABLED" && len(targets) == 0 {
+		if state == "ENABLED" && len(targets) == 0 && !targetsTruncated {
 			rows = append(rows, resource.FindingRow{
 				Label: "Targets",
 				Value: "enabled rule has no targets (rule matches but goes nowhere)",
@@ -2426,18 +2456,40 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		if apiID == "" {
 			continue
 		}
-		out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
-			ApiId: aws.String(apiID),
-		})
-		if err != nil {
-			truncated = true
-			continue
+		var stages []apigatewayv2types.Stage
+		stagesTruncated := false
+		var stagesNextToken *string
+		stagePages := 0
+		for {
+			if stagePages >= PerParentPageCap {
+				stagesTruncated = true
+				break
+			}
+			out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
+				ApiId:     aws.String(apiID),
+				NextToken: stagesNextToken,
+			})
+			stagePages++
+			if err != nil {
+				truncated = true
+				break
+			}
+			stages = append(stages, out.Items...)
+			if out.NextToken == nil {
+				break
+			}
+			stagesNextToken = out.NextToken
 		}
-		fieldUpdates[apiID] = map[string]string{"stages_count": strconv.Itoa(len(out.Items))}
+
+		stagesCountStr := strconv.Itoa(len(stages))
+		if stagesTruncated {
+			stagesCountStr += "+"
+		}
+		fieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
 		var summaries []string
 		var rows []resource.FindingRow
 
-		for _, stage := range out.Items {
+		for _, stage := range stages {
 			stageName := stage.StageName
 			if stageName == nil {
 				stageName = aws.String("(unnamed)")
@@ -2675,26 +2727,148 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	return EnricherResult{IssueCount: 0, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
-// DISABLED: EnrichECRRepository previously called DescribeImageScanFindings for each
-// ECR repository, but DescribeImageScanFindings requires both RepositoryName AND
-// ImageId — calling it with only RepositoryName fails with a validation error on
-// every invocation. The correct approach is: ListImages → per-image
-// DescribeImageScanFindings. Returning empty findings instead of perpetually
-// erroring on every ECR repository.
+// ECRImagesCapPerRepo is the maximum number of images scanned per repository
+// during Wave 2 enrichment. Caps the per-repo ListImages + DescribeImageScanFindings
+// fanout so that large registries do not cause excessive API call counts.
+const ECRImagesCapPerRepo = 10
+
+// EnrichECRRepository enumerates up to ECRImagesCapPerRepo images per repository
+// using ListImages, then calls DescribeImageScanFindings for each image to surface
+// CRITICAL and HIGH vulnerability findings.
 //
-// TODO: implement properly with ListImages → DescribeImageScanFindings per
-// image. Current single-call form is broken (DescribeImageScanFindings
-// requires ImageId). Returning empty findings instead of perpetually
-// erroring on every ECR repository.
+// Findings:
+//   - Any CRITICAL findings across scanned images → "!" severity.
+//   - Any HIGH findings (no critical) → "~" severity.
+//
+// fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
+// Repositories without scan data (unscanned images) are skipped silently.
+// Per-image ScanNotFoundException is routine and not treated as an error.
+// Skip when clients is nil or clients.ECR does not implement ECRListImagesAPI
+// or ECRDescribeImageScanFindingsAPI.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
-	// TODO: implement properly with ListImages → DescribeImageScanFindings per
-	// image. Current single-call form is broken (DescribeImageScanFindings
-	// requires ImageId). Returning empty findings instead of perpetually
-	// erroring on every ECR repository.
-	_ = ctx
-	_ = clients
-	_ = resources
-	return EnricherResult{Findings: map[string]resource.EnrichmentFinding{}}, nil
+	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
+	if clients == nil || clients.ECR == nil {
+		return EnricherResult{Findings: findings}, nil
+	}
+	listAPI, okL := clients.ECR.(ECRListImagesAPI)
+	scanAPI, okS := clients.ECR.(ECRDescribeImageScanFindingsAPI)
+	if !okL || !okS {
+		return EnricherResult{Findings: findings}, nil
+	}
+
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		repoName := r.Name
+		if repoName == "" {
+			// ID is usually an ARN; last segment after '/' is the repository name.
+			if idx := strings.LastIndex(r.ID, "/"); idx >= 0 && idx < len(r.ID)-1 {
+				repoName = r.ID[idx+1:]
+			} else {
+				repoName = r.ID
+			}
+		}
+		if repoName == "" {
+			continue
+		}
+
+		// Paginate ListImages, capped at ECRImagesCapPerRepo.
+		var imageIDs []ecrtypes.ImageIdentifier
+		var listToken *string
+		for len(imageIDs) < ECRImagesCapPerRepo {
+			listOut, err := listAPI.ListImages(ctx, &ecr.ListImagesInput{
+				RepositoryName: aws.String(repoName),
+				NextToken:      listToken,
+			})
+			if err != nil {
+				truncated = true
+				break
+			}
+			for _, id := range listOut.ImageIds {
+				if len(imageIDs) >= ECRImagesCapPerRepo {
+					truncated = true
+					break
+				}
+				imageIDs = append(imageIDs, id)
+			}
+			if listOut.NextToken == nil {
+				break
+			}
+			listToken = listOut.NextToken
+		}
+
+		scannedCount := 0
+		var criticalTotal int32
+		var highTotal int32
+		for _, img := range imageIDs {
+			if img.ImageDigest == nil {
+				continue
+			}
+			scanOut, err := scanAPI.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
+				RepositoryName: aws.String(repoName),
+				ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
+			})
+			if err != nil {
+				// ScanNotFoundException is routine for unscanned images — skip silently.
+				continue
+			}
+			scannedCount++
+			if scanOut.ImageScanFindings != nil {
+				for sev, n := range scanOut.ImageScanFindings.FindingSeverityCounts {
+					switch sev {
+					case string(ecrtypes.FindingSeverityCritical):
+						criticalTotal += n
+					case string(ecrtypes.FindingSeverityHigh):
+						highTotal += n
+					}
+				}
+			}
+		}
+
+		fieldUpdates[r.ID] = map[string]string{
+			"critical_vulns": strconv.FormatInt(int64(criticalTotal), 10),
+			"high_vulns":     strconv.FormatInt(int64(highTotal), 10),
+			"images_scanned": strconv.Itoa(scannedCount),
+		}
+
+		if criticalTotal == 0 && highTotal == 0 {
+			continue
+		}
+
+		var rows []resource.FindingRow
+		tier := "~"
+		if criticalTotal > 0 {
+			tier = "!"
+			rows = append(rows, resource.FindingRow{
+				Label: "CRITICAL",
+				Value: fmt.Sprintf("%d CRITICAL findings across %d image(s)", criticalTotal, scannedCount),
+				Tier:  "!",
+			})
+		}
+		if highTotal > 0 {
+			rows = append(rows, resource.FindingRow{
+				Label: "HIGH",
+				Value: fmt.Sprintf("%d HIGH findings across %d image(s)", highTotal, scannedCount),
+				Tier:  "~",
+			})
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: tier,
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+
+	issueCount := 0
+	for _, f := range findings {
+		if f.Severity == "!" {
+			issueCount++
+		}
+	}
+	return EnricherResult{IssueCount: issueCount, Truncated: truncated, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
@@ -3429,38 +3603,109 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			continue
 		}
 
-		groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
-			GroupName: aws.String(groupName),
-		})
-		if err != nil {
-			truncated = true
+		// Paginate members via GetGroup (uses Marker/IsTruncated).
+		var allUsers []iamtypes.User
+		memberTruncated := false
+		var groupMarker *string
+		memberPages := 0
+		for {
+			if memberPages >= PerParentPageCap {
+				memberTruncated = true
+				break
+			}
+			groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
+				GroupName: aws.String(groupName),
+				Marker:    groupMarker,
+			})
+			memberPages++
+			if err != nil {
+				truncated = true
+				break
+			}
+			allUsers = append(allUsers, groupOut.Users...)
+			if groupOut.IsTruncated {
+				groupMarker = groupOut.Marker
+			} else {
+				break
+			}
+		}
+		if memberPages == 0 {
+			// GetGroup errored on the first call; skip this group.
 			continue
 		}
 
-		attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
-			GroupName: aws.String(groupName),
-		})
-		if err != nil {
-			truncated = true
+		// Paginate attached policies.
+		var allAttached []iamtypes.AttachedPolicy
+		attachedTruncated := false
+		var attachedMarker *string
+		attachedPages := 0
+		for {
+			if attachedPages >= PerParentPageCap {
+				attachedTruncated = true
+				break
+			}
+			attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
+				GroupName: aws.String(groupName),
+				Marker:    attachedMarker,
+			})
+			attachedPages++
+			if err != nil {
+				truncated = true
+				break
+			}
+			allAttached = append(allAttached, attachedOut.AttachedPolicies...)
+			if attachedOut.IsTruncated {
+				attachedMarker = attachedOut.Marker
+			} else {
+				break
+			}
+		}
+		if attachedPages == 0 {
 			continue
 		}
 
-		inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
-			GroupName: aws.String(groupName),
-		})
-		if err != nil {
-			truncated = true
+		// Paginate inline policies.
+		var allInline []string
+		inlineTruncated := false
+		var inlineMarker *string
+		inlinePages := 0
+		for {
+			if inlinePages >= PerParentPageCap {
+				inlineTruncated = true
+				break
+			}
+			inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
+				GroupName: aws.String(groupName),
+				Marker:    inlineMarker,
+			})
+			inlinePages++
+			if err != nil {
+				truncated = true
+				break
+			}
+			allInline = append(allInline, inlineOut.PolicyNames...)
+			if inlineOut.IsTruncated {
+				inlineMarker = inlineOut.Marker
+			} else {
+				break
+			}
+		}
+		if inlinePages == 0 {
 			continue
 		}
 
-		memberCount := len(groupOut.Users)
+		memberCount := len(allUsers)
+		memberCountStr := strconv.Itoa(memberCount)
+		if memberTruncated {
+			memberCountStr += "+"
+		}
 		fieldUpdates[r.ID] = map[string]string{
-			"member_count": strconv.Itoa(memberCount),
+			"member_count": memberCountStr,
 		}
 
 		var rows []resource.FindingRow
 
-		if memberCount == 0 {
+		if memberCount == 0 && !memberTruncated {
 			rows = append(rows, resource.FindingRow{
 				Label: "Members",
 				Value: "group has no members (orphan)",
@@ -3468,7 +3713,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 		}
 
-		if len(attachedOut.AttachedPolicies) == 0 && len(inlineOut.PolicyNames) == 0 {
+		if len(allAttached) == 0 && len(allInline) == 0 && !attachedTruncated && !inlineTruncated {
 			rows = append(rows, resource.FindingRow{
 				Label: "Policies",
 				Value: "group has no policies (no-op group)",

@@ -293,12 +293,6 @@ func computeResourceTypes() []ResourceTypeDef {
 					return ColorWarning
 				}
 
-				// TODO(enrichment): instances_unhealthy_count, in_service_count, and
-				// suspended_processes are not yet populated by the ASG fetcher
-				// (autoscaling.go registers only asg_name, min_size, max_size, desired,
-				// instances, status). The checks below are wired but will never fire
-				// until the fetcher is extended to emit those fields.
-
 				// InService count below minimum → Broken.
 				inService := r.Fields["in_service_count"]
 				minSz := r.Fields["min_size"]

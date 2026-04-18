@@ -60,7 +60,7 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -93,7 +93,7 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -121,7 +121,7 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.ApproximateZero("nat")
 	}
 	return relatedResult("nat", ids)
 }
@@ -156,7 +156,7 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -206,7 +206,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, mainRTBID)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.ApproximateZero("rtb")
 	}
 	return relatedResult("rtb", ids)
 }
@@ -265,7 +265,7 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
@@ -312,7 +312,7 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.ApproximateZero("eks")
 	}
 	return relatedResult("eks", ids)
 }
@@ -344,7 +344,7 @@ func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", ids)
 }

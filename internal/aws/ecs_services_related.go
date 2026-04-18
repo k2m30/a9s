@@ -123,7 +123,7 @@ func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -165,7 +165,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -179,7 +179,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 	if len(raw.LoadBalancers) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
@@ -202,7 +202,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
 	// Step 3: collect ELB ARNs from matched TGs.
@@ -247,7 +247,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncatedELB {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -258,7 +258,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 	taskDefARN := ""
 	if raw.TaskDefinition != nil {
@@ -292,7 +292,7 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }

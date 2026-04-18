@@ -40,7 +40,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.ApproximateZero("r53")
 	}
 	return relatedResult("r53", ids)
 }

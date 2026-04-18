@@ -19,9 +19,9 @@ func init() {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEbAlarm, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkEbELB, NeedsTargetCache: true},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEbTG, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG, NeedsTargetCache: true},
+		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkEbELB, NeedsTargetCache: false},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEbTG, NeedsTargetCache: false},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG, NeedsTargetCache: false},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRole, NeedsTargetCache: false},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkEbS3, NeedsTargetCache: false},
 	})
@@ -30,17 +30,11 @@ func init() {
 // checkEbCFN checks the CFN cache for a stack associated with this EB environment.
 // Pattern C: match by stack name prefix "awseb-{envID}".
 func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
-	}
-
-	envID := ""
-	if eb.EnvironmentId != nil {
-		envID = *eb.EnvironmentId
-	}
-	if envID == "" {
-		envID = res.ID
+	envID := res.ID
+	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
+		if eb.EnvironmentId != nil && *eb.EnvironmentId != "" {
+			envID = *eb.EnvironmentId
+		}
 	}
 	if envID == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -66,7 +60,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", ids)
 }
@@ -74,17 +68,11 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 // checkEbLogs checks the log groups cache for groups associated with this EB environment.
 // Pattern C: match by log group prefix "/aws/elasticbeanstalk/{envName}/".
 func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
-	}
-
-	envName := ""
-	if eb.EnvironmentName != nil {
-		envName = *eb.EnvironmentName
-	}
-	if envName == "" {
-		envName = res.Name
+	envName := res.Name
+	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
+		if eb.EnvironmentName != nil && *eb.EnvironmentName != "" {
+			envName = *eb.EnvironmentName
+		}
 	}
 	if envName == "" {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -107,7 +95,7 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -115,17 +103,11 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 // checkEbASG checks the ASG cache for groups tagged with this EB environment name.
 // Pattern C: match by "elasticbeanstalk:environment-name" tag on each ASG.
 func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
-	}
-
-	envName := ""
-	if eb.EnvironmentName != nil {
-		envName = *eb.EnvironmentName
-	}
-	if envName == "" {
-		envName = res.Name
+	envName := res.Name
+	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
+		if eb.EnvironmentName != nil && *eb.EnvironmentName != "" {
+			envName = *eb.EnvironmentName
+		}
 	}
 	if envName == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -154,7 +136,7 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }
@@ -163,17 +145,11 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 // environment name via the "elasticbeanstalk:environment-name" tag.
 // Pattern C: tag-based cache scan.
 func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
-	}
-
-	envName := ""
-	if eb.EnvironmentName != nil {
-		envName = *eb.EnvironmentName
-	}
-	if envName == "" {
-		envName = res.Name
+	envName := res.Name
+	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
+		if eb.EnvironmentName != nil && *eb.EnvironmentName != "" {
+			envName = *eb.EnvironmentName
+		}
 	}
 	if envName == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -198,7 +174,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -214,16 +190,11 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 // convention). Falls back to substring match on alarm name if no dimension matches.
 // Pattern D.
 func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
-	}
-	envName := ""
-	if eb.EnvironmentName != nil {
-		envName = *eb.EnvironmentName
-	}
-	if envName == "" {
-		envName = res.Name
+	envName := res.Name
+	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
+		if eb.EnvironmentName != nil && *eb.EnvironmentName != "" {
+			envName = *eb.EnvironmentName
+		}
 	}
 	if envName == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
@@ -256,7 +227,7 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }

@@ -32,7 +32,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -97,9 +97,8 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
 	}
-	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
-	}
+	// ec2List may be nil when no ec2 cache entry is present (secondary lookup).
+	// Continue with an empty map — results will be based on asg cache alone.
 
 	// Build map: instanceID -> image_id from the EC2 cache.
 	ec2Image := make(map[string]string, len(ec2List))
@@ -126,7 +125,7 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && (asgTruncated || ec2Truncated) {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.ApproximateZero("asg")
 	}
 	return relatedResult("asg", ids)
 }

@@ -58,7 +58,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", ids)
 }
@@ -105,7 +105,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.ApproximateZero("elb")
 	}
 	return relatedResult("elb", ids)
 }
@@ -137,7 +137,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.ApproximateZero("waf")
 	}
 	return relatedResult("waf", ids)
 }
@@ -169,7 +169,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.ApproximateZero("acm")
 	}
 	return relatedResult("acm", ids)
 }
@@ -218,7 +218,7 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }

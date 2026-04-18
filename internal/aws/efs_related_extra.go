@@ -43,7 +43,7 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -62,7 +62,7 @@ func checkEFSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 	instanceSet := make(map[string]struct{})
 	for _, eniRes := range eniList {
@@ -82,7 +82,7 @@ func checkEFSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
@@ -98,7 +98,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -111,7 +111,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.ApproximateZero("eni")
 	}
 	return relatedResult("eni", ids)
 }
@@ -127,7 +127,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	vpcSet := make(map[string]struct{})
 	for _, eniRes := range eniList {
@@ -147,7 +147,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.ApproximateZero("vpc")
 	}
 	return relatedResult("vpc", ids)
 }

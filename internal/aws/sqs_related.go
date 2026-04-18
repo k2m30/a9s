@@ -125,7 +125,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.ApproximateZero("sns-sub")
 	}
 	return relatedResult("sns-sub", ids)
 }
@@ -165,7 +165,7 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -247,7 +247,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.ApproximateZero("sqs")
 	}
 	return relatedResult("sqs", ids)
 }

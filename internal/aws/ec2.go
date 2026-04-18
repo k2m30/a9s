@@ -48,7 +48,7 @@ func init() {
 		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true},
 		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: false},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},

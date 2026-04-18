@@ -44,7 +44,7 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -76,7 +76,7 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 	return relatedResult("ct-events", ids)
 }
