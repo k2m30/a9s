@@ -332,8 +332,18 @@ func (m *DetailModel) buildFieldList() {
 			})
 		} else if !emittedPath[df.Path] {
 			// Path-form: emit all FieldItems with this path (may be header + sub-fields).
+			// When df.Label is set, override the first (header) item's label so the
+			// user-provided "label:" in YAML actually shows up. Sub-field labels are
+			// derived from the struct shape and are not overridden.
 			emittedPath[df.Path] = true
-			items = append(items, pathItemsByPath[df.Path]...)
+			pathItems := pathItemsByPath[df.Path]
+			if df.Label != "" && len(pathItems) > 0 {
+				// Clone to avoid mutating the cached slice — pathItemsByPath may be
+				// referenced again on re-render.
+				pathItems = append([]fieldpath.FieldItem(nil), pathItems...)
+				pathItems[0].Key = df.Label
+			}
+			items = append(items, pathItems...)
 		}
 	}
 

@@ -100,7 +100,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "ClusterConfig"}, {Path: "EBSOptions"}, {Path: "Endpoint"}, {Path: "Endpoints"},
 				{Path: "EncryptionAtRestOptions"}, {Path: "DomainEndpointOptions"},
 				{Path: "AdvancedSecurityOptions"}, {Path: "Created"}, {Path: "Deleted"},
-				{Key: "cluster_health", Label: "Cluster Health"},
+				// {Key: "cluster_health", Label: "Cluster Health"} — re-add when CloudWatch Wave-3 enricher populates this field. Today the fetcher only writes domain_processing_status.
 			},
 		},
 		"redshift": {
