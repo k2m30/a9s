@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -430,6 +431,14 @@ func (m *ResourceListModel) View() string {
 
 	var sb strings.Builder
 
+	// Banner: surface enrichment findings that aren't visible as row markers
+	// in the current viewport (off-viewport, filtered-out, or ~-severity types
+	// where row color doesn't signal the issue alone).
+	if banner := m.findingsBanner(startRow, endRow); banner != "" {
+		sb.WriteString(banner)
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(headerLine)
 
 	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
@@ -482,6 +491,47 @@ func (m *ResourceListModel) View() string {
 	}
 
 	return sb.String()
+}
+
+// findingsBanner returns a one-line banner summarizing enrichment findings
+// that are not visible as row markers in the rendered viewport
+// [startRow, endRow). A finding is "visible" only if its resource ID is on
+// a row that is currently rendered to screen — rows scrolled off-page,
+// excluded by text filter, or never loaded all count as hidden.
+//
+// Returns "" when every finding maps to a visible row and the truncation
+// flag is unset.
+func (m *ResourceListModel) findingsBanner(startRow, endRow int) string {
+	if m.enrichmentIssueCount == 0 && len(m.findingsByID) == 0 {
+		return ""
+	}
+	if startRow < 0 {
+		startRow = 0
+	}
+	if endRow > len(m.filteredResources) {
+		endRow = len(m.filteredResources)
+	}
+	visibleWithFinding := 0
+	for i := startRow; i < endRow; i++ {
+		if _, ok := m.findingsByID[m.filteredResources[i].ID]; ok {
+			visibleWithFinding++
+		}
+	}
+	hidden := len(m.findingsByID) - visibleWithFinding
+	if hidden <= 0 && !m.enrichmentTruncated {
+		return ""
+	}
+	var parts []string
+	if hidden > 0 {
+		parts = append(parts, fmt.Sprintf("%d background-check finding(s) off-viewport or on filtered/unloaded rows", hidden))
+	}
+	if m.enrichmentTruncated {
+		parts = append(parts, "count is a lower bound (truncated)")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return styles.BannerInfo.Render("ⓘ " + strings.Join(parts, "; "))
 }
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.

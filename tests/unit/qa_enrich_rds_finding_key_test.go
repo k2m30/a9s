@@ -92,8 +92,11 @@ func TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
 	if _, ok := result.Findings["rds-cluster-prod"]; ok {
 		t.Error("finding for unprobed cluster ARN suffix must NOT appear in Findings")
 	}
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2 (one per probed instance with pending maintenance)", result.IssueCount)
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0 (~ findings do not count toward badge)", result.IssueCount)
+	}
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2 (one finding per probed resource)", len(result.Findings))
 	}
 }
 

@@ -25,7 +25,6 @@ import (
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
-	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -48,30 +47,15 @@ type allEnrichersCase struct {
 }
 
 // TestAllEnrichers_IssueCountMatchesFindings verifies that every registered enricher
-// returns result.IssueCount == len(result.Findings) when seeded with one finding.
-// Tests all 7 distinct enricher implementations (rds and dbi share EnrichRDSDocDBMaintenance).
+// that produces severity "!" findings returns result.IssueCount == len(result.Findings)
+// when seeded with one finding. Enrichers that only produce severity "~" (informational)
+// findings are excluded because "~" findings do not contribute to IssueCount — they are
+// tested separately in TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources.
 func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/abc123"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sm"
 
 	cases := []allEnrichersCase{
-		{
-			name: "rds/EnrichRDSDocDBMaintenance",
-			clients: &awsclient.ServiceClients{
-				RDS: &enrichRDSFake{
-					actions: []rdstypes.ResourcePendingMaintenanceActions{
-						{
-							ResourceIdentifier: aws.String("arn:aws:rds:eu-west-2:123456789012:db:my-db"),
-							PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
-								{Action: aws.String("system-update")},
-							},
-						},
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "my-db"}},
-			call:   awsclient.EnrichRDSDocDBMaintenance,
-		},
 		{
 			name: "ebs/EnrichEBSVolumeStatus",
 			clients: &awsclient.ServiceClients{

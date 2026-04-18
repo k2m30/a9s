@@ -80,7 +80,7 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 //  5. Deliver EnrichmentCheckedMsg with the NEW session gen → must NOT panic
 //     (maps are non-nil after re-initialization).
 func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// Step 1: seed findings for ec2 and rds.
@@ -157,7 +157,7 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 // profiles, a TypeGen=0 message for any enriched type is stale regardless of
 // which type was seeded — both ec2 AND rds must be cleared simultaneously.
 func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = seedEnrichmentFindings(m)
 
@@ -187,7 +187,7 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 // clears enrichmentFindings, enrichmentRan, and enrichmentTypeGen — same as
 // profile switch but triggered by RegionSelectedMsg.
 func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// Step 1: seed findings for ec2 and rds.
@@ -246,7 +246,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 // TestRegionSwitch_BothEnrichmentMapsCleared verifies that region switch
 // clears state for all enriched types simultaneously (parallel to T062 test).
 func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = seedEnrichmentFindings(m)
 
@@ -273,7 +273,7 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 //
 // This is the "maps are empty, not nil" safety check for enrichmentTypeGen.
 func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// Seed some per-type gen by pressing Ctrl+R on ec2 list.
@@ -302,7 +302,7 @@ func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 // TestRegionSwitch_TypeGenResetAllowsNewEnrichment verifies same as above but
 // for region switch — enrichmentTypeGen is reset to empty (not nil) map.
 func TestRegionSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
 	// Seed some per-type gen.

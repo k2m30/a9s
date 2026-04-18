@@ -117,7 +117,7 @@ func enrichmentCheckedWithFindings(sessionGen, typeGen int) messages.EnrichmentC
 //     APIErrorMsg, which the wrapper passes through unchanged.
 //  5. After the error, Ctrl+R may be pressed again — state remains clean.
 func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
@@ -170,7 +170,7 @@ func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
 // Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
 // list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEBSList(m)
 
@@ -209,7 +209,7 @@ func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 // delivering ResourcesLoadedMsg (TypeGen=1 stamped), the active ResourceListModel
 // reflects the loaded resources — list update is unconditional per FR-017.
 func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
@@ -249,7 +249,7 @@ func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 // Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
 // list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEBSList(m)
 
@@ -337,7 +337,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 // Uses "ebs" — registered in both EnricherRegistry and buildEnrichQueue's order
 // list. EC2 was dropped from the enricher registry and no longer generates probes.
 func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEBSList(m)
 
@@ -435,7 +435,7 @@ func (e simpleError) Error() string { return string(e) }
 // Expected: the per-type gen guard (msg.TypeGen != enrichmentTypeGen["ec2"])
 // drops the stale message → cmd is nil, findings NOT restored.
 func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
@@ -475,7 +475,7 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 // normal (non-Ctrl+R) ResourcesLoadedMsg with TypeGen=0 never triggers the
 // enrichment rerun tail branch. This is the "no regression" check.
 func TestListCtrlR_NormalFetch_TypeGenZeroNeverTriggersRerun(t *testing.T) {
-	tui.Version = "test"
+	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 

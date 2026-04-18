@@ -156,6 +156,15 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 				lifecycle = string(inst.InstanceLifecycle)
 			}
 
+			imageID := ""
+			if inst.ImageId != nil {
+				imageID = *inst.ImageId
+			}
+			vpcID := ""
+			if inst.VpcId != nil {
+				vpcID = *inst.VpcId
+			}
+
 			r := resource.Resource{
 				ID:     instanceID,
 				Name:   name,
@@ -169,6 +178,8 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 					"public_ip":   publicIP,
 					"launch_time": launchTime,
 					"lifecycle":   lifecycle,
+					"image_id":    imageID,
+					"vpc_id":      vpcID,
 				},
 				RawStruct: inst,
 			}

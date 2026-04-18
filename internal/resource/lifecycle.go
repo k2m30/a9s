@@ -14,7 +14,11 @@ func StandardLifecycleColor(status string) Color {
 		return ColorWarning
 	case "failed", "error":
 		return ColorBroken
-	case "deleted", "inactive":
+	case "deleted":
+		return ColorDim
+	case "inactive":
+		// "inactive" is a steady-state status (ASG scaled to 0, disabled
+		// rule). Not actively broken — dim and excluded from issue badges.
 		return ColorDim
 	}
 	return ColorHealthy

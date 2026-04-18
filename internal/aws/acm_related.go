@@ -95,8 +95,13 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ reso
 			continue
 		}
 		parts := strings.Split(arn, "/")
-		if len(parts) >= 3 {
+		// ALB/NLB ARN shape: ":loadbalancer/app/<name>/<id>"  → parts ends [..., "app", name, id]
+		// Classic ELB shape: ":loadbalancer/<name>"           → parts ends [..., "loadbalancer", name]
+		switch {
+		case len(parts) >= 4 && (parts[len(parts)-3] == "app" || parts[len(parts)-3] == "net" || parts[len(parts)-3] == "gateway"):
 			ids = append(ids, parts[len(parts)-2])
+		case len(parts) >= 2 && strings.HasSuffix(parts[len(parts)-2], ":loadbalancer"):
+			ids = append(ids, parts[len(parts)-1])
 		}
 	}
 	return relatedResult("elb", ids)

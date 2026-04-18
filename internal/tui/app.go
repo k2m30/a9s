@@ -698,8 +698,14 @@ func (m *Model) popView() bool {
 					// enriched count. Never overwrite a higher enriched count.
 					newIssues := rl.IssueCount()
 					curIssues := menu.GetIssueCounts()[shortName]
-					if newIssues > curIssues {
+					curIssueTrunc := menu.GetIssueTruncated()[shortName]
+					switch {
+					case newIssues > curIssues:
+						// higher enriched count from rl: take it
 						menu.SetIssues(shortName, newIssues, newTrunc)
+					case newIssues == curIssues && curIssueTrunc && !newTrunc:
+						// count confirmed but stale "+" must clear
+						menu.SetIssues(shortName, newIssues, false)
 					}
 				}
 			}

@@ -266,9 +266,23 @@ AWS API: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Reposi
 
 AWS API: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html
 
-- **`iam-user`** — Event user identity (Type=IAMUser).
-- **`role`** — Event user identity (Type=AssumedRole).
-- **`trail`** — Event source trail.
+- **`iam-user`** — `userIdentity.userName` (Type=IAMUser) — events performed by this IAM user.
+- **`role`** — `userIdentity.sessionContext.sessionIssuer.arn` (Type=AssumedRole) — events performed under this role.
+- **`ec2`** — `resources[].ARN` matching EC2 instance ARNs — EC2-targeted CloudTrail events.
+- **`s3`** — `resources[].ARN` matching S3 bucket ARNs — data-plane and management events on S3.
+- **`lambda`** — `resources[].ARN` matching Lambda function ARNs — invocation and config events.
+- **`dbi`** — `resources[].ARN` matching RDS instance ARNs — RDS management events.
+- **`kms`** — `resources[].ARN` matching KMS key ARNs — key usage and policy events.
+- **`secrets`** — `resources[].ARN` matching Secrets Manager ARNs — secret access and rotation events.
+- **`vpce`** — `resources[].ARN` matching VPC endpoint ARNs — endpoint policy and lifecycle events.
+- **`sg`** — `resources[].ARN` matching security group ARNs — rule change and association events.
+- **`ddb`** — `resources[].ARN` matching DynamoDB table ARNs — table management events.
+- **`cfn`** — `resources[].ARN` matching CloudFormation stack ARNs — stack lifecycle events.
+- **`trail`** — `resources[].ARN` matching CloudTrail trail ARNs — trail config and status events.
+- **`ct-events` (by AccessKeyId)** — Self-pivot: convenience filter within ct-events by `userIdentity.accessKeyId`.
+- **`ct-events` (by Username)** — Self-pivot: convenience filter within ct-events by `userIdentity.userName`.
+- **`ct-events` (by EventName)** — Self-pivot: convenience filter within ct-events by `eventName`.
+- **`ct-events` (by SharedEventId)** — Self-pivot: convenience filter within ct-events by `sharedEventId`.
 
 ### `dbc`
 
