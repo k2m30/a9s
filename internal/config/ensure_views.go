@@ -35,13 +35,15 @@ func GenerateViewYAML(v ViewDef) []byte {
 		}
 		b.WriteString("detail:\n")
 		for _, df := range v.Detail {
-			if df.Key != "" {
-				if df.Label != "" {
-					fmt.Fprintf(&b, "  - { key: %s, label: %q }\n", df.Key, df.Label)
-				} else {
-					fmt.Fprintf(&b, "  - { key: %s }\n", df.Key)
-				}
-			} else {
+			switch {
+			case df.Key != "" && df.Label != "":
+				fmt.Fprintf(&b, "  - { key: %s, label: %q }\n", df.Key, df.Label)
+			case df.Key != "":
+				fmt.Fprintf(&b, "  - { key: %s }\n", df.Key)
+			case df.Path != "" && df.Label != "":
+				fmt.Fprintf(&b, "  - { path: %s, label: %q }\n", df.Path, df.Label)
+			default:
+				// Bare path-form (no label) stays as a simple string for readability.
 				fmt.Fprintf(&b, "  - %s\n", df.Path)
 			}
 		}
