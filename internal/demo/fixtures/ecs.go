@@ -362,6 +362,16 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 					PortMappings: []ecstypes.PortMapping{
 						{ContainerPort: aws.Int32(8080), Protocol: ecstypes.TransportProtocolTcp},
 					},
+					Secrets: []ecstypes.Secret{
+						{
+							Name:      aws.String("DB_PASSWORD"),
+							ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"),
+						},
+						{
+							Name:      aws.String("API_KEY"),
+							ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
+						},
+					},
 				},
 			},
 		},

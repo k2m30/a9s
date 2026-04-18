@@ -42,3 +42,16 @@ func (f *DynamoDBFake) DescribeContinuousBackups(_ context.Context, input *dynam
 	}
 	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
 }
+
+// DescribeKinesisStreamingDestination returns Kinesis streaming destinations for the given table.
+func (f *DynamoDBFake) DescribeKinesisStreamingDestination(_ context.Context, input *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+	name := aws.ToString(input.TableName)
+	dests, ok := f.fix.KinesisDestinations[name]
+	if !ok {
+		return &dynamodb.DescribeKinesisStreamingDestinationOutput{TableName: input.TableName}, nil
+	}
+	return &dynamodb.DescribeKinesisStreamingDestinationOutput{
+		TableName:                    input.TableName,
+		KinesisDataStreamDestinations: dests,
+	}, nil
+}

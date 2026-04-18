@@ -8,6 +8,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -212,5 +213,184 @@ func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// kinesis→ddb (Pattern C+reverse: cache["ddb"] scan, DescribeKinesisStreamingDestination)
+// ---------------------------------------------------------------------------
+
+// kinesisSourceResource builds a Kinesis stream resource used as the parent.
+func kinesisSourceResource(streamName, streamARN string) resource.Resource {
+	return resource.Resource{
+		ID:   streamName,
+		Name: streamName,
+		Fields: map[string]string{
+			"stream_arn": streamARN,
+		},
+	}
+}
+
+// ddbTableResource builds a DynamoDB table cache entry.
+func ddbTableResource(tableName string) resource.Resource {
+	return resource.Resource{
+		ID:   tableName,
+		Name: tableName,
+	}
+}
+
+// TestRelated_Kinesis_DDB_Match verifies that a DynamoDB table whose
+// DescribeKinesisStreamingDestination returns this stream's ARN is returned
+// with Count=1.
+func TestRelated_Kinesis_DDB_Match(t *testing.T) {
+	const streamName = "clickstream-ingest"
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+	const tableName = "events-table"
+
+	fakeDDB := newFakeDynamoDBWithKinesisDestination(tableName, streamARN)
+	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
+
+	cache := resource.ResourceCache{
+		"ddb": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{ddbTableResource(tableName)},
+		},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != tableName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, tableName)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_Kinesis_DDB_Match_Truncated verifies that IsTruncated propagates
+// to Approximate=true while Count still reflects found matches.
+func TestRelated_Kinesis_DDB_Match_Truncated(t *testing.T) {
+	const streamName = "clickstream-ingest"
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+	const tableName = "events-table"
+
+	fakeDDB := newFakeDynamoDBWithKinesisDestination(tableName, streamARN)
+	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
+
+	cache := resource.ResourceCache{
+		"ddb": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{ddbTableResource(tableName)},
+			IsTruncated: true,
+		},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Approximate {
+		t.Error("Approximate = false, want true (cache is truncated)")
+	}
+}
+
+// TestRelated_Kinesis_DDB_Empty verifies that a DynamoDB table not streaming to
+// this Kinesis stream returns Count=0.
+func TestRelated_Kinesis_DDB_Empty(t *testing.T) {
+	const streamName = "clickstream-ingest"
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+	const otherStreamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/other-stream"
+	const tableName = "events-table"
+
+	fakeDDB := newFakeDynamoDBWithKinesisDestination(tableName, otherStreamARN)
+	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
+
+	cache := resource.ResourceCache{
+		"ddb": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{ddbTableResource(tableName)},
+		},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), clients, kinesisSourceResource(streamName, streamARN), cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (table streams to a different Kinesis stream)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_DDB_MissingCache verifies that a missing "ddb" cache key
+// returns the zero-value (Count=0), not Count=-1.
+func TestRelated_Kinesis_DDB_MissingCache(t *testing.T) {
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+
+	fakeDDB := &fakeDynamoDBBatch4{}
+	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), clients, kinesisSourceResource("clickstream-ingest", streamARN), resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (cache key missing returns zero-value)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_DDB_NoStreamARN verifies that a stream resource with no
+// stream_arn field returns Count=0 (not an error).
+func TestRelated_Kinesis_DDB_NoStreamARN(t *testing.T) {
+	source := resource.Resource{
+		ID:     "clickstream-ingest",
+		Name:   "clickstream-ingest",
+		Fields: map[string]string{},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no stream ARN field)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_DDB_NoClient verifies that nil/missing DynamoDB client
+// returns Count=-1.
+func TestRelated_Kinesis_DDB_NoClient(t *testing.T) {
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+
+	cache := resource.ResourceCache{
+		"ddb": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{ddbTableResource("events-table")},
+		},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), nil, kinesisSourceResource("clickstream-ingest", streamARN), cache)
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (no DynamoDB client)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_DDB_FetchFilter verifies that the checker does NOT populate
+// FetchFilter — reverse-scan checkers must not set FetchFilter (Fix 3).
+func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+
+	fakeDDB := &fakeDynamoDBBatch4{}
+	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
+
+	cache := resource.ResourceCache{
+		"ddb": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
+	}
+
+	checker := kinesisCheckerByTarget(t, "ddb")
+	result := checker(context.Background(), clients, kinesisSourceResource("clickstream-ingest", streamARN), cache)
+
+	if len(result.FetchFilter) != 0 {
+		t.Errorf("FetchFilter = %v, want empty (reverse-scan checkers must not set FetchFilter)", result.FetchFilter)
 	}
 }

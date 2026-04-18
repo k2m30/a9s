@@ -34,7 +34,6 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAlarmKMS},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkAlarmLambda},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAlarmLogs},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkAlarmRole},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmS3},
 		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmSFN},
 		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF},

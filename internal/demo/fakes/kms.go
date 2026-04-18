@@ -55,3 +55,15 @@ func (f *KMSFake) GetKeyRotationStatus(_ context.Context, input *kms.GetKeyRotat
 	}
 	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: false}, nil
 }
+
+// ListGrants is a no-op stub satisfying KMSListGrantsAPI.
+// Demo mode does not model KMS grants.
+func (f *KMSFake) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options)) (*kms.ListGrantsOutput, error) {
+	return &kms.ListGrantsOutput{}, nil
+}
+
+// GetKeyPolicy is a no-op stub satisfying KMSGetKeyPolicyAPI.
+// Demo mode does not model KMS key policies.
+func (f *KMSFake) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
+	return &kms.GetKeyPolicyOutput{}, nil
+}

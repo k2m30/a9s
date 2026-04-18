@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
-
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -228,74 +226,61 @@ func TestRelated_APIGW_WAF_EmptyInput(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwKMS tests — Count: 0 is definitive (apigatewayv2 exposes no
-// customer-managed CMK anywhere in the service model).
+// checkApigwKMS tests (Pattern C: GetIntegrations + GetFunction per Lambda).
 // ---------------------------------------------------------------------------
 
-// TestRelated_Apigw_KMS_DefinitiveZero: real apigatewayv2types.Api RawStruct
-// → Count: 0 (definitive, not unknown).
-func TestRelated_Apigw_KMS_DefinitiveZero(t *testing.T) {
-	apiID := "abc123"
-	name := "my-api"
+// TestRelated_Apigw_KMS_Match verifies that an API with a Lambda integration
+// whose FunctionConfiguration carries a KMSKeyArn yields Count=1.
+func TestRelated_Apigw_KMS_Match(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-1234-5678-abcd-111111111111"
+	const fnName = "my-function"
+
 	res := resource.Resource{
-		ID:     apiID,
-		Name:   name,
-		Fields: map[string]string{"api_id": apiID, "name": name},
-		RawStruct: apigwtypes.Api{
-			ApiId:        &apiID,
-			Name:         &name,
-			ProtocolType: apigwtypes.ProtocolTypeHttp,
-		},
+		ID:     "abc123",
+		Name:   "my-api",
+		Fields: map[string]string{},
+	}
+	clients := &awsclient.ServiceClients{
+		APIGatewayV2: newFakeAPIGWV2WithLambdaIntegration(fnName),
+		Lambda:       newFakeLambdaWithKMSKey(keyARN),
 	}
 	checker := apigwCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (apigatewayv2 has no KMS relationship)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	if len(result.ResourceIDs) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
 	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
-	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+	if result.ResourceIDs[0] != "a1b2c3d4-1234-5678-abcd-111111111111" {
+		t.Errorf("ResourceIDs[0] = %q, want key UUID", result.ResourceIDs[0])
 	}
 }
 
-// TestRelated_Apigw_KMS_EmptyInput: empty API id → Count: 0.
+// TestRelated_Apigw_KMS_EmptyInput verifies that an empty API ID returns Count=0
+// without calling any API.
 func TestRelated_Apigw_KMS_EmptyInput(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
-	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
 	}
 }
 
-// TestRelated_Apigw_KMS_WrongRawStructType: RawStruct is not apigatewayv2types.Api
-// → Count: 0 (still definitive; mis-typed input cannot yield KMS info).
+// TestRelated_Apigw_KMS_WrongRawStructType verifies that nil clients returns
+// Count=-1 (GetIntegrations cannot proceed).
 func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 	res := resource.Resource{
-		ID:        "abc123",
-		Fields:    map[string]string{"api_id": "abc123"},
-		RawStruct: "not-an-api-struct",
+		ID:     "abc123",
+		Fields: map[string]string{},
 	}
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type)", result.Count)
-	}
-	if result.TargetType != "kms" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

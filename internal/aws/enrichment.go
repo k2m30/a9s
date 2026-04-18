@@ -66,68 +66,85 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// EnricherRegistry maps resource short names to their Wave 2 enricher functions.
-// Ordered by priority: batchable (cheap) first, per-resource (expensive) last.
+// Enricher carries an EnricherFunc plus scheduling metadata.
+// Priority controls Wave 2 dispatch order: lower values run first.
+// The default priority is 100; batchable (cheap) enrichers use 10.
+type Enricher struct {
+	Fn       EnricherFunc
+	Priority int // lower runs first; default 100
+}
+
+// EnricherRegistry maps resource short names to their Wave 2 Enricher metadata.
+// Each entry carries the enricher function (Fn) and its dispatch priority
+// (Priority: lower runs first; 10 = batchable/cheap, 100 = default).
+//
+// Priority is the single source of truth for enrichment ordering.
+// buildEnrichQueue in internal/tui/app_fetchers.go sorts by Priority then
+// alphabetically within each tier — no hardcoded ordering list needed.
 //
 // Every registered resource type per docs/attention-signals.md either:
 //   - has a real Wave 2 enricher registered here (Wave 2 column non-empty), or
 //   - is registered with NoOpEnricher (Wave 2 column is "None" in the doc).
 //
 // Doc-grounded test TestAttentionSignalsDoc enforces this contract.
-var EnricherRegistry = map[string]EnricherFunc{
-	"rds":      EnrichRDSDocDBMaintenance,
-	"dbi":      EnrichRDSDocDBMaintenance,
-	"dbc":      EnrichRDSDocDBMaintenance,
-	"ecs-svc":  EnrichECSServices,
-	"ecs":      EnrichECSClusters,
-	"ecs-task": EnrichECSTasks,
-	"eb-rule":  EnrichEventBridgeRuleTargets,
-	"ddb":      EnrichDynamoDBPITR,
-	"ec2":      EnrichEC2InstanceStatus,
-	"asg":      EnrichASGScalingActivities,
-	"ebs":      EnrichEBSVolumeStatus,
-	"cb":       EnrichCodeBuildStatus,
-	"tg":       EnrichTargetGroupHealth,
-	"pipeline": EnrichCodePipelineStatus,
-	"sfn":      EnrichStepFunctionsStatus,
-	"glue":     EnrichGlueJobStatus,
-	"backup":   EnrichBackupJobs,
-	"ses":      EnrichSESAccount,
-	"kms":      EnrichKMSRotation,
-	"efs":      EnrichEFSMountTargets,
-	"tgw":      EnrichTGWAttachments,
-	"eb":       EnrichEBEnvironmentHealth,
-	"elb":      EnrichELBAttributes,
-	"sqs":      EnrichSQSAttributes,
-	"sns":      EnrichSNSSubscriptions,
-	"msk":      EnrichMSKCluster,
-	"acm":      EnrichACMCertificate,
-	"cf":       EnrichCloudFrontDistribution,
-	"apigw":    EnrichAPIGatewayStage,
-	"cfn":      EnrichCFNStackEvents,
-	"ecr":          EnrichECRRepository,
-	"codeartifact": EnrichCodeArtifactRepository,
-	"athena":       EnrichAthenaWorkGroup,
-	"r53":          EnrichRoute53Zone,
-	"waf":          EnrichWAFLogging,
-	"role":         EnrichIAMRoleLastUsed,
-	"policy":       EnrichIAMPolicy,
-	"iam-user":  EnrichIAMUserMFA,
-	"iam-group": EnrichIAMGroup,
-	"logs":      EnrichLogsMetricFilters,
+var EnricherRegistry = map[string]Enricher{
+	// Priority 10 — batchable enrichers (cheap, run first)
+	"dbi":      {Fn: EnrichRDSDocDBMaintenance, Priority: 10},
+	"ebs":      {Fn: EnrichEBSVolumeStatus, Priority: 10},
+	"cb":       {Fn: EnrichCodeBuildStatus, Priority: 10},
+	"tg":       {Fn: EnrichTargetGroupHealth, Priority: 10},
+	"pipeline": {Fn: EnrichCodePipelineStatus, Priority: 10},
+	"sfn":      {Fn: EnrichStepFunctionsStatus, Priority: 10},
+	"glue":     {Fn: EnrichGlueJobStatus, Priority: 10},
+	// Priority 100 — per-resource enrichers (default)
+	"rds":      {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
+	"dbc":      {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
+	"ecs-svc":  {Fn: EnrichECSServices, Priority: 100},
+	"ecs":      {Fn: EnrichECSClusters, Priority: 100},
+	"ecs-task": {Fn: EnrichECSTasks, Priority: 100},
+	"eb-rule":  {Fn: EnrichEventBridgeRuleTargets, Priority: 100},
+	"ddb":      {Fn: EnrichDynamoDBPITR, Priority: 100},
+	"ec2":      {Fn: EnrichEC2InstanceStatus, Priority: 100},
+	"asg":      {Fn: EnrichASGScalingActivities, Priority: 100},
+	"backup":   {Fn: EnrichBackupJobs, Priority: 100},
+	"ses":      {Fn: EnrichSESAccount, Priority: 100},
+	"kms":      {Fn: EnrichKMSRotation, Priority: 100},
+	"efs":      {Fn: EnrichEFSMountTargets, Priority: 100},
+	"tgw":      {Fn: EnrichTGWAttachments, Priority: 100},
+	"eb":       {Fn: EnrichEBEnvironmentHealth, Priority: 100},
+	"elb":      {Fn: EnrichELBAttributes, Priority: 100},
+	"sqs":      {Fn: EnrichSQSAttributes, Priority: 100},
+	"sns":      {Fn: EnrichSNSSubscriptions, Priority: 100},
+	"msk":      {Fn: EnrichMSKCluster, Priority: 100},
+	"acm":      {Fn: EnrichACMCertificate, Priority: 100},
+	"cf":       {Fn: EnrichCloudFrontDistribution, Priority: 100},
+	"apigw":    {Fn: EnrichAPIGatewayStage, Priority: 100},
+	"cfn":      {Fn: EnrichCFNStackEvents, Priority: 100},
+	"ecr":          {Fn: EnrichECRRepository, Priority: 100},
+	"codeartifact": {Fn: EnrichCodeArtifactRepository, Priority: 100},
+	"athena":       {Fn: EnrichAthenaWorkGroup, Priority: 100},
+	"r53":          {Fn: EnrichRoute53Zone, Priority: 100},
+	"waf":          {Fn: EnrichWAFLogging, Priority: 100},
+	"role":         {Fn: EnrichIAMRoleLastUsed, Priority: 100},
+	"policy":       {Fn: EnrichIAMPolicy, Priority: 100},
+	"iam-user":  {Fn: EnrichIAMUserMFA, Priority: 100},
+	"iam-group": {Fn: EnrichIAMGroup, Priority: 100},
+	"logs":      {Fn: EnrichLogsMetricFilters, Priority: 100},
+	"vpc":       {Fn: EnrichVPCFlowLogs, Priority: 100},
+	"s3":        {Fn: EnrichS3PublicAccessBlock, Priority: 100},
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
-	"alarm":      NoOpEnricher,
-	"ami":        NoOpEnricher,
-	"ct-events":  NoOpEnricher,
-	"docdb-snap": NoOpEnricher,
-	"ebs-snap":   NoOpEnricher,
-	"eip":        NoOpEnricher,
-	"eni":        NoOpEnricher,
-	"igw":        NoOpEnricher,
-	"kinesis":    NoOpEnricher,
-	"lambda":     NoOpEnricher,
-	"nat":        NoOpEnricher,
+	"alarm":      {Fn: NoOpEnricher, Priority: 100},
+	"ami":        {Fn: NoOpEnricher, Priority: 100},
+	"ct-events":  {Fn: NoOpEnricher, Priority: 100},
+	"docdb-snap": {Fn: NoOpEnricher, Priority: 100},
+	"ebs-snap":   {Fn: NoOpEnricher, Priority: 100},
+	"eip":        {Fn: NoOpEnricher, Priority: 100},
+	"eni":        {Fn: NoOpEnricher, Priority: 100},
+	"igw":        {Fn: NoOpEnricher, Priority: 100},
+	"kinesis":    {Fn: NoOpEnricher, Priority: 100},
+	"lambda":     {Fn: NoOpEnricher, Priority: 100},
+	"nat":        {Fn: NoOpEnricher, Priority: 100},
 	// eks and ng use NoOpEnricher because their fetchers already perform the
 	// per-resource DescribeCluster / DescribeNodegroup calls and populate the
 	// health_issues_count and health_issues Wave 2 fields at fetch time. The
@@ -135,8 +152,8 @@ var EnricherRegistry = map[string]EnricherFunc{
 	// the registry entry exists for contract conformance
 	// (TestAttentionSignalsDoc enforces every documented Wave 2 row has a
 	// registry entry).
-	"eks": NoOpEnricher,
-	"ng":  NoOpEnricher,
+	"eks": {Fn: NoOpEnricher, Priority: 100},
+	"ng":  {Fn: NoOpEnricher, Priority: 100},
 	// opensearch and trail use NoOpEnricher because their fetchers already
 	// perform the per-resource Describe* calls (DescribeDomains and
 	// GetTrailStatus respectively) and populate Wave 2 classification fields
@@ -144,20 +161,18 @@ var EnricherRegistry = map[string]EnricherFunc{
 	// in-fetcher Wave 2; the registry entry exists for contract conformance
 	// (TestAttentionSignalsDoc enforces every documented Wave 2 row has a
 	// registry entry).
-	"opensearch": NoOpEnricher,
-	"rds-snap":   NoOpEnricher,
-	"redshift":   NoOpEnricher,
-	"redis":      NoOpEnricher,
-	"rtb":        NoOpEnricher,
-	"secrets":    NoOpEnricher,
-	"sg":         NoOpEnricher,
-	"sns-sub":    NoOpEnricher,
-	"ssm":        NoOpEnricher,
-	"subnet":     NoOpEnricher,
-	"trail":      NoOpEnricher,
-	"vpc":        EnrichVPCFlowLogs,
-	"vpce":       NoOpEnricher,
-	"s3":         EnrichS3PublicAccessBlock,
+	"opensearch": {Fn: NoOpEnricher, Priority: 100},
+	"rds-snap":   {Fn: NoOpEnricher, Priority: 100},
+	"redshift":   {Fn: NoOpEnricher, Priority: 100},
+	"redis":      {Fn: NoOpEnricher, Priority: 100},
+	"rtb":        {Fn: NoOpEnricher, Priority: 100},
+	"secrets":    {Fn: NoOpEnricher, Priority: 100},
+	"sg":         {Fn: NoOpEnricher, Priority: 100},
+	"sns-sub":    {Fn: NoOpEnricher, Priority: 100},
+	"ssm":        {Fn: NoOpEnricher, Priority: 100},
+	"subnet":     {Fn: NoOpEnricher, Priority: 100},
+	"trail":      {Fn: NoOpEnricher, Priority: 100},
+	"vpce":       {Fn: NoOpEnricher, Priority: 100},
 }
 
 // NoOpEnricher is registered for resource types whose Wave 2 column in
