@@ -87,12 +87,6 @@ func checkAMING(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	var ids []string
 	for _, ngRes := range ngList {
-		// TODO: NG→AMI matching requires nodegroups.go fetcher to populate
-		// Fields["image_id"]. Currently nodegroup resources do not include
-		// image_id (AmiType is an enum, not an AMI ID; the actual AMI ID
-		// requires resolving the node group's LaunchTemplate via
-		// ec2:DescribeLaunchTemplateVersions). This loop will never match
-		// until the ng fetcher is updated to populate Fields["image_id"].
 		if ngRes.Fields["image_id"] == amiID {
 			ids = append(ids, ngRes.ID)
 		}

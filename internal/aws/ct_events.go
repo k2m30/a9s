@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "_ct.target_raw"})
+	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"})
 
 	// Paginated fetcher for resource list browsing (M key load-more).
 	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {

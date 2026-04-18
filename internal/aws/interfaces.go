@@ -1435,24 +1435,43 @@ type S3GetPublicAccessBlockAPI interface {
 
 // EnricherResult is the typed return value of a Wave 2 enricher.
 //
-//   - IssueCount is the number of resources the enricher classifies as issue-worthy
-//     for the menu badge. Severity "!" findings contribute; severity "~" findings
-//     (informational) do NOT contribute to IssueCount.
-//   - Truncated is true when the enricher only inspected a subset (e.g., capped at
-//     EnrichmentCap) so the count is a lower bound.
-//   - Findings is a map from resource.Resource.ID → EnrichmentFinding for every
-//     affected resource the enricher observed. For account-wide enrichers (RDS,
-//     EC2 status checks, EBS), Findings may contain entries for resources that
-//     are NOT in the input `resources` slice — banner derivation uses this
-//     information. Enrichers that receive API identifiers in a different form
-//     (e.g., ARNs) MUST normalize to Resource.ID; if no match can be determined,
-//     the affected resource is skipped silently.
-//     MAY be empty when no issues are found. MUST NOT be nil on success — use
-//     make(map[string]resource.EnrichmentFinding) for the empty case.
+//   - IssueCount: number of resources classified issue-worthy for the menu badge
+//     (severity "!" findings; "~" informational do NOT count).
+//
+//   - Truncated: GLOBAL signal — true when ANY part of the enricher's walk was
+//     cut short (EnrichmentCap hit, page cap hit, or API errors skipped records).
+//     Kept for back-compat and banner aggregation. Prefer TruncatedIDs for
+//     per-resource resolution.
+//
+//   - TruncatedIDs: per-resource truncation. Key = Resource.ID that could not be
+//     fully inspected (API error on that resource, page cap hit during a
+//     per-parent paginated walk, etc.). The UI renders "?" on just that row
+//     instead of a global banner. An ID appearing here MUST NOT also appear in
+//     Findings unless the partial data was still usable.
+//
+//   - UnmatchedIDs: API identifiers the enricher observed but could NOT normalize
+//     back to any input Resource.ID. Previously this was silently dropped —
+//     now it's explicit telemetry. The menu/banner MAY surface the count
+//     ("12 findings unattributable") to give the user a visible failure mode.
+//     Value = the raw identifier as seen from the API (ARN, ARN prefix, name).
+//
+//   - Findings: map from Resource.ID → EnrichmentFinding. May contain entries
+//     for resources NOT in the input slice (account-wide enrichers). Enrichers
+//     that receive API identifiers in a different form (e.g., ARNs) MUST
+//     normalize to Resource.ID; if no match can be determined, APPEND to
+//     UnmatchedIDs (do NOT silently drop).
+//
+//   - FieldUpdates: map from Resource.ID → (fieldKey → value). Same normalization
+//     rule applies.
+//
+// MAY have empty maps/slices but MUST NOT be nil for any reference field on
+// success — initialize each with `make(...)` / `[]string{}` before returning.
 type EnricherResult struct {
-	IssueCount int
-	Truncated  bool
-	Findings   map[string]resource.EnrichmentFinding
+	IssueCount   int
+	Truncated    bool
+	TruncatedIDs map[string]bool
+	UnmatchedIDs []string
+	Findings     map[string]resource.EnrichmentFinding
 	// FieldUpdates carries per-resource Fields[] mutations the enricher wants
 	// merged into the cached row. Keyed by resource ID, then by field key.
 	// Used by list columns and Color funcs that need access to Wave-2-derived

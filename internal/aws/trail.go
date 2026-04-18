@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region"})
+	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error"})
 
 	resource.RegisterPaginated("trail", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)

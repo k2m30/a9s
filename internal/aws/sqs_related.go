@@ -74,7 +74,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	if len(topicSet) == 0 {
 		if truncated {
-			return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+			return resource.ApproximateZero("sns")
 		}
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
