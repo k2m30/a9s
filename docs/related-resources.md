@@ -1047,7 +1047,7 @@ AWS API: https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html
 > independent DevOps reviewers and found to have no implementable linkage in
 > the AWS API surface (beyond heuristic reverse-scans that would lie to users
 > with false positives or silent zeros). See
-> [related-panel-devops-consensus.md](./related-panel-devops-consensus.md)
+> [related-panel-devops-consensus.md](./historical/019-related-panel/related-panel-devops-consensus.md)
 > for the evidence trail. Re-adding any of these pairs requires new AWS API
 > evidence cited per the Policy section at the top of this file.
 

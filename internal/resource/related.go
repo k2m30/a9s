@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -66,6 +67,36 @@ type ResourceCache map[string]ResourceCacheEntry
 
 // RelatedChecker returns a count of related resources of a specific type.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
+
+// ValidateRelatedResult sanity-checks that a checker's result is internally
+// consistent with its declared TargetType. Catches bugs where a checker
+// scans the wrong cache (e.g., returning ecs-task IDs as TargetType "ecs").
+//
+// Returns the first violation as an error, or nil if the result is consistent.
+// Currently checks:
+//   - TargetType is non-empty
+//   - When Count > 0, ResourceIDs is non-empty
+//   - When Count is -1, no IDs are populated
+//   - When Approximate is true, Count must be >= 0 (never paired with -1)
+//
+// This is intended for test invariants and optional debug-mode runtime checks,
+// not for production error returns. The drill-in path can additionally cross-
+// check that returned IDs exist in the target-type's cache (out of scope here).
+func ValidateRelatedResult(r RelatedCheckResult) error {
+	if r.TargetType == "" {
+		return fmt.Errorf("RelatedCheckResult: empty TargetType")
+	}
+	if r.Count > 0 && len(r.ResourceIDs) == 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType, r.Count)
+	}
+	if r.Count == -1 && len(r.ResourceIDs) > 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=-1 but %d ResourceIDs present", r.TargetType, len(r.ResourceIDs))
+	}
+	if r.Approximate && r.Count < 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true paired with Count=%d (must be >=0)", r.TargetType, r.Count)
+	}
+	return nil
+}
 
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}

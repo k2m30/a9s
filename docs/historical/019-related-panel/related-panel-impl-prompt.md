@@ -4,8 +4,8 @@ You are implementing AWS related-panel checkers for the a9s project. Working dir
 
 ## Source inputs (READ THESE FIRST)
 
-1. `docs/related-panel-missing.md` — the full list of 114 parent→related pairs currently missing implementations. Every row is your work queue.
-2. `docs/related-panel-devops-consensus.md` — 5 blind DevOps reviewers' independent answers for each pair (possible? + AWS API sequence). **This is your source of truth for what each pair means in AWS and how to resolve it.**
+1. `docs/historical/019-related-panel/related-panel-missing.md` — the full list of 114 parent→related pairs currently missing implementations. Every row is your work queue.
+2. `docs/historical/019-related-panel/related-panel-devops-consensus.md` — 5 blind DevOps reviewers' independent answers for each pair (possible? + AWS API sequence). **This is your source of truth for what each pair means in AWS and how to resolve it.**
 3. `docs/related-resources.md` — the golden contract.
 
 ## Absolute rules
