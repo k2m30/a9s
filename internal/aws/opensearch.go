@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("opensearch", []string{"domain_name", "engine_version", "instance_type", "instance_count", "endpoint", "domain_processing_status"})
+	resource.RegisterFieldKeys("opensearch", []string{"domain_name", "engine_version", "instance_type", "instance_count", "endpoint", "status", "domain_processing_status"})
 
 	resource.RegisterPaginated("opensearch", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)

@@ -230,7 +230,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", matched)
 }
@@ -279,7 +279,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.ApproximateZero("s3")
 	}
 	return relatedResult("s3", matched)
 }
@@ -334,7 +334,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", matched)
 }
@@ -401,7 +401,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "rds", Count: -1}
+		return resource.ApproximateZero("rds")
 	}
 	return relatedResult("rds", matched)
 }
@@ -454,7 +454,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.ApproximateZero("kms")
 	}
 	return relatedResult("kms", matched)
 }
@@ -512,7 +512,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", matched)
 }
@@ -557,7 +557,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.ApproximateZero("vpce")
 	}
 	return relatedResult("vpce", matched)
 }
@@ -606,7 +606,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.ApproximateZero("sg")
 	}
 	return relatedResult("sg", matched)
 }
@@ -655,7 +655,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.ApproximateZero("ddb")
 	}
 	return relatedResult("ddb", matched)
 }
@@ -810,7 +810,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+		return resource.ApproximateZero("trail")
 	}
 	return relatedResult("trail", matched)
 }
@@ -859,7 +859,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(matched) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	return relatedResult("cfn", matched)
 }
