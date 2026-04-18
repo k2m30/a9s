@@ -929,6 +929,12 @@ type WAFv2ListResourcesForWebACLAPI interface {
 	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
 }
 
+// WAFv2GetWebACLAPI defines the interface for the WAFv2 GetWebACL operation.
+// Used by EnrichWAFLogging to count BLOCK rules per WebACL.
+type WAFv2GetWebACLAPI interface {
+	GetWebACL(ctx context.Context, params *wafv2.GetWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.GetWebACLOutput, error)
+}
+
 // EC2DescribeTransitGatewayRouteTablesAPI defines the interface for the EC2
 // DescribeTransitGatewayRouteTables operation.
 type EC2DescribeTransitGatewayRouteTablesAPI interface {
@@ -1106,6 +1112,9 @@ type WAFv2API interface {
 	WAFv2ListWebACLsAPI
 	WAFv2ListResourcesForWebACLAPI
 	WAFGetLoggingConfigurationAPI // Wave 2 enrichment
+	// WAFv2GetWebACLAPI is intentionally excluded from the aggregate — EnrichWAFLogging
+	// calls GetWebACL via type assertion so test fakes that only cover logging do not
+	// need to implement it.
 }
 
 // SecretsManagerAPI is the aggregate interface covering all SecretsManager operations used by a9s fetchers.
@@ -1213,6 +1222,12 @@ type CodeArtifactGetDomainPermissionsPolicyAPI interface {
 // Used by checkCodeartifactKMS to resolve the KMS encryption key for the repository's domain.
 type CodeArtifactDescribeDomainAPI interface {
 	DescribeDomain(ctx context.Context, params *codeartifact.DescribeDomainInput, optFns ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error)
+}
+
+// CodeArtifactListPackagesAPI defines the interface for the CodeArtifact ListPackages operation.
+// Used by EnrichCodeArtifactRepository to count packages per repository.
+type CodeArtifactListPackagesAPI interface {
+	ListPackages(ctx context.Context, params *codeartifact.ListPackagesInput, optFns ...func(*codeartifact.Options)) (*codeartifact.ListPackagesOutput, error)
 }
 
 // CodeArtifactAPI is the aggregate interface covering all CodeArtifact operations used by a9s fetchers.

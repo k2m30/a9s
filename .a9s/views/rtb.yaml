@@ -13,6 +13,9 @@ list:
   Assoc.:
     key: associations_count
     width: 8
+  Blackholes:
+    key: blackhole_routes_count
+    width: 10
 
 detail:
   - RouteTableId

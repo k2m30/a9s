@@ -2,6 +2,9 @@ list:
   Job Name:
     path: Name
     width: 32
+  Last Run:
+    key: last_run
+    width: 14
   Version:
     path: GlueVersion
     width: 10

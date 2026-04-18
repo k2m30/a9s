@@ -4,6 +4,9 @@ list:
   State:
     path: State.Name
     width: 12
+  Health:
+    key: instance_status
+    width: 12
   Lifecycle:
     key: lifecycle
     width: 12

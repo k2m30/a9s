@@ -3,7 +3,9 @@ package fakes
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
+	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -43,4 +45,26 @@ func (f *CodeArtifactFake) GetDomainPermissionsPolicy(_ context.Context, _ *code
 // Demo mode does not model CodeArtifact domain KMS encryption keys.
 func (f *CodeArtifactFake) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
 	return &codeartifact.DescribeDomainOutput{}, nil
+}
+
+// ListPackages returns stub package summaries for demo mode.
+// acme-npm returns 12 npm packages; acme-pypi returns 8; acme-maven returns 5.
+func (f *CodeArtifactFake) ListPackages(_ context.Context, input *codeartifact.ListPackagesInput, _ ...func(*codeartifact.Options)) (*codeartifact.ListPackagesOutput, error) {
+	repoPackageCounts := map[string]int{
+		"acme-npm":   12,
+		"acme-pypi":  8,
+		"acme-maven": 5,
+	}
+	repoName := ""
+	if input.Repository != nil {
+		repoName = *input.Repository
+	}
+	count := repoPackageCounts[repoName]
+	packages := make([]codeartifacttypes.PackageSummary, count)
+	for i := range packages {
+		packages[i] = codeartifacttypes.PackageSummary{
+			Package: aws.String("pkg"),
+		}
+	}
+	return &codeartifact.ListPackagesOutput{Packages: packages}, nil
 }

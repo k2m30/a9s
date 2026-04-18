@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use"})
+	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"})
 
 	resource.RegisterPaginated("acm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -84,6 +85,18 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			inUse = "true"
 		}
 
+		// Compute days_left until certificate expiry.
+		// Format: "<N> days" for future expiry, "expired" for past expiry.
+		daysLeft := ""
+		if cert.NotAfter != nil {
+			d := int(time.Until(*cert.NotAfter).Hours() / 24)
+			if d < 0 {
+				daysLeft = "expired"
+			} else {
+				daysLeft = fmt.Sprintf("%d days", d)
+			}
+		}
+
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
@@ -94,6 +107,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 				"type":        certType,
 				"not_after":   notAfter,
 				"in_use":      inUse,
+				"days_left":   daysLeft,
 			},
 			RawStruct: cert,
 		}

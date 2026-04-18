@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -12,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ami", []string{"image_id", "name", "state", "architecture", "platform", "root_device_type", "creation_date", "public"})
+	resource.RegisterFieldKeys("ami", []string{"image_id", "name", "state", "architecture", "platform", "root_device_type", "creation_date", "public", "deprecated"})
 
 	resource.RegisterPaginated("ami", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -151,6 +152,25 @@ func imageResource(img ec2types.Image) resource.Resource {
 		public = "true"
 	}
 
+	// Compute deprecated: "yes (Nmo ago)" if past, "soon" if within 90d, "" otherwise
+	deprecated := ""
+	if img.DeprecationTime != nil && *img.DeprecationTime != "" {
+		if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil {
+			until := time.Until(t)
+			switch {
+			case until < 0:
+				months := int(-until.Hours() / (24 * 30))
+				if months < 1 {
+					deprecated = "yes (<1mo ago)"
+				} else {
+					deprecated = fmt.Sprintf("yes (%dmo ago)", months)
+				}
+			case until < 90*24*time.Hour:
+				deprecated = "soon"
+			}
+		}
+	}
+
 	return resource.Resource{
 		ID:     imageID,
 		Name:   name,
@@ -164,6 +184,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 			"root_device_type": rootDeviceType,
 			"creation_date":    creationDate,
 			"public":           public,
+			"deprecated":       deprecated,
 		},
 		RawStruct: img,
 	}

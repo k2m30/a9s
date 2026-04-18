@@ -33,6 +33,29 @@ func (f *WAFFake) ListResourcesForWebACL(_ context.Context, input *wafv2.ListRes
 	return &wafv2.ListResourcesForWebACLOutput{ResourceArns: arns}, nil
 }
 
+// GetWebACL returns a stub WebACL with a rules summary for demo mode.
+// The prod and cloudfront ACLs have 3 rules; the staging ACL has 1.
+func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ...func(*wafv2.Options)) (*wafv2.GetWebACLOutput, error) {
+	if input.Name == nil {
+		return nil, fmt.Errorf("GetWebACL: Name is required")
+	}
+	ruleCount := 3
+	if *input.Name == "acme-staging-waf" {
+		ruleCount = 1
+	}
+	rules := make([]wafv2types.Rule, ruleCount)
+	for i := range rules {
+		rules[i] = wafv2types.Rule{Name: aws.String(fmt.Sprintf("rule-%d", i+1))}
+	}
+	return &wafv2.GetWebACLOutput{
+		WebACL: &wafv2types.WebACL{
+			Id:    input.Id,
+			Name:  input.Name,
+			Rules: rules,
+		},
+	}, nil
+}
+
 // GetLoggingConfiguration returns a stub logging configuration.
 // In demo mode the staging WAF ACL has no logging configured
 // (returns WAFNonexistentItemException), triggering the finding.

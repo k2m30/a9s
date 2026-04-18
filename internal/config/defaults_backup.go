@@ -5,6 +5,7 @@ func backupDefaultViews() map[string]ViewDef {
 		"backup": {
 			List: []ListColumn{
 				{Title: "Plan Name", Path: "BackupPlanName", Width: 32},
+				{Title: "Last Status", Key: "last_status", Width: 14},
 				{Title: "Plan ID", Path: "BackupPlanId", Width: 38},
 				{Title: "Created", Path: "CreationDate", Width: 22},
 				{Title: "Last Execution", Path: "LastExecutionDate", Width: 22},

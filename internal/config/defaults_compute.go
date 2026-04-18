@@ -6,6 +6,7 @@ func computeDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "", Width: 24},
 				{Title: "State", Path: "State.Name", Width: 12},
+				{Title: "Health", Key: "instance_status", Width: 12},
 				{Title: "Lifecycle", Key: "lifecycle", Width: 12},
 				{Title: "Type", Path: "InstanceType", Width: 14},
 				{Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
@@ -249,7 +250,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Name", Path: "Name", Width: 32},
 				{Title: "Image ID", Path: "ImageId", Width: 22},
 				{Title: "State", Path: "State", Width: 12},
-				{Title: "Deprecated", Path: "DeprecationTime", Width: 22},
+				{Title: "Deprecated", Key: "deprecated", Width: 22},
 				{Title: "Arch", Path: "Architecture", Width: 10},
 				{Title: "Platform", Path: "PlatformDetails", Width: 16},
 				{Title: "Root Device", Path: "RootDeviceType", Width: 14},

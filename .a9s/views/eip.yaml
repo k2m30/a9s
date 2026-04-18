@@ -7,6 +7,9 @@ list:
   Public IP:
     path: PublicIp
     width: 16
+  State:
+    key: status
+    width: 12
   Association:
     path: AssociationId
     width: 26
