@@ -223,11 +223,14 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "instance_count", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
+			// OpenSearch DomainStatus per docs/attention-signals.md.
+			// Precedence: terminal/admin (Dim) overridden by Broken; Broken overrides Warning.
+			// Field contract:
+			//   - domain_processing_status: from DescribeDomains.DomainProcessingStatus
+			//     (always populated by the fetcher; "Isolated" → Broken)
+			//   - cluster_health: Red/Yellow/Green from CloudWatch (Wave 3, not yet
+			//     implemented — branch kept for forward-compatibility, currently never fires)
 			Color: func(r Resource) Color {
-				// OpenSearch DomainStatus per docs/attention-signals.md.
-				// Precedence: terminal/admin (Dim) overridden by Broken;
-				// Broken overrides Warning. ClusterHealth Red/Yellow comes
-				// from CloudWatch (populated by fetcher when available).
 				if r.Fields["deleted"] == "true" {
 					return ColorDim
 				}

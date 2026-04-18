@@ -6,6 +6,7 @@ func cicdDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Stack Name", Path: "StackName", Width: 36},
 				{Title: "Status", Path: "StackStatus", Width: 24},
+				{Title: "Reason", Path: "StackStatusReason", Width: 32},
 				{Title: "Created", Path: "CreationTime", Width: 22},
 				{Title: "Updated", Path: "LastUpdatedTime", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},

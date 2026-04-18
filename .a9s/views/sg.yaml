@@ -5,6 +5,9 @@ list:
   Group ID:
     path: GroupId
     width: 24
+  Risk:
+    key: risk_summary
+    width: 22
   VPC ID:
     path: VpcId
     width: 24
