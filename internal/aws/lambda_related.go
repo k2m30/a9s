@@ -270,6 +270,47 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("cfn", ids)
 }
 
+// checkLambdaECR resolves the ECR repository for container-image Lambda functions.
+// Pattern F — no AWS call needed. Reads PackageType from FunctionConfiguration
+// and the image URI from res.Fields["image_uri"]. ECR image URIs follow the
+// pattern <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>].
+// Returns Count: 0 if PackageType != Image, Count: -1 if the URI is missing or
+// the repository name cannot be parsed.
+func checkLambdaECR(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	if fn.PackageType != "Image" {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
+	}
+	// Image URI is only available via lambda:GetFunction (not ListFunctions).
+	// If the fetcher has stored it in Fields["image_uri"] use it; otherwise
+	// we cannot determine the repository without an extra API call.
+	imageURI := res.Fields["image_uri"]
+	if imageURI == "" {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	// URI form: <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>]
+	// We need the <repo> portion — everything after the hostname "/" and before ":" or "@".
+	slashIdx := strings.Index(imageURI, "/")
+	if slashIdx < 0 || slashIdx == len(imageURI)-1 {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	repoAndTag := imageURI[slashIdx+1:]
+	// Strip tag/digest suffix.
+	if idx := strings.Index(repoAndTag, ":"); idx >= 0 {
+		repoAndTag = repoAndTag[:idx]
+	}
+	if idx := strings.Index(repoAndTag, "@"); idx >= 0 {
+		repoAndTag = repoAndTag[:idx]
+	}
+	if repoAndTag == "" {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	return relatedResult("ecr", []string{repoAndTag})
+}
+
 // checkLambdaEBRule finds EventBridge rules that target this Lambda
 // (Pattern A — live API). There is no field on FunctionConfiguration that
 // enumerates incoming rules, and scanning the eb-rule cache alone is

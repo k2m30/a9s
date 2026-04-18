@@ -35,3 +35,9 @@ func (f *ECRFake) DescribeImages(_ context.Context, input *ecr.DescribeImagesInp
 func (f *ECRFake) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
 	return &ecr.DescribeImageScanFindingsOutput{}, nil
 }
+
+// GetRepositoryPolicy is a no-op stub satisfying ECRGetRepositoryPolicyAPI.
+// Demo mode does not model ECR repository policies.
+func (f *ECRFake) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
+	return &ecr.GetRepositoryPolicyOutput{}, nil
+}

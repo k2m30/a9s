@@ -27,12 +27,9 @@ func init() {
 		{TargetType: "dbc", DisplayName: "DocumentDB Clusters", Checker: checkTGDBC},
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkTGDBI},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkTGEC2},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkTGKMS},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTGLambda},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTGLogs},
 		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkTGRDSSnap},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkTGRole},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkTGSecrets},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
 	})

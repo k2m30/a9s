@@ -80,23 +80,24 @@ func ebRuleTargetsByService(ctx context.Context, clients any, ruleName string, s
 		name := ""
 		switch service {
 		case "kinesis":
-			if idx := strings.Index(arn, ":stream/"); idx >= 0 {
-				name = arn[idx+len(":stream/"):]
+			if _, after, ok := strings.Cut(arn, ":stream/"); ok {
+				name = after
 			}
 		case "lambda":
-			if idx := strings.Index(arn, ":function:"); idx >= 0 {
-				name = arn[idx+len(":function:"):]
-				if colon := strings.Index(name, ":"); colon >= 0 {
-					name = name[:colon] // strip :version
+			if _, after, ok := strings.Cut(arn, ":function:"); ok {
+				if before, _, hasSep := strings.Cut(after, ":"); hasSep {
+					name = before // strip :version
+				} else {
+					name = after
 				}
 			}
 		case "logs":
-			if idx := strings.Index(arn, ":log-group:"); idx >= 0 {
-				name = strings.TrimSuffix(arn[idx+len(":log-group:"):], ":*")
+			if _, after, ok := strings.Cut(arn, ":log-group:"); ok {
+				name = strings.TrimSuffix(after, ":*")
 			}
 		case "states":
-			if idx := strings.Index(arn, ":stateMachine:"); idx >= 0 {
-				name = arn[idx+len(":stateMachine:"):]
+			if _, after, ok := strings.Cut(arn, ":stateMachine:"); ok {
+				name = after
 			}
 		case "sns", "sqs":
 			if i := strings.LastIndex(arn, ":"); i >= 0 {

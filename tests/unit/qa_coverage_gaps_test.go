@@ -212,8 +212,8 @@ func TestEnricherRegistry_AllExpectedKeys(t *testing.T) {
 	// implementations.
 	expected := []string{"rds", "dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	for _, key := range expected {
-		if awsclient.EnricherRegistry[key] == nil {
-			t.Errorf("EnricherRegistry[%q] is nil", key)
+		if e, ok := awsclient.EnricherRegistry[key]; !ok || e.Fn == nil {
+			t.Errorf("EnricherRegistry[%q].Fn is nil or missing", key)
 		}
 	}
 }

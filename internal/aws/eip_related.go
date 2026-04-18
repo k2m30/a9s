@@ -26,7 +26,6 @@ func init() {
 		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkEIPECS},
 		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkEIPECSSvc},
 		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEIPECSTask},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEIPKMS},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEIPLogs},
 	})
 }

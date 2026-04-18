@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -259,11 +260,8 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 		if zones == "" {
 			continue
 		}
-		for _, s := range splitCSV(zones) {
-			if s == subnetID {
-				ids = append(ids, asgRes.ID)
-				break
-			}
+		if slices.Contains(splitCSV(zones), subnetID) {
+			ids = append(ids, asgRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {
@@ -309,11 +307,8 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 		if subs == "" {
 			continue
 		}
-		for _, s := range splitCSV(subs) {
-			if s == subnetID {
-				ids = append(ids, eksRes.ID)
-				break
-			}
+		if slices.Contains(splitCSV(subs), subnetID) {
+			ids = append(ids, eksRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {
@@ -344,11 +339,8 @@ func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, ca
 		if !ok {
 			continue
 		}
-		for _, sID := range vpceRaw.SubnetIds {
-			if sID == subnetID {
-				ids = append(ids, vpceRes.ID)
-				break
-			}
+		if slices.Contains(vpceRaw.SubnetIds, subnetID) {
+			ids = append(ids, vpceRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 		if err != nil {
 			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
 		}
+		// IsTruncated: populated from first-page result; loaders stop at page 1.
 		return messages.ResourcesLoadedMsg{
 			ResourceType: resourceType,
 			Resources:    result.Resources,
@@ -531,19 +533,32 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 }
 
 // buildEnrichQueue returns resource types that have registered enrichers AND
-// have retained probe resources. Ordered by priority: batchable first, per-resource last.
+// have retained probe resources, sorted by declarative priority from
+// EnricherRegistry[name].Priority (lower values first), then alphabetically
+// within the same priority tier. Priority is metadata on the registry entry:
+// 10 = batchable (cheap, run first), 100 = default per-resource enricher.
 func (m *Model) buildEnrichQueue() []string {
-	// Priority order matches the spec.
-	order := []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
-	var queue []string
-	for _, name := range order {
-		if _, ok := awsclient.EnricherRegistry[name]; !ok {
-			continue
-		}
+	type pair struct {
+		name     string
+		priority int
+	}
+
+	var ps []pair
+	for name, e := range awsclient.EnricherRegistry {
 		if _, ok := m.probeResources[name]; !ok {
 			continue
 		}
-		queue = append(queue, name)
+		ps = append(ps, pair{name: name, priority: e.Priority})
+	}
+	sort.Slice(ps, func(i, j int) bool {
+		if ps[i].priority != ps[j].priority {
+			return ps[i].priority < ps[j].priority
+		}
+		return ps[i].name < ps[j].name // stable: alphabetical within priority
+	})
+	queue := make([]string, len(ps))
+	for i, p := range ps {
+		queue[i] = p.name
 	}
 	return queue
 }
@@ -556,9 +571,9 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
 	resources := m.probeResources[shortName]
-	enricher := awsclient.EnricherRegistry[shortName]
+	enricherFn := awsclient.EnricherRegistry[shortName].Fn
 	typeGen := m.enrichmentTypeGen[shortName]
-	if enricher == nil {
+	if enricherFn == nil {
 		return nil
 	}
 	return func() tea.Msg {
@@ -574,7 +589,7 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 		defer cancel()
 
 		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.EnricherResult, error) {
-			return enricher(ctx, clients, resources)
+			return enricherFn(ctx, clients, resources)
 		})
 		if err != nil {
 			return messages.EnrichmentCheckedMsg{
