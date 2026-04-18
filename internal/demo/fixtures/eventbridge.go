@@ -50,6 +50,25 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 			ScheduleExpression: aws.String("cron(0 0 ? * SUN *)"),
 			Description:        aws.String("Weekly staging environment cleanup (disabled)"),
 		},
+		// Issue: ENABLED rule with no targets → Broken (rule fires but goes nowhere)
+		{
+			Name:               aws.String("eb-rule-no-targets"),
+			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/eb-rule-no-targets"),
+			State:              eventbridgetypes.RuleStateEnabled,
+			EventBusName:       aws.String("default"),
+			ScheduleExpression: aws.String("rate(5 minutes)"),
+			Description:        aws.String("Enabled rule with no targets configured — events are silently dropped"),
+		},
+		// Issue: DISABLED rule with targets → Warning (targets are configured but rule won't fire)
+		{
+			Name:               aws.String("eb-rule-disabled-with-targets"),
+			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/eb-rule-disabled-with-targets"),
+			State:              eventbridgetypes.RuleStateDisabled,
+			EventBusName:       aws.String("default"),
+			ScheduleExpression: aws.String("cron(0 6 * * ? *)"),
+			Description:        aws.String("Disabled rule — targets are configured but this rule will not trigger"),
+			RoleArn:            aws.String(prodEBRoleARN),
+		},
 	}
 
 	targetsByRule := map[string][]eventbridgetypes.Target{
@@ -63,6 +82,15 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 			{
 				Id:  aws.String("SNSAlertTopic"),
 				Arn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+			},
+		},
+		// eb-rule-no-targets: intentionally empty — the rule itself has no targets
+		"eb-rule-no-targets": {},
+		// eb-rule-disabled-with-targets: has targets but rule is disabled
+		"eb-rule-disabled-with-targets": {
+			{
+				Id:  aws.String("SQSDeadLetterQueue"),
+				Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
 			},
 		},
 	}

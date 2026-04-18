@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -36,17 +37,42 @@ func init() {
 	// Role is a full ARN on Lambda (arn:aws:iam::.../role/name); the navigable
 	// field uses the ARN path directly. The target role fixture must carry the ARN
 	// as its ID for the infrastructure integrity check to pass.
+	// VpcConfig: VpcId, SubnetIds, SecurityGroupIds — present when function runs in a VPC.
+	// KMSKeyArn — KMS key for environment variable encryption.
 	resource.RegisterNavigableFields("lambda", []resource.NavigableField{
 		{FieldPath: "Role", TargetType: "role"},
+		{FieldPath: "KMSKeyArn", TargetType: "kms"},
+		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
+		{FieldPath: "VpcConfig.SubnetIds", TargetType: "subnet"},
+		{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 	})
 
 	resource.RegisterRelated("lambda", []resource.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
-		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkLambdaSQS, NeedsTargetCache: false},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkLambdaLogs, NeedsTargetCache: true},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEbRule, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLambdaSG},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkLambdaVPC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLambdaKMS},
+		{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkLambdaSQS},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
+		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEBRule, NeedsTargetCache: false},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLambdaSubnet},
+		{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkLambdaEFS},
+		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true},
+		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkLambdaCF, NeedsTargetCache: true},
+		{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkLambdaDDB},
+		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLambdaKinesis},
+		{TargetType: "msk", DisplayName: "MSK Clusters", Checker: checkLambdaMSK},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkLambdaCTEvents, NeedsTargetCache: true},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkLambdaTG, NeedsTargetCache: true},
+		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkLambdaSNS, NeedsTargetCache: true},
+		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkLambdaSNSSub, NeedsTargetCache: true},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkLambdaS3, NeedsTargetCache: true},
+		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkLambdaECR},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkLambdaENI, NeedsTargetCache: true},
+		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkLambdaSecrets, NeedsTargetCache: true},
+		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkLambdaSSM, NeedsTargetCache: true},
 	})
 }
 
@@ -103,6 +129,14 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		runtime := string(fn.Runtime)
+		// Use State as Status when it signals a real problem (Failed, Pending).
+		// Inactive is not promoted — it means the function was evicted from
+		// memory after an idle period, not that it's broken. Fall back to
+		// runtime for healthy/inactive functions.
+		status := runtime
+		if fn.State == lambdatypes.StateFailed || fn.State == lambdatypes.StatePending {
+			status = string(fn.State)
+		}
 
 		memory := ""
 		if fn.MemorySize != nil {
@@ -143,7 +177,7 @@ func FetchLambdaFunctionsPageWithEventSources(
 		r := resource.Resource{
 			ID:     functionName,
 			Name:   functionName,
-			Status: runtime,
+			Status: status,
 			Fields: map[string]string{
 				"function_name":    functionName,
 				"runtime":          runtime,

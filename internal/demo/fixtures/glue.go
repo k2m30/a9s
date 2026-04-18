@@ -23,6 +23,7 @@ func NewGlueFixtures() *GlueFixtures {
 	dpuSucceeded := 45000.0
 	dpuFailed := 12000.0
 	dpuTimeout := 72000.0
+	dpuError := 5000.0
 
 	return &GlueFixtures{
 		Jobs: []gluetypes.Job{
@@ -65,6 +66,20 @@ func NewGlueFixtures() *GlueFixtures {
 					Name: aws.String("pythonshell"),
 				},
 			},
+			// Issue: latest JobRun=ERROR → Broken (job script threw an unhandled exception)
+			{
+				Name:            aws.String("glue-error-run"),
+				Role:            aws.String("acme-glue-role"),
+				GlueVersion:     aws.String("4.0"),
+				WorkerType:      gluetypes.WorkerTypeG1x,
+				NumberOfWorkers: aws.Int32(5),
+				MaxRetries:      0,
+				CreatedOn:       aws.Time(mustParseGlueTime("2025-09-01T09:00:00+00:00")),
+				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-04-01T10:00:00+00:00")),
+				Command: &gluetypes.JobCommand{
+					Name: aws.String("glueetl"),
+				},
+			},
 		},
 		JobRuns: map[string][]gluetypes.JobRun{
 			"acme-etl-orders": {
@@ -102,6 +117,18 @@ func NewGlueFixtures() *GlueFixtures {
 					ExecutionTime: 7200,
 					ErrorMessage:  aws.String("Job execution exceeded timeout of 7200 seconds"),
 					DPUSeconds:    &dpuTimeout,
+				},
+			},
+			"glue-error-run": {
+				{
+					Id:            aws.String("jr_eee55555-5555-5555-5555-555555555555"),
+					JobName:       aws.String("glue-error-run"),
+					JobRunState:   gluetypes.JobRunStateError,
+					StartedOn:     aws.Time(mustParseGlueTime("2026-04-18T06:00:00+00:00")),
+					CompletedOn:   aws.Time(mustParseGlueTime("2026-04-18T06:03:00+00:00")),
+					ExecutionTime: 180,
+					ErrorMessage:  aws.String("An error occurred: java.lang.NullPointerException at line 47 of transform script"),
+					DPUSeconds:    &dpuError,
 				},
 			},
 		},

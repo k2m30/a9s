@@ -33,3 +33,17 @@ func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeli
 		StageStates:  []cptypes.StageState{},
 	}, nil
 }
+
+// GetPipeline returns an empty pipeline declaration — demo mode does not
+// model pipeline stage details.
+func (f *CodePipelineFake) GetPipeline(_ context.Context, input *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
+	var name string
+	if input != nil && input.Name != nil {
+		name = *input.Name
+	}
+	return &codepipeline.GetPipelineOutput{
+		Pipeline: &cptypes.PipelineDeclaration{
+			Name: &name,
+		},
+	}, nil
+}

@@ -74,7 +74,7 @@ const dangerCTJSON = `{
 //
 //go:fix inline
 func awsStrPtr(s string) *string {
-	return new(s)
+	return &s
 }
 
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
@@ -810,15 +810,17 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 			coloredModel := newDetailModel(res, "ct-events", cfg)
 			coloredView := coloredModel.View()
 
-			// The exact ANSI-styled event value as RowColorStyle(tier) would produce it.
-			wantStyled := styles.RowColorStyle(tier).Render(expectedEventValue)
+			// The exact ANSI-styled event value as ColorStyle(ctEventsTd.Color(r)) would produce it.
+			ctEventsTd := resource.FindResourceType("ct-events")
+			tierRes := resource.Resource{ID: id, Status: tier}
+			wantStyled := styles.ColorStyle(ctEventsTd.Color(tierRes)).Render(expectedEventValue)
 
 			// 1. The styled string must appear in the view (ColorTier was applied to Event row).
 			if !strings.Contains(coloredView, wantStyled) {
-				t.Errorf("tier %q: View() does not contain RowColorStyle(%q).Render(%q)\n"+
+				t.Errorf("tier %q: View() does not contain ColorStyle(ctEventsTd.Color(r)).Render(%q)\n"+
 					"ColorTier not propagated from Row.Severity to FieldItem.ColorTier in sectionsToFieldItems.\n"+
 					"wantStyled = %q",
-					tier, tier, expectedEventValue, wantStyled)
+					tier, expectedEventValue, wantStyled)
 				return
 			}
 
@@ -826,9 +828,9 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 			// strings.Count counts non-overlapping occurrences of wantStyled in the full view.
 			count := strings.Count(coloredView, wantStyled)
 			if count != 1 {
-				t.Errorf("tier %q: RowColorStyle(%q).Render(%q) appears %d times in View(), want exactly 1\n"+
+				t.Errorf("tier %q: ColorStyle(ctEventsTd.Color(r)).Render(%q) appears %d times in View(), want exactly 1\n"+
 					"A count > 1 means ColorTier was copied to more rows than the ACTION/Event row (FR-002 single-cell exception violated).",
-					tier, tier, expectedEventValue, count)
+					tier, expectedEventValue, count)
 			}
 		})
 	}

@@ -1,5 +1,7 @@
 package resource
 
+import "strconv"
+
 func dnsCdnResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -14,6 +16,15 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "record_count", Title: "Records", Width: 9, Sortable: true},
 				{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
 				{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
+			},
+			Color: func(r Resource) Color {
+				s := r.Fields["record_count"]
+				if s != "" {
+					if n, err := strconv.ParseInt(s, 10, 64); err == nil && n <= 2 {
+						return ColorWarning
+					}
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{{
 				ChildType:      "r53_records",
@@ -36,6 +47,15 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "aliases", Title: "Aliases", Width: 30, Sortable: false},
 				{Key: "price_class", Title: "Price Class", Width: 16, Sortable: true},
 			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "Deployed":
+					return ColorHealthy
+				case "InProgress":
+					return ColorWarning
+				}
+				return ColorHealthy
+			},
 		},
 		{
 			Name:          "ACM Certificates",
@@ -49,6 +69,19 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "type", Title: "Type", Width: 14, Sortable: true},
 				{Key: "not_after", Title: "Expires", Width: 22, Sortable: true},
 				{Key: "in_use", Title: "In Use", Width: 8, Sortable: true},
+			},
+			Color: func(r Resource) Color {
+				switch r.Fields["status"] {
+				case "ISSUED":
+					return ColorHealthy
+				case "PENDING_VALIDATION":
+					return ColorWarning
+				case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT":
+					return ColorBroken
+				case "INACTIVE":
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -64,6 +97,7 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 50, Sortable: false},
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
+			Color: func(_ Resource) Color { return ColorHealthy },
 		},
 	}
 }

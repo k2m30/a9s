@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "path", "create_date"})
+	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "is_attachable", "path", "create_date"})
 
 	resource.RegisterPaginated("policy", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -96,6 +96,11 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 			createDate = policy.CreateDate.Format("2006-01-02 15:04")
 		}
 
+		isAttachable := "false"
+		if policy.IsAttachable {
+			isAttachable = "true"
+		}
+
 		r := resource.Resource{
 			ID:     policyName,
 			Name:   policyName,
@@ -104,6 +109,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 				"policy_name":      policyName,
 				"policy_type":      "managed",
 				"attachment_count": attachmentCount,
+				"is_attachable":    isAttachable,
 				"path":             path,
 				"create_date":      createDate,
 			},

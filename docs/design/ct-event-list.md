@@ -1,5 +1,7 @@
 # CloudTrail Events List View — Design
 
+> Note: references to `styles.RowColorStyle` / `IsDimRowColor` in this file are historical. Current API: `styles.ColorStyle(resource.Color)` via `ResourceTypeDef.ResolveColor(r)`. See `docs/architecture.md` Row Coloring.
+
 Status: design spec, not implemented. No code under `internal/`, `cmd/a9s/`,
 `tests/`, or `.a9s/` changes as part of this document. Source of truth for
 event shapes is `docs/design/ct-taxonomy.md`; the sibling detail-view spec

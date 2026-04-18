@@ -3,26 +3,48 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("sns", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSNSCFN, NeedsTargetCache: true},
-		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
+// snsGetTopicAttrs wraps GetTopicAttributes in RetryOnThrottle. Returns nil on
+// any failure (unsupported client, API error, empty output).
+func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[string]string {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.SNS == nil {
+		return nil
+	}
+	api, ok := c.SNS.(SNSGetTopicAttributesAPI)
+	if !ok {
+		return nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sns.GetTopicAttributesOutput, error) {
+		return api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &topicARN})
 	})
+	if err != nil || out == nil {
+		return nil
+	}
+	return out.Attributes
 }
 
-// checkSNSCFN returns Count: 0 because SNS topic tags are not included in the
-// ListTopics response — the CFN relationship cannot be determined from cache alone.
-func checkSNSCFN(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+func init() {
+	resource.RegisterRelated("sns", []resource.RelatedDef{
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: false},
+		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSKMS, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSNSRole, NeedsTargetCache: false},
+	})
+
+	// snstypes topic: detail view renders only TopicArn — no cross-ref fields (KmsMasterKeyId,
+	// subscriptions, delivery policies are GetTopicAttributes results, not in the list RawStruct).
 }
+
+
 
 // checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,
 // or InsufficientDataActions reference this SNS topic ARN.
@@ -55,7 +77,7 @@ func checkSNSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
 }
@@ -89,9 +111,103 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.ApproximateZero("sns-sub")
 	}
 	return relatedResult("sns-sub", ids)
+}
+
+
+// checkSNSKMS resolves the KMS key used for at-rest encryption of this SNS topic
+// via GetTopicAttributes (Pattern C: 1 API call, attribute "KmsMasterKeyId").
+func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	topicARN := res.Fields["topic_arn"]
+	if topicARN == "" {
+		topicARN = res.ID
+	}
+	if topicARN == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
+	if attrs == nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	keyID := attrs["KmsMasterKeyId"]
+	if keyID == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	return relatedResult("kms", []string{arnLastSegment(keyID)})
+}
+
+// checkSNSRole extracts IAM role principals from the SNS topic's access policy
+// (GetTopicAttributes "Policy"). Pattern C: 1 API call, offline JSON parse. Role
+// names are extracted from Principal.AWS values that look like role ARNs.
+func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	topicARN := res.Fields["topic_arn"]
+	if topicARN == "" {
+		topicARN = res.ID
+	}
+	if topicARN == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
+	if attrs == nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	policy := attrs["Policy"]
+	if policy == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	seen := map[string]struct{}{}
+	extractRoleNamesFromPolicy([]byte(policy), seen)
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	return relatedResult("role", names)
+}
+
+// extractRoleNamesFromPolicy walks a JSON IAM policy and records role names from
+// Principal.AWS entries whose value looks like an IAM role ARN
+// (arn:aws:iam::ACCT:role/NAME).
+func extractRoleNamesFromPolicy(doc []byte, seen map[string]struct{}) {
+	var raw any
+	if err := json.Unmarshal(doc, &raw); err != nil {
+		return
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			for k, val := range x {
+				if k == "AWS" {
+					addPolicyPrincipal(val, seen)
+				}
+				walk(val)
+			}
+		case []any:
+			for _, item := range x {
+				walk(item)
+			}
+		}
+	}
+	walk(raw)
+}
+
+// addPolicyPrincipal handles Principal.AWS which can be a string or a []string.
+// Only role ARNs (":role/") are recorded.
+func addPolicyPrincipal(v any, seen map[string]struct{}) {
+	switch x := v.(type) {
+	case string:
+		if strings.Contains(x, ":role/") {
+			seen[arnRoleName(x)] = struct{}{}
+		}
+	case []any:
+		for _, it := range x {
+			if s, ok := it.(string); ok && strings.Contains(s, ":role/") {
+				seen[arnRoleName(s)] = struct{}{}
+			}
+		}
+	}
 }
 
 // snsAlarmReferences reports whether any of the alarm's action lists contain

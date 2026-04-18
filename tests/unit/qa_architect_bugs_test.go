@@ -181,8 +181,8 @@ func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
 	// Check that the configured paths actually match s3types.Object field names
 	// s3types.Object has: Key, Size, LastModified, StorageClass, ETag, Owner
 	// NOT "Name" — that's a bucket field
-	for _, path := range vd.Detail {
-		if path == "Name" {
+	for _, df := range vd.Detail {
+		if df.String() == "Name" {
 			t.Error("s3_objects detail config has path 'Name' but s3types.Object has 'Key', not 'Name' — this will extract nothing")
 		}
 	}

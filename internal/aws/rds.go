@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn"})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period", "cis_flags"})
 
 	resource.RegisterRelated("dbi", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
@@ -19,8 +20,21 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbiSubnets},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbiAlarm, NeedsTargetCache: true},
 		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkDbiRDSSnap, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets, NeedsTargetCache: true},
+		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC, NeedsTargetCache: true},
+		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
+		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
+	})
+
+	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
+	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
+	resource.RegisterNavigableFields("dbi", []resource.NavigableField{
+		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
+		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
+		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
+		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 
 	resource.RegisterPaginated("dbi", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -103,19 +117,60 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			multiAZ = "Yes"
 		}
 
+		publiclyAccessible := "false"
+		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
+			publiclyAccessible = "true"
+		}
+
+		storageEncrypted := "true"
+		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
+			storageEncrypted = "false"
+		}
+
+		deletionProtection := "true"
+		if db.DeletionProtection != nil && !*db.DeletionProtection {
+			deletionProtection = "false"
+		}
+
+		backupRetentionPeriod := "0"
+		if db.BackupRetentionPeriod != nil {
+			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
+		}
+
+		// Compute CIS compliance flags.
+		var cisFlags []string
+		if publiclyAccessible == "true" {
+			cisFlags = append(cisFlags, "PUB")
+		}
+		if storageEncrypted == "false" {
+			cisFlags = append(cisFlags, "UNENC")
+		}
+		if backupRetentionPeriod == "0" {
+			cisFlags = append(cisFlags, "NOBKP")
+		}
+		if deletionProtection == "false" {
+			cisFlags = append(cisFlags, "NOPROT")
+		}
+		cisFlagsVal := strings.Join(cisFlags, "|")
+
 		r := resource.Resource{
 			ID:     dbIdentifier,
 			Name:   dbIdentifier,
 			Status: status,
 			Fields: map[string]string{
-				"db_identifier":  dbIdentifier,
-				"engine":         engine,
-				"engine_version": engineVersion,
-				"status":         status,
-				"class":          class,
-				"endpoint":       endpoint,
-				"multi_az":       multiAZ,
-				"arn":            aws.ToString(db.DBInstanceArn),
+				"db_identifier":           dbIdentifier,
+				"engine":                  engine,
+				"engine_version":          engineVersion,
+				"status":                  status,
+				"class":                   class,
+				"endpoint":                endpoint,
+				"multi_az":                multiAZ,
+				"arn":                     aws.ToString(db.DBInstanceArn),
+				"publicly_accessible":     publiclyAccessible,
+				"storage_encrypted":       storageEncrypted,
+				"deletion_protection":     deletionProtection,
+				"backup_retention_period": backupRetentionPeriod,
+				"cis_flags":               cisFlagsVal,
 			},
 			RawStruct: db,
 		}

@@ -8,6 +8,9 @@ list:
   Protocol:
     path: ProtocolType
     width: 12
+  Stages:
+    key: stages_count
+    width: 7
   Endpoint:
     path: ApiEndpoint
     width: 50

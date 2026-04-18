@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -24,7 +25,120 @@ func init() {
 		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true},
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true},
+		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS, NeedsTargetCache: true},
+		{TargetType: "iam-group", DisplayName: "IAM Groups (via AssumeRolePolicy)", Checker: checkRoleIamGroup, NeedsTargetCache: false},
+		{TargetType: "iam-user", DisplayName: "IAM Users (via AssumeRolePolicy)", Checker: checkRoleIamUser, NeedsTargetCache: false},
 	})
+}
+
+// checkRoleEKS scans the eks cluster cache for clusters whose RoleArn matches this
+// role's ARN or name. Pattern C.
+func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	roleName := res.ID
+	roleARN := ""
+	if raw, ok := assertStruct[iamtypes.Role](res.RawStruct); ok && raw.Arn != nil {
+		roleARN = *raw.Arn
+	}
+
+	eksList, truncated, err := roleRelatedResources(ctx, clients, cache, "eks")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "eks", Count: -1, Err: err}
+	}
+	if eksList == nil {
+		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+	}
+
+	var ids []string
+	for _, e := range eksList {
+		cluster, ok := assertStruct[ekstypes.Cluster](e.RawStruct)
+		if !ok || cluster.RoleArn == nil {
+			continue
+		}
+		arn := *cluster.RoleArn
+		if (roleARN != "" && arn == roleARN) || (roleName != "" && roleNameFromARN(arn) == roleName) {
+			ids = append(ids, e.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("eks")
+	}
+	return relatedResult("eks", ids)
+}
+
+// checkRoleIamGroup extracts IAM group names from this role's AssumeRolePolicy (trust
+// policy) by scanning Principal.AWS ARN entries matching ":group/". The trust
+// document is already fetched + URL-decoded by the role fetcher and lives in
+// Fields["assume_role_policy_document"] — 0 API calls, offline parse.
+func checkRoleIamGroup(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	doc := res.Fields["assume_role_policy_document"]
+	if doc == "" {
+		return resource.RelatedCheckResult{TargetType: "iam-group", Count: 0}
+	}
+	seen := map[string]struct{}{}
+	extractPrincipalsByKind([]byte(doc), ":group/", seen)
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	return relatedResult("iam-group", names)
+}
+
+// checkRoleIamUser extracts IAM user names from this role's AssumeRolePolicy trust
+// policy by scanning Principal.AWS ARN entries matching ":user/". 0-call path.
+func checkRoleIamUser(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	doc := res.Fields["assume_role_policy_document"]
+	if doc == "" {
+		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
+	}
+	seen := map[string]struct{}{}
+	extractPrincipalsByKind([]byte(doc), ":user/", seen)
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	return relatedResult("iam-user", names)
+}
+
+// extractPrincipalsByKind walks a JSON IAM policy document and records the
+// last-segment name (after the final "/") from Principal.AWS ARN entries whose
+// string contains the given kindMarker (e.g. ":group/", ":user/", ":role/").
+func extractPrincipalsByKind(doc []byte, kindMarker string, seen map[string]struct{}) {
+	var raw any
+	if err := json.Unmarshal(doc, &raw); err != nil {
+		return
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			for k, val := range x {
+				if k == "AWS" {
+					addKindedPrincipal(val, kindMarker, seen)
+				}
+				walk(val)
+			}
+		case []any:
+			for _, item := range x {
+				walk(item)
+			}
+		}
+	}
+	walk(raw)
+}
+
+func addKindedPrincipal(v any, kindMarker string, seen map[string]struct{}) {
+	switch x := v.(type) {
+	case string:
+		if strings.Contains(x, kindMarker) {
+			seen[arnRoleName(x)] = struct{}{}
+		}
+	case []any:
+		for _, it := range x {
+			if s, ok := it.(string); ok && strings.Contains(s, kindMarker) {
+				seen[arnRoleName(s)] = struct{}{}
+			}
+		}
+	}
 }
 
 // roleNameFromARN extracts the role name from a role ARN or returns the input as-is
@@ -73,7 +187,7 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.ApproximateZero("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -103,7 +217,7 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.ApproximateZero("glue")
 	}
 	return relatedResult("glue", ids)
 }
@@ -133,7 +247,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.ApproximateZero("ng")
 	}
 	return relatedResult("ng", ids)
 }
@@ -204,10 +318,11 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.ApproximateZero("ec2")
 	}
 	return relatedResult("ec2", ids)
 }
+
 
 // roleRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
@@ -220,3 +335,6 @@ func roleRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	}
 	return resources, isTruncated, err
 }
+
+
+

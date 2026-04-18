@@ -33,3 +33,18 @@ func (f *SFNFake) ListExecutions(_ context.Context, input *sfn.ListExecutionsInp
 func (f *SFNFake) GetExecutionHistory(_ context.Context, _ *sfn.GetExecutionHistoryInput, _ ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
 	return &sfn.GetExecutionHistoryOutput{}, nil
 }
+
+// DescribeStateMachine returns an empty state machine — demo mode does not
+// model ASL definitions.
+func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeStateMachineInput, _ ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
+	var arn string
+	if input != nil && input.StateMachineArn != nil {
+		arn = *input.StateMachineArn
+	}
+	return &sfn.DescribeStateMachineOutput{StateMachineArn: &arn}, nil
+}
+
+// ListTagsForResource returns an empty tag list — demo mode does not model SFN tags.
+func (f *SFNFake) ListTagsForResource(_ context.Context, _ *sfn.ListTagsForResourceInput, _ ...func(*sfn.Options)) (*sfn.ListTagsForResourceOutput, error) {
+	return &sfn.ListTagsForResourceOutput{}, nil
+}

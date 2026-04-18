@@ -5,6 +5,9 @@ list:
   State:
     path: State
     width: 10
+  Targets:
+    key: target_count
+    width: 8
   Event Bus:
     path: EventBusName
     width: 18

@@ -1,5 +1,7 @@
 # CloudTrail Event Detail View — Design v2
 
+> Note: references to `styles.RowColorStyle` in this file are historical. Current API: `styles.ColorStyle(resource.Color)` via `ResourceTypeDef.ResolveColor(r)`. See `docs/architecture.md` Row Coloring.
+
 Status: **proposed, awaiting visual approval via `cmd/preview/ct_event/`**.
 Supersedes [`ct-event-detail.md`](./ct-event-detail.md).
 

@@ -2,6 +2,12 @@ list:
   Domain Name:
     path: DomainName
     width: 28
+  Status:
+    key: status
+    width: 12
+  Processing:
+    key: domain_processing_status
+    width: 14
   Engine Version:
     path: EngineVersion
     width: 16

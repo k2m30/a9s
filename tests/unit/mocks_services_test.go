@@ -672,12 +672,26 @@ func (m *mockRedshiftClient) DescribeClusters(ctx context.Context, params *redsh
 // ---------------------------------------------------------------------------
 
 type mockCloudTrailClient struct {
-	output *cloudtrail.DescribeTrailsOutput
-	err    error
+	output       *cloudtrail.DescribeTrailsOutput
+	err          error
+	statusByName map[string]*cloudtrail.GetTrailStatusOutput
+	statusErr    error
 }
 
 func (m *mockCloudTrailClient) DescribeTrails(ctx context.Context, params *cloudtrail.DescribeTrailsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.DescribeTrailsOutput, error) {
 	return m.output, m.err
+}
+
+func (m *mockCloudTrailClient) GetTrailStatus(ctx context.Context, params *cloudtrail.GetTrailStatusInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetTrailStatusOutput, error) {
+	if m.statusErr != nil {
+		return nil, m.statusErr
+	}
+	if params != nil && params.Name != nil {
+		if out, ok := m.statusByName[*params.Name]; ok {
+			return out, nil
+		}
+	}
+	return &cloudtrail.GetTrailStatusOutput{}, nil
 }
 
 // ---------------------------------------------------------------------------

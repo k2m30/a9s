@@ -703,11 +703,7 @@ var relatedSmokeTable = []smokeTestCase{
 					t.Errorf("TG-S06: %s Checker must be non-nil; got nil", targetType)
 				}
 			}
-			for i := range defs {
-				if defs[i].TargetType == "cfn" {
-					t.Errorf("TG-S06: cfn related def must not be registered (removed); found unexpected def")
-				}
-			}
+			// cfn is now registered per golden doc (docs/related-resources.md)
 		},
 	},
 
@@ -726,16 +722,15 @@ var relatedSmokeTable = []smokeTestCase{
 			},
 			RawStruct: ec2types.TransitGateway{},
 		},
-		expectedLabels: []string{"VPCs", "Route Tables", "CloudFormation"},
+		// tgw→cfn dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
+		expectedLabels: []string{"VPCs", "Route Tables"},
 		deliveries: []smokeDelivery{
 			{"rtb", 1, []string{"rtb-0aaa111111111111a"}},
 			{"vpc", 0, nil},
-			{"cfn", 0, nil},
 		},
 		zeroDeliveries: []smokeDelivery{
 			{"rtb", 0, nil},
 			{"vpc", 0, nil},
-			{"cfn", 0, nil},
 		},
 		firstNavTarget: "rtb",
 		s06: func(t *testing.T) {
@@ -745,7 +740,7 @@ var relatedSmokeTable = []smokeTestCase{
 			for i := range defs {
 				defMap[defs[i].TargetType] = &defs[i]
 			}
-			for _, targetType := range []string{"vpc", "cfn", "rtb"} {
+			for _, targetType := range []string{"vpc", "rtb"} {
 				def, found := defMap[targetType]
 				if !found {
 					t.Errorf("TGW-S06: related def for %q not registered", targetType)
@@ -920,11 +915,11 @@ var relatedSmokeTable = []smokeTestCase{
 		s06: func(t *testing.T) {
 			t.Helper()
 			defs := resource.GetRelated("vpce")
-			if len(defs) != 5 {
-				t.Fatalf("VPCE-S06: expected 5 related defs for vpce, got %d", len(defs))
+			if len(defs) < 6 {
+				t.Fatalf("VPCE-S06: expected at least 6 related defs for vpce, got %d", len(defs))
 			}
 			// Entries that require a real async Checker implementation.
-			checkerTargets := []string{"subnet", "sg", "rtb", "eni"}
+			checkerTargets := []string{"subnet", "sg", "rtb", "eni", "vpc"}
 			for _, target := range checkerTargets {
 				var found *resource.RelatedDef
 				for i := range defs {

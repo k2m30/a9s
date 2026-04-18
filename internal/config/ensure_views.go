@@ -20,10 +20,11 @@ func GenerateViewYAML(v ViewDef) []byte {
 		b.WriteString("list:\n")
 		for _, col := range v.List {
 			fmt.Fprintf(&b, "  %s:\n", yamlKey(col.Title))
+			if col.Path != "" {
+				fmt.Fprintf(&b, "    path: %s\n", col.Path)
+			}
 			if col.Key != "" {
 				fmt.Fprintf(&b, "    key: %s\n", col.Key)
-			} else if col.Path != "" {
-				fmt.Fprintf(&b, "    path: %s\n", col.Path)
 			}
 			fmt.Fprintf(&b, "    width: %d\n", col.Width)
 		}
@@ -34,8 +35,18 @@ func GenerateViewYAML(v ViewDef) []byte {
 			b.WriteString("\n")
 		}
 		b.WriteString("detail:\n")
-		for _, d := range v.Detail {
-			fmt.Fprintf(&b, "  - %s\n", d)
+		for _, df := range v.Detail {
+			switch {
+			case df.Key != "" && df.Label != "":
+				fmt.Fprintf(&b, "  - { key: %s, label: %q }\n", df.Key, df.Label)
+			case df.Key != "":
+				fmt.Fprintf(&b, "  - { key: %s }\n", df.Key)
+			case df.Path != "" && df.Label != "":
+				fmt.Fprintf(&b, "  - { path: %s, label: %q }\n", df.Path, df.Label)
+			default:
+				// Bare path-form (no label) stays as a simple string for readability.
+				fmt.Fprintf(&b, "  - %s\n", df.Path)
+			}
 		}
 	}
 

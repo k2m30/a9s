@@ -20,8 +20,8 @@ func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 	ensureNoColor(t)
 
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms"},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events"},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
@@ -53,8 +53,8 @@ func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 	ensureNoColor(t)
 
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms"},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events"},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
@@ -88,7 +88,7 @@ func TestBug_FirstToggleRelated_HidesAutoShownColumn(t *testing.T) {
 	ensureNoColor(t)
 
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms"},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
