@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -416,6 +417,19 @@ func (m *ResourceListModel) View() string {
 	// Render header row.
 	headerLine := m.renderHeaderRow(cols)
 
+	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
+	// column index. If the identity column is scrolled off-screen or truncated out,
+	// set to -1 so renderDataRow skips the marker entirely rather than falling back
+	// to the first visible column (which would jump the dot to State/Type/etc.).
+	// Must be computed here (before VisibleWindow) so findingsBanner can use it.
+	markerColIdx := -1
+	if fullMarkerColIdx >= m.hScrollOffset {
+		candidate := fullMarkerColIdx - m.hScrollOffset
+		if candidate < len(cols) && cols[candidate].key == fullCols[fullMarkerColIdx].key && cols[candidate].path == fullCols[fullMarkerColIdx].path {
+			markerColIdx = candidate
+		}
+	}
+
 	// Determine visible row count: height minus column header row (1).
 	// Frame borders are already excluded from m.height by the root model.
 	visibleRows := max(m.height-1, 1)
@@ -423,6 +437,16 @@ func (m *ResourceListModel) View() string {
 	// Reserve one row for the "load more" indicator when paginated and truncated.
 	showLoadMore := m.pagination != nil && m.pagination.IsTruncated
 	if showLoadMore && visibleRows > 2 {
+		visibleRows--
+	}
+
+	// Reserve one row for the enrichment banner when it will be shown.
+	// A banner appears when: truncation flag is set, OR any findings exist
+	// (some may be off-viewport or have their marker hidden by hscroll).
+	// We conservatively reserve a row any time banner content is possible;
+	// this prevents the total line count from exceeding m.height.
+	mightShowBanner := m.enrichmentTruncated || len(m.findingsByID) > 0
+	if mightShowBanner && visibleRows > 1 {
 		visibleRows--
 	}
 
@@ -434,24 +458,12 @@ func (m *ResourceListModel) View() string {
 	// Banner: surface enrichment findings that aren't visible as row markers
 	// in the current viewport (off-viewport, filtered-out, or ~-severity types
 	// where row color doesn't signal the issue alone).
-	if banner := m.findingsBanner(startRow, endRow); banner != "" {
+	if banner := m.findingsBanner(startRow, endRow, markerColIdx); banner != "" {
 		sb.WriteString(banner)
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString(headerLine)
-
-	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
-	// column index. If the identity column is scrolled off-screen or truncated out,
-	// set to -1 so renderDataRow skips the marker entirely rather than falling back
-	// to the first visible column (which would jump the dot to State/Type/etc.).
-	markerColIdx := -1
-	if fullMarkerColIdx >= m.hScrollOffset {
-		candidate := fullMarkerColIdx - m.hScrollOffset
-		if candidate < len(cols) && cols[candidate].key == fullCols[fullMarkerColIdx].key && cols[candidate].path == fullCols[fullMarkerColIdx].path {
-			markerColIdx = candidate
-		}
-	}
 
 	for i := startRow; i < endRow; i++ {
 		sb.WriteString("\n")
@@ -496,13 +508,17 @@ func (m *ResourceListModel) View() string {
 // findingsBanner returns a one-line banner summarizing enrichment findings
 // that are not visible as row markers in the rendered viewport
 // [startRow, endRow). A finding is "visible" only if its resource ID is on
-// a row that is currently rendered to screen — rows scrolled off-page,
-// excluded by text filter, or never loaded all count as hidden.
+// a row that is currently rendered to screen AND the marker column is visible
+// (markerColIdx >= 0). When markerColIdx == -1 (identity column scrolled
+// off-screen), all viewport-row findings are treated as hidden because the
+// row marker is suppressed by renderDataRow.
 //
-// Returns "" when every finding maps to a visible row and the truncation
-// flag is unset.
-func (m *ResourceListModel) findingsBanner(startRow, endRow int) string {
-	if m.enrichmentIssueCount == 0 && len(m.findingsByID) == 0 {
+// Returns "" when every finding maps to a visible row with a visible marker
+// and the truncation flag is unset.
+func (m *ResourceListModel) findingsBanner(startRow, endRow, markerColIdx int) string {
+	// Allow through when truncated even with zero findings/issueCount — the
+	// user must know the count is a lower bound.
+	if m.enrichmentIssueCount == 0 && len(m.findingsByID) == 0 && !m.enrichmentTruncated {
 		return ""
 	}
 	if startRow < 0 {
@@ -511,10 +527,15 @@ func (m *ResourceListModel) findingsBanner(startRow, endRow int) string {
 	if endRow > len(m.filteredResources) {
 		endRow = len(m.filteredResources)
 	}
+	// Count findings that have a visible row marker.
+	// When markerColIdx == -1 the identity column is off-screen, so
+	// renderDataRow suppresses the marker on every row — treat all as hidden.
 	visibleWithFinding := 0
-	for i := startRow; i < endRow; i++ {
-		if _, ok := m.findingsByID[m.filteredResources[i].ID]; ok {
-			visibleWithFinding++
+	if markerColIdx >= 0 {
+		for i := startRow; i < endRow; i++ {
+			if _, ok := m.findingsByID[m.filteredResources[i].ID]; ok {
+				visibleWithFinding++
+			}
 		}
 	}
 	hidden := len(m.findingsByID) - visibleWithFinding
@@ -545,8 +566,35 @@ func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, f
 	m.styledRowCache = nil
 }
 
+// ApplyFieldUpdates merges Wave-2-derived field values into the in-memory
+// resource slices. Keyed by resource ID, then by field key. Invalidates the
+// styled row cache so the new values appear on the next render.
+func (m *ResourceListModel) ApplyFieldUpdates(updates map[string]map[string]string) {
+	if len(updates) == 0 {
+		return
+	}
+	for i := range m.allResources {
+		if kvMap, ok := updates[m.allResources[i].ID]; ok {
+			if m.allResources[i].Fields == nil {
+				m.allResources[i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(m.allResources[i].Fields, kvMap)
+		}
+	}
+	for i := range m.filteredResources {
+		if kvMap, ok := updates[m.filteredResources[i].ID]; ok {
+			if m.filteredResources[i].Fields == nil {
+				m.filteredResources[i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(m.filteredResources[i].Fields, kvMap)
+		}
+	}
+	m.styledRowCache = nil
+}
+
 // InvalidateStyleCache clears the styled row cache, forcing re-render
 // with current styles. Called after theme changes.
 func (m *ResourceListModel) InvalidateStyleCache() {
 	m.styledRowCache = nil
 }
+
