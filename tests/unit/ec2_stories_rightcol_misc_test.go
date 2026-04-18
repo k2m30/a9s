@@ -848,8 +848,8 @@ func TestEC2_051_CopyFromRightCol(t *testing.T) {
 func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 	// Ensure EC2 related defs are registered (prior tests may unregister them).
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups"},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups"},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 

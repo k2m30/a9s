@@ -282,6 +282,8 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 				case "~":
 					val = "~ " + val
 				}
+			} else if m.truncatedByID[r.ID] {
+				val = "? " + val
 			}
 		}
 		padded := text.PadOrTrunc(val, c.width)
