@@ -33,7 +33,7 @@ func TestGolden_EC2RelatedView_Text(t *testing.T) {
 	actual := stripAnsi(snapshotEC2RelatedView(t))
 	actual = strings.ReplaceAll(actual, "\r\n", "\n")
 
-	goldenPath := filepath.Join("..", "testdata", "golden", "ec2_related_view.golden.txt")
+	goldenPath := filepath.Join("..", "testdata", "golden", "ec2_related_view", "view.golden.txt")
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
 			t.Fatalf("create golden dir: %v", err)
@@ -67,7 +67,7 @@ func TestGolden_EC2RelatedView_ANSI(t *testing.T) {
 		t.Fatalf("ANSI golden requires style escape sequences, but none were present")
 	}
 
-	goldenPath := filepath.Join("..", "testdata", "golden", "ec2_related_view.ansi.golden")
+	goldenPath := filepath.Join("..", "testdata", "golden", "ec2_related_view", "view.ansi.golden")
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
 			t.Fatalf("create golden dir: %v", err)

@@ -62,7 +62,7 @@ func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 	actual := stripAnsi(m.View())
 	actual = strings.ReplaceAll(actual, "\r\n", "\n")
 
-	goldenPath := filepath.Join("..", "testdata", "golden", "ctdetail_demo_case_d.txt")
+	goldenPath := filepath.Join("..", "testdata", "golden", "ctdetail_demo", "case_d.txt")
 
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
 		if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
