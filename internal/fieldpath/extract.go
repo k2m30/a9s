@@ -328,9 +328,9 @@ func isZeroOrNil(v reflect.Value) bool {
 // Duplicate-key rule: if two entries share a Key, the slice is left unflattened
 // so downstream consumers (detail view's `flattenTagItems`, YAML struct-form
 // output) preserve both values. A map cannot represent duplicate keys without
-// silently dropping data, which violates the "degrade honestly" rule from
-// docs/architecture-intended.md. Duplicates are rare in AWS tag data but
-// possible; when they occur the honest answer is to not flatten.
+// silently dropping data — the "degrade honestly" rule in docs/architecture.md
+// applies here. Duplicates are rare in AWS tag data but possible; when they
+// occur the honest answer is to not flatten.
 func tryFlattenKeyValueSlice(val reflect.Value) map[string]any {
 	// element type after pointer deref
 	et := val.Type().Elem()

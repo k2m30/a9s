@@ -1,13 +1,12 @@
 # a9s Architecture Guide
 
-> **DESCRIPTIVE GUIDE.** This document describes the current implementation state.
-> For normative architecture rules (how the system should be designed), see
-> [architecture-intended.md](./architecture-intended.md). When the two disagree,
-> architecture-intended.md is authoritative.
+> **SINGLE SOURCE OF TRUTH.** This document is both the descriptive guide
+> (how the system is built today) and the normative contract (how new
+> changes must behave). When the implementation diverges from this doc,
+> either the implementation is wrong or this doc must be amended in the
+> same PR.
 
-This document is the first thing you should read when joining the project. It covers the current runtime architecture.
-
-For the normative "how it should be" version used to compare intended design against implementation, see [`architecture-intended.md`](./architecture-intended.md).
+This document is the first thing you should read when joining the project. It covers the runtime architecture and the invariants new code must honor.
 
 ## What is a9s?
 
@@ -32,12 +31,41 @@ The current codebase is already organized around a useful separation of concerns
 
 ### Architectural Invariants
 
-- Views never call AWS directly.
-- Views communicate with the rest of the app by emitting typed messages.
-- The root `tui.Model` owns navigation, clients, session caches, and async result routing.
-- Every async result must carry enough context to reject stale or wrong-target updates.
-- Cache invalidation rules must be explicit for refresh, profile switch, region switch, and view-open flows.
-- `Esc` is the back/dismiss key. `q` is the quit key in normal mode; it is not the navigation primitive.
+The invariants below are normative. Code that violates them is wrong even
+if it "works" — the gen guards, registry completeness checks, and related
+validators in `tests/unit/architecture_conformance_test.go` fail loudly when
+any of these drift.
+
+1. **One root application model owns session state and orchestration.**
+   UI shell concerns and session-runtime state both live on `tui.Model`
+   (the latter via the embedded `sessionRuntime`), but the boundary between
+   them is explicit. No orchestration state leaks into view structs.
+2. **Views render state and emit typed messages.** Views never call AWS
+   directly. `m.clients` is passed to tea.Cmds created by the root model,
+   not consumed inside `View()`.
+3. **Registries are the declarative source of truth.** Supported resource
+   types, related defs, navigable fields, fetchers, detail enrichers, and
+   Wave 2 issue enrichers are all registered at package init. There is no
+   hand-maintained allowlist in dispatch code — background systems iterate
+   registry state and sort by declarative priority metadata.
+4. **AWS adapter code translates SDK types into `resource.Resource`.**
+   `internal/aws` does not own navigation or UI policy. It does not
+   import `internal/tui`.
+5. **Every async result carries enough identity to reject stale updates.**
+   Every Msg with a `Gen` or `TypeGen` field must be stamped at dispatch
+   time. Handlers MUST drop messages whose generation does not match the
+   current session-wide / per-type counter.
+6. **Cache invalidation is explicit.** Refresh, profile switch, and region
+   switch paths all rotate the session runtime via `resetForSessionSwitch`:
+   every gen counter is bumped and every map/queue is rebuilt in one place.
+7. **Feature-specific caches do not hang off transport objects.**
+   `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
+   caches (e.g. the IAM policy document cache) live on `sessionRuntime` and
+   reach detail enrichers via `*awsclient.DetailEnrichmentCtx`.
+8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
+   is the quit key in normal mode; it is not a navigation primitive.
+   Input-mode and search-mode semantics take precedence over view-local
+   bindings.
 
 ---
 
