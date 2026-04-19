@@ -298,8 +298,8 @@ func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 // CODER: implement checkApigwACM in internal/aws/apigw_related.go so that it
 // calls GetDomainNames + GetApiMappings via the APIGatewayV2API client (which
 // must also embed APIGatewayV2GetDomainNamesAPI and APIGatewayV2GetApiMappingsAPI
-// — both already defined in internal/aws/interfaces_networking.go lines 31-48).
-// Update APIGatewayV2API in internal/aws/interfaces.go to embed both new
+// — both defined in internal/aws/interfaces_apigateway.go).
+// Update APIGatewayV2API in internal/aws/interfaces_apigateway.go to embed both
 // sub-interfaces alongside APIGatewayV2GetApisAPI and APIGatewayV2GetStagesAPI.
 // ---------------------------------------------------------------------------
 

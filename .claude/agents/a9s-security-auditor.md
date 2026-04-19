@@ -23,7 +23,7 @@ You are a security auditor for the a9s project, a Terminal UI AWS Resource Manag
 
 ### 1. Read-Only AWS API Verification
 
-Scan all files in `internal/aws/*.go` (excluding client.go, errors.go, interfaces.go, profile.go, regions.go).
+Scan all files in `internal/aws/*.go` (excluding client.go, errors.go, interfaces.go, interfaces_*.go, profile.go, regions.go).
 
 Verify that ONLY these API call patterns are used:
 - List*, Describe*, Get*, Search*, Lookup*, BatchGet*, Scan*

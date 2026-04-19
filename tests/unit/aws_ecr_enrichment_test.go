@@ -5,7 +5,7 @@ package unit
 //
 // ── Coder note ─────────────────────────────────────────────────────────────────
 // ECRListImagesAPI and its embedding into ECRAPI already exist in
-// internal/aws/interfaces.go. The only coder action required is:
+// internal/aws/interfaces_ecr.go. The only coder action required is:
 //
 //  1. Add ListImages to internal/demo/fakes/ecr.go (ECRFake) so the demo fake
 //     satisfies the updated ECRAPI interface.

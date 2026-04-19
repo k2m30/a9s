@@ -81,7 +81,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Interfaces
-- [ ] AWS service interfaces are single-method, defined in `internal/aws/interfaces.go`
+- [ ] AWS service interfaces are single-method, defined in the per-service file `internal/aws/interfaces_<service>.go` (one file per AWS service; `interfaces.go` itself holds only the package doc)
 - [ ] Each interface wraps exactly one SDK operation (e.g., `EC2DescribeInstancesAPI`)
 - [ ] Functions return concrete types, accept interfaces
 - [ ] The `View` interface in `views/view.go` is the only view-level interface
@@ -243,7 +243,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] TDD: failing tests written BEFORE implementation code
 - [ ] All resource types tested — never just one representative type
 - [ ] Subtests use `t.Run(tc.name, ...)` for parallel-safe isolation
-- [ ] AWS mocks implement single-method interfaces from `interfaces.go`
+- [ ] AWS mocks implement single-method interfaces from `interfaces_<service>.go`
 - [ ] Mocks return canned data — no real AWS calls in unit tests
 - [ ] `resource.RegisterPaginated()` / `resource.UnregisterPaginated()` used for test isolation
 - [ ] View tests construct models directly and call `Update()` / `View()` — no `tea.Program`

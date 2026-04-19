@@ -7,7 +7,7 @@ package unit
 //   1. Add go.mod dependency:
 //      go get github.com/aws/aws-sdk-go-v2/service/apigateway
 //
-//   2. Interface in internal/aws/interfaces.go:
+//   2. Interface in internal/aws/interfaces_apigateway.go:
 //      import "github.com/aws/aws-sdk-go-v2/service/apigateway"
 //
 //      type APIGatewayV1GetRestApisAPI interface {
@@ -60,7 +60,7 @@ import (
 // This uses the interface the coder will define. Until then, the
 // compile-time check below will fail.
 //
-// CODER: After adding APIGatewayV1GetRestApisAPI to interfaces.go and
+// CODER: After adding APIGatewayV1GetRestApisAPI to interfaces_apigateway.go and
 // adding the v1 SDK to go.mod, restore the real implementation below and
 // uncomment the apigateway/apigatewaytypes imports above.
 // ---------------------------------------------------------------------------

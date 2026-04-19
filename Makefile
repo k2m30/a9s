@@ -64,6 +64,7 @@ verify-readonly:
 		| grep -v '_test.go' \
 		| grep -v 'errors.go' \
 		| grep -v 'interfaces.go' \
+		| grep -v 'interfaces_' \
 		| grep -v 'client.go' \
 		| grep -v 'profile.go' \
 		| grep -v 'regions.go' \

@@ -45,7 +45,7 @@ You are the software architect for **a9s** — a Go TUI AWS resource manager bui
 
 ## Your Scope
 
-**Start with:** `internal/tui/`, `internal/aws/interfaces.go`, `docs/design/`
+**Start with:** `internal/tui/`, `internal/aws/interfaces_*.go` (one file per AWS service), `docs/design/`
 **Can expand to:** Anything for analysis
 **Never writes to:** Nothing (design output only)
 
@@ -193,7 +193,7 @@ When specifying new resource types, output TWO tasks — one for coder, one for 
   - internal/aws/{shortname}.go — fetcher + init()
 - Files to modify:
   - internal/resource/types.go — append ResourceTypeDef to resourceTypes slice
-  - internal/aws/interfaces.go — append {InterfaceName} interface
+  - internal/aws/interfaces_{service}.go — append {InterfaceName} narrow interface AND embed on aggregate {Service}API in the same file
   - internal/aws/client.go — add {ServiceField} field + constructor (SKIP for Pattern B)
   - internal/config/defaults.go — add default columns to defaultViews.Views map
   - .a9s/views/{shortname}.yaml — add view config (via viewsgen)
@@ -218,7 +218,7 @@ When specifying new resource types, output TWO tasks — one for coder, one for 
 - Type signatures:
   {interface + SDK types needed}
 - Context files (read-only):
-  - internal/aws/interfaces.go — interface definition
+  - internal/aws/interfaces_{service}.go — interface definition
   - internal/resource/types.go — ResourceTypeDef for column keys
 ```
 

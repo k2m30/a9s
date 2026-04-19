@@ -67,7 +67,7 @@ After reading all outputs, the agent applies judgment to produce a final report:
 
 These are architectural decisions, not violations:
 
-- `internal/aws/interfaces.go` exceeds 500 lines -- grows linearly with resource types, each interface is 3 lines. Acceptable.
+- `internal/aws/interfaces_<service>.go` files may individually exceed 500 lines for services with many narrow operation interfaces (EC2, IAM). Growth is linear with resource types; each interface is ~3 lines. Acceptable.
 - `internal/tui/views/resourcelist.go` exceeds 500 lines -- complex view with filtering, sorting, pagination. Monitor but acceptable.
 - `ResourceListModel.Update()` exceeds 50 lines -- Bubble Tea type-switch pattern, accepted exception per checklist.
 - `*DefaultViews()` and `*ResourceTypes()` functions are large map/slice literals -- data declarations, not logic. Acceptable.
