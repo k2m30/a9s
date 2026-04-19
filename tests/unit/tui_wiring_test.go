@@ -202,8 +202,8 @@ func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Push a reveal view via SecretRevealedMsg
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
+	// Push a reveal view via ValueRevealedMsg
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
 		ResourceID: "my-secret",
 		Value:      "s3cr3t-value",
 	})
@@ -526,15 +526,15 @@ func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
 		t.Fatal("pressing 'x' on secrets resource list should return a reveal fetch command")
 	}
 
-	// Execute the cmd — should yield FlashMsg (nil clients) or SecretRevealedMsg
+	// Execute the cmd — should yield FlashMsg (nil clients) or ValueRevealedMsg
 	msg := cmd()
 	switch msg.(type) {
 	case messages.FlashMsg:
 		// Expected: no clients initialized
-	case messages.SecretRevealedMsg:
+	case messages.ValueRevealedMsg:
 		// Would happen if clients were set
 	default:
-		t.Errorf("expected FlashMsg or SecretRevealedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg or ValueRevealedMsg, got %T", msg)
 	}
 }
 
@@ -562,7 +562,7 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 		// Execute to check it's not a reveal command
 		msg := cmd()
 		switch msg := msg.(type) {
-		case messages.SecretRevealedMsg:
+		case messages.ValueRevealedMsg:
 			t.Error("pressing 'x' on non-secrets resource should not trigger reveal")
 		case messages.NavigateMsg:
 			if msg.Target == messages.TargetReveal {
@@ -632,14 +632,13 @@ func TestWiring_ViewConfigLoadedAtInit(t *testing.T) {
 	}
 }
 
-// ── SecretRevealedMsg push test ─────────────────────────────────────────────
+// ── ValueRevealedMsg push test ──────────────────────────────────────────────
 
-func TestWiring_SecretRevealedMsg_PushesRevealView(t *testing.T) {
+func TestWiring_ValueRevealedMsg_PushesRevealView(t *testing.T) {
 	tui.Version = "1.0.0"
 	m := newRootSizedModel()
 
-	// Send SecretRevealedMsg
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
 		ResourceID: "prod/db-password",
 		Value:      "hunter2",
 	})
@@ -654,11 +653,11 @@ func TestWiring_SecretRevealedMsg_PushesRevealView(t *testing.T) {
 	}
 }
 
-func TestWiring_SecretRevealedMsg_Error(t *testing.T) {
+func TestWiring_ValueRevealedMsg_Error(t *testing.T) {
 	tui.Version = "1.0.0"
 	m := newRootSizedModel()
 
-	m, cmd := rootApplyMsg(m, messages.SecretRevealedMsg{
+	m, cmd := rootApplyMsg(m, messages.ValueRevealedMsg{
 		Err: errForTest("access denied"),
 	})
 	// The handler now returns a FlashMsg command; dispatch it.

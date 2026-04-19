@@ -8,9 +8,10 @@ import (
 
 // TestDbiColor tests the Color function for DB Instances (dbi).
 //
-// The production Color func reads "status" (with fallback to "db_instance_status")
-// and delegates to rdsInstanceColor. It also honors backup_retention_period,
-// publicly_accessible, storage_encrypted, and deletion_protection — all tested below.
+// The production Color func reads "status" (the canonical fetcher key; the
+// legacy "db_instance_status" fallback was removed in #284) and delegates to
+// rdsInstanceColor. It also honors backup_retention_period, publicly_accessible,
+// storage_encrypted, and deletion_protection — all tested below.
 func TestDbiColor(t *testing.T) {
 	td := resource.FindResourceType("dbi")
 	if td == nil {
@@ -113,19 +114,14 @@ func TestDbiColor(t *testing.T) {
 			want:   resource.ColorWarning,
 		},
 
-		// --- fallback field ---
+		// --- legacy key is now ignored; only "status" drives Color (#284) ---
 		{
-			name:   "fallback_db_instance_status_available",
-			fields: map[string]string{"db_instance_status": "available"},
+			name:   "legacy_db_instance_status_alone_is_ignored",
+			fields: map[string]string{"db_instance_status": "failed"},
 			want:   resource.ColorHealthy,
 		},
 		{
-			name:   "fallback_db_instance_status_failed",
-			fields: map[string]string{"db_instance_status": "failed"},
-			want:   resource.ColorBroken,
-		},
-		{
-			name:   "status_takes_priority_over_fallback",
+			name:   "status_takes_priority_over_legacy_key",
 			fields: map[string]string{"status": "available", "db_instance_status": "failed"},
 			want:   resource.ColorHealthy,
 		},

@@ -95,9 +95,6 @@ type ValueRevealedMsg struct {
 	Err          error
 }
 
-// SecretRevealedMsg is a backwards-compatibility alias for ValueRevealedMsg.
-type SecretRevealedMsg = ValueRevealedMsg
-
 // CopiedMsg is sent after a successful clipboard copy.
 type CopiedMsg struct {
 	Content string

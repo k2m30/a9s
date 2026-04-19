@@ -363,12 +363,14 @@ func TestQA_RDS_ListData_RowCount(t *testing.T) {
 // A.4 Status Coloring — uses per-type Color func via styles.ColorStyle
 // ===========================================================================
 
-// rdsColorResource returns a minimal RDS Resource for a given db_instance_status value.
+// rdsColorResource returns a minimal RDS Resource for a given status value.
+// Uses the canonical "status" key (the legacy "db_instance_status" fallback
+// was removed in #284).
 func rdsColorResource(dbStatus string) resource.Resource {
 	return resource.Resource{
 		ID:     "db-test-001",
 		Status: dbStatus,
-		Fields: map[string]string{"db_instance_status": dbStatus},
+		Fields: map[string]string{"status": dbStatus},
 	}
 }
 
