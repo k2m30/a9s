@@ -1,4 +1,4 @@
-// detail_enrichment_ctx.go defines the composite context passed to on-demand
+// detail_enrichment.go defines the composite context passed to on-demand
 // detail enrichers. It separates pure AWS transport (*ServiceClients) from
 // session-scoped caches (e.g. *PolicyDocumentCache) so cache ownership lives
 // with the session runtime rather than hanging off transport objects.
