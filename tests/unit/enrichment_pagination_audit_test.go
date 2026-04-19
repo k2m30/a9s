@@ -11,7 +11,7 @@ package unit
 //  1. Pins the required multi-page contract so the coder can implement it (tests
 //     fail before the fix, pass after).
 //  2. Caps the walk at EnrichmentCap pages to avoid unbounded API calls.
-//  3. Provides a structural meta-test (AST walk of enrichment.go) that flags any
+//  3. Provides a structural meta-test (AST walk of *_issue_enrichment.go files) that flags any
 //     future regression: a new enricher that calls a paginated API without a loop.
 //
 // # Covered enrichers

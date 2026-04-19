@@ -407,28 +407,8 @@ var _ awsclient.CWLogsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeLogStreamsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeMetricFiltersAPI = (*cwLogsFullFake)(nil)
 
-// cwLogsMetricOnlyFake implements only CWLogsDescribeMetricFiltersAPI (NOT
-// CWLogsDescribeLogStreamsAPI). Used to test the hasStreams=false branch.
-type cwLogsMetricOnlyFake struct {
-	filtersByGroup map[string][]cwlogstypes.MetricFilter
-}
-
-func (f *cwLogsMetricOnlyFake) DescribeMetricFilters(
-	_ context.Context,
-	in *cwlogssvc.DescribeMetricFiltersInput,
-	_ ...func(*cwlogssvc.Options),
-) (*cwlogssvc.DescribeMetricFiltersOutput, error) {
-	name := ""
-	if in != nil && in.LogGroupName != nil {
-		name = *in.LogGroupName
-	}
-	return &cwlogssvc.DescribeMetricFiltersOutput{MetricFilters: f.filtersByGroup[name]}, nil
-}
-
-// cwLogsMetricOnlyFake satisfies CWLogsAPI through DescribeMetricFilters only.
-// This is NOT valid as a full CWLogsAPI — we use it via the CWLogsAPI interface
-// by embedding a nil zero value of the aggregate so that the DescribeLogStreams
-// type assertion at enrichment.go:4125 FAILS (hasStreams=false).
+// cwLogsNoStreamsFake embeds CWLogsAPI as nil so the DescribeLogStreams
+// type assertion in EnrichLogsMetricFilters FAILS (hasStreams=false).
 type cwLogsNoStreamsFake struct {
 	awsclient.CWLogsAPI // nil embedded — causes panic on any non-overridden call
 

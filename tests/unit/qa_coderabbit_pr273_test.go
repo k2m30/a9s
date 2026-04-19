@@ -593,7 +593,7 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 // manual abort). It is not a failure — treating it as one generates noise and
 // inflates the issue badge count.
 //
-// Currently FAILS: the switch at enrichment.go line 269 only skips SUCCEEDED and
+// Currently FAILS: the switch in EnrichCodeBuildBuilds only skips SUCCEEDED and
 // IN_PROGRESS; STOPPED falls through and produces a finding with severity "!".
 func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
@@ -957,7 +957,7 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *test
 //   Item 11: isVisibleUnderIssueFilter returns true when m.issueTruncated[shortName]
 //            and !td.AlwaysHealthy — mainmenu.go:570-573.
 //
-//   Item 15: Per-resource API errors set truncated=true — enrichment.go:249,334,385.
+//   Item 15: Per-resource API errors set truncated=true in per-resource enrichers.
 //
 // Tests for these items would PASS today; no failing pins written.
 

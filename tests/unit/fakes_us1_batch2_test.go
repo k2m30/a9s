@@ -17,7 +17,6 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
 )
 
 // ---------------------------------------------------------------------------
@@ -462,25 +461,3 @@ func newFakeELBv2WithLBsAndListeners(lbs []elbv2types.LoadBalancer, listeners []
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fakeSNSBatch2 — implements SNSAPI for batch-2 tests (stub-only, SNS not
-// directly needed for these checkers but required to satisfy ServiceClients).
-// ---------------------------------------------------------------------------
-
-type fakeSNSBatch2 struct{}
-
-func (f *fakeSNSBatch2) ListSubscriptionsByTopic(_ context.Context, _ *sns.ListSubscriptionsByTopicInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
-	return &sns.ListSubscriptionsByTopicOutput{}, nil
-}
-
-func (f *fakeSNSBatch2) GetTopicAttributes(_ context.Context, _ *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
-	return &sns.GetTopicAttributesOutput{Attributes: map[string]string{}}, nil
-}
-
-func (f *fakeSNSBatch2) ListTagsForResource(_ context.Context, _ *sns.ListTagsForResourceInput, _ ...func(*sns.Options)) (*sns.ListTagsForResourceOutput, error) {
-	return &sns.ListTagsForResourceOutput{}, nil
-}
-
-func (f *fakeSNSBatch2) GetSubscriptionAttributes(_ context.Context, _ *sns.GetSubscriptionAttributesInput, _ ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error) {
-	return &sns.GetSubscriptionAttributesOutput{Attributes: map[string]string{}}, nil
-}

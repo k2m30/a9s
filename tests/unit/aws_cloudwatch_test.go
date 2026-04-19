@@ -12,11 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
-// float64Ptr returns a pointer to the given float64 value.
-//
-//go:fix inline
-func float64Ptr(v float64) *float64 { return new(v) }
-
 // ---------------------------------------------------------------------------
 // CloudWatch Alarms fetcher tests
 // ---------------------------------------------------------------------------

@@ -14,19 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// fakeSNSAttrs implements SNSGetTopicAttributesAPI returning a fixed attribute map.
-type fakeSNSAttrs struct {
-	attrs map[string]string
-	err   error
-}
-
-func (f *fakeSNSAttrs) GetTopicAttributes(_ context.Context, _ *snssvc.GetTopicAttributesInput, _ ...func(*snssvc.Options)) (*snssvc.GetTopicAttributesOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &snssvc.GetTopicAttributesOutput{Attributes: f.attrs}, nil
-}
-
 // fakeSNSFull implements the full SNSAPI for ServiceClients.SNS.
 type fakeSNSFull struct {
 	attrs map[string]string

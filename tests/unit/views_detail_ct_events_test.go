@@ -70,13 +70,6 @@ const dangerCTJSON = `{
 	"eventType":"AwsApiCall"
 }`
 
-// awsStrPtr returns a *string pointing to s — helper for cloudtrailtypes.Event fields.
-//
-//go:fix inline
-func awsStrPtr(s string) *string {
-	return &s
-}
-
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
 // cloudtrailtypes.Event (the AWS SDK type), exactly as buildCTResource does in
 // internal/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.

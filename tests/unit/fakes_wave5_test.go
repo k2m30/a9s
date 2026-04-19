@@ -95,20 +95,6 @@ func (f *fakeGlueWithTags) GetTags(_ context.Context, _ *glue.GetTagsInput, _ ..
 var _ awsclient.GlueAPI = (*fakeGlueWithTags)(nil)
 var _ awsclient.GlueGetTagsAPI = (*fakeGlueWithTags)(nil)
 
-// newFakeGlueWithStackTag returns a fakeGlueWithTags whose GetTags returns
-// a single aws:cloudformation:stack-name tag entry.
-func newFakeGlueWithStackTag(stackName string) *fakeGlueWithTags {
-	return &fakeGlueWithTags{
-		tags: map[string]string{"aws:cloudformation:stack-name": stackName},
-	}
-}
-
-// newFakeGlueWithNoStackTag returns a fakeGlueWithTags whose GetTags returns
-// no cloudformation tag (stack-name will be empty string).
-func newFakeGlueWithNoStackTag() *fakeGlueWithTags {
-	return &fakeGlueWithTags{tags: map[string]string{"env": "prod"}}
-}
-
 // ---------------------------------------------------------------------------
 // fakeGlueWithSecurityConfig — implements GlueAPI + GlueGetSecurityConfigurationAPI.
 // GetSecurityConfiguration is controllable; GetJobs / GetJobRuns return empty stubs.

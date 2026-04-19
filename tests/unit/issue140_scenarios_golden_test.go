@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -315,7 +314,7 @@ func sortedScenarioNames(m map[string]string) []string {
 func TestIssue140ScenarioCatalog(t *testing.T) {
 	// Human-readable, test output only (no assertions).
 	for _, sc := range issue140Scenarios() {
-		t.Log(fmt.Sprintf("scenario: %s", sc.name))
+		t.Logf("scenario: %s", sc.name)
 	}
 }
 

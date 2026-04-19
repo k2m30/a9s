@@ -24,22 +24,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ---------------------------------------------------------------------------
-// fakeELBv2Tags — implements ELBv2DescribeTagsAPI for checkELBCFN tests
-// ---------------------------------------------------------------------------
-
-type fakeELBv2Tags struct {
-	output *elbv2.DescribeTagsOutput
-	err    error
-}
-
-func (f *fakeELBv2Tags) DescribeTags(_ context.Context, _ *elbv2.DescribeTagsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTagsOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.output, nil
-}
-
 // fakeELBv2Full embeds fakeELBv2Batch2 (satisfies ELBv2API) plus DescribeTags
 // (ELBv2DescribeTagsAPI) and GetWebACLForResource is on a separate WAF fake.
 type fakeELBv2Full struct {
@@ -89,27 +73,6 @@ func (f *fakeWAFv2ForResource) ListResourcesForWebACL(_ context.Context, _ *wafv
 
 func (f *fakeWAFv2ForResource) GetLoggingConfiguration(_ context.Context, _ *wafv2.GetLoggingConfigurationInput, _ ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error) {
 	return &wafv2.GetLoggingConfigurationOutput{}, nil
-}
-
-// ---------------------------------------------------------------------------
-// Helper: ELB source resource with known ARN
-// ---------------------------------------------------------------------------
-
-func elbSrc(name, arn, vpcID, dnsName string) resource.Resource {
-	return resource.Resource{
-		ID:   name,
-		Name: name,
-		Fields: map[string]string{
-			"load_balancer_arn": arn,
-			"vpc_id":            vpcID,
-			"dns_name":          dnsName,
-			"name":              name,
-		},
-		RawStruct: elbv2types.LoadBalancer{
-			LoadBalancerName: aws.String(name),
-			LoadBalancerArn:  aws.String(arn),
-		},
-	}
 }
 
 // --- checkELBSG (Pattern F — reads SecurityGroups) ---

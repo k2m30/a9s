@@ -10,7 +10,7 @@ package unit
 //  1. Add ListImages to internal/demo/fakes/ecr.go (ECRFake) so the demo fake
 //     satisfies the updated ECRAPI interface.
 //
-//  2. Implement EnrichECRRepository in internal/aws/enrichment.go:
+//  2. Implement EnrichECRRepository in internal/aws/ecr_issue_enrichment.go:
 //     ListImages (paginated) → cap at 10 per repo → DescribeImageScanFindings
 //     per digest → aggregate CRITICAL+HIGH → emit findings + FieldUpdates.
 //

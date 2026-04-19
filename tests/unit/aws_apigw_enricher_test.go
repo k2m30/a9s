@@ -241,7 +241,7 @@ func TestEnrichAPIGatewayStage_NilClientReturnsEmptyFindingsNoError(t *testing.T
 // Per docs/attention-signals.md Wave 2: "no deployed stage" is a signal worth
 // surfacing to the operator — a REST/HTTP API with no stage is inactive.
 //
-// CODER NOTE: Currently enrichment.go:2833-2835 (or similar) `continue`s without
+// CODER NOTE: Currently apigw_issue_enrichment.go `continue`s without
 // emitting any finding when stages == 0. This must change. After the fix,
 // TestEnrichAPIGatewayStage_ZeroStagesAcrossPages in aws_apigw_v2_pagination_test.go
 // (which asserts len(result.Findings)==0 for 0 stages) will need its expectation

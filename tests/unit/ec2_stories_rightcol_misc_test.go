@@ -133,19 +133,6 @@ func ec2StoryViewContent(m tui.Model) string {
 	return m.View().Content
 }
 
-// newEC2StoryDemoModel creates a tui.Model in demo mode sized for testing.
-func newEC2StoryDemoModel(t *testing.T) tui.Model {
-	t.Helper()
-	m := tui.New("demo", "us-east-1",
-		tui.WithClients(demo.NewServiceClients()),
-		tui.WithIsDemo(true),
-		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
-	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
-	return m
-}
-
 // deliverRelatedResult delivers a RelatedCheckResultMsg to a DetailModel.
 func deliverRelatedResult(d views.DetailModel, targetType string, count int) views.DetailModel {
 	msg := messages.RelatedCheckResultMsg{
@@ -162,11 +149,6 @@ func deliverRelatedResult(d views.DetailModel, targetType string, count int) vie
 // pressDetailKey sends a single character keypress to a DetailModel.
 func pressDetailKey(d views.DetailModel, ch string) (views.DetailModel, tea.Cmd) {
 	return d.Update(tea.KeyPressMsg{Code: -1, Text: ch})
-}
-
-// pressDetailSpecial sends a special key to a DetailModel.
-func pressDetailSpecial(d views.DetailModel, code rune) (views.DetailModel, tea.Cmd) {
-	return d.Update(tea.KeyPressMsg{Code: code})
 }
 
 // pressDetailTab sends Tab to a DetailModel.
@@ -547,10 +529,8 @@ func TestEC2_043_AllCount0_NoCursorInRightCol(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if msg != nil {
-			if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
-				t.Errorf("EC2-043: Enter on all-count=0 right column must not produce RelatedNavigateMsg; got %T", msg)
-			}
+		if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
+			t.Errorf("EC2-043: Enter on all-count=0 right column must not produce RelatedNavigateMsg; got %T", msg)
 		}
 	}
 }

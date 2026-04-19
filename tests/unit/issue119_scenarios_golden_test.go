@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,7 +98,7 @@ func TestIssue119ScenarioGoldens(t *testing.T) {
 
 func TestIssue119ScenarioCatalog(t *testing.T) {
 	for _, sc := range issue119Scenarios() {
-		t.Log(fmt.Sprintf("scenario: %s", sc.name))
+		t.Logf("scenario: %s", sc.name)
 	}
 }
 

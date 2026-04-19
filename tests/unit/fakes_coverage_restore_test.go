@@ -22,9 +22,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
-// ptrStr is a string pointer helper for test data.
-func ptrStr(s string) *string { return &s }
-
 // ---------------------------------------------------------------------------
 // fakeAthenaCR — implements AthenaAPI (ListWorkGroups + GetWorkGroup)
 // Used by: athena coverage-restore tests.
@@ -210,27 +207,6 @@ func (f *fakeBackupCR) ListRecoveryPointsByResource(_ context.Context, _ *backup
 }
 
 var _ awsclient.BackupAPI = (*fakeBackupCR)(nil)
-
-// newFakeBackupCRWithPlanVaults returns a fakeBackupCR whose GetBackupPlan returns a
-// plan with the given vault names as TargetBackupVaultName across rules.
-func newFakeBackupCRWithPlanVaults(vaults []string) *fakeBackupCR {
-	rules := make([]backuptypes.BackupRule, len(vaults))
-	for i, v := range vaults {
-		v := v
-		rules[i] = backuptypes.BackupRule{
-			RuleName:              aws.String("rule-" + v),
-			TargetBackupVaultName: &v,
-		}
-	}
-	return &fakeBackupCR{
-		getBackupPlanOutput: &backup.GetBackupPlanOutput{
-			BackupPlan: &backuptypes.BackupPlan{
-				BackupPlanName: aws.String("test-plan"),
-				Rules:          rules,
-			},
-		},
-	}
-}
 
 // newFakeBackupCRWithVaultKMS returns a fakeBackupCR configured for KMS key
 // resolution: GetBackupPlan with a vault rule, DescribeBackupVault with key ARN.

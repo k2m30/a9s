@@ -81,7 +81,7 @@ func TestEnrichmentCapValue(t *testing.T) {
 // TestEnrichmentCapTruncation verifies that per-resource enrichers report
 // Truncated=true when the resource slice exceeds EnrichmentCap.
 // This test uses a synthetic enricher that mirrors the pattern used by the
-// real per-resource enrichers in enrichment.go.
+// real per-resource enrichers in *_issue_enrichment.go.
 func TestEnrichmentCapTruncation(t *testing.T) {
 	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,

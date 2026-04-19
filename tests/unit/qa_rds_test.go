@@ -1482,15 +1482,3 @@ func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Small helper functions (local to this file to avoid conflicts)
-// ===========================================================================
-
-//go:fix inline
-func strPointer(s string) *string { return new(s) }
-
-//go:fix inline
-func boolPtr(b bool) *bool { return new(b) }
-
-//go:fix inline
-func int32Val(i int32) *int32 { return new(i) }

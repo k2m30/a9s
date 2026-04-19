@@ -8,7 +8,7 @@ package unit
 // fetcher field-key registry and the enricher field-key registry).
 //
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// greps internal/aws/enrichment.go to verify the coder actually wired up
+// globs internal/aws/*_issue_enrichment.go to verify the coder actually wired up
 // RegisterEnricherFieldKeys calls rather than declaring the helper and leaving it
 // empty.
 

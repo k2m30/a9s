@@ -23,47 +23,7 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
-
-// ---------------------------------------------------------------------------
-// SSM fake — implements SSMAPI (SSMDescribeParametersAPI +
-// SSMGetParameterAPI + SSMDescribeInstanceInformationAPI)
-// ---------------------------------------------------------------------------
-
-type fakeSSMUS1 struct {
-	instanceInfoOutput *ssm.DescribeInstanceInformationOutput
-	instanceInfoErr    error
-}
-
-func (f *fakeSSMUS1) DescribeParameters(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
-	return &ssm.DescribeParametersOutput{}, nil
-}
-
-func (f *fakeSSMUS1) GetParameter(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-	return &ssm.GetParameterOutput{}, nil
-}
-
-func (f *fakeSSMUS1) DescribeInstanceInformation(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
-	if f.instanceInfoErr != nil {
-		return nil, f.instanceInfoErr
-	}
-	if f.instanceInfoOutput != nil {
-		return f.instanceInfoOutput, nil
-	}
-	return &ssm.DescribeInstanceInformationOutput{}, nil
-}
-
-// newFakeSSMWithInstances constructs a fakeSSMUS1 returning the supplied
-// instance information entries.
-func newFakeSSMWithInstances(entries []ssmtypes.InstanceInformation) *fakeSSMUS1 {
-	return &fakeSSMUS1{
-		instanceInfoOutput: &ssm.DescribeInstanceInformationOutput{
-			InstanceInformationList: entries,
-		},
-	}
-}
 
 // ---------------------------------------------------------------------------
 // EventBridge fake — implements EventBridgeAPI
@@ -282,21 +242,6 @@ func newFakeLambdaWithKMSKey(kmsKeyARN string) *fakeLambdaUS1 {
 		getFunctionOutput: &lambdapkg.GetFunctionOutput{
 			Configuration: &lambdatypes.FunctionConfiguration{
 				KMSKeyArn: &kmsKeyARN,
-			},
-		},
-	}
-}
-
-// newFakeLambdaWithImageURI returns a fakeLambdaUS1 whose GetFunction returns
-// a FunctionConfiguration with the specified ImageUri in Code.
-func newFakeLambdaWithImageURI(imageURI string) *fakeLambdaUS1 {
-	return &fakeLambdaUS1{
-		getFunctionOutput: &lambdapkg.GetFunctionOutput{
-			Configuration: &lambdatypes.FunctionConfiguration{
-				PackageType: lambdatypes.PackageTypeImage,
-			},
-			Code: &lambdatypes.FunctionCodeLocation{
-				ImageUri: &imageURI,
 			},
 		},
 	}

@@ -286,7 +286,8 @@ Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` inter
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
 
 **Architecture:**
-- `internal/aws/enrichment.go` — 66 issue-enricher entries in `IssueEnricherRegistry` (40 real issue-enricher functions + 26 `NoOpIssueEnricher` entries for types with Wave 2 = "None" per `docs/attention-signals.md`)
+- `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
+- `internal/aws/*_issue_enrichment.go` — one file per registered short name (67 total: 43 real enricher functions + 24 `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`). Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
 - `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
 - `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
@@ -302,7 +303,7 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Registry**: All 66 registered resource types have an `EnricherRegistry` entry per `docs/attention-signals.md`. 40 entries are real enricher functions; the remaining 26 are `NoOpEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: All 67 registered resource types have an `IssueEnricherRegistry` entry per `docs/attention-signals.md`. 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpIssueEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpIssueEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
 **Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
@@ -527,7 +528,7 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 a9s has two distinct enrichment pipelines with disjoint contracts:
 
 1. **Detail enrichment** (on-demand) — `resource.DetailEnricher` in `internal/resource/enricher.go`. Fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
-2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` registered in `awsclient.IssueEnricherRegistry` (`internal/aws/enrichment.go`). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
+2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` registered in `awsclient.IssueEnricherRegistry` (infrastructure in `internal/aws/issue_enrichment.go`; one `*_issue_enrichment.go` file per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
 
 ### On-Demand Detail Enhancement
 
