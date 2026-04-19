@@ -7,6 +7,7 @@ package unit_test
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -16,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -393,4 +396,76 @@ func newFakeAPIGWV2WithLambdaIntegration(functionName string) *fakeAPIGWV2US1 {
 			{IntegrationUri: &uri},
 		},
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Lambda fake (ESM variant) — implements LambdaAPI
+// Returns a configurable list of event source mapping FunctionArns.
+// Used by checkSQSLambda tests.
+// ---------------------------------------------------------------------------
+
+type fakeLambdaListESM struct {
+	// mappings is a slice of FunctionArn strings returned by ListEventSourceMappings.
+	mappings []string
+}
+
+func (f *fakeLambdaListESM) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
+	return &lambdapkg.ListFunctionsOutput{}, nil
+}
+
+func (f *fakeLambdaListESM) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
+	var mappings []lambdatypes.EventSourceMappingConfiguration
+	for i := range f.mappings {
+		arn := f.mappings[i]
+		mappings = append(mappings, lambdatypes.EventSourceMappingConfiguration{
+			FunctionArn: &arn,
+		})
+	}
+	return &lambdapkg.ListEventSourceMappingsOutput{EventSourceMappings: mappings}, nil
+}
+
+func (f *fakeLambdaListESM) GetFunction(_ context.Context, _ *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
+	return &lambdapkg.GetFunctionOutput{}, nil
+}
+
+func (f *fakeLambdaListESM) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
+	return &lambdapkg.ListTagsOutput{}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Kinesis fake — implements KinesisAPI + KinesisListTagsForStreamAPI +
+// KinesisDescribeStreamSummaryAPI via type-assertion upgrade.
+// Used by checkKinesisCFN and checkKinesisKMS tests.
+// ---------------------------------------------------------------------------
+
+type fakeKinesisWithTagsAndDesc struct {
+	// cfnStackName is the aws:cloudformation:stack-name tag value to return.
+	// Empty string means no cfn tag.
+	cfnStackName string
+	// kmsKeyID is the KeyId returned in StreamDescriptionSummary.
+	// Empty string means no KMS encryption.
+	kmsKeyID string
+}
+
+func (f *fakeKinesisWithTagsAndDesc) ListStreams(_ context.Context, _ *kinesis.ListStreamsInput, _ ...func(*kinesis.Options)) (*kinesis.ListStreamsOutput, error) {
+	return &kinesis.ListStreamsOutput{}, nil
+}
+
+func (f *fakeKinesisWithTagsAndDesc) ListTagsForStream(_ context.Context, _ *kinesis.ListTagsForStreamInput, _ ...func(*kinesis.Options)) (*kinesis.ListTagsForStreamOutput, error) {
+	hasMore := false
+	var tags []kinesistypes.Tag
+	if f.cfnStackName != "" {
+		k := "aws:cloudformation:stack-name"
+		v := f.cfnStackName
+		tags = append(tags, kinesistypes.Tag{Key: &k, Value: &v})
+	}
+	return &kinesis.ListTagsForStreamOutput{HasMoreTags: &hasMore, Tags: tags}, nil
+}
+
+func (f *fakeKinesisWithTagsAndDesc) DescribeStreamSummary(_ context.Context, _ *kinesis.DescribeStreamSummaryInput, _ ...func(*kinesis.Options)) (*kinesis.DescribeStreamSummaryOutput, error) {
+	summary := &kinesistypes.StreamDescriptionSummary{}
+	if f.kmsKeyID != "" {
+		summary.KeyId = aws.String(f.kmsKeyID)
+	}
+	return &kinesis.DescribeStreamSummaryOutput{StreamDescriptionSummary: summary}, nil
 }

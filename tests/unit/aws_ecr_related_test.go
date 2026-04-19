@@ -805,6 +805,81 @@ func TestRelated_ECR_ECSTask_Empty(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// ecr → kms: Pattern F — reads EncryptionConfiguration.KmsKey, no API call
+// ---------------------------------------------------------------------------
+
+// TestRelated_ECR_KMS_Match verifies that a repository with a KMS key ARN returns
+// the key ID (last segment after "/") as a single ResourceID.
+func TestRelated_ECR_KMS_Match(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abc1234567890def"
+	const keyID = "mrk-abc1234567890def"
+
+	source := resource.Resource{
+		ID:   "acme/api-service",
+		Name: "acme/api-service",
+		RawStruct: ecrtypes.Repository{
+			RepositoryName: aws.String("acme/api-service"),
+			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+				EncryptionType: ecrtypes.EncryptionTypeKms,
+				KmsKey:         aws.String(keyARN),
+			},
+		},
+	}
+
+	checker := ecrCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_ECR_KMS_NoEncryptionConfig verifies that a repository with no
+// EncryptionConfiguration returns Count:0.
+func TestRelated_ECR_KMS_NoEncryptionConfig(t *testing.T) {
+	source := resource.Resource{
+		ID:   "acme/api-service",
+		Name: "acme/api-service",
+		RawStruct: ecrtypes.Repository{
+			RepositoryName:          aws.String("acme/api-service"),
+			EncryptionConfiguration: nil,
+		},
+	}
+
+	checker := ecrCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionConfiguration)", result.Count)
+	}
+}
+
+// TestRelated_ECR_KMS_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count:0 (assertStruct fails, no key extracted).
+func TestRelated_ECR_KMS_WrongRawStruct(t *testing.T) {
+	source := resource.Resource{
+		ID:        "acme/api-service",
+		RawStruct: "not-a-repository",
+	}
+
+	checker := ecrCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
+	}
+}
+
 // TestRelated_ECR_ECSTask_WrongRawStruct verifies that wrong parent RawStruct
 // does not prevent the checker from working — checkECRECSTask uses res.ID not RawStruct.
 func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {

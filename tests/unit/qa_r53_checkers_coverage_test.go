@@ -639,3 +639,372 @@ func TestRelated_R53_APIGW_MultipleRecords_OnlyAPIDNSMatches(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, apiID)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkR53ELB tests
+// ---------------------------------------------------------------------------
+
+// TestRelated_R53_ELB_Match verifies that alias records pointing at an ELB DNS
+// name (*.elb.amazonaws.com) resolve to the matching ELB ID from cache.
+func TestRelated_R53_ELB_Match(t *testing.T) {
+	const elbDNS = "myalb-123456789.us-east-1.elb.amazonaws.com"
+	const elbID = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/myalb/abc123"
+
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("app.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String(elbDNS),
+						EvaluateTargetHealth: true,
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	elbRes := resource.Resource{
+		ID:   elbID,
+		Name: "myalb",
+		Fields: map[string]string{
+			"dns_name": elbDNS,
+		},
+	}
+	cache := resource.ResourceCache{
+		"elb": resource.ResourceCacheEntry{Resources: []resource.Resource{elbRes}},
+	}
+
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB001", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.TargetType != "elb" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbID)
+	}
+}
+
+// TestRelated_R53_ELB_DualstackPrefix verifies that alias DNS names prefixed
+// with "dualstack." are matched against the unprefixed ELB dns_name in cache.
+func TestRelated_R53_ELB_DualstackPrefix(t *testing.T) {
+	const elbDNS = "myalb-123456789.us-east-1.elb.amazonaws.com"
+	const elbID = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/myalb/abc123"
+
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("app.example.com."),
+					Type: r53types.RRTypeAaaa,
+					AliasTarget: &r53types.AliasTarget{
+						// Route53 often emits "dualstack.<elb-dns>" for IPv6 records.
+						DNSName:              aws.String("dualstack." + elbDNS),
+						EvaluateTargetHealth: true,
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	elbRes := resource.Resource{
+		ID:     elbID,
+		Fields: map[string]string{"dns_name": elbDNS},
+	}
+	cache := resource.ResourceCache{
+		"elb": resource.ResourceCacheEntry{Resources: []resource.Resource{elbRes}},
+	}
+
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB002", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (dualstack. prefix must match unprefixed dns_name)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbID)
+	}
+}
+
+// TestRelated_R53_ELB_NoMatch verifies that alias records pointing at non-ELB
+// endpoints yield Count:0.
+func TestRelated_R53_ELB_NoMatch(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("api.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String("abc123.execute-api.us-east-1.amazonaws.com"),
+						EvaluateTargetHealth: false,
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+	cache := resource.ResourceCache{
+		"elb": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{ID: "some-elb", Fields: map[string]string{"dns_name": "some-elb.us-east-1.elb.amazonaws.com"}}},
+		},
+	}
+
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB003", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at .elb.amazonaws.com)", result.Count)
+	}
+}
+
+// TestRelated_R53_ELB_NilClients verifies that nil clients → Count:-1.
+func TestRelated_R53_ELB_NilClients(t *testing.T) {
+	checker := r53CheckerByTarget(t, "elb")
+	source := resource.Resource{ID: "ZELB004", Fields: map[string]string{}}
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	}
+}
+
+// TestRelated_R53_ELB_CacheNilList verifies that when ELB cache is nil, the
+// alias DNS names are returned directly as IDs (fallback path).
+// ---------------------------------------------------------------------------
+// checkR53CF tests
+// ---------------------------------------------------------------------------
+
+// TestRelated_R53_CF_Match verifies that alias records pointing at a CloudFront
+// distribution domain (*.cloudfront.net) resolve to the CF ID from cache.
+func TestRelated_R53_CF_Match(t *testing.T) {
+	const cfDomain = "d1234abcdef.cloudfront.net"
+	const cfID = "E1ABCDEF123456"
+
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("www.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String(cfDomain),
+						EvaluateTargetHealth: false,
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	cfRes := resource.Resource{
+		ID:   cfID,
+		Name: cfID,
+		Fields: map[string]string{
+			"domain_name": cfDomain,
+		},
+	}
+	cache := resource.ResourceCache{
+		"cf": resource.ResourceCacheEntry{Resources: []resource.Resource{cfRes}},
+	}
+
+	checker := r53CheckerByTarget(t, "cf")
+	source := resource.Resource{ID: "ZCF001", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.TargetType != "cf" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "cf")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != cfID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, cfID)
+	}
+}
+
+// TestRelated_R53_CF_NoMatch verifies that alias records pointing at non-CF
+// endpoints yield Count:0.
+func TestRelated_R53_CF_NoMatch(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("app.example.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String("myalb-123.us-east-1.elb.amazonaws.com"),
+						EvaluateTargetHealth: true,
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+	cache := resource.ResourceCache{
+		"cf": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{ID: "EDIST001", Fields: map[string]string{"domain_name": "d999xyz.cloudfront.net"}}},
+		},
+	}
+
+	checker := r53CheckerByTarget(t, "cf")
+	source := resource.Resource{ID: "ZCF002", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (alias does not point at .cloudfront.net)", result.Count)
+	}
+}
+
+// TestRelated_R53_CF_NilClients verifies that nil clients → Count:-1.
+func TestRelated_R53_CF_NilClients(t *testing.T) {
+	checker := r53CheckerByTarget(t, "cf")
+	source := resource.Resource{ID: "ZCF003", Fields: map[string]string{}}
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	}
+}
+
+// TestRelated_R53_CF_CacheNilList verifies that when CF cache is unavailable,
+// the CloudFront domain name itself is returned as the fallback ID.
+// ---------------------------------------------------------------------------
+// checkR53ACM tests
+// ---------------------------------------------------------------------------
+
+// TestRelated_R53_ACM_Match verifies that a CNAME record starting with "_" whose
+// value ends with ".acm-validations.aws" is counted as an ACM validation record.
+func TestRelated_R53_ACM_Match(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					// ACM DNS validation record: _<token>.<domain>. CNAME <token>.acm-validations.aws.
+					Name: aws.String("_acmchallenge.example.com."),
+					Type: r53types.RRTypeCname,
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("_abc123def456.acm-validations.aws.")},
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	checker := r53CheckerByTarget(t, "acm")
+	source := resource.Resource{ID: "ZACM001", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.TargetType != "acm" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	// The record name (minus trailing dot) is used as the ID.
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "_acmchallenge.example.com" {
+		t.Errorf("ResourceIDs = %v, want [_acmchallenge.example.com]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_R53_ACM_MultipleValidationRecords verifies that two CNAME validation
+// records for two certificates in one zone both produce IDs.
+func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					Name: aws.String("_cert1.example.com."),
+					Type: r53types.RRTypeCname,
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("_token1.acm-validations.aws.")},
+					},
+				},
+				{
+					Name: aws.String("_cert2.example.com."),
+					Type: r53types.RRTypeCname,
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("_token2.acm-validations.aws.")},
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	checker := r53CheckerByTarget(t, "acm")
+	source := resource.Resource{ID: "ZACM002", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2 (two distinct validation records)", result.Count)
+	}
+	seen := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		seen[id] = true
+	}
+	if !seen["_cert1.example.com"] {
+		t.Errorf("ResourceIDs missing _cert1.example.com; got %v", result.ResourceIDs)
+	}
+	if !seen["_cert2.example.com"] {
+		t.Errorf("ResourceIDs missing _cert2.example.com; got %v", result.ResourceIDs)
+	}
+}
+
+// TestRelated_R53_ACM_NonACMCNAMEIgnored verifies that CNAME records not matching
+// the ACM validation pattern (_prefix + .acm-validations.aws suffix) are ignored.
+func TestRelated_R53_ACM_NonACMCNAMEIgnored(t *testing.T) {
+	fakeR53 := &fakeRoute53Full{
+		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
+			ResourceRecordSets: []r53types.ResourceRecordSet{
+				{
+					// CNAME without _ prefix — not ACM validation.
+					Name: aws.String("mail.example.com."),
+					Type: r53types.RRTypeCname,
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("mailserver.example.com.")},
+					},
+				},
+				{
+					// CNAME with _ prefix but wrong suffix — not ACM.
+					Name: aws.String("_dmarc.example.com."),
+					Type: r53types.RRTypeCname,
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("v=DMARC1; p=none")},
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{Route53: fakeR53}
+
+	checker := r53CheckerByTarget(t, "acm")
+	source := resource.Resource{ID: "ZACM003", Fields: map[string]string{}}
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (non-ACM CNAMEs must not be counted)", result.Count)
+	}
+}
+
+// TestRelated_R53_ACM_NilClients verifies that nil clients → Count:-1.
+func TestRelated_R53_ACM_NilClients(t *testing.T) {
+	checker := r53CheckerByTarget(t, "acm")
+	source := resource.Resource{ID: "ZACM004", Fields: map[string]string{}}
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+	}
+}

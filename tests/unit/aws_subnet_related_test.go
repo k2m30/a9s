@@ -323,4 +323,255 @@ func TestNavigableFields_Subnet(t *testing.T) {
 	}
 }
 
+// --- VPC checker tests ---
+
+// TestRelated_Subnet_VPC_Found: subnet with vpc_id in Fields returns the VPC.
+func TestRelated_Subnet_VPC_Found(t *testing.T) {
+	res := subnetSrcResource()
+	checker := subnetCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-11111111" {
+		t.Errorf("ResourceIDs = %v, want [vpc-11111111]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Subnet_VPC_NoVPCID: subnet with missing vpc_id returns Count:0.
+func TestRelated_Subnet_VPC_NoVPCID(t *testing.T) {
+	res := resource.Resource{
+		ID:     "subnet-abc123",
+		Fields: map[string]string{},
+	}
+	checker := subnetCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count)
+	}
+}
+
+// --- ASG checker tests ---
+
+// TestRelated_Subnet_ASG_Match: an ASG whose vpc_zone_identifier contains this
+// subnet ID (comma-separated) produces Count:1.
+func TestRelated_Subnet_ASG_Match(t *testing.T) {
+	res := subnetSrcResource()
+	// vpc_zone_identifier contains our subnet plus a second subnet.
+	asgRes := resource.Resource{
+		ID:   "my-asg",
+		Name: "my-asg",
+		Fields: map[string]string{
+			"vpc_zone_identifier": "subnet-abc123,subnet-other999",
+		},
+	}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{asgRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-asg" {
+		t.Errorf("ResourceIDs = %v, want [my-asg]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Subnet_ASG_NoMatch: an ASG whose vpc_zone_identifier does not
+// include this subnet produces Count:0.
+func TestRelated_Subnet_ASG_NoMatch(t *testing.T) {
+	res := subnetSrcResource()
+	asgRes := resource.Resource{
+		ID: "other-asg",
+		Fields: map[string]string{
+			"vpc_zone_identifier": "subnet-other999,subnet-another888",
+		},
+	}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{asgRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in vpc_zone_identifier)", result.Count)
+	}
+}
+
+// TestRelated_Subnet_ASG_SubnetsFieldFallback: ASG with no vpc_zone_identifier
+// but a "subnets" field containing the subnet ID matches.
+func TestRelated_Subnet_ASG_SubnetsFieldFallback(t *testing.T) {
+	res := subnetSrcResource()
+	asgRes := resource.Resource{
+		ID: "fallback-asg",
+		Fields: map[string]string{
+			"subnets": "subnet-abc123",
+		},
+	}
+	cache := resource.ResourceCache{
+		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{asgRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (subnets fallback field matched)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "fallback-asg" {
+		t.Errorf("ResourceIDs = %v, want [fallback-asg]", result.ResourceIDs)
+	}
+}
+
+// --- EKS checker tests ---
+// checkSubnetEFS is a genuine stub (unconditionally Count:-1 for non-empty ID);
+// it is intentionally not tested.
+
+// TestRelated_Subnet_EKS_Match: an EKS cluster whose "subnets" field contains
+// this subnet ID produces Count:1.
+func TestRelated_Subnet_EKS_Match(t *testing.T) {
+	res := subnetSrcResource()
+	eksRes := resource.Resource{
+		ID:   "my-cluster",
+		Name: "my-cluster",
+		Fields: map[string]string{
+			"subnets": "subnet-abc123,subnet-other999",
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{eksRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (EKS subnets field matches)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Subnet_EKS_SubnetIDsFieldFallback: EKS cluster with no "subnets"
+// but a "subnet_ids" field containing the subnet ID also matches.
+func TestRelated_Subnet_EKS_SubnetIDsFieldFallback(t *testing.T) {
+	res := subnetSrcResource()
+	eksRes := resource.Resource{
+		ID: "other-cluster",
+		Fields: map[string]string{
+			"subnet_ids": "subnet-abc123",
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{eksRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (subnet_ids fallback field matched)", result.Count)
+	}
+}
+
+// TestRelated_Subnet_EKS_NoMatch: an EKS cluster whose subnets field does not
+// contain this subnet produces Count:0.
+func TestRelated_Subnet_EKS_NoMatch(t *testing.T) {
+	res := subnetSrcResource()
+	eksRes := resource.Resource{
+		ID: "unrelated-cluster",
+		Fields: map[string]string{
+			"subnets": "subnet-other999,subnet-another888",
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{eksRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in EKS subnets)", result.Count)
+	}
+}
+
+// --- VPCE checker tests ---
+
+// TestRelated_Subnet_VPCE_Match: a VPC endpoint whose SubnetIds includes this
+// subnet produces Count:1.
+func TestRelated_Subnet_VPCE_Match(t *testing.T) {
+	res := subnetSrcResource()
+	vpceRes := resource.Resource{
+		ID:   "vpce-0a1b2c3d4e5f60001",
+		Name: "com.amazonaws.us-east-1.s3",
+		RawStruct: ec2types.VpcEndpoint{
+			VpcEndpointId: new("vpce-0a1b2c3d4e5f60001"),
+			SubnetIds:     []string{"subnet-abc123", "subnet-other999"},
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (subnet in VPCE SubnetIds)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0a1b2c3d4e5f60001" {
+		t.Errorf("ResourceIDs = %v, want [vpce-0a1b2c3d4e5f60001]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Subnet_VPCE_NoMatch: a VPC endpoint whose SubnetIds does not
+// include this subnet produces Count:0.
+func TestRelated_Subnet_VPCE_NoMatch(t *testing.T) {
+	res := subnetSrcResource()
+	vpceRes := resource.Resource{
+		ID: "vpce-other",
+		RawStruct: ec2types.VpcEndpoint{
+			SubnetIds: []string{"subnet-other999"},
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (subnet not in VPCE SubnetIds)", result.Count)
+	}
+}
+
+// TestRelated_Subnet_VPCE_WrongRawStruct: a VPCE resource with no
+// RawStruct of the expected type is skipped (no panic, Count:0).
+func TestRelated_Subnet_VPCE_WrongRawStruct(t *testing.T) {
+	res := subnetSrcResource()
+	vpceRes := resource.Resource{
+		ID:        "vpce-wrongtype",
+		RawStruct: "not-a-VpcEndpoint",
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes}},
+	}
+
+	checker := subnetCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type skipped)", result.Count)
+	}
+}
+
 // --- Demo checker test ---

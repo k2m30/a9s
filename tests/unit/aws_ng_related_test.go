@@ -592,3 +592,289 @@ func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkNGSG — RemoteAccessSecurityGroup from RawStruct (Pattern F)
+// ---------------------------------------------------------------------------
+
+// TestRelated_NG_SG_Found verifies that the remote access SG ID is returned
+// when Resources.RemoteAccessSecurityGroup is set.
+func TestRelated_NG_SG_Found(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			Resources: &ekstypes.NodegroupResources{
+				RemoteAccessSecurityGroup: aws.String("sg-remote12345"),
+			},
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "sg-remote12345" {
+		t.Errorf("ResourceIDs = %v, want [sg-remote12345]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_NG_SG_NilResources verifies Count=0 when Resources is nil (no remote access SG).
+func TestRelated_NG_SG_NilResources(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			Resources:     nil,
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (nil Resources)", result.Count)
+	}
+}
+
+// TestRelated_NG_SG_EmptyGroupID verifies Count=0 when RemoteAccessSecurityGroup is empty string.
+func TestRelated_NG_SG_EmptyGroupID(t *testing.T) {
+	res := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+			Resources: &ekstypes.NodegroupResources{
+				RemoteAccessSecurityGroup: aws.String(""),
+			},
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty RemoteAccessSecurityGroup)", result.Count)
+	}
+}
+
+// TestRelated_NG_SG_WrongRawStruct verifies Count=-1 when RawStruct is not an EKS Nodegroup.
+func TestRelated_NG_SG_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "general-pool",
+		RawStruct: "not-a-nodegroup",
+	}
+
+	checker := ngCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkNGEC2 — EC2 instances tagged eks:nodegroup-name (Pattern C+tag)
+// ---------------------------------------------------------------------------
+
+// TestRelated_NG_EC2_MatchByNodegroupTag verifies that EC2 instances tagged
+// with "eks:nodegroup-name" matching this node group are returned.
+func TestRelated_NG_EC2_MatchByNodegroupTag(t *testing.T) {
+	const ngName = "general-pool"
+	const clusterName = "prod-cluster"
+
+	ec2Res := resource.Resource{
+		ID:   "i-abcdef1234567890",
+		Name: "i-abcdef1234567890",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-abcdef1234567890"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String(ngName)},
+				{Key: aws.String("eks:cluster-name"), Value: aws.String(clusterName)},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+	source := resource.Resource{
+		ID:   ngName,
+		Name: ngName,
+		Fields: map[string]string{
+			"nodegroup_name": ngName,
+			"cluster_name":   clusterName,
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String(ngName),
+			ClusterName:   aws.String(clusterName),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-abcdef1234567890" {
+		t.Errorf("ResourceIDs = %v, want [i-abcdef1234567890]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_NG_EC2_NoMatchDifferentCluster verifies that instances tagged with
+// the same nodegroup name but a different cluster are excluded.
+func TestRelated_NG_EC2_NoMatchDifferentCluster(t *testing.T) {
+	const ngName = "general-pool"
+
+	ec2Res := resource.Resource{
+		ID:   "i-abcdef1234567890",
+		Name: "i-abcdef1234567890",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-abcdef1234567890"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String(ngName)},
+				{Key: aws.String("eks:cluster-name"), Value: aws.String("other-cluster")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
+	}
+	source := resource.Resource{
+		ID:   ngName,
+		Name: ngName,
+		Fields: map[string]string{
+			"nodegroup_name": ngName,
+			"cluster_name":   "prod-cluster",
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String(ngName),
+			ClusterName:   aws.String("prod-cluster"),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (different cluster)", result.Count)
+	}
+}
+
+// TestRelated_NG_EC2_EmptyNodegroupName verifies Count=0 immediately when
+// the nodegroup name cannot be determined.
+func TestRelated_NG_EC2_EmptyNodegroupName(t *testing.T) {
+	source := resource.Resource{
+		ID:   "",
+		Name: "",
+		Fields: map[string]string{
+			"nodegroup_name": "",
+		},
+		RawStruct: ekstypes.Nodegroup{},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty nodegroup name)", result.Count)
+	}
+}
+
+// TestRelated_NG_EC2_NilCache verifies Count=-1 when the cache has no ec2 entry
+// and clients is nil (cannot fetch).
+func TestRelated_NG_EC2_NilCache(t *testing.T) {
+	source := resource.Resource{
+		ID:   "general-pool",
+		Name: "general-pool",
+		Fields: map[string]string{
+			"nodegroup_name": "general-pool",
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String("general-pool"),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil cache, nil clients)", result.Count)
+	}
+}
+
+// TestRelated_NG_EC2_InstanceNotEC2Type verifies that cache entries whose RawStruct
+// is not ec2types.Instance are skipped without panic.
+func TestRelated_NG_EC2_InstanceNotEC2Type(t *testing.T) {
+	const ngName = "general-pool"
+
+	wrongTypeRes := resource.Resource{
+		ID:        "i-abcdef1234567890",
+		RawStruct: iamtypes.Role{},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{wrongTypeRes}},
+	}
+	source := resource.Resource{
+		ID:   ngName,
+		Name: ngName,
+		Fields: map[string]string{
+			"nodegroup_name": ngName,
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String(ngName),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type in cache entry)", result.Count)
+	}
+}
+
+// TestRelated_NG_EC2_TruncatedCacheNoMatch verifies Approximate=true when
+// cache is truncated and zero matches found.
+func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
+	const ngName = "general-pool"
+
+	ec2Res := resource.Resource{
+		ID:   "i-xxxxxxxxxxxxxxxx",
+		Name: "i-xxxxxxxxxxxxxxxx",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-xxxxxxxxxxxxxxxx"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("other-pool")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{ec2Res},
+			IsTruncated: true,
+		},
+	}
+	source := resource.Resource{
+		ID:   ngName,
+		Name: ngName,
+		Fields: map[string]string{
+			"nodegroup_name": ngName,
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String(ngName),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, source, cache)
+
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	}
+}
+

@@ -581,3 +581,90 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 		t.Fatal("expected a command on refresh")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd
+// Verifies that handleEnrichDetail returns a nil command when no enricher is
+// registered for the resource type. "ec2" has no detail enricher.
+// ---------------------------------------------------------------------------
+
+func TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd(t *testing.T) {
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Confirm ec2 has no detail enricher (guard against future registration).
+	if resource.HasDetailEnricher("ec2") {
+		t.Skip("ec2 now has a detail enricher — update this test to use a type without one")
+	}
+
+	ec2Res := resource.Resource{
+		ID:   "i-1234567890abcdef0",
+		Name: "test-instance",
+		Fields: map[string]string{
+			"instance_id": "i-1234567890abcdef0",
+			"state":       "running",
+		},
+	}
+
+	// Dispatch EnrichDetailMsg directly — exercises handleEnrichDetail.
+	_, cmd := rootApplyMsg(m, messages.EnrichDetailMsg{
+		ResourceType: "ec2",
+		Resource:     ec2Res,
+	})
+
+	// No enricher registered → cmd must be nil.
+	if cmd != nil {
+		t.Error("handleEnrichDetail should return nil cmd when no enricher is registered for the type")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg
+// Verifies that handleEnrichDetail with a registered enricher returns a cmd
+// that, when executed, produces an EnrichDetailResultMsg with the correct
+// ResourceType and ResourceID.
+// ---------------------------------------------------------------------------
+
+func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing.T) {
+	if !resource.HasDetailEnricher("role_policies") {
+		t.Fatal("expected role_policies detail enricher to be registered")
+	}
+
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
+	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
+
+	// Dispatch EnrichDetailMsg directly to exercise handleEnrichDetail.
+	_, cmd := rootApplyMsg(m, messages.EnrichDetailMsg{
+		ResourceType: "role_policies",
+		Resource:     res,
+	})
+
+	if cmd == nil {
+		t.Fatal("handleEnrichDetail should return a non-nil cmd when an enricher is registered")
+	}
+
+	// Execute the cmd — it calls the enricher and returns EnrichDetailResultMsg.
+	result := cmd()
+	resultMsg, ok := result.(messages.EnrichDetailResultMsg)
+	if !ok {
+		t.Fatalf("cmd() should return EnrichDetailResultMsg, got %T", result)
+	}
+	if resultMsg.ResourceType != "role_policies" {
+		t.Errorf("EnrichDetailResultMsg.ResourceType = %q, want %q", resultMsg.ResourceType, "role_policies")
+	}
+	if resultMsg.ResourceID != res.ID {
+		t.Errorf("EnrichDetailResultMsg.ResourceID = %q, want %q", resultMsg.ResourceID, res.ID)
+	}
+}

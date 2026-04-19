@@ -412,3 +412,269 @@ func TestRelated_Ddb_Kinesis_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkDdbLogs — Pattern C: substring match on log group ID
+// ---------------------------------------------------------------------------
+
+// TestRelated_Ddb_Logs_Match verifies that log groups whose ID contains the
+// table name as a substring are returned.
+func TestRelated_Ddb_Logs_Match(t *testing.T) {
+	logRes := resource.Resource{
+		ID:     "/aws/dynamodb/my-orders-table/data-plane",
+		Fields: map[string]string{},
+	}
+	otherLog := resource.Resource{
+		ID:     "/aws/lambda/unrelated-function",
+		Fields: map[string]string{},
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes, otherLog}},
+	}
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/dynamodb/my-orders-table/data-plane" {
+		t.Errorf("ResourceIDs = %v, want [/aws/dynamodb/my-orders-table/data-plane]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Ddb_Logs_NoMatch verifies that when no log group contains the
+// table name, Count=0 is returned.
+func TestRelated_Ddb_Logs_NoMatch(t *testing.T) {
+	logRes := resource.Resource{
+		ID:     "/aws/lambda/unrelated-function",
+		Fields: map[string]string{},
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+	}
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+// TestRelated_Ddb_Logs_EmptyID verifies that an empty table ID returns Count=0.
+func TestRelated_Ddb_Logs_EmptyID(t *testing.T) {
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/aws/dynamodb/something"},
+		}},
+	}
+	src := resource.Resource{ID: "", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty table ID)", result.Count)
+	}
+}
+
+// TestRelated_Ddb_Logs_NilCache verifies that an empty cache returns Count=-1.
+func TestRelated_Ddb_Logs_NilCache(t *testing.T) {
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkDdbVPCE — Pattern C: service_name field contains ".dynamodb"
+// ---------------------------------------------------------------------------
+
+// TestRelated_Ddb_VPCE_Match verifies that VPC endpoints with a DynamoDB
+// service_name are returned regardless of table name (account-level resource).
+func TestRelated_Ddb_VPCE_Match(t *testing.T) {
+	vpceRes := resource.Resource{
+		ID: "vpce-0a1b2c3d4e5f67890",
+		Fields: map[string]string{
+			"service_name": "com.amazonaws.us-east-1.dynamodb",
+		},
+	}
+	otherVPCE := resource.Resource{
+		ID: "vpce-aaabbbbccc0000111",
+		Fields: map[string]string{
+			"service_name": "com.amazonaws.us-east-1.s3",
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes, otherVPCE}},
+	}
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0a1b2c3d4e5f67890" {
+		t.Errorf("ResourceIDs = %v, want [vpce-0a1b2c3d4e5f67890]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Ddb_VPCE_NoMatch verifies that endpoints without ".dynamodb" in
+// service_name return Count=0.
+func TestRelated_Ddb_VPCE_NoMatch(t *testing.T) {
+	vpceRes := resource.Resource{
+		ID: "vpce-aaabbbbccc0000111",
+		Fields: map[string]string{
+			"service_name": "com.amazonaws.us-east-1.s3",
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes}},
+	}
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no DynamoDB endpoint)", result.Count)
+	}
+}
+
+// TestRelated_Ddb_VPCE_NilCache verifies that an empty cache returns Count=-1.
+func TestRelated_Ddb_VPCE_NilCache(t *testing.T) {
+	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
+
+	checker := ddbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkDdbKMS — Pattern F (SSEDescription.KMSMasterKeyArn)
+// ---------------------------------------------------------------------------
+
+// TestRelated_Ddb_KMS_InvalidRawStruct verifies Count=-1 when the RawStruct
+// is not a TableDescription.
+func TestRelated_Ddb_KMS_InvalidRawStruct(t *testing.T) {
+	src := resource.Resource{ID: "acme-orders", RawStruct: "not-a-table"}
+	checker := ddbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
+	}
+}
+
+// TestRelated_Ddb_KMS_NoSSEDescription verifies Count=0 when SSEDescription is nil.
+func TestRelated_Ddb_KMS_NoSSEDescription(t *testing.T) {
+	src := resource.Resource{
+		ID:        "acme-orders",
+		RawStruct: ddbtypes.TableDescription{TableName: aws.String("acme-orders")},
+	}
+	checker := ddbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no SSEDescription)", result.Count)
+	}
+}
+
+// TestRelated_Ddb_KMS_ARNMissingSlash verifies Count=0 when KMSMasterKeyArn
+// has no "/" separator (cannot extract key ID).
+func TestRelated_Ddb_KMS_ARNMissingSlash(t *testing.T) {
+	src := resource.Resource{
+		ID: "acme-orders",
+		RawStruct: ddbtypes.TableDescription{
+			SSEDescription: &ddbtypes.SSEDescription{
+				KMSMasterKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key"),
+			},
+		},
+	}
+	checker := ddbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no slash in ARN)", result.Count)
+	}
+}
+
+// TestRelated_Ddb_KMS_ValidARN verifies that a well-formed ARN yields
+// Count=1 and the key ID extracted after the last "/".
+func TestRelated_Ddb_KMS_ValidARN(t *testing.T) {
+	const keyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
+	src := resource.Resource{
+		ID: "acme-orders",
+		RawStruct: ddbtypes.TableDescription{
+			SSEDescription: &ddbtypes.SSEDescription{
+				KMSMasterKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/" + keyID),
+			},
+		},
+	}
+	checker := ddbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkDdbLambda — Pattern A: live ListEventSourceMappings
+// ---------------------------------------------------------------------------
+
+// TestRelated_Ddb_Lambda_StreamEnabledWithMappings verifies that when streams
+// are enabled and the Lambda fake returns two function ARNs, Count=2.
+func TestRelated_Ddb_Lambda_StreamEnabledWithMappings(t *testing.T) {
+	fn1 := "arn:aws:lambda:us-east-1:123456789012:function:orders-processor"
+	fn2 := "arn:aws:lambda:us-east-1:123456789012:function:orders-dlq"
+	src := resource.Resource{
+		ID: "acme-orders",
+		RawStruct: ddbtypes.TableDescription{
+			TableName:       aws.String("acme-orders"),
+			LatestStreamArn: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders/stream/2026-01-01T00:00:00.000"),
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		Lambda: newFakeLambdaWithESMFunctions([]string{fn1, fn2}),
+	}
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+	if len(result.ResourceIDs) != 2 {
+		t.Errorf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Ddb_Lambda_StreamEnabledNoMappings verifies Count=0 when the
+// Lambda API returns no event source mappings.
+func TestRelated_Ddb_Lambda_StreamEnabledNoMappings(t *testing.T) {
+	src := resource.Resource{
+		ID: "acme-orders",
+		RawStruct: ddbtypes.TableDescription{
+			TableName:       aws.String("acme-orders"),
+			LatestStreamArn: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders/stream/2026-01-01T00:00:00.000"),
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		Lambda: newFakeLambdaWithESMFunctions([]string{}),
+	}
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no mappings)", result.Count)
+	}
+}
