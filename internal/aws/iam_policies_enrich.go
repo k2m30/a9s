@@ -25,10 +25,12 @@ func init() {
 // All top-level policies are managed (Scope=Local), so only the managed
 // document path is needed.
 func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return res, fmt.Errorf("invalid clients")
+	dctx, ok := clients.(*DetailEnrichmentCtx)
+	if !ok || dctx == nil || dctx.Clients == nil || dctx.PolicyDocs == nil {
+		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
+	c := dctx.Clients
+	cache := dctx.PolicyDocs
 
 	// Accept both the original SDK type and an already-enriched wrapper
 	// (re-enrichment happens when detail→YAML/JSON each trigger enrichment).
@@ -48,7 +50,7 @@ func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (reso
 	policyArn := *policy.Arn
 
 	cacheKey := ManagedKey(policyArn)
-	if cached := c.PolicyDocCache.Get(cacheKey); cached != nil {
+	if cached := cache.Get(cacheKey); cached != nil {
 		res.RawStruct = PolicyEnriched{Policy: policy, Document: cached}
 		return res, nil
 	}
@@ -64,7 +66,7 @@ func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (reso
 		return res, err
 	}
 
-	c.PolicyDocCache.Set(cacheKey, doc)
+	cache.Set(cacheKey, doc)
 	res.RawStruct = PolicyEnriched{Policy: policy, Document: doc}
 	return res, nil
 }

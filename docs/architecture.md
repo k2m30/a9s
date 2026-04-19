@@ -528,7 +528,7 @@ View opens (detail, YAML, or JSON)
 - **If caching is justified**: use a session-scoped, feature-specific cache owned by session context (`ServiceClients` today). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
 - **Never**: use package-global cache state for enrichers.
 
-**Current example**: IAM policy document enrichment uses the session-scoped `PolicyDocCache` on `ServiceClients`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. When `ServiceClients` is replaced on profile/region switch, the old cache is garbage collected — no explicit invalidation hooks needed.
+**Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `sessionRuntime.policyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `resetForSessionSwitch` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
 
 ---
 
@@ -567,7 +567,7 @@ The app has four distinct caches, each serving a different purpose:
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
 | **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
 | **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
-| **Enricher caches** | Feature-specific cache on `ServiceClients` (current example: `PolicyDocCache`) | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
+| **Detail-enricher caches** | Feature-specific cache owned by `sessionRuntime` and delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `resetForSessionSwitch` on profile/region switch |
 | **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps on root `Model` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
@@ -809,7 +809,6 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 ## Known Compromises
 
 - Session orchestration lives on the embedded `sessionRuntime` inside `tui.Model`. This keeps Bubble Tea integration simple (one top-level `tea.Model`) while making the UI-shell vs session-runtime boundary explicit in code. Moving it to a standalone type outside `internal/tui` is not planned: the orchestration handlers already access it via field promotion and do not cross the package boundary.
-- When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
 ---

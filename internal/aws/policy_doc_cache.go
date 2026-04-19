@@ -1,7 +1,9 @@
 // policy_doc_cache.go provides a session-scoped, concurrency-safe cache for
-// decoded IAM policy documents. Owned by ServiceClients — cache lifetime is
-// tied to the session. When ServiceClients is replaced on profile/region switch,
-// the old cache is garbage collected automatically.
+// decoded IAM policy documents. Owned by the session runtime (tui.Model's
+// embedded sessionRuntime) and passed to detail enrichers via
+// DetailEnrichmentCtx. Cache lifetime is tied to the session; profile/region
+// rotation rebuilds the cache so entries from a previous account are not
+// returned to the next one.
 package aws
 
 import "sync"

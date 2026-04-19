@@ -1,6 +1,7 @@
 package tui
 
 import (
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -51,6 +52,11 @@ type sessionRuntime struct {
 	relatedGen    uint64 // bumped on refresh/profile/region switch
 	enrichGen     uint64 // bumped on refresh/profile/region switch (detail-enrichment only)
 	enrichResKey  string // "resourceType:resourceID" of last detail-enrichment dispatch
+
+	// Feature-specific session caches. These used to hang off *ServiceClients
+	// but that blurred the AWS-transport/session-state boundary; they live
+	// here instead and are passed to detail enrichers via DetailEnrichmentCtx.
+	policyDocCache *awsclient.PolicyDocumentCache
 }
 
 // newSessionRuntime constructs a fresh sessionRuntime with all maps initialized
@@ -68,6 +74,7 @@ func newSessionRuntime() sessionRuntime {
 		relatedCache:           newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:             1,
 		enrichGen:              1,
+		policyDocCache:         &awsclient.PolicyDocumentCache{},
 	}
 }
 
@@ -99,4 +106,8 @@ func (r *sessionRuntime) resetForSessionSwitch() {
 	r.enrichmentRan = make(map[string]bool)
 	r.enrichmentTypeGen = make(map[string]int)
 	r.enrichmentTruncatedIDs = make(map[string]map[string]bool)
+
+	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
+	// documents fetched in the previous account cannot leak into the next.
+	r.policyDocCache = &awsclient.PolicyDocumentCache{}
 }

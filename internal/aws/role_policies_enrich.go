@@ -18,12 +18,14 @@ func init() {
 
 // enrichRolePolicy fetches the policy document for a role_policies resource
 // and returns an enriched copy with Document set on RawStruct.
-// Uses the session-scoped PolicyDocCache on ServiceClients.
+// Uses the session-scoped PolicyDocs cache provided on DetailEnrichmentCtx.
 func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return res, fmt.Errorf("invalid clients")
+	dctx, ok := clients.(*DetailEnrichmentCtx)
+	if !ok || dctx == nil || dctx.Clients == nil || dctx.PolicyDocs == nil {
+		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
+	c := dctx.Clients
+	cache := dctx.PolicyDocs
 
 	row, ok := res.RawStruct.(RolePolicyRow)
 	if !ok {
@@ -42,7 +44,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 		}
 		cacheKey := InlineKey(roleName, row.PolicyName)
 
-		if cached := c.PolicyDocCache.Get(cacheKey); cached != nil {
+		if cached := cache.Get(cacheKey); cached != nil {
 			doc = cached
 		} else {
 			getRolePolicyAPI, ok := c.IAM.(IAMGetRolePolicyAPI)
@@ -53,7 +55,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 			if err != nil {
 				return res, err
 			}
-			c.PolicyDocCache.Set(cacheKey, doc)
+			cache.Set(cacheKey, doc)
 		}
 	} else {
 		if row.PolicyArn == "" {
@@ -61,7 +63,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 		}
 		cacheKey := ManagedKey(row.PolicyArn)
 
-		if cached := c.PolicyDocCache.Get(cacheKey); cached != nil {
+		if cached := cache.Get(cacheKey); cached != nil {
 			doc = cached
 		} else {
 			getPolicyAPI, ok1 := c.IAM.(IAMGetPolicyAPI)
@@ -73,7 +75,7 @@ func enrichRolePolicy(ctx context.Context, clients any, res resource.Resource) (
 			if err != nil {
 				return res, err
 			}
-			c.PolicyDocCache.Set(cacheKey, doc)
+			cache.Set(cacheKey, doc)
 		}
 	}
 

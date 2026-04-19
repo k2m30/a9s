@@ -76,9 +76,10 @@ reviews:
         - URL-encoded IAM documents use RFC 3986 percent-encoding — must use
           url.PathUnescape, NOT url.QueryUnescape (+ must stay literal)
         - All fetcher registration happens in init() functions
-        - Enricher caches are session-scoped on ServiceClients (PolicyDocCache field),
-          NOT package-global. Cache lifetime is tied to the session — no explicit
-          invalidation hooks needed.
+        - Detail-enricher caches live on sessionRuntime (internal/tui) and are
+          delivered to enrichers via *awsclient.DetailEnrichmentCtx, NOT hung off
+          *ServiceClients. resetForSessionSwitch rotates them on profile/region
+          switch; no package-global cache state is allowed.
 
     - path: "internal/resource/**"
       instructions: |
