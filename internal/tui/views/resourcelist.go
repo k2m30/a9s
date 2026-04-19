@@ -562,12 +562,16 @@ func (m *ResourceListModel) findingsBanner(startRow, endRow, markerColIdx int) s
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.
 // issueCount is the unified Wave-1 + Wave-2 distinct-instance count (R2/R3 source of truth).
 // truncated indicates a lower-bound count; findings is the per-resource finding map.
-// Invalidates the styled row cache because findings affect marker rendering.
+// Invalidates the styled row cache because findings affect marker rendering and
+// re-runs applySortAndFilter so that the ctrl+z attention filter picks up newly
+// flagged rows immediately — otherwise enabling ctrl+z before Wave 2 completes
+// would leave the enriched rows hidden until the next filter edit.
 func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]resource.EnrichmentFinding) {
 	m.enrichmentIssueCount = issueCount
 	m.enrichmentTruncated = truncated
 	m.findingsByID = findings
 	m.styledRowCache = nil
+	m.applySortAndFilter()
 }
 
 // ApplyFieldUpdates merges Wave-2-derived field values into the in-memory

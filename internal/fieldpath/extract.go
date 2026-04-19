@@ -382,8 +382,14 @@ func tryFlattenKeyValueSlice(val reflect.Value) map[string]any {
 			// Duplicate key — preserve both entries by refusing to flatten.
 			return nil
 		}
-		v, _ := stringFieldValue(ev.FieldByName("Value"))
-		out[k] = v
+		// Preserve nil Values as YAML null rather than silently coercing to
+		// the empty string — "no value set" and "value is empty string" are
+		// distinct and the struct-form output made the distinction visible.
+		if v, vok := stringFieldValue(ev.FieldByName("Value")); vok {
+			out[k] = v
+		} else {
+			out[k] = nil
+		}
 	}
 	if len(out) == 0 {
 		return nil

@@ -232,6 +232,37 @@ type syntheticDBSnapshot struct {
 	TagList              []rdstypes.Tag
 }
 
+// TestToSafeValue_NilTagValuePreservedAsNull pins that a tag with nil Value
+// is flattened to a YAML null, not coerced to the empty string. "Value not
+// set" and "Value is the empty string" are distinct, and the struct-form
+// output made that distinction visible; the flattened form must not hide it.
+func TestToSafeValue_NilTagValuePreservedAsNull(t *testing.T) {
+	tags := []rdstypes.Tag{
+		{Key: aws.String("Orphan"), Value: nil},
+		{Key: aws.String("Named"), Value: aws.String("main")},
+	}
+	val := reflect.ValueOf(tags)
+	result := fieldpath.ToSafeValue(val)
+
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("ToSafeValue(tags with one nil Value) = %T, want map[string]any", result)
+	}
+	got, present := m["Orphan"]
+	if !present {
+		t.Fatalf("flattened map must still carry the key %q even when Value is nil", "Orphan")
+	}
+	if got != nil {
+		t.Errorf("Orphan = %v (type %T), want nil — nil tag Value must not be silently coerced to empty string", got, got)
+	}
+	if s, ok := got.(string); ok && s == "" {
+		t.Errorf("Orphan = \"\" (empty string) — nil tag Value must be preserved as nil/null, not \"\"")
+	}
+	if m["Named"] != "main" {
+		t.Errorf("non-nil Value lost during flattening: Named = %v, want \"main\"", m["Named"])
+	}
+}
+
 // TestYAMLView_TagListFlattened verifies that when YAMLModel.RawContent() serializes
 // a resource whose RawStruct has a TagList field of []rdstypes.Tag, the resulting YAML
 // contains "Component: x" (flattened map) and NOT "- Key: Component" (struct slice).
