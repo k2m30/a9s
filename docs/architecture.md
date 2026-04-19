@@ -553,7 +553,7 @@ View opens (detail, YAML, or JSON)
 
 **Caching policy**:
 - **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session.
-- **If caching is justified**: use a session-scoped, feature-specific cache owned by session context (`ServiceClients` today). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
+- **If caching is justified**: use a session-scoped, feature-specific cache owned by `sessionRuntime` (passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
 - **Never**: use package-global cache state for enrichers.
 
 **Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `sessionRuntime.policyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `resetForSessionSwitch` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
@@ -593,10 +593,10 @@ The app has four distinct caches, each serving a different purpose:
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
-| **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
-| **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
+| **Resource cache** | `sessionRuntime.resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch via `resetForSessionSwitch` |
+| **Related cache** | `sessionRuntime.relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
 | **Detail-enricher caches** | Feature-specific cache owned by `sessionRuntime` and delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `resetForSessionSwitch` on profile/region switch |
-| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps on root `Model` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
+| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` on `sessionRuntime` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
@@ -604,7 +604,7 @@ The app has four distinct caches, each serving a different purpose:
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
-**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `ServiceClients`, so cache lifetime matches session lifetime. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
+**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `sessionRuntime` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `resetForSessionSwitch`. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
 
 ---
 

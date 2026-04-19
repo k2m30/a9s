@@ -73,30 +73,13 @@ func TestConformance_RelatedValidatorsExposed(t *testing.T) {
 // Stale-result / invalidation guards
 // ---------------------------------------------------------------------------
 
-// TestConformance_GenCountersSeedAtOne_NotZero pins the seed=1 convention
-// for every gen counter owned by sessionRuntime. Zero is the documented
-// "never match" value used by test-injected messages; a freshly constructed
-// session must never compare-equal against Gen=0. This guard would catch a
-// regression where someone "cleaned up" the explicit =1 seeds.
-//
-// We prove it indirectly through behaviour: bumping a session generation
-// from initial state must not roll through zero. The sessionRuntime struct
-// is unexported so we cannot read the counters directly; the behavioural
-// assertion is good enough — any sessionRuntime with a seed of 0 would
-// still produce 1 on first bump (matching the documented "always stale" Gen=0
-// test messages), which would make rerun-on-start paths disagree with the
-// test-injection convention. The dedicated integration exists in
-// tests/unit/enricher_naming_contract_test.go and the profile-switch tests.
-func TestConformance_GenCountersSeedAtOne_NotZero(t *testing.T) {
-	// This test is informational — its presence documents the contract and
-	// points at the dedicated tests that enforce it. Remove only when the
-	// seed-at-1 convention is itself removed (and the test-injection Gen=0
-	// sentinel replaced).
-	t.Log(
-		"sessionRuntime seeds relatedGen/enrichGen at 1; Gen=0 on incoming " +
-			"messages is the documented test-injection bypass. See " +
-			"internal/tui/session_runtime.go and the profile-switch handlers.",
-	)
+// TestConformance_Wave2Registry_IsNonEmpty pins that the Wave 2 registry
+// has been wired at package init. An empty registry would silently disable
+// every Wave 2 background check, since buildEnrichQueue iterates over it.
+func TestConformance_Wave2Registry_IsNonEmpty(t *testing.T) {
+	if len(awsclient.IssueEnricherRegistry) == 0 {
+		t.Fatal("awsclient.IssueEnricherRegistry is empty — Wave 2 dispatch would silently skip every type; init() wiring missing")
+	}
 }
 
 // ---------------------------------------------------------------------------

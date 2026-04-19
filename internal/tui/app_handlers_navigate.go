@@ -139,7 +139,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if d.NeedsRelatedCheck() {
 			ck := relatedCacheKey(resType, msg.Resource.ID)
 			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(cached)
+				d.ApplyRelatedResults(relatedCacheReplay(resType, cached))
 			} else {
 				cmds = append(cmds, func() tea.Msg {
 					return messages.RelatedCheckStartedMsg{

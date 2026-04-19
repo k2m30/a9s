@@ -67,9 +67,9 @@ func init() {
 	commercialDisplayNames = map[string]string{}
 	for _, p := range parsed.Partitions {
 		if p.ID != "aws" {
-			// Skip gov-cloud (aws-us-gov) and China (aws-cn). a9s is designed
-			// for the commercial partition; gov/china users need a separate
-			// build (see tests/unit/gov_cloud_build_test.go for the stance).
+			// Skip gov-cloud (aws-us-gov) and China (aws-cn). a9s targets the
+			// commercial partition; TestAllRegions_NoGovOrChinaLeaks pins that
+			// nothing from those partitions leaks into AllRegions().
 			continue
 		}
 		re, err := regexp.Compile(p.RegionRegex)

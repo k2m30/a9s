@@ -21,8 +21,11 @@ import (
 //
 //   - Only session-scoped orchestration state belongs here. UI shell concerns
 //     (view stack, header, input mode, theme) stay on the surrounding Model.
-//   - Maps and slices must be constructed by newSessionRuntime — zero-value
-//     maps are not acceptable for handler paths that write into them.
+//   - Maps that handler paths write into directly (resourceCache,
+//     enrichmentFindings, enrichmentRan, enrichmentTypeGen,
+//     enrichmentTruncatedIDs) MUST be constructed by newSessionRuntime.
+//     probeResources and the availability/enrich queues stay nil until a
+//     probe retains its first batch — they are built in place.
 //   - Session rotation (profile/region switch) MUST bump every generation and
 //     replace/clear the caches, so in-flight messages tagged with old gens are
 //     discarded by the handlers' gen guards.

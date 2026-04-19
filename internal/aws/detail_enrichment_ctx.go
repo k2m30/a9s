@@ -19,12 +19,14 @@ package aws
 //     profile/region rotations rather than implicit via ServiceClients
 //     replacement.
 type DetailEnrichmentCtx struct {
-	// Clients holds the AWS transport objects. MUST NOT be nil when passed to
-	// an enricher.
+	// Clients holds the AWS transport objects. Enrichers that need an AWS
+	// API return an "invalid detail-enrichment context" error when this is
+	// nil rather than panicking.
 	Clients *ServiceClients
 
-	// PolicyDocs is the session-scoped IAM policy document cache. MUST NOT be
-	// nil when passed to an enricher that expects it (role_policies, policy).
-	// Callers construct one per session and rotate it on profile/region switch.
+	// PolicyDocs is the session-scoped IAM policy document cache. Enrichers
+	// that rely on it (role_policies, policy) return an error when it is
+	// nil; other enrichers ignore it. Callers construct one per session and
+	// rotate it on profile/region switch via resetForSessionSwitch.
 	PolicyDocs *PolicyDocumentCache
 }

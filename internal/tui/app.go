@@ -132,6 +132,22 @@ func relatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID
 }
 
+// relatedCacheReplay converts cached related-check results into the
+// RelatedCheckResultMsg form the detail view expects, preserving both the
+// resourceType and the per-row DefDisplayName so rightcolumn replay can
+// match the correct row on detail re-entry.
+func relatedCacheReplay(resourceType string, cached []relatedCacheResult) []messages.RelatedCheckResultMsg {
+	out := make([]messages.RelatedCheckResultMsg, len(cached))
+	for i, c := range cached {
+		out[i] = messages.RelatedCheckResultMsg{
+			ResourceType:   resourceType,
+			DefDisplayName: c.DefDisplayName,
+			Result:         c.Result,
+		}
+	}
+	return out
+}
+
 // relatedCacheLRU is a simple LRU cache for related-resource check results.
 // It caps at maxRelatedCacheEntries entries; the least-recently-used entry
 // is evicted when the cap is exceeded. Thread-safety is not required because
@@ -144,9 +160,19 @@ type relatedCacheLRU struct {
 	order *list.List
 }
 
+// relatedCacheResult bundles the per-row DisplayName with the checker result
+// so that cache replay can reconstruct the full RelatedCheckResultMsg — the
+// rightcolumn view disambiguates multiple rows sharing a TargetType (e.g.
+// ct-events' 4 self-pivots) by DefDisplayName, and losing it on the first
+// replay would leave those rows stuck loading forever.
+type relatedCacheResult struct {
+	DefDisplayName string
+	Result         resource.RelatedCheckResult
+}
+
 type relatedCacheItem struct {
 	key     string
-	results []resource.RelatedCheckResult
+	results []relatedCacheResult
 }
 
 func newRelatedCacheLRU(cap int) *relatedCacheLRU {
@@ -157,7 +183,7 @@ func newRelatedCacheLRU(cap int) *relatedCacheLRU {
 	}
 }
 
-func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) {
+func (c *relatedCacheLRU) get(key string) ([]relatedCacheResult, bool) {
 	el, ok := c.index[key]
 	if !ok {
 		return nil, false
@@ -166,7 +192,7 @@ func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) 
 	return el.Value.(*relatedCacheItem).results, true
 }
 
-func (c *relatedCacheLRU) set(key string, results []resource.RelatedCheckResult) {
+func (c *relatedCacheLRU) set(key string, results []relatedCacheResult) {
 	if el, ok := c.index[key]; ok {
 		c.order.MoveToFront(el)
 		el.Value.(*relatedCacheItem).results = results
@@ -517,7 +543,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if sourceID != "" {
 			ck := relatedCacheKey(msg.ResourceType, sourceID)
 			existing, _ := m.relatedCache.get(ck)
-			m.relatedCache.set(ck, append(existing, msg.Result))
+			m.relatedCache.set(ck, append(existing, relatedCacheResult{
+				DefDisplayName: msg.DefDisplayName,
+				Result:         msg.Result,
+			}))
 		}
 		// Write-back: persist pages fetched on cold miss so the next detail view
 		// for any resource type gets a cache hit instead of re-fetching.
