@@ -3,7 +3,7 @@ package unit
 // enricher_result_contract_test.go — Structural contract tests for IssueEnricherResult.
 //
 // These tests pin the required fields of IssueEnricherResult. They fail with
-// compile errors until the field exists in internal/aws/interfaces.go.
+// compile errors until the field exists in internal/aws/issue_enrichment.go.
 //
 // Tests:
 //   1. TruncatedIDs field exists with type map[string]bool.
@@ -24,7 +24,7 @@ func TestIssueEnricherResult_HasTruncatedIDsField(t *testing.T) {
 	rt := reflect.TypeOf(awsclient.IssueEnricherResult{})
 	f, ok := rt.FieldByName("TruncatedIDs")
 	if !ok {
-		t.Fatal("IssueEnricherResult is missing required field TruncatedIDs — add it to internal/aws/interfaces.go")
+		t.Fatal("IssueEnricherResult is missing required field TruncatedIDs — add it to internal/aws/issue_enrichment.go")
 	}
 	want := reflect.TypeOf(map[string]bool{})
 	if f.Type != want {

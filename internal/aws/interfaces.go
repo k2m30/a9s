@@ -49,8 +49,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
-
-	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // EC2DescribeInstancesAPI defines the interface for the EC2 DescribeInstances operation.
@@ -1447,54 +1445,6 @@ type RDSDescribePendingMaintenanceAPI interface {
 type S3GetPublicAccessBlockAPI interface {
 	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
-
-// IssueEnricherResult is the typed return value of a Wave 2 issue enricher.
-//
-//   - IssueCount: number of resources classified issue-worthy for the menu badge
-//     (severity "!" findings; "~" informational do NOT count).
-//
-//   - Truncated: GLOBAL signal — true when ANY part of the enricher's walk was
-//     cut short (EnrichmentCap hit, page cap hit, or API errors skipped records).
-//     Kept for back-compat and banner aggregation. Prefer TruncatedIDs for
-//     per-resource resolution.
-//
-//   - TruncatedIDs: per-resource truncation. Key = Resource.ID that could not be
-//     fully inspected (API error on that resource, page cap hit during a
-//     per-parent paginated walk, etc.). The UI renders "?" on just that row
-//     instead of a global banner. An ID appearing here MUST NOT also appear in
-//     Findings unless the partial data was still usable.
-//
-//   - Findings: map from Resource.ID → EnrichmentFinding. May contain entries
-//     for resources NOT in the input slice (account-wide enrichers). Enrichers
-//     that receive API identifiers in a different form (e.g., ARNs) MUST
-//     normalize to Resource.ID before writing to Findings.
-//
-//   - FieldUpdates: map from Resource.ID → (fieldKey → value). Same normalization
-//     rule applies.
-//
-// MAY have empty maps but MUST NOT be nil for any reference field on
-// success — initialize each with `make(...)` before returning.
-type IssueEnricherResult struct {
-	IssueCount   int
-	Truncated    bool
-	TruncatedIDs map[string]bool
-	Findings     map[string]resource.EnrichmentFinding
-	// FieldUpdates carries per-resource Fields[] mutations the enricher wants
-	// merged into the cached row. Keyed by resource ID, then by field key.
-	// Used by list columns and Color funcs that need access to Wave-2-derived
-	// data without subscribing to the Findings stream separately.
-	// MUST NOT be nil if the enricher writes any updates; use
-	// make(map[string]map[string]string).
-	FieldUpdates map[string]map[string]string
-}
-
-// IssueEnricherFunc is a pluggable function that makes additional API calls
-// for a resource type and returns a typed IssueEnricherResult. The resources
-// slice contains retained first-page resources from Wave 1 probes. This is the
-// Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
-// (internal/resource/enricher.go) which enriches a single resource for detail
-// views.
-type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error)
 
 // --- messaging-dev partition appended interfaces ---
 
