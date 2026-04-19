@@ -16,15 +16,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	acmsvc "github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
+	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
-	"github.com/aws/aws-sdk-go-v2/service/athena"
-	"github.com/aws/aws-sdk-go-v2/service/codebuild"
-	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -35,10 +35,10 @@ import (
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
-	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
-	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
@@ -58,8 +58,8 @@ import (
 	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
-	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -162,29 +162,29 @@ var IssueEnricherRegistry = map[string]IssueEnricher{
 	"sfn":      {Fn: EnrichStepFunctionsStatus, Priority: 10},
 	"glue":     {Fn: EnrichGlueJobStatus, Priority: 10},
 	// Priority 100 — per-resource enrichers (default)
-	"rds":      {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
-	"dbc":      {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
-	"ecs-svc":  {Fn: EnrichECSServices, Priority: 100},
-	"ecs":      {Fn: EnrichECSClusters, Priority: 100},
-	"ecs-task": {Fn: EnrichECSTasks, Priority: 100},
-	"eb-rule":  {Fn: EnrichEventBridgeRuleTargets, Priority: 100},
-	"ddb":      {Fn: EnrichDynamoDBPITR, Priority: 100},
-	"ec2":      {Fn: EnrichEC2InstanceStatus, Priority: 100},
-	"asg":      {Fn: EnrichASGScalingActivities, Priority: 100},
-	"backup":   {Fn: EnrichBackupJobs, Priority: 100},
-	"ses":      {Fn: EnrichSESAccount, Priority: 100},
-	"kms":      {Fn: EnrichKMSRotation, Priority: 100},
-	"efs":      {Fn: EnrichEFSMountTargets, Priority: 100},
-	"tgw":      {Fn: EnrichTGWAttachments, Priority: 100},
-	"eb":       {Fn: EnrichEBEnvironmentHealth, Priority: 100},
-	"elb":      {Fn: EnrichELBAttributes, Priority: 100},
-	"sqs":      {Fn: EnrichSQSAttributes, Priority: 100},
-	"sns":      {Fn: EnrichSNSSubscriptions, Priority: 100},
-	"msk":      {Fn: EnrichMSKCluster, Priority: 100},
-	"acm":      {Fn: EnrichACMCertificate, Priority: 100},
-	"cf":       {Fn: EnrichCloudFrontDistribution, Priority: 100},
-	"apigw":    {Fn: EnrichAPIGatewayStage, Priority: 100},
-	"cfn":      {Fn: EnrichCFNCombined, Priority: 100},
+	"rds":          {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
+	"dbc":          {Fn: EnrichRDSDocDBMaintenance, Priority: 100},
+	"ecs-svc":      {Fn: EnrichECSServices, Priority: 100},
+	"ecs":          {Fn: EnrichECSClusters, Priority: 100},
+	"ecs-task":     {Fn: EnrichECSTasks, Priority: 100},
+	"eb-rule":      {Fn: EnrichEventBridgeRuleTargets, Priority: 100},
+	"ddb":          {Fn: EnrichDynamoDBPITR, Priority: 100},
+	"ec2":          {Fn: EnrichEC2InstanceStatus, Priority: 100},
+	"asg":          {Fn: EnrichASGScalingActivities, Priority: 100},
+	"backup":       {Fn: EnrichBackupJobs, Priority: 100},
+	"ses":          {Fn: EnrichSESAccount, Priority: 100},
+	"kms":          {Fn: EnrichKMSRotation, Priority: 100},
+	"efs":          {Fn: EnrichEFSMountTargets, Priority: 100},
+	"tgw":          {Fn: EnrichTGWAttachments, Priority: 100},
+	"eb":           {Fn: EnrichEBEnvironmentHealth, Priority: 100},
+	"elb":          {Fn: EnrichELBAttributes, Priority: 100},
+	"sqs":          {Fn: EnrichSQSAttributes, Priority: 100},
+	"sns":          {Fn: EnrichSNSSubscriptions, Priority: 100},
+	"msk":          {Fn: EnrichMSKCluster, Priority: 100},
+	"acm":          {Fn: EnrichACMCertificate, Priority: 100},
+	"cf":           {Fn: EnrichCloudFrontDistribution, Priority: 100},
+	"apigw":        {Fn: EnrichAPIGatewayStage, Priority: 100},
+	"cfn":          {Fn: EnrichCFNCombined, Priority: 100},
 	"ecr":          {Fn: EnrichECRRepository, Priority: 100},
 	"codeartifact": {Fn: EnrichCodeArtifactRepository, Priority: 100},
 	"athena":       {Fn: EnrichAthenaWorkGroup, Priority: 100},
@@ -192,11 +192,11 @@ var IssueEnricherRegistry = map[string]IssueEnricher{
 	"waf":          {Fn: EnrichWAFLogging, Priority: 100},
 	"role":         {Fn: EnrichIAMRoleLastUsed, Priority: 100},
 	"policy":       {Fn: EnrichIAMPolicy, Priority: 100},
-	"iam-user":  {Fn: EnrichIAMUserMFA, Priority: 100},
-	"iam-group": {Fn: EnrichIAMGroup, Priority: 100},
-	"logs":      {Fn: EnrichLogsMetricFilters, Priority: 100},
-	"vpc":       {Fn: EnrichVPCFlowLogs, Priority: 100},
-	"s3":        {Fn: EnrichS3PublicAccessBlock, Priority: 100},
+	"iam-user":     {Fn: EnrichIAMUserMFA, Priority: 100},
+	"iam-group":    {Fn: EnrichIAMGroup, Priority: 100},
+	"logs":         {Fn: EnrichLogsMetricFilters, Priority: 100},
+	"vpc":          {Fn: EnrichVPCFlowLogs, Priority: 100},
+	"s3":           {Fn: EnrichS3PublicAccessBlock, Priority: 100},
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
 	"alarm":      {Fn: NoOpIssueEnricher, Priority: 100},
@@ -236,12 +236,12 @@ var IssueEnricherRegistry = map[string]IssueEnricher{
 	// dangerous_open_count and wide_open at fetch time. The Color func reads
 	// those fields. Pragmatic in-fetcher Wave 2; the registry entry exists for
 	// contract conformance.
-	"sg":         {Fn: NoOpIssueEnricher, Priority: 100},
-	"sns-sub":    {Fn: NoOpIssueEnricher, Priority: 100},
-	"ssm":        {Fn: NoOpIssueEnricher, Priority: 100},
-	"subnet":     {Fn: NoOpIssueEnricher, Priority: 100},
-	"trail":      {Fn: NoOpIssueEnricher, Priority: 100},
-	"vpce":       {Fn: NoOpIssueEnricher, Priority: 100},
+	"sg":      {Fn: NoOpIssueEnricher, Priority: 100},
+	"sns-sub": {Fn: NoOpIssueEnricher, Priority: 100},
+	"ssm":     {Fn: NoOpIssueEnricher, Priority: 100},
+	"subnet":  {Fn: NoOpIssueEnricher, Priority: 100},
+	"trail":   {Fn: NoOpIssueEnricher, Priority: 100},
+	"vpce":    {Fn: NoOpIssueEnricher, Priority: 100},
 }
 
 // NoOpIssueEnricher is registered for resource types whose Wave 2 column in
@@ -2830,6 +2830,21 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			}
 		}
 
+		stagesCount := len(stages)
+		if stagesCount == 0 && !stagesTruncated && !truncatedIDs[r.ID] {
+			// No deployed stages — surface as an informational finding.
+			// Only emitted when stage fetch succeeded (no error, no page cap).
+			findings[apiID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  "no deployed stages",
+				Rows: []resource.FindingRow{{
+					Label: "Issue",
+					Value: "no deployed stages",
+					Tier:  "~",
+				}},
+			}
+			continue
+		}
 		if len(summaries) == 0 {
 			continue
 		}

@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -968,9 +969,9 @@ type EC2API interface {
 	EC2DescribeVolumesAPI
 	EC2DescribeSnapshotsAPI
 	EC2DescribeImagesAPI
-	EC2DescribeInstanceStatusAPI        // Wave 2 enrichment
-	EC2DescribeVolumeStatusAPI          // Wave 2 enrichment
-	EC2DescribeFlowLogsAPI              // Wave 2 enrichment
+	EC2DescribeInstanceStatusAPI         // Wave 2 enrichment
+	EC2DescribeVolumeStatusAPI           // Wave 2 enrichment
+	EC2DescribeFlowLogsAPI               // Wave 2 enrichment
 	EC2DescribeLaunchTemplateVersionsAPI // asg→ami, asg→role, asg→sg
 }
 
@@ -1173,11 +1174,25 @@ type ACMAPI interface {
 	ACMDescribeCertificateAPI
 }
 
+// APIGatewayV1GetRestApisAPI defines the interface for the APIGateway v1 GetRestApis operation.
+type APIGatewayV1GetRestApisAPI interface {
+	GetRestApis(ctx context.Context, params *apigateway.GetRestApisInput, optFns ...func(*apigateway.Options)) (*apigateway.GetRestApisOutput, error)
+}
+
+// APIGatewayV1API is the aggregate interface covering APIGateway v1 (REST) operations used by a9s fetchers.
+// *apigateway.Client structurally satisfies this interface.
+type APIGatewayV1API interface {
+	APIGatewayV1GetRestApisAPI
+}
+
 // APIGatewayV2API is the aggregate interface covering all APIGatewayV2 operations used by a9s fetchers.
 // *apigatewayv2.Client structurally satisfies this interface.
 type APIGatewayV2API interface {
 	APIGatewayV2GetApisAPI
-	APIGatewayV2GetStagesAPI // Wave 2 enrichment
+	APIGatewayV2GetStagesAPI       // Wave 2 enrichment
+	APIGatewayV2GetDomainNamesAPI  // custom domain → ACM/R53 pivot
+	APIGatewayV2GetApiMappingsAPI  // domain → API mapping pivot
+	APIGatewayV2GetIntegrationsAPI // Lambda/SFN/SNS integration pivot
 }
 
 // CFNAPI is the aggregate interface covering all CloudFormation operations used by a9s fetchers.

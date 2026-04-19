@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -283,4 +285,153 @@ func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// checkApigwACM tests
+//
+// checkApigwACM resolves ACM certificates attached to this API's custom domain
+// names by calling apigatewayv2:GetDomainNames then apigatewayv2:GetApiMappings
+// per domain. Domains whose mappings include the target API ID contribute their
+// DomainNameConfigurations[*].CertificateArn to the result set.
+//
+// CODER: implement checkApigwACM in internal/aws/apigw_related.go so that it
+// calls GetDomainNames + GetApiMappings via the APIGatewayV2API client (which
+// must also embed APIGatewayV2GetDomainNamesAPI and APIGatewayV2GetApiMappingsAPI
+// — both already defined in internal/aws/interfaces_networking.go lines 31-48).
+// Update APIGatewayV2API in internal/aws/interfaces.go to embed both new
+// sub-interfaces alongside APIGatewayV2GetApisAPI and APIGatewayV2GetStagesAPI.
+// ---------------------------------------------------------------------------
+
+// fakeAPIGWV2ACM satisfies the extended APIGatewayV2API interface (including
+// GetDomainNames and GetApiMappings) used by checkApigwACM.
+type fakeAPIGWV2ACM struct {
+	domains  []apigwv2types.DomainName
+	mappings map[string][]apigwv2types.ApiMapping
+}
+
+func (f *fakeAPIGWV2ACM) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error) {
+	return &apigatewayv2.GetApisOutput{}, nil
+}
+
+func (f *fakeAPIGWV2ACM) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
+	return &apigatewayv2.GetStagesOutput{}, nil
+}
+
+func (f *fakeAPIGWV2ACM) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
+	return &apigatewayv2.GetIntegrationsOutput{}, nil
+}
+
+func (f *fakeAPIGWV2ACM) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
+	return &apigatewayv2.GetDomainNamesOutput{Items: f.domains}, nil
+}
+
+func (f *fakeAPIGWV2ACM) GetApiMappings(_ context.Context, params *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	var domain string
+	if params != nil && params.DomainName != nil {
+		domain = *params.DomainName
+	}
+	return &apigatewayv2.GetApiMappingsOutput{Items: f.mappings[domain]}, nil
+}
+
+func ptr(s string) *string { return &s }
+
+// TestCheckApigwACM_ResolvesCertArn verifies that checkApigwACM finds the domain
+// whose ApiMappings includes the target API ID and extracts the cert ARN last
+// segment as the resolved ACM resource ID.
+func TestCheckApigwACM_ResolvesCertArn(t *testing.T) {
+	certARNa := "arn:aws:acm:us-east-1:111:certificate/cert-A"
+	certARNb := "arn:aws:acm:us-east-1:111:certificate/cert-B"
+	apiID := "api-under-test"
+	stage := "prod"
+
+	fake := &fakeAPIGWV2ACM{
+		domains: []apigwv2types.DomainName{
+			{
+				DomainName: ptr("api.example.com"),
+				DomainNameConfigurations: []apigwv2types.DomainNameConfiguration{
+					{CertificateArn: &certARNa},
+				},
+			},
+			{
+				DomainName: ptr("beta.example.com"),
+				DomainNameConfigurations: []apigwv2types.DomainNameConfiguration{
+					{CertificateArn: &certARNb},
+				},
+			},
+		},
+		mappings: map[string][]apigwv2types.ApiMapping{
+			"api.example.com":  {{ApiId: ptr(apiID), Stage: &stage}},
+			"beta.example.com": {{ApiId: ptr("other-api"), Stage: &stage}},
+		},
+	}
+	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
+	res := resource.Resource{ID: apiID, Fields: map[string]string{}}
+
+	checker := apigwCheckerByTarget(t, "acm")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 {
+		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs)
+	}
+	if result.ResourceIDs[0] != "cert-A" {
+		t.Errorf("ResourceIDs[0] = %q, want \"cert-A\" (last ARN segment)", result.ResourceIDs[0])
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestCheckApigwACM_NoDomains verifies that an account with no custom domain names
+// returns Count 0 (no pivots found), not -1 (unknown).
+func TestCheckApigwACM_NoDomains(t *testing.T) {
+	fake := &fakeAPIGWV2ACM{
+		domains:  []apigwv2types.DomainName{},
+		mappings: map[string][]apigwv2types.ApiMapping{},
+	}
+	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
+	res := resource.Resource{ID: "api-under-test", Fields: map[string]string{}}
+
+	checker := apigwCheckerByTarget(t, "acm")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no domains → no cert pivots)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestCheckApigwACM_ClientMissing verifies that a nil APIGatewayV2 client returns
+// Count -1 (unknown) without panicking.
+func TestCheckApigwACM_ClientMissing(t *testing.T) {
+	clients := &awsclient.ServiceClients{APIGatewayV2: nil}
+	res := resource.Resource{ID: "api-under-test", Fields: map[string]string{}}
+
+	checker := apigwCheckerByTarget(t, "acm")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil APIGatewayV2 client)", result.Count)
+	}
+}
+
+// TestApigwRelatedRegistry_ACMIsRegisteredWithRealImplementation verifies that
+// the ACM pivot IS registered in the related defs for "apigw", now that
+// checkApigwACM has a real GetDomainNames + GetApiMappings implementation.
+func TestApigwRelatedRegistry_ACMIsRegisteredWithRealImplementation(t *testing.T) {
+	defs := resource.GetRelated("apigw")
+	for _, def := range defs {
+		if def.TargetType == "acm" {
+			if def.Checker == nil {
+				t.Error("apigw ACM related def must have a non-nil Checker")
+			}
+			return
+		}
+	}
+	t.Error("apigw related registry must register TargetType=\"acm\" now that checkApigwACM is implemented")
 }

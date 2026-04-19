@@ -189,14 +189,64 @@ func checkApigwWAF(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
 }
 
-// checkApigwACM reports ACM certificates on this API's custom domain.
-// Custom domain mapping requires apigatewayv2:GetDomainNames (not GetApis).
-// Returns Count: -1.
-func checkApigwACM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// checkApigwACM reports ACM certificates attached to this API's custom domain names.
+// Enumerates GetDomainNames, then per domain calls GetApiMappings to check if the
+// domain maps to this API. For matching domains, harvests CertificateArn from each
+// DomainNameConfiguration.
+func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	apiID := res.ID
+	if apiID == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.APIGatewayV2 == nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	}
+	dnAPI, ok := c.APIGatewayV2.(APIGatewayV2GetDomainNamesAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	}
+	mapAPI, ok := c.APIGatewayV2.(APIGatewayV2GetApiMappingsAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	}
+	// Enumerate all custom domain names (one call).
+	dn, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetDomainNamesOutput, error) {
+		return dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+	}
+	seen := make(map[string]struct{})
+	for _, d := range dn.Items {
+		if d.DomainName == nil {
+			continue
+		}
+		// Per domain: get its mappings; check if any maps to this API.
+		m, merr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetApiMappingsOutput, error) {
+			return mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName})
+		})
+		if merr != nil || m == nil {
+			continue
+		}
+		matched := false
+		for _, am := range m.Items {
+			if am.ApiId != nil && *am.ApiId == apiID {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		// Harvest CertificateArn from each domain configuration.
+		for _, dcfg := range d.DomainNameConfigurations {
+			if dcfg.CertificateArn != nil && *dcfg.CertificateArn != "" {
+				seen[arnLastSegment(*dcfg.CertificateArn)] = struct{}{}
+			}
+		}
+	}
+	return relatedResult("acm", mapKeys(seen))
 }
 
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms

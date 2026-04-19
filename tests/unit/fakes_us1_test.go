@@ -356,7 +356,7 @@ func newFakeCodeArtifactWithKMSKey(keyARN string) *fakeCodeArtifactUS1 {
 // ---------------------------------------------------------------------------
 
 type fakeAPIGWV2US1 struct {
-	integrations []apigwv2types.Integration
+	integrations    []apigwv2types.Integration
 	integrationsErr error
 }
 
@@ -373,6 +373,14 @@ func (f *fakeAPIGWV2US1) GetIntegrations(_ context.Context, _ *apigatewayv2.GetI
 		return nil, f.integrationsErr
 	}
 	return &apigatewayv2.GetIntegrationsOutput{Items: f.integrations}, nil
+}
+
+func (f *fakeAPIGWV2US1) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
+	return &apigatewayv2.GetDomainNamesOutput{}, nil
+}
+
+func (f *fakeAPIGWV2US1) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	return &apigatewayv2.GetApiMappingsOutput{}, nil
 }
 
 // newFakeAPIGWV2WithLambdaIntegration returns a fakeAPIGWV2US1 whose

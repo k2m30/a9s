@@ -21,7 +21,8 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// checkApigwACM — stub: returns Count:-1 for non-empty API ID.
+// checkApigwACM — resolves ACM certs via GetDomainNames + GetApiMappings.
+// With a nil client we exercise the client-missing guard → Count:-1.
 // ---------------------------------------------------------------------------
 
 func TestRelated_APIGW_ACM_Unknown(t *testing.T) {
@@ -33,7 +34,7 @@ func TestRelated_APIGW_ACM_Unknown(t *testing.T) {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
 	}
 	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (ACM certs on custom domain require GetDomainNames, not in GetApis)", result.Count)
+		t.Errorf("Count = %d, want -1 (nil client hits the client-missing guard before any AWS call)", result.Count)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -18,7 +19,7 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchAPIGatewaysPage(ctx, c.APIGatewayV2, continuationToken)
+		return FetchAPIGatewaysPageMerged(ctx, c, continuationToken)
 	})
 
 	resource.RegisterRelated("apigw", []resource.RelatedDef{
@@ -38,6 +39,69 @@ func init() {
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkApigwSNS},
 		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkApigwVPCE},
 	})
+}
+
+// FetchAPIGatewaysPageMerged fetches a single page of API Gateways from both
+// APIGateway V2 (HTTP/WEBSOCKET) and APIGateway V1 (REST), merging results.
+// On the first page (continuationToken == ""), all V1 REST APIs are fully
+// paginated (using Position-based pagination) and the first page of V2 is
+// fetched. On subsequent pages, only V2 pagination continues.
+// V1 REST API resources have Fields["protocol"] == "REST".
+// If c.APIGatewayV1 is nil, only V2 resources are returned.
+func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+	var resources []resource.Resource
+
+	// On the first page, fetch all V1 REST APIs (fully paginated).
+	if continuationToken == "" && c.APIGatewayV1 != nil {
+		var position *string
+		for {
+			input := &apigateway.GetRestApisInput{
+				Limit: aws.Int32(DefaultPageSize),
+			}
+			if position != nil {
+				input.Position = position
+			}
+			out, err := c.APIGatewayV1.GetRestApis(ctx, input)
+			if err != nil {
+				return resource.FetchResult{}, fmt.Errorf("fetching REST API gateways: %w", err)
+			}
+			for _, item := range out.Items {
+				apiID := aws.ToString(item.Id)
+				name := aws.ToString(item.Name)
+				description := aws.ToString(item.Description)
+				r := resource.Resource{
+					ID:     apiID,
+					Name:   name,
+					Status: "",
+					Fields: map[string]string{
+						"api_id":      apiID,
+						"name":        name,
+						"protocol":    "REST",
+						"endpoint":    "",
+						"description": description,
+					},
+					RawStruct: item,
+				}
+				resources = append(resources, r)
+			}
+			if out.Position == nil {
+				break
+			}
+			position = out.Position
+		}
+	}
+
+	// Fetch the current page of V2 APIs.
+	v2Result, err := FetchAPIGatewaysPage(ctx, c.APIGatewayV2, continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+	resources = append(resources, v2Result.Resources...)
+
+	return resource.FetchResult{
+		Resources:  resources,
+		Pagination: v2Result.Pagination,
+	}, nil
 }
 
 // FetchAPIGateways calls the API Gateway V2 GetApis API and converts
