@@ -32,7 +32,7 @@ func init() {
 }
 
 // FetchSSMParameters calls the SSM DescribeParameters API and returns all pages
-// of parameters. Used by existing tests and the legacy fetcher.
+// of parameters. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

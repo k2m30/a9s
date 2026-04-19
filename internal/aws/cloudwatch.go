@@ -46,7 +46,7 @@ func init() {
 }
 
 // FetchCloudWatchAlarms calls the CloudWatch DescribeAlarms API and returns all
-// pages of alarms. Used by existing tests and the legacy fetcher.
+// pages of alarms. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchCloudWatchAlarms(ctx context.Context, api CloudWatchDescribeAlarmsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

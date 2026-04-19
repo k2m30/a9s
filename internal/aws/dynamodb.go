@@ -38,7 +38,7 @@ func init() {
 }
 
 // FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and
-// returns all pages of tables. Used by existing tests and the legacy fetcher.
+// returns all pages of tables. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

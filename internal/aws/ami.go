@@ -39,7 +39,7 @@ func init() {
 }
 
 // FetchAMIs calls the EC2 DescribeImages API and returns all pages of AMIs.
-// Used by existing tests and the legacy fetcher.
+// Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

@@ -33,7 +33,7 @@ func init() {
 }
 
 // FetchIAMUsers calls the IAM ListUsers API and returns all pages of users.
-// Used by existing tests and the legacy fetcher.
+// Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

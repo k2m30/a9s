@@ -149,7 +149,7 @@ func init() {
 }
 
 // FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and returns all
-// pages of security groups. Used by existing tests and the legacy fetcher.
+// pages of security groups. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
