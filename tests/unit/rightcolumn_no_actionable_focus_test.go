@@ -49,7 +49,8 @@ func buildAllZeroDetail(t *testing.T, fixture resource.Resource) views.DetailMod
 	for _, def := range defs {
 		// Inject Count=0, no FetchFilter — non-actionable, resolved.
 		d, _ = d.Update(messages.RelatedCheckResultMsg{
-			ResourceType: "ct-events",
+			ResourceType:   "ct-events",
+			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
 				Count:       0,
@@ -78,7 +79,8 @@ func buildMixedNonActionableDetail(t *testing.T, fixture resource.Resource) view
 			count = -1 // odd indices: Count=-1, no FetchFilter
 		}
 		d, _ = d.Update(messages.RelatedCheckResultMsg{
-			ResourceType: "ct-events",
+			ResourceType:   "ct-events",
+			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
 				Count:       count,
