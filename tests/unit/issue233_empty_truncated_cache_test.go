@@ -49,7 +49,7 @@ import (
 func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
-	// Non-demo model: no WithDemo option.
+	// Non-demo model: no WithIsDemo option.
 	// This makes handleRelatedCheckStarted use the real checker path (not demo fixtures).
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})

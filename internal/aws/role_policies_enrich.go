@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterEnricher("role_policies", enrichRolePolicy)
+	resource.RegisterDetailEnricher("role_policies", enrichRolePolicy)
 }
 
 // enrichRolePolicy fetches the policy document for a role_policies resource

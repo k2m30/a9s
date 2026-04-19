@@ -203,33 +203,33 @@ func TestRealApplyFilter_NonzeroVisible_AllOthersZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// EnricherRegistry completeness
+// IssueEnricherRegistry completeness
 // ---------------------------------------------------------------------------
 
-func TestEnricherRegistry_AllExpectedKeys(t *testing.T) {
+func TestIssueEnricherRegistry_AllExpectedKeys(t *testing.T) {
 	// The original 8 enrichers from issue #196. These must still be
 	// registered (real, not noop) — they're the foundational Wave 2
 	// implementations.
 	expected := []string{"rds", "dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	for _, key := range expected {
-		if e, ok := awsclient.EnricherRegistry[key]; !ok || e.Fn == nil {
-			t.Errorf("EnricherRegistry[%q].Fn is nil or missing", key)
+		if e, ok := awsclient.IssueEnricherRegistry[key]; !ok || e.Fn == nil {
+			t.Errorf("IssueEnricherRegistry[%q].Fn is nil or missing", key)
 		}
 	}
 }
 
-func TestEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
+func TestIssueEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
 	// Per docs/attention-signals.md, EVERY registered resource type has an
-	// EnricherRegistry entry (real or NoOpEnricher). The doc-grounded test
+	// IssueEnricherRegistry entry (real or NoOpIssueEnricher). The doc-grounded test
 	// TestAttentionSignalsDoc enforces the registration contract — this test only
 	// asserts there are no entries for shortNames that are not registered as
 	// resource types.
 	//
 	// TODO(no-middle-state): avoid calling this the "full contract". Registration
 	// is necessary, but it does not prove that the feature is fully implemented.
-	for key := range awsclient.EnricherRegistry {
+	for key := range awsclient.IssueEnricherRegistry {
 		if resource.FindResourceType(key) == nil {
-			t.Errorf("EnricherRegistry has entry for %q but no such ResourceTypeDef is registered", key)
+			t.Errorf("IssueEnricherRegistry has entry for %q but no such ResourceTypeDef is registered", key)
 		}
 	}
 }

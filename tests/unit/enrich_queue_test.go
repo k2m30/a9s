@@ -1,17 +1,15 @@
 package unit
 
-// enrich_queue_test.go — Regression tests for ARCH-04: declarative enricher
+// enrich_queue_test.go — Regression tests for declarative Wave 2 issue-enricher
 // priority metadata.
 //
-// After ARCH-04, EnricherRegistry changes from map[string]EnricherFunc to
-// map[string]Enricher{Fn EnricherFunc; Priority int}. The seven "batchable"
-// types (dbi, ebs, cb, tg, pipeline, sfn, glue) get Priority=10; all remaining
-// types get Priority=100. buildEnrichQueue sorts by Priority (asc) then
-// alphabetically within each tier.
+// IssueEnricherRegistry is map[string]IssueEnricher{Fn IssueEnricherFunc;
+// Priority int}. The seven "batchable" types (dbi, ebs, cb, tg, pipeline, sfn,
+// glue) get Priority=10; all remaining types get Priority=100.
+// buildEnrichQueue sorts by Priority (asc) then alphabetically within each
+// tier.
 //
-// TDD contract: tests are RED until ARCH-04 coder task finishes.  The coder
-// changes the EnricherRegistry map-value type; tests below verify the resulting
-// ordering behaviour.
+// These tests verify resulting ordering behaviour against the registry.
 //
 // Seeding strategy: AvailabilityPrefetchedMsg.Resources populates all
 // probeResources in one shot and triggers startEnrichment, avoiding the
@@ -30,8 +28,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
-// priority10Types lists the short names that receive Priority=10 after ARCH-04.
-// These are the "batchable" enrichers scheduled first in the dispatch queue.
+// priority10Types lists the short names that receive Priority=10 in
+// IssueEnricherRegistry. These are the "batchable" Wave 2 issue enrichers
+// scheduled first in the dispatch queue.
 var priority10Types = []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 
 // enrichmentTypesFromMsgs extracts ResourceType strings in order for diagnostics.
@@ -43,12 +42,12 @@ func enrichmentTypesFromMsgs(msgs []messages.EnrichmentCheckedMsg) []string {
 	return out
 }
 
-// seedAllEnricherTypes builds an AvailabilityPrefetchedMsg.Resources map containing
-// one fake resource for every key in EnricherRegistry, then delivers it to the
-// model.  Returns the cmd that triggers startEnrichment.
+// seedAllEnricherTypes builds an AvailabilityPrefetchedMsg.Resources map
+// containing one fake resource for every key in IssueEnricherRegistry, then
+// delivers it to the model. Returns the cmd that triggers startEnrichment.
 func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
-	allResources := make(map[string][]resource.Resource, len(awsclient.EnricherRegistry))
-	for shortName := range awsclient.EnricherRegistry {
+	allResources := make(map[string][]resource.Resource, len(awsclient.IssueEnricherRegistry))
+	for shortName := range awsclient.IssueEnricherRegistry {
 		allResources[shortName] = []resource.Resource{
 			{ID: shortName + "-probe", Name: shortName + "-probe", Fields: map[string]string{}},
 		}
@@ -141,22 +140,22 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	tui.Version = "test"
 
 	// Snapshot and restore the full registry around this test.
-	snapshot := make(map[string]awsclient.Enricher, len(awsclient.EnricherRegistry))
-	maps.Copy(snapshot, awsclient.EnricherRegistry)
+	snapshot := make(map[string]awsclient.IssueEnricher, len(awsclient.IssueEnricherRegistry))
+	maps.Copy(snapshot, awsclient.IssueEnricherRegistry)
 	t.Cleanup(func() {
-		for k := range awsclient.EnricherRegistry {
-			delete(awsclient.EnricherRegistry, k)
+		for k := range awsclient.IssueEnricherRegistry {
+			delete(awsclient.IssueEnricherRegistry, k)
 		}
-		maps.Copy(awsclient.EnricherRegistry, snapshot)
+		maps.Copy(awsclient.IssueEnricherRegistry, snapshot)
 	})
 
 	// Replace registry with only the seven priority-10 types.
-	for k := range awsclient.EnricherRegistry {
-		delete(awsclient.EnricherRegistry, k)
+	for k := range awsclient.IssueEnricherRegistry {
+		delete(awsclient.IssueEnricherRegistry, k)
 	}
 	for _, name := range priority10Types {
-		awsclient.EnricherRegistry[name] = awsclient.Enricher{
-			Fn:       awsclient.NoOpEnricher,
+		awsclient.IssueEnricherRegistry[name] = awsclient.IssueEnricher{
+			Fn:       awsclient.NoOpIssueEnricher,
 			Priority: 10,
 		}
 	}
@@ -232,7 +231,7 @@ func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 		dispatched[msg.ResourceType] = true
 	}
 
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		if !dispatched[shortName] {
 			t.Errorf("enricher %q is registered with a probeResources entry but was NOT dispatched; "+
 				"check buildEnrichQueue handles all EnricherRegistry keys", shortName)
@@ -258,11 +257,11 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 	// Register a no-op Enricher for the test type.
 	// This assignment uses the new Enricher struct — TDD-red until ARCH-04 completes
 	// the registry type migration from map[string]EnricherFunc to map[string]Enricher.
-	awsclient.EnricherRegistry[probeSkipType] = awsclient.Enricher{
-		Fn:       awsclient.NoOpEnricher,
+	awsclient.IssueEnricherRegistry[probeSkipType] = awsclient.IssueEnricher{
+		Fn:       awsclient.NoOpIssueEnricher,
 		Priority: 100,
 	}
-	t.Cleanup(func() { delete(awsclient.EnricherRegistry, probeSkipType) })
+	t.Cleanup(func() { delete(awsclient.IssueEnricherRegistry, probeSkipType) })
 
 	m := newRootSizedModel()
 

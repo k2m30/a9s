@@ -14,7 +14,7 @@ import (
 // handleEnrichDetail dispatches the enricher for the given resource type.
 // Stamps the current enrichGen so stale results are discarded.
 func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.Cmd) {
-	enricher := resource.GetEnricher(msg.ResourceType)
+	enricher := resource.GetDetailEnricher(msg.ResourceType)
 	if enricher == nil {
 		return m, nil
 	}

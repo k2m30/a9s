@@ -75,13 +75,13 @@ import (
 )
 
 func init() {
-	// Wave 2 field keys produced by enrichers via EnricherResult.FieldUpdates.
+	// Wave 2 field keys produced by enrichers via IssueEnricherResult.FieldUpdates.
 	// Fetcher-produced keys live in each type's own fetcher file (e.g. internal/aws/ec2.go).
 	// Test TestColumnKeysHaveProducers asserts every column.Key appears in
 	// fetcher-keys union enricher-keys or a documented allowlist.
 	//
 	// Enrichers that produce ONLY Findings (no FieldUpdates) are documented here
-	// and have no RegisterEnricherFieldKeys call:
+	// and have no RegisterIssueEnricherFieldKeys call:
 	//   dbi, rds, dbc  — EnrichRDSDocDBMaintenance (findings only)
 	//   ebs            — EnrichEBSVolumeStatus (findings only)
 	//   ec2            — EnrichEC2InstanceStatus (findings only)
@@ -100,41 +100,44 @@ func init() {
 	//   ecs            — EnrichECSClusters (findings only)
 	//   ecs-task       — EnrichECSTasks (findings only)
 
-	resource.RegisterEnricherFieldKeys("cb", []string{"last_build"})
-	resource.RegisterEnricherFieldKeys("tg", []string{"health_summary"})
-	resource.RegisterEnricherFieldKeys("pipeline", []string{"last_status"})
-	resource.RegisterEnricherFieldKeys("sfn", []string{"last_run"})
-	resource.RegisterEnricherFieldKeys("backup", []string{"last_status"})
-	resource.RegisterEnricherFieldKeys("glue", []string{"last_run"})
-	resource.RegisterEnricherFieldKeys("ddb", []string{"pitr_enabled"})
-	resource.RegisterEnricherFieldKeys("redis", []string{"automatic_failover", "multi_az"})
-	resource.RegisterEnricherFieldKeys("kms", []string{"rotation_enabled"})
-	resource.RegisterEnricherFieldKeys("tgw", []string{"att_status"})
-	resource.RegisterEnricherFieldKeys("vpc", []string{"flow_logs"})
-	resource.RegisterEnricherFieldKeys("s3", []string{"public_access"})
-	resource.RegisterEnricherFieldKeys("eb-rule", []string{"target_count"})
-	resource.RegisterEnricherFieldKeys("sqs", []string{"dlq"})
-	resource.RegisterEnricherFieldKeys("sns", []string{"subs_count"})
-	resource.RegisterEnricherFieldKeys("apigw", []string{"stages_count"})
-	resource.RegisterEnricherFieldKeys("cfn", []string{"drift_status"})
-	resource.RegisterEnricherFieldKeys("ecr", []string{"critical_vulns", "high_vulns", "images_scanned"})
-	resource.RegisterEnricherFieldKeys("codeartifact", []string{"package_count"})
-	resource.RegisterEnricherFieldKeys("waf", []string{"rules_summary"})
-	resource.RegisterEnricherFieldKeys("policy", []string{"risk"})
-	resource.RegisterEnricherFieldKeys("iam-user", []string{"mfa", "risk"})
-	resource.RegisterEnricherFieldKeys("iam-group", []string{"member_count"})
-	resource.RegisterEnricherFieldKeys("logs", []string{"last_event_at"})
+	resource.RegisterIssueEnricherFieldKeys("cb", []string{"last_build"})
+	resource.RegisterIssueEnricherFieldKeys("tg", []string{"health_summary"})
+	resource.RegisterIssueEnricherFieldKeys("pipeline", []string{"last_status"})
+	resource.RegisterIssueEnricherFieldKeys("sfn", []string{"last_run"})
+	resource.RegisterIssueEnricherFieldKeys("backup", []string{"last_status"})
+	resource.RegisterIssueEnricherFieldKeys("glue", []string{"last_run"})
+	resource.RegisterIssueEnricherFieldKeys("ddb", []string{"pitr_enabled"})
+	resource.RegisterIssueEnricherFieldKeys("redis", []string{"automatic_failover", "multi_az"})
+	resource.RegisterIssueEnricherFieldKeys("kms", []string{"rotation_enabled"})
+	resource.RegisterIssueEnricherFieldKeys("tgw", []string{"att_status"})
+	resource.RegisterIssueEnricherFieldKeys("vpc", []string{"flow_logs"})
+	resource.RegisterIssueEnricherFieldKeys("s3", []string{"public_access"})
+	resource.RegisterIssueEnricherFieldKeys("eb-rule", []string{"target_count"})
+	resource.RegisterIssueEnricherFieldKeys("sqs", []string{"dlq"})
+	resource.RegisterIssueEnricherFieldKeys("sns", []string{"subs_count"})
+	resource.RegisterIssueEnricherFieldKeys("apigw", []string{"stages_count"})
+	resource.RegisterIssueEnricherFieldKeys("cfn", []string{"drift_status"})
+	resource.RegisterIssueEnricherFieldKeys("ecr", []string{"critical_vulns", "high_vulns", "images_scanned"})
+	resource.RegisterIssueEnricherFieldKeys("codeartifact", []string{"package_count"})
+	resource.RegisterIssueEnricherFieldKeys("waf", []string{"rules_summary"})
+	resource.RegisterIssueEnricherFieldKeys("policy", []string{"risk"})
+	resource.RegisterIssueEnricherFieldKeys("iam-user", []string{"mfa", "risk"})
+	resource.RegisterIssueEnricherFieldKeys("iam-group", []string{"member_count"})
+	resource.RegisterIssueEnricherFieldKeys("logs", []string{"last_event_at"})
 }
 
-// Enricher carries an EnricherFunc plus scheduling metadata.
+// IssueEnricher carries a Wave 2 IssueEnricherFunc plus scheduling metadata.
 // Priority controls Wave 2 dispatch order: lower values run first.
 // The default priority is 100; batchable (cheap) enrichers use 10.
-type Enricher struct {
-	Fn       EnricherFunc
+//
+// Distinct from resource.DetailEnricher (internal/resource/enricher.go) which
+// is the on-demand detail-view enricher contract.
+type IssueEnricher struct {
+	Fn       IssueEnricherFunc
 	Priority int // lower runs first; default 100
 }
 
-// EnricherRegistry maps resource short names to their Wave 2 Enricher metadata.
+// IssueEnricherRegistry maps resource short names to their Wave 2 Enricher metadata.
 // Each entry carries the enricher function (Fn) and its dispatch priority
 // (Priority: lower runs first; 10 = batchable/cheap, 100 = default).
 //
@@ -144,12 +147,12 @@ type Enricher struct {
 //
 // Every registered resource type per docs/attention-signals.md either:
 //   - has a real Wave 2 enricher registered here (Wave 2 column non-empty), or
-//   - is registered with NoOpEnricher (Wave 2 column is "None" in the doc).
+//   - is registered with NoOpIssueEnricher (Wave 2 column is "None" in the doc).
 //
 // TODO(no-middle-state): TestAttentionSignalsDoc enforces registration only.
 // Do not treat a registered enricher as proof that Wave 2 is populated, visible
 // in the UI, or honest under partial data.
-var EnricherRegistry = map[string]Enricher{
+var IssueEnricherRegistry = map[string]IssueEnricher{
 	// Priority 10 — batchable enrichers (cheap, run first)
 	"dbi":      {Fn: EnrichRDSDocDBMaintenance, Priority: 10},
 	"ebs":      {Fn: EnrichEBSVolumeStatus, Priority: 10},
@@ -196,57 +199,57 @@ var EnricherRegistry = map[string]Enricher{
 	"s3":        {Fn: EnrichS3PublicAccessBlock, Priority: 100},
 	// Wave 2 = None per docs/attention-signals.md — explicit no-op registration
 	// makes the empty Wave 2 contract testable.
-	"alarm":      {Fn: NoOpEnricher, Priority: 100},
-	"ami":        {Fn: NoOpEnricher, Priority: 100},
-	"ct-events":  {Fn: NoOpEnricher, Priority: 100},
-	"docdb-snap": {Fn: NoOpEnricher, Priority: 100},
-	"ebs-snap":   {Fn: NoOpEnricher, Priority: 100},
-	"eip":        {Fn: NoOpEnricher, Priority: 100},
-	"eni":        {Fn: NoOpEnricher, Priority: 100},
-	"igw":        {Fn: NoOpEnricher, Priority: 100},
-	"kinesis":    {Fn: NoOpEnricher, Priority: 100},
-	"lambda":     {Fn: NoOpEnricher, Priority: 100},
-	"nat":        {Fn: NoOpEnricher, Priority: 100},
-	// eks and ng use NoOpEnricher because their fetchers already perform the
+	"alarm":      {Fn: NoOpIssueEnricher, Priority: 100},
+	"ami":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"ct-events":  {Fn: NoOpIssueEnricher, Priority: 100},
+	"docdb-snap": {Fn: NoOpIssueEnricher, Priority: 100},
+	"ebs-snap":   {Fn: NoOpIssueEnricher, Priority: 100},
+	"eip":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"eni":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"igw":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"kinesis":    {Fn: NoOpIssueEnricher, Priority: 100},
+	"lambda":     {Fn: NoOpIssueEnricher, Priority: 100},
+	"nat":        {Fn: NoOpIssueEnricher, Priority: 100},
+	// eks and ng use NoOpIssueEnricher because their fetchers already perform the
 	// per-resource DescribeCluster / DescribeNodegroup calls and populate the
 	// health_issues_count and health_issues Wave 2 fields at fetch time. The
 	// Color funcs read those fields. This is a pragmatic in-fetcher Wave 2;
 	// the registry entry exists for contract conformance
 	// (TestAttentionSignalsDoc enforces every documented Wave 2 row has a
 	// registry entry).
-	"eks": {Fn: NoOpEnricher, Priority: 100},
-	"ng":  {Fn: NoOpEnricher, Priority: 100},
-	// opensearch and trail use NoOpEnricher because their fetchers already
+	"eks": {Fn: NoOpIssueEnricher, Priority: 100},
+	"ng":  {Fn: NoOpIssueEnricher, Priority: 100},
+	// opensearch and trail use NoOpIssueEnricher because their fetchers already
 	// perform the per-resource Describe* calls (DescribeDomains and
 	// GetTrailStatus respectively) and populate Wave 2 classification fields
 	// at fetch time. The Color funcs read those fields. This is a pragmatic
 	// in-fetcher Wave 2; the registry entry exists for contract conformance
 	// (TestAttentionSignalsDoc enforces every documented Wave 2 row has a
 	// registry entry).
-	"opensearch": {Fn: NoOpEnricher, Priority: 100},
-	"rds-snap":   {Fn: NoOpEnricher, Priority: 100},
-	"redshift":   {Fn: NoOpEnricher, Priority: 100},
+	"opensearch": {Fn: NoOpIssueEnricher, Priority: 100},
+	"rds-snap":   {Fn: NoOpIssueEnricher, Priority: 100},
+	"redshift":   {Fn: NoOpIssueEnricher, Priority: 100},
 	"redis":      {Fn: EnrichRedisReplicationGroup, Priority: 100},
-	"rtb":        {Fn: NoOpEnricher, Priority: 100},
-	"secrets":    {Fn: NoOpEnricher, Priority: 100},
-	// sg uses NoOpEnricher because sg.go's fetcher already computes
+	"rtb":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"secrets":    {Fn: NoOpIssueEnricher, Priority: 100},
+	// sg uses NoOpIssueEnricher because sg.go's fetcher already computes
 	// dangerous_open_count and wide_open at fetch time. The Color func reads
 	// those fields. Pragmatic in-fetcher Wave 2; the registry entry exists for
 	// contract conformance.
-	"sg":         {Fn: NoOpEnricher, Priority: 100},
-	"sns-sub":    {Fn: NoOpEnricher, Priority: 100},
-	"ssm":        {Fn: NoOpEnricher, Priority: 100},
-	"subnet":     {Fn: NoOpEnricher, Priority: 100},
-	"trail":      {Fn: NoOpEnricher, Priority: 100},
-	"vpce":       {Fn: NoOpEnricher, Priority: 100},
+	"sg":         {Fn: NoOpIssueEnricher, Priority: 100},
+	"sns-sub":    {Fn: NoOpIssueEnricher, Priority: 100},
+	"ssm":        {Fn: NoOpIssueEnricher, Priority: 100},
+	"subnet":     {Fn: NoOpIssueEnricher, Priority: 100},
+	"trail":      {Fn: NoOpIssueEnricher, Priority: 100},
+	"vpce":       {Fn: NoOpIssueEnricher, Priority: 100},
 }
 
-// NoOpEnricher is registered for resource types whose Wave 2 column in
+// NoOpIssueEnricher is registered for resource types whose Wave 2 column in
 // docs/attention-signals.md is "None". It makes the "no Wave 2 signal"
 // classification explicit in the registry rather than implicit-by-absence.
 // Returns zero findings, zero issues, not truncated — never fails.
-func NoOpEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
-	return EnricherResult{
+func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (IssueEnricherResult, error) {
+	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},
 		IssueCount:   0,
@@ -283,11 +286,11 @@ func formatDate(t interface{ Format(string) string }) string {
 // Severity is "~" (informational); IssueCount is always 0 (excluded from menu badge).
 // The API returns maintenance actions for all RDS/DocDB resources (clusters AND instances).
 // Pagination uses Marker; walks up to EnrichmentCap pages.
-func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.RDS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	type maintenanceAction = rds.DescribePendingMaintenanceActionsOutput
 	var allPages []*maintenanceAction
@@ -304,7 +307,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allPages = append(allPages, out)
 		if out.Marker == nil {
@@ -394,17 +397,17 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (account-wide, paginated) and returns
 // a Finding for every volume with non-ok status.
 // Severity is "!" (broken/degraded). Walks up to EnrichmentCap pages via NextToken.
-func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -427,7 +430,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allVolumeStatuses = append(allVolumeStatuses, out.VolumeStatuses...)
 		if out.NextToken == nil {
@@ -478,18 +481,18 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
 // and returns a Finding for every project whose latest build is not SUCCEEDED.
 // Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".
-func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.CodeBuild == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	names := make([]string, 0, len(resources))
 	for _, r := range resources {
@@ -498,7 +501,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(names) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
@@ -523,13 +526,13 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(buildIDs) == 0 {
-		return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+		return IssueEnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 		Ids: buildIDs,
 	})
 	if err != nil {
-		return EnricherResult{TruncatedIDs: truncatedIDs}, err
+		return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
@@ -583,18 +586,18 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 		fieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
 // Returns a Finding for each TG with at least one unhealthy target.
 // Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".
-func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.ELBv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -647,18 +650,18 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
 // Returns a Finding for each pipeline with a failed stage.
 // Severity is "!" (broken/degraded). Summary: "stage <Name> failed".
-func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.CodePipeline == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -719,18 +722,18 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		}
 		fieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
 // Returns a Finding for each state machine whose latest execution is FAILED, TIMED_OUT, or ABORTED.
 // Severity is "!" (broken/degraded). Summary: "latest execution <STATUS>".
-func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.SFN == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -781,7 +784,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
@@ -789,12 +792,12 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
 // IssueCount counts only "!" findings. First failure per plan wins.
 // Pagination uses NextToken; walks up to EnrichmentCap pages.
-func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.Backup == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	var allJobs []backuptypes.BackupJob
 	var nextToken *string
@@ -810,7 +813,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allJobs = append(allJobs, out.BackupJobs...)
 		if out.NextToken == nil {
@@ -881,21 +884,21 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSESAccount calls GetAccount once (account-wide) and returns a Finding
 // keyed "account" when the account is shut down, on probation, or sending is disabled.
 // Severity "!" for SHUTDOWN, "~" for PROBATION or sending disabled.
-func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (EnricherResult, error) {
+func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.SESv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
 	if err != nil {
-		return EnricherResult{TruncatedIDs: truncatedIDs}, err
+		return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 	}
 	if out.EnforcementStatus != nil {
 		switch *out.EnforcementStatus {
@@ -933,7 +936,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: false, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: false, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
@@ -941,11 +944,11 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, _ []resource
 // Scheduled events with NotBeforeDeadline within the next 7 days also produce a Finding.
 // Severity "!" for status != ok; "~" for scheduled events. IssueCount counts "!" findings only.
 // Pagination uses NextToken; walks up to EnrichmentCap pages.
-func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -969,7 +972,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		})
 		pages++
 		if err != nil {
-			return EnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
 		}
 		allInstanceStatuses = append(allInstanceStatuses, out.InstanceStatuses...)
 		if out.NextToken == nil {
@@ -1060,17 +1063,17 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
 // (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
 // Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".
-func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.AutoScaling == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1123,18 +1126,18 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
 // Returns a Finding for each job whose latest run is FAILED, ERROR, or TIMEOUT.
 // Severity is "!" (broken/degraded). Summary: "latest run <STATUS>".
-func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.Glue == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1181,18 +1184,18 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); IssueCount counts PITR-disabled findings.
-func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.DynamoDB == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1237,7 +1240,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichRedisReplicationGroup calls DescribeReplicationGroups (account-wide, paginated)
@@ -1252,12 +1255,12 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 // No Findings are produced (Wave-1 Color func reads the fields directly).
 // Severity stays "~" via the Color func when applicable.
 // Pagination uses Marker; walks up to EnrichmentCap pages.
-func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.ElastiCache == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// Build set of resource IDs (CacheClusterIds) we know about so we don't
 	// emit FieldUpdates for clusters not in the current list.
@@ -1280,7 +1283,7 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 		if err != nil {
 			// ElastiCache errors on this call are non-fatal — return an empty result
 			// rather than propagating (enricher is best-effort for field updates).
-			return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 		}
 		for _, rg := range out.ReplicationGroups {
 			af := strings.ToLower(string(rg.AutomaticFailover))
@@ -1300,7 +1303,7 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 		}
 		marker = out.Marker
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
@@ -1308,12 +1311,12 @@ func EnrichRedisReplicationGroup(ctx context.Context, clients *ServiceClients, r
 // Severity is "~" (informational per CIS KMS.1); IssueCount counts rotation-disabled findings.
 // AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
 // silently skipped without marking Truncated. Other per-key errors set Truncated=true.
-func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.KMS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1352,18 +1355,18 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
 // pagination up to PerParentPageCap pages) and returns a Finding for any file system with a
 // mount target whose LifeCycleState is not "available". Severity is "!" (broken/degraded).
 // Summary: "mount target unavailable: <mountTargetID> in <az>".
-func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.EFS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1429,7 +1432,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			break // first finding per FS is sufficient
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
@@ -1437,12 +1440,12 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 // attachments in a failed or transitional state.
 // Severity "!" for failed/failing; severity "~" for modifying/pendingAcceptance/rollingBack.
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
-func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1537,19 +1540,19 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			findings[tgwID] = *worst
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (cap EnrichmentCap)
 // and returns a Finding when no active flow logs exist for the VPC.
 // Severity is "~" (informational per CIS EC2.6).
 // Summary: "no active VPC flow logs (CIS EC2.6)".
-func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.EC2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1614,7 +1617,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			"flow_logs": flowLogsVal,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
@@ -1624,12 +1627,12 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 // Summaries:
 //   - "no public access block (account-level may apply)" — NoSuchPublicAccessBlockConfiguration
 //   - "public-access block partial: <flag>=false" — one or more flags false
-func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.S3 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -1699,7 +1702,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			fieldUpdates[name] = map[string]string{"public_access": "RISK"}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichECSServices is a Wave 2 enricher for ECS services.
@@ -1709,11 +1712,11 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 //   - deployment circuit-breaker triggered → "!" finding
 //   - runningCount < desiredCount with no IN_PROGRESS deployment → "!" finding
 //   - Recent events (last 10m) containing "unable to place" or "ELB health checks failed" → "!" finding
-func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
@@ -1842,7 +1845,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichECSClusters is a Wave 2 enricher for ECS clusters.
@@ -1853,12 +1856,12 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 //
 // Note: IssueCount is 0 for this enricher because all findings are severity "~"
 // (informational) and do not contribute to the attention menu badge per the
-// EnricherResult contract.
-func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+// IssueEnricherResult contract.
+func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	clusterNames := make([]string, 0, len(resources))
@@ -1940,7 +1943,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 
 	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
 	// do not contribute to the attention menu badge.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.
@@ -1951,11 +1954,11 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 //   - StopCode == TaskFailedToStart → task never launched
 //   - StopCode == EssentialContainerExited → essential container died
 //   - Any container with a non-zero ExitCode → container crash detected
-func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	// Group task ARNs by cluster ARN.
@@ -2057,7 +2060,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
@@ -2065,12 +2068,12 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 //   - Rule state == ENABLED AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)
 //   - Rule state == DISABLED AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
-func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.EventBridge == nil || len(resources) == 0 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -2195,7 +2198,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 	}
 
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
@@ -2203,11 +2206,11 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 // "~" finding for each environment with a non-empty Causes slice.
 // Summary: "EB causes: <first cause>". IssueCount is always 0 — causes are
 // informational signals, not broken-state indicators.
-func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ElasticBeanstalk == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2253,7 +2256,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
@@ -2261,11 +2264,11 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 // each LB missing deletion protection or access logging.
 // The worst finding per LB is promoted to "!" if both attributes are missing;
 // otherwise "~" is used. IssueCount counts findings with Severity "!".
-func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ELBv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2320,18 +2323,18 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
 // to surface missing DLQ and missing KMS encryption as Wave 2 findings.
 // Per-queue errors are treated as truncated (skip silently).
-func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.SQS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2387,18 +2390,18 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
 // Per-topic errors are treated as truncated (skip silently).
-func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.SNS == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2467,7 +2470,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}
 		}
 	}
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
@@ -2477,11 +2480,11 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 //
 // Serverless clusters (Provisioned==nil) are skipped.
 // Skip if clients.MSK == nil. Per-cluster errors → Truncated.
-func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.MSK == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2531,7 +2534,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // isMSKVersionOutdated returns true when the given Kafka version string is below the
@@ -2576,11 +2579,11 @@ func parseVersionPart(s string) (int, error) {
 //
 // IssueCount counts only "!" severity findings — "~" (informational) are excluded from the badge.
 // Skip if clients.ACM == nil. Per-cert errors → Truncated.
-func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ACM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	now := time.Now()
@@ -2634,7 +2637,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 			// "~" is informational — not counted in IssueCount.
 		}
 	}
-	return EnricherResult{IssueCount: bangCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: bangCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)
@@ -2645,11 +2648,11 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 //   - Any Origin with CustomOriginConfig.OriginProtocolPolicy == "http-only" → "origin without TLS"
 //
 // Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
-func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudFront == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2722,7 +2725,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	}
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
@@ -2735,12 +2738,12 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 //
 // Findings are aggregated per API (one finding per API, covering all stages).
 // Skip if clients.APIGatewayV2 == nil. Per-API errors → truncated.
-func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.APIGatewayV2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2847,7 +2850,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	}
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
@@ -2855,11 +2858,11 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 // resource with ResourceStatus ending in "_FAILED". A failed resource event produces
 // a "!" finding: "recent resource failure: <ResourceType>/<LogicalResourceId>".
 // This surfaces hidden failures that are not reflected in the top-level StackStatus.
-func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudFormation == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -2927,7 +2930,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			Rows:     failedRows,
 		}
 	}
-	return EnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
@@ -2935,14 +2938,14 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 // adds "~" findings for stacks that have drifted from their template.
 // On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
 // IssueCount = CFNStackEvents.IssueCount (drift adds 0). Truncated = either truncated.
-func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	eventsResult, err := EnrichCFNStackEvents(ctx, clients, resources)
 	if err != nil {
-		return EnricherResult{}, err
+		return IssueEnricherResult{}, err
 	}
 	driftResult, err := EnrichCFNDrift(ctx, clients, resources)
 	if err != nil {
-		return EnricherResult{}, err
+		return IssueEnricherResult{}, err
 	}
 	merged := make(map[string]resource.EnrichmentFinding, len(eventsResult.Findings)+len(driftResult.Findings))
 	// Drift findings go in first; stack-events findings overwrite on conflict.
@@ -2965,7 +2968,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 	mergedTruncatedIDs := make(map[string]bool, len(eventsResult.TruncatedIDs)+len(driftResult.TruncatedIDs))
 	maps.Copy(mergedTruncatedIDs, eventsResult.TruncatedIDs)
 	maps.Copy(mergedTruncatedIDs, driftResult.TruncatedIDs)
-	return EnricherResult{
+	return IssueEnricherResult{
 		IssueCount:   eventsResult.IssueCount,
 		Truncated:    eventsResult.Truncated || driftResult.Truncated,
 		TruncatedIDs: mergedTruncatedIDs,
@@ -2978,12 +2981,12 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // read DriftInformation.StackDriftStatus. A status of DRIFTED produces a "~" finding
 // "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
 // Severity "~" findings do not contribute to IssueCount.
-func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudFormation == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3029,8 +3032,8 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 	}
-	// "~" findings do not contribute to IssueCount per the EnricherResult contract.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	// "~" findings do not contribute to IssueCount per the IssueEnricherResult contract.
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // ECRImagesCapPerRepo is the maximum number of images scanned per repository
@@ -3051,17 +3054,17 @@ const ECRImagesCapPerRepo = 10
 // Per-image ScanNotFoundException is routine and not treated as an error.
 // Skip when clients is nil or clients.ECR does not implement ECRListImagesAPI
 // or ECRDescribeImageScanFindingsAPI.
-func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients == nil || clients.ECR == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	listAPI, okL := clients.ECR.(ECRListImagesAPI)
 	scanAPI, okS := clients.ECR.(ECRDescribeImageScanFindingsAPI)
 	if !okL || !okS {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -3177,7 +3180,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
@@ -3189,12 +3192,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 //
 // Per-repo errors other than ResourceNotFoundException mark Truncated=true and are skipped.
 // Skip when clients.CodeArtifact == nil.
-func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.CodeArtifact == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
@@ -3291,7 +3294,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			issueCount++
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
@@ -3305,11 +3308,11 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 //
 // Per-WG errors mark Truncated=true and are skipped.
 // Skip when clients.Athena == nil.
-func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.Athena == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3370,7 +3373,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 		// "~" severity does not contribute to IssueCount.
 	}
-	return EnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
@@ -3381,11 +3384,11 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 //     "private zone with no VPC associations (orphan)"
 //
 // Skip if clients.Route53 == nil. Per-zone errors → Truncated.
-func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.Route53 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3427,7 +3430,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 	// All Route53 findings are severity "~" (informational).
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
@@ -3439,12 +3442,12 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 //
 // Also writes FieldUpdates["rules_summary"] = "<N> rules BLOCK" or "0 rules ALLOW".
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) → Truncated.
-func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.WAFv2 == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3540,7 +3543,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		}
 	}
 	// All WAF logging findings are severity "~" (informational).
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -3550,15 +3553,15 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 //
 // AWS service-linked roles (Path starts with "/aws-service-role/") are skipped.
 // Skip when clients.IAM == nil.
-func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getRoleAPI, ok := clients.IAM.(IAMGetRoleAPI)
 	if !ok {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -3601,7 +3604,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
 }
 
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
@@ -3612,16 +3615,16 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 //
 // AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
 // Skip when clients.IAM == nil.
-func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getPolicyAPI, ok1 := clients.IAM.(IAMGetPolicyAPI)
 	getPolicyVersionAPI, ok2 := clients.IAM.(IAMGetPolicyVersionAPI)
 	if !ok1 || !ok2 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
@@ -3673,7 +3676,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			"risk": riskVal,
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy
@@ -3761,18 +3764,18 @@ func isAdminStarPolicyString(doc string) bool {
 //   - Any active access key with CreateDate >90d → "~" finding "access key >90d (rotation)"
 //
 // Skip when clients.IAM == nil.
-func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	loginProfileAPI, ok1 := clients.IAM.(IAMGetLoginProfileAPI)
 	mfaAPI, ok2 := clients.IAM.(IAMListMFADevicesAPI)
 	accessKeyAPI, ok3 := clients.IAM.(IAMListAccessKeysAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -3892,7 +3895,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			Rows:     rows,
 		}
 	}
-	return EnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -3903,18 +3906,18 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 //   - ListAttachedGroupPolicies empty AND ListGroupPolicies empty → "~" finding "group has no policies (no-op group)"
 //
 // Skip when clients.IAM == nil.
-func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.IAM == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	getGroupAPI, ok1 := clients.IAM.(IAMGetGroupAPI)
 	attachedPoliciesAPI, ok2 := clients.IAM.(IAMListAttachedGroupPoliciesAPI)
 	inlinePoliciesAPI, ok3 := clients.IAM.(IAMListGroupPoliciesAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -4077,7 +4080,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 	// Group findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
@@ -4090,16 +4093,16 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 //   - CloudTrail log group with no metric filters → "~" finding "audit log group missing metric filters"
 //
 // Skip when clients.CloudWatchLogs == nil.
-func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudWatchLogs == nil {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	metricFiltersAPI, ok := clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI)
 	if !ok {
-		return EnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
 	// always succeeds for valid clients. However, test fakes that embed the interface
@@ -4174,7 +4177,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		}
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	return EnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }
 
 // safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic

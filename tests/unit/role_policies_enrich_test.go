@@ -253,11 +253,11 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 	}
 }
 
-func TestEnricherRegistry_RolePolicies_EnricherIsNonNil(t *testing.T) {
-	// Verify the registered enricher is the real one (not a stub).
-	e := resource.GetEnricher("role_policies")
+func TestDetailEnricherRegistry_RolePolicies_EnricherIsNonNil(t *testing.T) {
+	// Verify the registered detail enricher is the real one (not a stub).
+	e := resource.GetDetailEnricher("role_policies")
 	if e == nil {
-		t.Fatal("role_policies enricher must not be nil")
+		t.Fatal("role_policies detail enricher must not be nil")
 	}
 }
 

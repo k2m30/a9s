@@ -3,7 +3,7 @@ package unit
 // qa_enrichment_dispatch_test.go — Tests for enrichment dispatch and handler behavior.
 //
 // Tests verify:
-//   1. EnricherRegistry completeness — all 8 resource short names are registered with non-nil functions.
+//   1. IssueEnricherRegistry completeness — all 8 resource short names are registered with non-nil functions.
 //   2. Session-wide gen guard — EnrichmentCheckedMsg with stale Gen is silently dropped (no panic, no cmd).
 //   3. Per-type gen guard — EnrichmentCheckedMsg with stale TypeGen is silently dropped.
 //   4. Valid EnrichmentCheckedMsg with Err != nil does not crash.
@@ -40,22 +40,22 @@ var originalIssue196Enrichers = []string{
 	"glue",
 }
 
-// TestEnricherRegistry_OriginalSetStillRegistered pins the original 8
+// TestIssueEnricherRegistry_OriginalSetStillRegistered pins the original 8
 // enrichers from issue #196.
-func TestEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
+func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 	for _, shortName := range originalIssue196Enrichers {
-		fn, ok := awsclient.EnricherRegistry[shortName]
+		fn, ok := awsclient.IssueEnricherRegistry[shortName]
 		if !ok {
-			t.Errorf("EnricherRegistry missing entry for %q", shortName)
+			t.Errorf("IssueEnricherRegistry missing entry for %q", shortName)
 			continue
 		}
 		if fn.Fn == nil {
-			t.Errorf("EnricherRegistry[%q].Fn is nil — must be a non-nil EnricherFunc", shortName)
+			t.Errorf("IssueEnricherRegistry[%q].Fn is nil — must be a non-nil IssueEnricherFunc", shortName)
 		}
 	}
 }
 
-// TestEnricherRegistry_NoEntriesForUnregisteredTypes verifies the registry
+// TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes verifies the registry
 // only contains entries for shortNames that are registered as ResourceTypeDefs.
 // Replaces the prior allowlist-based test — that was authoritative when only
 // 8 enrichers existed; now the doc-grounded contract (TestAttentionSignalsDoc)
@@ -63,10 +63,10 @@ func TestEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 //
 // TODO(no-middle-state): this test proves only registry shape. Keep behavioral
 // tests for any feature that is claimed as implemented.
-func TestEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
-	for key := range awsclient.EnricherRegistry {
+func TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
+	for key := range awsclient.IssueEnricherRegistry {
 		if resource.FindResourceType(key) == nil {
-			t.Errorf("EnricherRegistry[%q] has no matching ResourceTypeDef", key)
+			t.Errorf("IssueEnricherRegistry[%q] has no matching ResourceTypeDef", key)
 		}
 	}
 }

@@ -18,7 +18,7 @@ type PolicyEnriched struct {
 }
 
 func init() {
-	resource.RegisterEnricher("policy", enrichPolicy)
+	resource.RegisterDetailEnricher("policy", enrichPolicy)
 }
 
 // enrichPolicy fetches the policy document for a top-level IAM policy.

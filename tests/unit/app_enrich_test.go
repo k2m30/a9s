@@ -200,9 +200,9 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
 	m := newEnrichApp()
 
-	// Verify role_policies has an enricher registered
-	if !resource.HasEnricher("role_policies") {
-		t.Fatal("expected role_policies enricher to be registered")
+	// Verify role_policies has a detail enricher registered
+	if !resource.HasDetailEnricher("role_policies") {
+		t.Fatal("expected role_policies detail enricher to be registered")
 	}
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/test", "test", "Managed")

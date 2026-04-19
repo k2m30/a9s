@@ -135,14 +135,14 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	}
 	content := string(data)
 
-	const needle = "RegisterEnricherFieldKeys("
+	const needle = "RegisterIssueEnricherFieldKeys("
 	count := strings.Count(content, needle)
 
 	const minExpected = 10
 	if count < minExpected {
 		t.Errorf(
 			"found only %d call(s) to %s in internal/aws/enrichment.go, expected at least %d — "+
-				"the coder must register enricher field keys for each enriched type via an init() block",
+				"the coder must register Wave 2 issue-enricher field keys for each enriched type via an init() block",
 			count, needle, minExpected,
 		)
 	}

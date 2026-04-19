@@ -1,10 +1,10 @@
 package unit
 
-// qa_review_fix_enricher_truncated_test.go — Tests for EnricherFunc signature
+// qa_review_fix_enricher_truncated_test.go — Tests for IssueEnricherFunc signature
 // and EnrichmentCap constant behavior.
 //
-// Updated for the EnricherResult return type:
-//   EnricherFunc = func(ctx, clients, resources) (EnricherResult, error)
+// Updated for the IssueEnricherResult return type:
+//   IssueEnricherFunc = func(ctx, clients, resources) (IssueEnricherResult, error)
 
 import (
 	"context"
@@ -14,15 +14,15 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestEnricherFuncSignatureReturnsResult verifies that EnricherFunc accepts
-// functions with the new signature (ctx, clients, resources) → (EnricherResult, error).
-func TestEnricherFuncSignatureReturnsResult(t *testing.T) {
-	fn := awsclient.EnricherFunc(func(
+// TestIssueEnricherFuncSignatureReturnsResult verifies that IssueEnricherFunc accepts
+// functions with the new signature (ctx, clients, resources) → (IssueEnricherResult, error).
+func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
+	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
-	) (awsclient.EnricherResult, error) {
-		return awsclient.EnricherResult{
+	) (awsclient.IssueEnricherResult, error) {
+		return awsclient.IssueEnricherResult{
 			IssueCount: 3,
 			Truncated:  true,
 			Findings:   make(map[string]resource.EnrichmentFinding),
@@ -44,15 +44,15 @@ func TestEnricherFuncSignatureReturnsResult(t *testing.T) {
 	}
 }
 
-// TestEnricherFuncSignatureReturnsFalseWhenNotTruncated verifies that an enricher
+// TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated verifies that an enricher
 // can return Truncated=false when results are not capped.
-func TestEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
-	fn := awsclient.EnricherFunc(func(
+func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
+	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
-	) (awsclient.EnricherResult, error) {
-		return awsclient.EnricherResult{
+	) (awsclient.IssueEnricherResult, error) {
+		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  false,
 			Findings:   make(map[string]resource.EnrichmentFinding),
@@ -83,12 +83,12 @@ func TestEnrichmentCapValue(t *testing.T) {
 // This test uses a synthetic enricher that mirrors the pattern used by the
 // real per-resource enrichers in enrichment.go.
 func TestEnrichmentCapTruncation(t *testing.T) {
-	fn := awsclient.EnricherFunc(func(
+	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		resources []resource.Resource,
-	) (awsclient.EnricherResult, error) {
-		return awsclient.EnricherResult{
+	) (awsclient.IssueEnricherResult, error) {
+		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  len(resources) > awsclient.EnrichmentCap,
 			Findings:   make(map[string]resource.EnrichmentFinding),

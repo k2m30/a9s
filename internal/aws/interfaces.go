@@ -1433,7 +1433,7 @@ type S3GetPublicAccessBlockAPI interface {
 	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 }
 
-// EnricherResult is the typed return value of a Wave 2 enricher.
+// IssueEnricherResult is the typed return value of a Wave 2 issue enricher.
 //
 //   - IssueCount: number of resources classified issue-worthy for the menu badge
 //     (severity "!" findings; "~" informational do NOT count).
@@ -1459,7 +1459,7 @@ type S3GetPublicAccessBlockAPI interface {
 //
 // MAY have empty maps but MUST NOT be nil for any reference field on
 // success — initialize each with `make(...)` before returning.
-type EnricherResult struct {
+type IssueEnricherResult struct {
 	IssueCount   int
 	Truncated    bool
 	TruncatedIDs map[string]bool
@@ -1473,10 +1473,13 @@ type EnricherResult struct {
 	FieldUpdates map[string]map[string]string
 }
 
-// EnricherFunc is a pluggable function that makes additional API calls for a
-// resource type and returns a typed EnricherResult. The resources slice contains
-// retained first-page resources from Wave 1 probes.
-type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
+// IssueEnricherFunc is a pluggable function that makes additional API calls
+// for a resource type and returns a typed IssueEnricherResult. The resources
+// slice contains retained first-page resources from Wave 1 probes. This is the
+// Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
+// (internal/resource/enricher.go) which enriches a single resource for detail
+// views.
+type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error)
 
 // --- messaging-dev partition appended interfaces ---
 
