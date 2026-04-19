@@ -27,6 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // ---------------------------------------------------------------------------
@@ -53,7 +54,12 @@ func chainStrip(s string) string {
 // newChainDemoModel creates a demo-mode tui.Model sized at 120×30.
 func newChainDemoModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = chainApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }

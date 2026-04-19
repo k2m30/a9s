@@ -19,6 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -47,7 +48,12 @@ func navViewContent(m tui.Model) string {
 
 func newNavDemoModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = navApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }

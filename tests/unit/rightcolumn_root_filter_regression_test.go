@@ -10,6 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
@@ -22,7 +23,12 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 	})
 	t.Cleanup(func() { resource.RegisterRelated("ec2", oldDefs) })
 
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	res := resource.Resource{

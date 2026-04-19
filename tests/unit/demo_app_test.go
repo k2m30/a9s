@@ -24,7 +24,12 @@ func demoClientsReadyMsg() messages.ClientsReadyMsg {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatal("Init() returned nil cmd; expected a cmd that produces ClientsReadyMsg")
@@ -47,7 +52,12 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_FetchResources_EC2(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
@@ -82,7 +92,12 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_FetchResources_Unknown(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
@@ -125,7 +140,12 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -153,7 +173,12 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_BlockedCommand_Region(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -181,7 +206,12 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_RevealWorks(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -238,7 +268,12 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_SSMRevealWorks(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -292,7 +327,12 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
-	model := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	model := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())

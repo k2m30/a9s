@@ -11,6 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // helper: create a model with a size set so View() actually renders
@@ -742,7 +743,12 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	defer resource.UnregisterPaginatedChild(testChildType)
 
 	// Create model in demo mode so we don't need real AWS clients
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send EnterChildViewMsg with nil ParentContext — must not panic

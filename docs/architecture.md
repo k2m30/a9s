@@ -626,7 +626,7 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 - `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
-**API note**: `tui.WithDemo(true)` is a compatibility shim retained for tests written before the 014-demo-transport-mock refactor. It is NOT equivalent to `WithClients(demo.NewServiceClients()) + WithIsDemo(true)` alone — it additionally hardcodes `profile = demo.DemoProfile` and `region = demo.DemoRegion`. It does NOT set `noCache`; disk persistence remains enabled unless you also pass `WithNoCache(true)`. New code should use explicit options rather than `WithDemo`. The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality. Removal of `WithDemo` is tracked in tasks T045–T049.
+The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality.
 
 Demo mode is the primary way to develop and test the TUI without AWS access.
 
@@ -660,9 +660,10 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 - `WithClients(c)` — pre-supply AWS clients (used by demo mode and tests)
 - `WithNoCache(true)` — disable disk cache persistence (availability probes still run via `demoPrefetchCounts()`)
 - `WithIsDemo(true)` — mark session as demo mode (skips Wave 2 enrichment; set by `--demo` CLI bootstrap)
+- `WithProfile(p)` — override the profile string (used in tests to set a specific profile without live AWS)
+- `WithRegion(r)` — override the region string (used in tests to set a specific region without live AWS)
 - `WithCommand("ec2")` — open directly to a resource type on startup
 - `WithActiveTheme(name)` — set the initial active theme filename for the theme selector (used by `--theme` CLI flag)
-- `WithDemo(true)` — compatibility shim for pre-014 tests: sets `preSuppliedClients = demo.NewServiceClients()`, `isDemo = true`, and hardcodes `profile = demo.DemoProfile` / `region = demo.DemoRegion`. Does NOT set `noCache`. See Demo Mode above and Known Compromises below.
 
 ---
 
@@ -736,7 +737,12 @@ Test the full message-driven flow. Construct a real `tui.Model`, drive it with m
 
 ```go
 // Pattern: create app → send messages → assert on View() output
-app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+app := tui.New("demo", "us-east-1",
+    tui.WithClients(demo.NewServiceClients()),
+    tui.WithIsDemo(true),
+    tui.WithNoCache(true),
+    tui.WithProfile(demo.DemoProfile),
+    tui.WithRegion(demo.DemoRegion))
 m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 m, _ = rootApplyMsg(m, messages.NavigateMsg{...})
 content := stripANSI(rootViewContent(m))
@@ -781,7 +787,7 @@ Two mock layers serve different purposes:
 ### Writing New Tests
 
 1. **Test behavior, not implementation** — assert on what the user sees or what the function returns
-2. **Use demo fakes for TUI tests** — `tui.New("demo", "us-east-1", tui.WithDemo(true))`
+2. **Use demo fakes for TUI tests** — `tui.New("demo", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithIsDemo(true), tui.WithNoCache(true), tui.WithProfile(demo.DemoProfile), tui.WithRegion(demo.DemoRegion))`
 3. **Use narrow interface mocks for fetcher tests** — one mock per AWS API method
 4. **Always `stripANSI` before string assertions** — rendered output contains escape codes
 5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterEnricher(...) })` for temporary registrations
@@ -799,7 +805,6 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 ## Known Compromises
 
-- `WithDemo(true)` still exists as a compatibility shim for older tests. It is NOT a simple composition — it hardcodes `profile`/`region` to demo values and sets `isDemo = true` but does NOT set `noCache`. New code should prefer explicit client injection (`WithClients(demo.NewServiceClients())`) plus `WithIsDemo(true)` (and `WithNoCache(true)` when disk persistence must also be off). Removal of `WithDemo(true)` is tracked in tasks T045–T049 (see the `//nolint:gocritic` banner above the function).
 - The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
 - When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.

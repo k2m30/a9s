@@ -10,13 +10,19 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // TestEC2Detail_Render_MatchesApprovedDesignContract validates the current EC2
 // detail rendering against the approved design contract in
 // docs/design/related-resources-preview/ (mock #1: EC2 left-focused).
 func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
 	m = m2.(tui.Model)
 

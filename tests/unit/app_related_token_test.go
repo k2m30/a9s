@@ -26,6 +26,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch verifies that
@@ -37,7 +38,12 @@ import (
 // real AWS clients we can only verify cmd != nil; the Append check is best
 // verified in integration tests.
 func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Navigate to EC2 list.
@@ -94,7 +100,12 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 // TestHandleRelatedNavigate_CompleteCache_NoFetch verifies that when all
 // requested IDs are in a non-truncated cache, no fetch is dispatched.
 func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{

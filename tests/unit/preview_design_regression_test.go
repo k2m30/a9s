@@ -12,6 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 func previewApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
@@ -25,7 +26,12 @@ func previewView(m tui.Model) string {
 
 func newPreviewDemoModel(t *testing.T, w, h int) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = previewApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	return m
 }

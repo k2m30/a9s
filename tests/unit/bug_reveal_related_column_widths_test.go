@@ -9,6 +9,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths verifies the RELATED
@@ -21,7 +22,12 @@ func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 	ec2 := mustDemoEC2(t)
 	for _, w := range []int{60, 76, 95, 120, 160} {
 		t.Run(fmt.Sprintf("width=%d", w), func(t *testing.T) {
-			m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+			m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: 36})
 			m, _ = rootApplyMsg(m, messages.NavigateMsg{
 				Target:       messages.TargetDetail,

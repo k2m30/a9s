@@ -13,6 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // rolePolicyRes builds a minimal role_policies resource for enrich tests.
@@ -48,7 +49,12 @@ func withDocument(res resource.Resource, doc map[string]any) resource.Resource {
 }
 
 func newEnrichApp() tui.Model {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -277,7 +283,12 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 }
 
 func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/rt-test", "rt-test", "Managed")
@@ -302,7 +313,12 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 }
 
 func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/err-test", "err-test", "Managed")
@@ -337,7 +353,12 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 }
 
 func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-test", "gen-test", "Managed")
@@ -363,7 +384,12 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 }
 
 func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-direct", "yaml-direct", "Managed")
@@ -398,7 +424,12 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 }
 
 func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-direct", "json-direct", "Managed")
@@ -433,7 +464,12 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 }
 
 func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-guard", "yaml-guard", "Managed")
@@ -522,7 +558,12 @@ func TestPolicyDocCache_ZeroValueSafe(t *testing.T) {
 }
 
 func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
-	app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	app := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/refresh-test", "refresh-test", "Managed")

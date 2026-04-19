@@ -16,6 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // Scenario-driven golden snapshots for Issue #119.
@@ -348,7 +349,12 @@ func issue119ModelToEC2Detail(t *testing.T, w, h int) tui.Model {
 
 func issue119RootModel(w, h int, demoMode bool) tui.Model {
 	if demoMode {
-		m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+		m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 		return issue119ApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	}
 	m := tui.New("testprofile", "us-east-1")

@@ -25,6 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // setupEC2ListWithCache navigates to the EC2 list, loads all EC2 resources, and
@@ -32,7 +33,12 @@ import (
 func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{

@@ -14,6 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // Scenario-driven golden snapshots for Issue #140.
@@ -276,7 +277,12 @@ func scenarioEC2034CloudTrailLast(t *testing.T) string {
 
 func issue140DemoModel(t *testing.T, w, h int) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	return m2.(tui.Model)
 }

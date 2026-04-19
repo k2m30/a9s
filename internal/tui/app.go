@@ -13,7 +13,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -228,21 +227,16 @@ func (c *relatedCacheLRU) len() int {
 // Option configures the root Model.
 type Option func(*Model)
 
-// WithDemo is a compatibility shim for tests written before the 014-demo-transport-mock
-// refactor. New code should use WithClients(demo.NewServiceClients()) + WithNoCache(true).
-// Will be removed after test files are migrated in T045–T049.
-//
-//nolint:gocritic // intentional compat shim; removal tracked in T045–T049
-func WithDemo(enabled bool) Option {
-	return func(m *Model) {
-		if !enabled {
-			return
-		}
-		m.preSuppliedClients = demo.NewServiceClients()
-		m.profile = demo.DemoProfile
-		m.region = demo.DemoRegion
-		m.isDemo = true
-	}
+// WithProfile overrides the profile field on the model. Used in tests that need
+// a specific profile string without going through the live AWS bootstrap path.
+func WithProfile(profile string) Option {
+	return func(m *Model) { m.profile = profile }
+}
+
+// WithRegion overrides the region field on the model. Used in tests that need
+// a specific region string without going through the live AWS bootstrap path.
+func WithRegion(region string) Option {
+	return func(m *Model) { m.region = region }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.

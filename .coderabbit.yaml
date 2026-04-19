@@ -104,7 +104,7 @@ reviews:
         - Tests must verify behavior (what the user sees or what the function returns),
           not implementation details (internal state, private fields)
         - Two mock layers: narrow interface mocks for fetcher isolation tests,
-          demo fakes (tui.WithDemo(true)) for full TUI behavior tests
+          demo fakes (tui.WithClients + tui.WithIsDemo + tui.WithNoCache + tui.WithProfile + tui.WithRegion) for full TUI behavior tests
         - Use stripANSI() before string assertions on rendered output
         - Clean up registries with t.Cleanup() for temporary registrations
         - Enricher cache is session-scoped on ServiceClients — different instances

@@ -37,6 +37,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // ---------------------------------------------------------------------------
@@ -135,7 +136,12 @@ func ec2StoryViewContent(m tui.Model) string {
 // newEC2StoryDemoModel creates a tui.Model in demo mode sized for testing.
 func newEC2StoryDemoModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }
@@ -582,7 +588,12 @@ func TestEC2_043_AllCount0_SecondTabReturnsFocus(t *testing.T) {
 // TestEC2_044_TerminalTooNarrow verifies that the tui.Model shows "too narrow"
 // when width < 60.
 func TestEC2_044_TerminalTooNarrow(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 30})
 
 	plain := stripAnsi(ec2StoryViewContent(m))
@@ -594,7 +605,12 @@ func TestEC2_044_TerminalTooNarrow(t *testing.T) {
 
 // TestEC2_044_TerminalExactly59Narrow verifies that width=59 (< 60) also shows "too narrow".
 func TestEC2_044_TerminalExactly59Narrow(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 59, Height: 30})
 
 	plain := stripAnsi(ec2StoryViewContent(m))
@@ -606,7 +622,12 @@ func TestEC2_044_TerminalExactly59Narrow(t *testing.T) {
 
 // TestEC2_044_Terminal60IsNotTooNarrow verifies that width=60 does NOT show "too narrow".
 func TestEC2_044_Terminal60IsNotTooNarrow(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 60, Height: 30})
 
 	plain := stripAnsi(ec2StoryViewContent(m))
@@ -653,7 +674,12 @@ func TestEC2_045_MediumLayout_HasSeparator(t *testing.T) {
 // TestEC2_047_EscFromDetailReturnsToList verifies that pressing Esc in the
 // EC2 detail view returns to the EC2 resource list, not the main menu.
 func TestEC2_047_EscFromDetailReturnsToList(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	// Navigate to EC2 list.
@@ -853,7 +879,12 @@ func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 	})
 	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	ec2Res := resource.Resource{
@@ -898,7 +929,12 @@ func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 // TestEC2_055_HelpScreenShown verifies that pressing ? in the EC2 detail view
 // shows the help overlay.
 func TestEC2_055_HelpScreenShown(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	ec2Res := resource.Resource{
@@ -928,7 +964,12 @@ func TestEC2_055_HelpScreenShown(t *testing.T) {
 // TestEC2_055_HelpScreenClosesOnAnyKey verifies that pressing any key from
 // the help screen closes it and returns to the EC2 detail view.
 func TestEC2_055_HelpScreenClosesOnAnyKey(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	ec2Res := resource.Resource{
@@ -999,7 +1040,12 @@ func TestEC2_056_YAMLViewHidesRightCol(t *testing.T) {
 // TestEC2_056_YAMLViewFullWidth verifies that the YAML view (after pressing y)
 // does not contain the │ column separator (it renders at full width).
 func TestEC2_056_YAMLViewFullWidth(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	ec2Res := resource.Resource{
