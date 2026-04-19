@@ -279,3 +279,62 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildEnrichQueue_NewEnricherAutoParticipates proves the scheduling
+// contract for #277: a brand-new issue enricher added at runtime (as any real
+// new enricher would be added in production code via the IssueEnricherRegistry
+// init block) participates in the dispatch queue WITHOUT any change to
+// internal/tui/app_fetchers.go. Priority metadata on the registry entry is the
+// single source of scheduling truth.
+func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
+	tui.Version = "test"
+
+	const novelType = "arch277-novel-enricher"
+
+	// Register a novel enricher with a distinct priority to prove the registry
+	// entry alone is sufficient to participate in dispatch ordering.
+	awsclient.IssueEnricherRegistry[novelType] = awsclient.IssueEnricher{
+		Fn:       awsclient.NoOpIssueEnricher,
+		Priority: 10, // batchable tier
+	}
+	t.Cleanup(func() { delete(awsclient.IssueEnricherRegistry, novelType) })
+
+	m := newRootSizedModel()
+	_, enrichCmd := seedAllEnricherTypes(m)
+
+	if enrichCmd == nil {
+		t.Skip("no cmd returned — cannot verify novel-enricher participation")
+	}
+
+	found := collectEnrichmentMsgs(enrichCmd)
+
+	novelPos := -1
+	for i, msg := range found {
+		if msg.ResourceType == novelType {
+			novelPos = i
+			break
+		}
+	}
+	if novelPos == -1 {
+		t.Fatalf("novel enricher %q did not participate in dispatch queue; "+
+			"buildEnrichQueue must read IssueEnricherRegistry directly so new registrations "+
+			"require no TUI runtime changes. Dispatched: %v",
+			novelType, enrichmentTypesFromMsgs(found))
+	}
+
+	// Prove priority metadata is honored: no Priority=100 entry appears before
+	// this Priority=10 novel entry.
+	p10Set := make(map[string]bool, len(priority10Types))
+	for _, name := range priority10Types {
+		p10Set[name] = true
+	}
+	p10Set[novelType] = true
+
+	for i := 0; i < novelPos; i++ {
+		if !p10Set[found[i].ResourceType] {
+			t.Errorf("novel Priority=10 enricher %q was preceded by Priority=100 type %q at index %d; "+
+				"priority metadata on IssueEnricherRegistry entry is not authoritative",
+				novelType, found[i].ResourceType, i)
+		}
+	}
+}
