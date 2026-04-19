@@ -75,38 +75,47 @@ func TestDetailEnricherRegistry_UnregisterDetailEnricher(t *testing.T) {
 	}
 }
 
-func TestDetailEnricherRegistry_OverwriteExisting(t *testing.T) {
-	firstCalled := false
-	secondCalled := false
-
-	resource.RegisterDetailEnricher("overwrite-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-		firstCalled = true
+func TestDetailEnricherRegistry_PanicsOnDuplicate(t *testing.T) {
+	stub := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
-	})
+	}
+	stub2 := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
+		return res, nil
+	}
+
+	resource.RegisterDetailEnricher("overwrite-test", stub)
 	t.Cleanup(func() { resource.UnregisterDetailEnricher("overwrite-test") })
 
-	// Overwrite with a second detail enricher
-	resource.RegisterDetailEnricher("overwrite-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-		secondCalled = true
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on duplicate registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("overwrite-test", stub2)
+}
+
+func TestDetailEnricherRegistry_PanicsOnEmptyName(t *testing.T) {
+	stubFn := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
-	})
-
-	got := resource.GetDetailEnricher("overwrite-test")
-	if got == nil {
-		t.Fatal("expected detail enricher to be registered after overwrite")
 	}
 
-	res := resource.Resource{ID: "r1", Fields: map[string]string{}}
-	if _, err := got(context.Background(), nil, res); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on empty name registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("", stubFn)
+}
 
-	if firstCalled {
-		t.Error("first detail enricher should NOT have been called after overwrite")
-	}
-	if !secondCalled {
-		t.Error("second detail enricher should have been called after overwrite")
-	}
+func TestDetailEnricherRegistry_PanicsOnNilFn(t *testing.T) {
+	t.Cleanup(func() { resource.UnregisterDetailEnricher("nil-fn-test") })
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on nil function registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("nil-fn-test", nil)
 }
 
 func TestDetailEnricherRegistry_RolePolicies_IsRegistered(t *testing.T) {
