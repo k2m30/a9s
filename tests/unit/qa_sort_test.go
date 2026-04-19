@@ -353,9 +353,9 @@ func TestQA_Sort_IndicatorPersistsAcrossScroll(t *testing.T) {
 // visible-position key ("3" = third visible column in defaults layout:
 // Bucket Name, Region, Creation Date).
 //
-// This test replaces the TestQA_S3_A6_3_Sort_ByAge approach (which used the
-// now-deprecated SortAge sentinel). After the visible-position fix, sort is
-// triggered by digit key matching visible column position, not a named field.
+// Sort is triggered by a digit key matching visible column position, not a
+// named sort field. Named sort sentinels were removed (#283) — the only sort
+// model is column-position-based.
 //
 // The s3BucketTypeDef has only 2 columns, but the defaults for "s3" have 3
 // (Bucket Name, Region, Creation Date). The superset path in resolveColumns()

@@ -452,7 +452,7 @@ Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth
 - Pressing a sort key sorts ascending; pressing the same key again toggles to descending
 - Sort indicator (▲/▼) appears in the column header
 
-The old named sort sentinels (`SortName`, `SortID`, `SortAge`) are deprecated and map to column indices 0, 1, 2 respectively. New code should use column-position sorting exclusively.
+Column-position sorting is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283. Sort state is a column index (`sortColIdx int`) plus a direction flag.
 
 ---
 

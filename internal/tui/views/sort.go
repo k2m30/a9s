@@ -12,23 +12,6 @@ import (
 // SortColNone indicates no active sort column.
 const SortColNone = -1
 
-// SortField is a backward-compatible type alias for the sort column index.
-// Kept for test compatibility.
-//
-// Deprecated: use sortColIdx (int) directly.
-type SortField = int
-
-// Deprecated sort-field sentinels. Kept for test compatibility.
-// SortNone maps to SortColNone (-1). SortName/SortID/SortAge map to column
-// indices 0/1/2 — these are approximate and only meaningful where those
-// columns exist at the expected positions.
-const (
-	SortNone SortField = SortColNone
-	SortName SortField = 0
-	SortID   SortField = 1
-	SortAge  SortField = 2
-)
-
 // compareRaw extracts raw values from two structs at the given path and compares
 // them directly (numeric, time). Returns comparison result and true if raw
 // comparison succeeded. Falls back to false when path doesn't resolve or types
