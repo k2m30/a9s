@@ -428,4 +428,3 @@ func extractMsg(t *testing.T, cmd tea.Cmd, pred func(tea.Msg) bool) tea.Msg {
 	t.Fatalf("extractMsg: no message matched predicate (got %T)", msg)
 	return nil
 }
-

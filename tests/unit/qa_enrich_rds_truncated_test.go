@@ -29,7 +29,7 @@ type rdsMaintenanceFake struct {
 func (f *rdsMaintenanceFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error) {
 	return &rds.DescribePendingMaintenanceActionsOutput{
 		PendingMaintenanceActions: f.actions,
-		Marker:                   f.marker,
+		Marker:                    f.marker,
 	}, nil
 }
 
@@ -80,4 +80,3 @@ func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
 		t.Error("Truncated = false, want true (Marker is non-nil)")
 	}
 }
-

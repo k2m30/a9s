@@ -31,12 +31,12 @@ func TestFetchCloudTrailTrails_ParsesMultipleTrails(t *testing.T) {
 					IncludeGlobalServiceEvents: aws.Bool(true),
 				},
 				{
-					Name:                   aws.String("data-events"),
-					TrailARN:               aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/data-events"),
-					S3BucketName:           aws.String("data-trail-bucket"),
-					HomeRegion:             aws.String("us-west-2"),
-					IsMultiRegionTrail:     aws.Bool(false),
-					IsOrganizationTrail:    aws.Bool(false),
+					Name:                     aws.String("data-events"),
+					TrailARN:                 aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/data-events"),
+					S3BucketName:             aws.String("data-trail-bucket"),
+					HomeRegion:               aws.String("us-west-2"),
+					IsMultiRegionTrail:       aws.Bool(false),
+					IsOrganizationTrail:      aws.Bool(false),
 					LogFileValidationEnabled: aws.Bool(false),
 				},
 			},
@@ -166,8 +166,8 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 		},
 		statusByName: map[string]*cloudtrail.GetTrailStatusOutput{
 			"audit-trail": {
-				IsLogging:             aws.Bool(true),
-				LatestDeliveryError:   nil,
+				IsLogging:           aws.Bool(true),
+				LatestDeliveryError: nil,
 			},
 		},
 	}

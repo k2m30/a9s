@@ -315,7 +315,7 @@ func (m *mockDDBListTablesAPIPaginated) ListTables(_ context.Context, in *dynamo
 }
 
 type mockDDBDescribeTableAPIPaginated struct {
-	Calls      int
+	Calls        int
 	DescribeFunc func(call int, tableName string) (*dynamodb.DescribeTableOutput, error)
 }
 
@@ -347,9 +347,9 @@ func TestQA_Pagination_FetchDynamoDBTablesPage_FirstPage(t *testing.T) {
 		DescribeFunc: func(_ int, tableName string) (*dynamodb.DescribeTableOutput, error) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
-					TableName:     aws.String(tableName),
-					TableStatus:   ddbtypes.TableStatusActive,
-					ItemCount:     &itemCount,
+					TableName:      aws.String(tableName),
+					TableStatus:    ddbtypes.TableStatusActive,
+					ItemCount:      &itemCount,
 					TableSizeBytes: &tableBytes,
 					BillingModeSummary: &ddbtypes.BillingModeSummary{
 						BillingMode: ddbtypes.BillingModePayPerRequest,

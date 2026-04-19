@@ -35,8 +35,8 @@ type sdkPartitions struct {
 }
 
 type sdkPartition struct {
-	ID          string                        `json:"id"`
-	RegionRegex string                        `json:"regionRegex"`
+	ID          string                         `json:"id"`
+	RegionRegex string                         `json:"regionRegex"`
 	Regions     map[string]sdkRegionDescriptor `json:"regions"`
 }
 

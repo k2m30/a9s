@@ -100,10 +100,6 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
-
-
-
-
 // checkSFNRole resolves the IAM execution role for this state machine via
 // DescribeStateMachine (Pattern C: 1 API call, RoleArn → role name).
 func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -253,4 +249,3 @@ func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	return relatedResult("eb-rule", out.RuleNames)
 }
-

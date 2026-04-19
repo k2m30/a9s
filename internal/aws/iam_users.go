@@ -98,11 +98,11 @@ func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationTok
 			Name:   userName,
 			Status: "",
 			Fields: map[string]string{
-				"user_name":            userName,
-				"user_id":              userID,
-				"path":                 path,
-				"create_date":          createDate,
-				"password_last_used":   passwordLastUsed,
+				"user_name":          userName,
+				"user_id":            userID,
+				"path":               path,
+				"create_date":        createDate,
+				"password_last_used": passwordLastUsed,
 				// has_console_password is set to "false" at fetch time; Wave 2
 				// EnrichIAMUserMFA calls GetLoginProfile per user to detect
 				// console password presence and updates this field via findings.

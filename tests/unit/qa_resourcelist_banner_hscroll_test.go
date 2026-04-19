@@ -84,6 +84,7 @@ func hscrollMarkerResources() []resource.Resource {
 // then account(20+2=22) → total=80 > 60. At width=60:
 //   - 1(leading) + 26 + 16 = 43, then region: 43+16=59 <= 60, then
 //     account: 59+22=81 > 60, remaining=60-59-2=-1 < 10 → dropped.
+//
 // So len(fitted)=3 < len(visible)=4 → canScroll=true → 'l' increments hScrollOffset.
 // After scroll: fullMarkerColIdx(0) < hScrollOffset(1) → markerColIdx=-1.
 func buildHscrollModel(t *testing.T) views.ResourceListModel {

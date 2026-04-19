@@ -7,10 +7,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
-	"github.com/k2m30/a9s/v3/internal/demo"
 )
 
 // TestEC2Detail_Render_MatchesApprovedDesignContract validates the current EC2
@@ -30,24 +30,24 @@ func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
 		ID:   "i-0abc123def456789a",
 		Name: "web-prod",
 		Fields: map[string]string{
-			"InstanceId": "i-0abc123def456789a",
-			"InstanceType": "t3.large",
-			"State": "running",
-			"VpcId": "vpc-0aaa111bbb222cc",
-			"SubnetId": "subnet-0bbb222ccc333dd",
-			"ImageId": "ami-0aaa111222333",
-			"KeyName": "prod-keypair",
-			"PrivateIpAddress": "10.0.48.175",
-			"PublicIpAddress": "203.0.113.10",
-			"LaunchTime": "2026-03-15 09:22:45",
-			"Architecture": "x86_64",
-			"SecurityGroups": "",
-			"SecurityGroups.GroupId.0": "sg-0ccc333ddd444ee",
+			"InstanceId":                 "i-0abc123def456789a",
+			"InstanceType":               "t3.large",
+			"State":                      "running",
+			"VpcId":                      "vpc-0aaa111bbb222cc",
+			"SubnetId":                   "subnet-0bbb222ccc333dd",
+			"ImageId":                    "ami-0aaa111222333",
+			"KeyName":                    "prod-keypair",
+			"PrivateIpAddress":           "10.0.48.175",
+			"PublicIpAddress":            "203.0.113.10",
+			"LaunchTime":                 "2026-03-15 09:22:45",
+			"Architecture":               "x86_64",
+			"SecurityGroups":             "",
+			"SecurityGroups.GroupId.0":   "sg-0ccc333ddd444ee",
 			"SecurityGroups.GroupName.0": "web-sg",
-			"SecurityGroups.GroupId.1": "sg-0ddd444eee555ff",
+			"SecurityGroups.GroupId.1":   "sg-0ddd444eee555ff",
 			"SecurityGroups.GroupName.1": "db-access-sg",
-			"IamInstanceProfile": "",
-			"IamInstanceProfile.Arn": "arn:aws:iam::123456:role/web-role",
+			"IamInstanceProfile":         "",
+			"IamInstanceProfile.Arn":     "arn:aws:iam::123456:role/web-role",
 		},
 	}
 

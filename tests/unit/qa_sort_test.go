@@ -399,11 +399,12 @@ func TestQA_Sort_S3_CreationDate_VisiblePositionKey(t *testing.T) {
 // "3", the S3 buckets are actually sorted by creation date in ascending order.
 //
 // Fixture buckets (from fixtureS3Buckets) by creation_date ascending:
-//   dev-fileshare        2025-03-06
-//   dev-loki-chunks      2025-05-?? (second)
-//   cdn-logs.example.com 2025-05-12
-//   cdn-website...       2025-05-13
-//   test-app-state       2025-06-20
+//
+//	dev-fileshare        2025-03-06
+//	dev-loki-chunks      2025-05-?? (second)
+//	cdn-logs.example.com 2025-05-12
+//	cdn-website...       2025-05-13
+//	test-app-state       2025-06-20
 func TestQA_Sort_S3_CreationDate_SortsDataCorrectly(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()

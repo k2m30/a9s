@@ -286,8 +286,8 @@ func (f *fakeDynamoDBBatch4) DescribeKinesisStreamingDestination(_ context.Conte
 	if f.kinesisDestByTable != nil {
 		if dests, ok := f.kinesisDestByTable[tableName]; ok {
 			return &dynamodb.DescribeKinesisStreamingDestinationOutput{
-				TableName:                        aws.String(tableName),
-				KinesisDataStreamDestinations:    dests,
+				TableName:                     aws.String(tableName),
+				KinesisDataStreamDestinations: dests,
 			}, nil
 		}
 	}
@@ -308,8 +308,8 @@ func newFakeDynamoDBWithKinesisDestination(tableName, streamARN string) *fakeDyn
 		kinesisDestByTable: map[string][]ddbtypes.KinesisDataStreamDestination{
 			tableName: {
 				{
-					StreamArn:            aws.String(streamARN),
-					DestinationStatus:    ddbtypes.DestinationStatusActive,
+					StreamArn:         aws.String(streamARN),
+					DestinationStatus: ddbtypes.DestinationStatusActive,
 				},
 			},
 		},

@@ -12,8 +12,8 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -525,8 +525,8 @@ func TestRelated_ASG_AMI_MatchByLaunchTemplate(t *testing.T) {
 		},
 	})
 	clients := &awsclient.ServiceClients{
-		EC2:          fakeEC2,
-		AutoScaling:  &fakeASGBatch2{},
+		EC2:         fakeEC2,
+		AutoScaling: &fakeASGBatch2{},
 	}
 
 	res := resource.Resource{

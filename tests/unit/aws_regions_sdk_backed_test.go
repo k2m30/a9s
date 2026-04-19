@@ -83,8 +83,8 @@ func TestValidateRegionCode_EdgeCases(t *testing.T) {
 		{"ap-northeast-3", true},
 		{"", false},
 		{"USA", false},
-		{"us-east", false},      // incomplete
-		{"us-east-1a", false},   // AZ, not a region
+		{"us-east", false},    // incomplete
+		{"us-east-1a", false}, // AZ, not a region
 		{"not-a-region-1", false},
 	}
 	for _, c := range cases {

@@ -61,8 +61,8 @@ func NewSNSFixtures() *SNSFixtures {
 	}
 
 	subsByTopic := map[string][]snstypes.Subscription{
-		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": subscriptions[:2],
-		"arn:aws:sns:us-east-1:123456789012:order-events":        subscriptions[2:4],
+		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  subscriptions[:2],
+		"arn:aws:sns:us-east-1:123456789012:order-events":         subscriptions[2:4],
 		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
 	}
 

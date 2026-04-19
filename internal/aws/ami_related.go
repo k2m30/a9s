@@ -57,9 +57,6 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 	return relatedResult("ebs-snap", ids)
 }
 
-
-
-
 // amiRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
 func amiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

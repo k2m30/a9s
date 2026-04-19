@@ -158,9 +158,3 @@ func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	return relatedResult("sqs", ids)
 }
-
-
-
-
-
-

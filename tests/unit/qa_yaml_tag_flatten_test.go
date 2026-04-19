@@ -154,8 +154,8 @@ func TestToSafeValue_DuplicateKeys_PreservedAsSlice(t *testing.T) {
 // simulating autoscaling TagDescription. ToSafeValue MUST NOT flatten this —
 // it has more than 2 exported fields.
 type richASGTag struct {
-	Key              *string
-	Value            *string
+	Key               *string
+	Value             *string
 	PropagateAtLaunch *bool
 }
 

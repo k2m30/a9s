@@ -55,12 +55,12 @@ import (
 // scanCallDigests records which image digests DescribeImageScanFindings was called for.
 type ecrEnrichFake struct {
 	awsclient.ECRAPI
-	listImagesByRepo      map[string][][]ecrtypes.ImageIdentifier // repo → pages
-	listImagesErrByRepo   map[string]error
-	scanCountsByDigest    map[string]map[string]int32 // digest → severity → count
-	scanErrByDigest       map[string]error
+	listImagesByRepo       map[string][][]ecrtypes.ImageIdentifier // repo → pages
+	listImagesErrByRepo    map[string]error
+	scanCountsByDigest     map[string]map[string]int32 // digest → severity → count
+	scanErrByDigest        map[string]error
 	listImagesCallsPerRepo map[string]int
-	scanCallDigests       []string
+	scanCallDigests        []string
 }
 
 func (f *ecrEnrichFake) ListImages(

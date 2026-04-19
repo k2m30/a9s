@@ -395,8 +395,8 @@ func TestRelated_NG_AMI_Match(t *testing.T) {
 // template (managed NG) produces Count=0.
 func TestRelated_NG_AMI_Empty(t *testing.T) {
 	res := resource.Resource{
-		ID:   "general-pool",
-		Name: "general-pool",
+		ID:     "general-pool",
+		Name:   "general-pool",
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
 			NodegroupName:  aws.String("general-pool"),
@@ -483,8 +483,8 @@ func TestRelated_NG_EBS_Match(t *testing.T) {
 // TestRelated_NG_EBS_Empty verifies that a node group with no ASG returns Count=0.
 func TestRelated_NG_EBS_Empty(t *testing.T) {
 	res := resource.Resource{
-		ID:   "general-pool",
-		Name: "general-pool",
+		ID:     "general-pool",
+		Name:   "general-pool",
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
 			NodegroupName: aws.String("general-pool"),
@@ -526,8 +526,8 @@ func TestRelated_NG_Subnet_Match(t *testing.T) {
 	const sub2 = "subnet-0a1b2c3d4e5f60002"
 
 	res := resource.Resource{
-		ID:   "general-pool",
-		Name: "general-pool",
+		ID:     "general-pool",
+		Name:   "general-pool",
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
 			NodegroupName: aws.String("general-pool"),
@@ -560,8 +560,8 @@ func TestRelated_NG_Subnet_Match(t *testing.T) {
 // produces Count=0.
 func TestRelated_NG_Subnet_Empty(t *testing.T) {
 	res := resource.Resource{
-		ID:   "general-pool",
-		Name: "general-pool",
+		ID:     "general-pool",
+		Name:   "general-pool",
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
 			NodegroupName: aws.String("general-pool"),

@@ -294,8 +294,8 @@ func TestRelated_Lambda_ECR_Match(t *testing.T) {
 // Count=0 (no ECR involvement).
 func TestRelated_Lambda_ECR_Empty(t *testing.T) {
 	src := resource.Resource{
-		ID:   "my-zip-function",
-		Name: "my-zip-function",
+		ID:     "my-zip-function",
+		Name:   "my-zip-function",
 		Fields: map[string]string{},
 		RawStruct: lambdatypes.FunctionConfiguration{
 			FunctionName: aws.String("my-zip-function"),

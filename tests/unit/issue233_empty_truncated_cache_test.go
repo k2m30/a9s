@@ -189,10 +189,10 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		t.Errorf("BUG #233: empty-but-truncated write-back: want Count=0, got Count=%d", got.Count)
 	}
 	if !got.Approximate {
-		t.Fatalf("BUG #233: empty-but-truncated CachedPages write-back corrupted IsTruncated. "+
-			"Expected TG checker Approximate=true (IsTruncated=true preserved from write-back), "+
-			"got Approximate=false. "+
-			"Root cause: app.go:383 guard `len(entry.Resources) > 0` drops pagination "+
+		t.Fatalf("BUG #233: empty-but-truncated CachedPages write-back corrupted IsTruncated. " +
+			"Expected TG checker Approximate=true (IsTruncated=true preserved from write-back), " +
+			"got Approximate=false. " +
+			"Root cause: app.go:383 guard `len(entry.Resources) > 0` drops pagination " +
 			"when the first page is empty, so buildResourceCacheSnapshot reconstructs IsTruncated=false.")
 	}
 }

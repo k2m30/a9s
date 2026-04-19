@@ -35,7 +35,7 @@ func eksCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 func TestNavigableFields_EKS(t *testing.T) {
 	expected := map[string]string{
-		"ResourcesVpcConfig.VpcId":                 "vpc",
+		"ResourcesVpcConfig.VpcId":                  "vpc",
 		"ResourcesVpcConfig.ClusterSecurityGroupId": "sg",
 	}
 	for path, wantTarget := range expected {
@@ -345,8 +345,8 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 
 func eksClusterSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:   "acme-services",
-		Name: "acme-services",
+		ID:     "acme-services",
+		Name:   "acme-services",
 		Fields: map[string]string{},
 		RawStruct: &ekstypes.Cluster{
 			Name: aws.String("acme-services"),

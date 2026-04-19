@@ -146,10 +146,6 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
-
-
-
-
 // ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

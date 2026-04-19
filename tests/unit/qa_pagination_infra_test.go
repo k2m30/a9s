@@ -434,7 +434,7 @@ func TestQA_Pagination_FetchECSTasksPage_FirstPage(t *testing.T) {
 	listTasksMock := &mockECSListTasksAPIPaginated{
 		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
 			return &ecs.ListTasksOutput{
-				TaskArns: []string{"arn:aws:ecs:us-east-1:111111111111:task/prod/abcdef123456"},
+				TaskArns:  []string{"arn:aws:ecs:us-east-1:111111111111:task/prod/abcdef123456"},
 				NextToken: nil,
 			}, nil
 		},
@@ -490,7 +490,7 @@ func TestQA_Pagination_FetchECSTasksPage_Continuation(t *testing.T) {
 	listTasksMock := &mockECSListTasksAPIPaginated{
 		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
 			return &ecs.ListTasksOutput{
-				TaskArns: []string{"arn:aws:ecs:us-east-1:111111111111:task/staging/xyz999888777"},
+				TaskArns:  []string{"arn:aws:ecs:us-east-1:111111111111:task/staging/xyz999888777"},
 				NextToken: nil,
 			}, nil
 		},

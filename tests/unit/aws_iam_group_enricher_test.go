@@ -150,8 +150,8 @@ func TestEnrichIAMGroup_PopulatedGroupProducesNoFindings(t *testing.T) {
 func TestEnrichIAMGroup_NoMembersProducesFindingSevTilde(t *testing.T) {
 	fake := &iamGroupFake{
 		usersByGroup: map[string][]iamtypes.User{
-			"dev-team": {},                         // empty group
-			"ops-team": {iamGroupUser("bob")},      // non-empty
+			"dev-team": {},                    // empty group
+			"ops-team": {iamGroupUser("bob")}, // non-empty
 		},
 		attachedPoliciesByGroup: map[string][]iamtypes.AttachedPolicy{
 			"dev-team": {iamAttachedPolicy("arn:aws:iam::aws:policy/ReadOnlyAccess", "ReadOnlyAccess")},
@@ -191,7 +191,7 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 			"ops-team": {iamGroupUser("bob")},
 		},
 		attachedPoliciesByGroup: map[string][]iamtypes.AttachedPolicy{
-			"dev-team": {},  // no attached policies
+			"dev-team": {}, // no attached policies
 			"ops-team": {iamAttachedPolicy("arn:aws:iam::aws:policy/ReadOnlyAccess", "ReadOnlyAccess")},
 		},
 		inlinePoliciesByGroup: map[string][]string{

@@ -362,5 +362,3 @@ func vpcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
-
-

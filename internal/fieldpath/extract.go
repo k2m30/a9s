@@ -590,10 +590,10 @@ type nestedFieldLine struct {
 // For array-indexed keys (e.g., SecurityGroups.GroupId.0), produces YAML
 // list-of-objects format with "- " markers and 2-space nesting per item:
 //
-//	- GroupId: sg-xxx
-//	  GroupName: my-group
-//	- GroupId: sg-yyy
-//	  GroupName: another-group
+//   - GroupId: sg-xxx
+//     GroupName: my-group
+//   - GroupId: sg-yyy
+//     GroupName: another-group
 //
 // For non-indexed keys (e.g., IamInstanceProfile.Arn), produces flat lines:
 //

@@ -35,7 +35,6 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("ec2", ids)
 }
 
-
 // checkASGAlarm searches the alarm cache for alarms with an "AutoScalingGroupName" dimension
 // matching this ASG's name.
 // Pattern D — dimension-based lookup.
@@ -110,7 +109,6 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	return relatedResult("ng", ids)
 }
-
 
 // checkASGAMI resolves the AMI used by the ASG's launch configuration or launch template.
 // For launch configs: autoscaling:DescribeLaunchConfigurations.ImageId.
@@ -329,7 +327,6 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 	return roleARNs
 }
 
-
 // asgRelatedResources returns the resource list for target from cache or fetches it.
 func asgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
@@ -340,9 +337,3 @@ func asgRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	}
 	return resources, isTruncated, err
 }
-
-
-
-
-
-

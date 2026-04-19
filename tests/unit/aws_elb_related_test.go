@@ -30,9 +30,9 @@ func elbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 func TestNavigableFields_ELB_Registered(t *testing.T) {
 	expected := map[string]string{
-		"VpcId":                        "vpc",
-		"SecurityGroups":               "sg",
-		"AvailabilityZones.SubnetId":   "subnet",
+		"VpcId":                      "vpc",
+		"SecurityGroups":             "sg",
+		"AvailabilityZones.SubnetId": "subnet",
 	}
 	for path, wantTarget := range expected {
 		nav := resource.IsFieldNavigable("elb", path)
@@ -55,8 +55,8 @@ func TestRelated_ELB_TG_Found(t *testing.T) {
 		ID:   "test-tg",
 		Name: "test-tg",
 		RawStruct: elbv2types.TargetGroup{
-			TargetGroupArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/1234567890abcdef"),
-			TargetGroupName: aws.String("test-tg"),
+			TargetGroupArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/1234567890abcdef"),
+			TargetGroupName:  aws.String("test-tg"),
 			LoadBalancerArns: []string{elbARN},
 		},
 	}

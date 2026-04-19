@@ -69,8 +69,8 @@ func TestFetchCBBuilds_Basic(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -220,8 +220,8 @@ func TestFetchCBBuilds_EmptyProject(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -248,8 +248,8 @@ func TestFetchCBBuilds_ListError(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -285,8 +285,8 @@ func TestFetchCBBuilds_BatchError(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -333,8 +333,8 @@ func TestFetchCBBuilds_Duration(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -386,8 +386,8 @@ func TestFetchCBBuilds_InProgressDuration(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -437,8 +437,8 @@ func TestFetchCBBuilds_SourceVersionShort(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -483,8 +483,8 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -580,8 +580,8 @@ func TestFetchCBBuilds_LogFields(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -634,8 +634,8 @@ func TestFetchCBBuilds_LogFieldsNil(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -691,8 +691,8 @@ func TestFetchCBBuilds_Pagination(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -722,8 +722,8 @@ func TestFetchCBBuilds_ParentContext(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -764,8 +764,8 @@ func TestFetchCBBuilds_RawStruct(t *testing.T) {
 		listMock,
 		batchMock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -881,14 +881,14 @@ func TestFetchCBBuilds_ContinuationToken(t *testing.T) {
 	batchMock := &mockCodeBuildBatchGetBuildsClient{
 		outputs: []*codebuild.BatchGetBuildsOutput{
 			{
-			Builds: []cbtypes.Build{
-				{
-					Id:          aws.String("my-project:build-from-token"),
-					BuildNumber: &buildNum,
-					BuildStatus: cbtypes.StatusTypeSucceeded,
-					StartTime:   &startTime,
+				Builds: []cbtypes.Build{
+					{
+						Id:          aws.String("my-project:build-from-token"),
+						BuildNumber: &buildNum,
+						BuildStatus: cbtypes.StatusTypeSucceeded,
+						StartTime:   &startTime,
+					},
 				},
-			},
 			},
 		},
 	}

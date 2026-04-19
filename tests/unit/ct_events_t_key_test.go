@@ -411,4 +411,3 @@ func TestBottomHints_MainMenu_NoCloudTrail(t *testing.T) {
 		}
 	}
 }
-

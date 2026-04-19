@@ -187,7 +187,6 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	return relatedResult("sg", []string{*ng.Resources.RemoteAccessSecurityGroup})
 }
 
-
 // checkNGAMI resolves the AMI used by this node group's launch template.
 // Pattern A — ec2:DescribeLaunchTemplateVersions if LaunchTemplate is set.
 // Managed NGs without a custom launch template: AMI resolution via SSM is deferred; returns Count:0.
@@ -331,6 +330,3 @@ func ngRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
-
-
-

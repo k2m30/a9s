@@ -356,8 +356,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
-		m.relatedGen++   // cancel in-flight results from previous batch
-		m.enrichGen++    // cancel in-flight enrichment from previous batch
+		m.relatedGen++      // cancel in-flight results from previous batch
+		m.enrichGen++       // cancel in-flight enrichment from previous batch
 		m.enrichResKey = "" // force gen bump on next enrichment dispatch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 

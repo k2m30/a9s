@@ -110,7 +110,7 @@ func wafWebACLResources(arns ...string) []resource.Resource {
 func wafLoggingOutput(arn string) *wafv2.GetLoggingConfigurationOutput {
 	return &wafv2.GetLoggingConfigurationOutput{
 		LoggingConfiguration: &wafv2types.LoggingConfiguration{
-			ResourceArn:            &arn,
+			ResourceArn:           &arn,
 			LogDestinationConfigs: []string{"arn:aws:logs:us-east-1:123456789012:log-group:aws-waf-logs-example"},
 		},
 	}

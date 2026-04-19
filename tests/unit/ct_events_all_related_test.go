@@ -392,4 +392,3 @@ func TestCloudTrailFake_SuffixMatching(t *testing.T) {
 		t.Error("expected at least one event matching suffix ':process-orders', got 0")
 	}
 }
-

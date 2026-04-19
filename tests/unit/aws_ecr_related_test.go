@@ -7,10 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -272,7 +272,7 @@ func TestRelated_ECR_CFN_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
-			"uri":           "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
+			"uri":            "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
 			"cfn_stack_name": "my-stack",
 		},
 		RawStruct: ecrtypes.Repository{
@@ -307,7 +307,7 @@ func TestRelated_ECR_CFN_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
-			"uri":           "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
+			"uri":            "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
 			"cfn_stack_name": "my-stack",
 		},
 		RawStruct: ecrtypes.Repository{
@@ -327,7 +327,7 @@ func TestRelated_ECR_CFN_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
-			"uri":           "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
+			"uri":            "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
 			"cfn_stack_name": "my-stack",
 		},
 		RawStruct: ecrtypes.Repository{

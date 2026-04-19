@@ -284,8 +284,6 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("s3", matched)
 }
 
-
-
 // checkCtEventsLambda extracts Lambda function names from the CloudTrail event.
 func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
@@ -866,4 +864,3 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 	}
 	return relatedResult("cfn", matched)
 }
-

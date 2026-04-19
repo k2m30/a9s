@@ -120,7 +120,6 @@ func FetchAMIByID(ctx context.Context, api EC2DescribeImagesAPI, imageID string)
 	return imageResource(output.Images[0]), nil
 }
 
-
 func imageResource(img ec2types.Image) resource.Resource {
 	imageID := ""
 	if img.ImageId != nil {

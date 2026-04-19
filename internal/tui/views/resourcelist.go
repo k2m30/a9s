@@ -28,7 +28,7 @@ type ResourceListModel struct {
 	scroll        ScrollState
 	hScrollOffset int
 
-	sortColIdx int    // -1 = no sort, 0-based column index
+	sortColIdx int // -1 = no sort, 0-based column index
 	sortAsc    bool
 	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
 
@@ -132,16 +132,16 @@ func NewResourceListFromCache(
 	attentionOnly bool,
 ) ResourceListModel {
 	m := ResourceListModel{
-		typeDef:       typeDef,
-		viewConfig:    viewConfig,
-		allResources:  resources,
-		pagination:    pagination,
-		filterText:    filterText,
-		sortColIdx:    sortColIdx,
-		sortAsc:       sortAsc,
-		hScrollOffset: hScrollOffset,
-		loading:       false,
-		keys:          k,
+		typeDef:         typeDef,
+		viewConfig:      viewConfig,
+		allResources:    resources,
+		pagination:      pagination,
+		filterText:      filterText,
+		sortColIdx:      sortColIdx,
+		sortAsc:         sortAsc,
+		hScrollOffset:   hScrollOffset,
+		loading:         false,
+		keys:            k,
 		AttentionFilter: AttentionFilter{enabled: attentionOnly},
 	}
 	m.applySortAndFilter()

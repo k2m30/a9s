@@ -720,8 +720,8 @@ func TestRelated_ECSSvc_ECR_MultipleContainers(t *testing.T) {
 // set returns Count=0 (not an error).
 func TestRelated_ECSSvc_ECR_NoTaskDef(t *testing.T) {
 	source := resource.Resource{
-		ID:   "api-service",
-		Name: "api-service",
+		ID:     "api-service",
+		Name:   "api-service",
 		Fields: map[string]string{"cluster": "prod-cluster"},
 		RawStruct: ecstypes.Service{
 			ServiceName: aws.String("api-service"),
@@ -857,8 +857,8 @@ func TestRelated_ECSSvc_Secrets_NoSecrets(t *testing.T) {
 // set returns Count=0 (not an error).
 func TestRelated_ECSSvc_Secrets_NoTaskDef(t *testing.T) {
 	source := resource.Resource{
-		ID:   "api-service",
-		Name: "api-service",
+		ID:     "api-service",
+		Name:   "api-service",
 		Fields: map[string]string{"cluster": "prod-cluster"},
 		RawStruct: ecstypes.Service{
 			ServiceName: aws.String("api-service"),

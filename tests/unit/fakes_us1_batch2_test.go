@@ -13,10 +13,10 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 )
 
@@ -27,8 +27,8 @@ import (
 // ---------------------------------------------------------------------------
 
 type fakeASGBatch2 struct {
-	describeLaunchConfigsFn         func(*autoscaling.DescribeLaunchConfigurationsInput) (*autoscaling.DescribeLaunchConfigurationsOutput, error)
-	describeNotificationConfigsFn   func(*autoscaling.DescribeNotificationConfigurationsInput) (*autoscaling.DescribeNotificationConfigurationsOutput, error)
+	describeLaunchConfigsFn       func(*autoscaling.DescribeLaunchConfigurationsInput) (*autoscaling.DescribeLaunchConfigurationsOutput, error)
+	describeNotificationConfigsFn func(*autoscaling.DescribeNotificationConfigurationsInput) (*autoscaling.DescribeNotificationConfigurationsOutput, error)
 }
 
 func (f *fakeASGBatch2) DescribeAutoScalingGroups(_ context.Context, _ *autoscaling.DescribeAutoScalingGroupsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
@@ -94,8 +94,8 @@ func newFakeASGWithNotifications(configs []asgtypes.NotificationConfiguration) *
 // ---------------------------------------------------------------------------
 
 type fakeEC2Batch2 struct {
-	describeSubnetsFn                   func(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
-	describeLaunchTemplateVersionsFn    func(*ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error)
+	describeSubnetsFn                func(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
+	describeLaunchTemplateVersionsFn func(*ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error)
 }
 
 func (f *fakeEC2Batch2) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
@@ -326,9 +326,9 @@ func newFakeIAMWithInstanceProfile(roles []iamtypes.Role) *fakeIAMBatch2 {
 // ---------------------------------------------------------------------------
 
 type fakeEBBatch2 struct {
-	describeEnvResourcesFn         func(*elasticbeanstalk.DescribeEnvironmentResourcesInput) (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error)
-	describeConfigSettingsFn       func(*elasticbeanstalk.DescribeConfigurationSettingsInput) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error)
-	describeApplicationVersionsFn  func(*elasticbeanstalk.DescribeApplicationVersionsInput) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error)
+	describeEnvResourcesFn        func(*elasticbeanstalk.DescribeEnvironmentResourcesInput) (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error)
+	describeConfigSettingsFn      func(*elasticbeanstalk.DescribeConfigurationSettingsInput) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error)
+	describeApplicationVersionsFn func(*elasticbeanstalk.DescribeApplicationVersionsInput) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error)
 }
 
 func (f *fakeEBBatch2) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {

@@ -252,4 +252,3 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		},
 	}, nil
 }
-

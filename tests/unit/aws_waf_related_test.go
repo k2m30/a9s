@@ -95,4 +95,3 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (CLOUDFRONT scope: requires ListResourcesForWebACL)", result.Count)
 	}
 }
-

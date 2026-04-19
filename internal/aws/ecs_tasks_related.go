@@ -125,16 +125,6 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("logs", ids)
 }
 
-
-
-
-
-
-
-
-
-
-
 // ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.
 func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

@@ -13,8 +13,8 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -92,8 +92,8 @@ func TestRelated_Eb_ELB_MatchByEnvironmentResources(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -128,8 +128,8 @@ func TestRelated_Eb_ELB_NoLoadBalancers(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -190,8 +190,8 @@ func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -240,8 +240,8 @@ func TestRelated_Eb_Role_NoRoleSettings(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -287,8 +287,8 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 
 	fakeEB := newFakeEBWithAppVersions([]ebtypes.ApplicationVersionDescription{
 		{
-			ApplicationName:     aws.String(appName),
-			VersionLabel:        aws.String("v1.0.0"),
+			ApplicationName: aws.String(appName),
+			VersionLabel:    aws.String("v1.0.0"),
 			SourceBundle: &ebtypes.S3Location{
 				S3Bucket: aws.String(s3Bucket),
 				S3Key:    aws.String("my-app/v1.0.0.zip"),
@@ -300,8 +300,8 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -342,8 +342,8 @@ func TestRelated_Eb_S3_NoApplicationVersions(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -401,8 +401,8 @@ func TestRelated_Eb_SG_MatchByLaunchConfigSecurityGroups(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -449,8 +449,8 @@ func TestRelated_Eb_SG_NoSecurityGroupSettings(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -529,8 +529,8 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
@@ -566,8 +566,8 @@ func TestRelated_Eb_TG_NoLoadBalancers(t *testing.T) {
 	}
 
 	res := resource.Resource{
-		ID:   envName,
-		Name: envName,
+		ID:     envName,
+		Name:   envName,
 		Fields: map[string]string{},
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),

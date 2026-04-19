@@ -373,7 +373,3 @@ func subnetRelatedResources(ctx context.Context, clients any, cache resource.Res
 	}
 	return resources, isTruncated, err
 }
-
-
-
-

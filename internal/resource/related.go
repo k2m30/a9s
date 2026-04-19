@@ -8,8 +8,8 @@ import (
 
 // RelatedDef defines one related resource class for a given resource type.
 type RelatedDef struct {
-	TargetType       string         // target resource short name (e.g., "tg", "alarm")
-	DisplayName      string         // right-column row label (e.g., "Target Groups")
+	TargetType  string // target resource short name (e.g., "tg", "alarm")
+	DisplayName string // right-column row label (e.g., "Target Groups")
 	// TODO(no-middle-state): a registered RelatedDef must have a real Checker.
 	// Treat nil as a structural bug, not as a supported "stub" state.
 	Checker          RelatedChecker // async checker function

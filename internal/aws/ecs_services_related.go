@@ -330,7 +330,6 @@ func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.Res
 	return resources, isTruncated, err
 }
 
-
 // checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
 // The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
 // the last segment after "/".
@@ -345,11 +344,3 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 	}
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
-
-
-
-
-
-
-
-

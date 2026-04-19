@@ -269,9 +269,9 @@ func TestFetchCfnResources_NilOptionalFields(t *testing.T) {
 		output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
-					LogicalResourceId:   aws.String("NilPhysical"),
-					ResourceType:        aws.String("AWS::EC2::Instance"),
-					ResourceStatus:      cfntypes.ResourceStatusCreateInProgress,
+					LogicalResourceId:    aws.String("NilPhysical"),
+					ResourceType:         aws.String("AWS::EC2::Instance"),
+					ResourceStatus:       cfntypes.ResourceStatusCreateInProgress,
 					LastUpdatedTimestamp: &lastUpdated,
 					// PhysicalResourceId is nil (resource not yet created)
 					// ResourceStatusReason is nil

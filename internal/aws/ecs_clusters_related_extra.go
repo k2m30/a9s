@@ -188,4 +188,3 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	return relatedResult("logs", ids)
 }
-

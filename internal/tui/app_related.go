@@ -398,4 +398,3 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	}
 	return snap
 }
-

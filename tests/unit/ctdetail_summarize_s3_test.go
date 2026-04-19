@@ -135,9 +135,9 @@ func TestCTDetailSummarizeS3_NoBucketKeyReExtraction(t *testing.T) {
 // the input params map. Mutation would corrupt cleaned-params from ExtractTarget.
 func TestCTDetailSummarizeS3_PurityNoMutation(t *testing.T) {
 	params := map[string]any{
-		"contentLength": float64(2048),
+		"contentLength":        float64(2048),
 		"serverSideEncryption": "aws:kms",
-		"nested": map[string]any{"x": "y"},
+		"nested":               map[string]any{"x": "y"},
 	}
 	before := deepCopyParams(params)
 	_ = ctdetail.SummarizeS3("PutObject", params)

@@ -162,27 +162,27 @@ func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 			MetricAlarms: []cwtypes.MetricAlarm{
 				{
 					// Only AlarmActions populated — count must be 1.
-					AlarmName:              aws.String("alarm-with-alarm-actions"),
-					StateValue:             cwtypes.StateValueOk,
-					AlarmActions:           []string{"arn:aws:sns:us-east-1:123456789012:my-topic"},
-					OKActions:              []string{},
+					AlarmName:               aws.String("alarm-with-alarm-actions"),
+					StateValue:              cwtypes.StateValueOk,
+					AlarmActions:            []string{"arn:aws:sns:us-east-1:123456789012:my-topic"},
+					OKActions:               []string{},
 					InsufficientDataActions: []string{},
 				},
 				{
 					// Only OKActions populated — actions_count must be "0"
 					// because OKActions are not alarm-trigger actions.
-					AlarmName:              aws.String("alarm-no-alarm-actions-but-ok-actions"),
-					StateValue:             cwtypes.StateValueOk,
-					AlarmActions:           []string{},
-					OKActions:              []string{"arn:aws:sns:us-east-1:123456789012:ok-topic-1", "arn:aws:sns:us-east-1:123456789012:ok-topic-2"},
+					AlarmName:               aws.String("alarm-no-alarm-actions-but-ok-actions"),
+					StateValue:              cwtypes.StateValueOk,
+					AlarmActions:            []string{},
+					OKActions:               []string{"arn:aws:sns:us-east-1:123456789012:ok-topic-1", "arn:aws:sns:us-east-1:123456789012:ok-topic-2"},
 					InsufficientDataActions: []string{},
 				},
 				{
 					// Only InsufficientDataActions populated — actions_count must be "0".
-					AlarmName:              aws.String("alarm-only-insufficient-data-actions"),
-					StateValue:             cwtypes.StateValueOk,
-					AlarmActions:           []string{},
-					OKActions:              []string{},
+					AlarmName:               aws.String("alarm-only-insufficient-data-actions"),
+					StateValue:              cwtypes.StateValueOk,
+					AlarmActions:            []string{},
+					OKActions:               []string{},
 					InsufficientDataActions: []string{"arn:aws:sns:us-east-1:123456789012:insuf-topic"},
 				},
 			},
