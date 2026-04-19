@@ -834,13 +834,6 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 ---
 
-## Known Compromises
-
-- Session orchestration lives on the embedded `sessionRuntime` inside `tui.Model`. This keeps Bubble Tea integration simple (one top-level `tea.Model`) while making the UI-shell vs session-runtime boundary explicit in code. Moving it to a standalone type outside `internal/tui` is not planned: the orchestration handlers already access it via field promotion and do not cross the package boundary.
-- Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
-
----
-
 ## Design Decisions
 
 ### Why no write operations?
