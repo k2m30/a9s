@@ -63,7 +63,18 @@ type resourceCacheEntry struct {
 
 // Model is the root Bubble Tea model. It owns the view stack, header state,
 // AWS clients, and routes all messages to the active child view.
+//
+// The Model pairs a UI shell (view stack, header, input mode, flash, theme)
+// with an embedded sessionRuntime that owns the in-memory orchestration state
+// tied to the active profile/region session. Field promotion means all access
+// sites like `m.resourceCache` resolve transparently to the embedded
+// sessionRuntime — see internal/tui/session_runtime.go for the ownership
+// contract. handleProfileSelected / handleRegionSelected rotate the
+// sessionRuntime to invalidate in-flight async results on switch.
 type Model struct {
+	sessionRuntime // embedded: session-scoped orchestration state
+
+	// --- UI shell state ---
 	width  int
 	height int
 
@@ -112,44 +123,8 @@ type Model struct {
 
 	preSuppliedClients *awsclient.ServiceClients
 
-	noCache         bool
-	isDemo          bool     // true when running in --demo mode (synthetic clients); controls Wave 2 skip
-	availabilityGen int      // incremented on profile/region switch to cancel stale probes
-	availQueue      []string // resource short names remaining to probe
-	availChecked    int      // number probed so far in current gen
-	availTotal      int      // total types to probe in current gen
-
-	// Issue count enrichment (Wave 2)
-	probeResources map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
-	enrichQueue    []string                       // resource types pending Wave 2 enrichment
-	enrichmentGen  int                            // session-wide generation counter for enrichment (profile/region switch)
-	enrichChecked  int                            // number of enrichment probes completed in current gen
-	enrichTotal    int                            // total enrichment probes to run in current gen
-
-	// Enrichment finding state (feature 018-enrichment-visibility).
-	// enrichmentFindings[shortName][resourceID] = EnrichmentFinding for resources
-	// with Wave 2 findings. Populated by handleEnrichmentChecked on success;
-	// cleared per-type when a rerun starts; cleared entirely on profile/region switch.
-	enrichmentFindings map[string]map[string]resource.EnrichmentFinding
-	// enrichmentRan[shortName] == true only after Wave 2 completed successfully
-	// for that type in this session. Distinct from menu.issueKnown (cached counts).
-	// Banner visibility keys off this signal.
-	enrichmentRan map[string]bool
-	// enrichmentTypeGen[shortName] is a per-type generation counter. Bumped on
-	// every rerun (startup Wave 2 dispatch, menu Ctrl+R, top-level list Ctrl+R).
-	// Stamped on EnrichmentCheckedMsg and (when non-zero) on ResourcesLoadedMsg
-	// from the wrapped Ctrl+R-for-rerun fetch. Handlers discard messages whose
-	// TypeGen doesn't match the current per-type gen.
-	enrichmentTypeGen map[string]int
-	// enrichmentTruncatedIDs[shortName][resourceID] = true when the enricher could
-	// not fully inspect that resource (per-resource API error or page cap).
-	enrichmentTruncatedIDs map[string]map[string]bool
-
-	resourceCache map[string]*resourceCacheEntry
-	relatedCache  *relatedCacheLRU
-	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
-	enrichGen     uint64 // incremented on refresh/profile/region switch to discard stale enrichment results
-	enrichResKey  string // "resourceType:resourceID" of last enrichment dispatch; gen only bumps on change
+	noCache bool
+	isDemo  bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.
@@ -295,24 +270,17 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		profile:            profile,
-		region:             region,
-		keys:               k,
-		stack:              []views.View{&menu},
-		cmdInput:           ti,
-		viewConfig:         cfg,
-		configErr:          cfgErr,
-		activeTheme:        "tokyo-night.yaml",
-		resourceCache:      make(map[string]*resourceCacheEntry),
-		relatedCache:       newRelatedCacheLRU(maxRelatedCacheEntries),
-		relatedGen:         1, // start at 1 so Generation=0 (unset) is always stale and rejected
-		enrichGen:          1, // same convention as relatedGen
-		enrichmentFindings:     make(map[string]map[string]resource.EnrichmentFinding),
-		enrichmentRan:          make(map[string]bool),
-		enrichmentTypeGen:      make(map[string]int),
-		enrichmentTruncatedIDs: make(map[string]map[string]bool),
-		appCtx:                 ctx,
-		appCancel:          cancel,
+		sessionRuntime: newSessionRuntime(),
+		profile:        profile,
+		region:         region,
+		keys:           k,
+		stack:          []views.View{&menu},
+		cmdInput:       ti,
+		viewConfig:     cfg,
+		configErr:      cfgErr,
+		activeTheme:    "tokyo-night.yaml",
+		appCtx:         ctx,
+		appCancel:      cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)

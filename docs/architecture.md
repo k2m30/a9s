@@ -304,10 +304,13 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 **Stacked-view live-update pattern:**
 - `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
 
-**Session-scoped state on root `Model`:**
+**Session-scoped state lives on the embedded `sessionRuntime` struct** (`internal/tui/session_runtime.go`), not on the UI shell portion of `Model`. The split makes ownership explicit: caches, Wave 1/Wave 2 queues, findings, and generation counters are all owned by `sessionRuntime`. Field promotion keeps the access syntax (`m.resourceCache`, `m.probeResources`, `m.enrichmentFindings`) unchanged. Profile/region switches call `m.resetForSessionSwitch()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
+
+Representative fields owned by `sessionRuntime`:
 - `enrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on profile/region switch.
 - `enrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
 - `enrichmentTypeGen map[string]int` — per-type generation counter; guards against stale in-flight rerun results.
+- `resourceCache`, `relatedCache`, `probeResources`, `availQueue`, `enrichQueue` — session-scoped caches and dispatch queues.
 
 ---
 
@@ -805,7 +808,7 @@ Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -r
 
 ## Known Compromises
 
-- The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
+- Session orchestration lives on the embedded `sessionRuntime` inside `tui.Model`. This keeps Bubble Tea integration simple (one top-level `tea.Model`) while making the UI-shell vs session-runtime boundary explicit in code. Moving it to a standalone type outside `internal/tui` is not planned: the orchestration handlers already access it via field promotion and do not cross the package boundary.
 - When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
 - Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
