@@ -1,4 +1,4 @@
-// policy_doc_cache.go provides a session-scoped, concurrency-safe cache for
+// iam_policy_doc_cache.go provides a session-scoped, concurrency-safe cache for
 // decoded IAM policy documents. Owned by the session runtime (tui.Model's
 // embedded sessionRuntime) and passed to detail enrichers via
 // DetailEnrichmentCtx. Cache lifetime is tied to the session; profile/region

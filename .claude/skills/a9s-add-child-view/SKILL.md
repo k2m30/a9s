@@ -69,7 +69,7 @@ DETAIL PATHS:
 Files to create:
   internal/aws/{child_type}.go — child fetcher + init() with RegisterChildType/RegisterPaginatedChild/RegisterFieldKeys
 Files to modify:
-  internal/aws/interfaces_{service}.go — append {InterfaceName} narrow interface AND embed it on the aggregate {Service}API in the same file
+  internal/aws/{service}_interfaces.go — append {InterfaceName} narrow interface AND embed it on the aggregate {Service}API in the same file
     Append point: after last narrow interface, before the aggregate {Service}API
   internal/resource/types.go — add Children to {parent}, add {ChildType}Columns()
     Append point: grep "{parent_shortname}" in resourceTypes
@@ -110,7 +110,7 @@ What to test:
   - Nil fields: no panic
   - Parent context: verify correct key used
 Context files (read-only):
-  internal/aws/interfaces_{service}.go — interface definition (after coder adds it)
+  internal/aws/{service}_interfaces.go — interface definition (after coder adds it)
   internal/resource/types.go — column keys
 ```
 
@@ -153,7 +153,7 @@ The coder receives the architect's coder task and makes all tests pass.
 
 ### Checklist (order matters):
 
-**1. Interface:** `internal/aws/interfaces_<service>.go` (APPEND to the service's per-service file; also embed on the aggregate `<Service>API` in the same file)
+**1. Interface:** `internal/aws/<service>_interfaces.go` (APPEND to the service's per-service file; also embed on the aggregate `<Service>API` in the same file)
 ```go
 type {InterfaceName} interface {
     {APICall}(ctx context.Context, params *{service}.{APICall}Input, optFns ...func(*{service}.Options)) (*{service}.{APICall}Output, error)

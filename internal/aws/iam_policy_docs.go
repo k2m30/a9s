@@ -1,4 +1,4 @@
-// iam_policy_docs.go owns IAM policy document fetch/decode helpers used by both policy_detail_enrichment.go and role_policies_detail_enrichment.go.
+// iam_policy_docs.go owns IAM policy document fetch/decode helpers used by both iam_policy_detail_enrichment.go and iam_role_policies_detail_enrichment.go.
 package aws
 
 import (

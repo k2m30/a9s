@@ -1,4 +1,4 @@
-// policy_issue_enrichment.go — Wave 2 issue enrichment for the policy resource type.
+// iam_policy_issue_enrichment.go — Wave 2 issue enrichment for the policy resource type.
 package aws
 
 import (

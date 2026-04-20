@@ -1,4 +1,4 @@
-// role_issue_enrichment.go — Wave 2 issue enrichment for the role resource type.
+// iam_role_issue_enrichment.go — Wave 2 issue enrichment for the role resource type.
 package aws
 
 import (

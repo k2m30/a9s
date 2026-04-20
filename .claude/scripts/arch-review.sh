@@ -252,7 +252,7 @@ multi_method_aws=$(awk '
     in_iface = 0
   }
   in_iface && /^\t[A-Z]/ { methods++ }
-' internal/aws/interfaces_*.go 2>/dev/null || true)
+' internal/aws/*_interfaces.go 2>/dev/null || true)
 
 if [ -z "$multi_method_aws" ]; then
   pass "All AWS interfaces are single-method"
