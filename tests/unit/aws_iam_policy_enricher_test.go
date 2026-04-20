@@ -104,9 +104,9 @@ func iamPolicyGetVersionOutput(doc string) *iam.GetPolicyVersionOutput {
 	encoded := pathEncodeDoc(doc)
 	return &iam.GetPolicyVersionOutput{
 		PolicyVersion: &iamtypes.PolicyVersion{
-			Document:        aws.String(encoded),
+			Document:         aws.String(encoded),
 			IsDefaultVersion: true,
-			VersionId:       aws.String("v1"),
+			VersionId:        aws.String("v1"),
 		},
 	}
 }

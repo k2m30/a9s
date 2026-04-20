@@ -956,4 +956,3 @@ func TestCTDetailExtractTarget_Navigability_CatchAll_NotNavigable(t *testing.T) 
 		t.Errorf("catch-all Resource row TargetType = %q; want empty string", rows[0].TargetType)
 	}
 }
-

@@ -111,8 +111,6 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("cfn", ids)
 }
 
-
-
 // checkCfnSNS extracts notification ARNs from the CloudFormation Stack's
 // NotificationARNs field and returns SNS topic identifiers.
 // Pattern F — no cache needed.

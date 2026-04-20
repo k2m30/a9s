@@ -2,14 +2,15 @@ package unit
 
 // Tests for §6 of docs/design/ct-event-list-v2.md: sort indicator binding.
 //
-// Bug: colHeaderTitle matches SortAge against any column whose key or title
-// contains "time"/"event"/"date" etc. For ct-events, both the TIME column
-// (key="time") and the EVENT column (title="EVENT", which contains "event")
-// match isAgeKey → both get the ↓/↑ glyph.
+// History: an earlier named-sort model matched sort sentinels against any
+// column whose key or title contained "time"/"event"/"date" etc. For
+// ct-events, both the TIME column (key="time") and the EVENT column
+// (title="EVENT", which contains "event") matched → both got the ↓/↑ glyph.
 //
-// Contract (§6): exactly ONE column carries the sort glyph for any active sort.
-// The fix is to bind the indicator to one explicit column via sortColIdx on
-// ResourceListModel instead of substring matching in colHeaderTitle.
+// Contract (§6): exactly ONE column carries the sort glyph for any active
+// sort. Runtime sort is column-position-only (sortColIdx on
+// ResourceListModel); there is no substring matching in the sort indicator
+// path.
 //
 // Column headers now carry number prefixes: "1:TIME", "2:EVENT", etc.
 // The sort glyph appears after the prefix+title: "2:TIME↓" (descending).
@@ -244,8 +245,10 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 			wantCount:    1,
 			wantOnColumn: "",
 		},
-		// ct-events + col 4 (EVENT): the old SortAge bug case.
-		// Sorting by the EVENT column should put the glyph on 5:EVENT, not TIME.
+		// ct-events + col 4 (EVENT): regression for the legacy substring-match
+		// bug. Sorting by the EVENT column must place the glyph on 5:EVENT and
+		// nowhere else — not on the TIME column which also contains "time" in
+		// its key.
 		{
 			name:         "ct-events_EVENT_col4",
 			typeName:     "ct-events",
@@ -314,13 +317,13 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 }
 
 // ===========================================================================
-// TestSortIndicator_NoGlyphWhenSortNone
+// TestSortIndicator_NoGlyphWhenUnsorted
 //
 // When no sort key has been pressed (default for most resource types), no
 // glyph appears. views.SortColNone (-1) is the initial sortColIdx value.
 // ===========================================================================
 
-func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
+func TestSortIndicator_NoGlyphWhenUnsorted(t *testing.T) {
 	for _, shortName := range []string{"ec2", "dbi"} {
 		t.Run(shortName, func(t *testing.T) {
 			os.Unsetenv("NO_COLOR")
@@ -345,7 +348,7 @@ func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 			// Do NOT apply any sort — defaults to SortColNone for ec2/dbi.
 			colIdx, _ := m.SortState()
 			if colIdx != views.SortColNone {
-				t.Skipf("resource type %q initialises with non-None sort (col %d), skipping SortNone test", shortName, colIdx)
+				t.Skipf("resource type %q initialises with non-None sort (col %d), skipping unsorted test", shortName, colIdx)
 			}
 
 			view := m.View()
@@ -363,20 +366,18 @@ func TestSortIndicator_NoGlyphWhenSortNone(t *testing.T) {
 }
 
 // ===========================================================================
-// TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn
+// TestSortIndicator_CTEvents_TimeSort_OnlyTIMEColumn
 //
-// Explicit regression test: after the P3 fix, the ↓ glyph must NOT appear
-// anywhere near the word "EVENT" in the ct-events header when sorting by the
-// TIME column (column index 1, key "2").
+// Explicit regression: the ↓ glyph must NOT appear anywhere near the word
+// "EVENT" in the ct-events header when sorting by the TIME column
+// (column index 1, key "2").
 //
-// With the new positional sort API, "sort by time" means pressing "2" to
-// activate column 1 (TIME). The header renders as "2:TIME↓".
-//
-// This test is the most precise catch for the §6 double-glyph bug.
-// It will FAIL against HEAD (current code decorates both TIME and EVENT).
+// "Sort by time" means pressing "2" to activate column 1 (TIME). The header
+// renders as "2:TIME↓". This is the most precise catch for the §6
+// double-glyph bug from the legacy substring-match era.
 // ===========================================================================
 
-func TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn(t *testing.T) {
+func TestSortIndicator_CTEvents_TimeSort_OnlyTIMEColumn(t *testing.T) {
 	// ct-events config column order: V[0], TIME[1], ACTOR[2], ORIGIN[3], EVENT[4], ...
 	// Sort by column 1 (TIME) descending.
 	m := buildSortModel(t, "ct-events", 1, false)
@@ -394,9 +395,10 @@ func TestSortIndicator_CTEvents_SortAge_OnlyTIMEColumn(t *testing.T) {
 		t.Errorf(
 			"sort glyph incorrectly appears on EVENT column\n"+
 				"  header: %q\n"+
-				"  bug: old isAgeKey(\"EVENT\") matched because \"event\" is in its substring list;\n"+
-				"  colHeaderTitle decorated both TIME and EVENT when sorting by the time column.\n"+
-				"  fix: use exact sortColIdx comparison instead of isAgeKey(c.title).",
+				"  regression: legacy substring matching would decorate any column whose\n"+
+				"  key or title contained \"event\"/\"time\"/etc. when sorting by the time\n"+
+				"  column. Current code uses exact sortColIdx comparison — do not\n"+
+				"  reintroduce title-substring matching in the sort-indicator path.",
 			plainHdr,
 		)
 	}

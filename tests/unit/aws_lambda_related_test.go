@@ -229,38 +229,6 @@ func TestRelated_Lambda_Alarms_CacheMissNoClients(t *testing.T) {
 
 // --- Stub checkers (nil Checker) ---
 
-func TestRelated_Lambda_SQS_IsStub(t *testing.T) {
-	defs := resource.GetRelated("lambda")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for lambda")
-	}
-	for _, def := range defs {
-		if def.TargetType == "sqs" {
-			if def.Checker == nil {
-				t.Errorf("lambda sqs Checker should not be nil")
-			}
-			return
-		}
-	}
-	t.Error("expected related def for target sqs not found for lambda")
-}
-
-func TestRelated_Lambda_CFN_IsStub(t *testing.T) {
-	defs := resource.GetRelated("lambda")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for lambda")
-	}
-	for _, def := range defs {
-		if def.TargetType == "cfn" {
-			if def.Checker == nil {
-				t.Errorf("lambda cfn Checker should not be nil")
-			}
-			return
-		}
-	}
-	t.Error("expected related def for target cfn not found for lambda")
-}
-
 // ---------------------------------------------------------------------------
 // checkLambdaECR — Pattern F: no API call, reads PackageType + image_uri field
 // ---------------------------------------------------------------------------
@@ -294,8 +262,8 @@ func TestRelated_Lambda_ECR_Match(t *testing.T) {
 // Count=0 (no ECR involvement).
 func TestRelated_Lambda_ECR_Empty(t *testing.T) {
 	src := resource.Resource{
-		ID:   "my-zip-function",
-		Name: "my-zip-function",
+		ID:     "my-zip-function",
+		Name:   "my-zip-function",
 		Fields: map[string]string{},
 		RawStruct: lambdatypes.FunctionConfiguration{
 			FunctionName: aws.String("my-zip-function"),
@@ -322,5 +290,500 @@ func TestRelated_Lambda_ECR_WrongRawStruct(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_ECR_ImageTypeNoURI: Image type but no image_uri field → Count: -1.
+func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
+	src := resource.Resource{
+		ID:     "my-image-function",
+		Fields: map[string]string{}, // no image_uri
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-image-function"),
+			PackageType:  lambdatypes.PackageTypeImage,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (Image type but no image_uri)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_ECR_ImageURIWithDigest: image URI with @sha256 digest suffix
+// is parsed correctly (digest stripped).
+func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
+	src := resource.Resource{
+		ID: "my-digest-function",
+		Fields: map[string]string{
+			"image_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo@sha256:abc123",
+		},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-digest-function"),
+			PackageType:  lambdatypes.PackageTypeImage,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-ecr-repo" {
+		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaLogs — Pattern C: default log group "/aws/lambda/{name}", custom via LoggingConfig
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_Logs_DefaultLogGroup(t *testing.T) {
+	const fnName = "my-function"
+	logRes := resource.Resource{
+		ID:   "/aws/lambda/my-function",
+		Name: "/aws/lambda/my-function",
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+	}
+	src := resource.Resource{
+		ID:   fnName,
+		Name: fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(fnName),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (default log group)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/lambda/my-function" {
+		t.Errorf("ResourceIDs = %v, want [/aws/lambda/my-function]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_Lambda_Logs_CustomLogGroupViaLoggingConfig(t *testing.T) {
+	const customGroup = "/custom/log/group"
+	logRes := resource.Resource{
+		ID:   customGroup,
+		Name: customGroup,
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+	}
+	src := resource.Resource{
+		ID:   "my-function",
+		Name: "my-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+			LoggingConfig: &lambdatypes.LoggingConfig{
+				LogGroup: aws.String(customGroup),
+			},
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (custom LoggingConfig group)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != customGroup {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, customGroup)
+	}
+}
+
+func TestRelated_Lambda_Logs_NoMatch(t *testing.T) {
+	logRes := resource.Resource{
+		ID:   "/aws/lambda/other-function",
+		Name: "/aws/lambda/other-function",
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+	}
+	src := resource.Resource{
+		ID:   "my-function",
+		Name: "my-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no matching log group)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_Logs_NilCache(t *testing.T) {
+	src := resource.Resource{
+		ID:   "my-function",
+		Name: "my-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_Logs_EmptyFunctionName(t *testing.T) {
+	src := resource.Resource{
+		ID:        "",
+		Name:      "",
+		RawStruct: lambdatypes.FunctionConfiguration{},
+	}
+	checker := lambdaCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaSG — Pattern F: reads VpcConfig.SecurityGroupIds
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_SG_VPCFunction(t *testing.T) {
+	src := resource.Resource{
+		ID:   "vpc-function",
+		Name: "vpc-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("vpc-function"),
+			VpcConfig: &lambdatypes.VpcConfigResponse{
+				SecurityGroupIds: []string{"sg-aaa111", "sg-bbb222"},
+			},
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+	if len(result.ResourceIDs) != 2 {
+		t.Errorf("ResourceIDs = %v, want [sg-aaa111 sg-bbb222]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_Lambda_SG_NoVPC(t *testing.T) {
+	src := resource.Resource{
+		ID:   "no-vpc-function",
+		Name: "no-vpc-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("no-vpc-function"),
+			VpcConfig:    (*lambdatypes.VpcConfigResponse)(nil),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_SG_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "bad-struct",
+		RawStruct: "not-a-function",
+	}
+	checker := lambdaCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaVPC — Pattern F: reads VpcConfig.VpcId
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_VPC_VPCFunction(t *testing.T) {
+	src := resource.Resource{
+		ID:   "vpc-function",
+		Name: "vpc-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("vpc-function"),
+			VpcConfig: &lambdatypes.VpcConfigResponse{
+				VpcId: aws.String("vpc-12345678"),
+			},
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-12345678" {
+		t.Errorf("ResourceIDs = %v, want [vpc-12345678]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_Lambda_VPC_NoVPCConfig(t *testing.T) {
+	src := resource.Resource{
+		ID:   "no-vpc-function",
+		Name: "no-vpc-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("no-vpc-function"),
+			VpcConfig:    (*lambdatypes.VpcConfigResponse)(nil),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no VPC config)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_VPC_EmptyVPCId(t *testing.T) {
+	src := resource.Resource{
+		ID:   "empty-vpc-function",
+		Name: "empty-vpc-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("empty-vpc-function"),
+			VpcConfig: &lambdatypes.VpcConfigResponse{
+				VpcId: aws.String(""),
+			},
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty VPC ID)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_VPC_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "bad-struct",
+		RawStruct: "not-a-function",
+	}
+	checker := lambdaCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaKMS — Pattern F: reads KMSKeyArn
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_KMS_WithKMSKey(t *testing.T) {
+	src := resource.Resource{
+		ID:   "encrypted-function",
+		Name: "encrypted-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("encrypted-function"),
+			KMSKeyArn:    aws.String("arn:aws:kms:us-east-1:123:key/abcd-1234"),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "abcd-1234" {
+		t.Errorf("ResourceIDs = %v, want [abcd-1234]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_Lambda_KMS_NoKMSKey(t *testing.T) {
+	src := resource.Resource{
+		ID:   "unencrypted-function",
+		Name: "unencrypted-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("unencrypted-function"),
+			KMSKeyArn:    nil,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_KMS_EmptyKMSArn(t *testing.T) {
+	src := resource.Resource{
+		ID:   "empty-kms-function",
+		Name: "empty-kms-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("empty-kms-function"),
+			KMSKeyArn:    aws.String(""),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty KMS ARN)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_KMS_KMSKeyNoSlash: KMS key ARN with no "/" (alias or bare key ID)
+// should be returned as-is.
+func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
+	src := resource.Resource{
+		ID:   "function-bare-kms",
+		Name: "function-bare-kms",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("function-bare-kms"),
+			KMSKeyArn:    aws.String("alias/aws/lambda"),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	// Has "/" → last segment after final "/" is "lambda"
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "lambda" {
+		t.Errorf("ResourceIDs = %v, want [lambda]", result.ResourceIDs)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaSQS — nil client path
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_SQS_NilClients(t *testing.T) {
+	src := resource.Resource{
+		ID:   "my-function",
+		Name: "my-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "sqs")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_SQS_EmptyFunctionName(t *testing.T) {
+	src := resource.Resource{
+		ID:        "",
+		Name:      "",
+		RawStruct: lambdatypes.FunctionConfiguration{},
+	}
+	checker := lambdaCheckerByTarget(t, "sqs")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaCFN — nil client / no FunctionArn paths
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_CFN_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "my-function",
+		RawStruct: "not-a-function",
+	}
+	checker := lambdaCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_CFN_NoFunctionArn(t *testing.T) {
+	src := resource.Resource{
+		ID:   "my-function",
+		Name: "my-function",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+			FunctionArn:  nil, // no ARN
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no FunctionArn)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaEBRule — nil client and no ARN/name paths
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_EBRule_WrongRawStruct(t *testing.T) {
+	src := resource.Resource{
+		ID:        "my-function",
+		RawStruct: "not-a-function",
+	}
+	checker := lambdaCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+func TestRelated_Lambda_EBRule_EmptyARNAndName(t *testing.T) {
+	src := resource.Resource{
+		ID:   "",
+		Name: "",
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: nil,
+			FunctionArn:  nil,
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no ARN and no name)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkLambdaAlarms — truncated cache path
+// ---------------------------------------------------------------------------
+
+func TestRelated_Lambda_Alarms_TruncatedCacheNoMatch(t *testing.T) {
+	const fnName = "my-function"
+
+	alarmRes := resource.Resource{
+		ID: "other-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("other-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("FunctionName"), Value: aws.String("different-fn")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{alarmRes},
+			IsTruncated: true,
+		},
+	}
+	src := resource.Resource{
+		ID:   fnName,
+		Name: fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(fnName),
+		},
+	}
+	checker := lambdaCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, src, cache)
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	}
+}
+
+func TestRelated_Lambda_Alarms_EmptyFunctionName(t *testing.T) {
+	src := resource.Resource{
+		ID:        "",
+		Name:      "",
+		RawStruct: lambdatypes.FunctionConfiguration{},
+	}
+	checker := lambdaCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
 	}
 }

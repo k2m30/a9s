@@ -141,6 +141,198 @@ func pipelineDeclarationEmpty(pipelineName string) *cptypes.PipelineDeclaration 
 	}
 }
 
+// pipelineDeclarationWithRoleArn builds a minimal PipelineDeclaration with
+// the given IAM role ARN set on the pipeline-level RoleArn field.
+func pipelineDeclarationWithRoleArn(pipelineName, roleArn string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name:    aws.String(pipelineName),
+		RoleArn: aws.String(roleArn),
+		Stages:  []cptypes.StageDeclaration{},
+	}
+}
+
+// pipelineDeclarationWithCFNAction builds a minimal PipelineDeclaration whose
+// single stage contains one CloudFormation deploy action referencing stackName.
+func pipelineDeclarationWithCFNAction(pipelineName, stackName string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Deploy"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("CFNDeploy"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategoryDeploy,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("CloudFormation"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"StackName": stackName,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// pipelineDeclarationWithCodeArtifactAction builds a minimal PipelineDeclaration
+// referencing a CodeArtifact repository name.
+func pipelineDeclarationWithCodeArtifactAction(pipelineName, repoName string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Source"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("CodeArtifactSource"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategorySource,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("CodeArtifact"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"RepositoryName": repoName,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// pipelineDeclarationWithECSSvcAction builds a minimal PipelineDeclaration
+// referencing an ECS service name in a deploy action.
+func pipelineDeclarationWithECSSvcAction(pipelineName, serviceName string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Deploy"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("ECSDeploy"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategoryDeploy,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("ECS"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"ServiceName": serviceName,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// pipelineDeclarationWithArtifactStore builds a minimal PipelineDeclaration
+// with an ArtifactStore using the given S3 bucket and optional KMS key ARN.
+func pipelineDeclarationWithArtifactStore(pipelineName, bucketName, kmsKeyARN string) *cptypes.PipelineDeclaration {
+	decl := &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		ArtifactStore: &cptypes.ArtifactStore{
+			Location: aws.String(bucketName),
+			Type:     cptypes.ArtifactStoreTypeS3,
+		},
+		Stages: []cptypes.StageDeclaration{},
+	}
+	if kmsKeyARN != "" {
+		decl.ArtifactStore.EncryptionKey = &cptypes.EncryptionKey{
+			Id:   aws.String(kmsKeyARN),
+			Type: cptypes.EncryptionKeyTypeKms,
+		}
+	}
+	return decl
+}
+
+// pipelineDeclarationWithLambdaAction builds a minimal PipelineDeclaration
+// referencing a Lambda function name in an invoke action.
+func pipelineDeclarationWithLambdaAction(pipelineName, functionName string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Invoke"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("LambdaInvoke"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategoryInvoke,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("Lambda"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"FunctionName": functionName,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// pipelineDeclarationWithS3DeployAction builds a minimal PipelineDeclaration
+// referencing an S3 bucket in a deploy action.
+func pipelineDeclarationWithS3DeployAction(pipelineName, bucketName string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Deploy"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("S3Deploy"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategoryDeploy,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("S3"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"BucketName": bucketName,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// pipelineDeclarationWithSNSApprovalAction builds a minimal PipelineDeclaration
+// with a Manual approval action carrying a notification ARN.
+func pipelineDeclarationWithSNSApprovalAction(pipelineName, topicARN string) *cptypes.PipelineDeclaration {
+	return &cptypes.PipelineDeclaration{
+		Name: aws.String(pipelineName),
+		Stages: []cptypes.StageDeclaration{
+			{
+				Name: aws.String("Approval"),
+				Actions: []cptypes.ActionDeclaration{
+					{
+						Name: aws.String("ManualApproval"),
+						ActionTypeId: &cptypes.ActionTypeId{
+							Category: cptypes.ActionCategoryApproval,
+							Owner:    cptypes.ActionOwnerAws,
+							Provider: aws.String("Manual"),
+							Version:  aws.String("1"),
+						},
+						Configuration: map[string]string{
+							"NotificationArn": topicARN,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 // ---------------------------------------------------------------------------
 // fakeECRBatch4 — implements ECRAPI
 // (ECRDescribeRepositoriesAPI + ECRDescribeImagesAPI +
@@ -286,8 +478,8 @@ func (f *fakeDynamoDBBatch4) DescribeKinesisStreamingDestination(_ context.Conte
 	if f.kinesisDestByTable != nil {
 		if dests, ok := f.kinesisDestByTable[tableName]; ok {
 			return &dynamodb.DescribeKinesisStreamingDestinationOutput{
-				TableName:                        aws.String(tableName),
-				KinesisDataStreamDestinations:    dests,
+				TableName:                     aws.String(tableName),
+				KinesisDataStreamDestinations: dests,
 			}, nil
 		}
 	}
@@ -308,8 +500,8 @@ func newFakeDynamoDBWithKinesisDestination(tableName, streamARN string) *fakeDyn
 		kinesisDestByTable: map[string][]ddbtypes.KinesisDataStreamDestination{
 			tableName: {
 				{
-					StreamArn:            aws.String(streamARN),
-					DestinationStatus:    ddbtypes.DestinationStatusActive,
+					StreamArn:         aws.String(streamARN),
+					DestinationStatus: ddbtypes.DestinationStatusActive,
 				},
 			},
 		},

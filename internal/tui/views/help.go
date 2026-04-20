@@ -71,7 +71,6 @@ func (m HelpModel) Update(msg tea.Msg) (HelpModel, tea.Cmd) {
 	return m, nil
 }
 
-
 // helpBinding is a single key-description pair for rendering.
 type helpBinding struct {
 	key  string

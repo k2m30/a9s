@@ -7,6 +7,7 @@ package unit_test
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -16,51 +17,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
-
-// ---------------------------------------------------------------------------
-// SSM fake — implements SSMAPI (SSMDescribeParametersAPI +
-// SSMGetParameterAPI + SSMDescribeInstanceInformationAPI)
-// ---------------------------------------------------------------------------
-
-type fakeSSMUS1 struct {
-	instanceInfoOutput *ssm.DescribeInstanceInformationOutput
-	instanceInfoErr    error
-}
-
-func (f *fakeSSMUS1) DescribeParameters(_ context.Context, _ *ssm.DescribeParametersInput, _ ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error) {
-	return &ssm.DescribeParametersOutput{}, nil
-}
-
-func (f *fakeSSMUS1) GetParameter(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-	return &ssm.GetParameterOutput{}, nil
-}
-
-func (f *fakeSSMUS1) DescribeInstanceInformation(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
-	if f.instanceInfoErr != nil {
-		return nil, f.instanceInfoErr
-	}
-	if f.instanceInfoOutput != nil {
-		return f.instanceInfoOutput, nil
-	}
-	return &ssm.DescribeInstanceInformationOutput{}, nil
-}
-
-// newFakeSSMWithInstances constructs a fakeSSMUS1 returning the supplied
-// instance information entries.
-func newFakeSSMWithInstances(entries []ssmtypes.InstanceInformation) *fakeSSMUS1 {
-	return &fakeSSMUS1{
-		instanceInfoOutput: &ssm.DescribeInstanceInformationOutput{
-			InstanceInformationList: entries,
-		},
-	}
-}
 
 // ---------------------------------------------------------------------------
 // EventBridge fake — implements EventBridgeAPI
@@ -284,21 +247,6 @@ func newFakeLambdaWithKMSKey(kmsKeyARN string) *fakeLambdaUS1 {
 	}
 }
 
-// newFakeLambdaWithImageURI returns a fakeLambdaUS1 whose GetFunction returns
-// a FunctionConfiguration with the specified ImageUri in Code.
-func newFakeLambdaWithImageURI(imageURI string) *fakeLambdaUS1 {
-	return &fakeLambdaUS1{
-		getFunctionOutput: &lambdapkg.GetFunctionOutput{
-			Configuration: &lambdatypes.FunctionConfiguration{
-				PackageType: lambdatypes.PackageTypeImage,
-			},
-			Code: &lambdatypes.FunctionCodeLocation{
-				ImageUri: &imageURI,
-			},
-		},
-	}
-}
-
 // ---------------------------------------------------------------------------
 // CodeArtifact fake — implements CodeArtifactAPI
 // (CodeArtifactListRepositoriesAPI + CodeArtifactGetRepositoryPermissionsPolicyAPI +
@@ -356,7 +304,7 @@ func newFakeCodeArtifactWithKMSKey(keyARN string) *fakeCodeArtifactUS1 {
 // ---------------------------------------------------------------------------
 
 type fakeAPIGWV2US1 struct {
-	integrations []apigwv2types.Integration
+	integrations    []apigwv2types.Integration
 	integrationsErr error
 }
 
@@ -375,6 +323,14 @@ func (f *fakeAPIGWV2US1) GetIntegrations(_ context.Context, _ *apigatewayv2.GetI
 	return &apigatewayv2.GetIntegrationsOutput{Items: f.integrations}, nil
 }
 
+func (f *fakeAPIGWV2US1) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
+	return &apigatewayv2.GetDomainNamesOutput{}, nil
+}
+
+func (f *fakeAPIGWV2US1) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	return &apigatewayv2.GetApiMappingsOutput{}, nil
+}
+
 // newFakeAPIGWV2WithLambdaIntegration returns a fakeAPIGWV2US1 whose
 // GetIntegrations returns a single integration pointing at the given Lambda
 // function name.
@@ -385,4 +341,76 @@ func newFakeAPIGWV2WithLambdaIntegration(functionName string) *fakeAPIGWV2US1 {
 			{IntegrationUri: &uri},
 		},
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Lambda fake (ESM variant) — implements LambdaAPI
+// Returns a configurable list of event source mapping FunctionArns.
+// Used by checkSQSLambda tests.
+// ---------------------------------------------------------------------------
+
+type fakeLambdaListESM struct {
+	// mappings is a slice of FunctionArn strings returned by ListEventSourceMappings.
+	mappings []string
+}
+
+func (f *fakeLambdaListESM) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
+	return &lambdapkg.ListFunctionsOutput{}, nil
+}
+
+func (f *fakeLambdaListESM) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
+	var mappings []lambdatypes.EventSourceMappingConfiguration
+	for i := range f.mappings {
+		arn := f.mappings[i]
+		mappings = append(mappings, lambdatypes.EventSourceMappingConfiguration{
+			FunctionArn: &arn,
+		})
+	}
+	return &lambdapkg.ListEventSourceMappingsOutput{EventSourceMappings: mappings}, nil
+}
+
+func (f *fakeLambdaListESM) GetFunction(_ context.Context, _ *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
+	return &lambdapkg.GetFunctionOutput{}, nil
+}
+
+func (f *fakeLambdaListESM) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
+	return &lambdapkg.ListTagsOutput{}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Kinesis fake — implements KinesisAPI + KinesisListTagsForStreamAPI +
+// KinesisDescribeStreamSummaryAPI via type-assertion upgrade.
+// Used by checkKinesisCFN and checkKinesisKMS tests.
+// ---------------------------------------------------------------------------
+
+type fakeKinesisWithTagsAndDesc struct {
+	// cfnStackName is the aws:cloudformation:stack-name tag value to return.
+	// Empty string means no cfn tag.
+	cfnStackName string
+	// kmsKeyID is the KeyId returned in StreamDescriptionSummary.
+	// Empty string means no KMS encryption.
+	kmsKeyID string
+}
+
+func (f *fakeKinesisWithTagsAndDesc) ListStreams(_ context.Context, _ *kinesis.ListStreamsInput, _ ...func(*kinesis.Options)) (*kinesis.ListStreamsOutput, error) {
+	return &kinesis.ListStreamsOutput{}, nil
+}
+
+func (f *fakeKinesisWithTagsAndDesc) ListTagsForStream(_ context.Context, _ *kinesis.ListTagsForStreamInput, _ ...func(*kinesis.Options)) (*kinesis.ListTagsForStreamOutput, error) {
+	hasMore := false
+	var tags []kinesistypes.Tag
+	if f.cfnStackName != "" {
+		k := "aws:cloudformation:stack-name"
+		v := f.cfnStackName
+		tags = append(tags, kinesistypes.Tag{Key: &k, Value: &v})
+	}
+	return &kinesis.ListTagsForStreamOutput{HasMoreTags: &hasMore, Tags: tags}, nil
+}
+
+func (f *fakeKinesisWithTagsAndDesc) DescribeStreamSummary(_ context.Context, _ *kinesis.DescribeStreamSummaryInput, _ ...func(*kinesis.Options)) (*kinesis.DescribeStreamSummaryOutput, error) {
+	summary := &kinesistypes.StreamDescriptionSummary{}
+	if f.kmsKeyID != "" {
+		summary.KeyId = aws.String(f.kmsKeyID)
+	}
+	return &kinesis.DescribeStreamSummaryOutput{StreamDescriptionSummary: summary}, nil
 }

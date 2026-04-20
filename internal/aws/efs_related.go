@@ -7,9 +7,9 @@ import (
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -107,7 +107,6 @@ func efsCFNStackName(res resource.Resource) string {
 	}
 	return ""
 }
-
 
 // checkEFSSG finds security groups for this EFS file system by scanning the ENI
 // cache for mount-target ENIs whose Description contains the filesystem ID (Pattern C).
@@ -302,5 +301,3 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 	result.Approximate = entry.IsTruncated
 	return result
 }
-
-

@@ -29,8 +29,8 @@ func natCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 func TestNavigableFields_NAT_Registered(t *testing.T) {
 	expected := map[string]string{
-		"VpcId":                           "vpc",
-		"SubnetId":                        "subnet",
+		"VpcId":                            "vpc",
+		"SubnetId":                         "subnet",
 		"NatGatewayAddresses.AllocationId": "eip",
 	}
 	for path, wantTarget := range expected {

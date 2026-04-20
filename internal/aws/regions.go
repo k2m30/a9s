@@ -1,7 +1,12 @@
 package aws
 
 import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
 	"os"
+	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/ini.v1"
@@ -13,37 +18,109 @@ type AWSRegion struct {
 	DisplayName string
 }
 
-// AllRegions returns a hardcoded list of all current AWS regions.
-func AllRegions() []AWSRegion {
-	return []AWSRegion{
-		{Code: "us-east-1", DisplayName: "US East (N. Virginia)"},
-		{Code: "us-east-2", DisplayName: "US East (Ohio)"},
-		{Code: "us-west-1", DisplayName: "US West (N. California)"},
-		{Code: "us-west-2", DisplayName: "US West (Oregon)"},
-		{Code: "af-south-1", DisplayName: "Africa (Cape Town)"},
-		{Code: "ap-east-1", DisplayName: "Asia Pacific (Hong Kong)"},
-		{Code: "ap-south-1", DisplayName: "Asia Pacific (Mumbai)"},
-		{Code: "ap-south-2", DisplayName: "Asia Pacific (Hyderabad)"},
-		{Code: "ap-southeast-1", DisplayName: "Asia Pacific (Singapore)"},
-		{Code: "ap-southeast-2", DisplayName: "Asia Pacific (Sydney)"},
-		{Code: "ap-southeast-3", DisplayName: "Asia Pacific (Jakarta)"},
-		{Code: "ap-northeast-1", DisplayName: "Asia Pacific (Tokyo)"},
-		{Code: "ap-northeast-2", DisplayName: "Asia Pacific (Seoul)"},
-		{Code: "ap-northeast-3", DisplayName: "Asia Pacific (Osaka)"},
-		{Code: "ca-central-1", DisplayName: "Canada (Central)"},
-		{Code: "eu-central-1", DisplayName: "Europe (Frankfurt)"},
-		{Code: "eu-central-2", DisplayName: "Europe (Zurich)"},
-		{Code: "eu-west-1", DisplayName: "Europe (Ireland)"},
-		{Code: "eu-west-2", DisplayName: "Europe (London)"},
-		{Code: "eu-west-3", DisplayName: "Europe (Paris)"},
-		{Code: "eu-north-1", DisplayName: "Europe (Stockholm)"},
-		{Code: "eu-south-1", DisplayName: "Europe (Milan)"},
-		{Code: "eu-south-2", DisplayName: "Europe (Spain)"},
-		{Code: "me-south-1", DisplayName: "Middle East (Bahrain)"},
-		{Code: "me-central-1", DisplayName: "Middle East (UAE)"},
-		{Code: "sa-east-1", DisplayName: "South America (Sao Paulo)"},
-		{Code: "il-central-1", DisplayName: "Israel (Tel Aviv)"},
+// partitionsJSON is the AWS SDK's own partitions catalog. It ships as
+// aws-sdk-go-v2/internal/endpoints/awsrulesfn/partitions.json and is
+// refreshed by the SDK release process. We embed a verified copy here and
+// parse it into AllRegions() at init time so the region catalogue is
+// SDK-backed — bumping the SDK version and re-copying this file is the
+// single source-of-truth update.
+//
+//go:embed data/partitions.json
+var partitionsJSON []byte
+
+// sdkPartitions is the minimal subset of the SDK's partition catalogue that
+// we parse: per-partition regex + region map with descriptions.
+type sdkPartitions struct {
+	Partitions []sdkPartition `json:"partitions"`
+}
+
+type sdkPartition struct {
+	ID          string                         `json:"id"`
+	RegionRegex string                         `json:"regionRegex"`
+	Regions     map[string]sdkRegionDescriptor `json:"regions"`
+}
+
+type sdkRegionDescriptor struct {
+	Description string `json:"description"`
+}
+
+var (
+	// allRegionsCache is the memoised AllRegions result.
+	allRegionsCache []AWSRegion
+
+	// awsPartitionRegionRegex is the regex that validates commercial-partition
+	// region codes. Exposed as a variable so tests can assert that every
+	// region we expose satisfies it.
+	awsPartitionRegionRegex *regexp.Regexp
+
+	// commercialDisplayNames maps commercial-partition region codes to their
+	// human-readable names. Populated from partitions.json at init.
+	commercialDisplayNames map[string]string
+)
+
+func init() {
+	var parsed sdkPartitions
+	if err := json.Unmarshal(partitionsJSON, &parsed); err != nil {
+		panic(fmt.Sprintf("aws regions: parse embedded partitions.json: %v", err))
 	}
+
+	commercialDisplayNames = map[string]string{}
+	for _, p := range parsed.Partitions {
+		if p.ID != "aws" {
+			// Skip gov-cloud (aws-us-gov) and China (aws-cn). a9s targets the
+			// commercial partition; TestAllRegions_NoGovOrChinaLeaks pins that
+			// nothing from those partitions leaks into AllRegions().
+			continue
+		}
+		re, err := regexp.Compile(p.RegionRegex)
+		if err != nil {
+			panic(fmt.Sprintf("aws regions: compile region regex %q: %v", p.RegionRegex, err))
+		}
+		awsPartitionRegionRegex = re
+
+		regions := make([]AWSRegion, 0, len(p.Regions))
+		for code, desc := range p.Regions {
+			// Filter out pseudo-regions that the SDK emits for global
+			// services (e.g. "aws-global", "aws-cn-global"). They are not
+			// selectable via the region switcher and do not match the
+			// commercial region regex.
+			if !re.MatchString(code) {
+				continue
+			}
+			display := desc.Description
+			if display == "" {
+				display = code
+			}
+			commercialDisplayNames[code] = display
+			regions = append(regions, AWSRegion{Code: code, DisplayName: display})
+		}
+		// Stable alphabetical order on code — the selector UI expects a
+		// deterministic ordering independent of map iteration.
+		sort.Slice(regions, func(i, j int) bool { return regions[i].Code < regions[j].Code })
+		allRegionsCache = regions
+	}
+	if awsPartitionRegionRegex == nil {
+		panic("aws regions: embedded partitions.json has no 'aws' partition")
+	}
+}
+
+// AllRegions returns the list of commercial-partition AWS regions in a stable
+// alphabetical order. Data comes from the SDK's partitions.json (embedded at
+// build time) so the catalogue stays in sync with the SDK release cycle.
+func AllRegions() []AWSRegion {
+	out := make([]AWSRegion, len(allRegionsCache))
+	copy(out, allRegionsCache)
+	return out
+}
+
+// ValidateRegionCode reports whether a region code matches the SDK's commercial
+// region regex. Returns false for an empty string or any code outside the
+// commercial partition.
+func ValidateRegionCode(code string) bool {
+	if awsPartitionRegionRegex == nil {
+		return false
+	}
+	return awsPartitionRegionRegex.MatchString(code)
 }
 
 // GetDefaultRegion reads the region configured for a given profile in the AWS config file.
@@ -61,7 +138,7 @@ func GetDefaultRegion(configPath, profile string) string {
 
 	cfg, err := ini.LoadSources(ini.LoadOptions{
 		Insensitive:     false,
-		AllowShadows:     true,
+		AllowShadows:    true,
 		Loose:           true,
 		InsensitiveKeys: true,
 	}, configPath)

@@ -36,7 +36,6 @@ func init() {
 	})
 }
 
-
 // checkOpenSearchAlarms checks the cache for CloudWatch alarms with DomainName dimension matching this domain.
 func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
@@ -143,7 +142,6 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 	}
 	return relatedResult("vpc", []string{*domain.VPCOptions.VPCId})
 }
-
 
 // checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
 // EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
@@ -284,5 +282,3 @@ func opensearchRelatedResources(ctx context.Context, clients any, cache resource
 	}
 	return resources, isTruncated, err
 }
-
-

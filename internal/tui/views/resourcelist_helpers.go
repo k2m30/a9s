@@ -510,6 +510,10 @@ func (m *ResourceListModel) applyFilter() {
 		for _, r := range result {
 			if m.typeDef.ResolveColor(r).IsIssue() {
 				kept = append(kept, r)
+				continue
+			}
+			if _, hasFinding := m.findingsByID[r.ID]; hasFinding {
+				kept = append(kept, r)
 			}
 		}
 		result = kept

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/smithy-go"
 	tea "charm.land/bubbletea/v2"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"

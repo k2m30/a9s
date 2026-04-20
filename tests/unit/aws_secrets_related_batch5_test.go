@@ -11,14 +11,14 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -401,7 +401,7 @@ func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	source := secretsSourceWithARN(secretARN, "prod/db/password")
 
 	matchingTask := resource.Resource{
-		ID:   "task-abc123",
+		ID:     "task-abc123",
 		Fields: map[string]string{"task_definition": taskDefARN},
 		RawStruct: ecstypes.Task{
 			TaskDefinitionArn: aws.String(taskDefARN),

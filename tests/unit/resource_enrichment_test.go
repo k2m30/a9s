@@ -1,6 +1,6 @@
 package unit
 
-// Tests for internal/resource/enrichment.go
+// Tests for internal/resource enrichment types
 //
 // Note: the four tests that previously appeared here
 // (TestEnrichmentFinding_FieldValues, TestEnrichmentFinding_ZeroValue,

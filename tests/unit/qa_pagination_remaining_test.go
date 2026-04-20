@@ -210,7 +210,7 @@ func TestQA_Pagination_FetchKinesisStreamsPage_FirstPage(t *testing.T) {
 					},
 				},
 				HasMoreStreams: aws.Bool(true),
-				NextToken:     aws.String("token-kinesis-page-2"),
+				NextToken:      aws.String("token-kinesis-page-2"),
 			}, nil
 		},
 	}
@@ -250,7 +250,7 @@ func TestQA_Pagination_FetchKinesisStreamsPage_Continuation(t *testing.T) {
 					},
 				},
 				HasMoreStreams: aws.Bool(false),
-				NextToken:     nil,
+				NextToken:      nil,
 			}, nil
 		},
 	}
@@ -287,7 +287,7 @@ func TestQA_Pagination_FetchKinesisStreamsPage_Empty(t *testing.T) {
 		PageFunc: func(_ int) (*kinesis.ListStreamsOutput, error) {
 			return &kinesis.ListStreamsOutput{
 				StreamSummaries: []kinesistypes.StreamSummary{},
-				HasMoreStreams:   aws.Bool(false),
+				HasMoreStreams:  aws.Bool(false),
 				NextToken:       nil,
 			}, nil
 		},

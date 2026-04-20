@@ -97,13 +97,6 @@ func (m *mockFastListBucketsClient) ListBuckets(
 	return &s3.ListBucketsOutput{Buckets: buckets}, nil
 }
 
-// strPtr returns a pointer to the given string.
-//
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
 // ---------------------------------------------------------------------------
 // EC2 mocks
 // ---------------------------------------------------------------------------

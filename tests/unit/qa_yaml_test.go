@@ -1371,3 +1371,93 @@ func TestQA_YAML_ResourceID_AllTypes(t *testing.T) {
 		})
 	}
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// IsTextViewer — distinguishes raw-text mode from resource-YAML mode
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestQA_YAML_IsTextViewer_True verifies that NewTextViewer produces a model
+// where IsTextViewer() returns true.
+func TestQA_YAML_IsTextViewer_True(t *testing.T) {
+	k := keys.Default()
+	tv := views.NewTextViewer("my-title", "line1\nline2", k)
+	if !tv.IsTextViewer() {
+		t.Error("NewTextViewer should produce IsTextViewer() == true")
+	}
+}
+
+// TestQA_YAML_IsTextViewer_False verifies that NewYAML (resource mode) produces
+// a model where IsTextViewer() returns false.
+func TestQA_YAML_IsTextViewer_False(t *testing.T) {
+	res := resource.Resource{
+		ID:     "i-test",
+		Fields: map[string]string{"state": "running"},
+	}
+	k := keys.Default()
+	m := views.NewYAML(res, "ec2", k)
+	if m.IsTextViewer() {
+		t.Error("NewYAML should produce IsTextViewer() == false")
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CopyContent — raw-text branch returns content + "Copied to clipboard"
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestQA_YAML_CopyContent_TextViewerMode verifies the rawText branch of
+// CopyContent: returns the raw text and a "Copied to clipboard" label.
+func TestQA_YAML_CopyContent_TextViewerMode(t *testing.T) {
+	const rawContent = "error: something went wrong\n  at line 42"
+	k := keys.Default()
+	tv := views.NewTextViewer("errors", rawContent, k)
+	tv.SetSize(80, 24)
+
+	content, label := tv.CopyContent()
+	if content != rawContent {
+		t.Errorf("CopyContent() text-viewer content = %q, want %q", content, rawContent)
+	}
+	if label != "Copied to clipboard" {
+		t.Errorf("CopyContent() text-viewer label = %q, want %q", label, "Copied to clipboard")
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// colorizeYAML list-item path — lines starting with "- " (scalar list items)
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestQA_YAML_ColorizeListItems verifies that standalone YAML list items
+// (lines starting with "- ") get syntax coloring applied to their scalar value.
+func TestQA_YAML_ColorizeListItems(t *testing.T) {
+	type fakeRoles struct {
+		Roles []string
+	}
+	raw := fakeRoles{Roles: []string{"reader", "readWrite", "dbAdmin"}}
+	res := resource.Resource{
+		ID:        "color-list-test",
+		Name:      "color-list-test",
+		RawStruct: &raw,
+		Fields:    map[string]string{},
+	}
+	m := yamlModel(res, 120, 40)
+	out := m.View()
+	plain := stripANSI(out)
+
+	// List items must appear in the view
+	if !strings.Contains(plain, "reader") {
+		t.Error("list item 'reader' not found in YAML view")
+	}
+	if !strings.Contains(plain, "readWrite") {
+		t.Error("list item 'readWrite' not found in YAML view")
+	}
+
+	// Output must be colored (colorizeValue was applied to the list items)
+	if !strings.Contains(out, "\x1b[") {
+		t.Error("YAML view with list items has no ANSI color codes")
+	}
+
+	// Raw content must list the items under "- " prefix
+	rawYAML := m.RawContent()
+	if !strings.Contains(rawYAML, "- reader") {
+		t.Errorf("RawContent() missing '- reader' list item, got:\n%s", rawYAML)
+	}
+}

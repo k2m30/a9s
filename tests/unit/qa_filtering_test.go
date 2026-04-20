@@ -529,8 +529,8 @@ func TestQA_Filter_11_20_RevealView_SlashIgnored(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to reveal view via SecretRevealedMsg
-	m, _ = rootApplyMsg(m, messages.SecretRevealedMsg{
+	// Navigate to reveal view via ValueRevealedMsg
+	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
 		ResourceID: "test-secret",
 		Value:      "s3cr3t-value",
 	})

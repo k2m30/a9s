@@ -130,7 +130,7 @@ func TestEnrichECRRepository_NoFindingsWhenAllCountsZero(t *testing.T) {
 // has FindingSeverityCounts[CRITICAL]=2, a finding with severity "!" is produced
 // for repo-1 and repo-2 has no finding.
 func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
-	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
+	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/ecr_issue_enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
 	fake := &ecrScanFindingsFake{
 		results: map[string]*ecrtypes.ImageScanFindings{
 			ecrRepo1: ecrScanFindings(map[string]int32{
@@ -169,7 +169,7 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 // FindingSeverityCounts[HIGH]=5 (no CRITICAL), a finding with severity "~" is produced
 // for repo-1. Severity "~" findings do NOT contribute to IssueCount.
 func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
-	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
+	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/ecr_issue_enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
 	fake := &ecrScanFindingsFake{
 		results: map[string]*ecrtypes.ImageScanFindings{
 			ecrRepo1: ecrScanFindings(map[string]int32{
@@ -264,7 +264,7 @@ func TestEnrichECRRepository_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 // sets Truncated=true, produces 0 findings for that repo, and does not propagate the
 // error.
 func TestEnrichECRRepository_APIErrorSetsTruncatedNoError(t *testing.T) {
-	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
+	t.Skip("EnrichECRRepository disabled — see TODO in internal/aws/ecr_issue_enrichment.go for ListImages-then-DescribeImageScanFindings rewrite")
 	apiErr := errors.New("ecr: DescribeImageScanFindings throttled")
 	fake := &ecrScanFindingsFake{
 		errByRepo: map[string]error{

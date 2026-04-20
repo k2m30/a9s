@@ -38,7 +38,7 @@ func init() {
 }
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
-// returns all pages of log groups. Used by existing tests and the legacy fetcher.
+// returns all pages of log groups. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

@@ -95,9 +95,6 @@ type ValueRevealedMsg struct {
 	Err          error
 }
 
-// SecretRevealedMsg is a backwards-compatibility alias for ValueRevealedMsg.
-type SecretRevealedMsg = ValueRevealedMsg
-
 // CopiedMsg is sent after a successful clipboard copy.
 type CopiedMsg struct {
 	Content string
@@ -207,10 +204,10 @@ type AvailabilityPrefetchedMsg struct {
 type AvailabilityCheckedMsg struct {
 	ResourceType string
 	HasResources bool
-	Count        int   // number of resources found
-	Truncated    bool  // true if count is from a truncated first page
-	Err          error // non-nil means "couldn't check" -- treat as unknown, don't grey out
-	Gen          int   // generation counter -- ignore if != current availabilityGen
+	Count        int                 // number of resources found
+	Truncated    bool                // true if count is from a truncated first page
+	Err          error               // non-nil means "couldn't check" -- treat as unknown, don't grey out
+	Gen          int                 // generation counter -- ignore if != current availabilityGen
 	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
 	Resources    []resource.Resource // retained first-page resources for Wave 2 enricher consumption
 }

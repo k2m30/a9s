@@ -19,6 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -51,7 +52,12 @@ func drainCmds(t *testing.T, m tui.Model, cmd tea.Cmd, maxDepth int) (tui.Model,
 func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Navigate to EC2 list.

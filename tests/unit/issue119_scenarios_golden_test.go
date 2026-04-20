@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -98,7 +98,7 @@ func TestIssue119ScenarioGoldens(t *testing.T) {
 
 func TestIssue119ScenarioCatalog(t *testing.T) {
 	for _, sc := range issue119Scenarios() {
-		t.Log(fmt.Sprintf("scenario: %s", sc.name))
+		t.Logf("scenario: %s", sc.name)
 	}
 }
 
@@ -348,7 +348,12 @@ func issue119ModelToEC2Detail(t *testing.T, w, h int) tui.Model {
 
 func issue119RootModel(w, h int, demoMode bool) tui.Model {
 	if demoMode {
-		m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+		m := tui.New("demo", "us-east-1",
+			tui.WithClients(demo.NewServiceClients()),
+			tui.WithIsDemo(true),
+			tui.WithNoCache(true),
+			tui.WithProfile(demo.DemoProfile),
+			tui.WithRegion(demo.DemoRegion))
 		return issue119ApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	}
 	m := tui.New("testprofile", "us-east-1")

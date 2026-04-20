@@ -58,11 +58,11 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 		certARN = *raw.CertificateArn
 	}
 	if certARN == "" {
-		return nil, nil
+		return []string{}, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ACM == nil {
-		return nil, errNoR53Client
+		return nil, errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
 		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
@@ -71,7 +71,7 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 		return nil, err
 	}
 	if out.Certificate == nil {
-		return nil, nil
+		return []string{}, nil
 	}
 	return out.Certificate.InUseBy, nil
 }
@@ -84,7 +84,7 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
@@ -115,7 +115,7 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}

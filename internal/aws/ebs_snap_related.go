@@ -88,7 +88,6 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("kms", []string{keyID})
 }
 
-
 // checkEBSSnapBackup calls backup:ListRecoveryPointsByResource with the
 // snapshot's ARN and returns the recovery-point ARNs. Pattern C.
 // Snapshot ARN: arn:aws:ec2:REGION::snapshot/SNAP-ID (no account segment).

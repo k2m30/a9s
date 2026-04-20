@@ -40,4 +40,3 @@ func TestCtEventsDemoRightColumnHidesZeroPivotRows(t *testing.T) {
 func TestCtEventsDemoRightColumnHidesZeroPivotRows_CaseH_NoActionable(t *testing.T) {
 	t.Skip("needs rewrite onto cold-cache harness (T047-T049)")
 }
-

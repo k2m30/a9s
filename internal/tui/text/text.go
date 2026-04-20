@@ -3,8 +3,8 @@ package text
 import (
 	"strings"
 
-	"github.com/charmbracelet/x/ansi"
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // PadOrTrunc pads s to exactly w visible columns, or truncates with "...".

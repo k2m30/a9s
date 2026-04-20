@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -74,6 +75,7 @@ type ServiceClients struct {
 	AutoScaling      ASGAPI
 	CloudFront       CloudFrontAPI
 	Route53          Route53API
+	APIGatewayV1     APIGatewayV1API
 	APIGatewayV2     APIGatewayV2API
 	ECR              ECRAPI
 	EFS              EFSAPI
@@ -95,11 +97,6 @@ type ServiceClients struct {
 	MSK              MSKAPI
 	Backup           BackupAPI
 	STS              *sts.Client
-
-	// PolicyDocCache is a session-scoped cache for decoded IAM policy documents.
-	// Automatically invalidated when ServiceClients is replaced on profile/region switch.
-	// Zero-value safe — no initialization needed.
-	PolicyDocCache PolicyDocumentCache
 }
 
 // NewAWSSessionContext creates a new AWS config using the given context, profile,
@@ -144,6 +141,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		AutoScaling:      autoscaling.NewFromConfig(cfg),
 		CloudFront:       cloudfront.NewFromConfig(cfg),
 		Route53:          route53.NewFromConfig(cfg),
+		APIGatewayV1:     apigateway.NewFromConfig(cfg),
 		APIGatewayV2:     apigatewayv2.NewFromConfig(cfg),
 		ECR:              ecr.NewFromConfig(cfg),
 		EFS:              efs.NewFromConfig(cfg),

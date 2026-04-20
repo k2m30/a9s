@@ -57,7 +57,7 @@ func init() {
 }
 
 // FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
-// of volumes. Used by existing tests and the legacy fetcher.
+// of volumes. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchEBSVolumes(ctx context.Context, api EC2DescribeVolumesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
@@ -189,7 +189,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 }
 
 // FetchEBSSnapshots calls the EC2 DescribeSnapshots API and returns all pages
-// of snapshots. Used by existing tests and the legacy fetcher.
+// of snapshots. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchEBSSnapshots(ctx context.Context, api EC2DescribeSnapshotsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

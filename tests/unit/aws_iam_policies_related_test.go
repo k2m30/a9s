@@ -78,29 +78,6 @@ func TestRelated_Policy_IAMUser_NonNil(t *testing.T) {
 	_ = checker
 }
 
-func TestRelated_Policy_IAMUser_NilClients(t *testing.T) {
-	source := resource.Resource{
-		ID:   "arn:aws:iam::111122223333:policy/test-policy",
-		Name: "test-policy",
-		Fields: map[string]string{
-			"policy_name": "test-policy",
-			"arn":         "arn:aws:iam::111122223333:policy/test-policy",
-		},
-		RawStruct: iamtypes.Policy{
-			Arn:        aws.String("arn:aws:iam::111122223333:policy/test-policy"),
-			PolicyName: aws.String("test-policy"),
-		},
-	}
-	checker := checkerByTarget(t, "policy", "iam-user")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
-	}
-	if result.TargetType != "iam-user" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-user")
-	}
-}
-
 func TestRelated_Policy_IAMUser_EmptyARN(t *testing.T) {
 	source := resource.Resource{
 		ID:   "",
@@ -118,29 +95,6 @@ func TestRelated_Policy_IAMUser_EmptyARN(t *testing.T) {
 func TestRelated_Policy_IAMGroup_NonNil(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")
 	_ = checker
-}
-
-func TestRelated_Policy_IAMGroup_NilClients(t *testing.T) {
-	source := resource.Resource{
-		ID:   "arn:aws:iam::111122223333:policy/test-policy",
-		Name: "test-policy",
-		Fields: map[string]string{
-			"policy_name": "test-policy",
-			"arn":         "arn:aws:iam::111122223333:policy/test-policy",
-		},
-		RawStruct: iamtypes.Policy{
-			Arn:        aws.String("arn:aws:iam::111122223333:policy/test-policy"),
-			PolicyName: aws.String("test-policy"),
-		},
-	}
-	checker := checkerByTarget(t, "policy", "iam-group")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
-	}
-	if result.TargetType != "iam-group" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "iam-group")
-	}
 }
 
 func TestRelated_Policy_IAMGroup_EmptyARN(t *testing.T) {

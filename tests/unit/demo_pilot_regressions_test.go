@@ -303,7 +303,7 @@ func TestDemo_CtxCommandBlocked(t *testing.T) {
 		// Pre-fix: TargetRegion pushes a view inline and returns nil cmd (no guard).
 		// Post-fix (F2): guard fires before pushing view, returns FlashMsg cmd.
 		if regionCmd == nil {
-			t.Fatalf("TargetRegion in demo mode returned nil cmd — "+
+			t.Fatalf("TargetRegion in demo mode returned nil cmd — " +
 				"demo guard is missing; pre-fix pushes region selector inline instead of blocking")
 		}
 

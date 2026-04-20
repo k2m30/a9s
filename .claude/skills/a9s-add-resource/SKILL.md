@@ -246,7 +246,7 @@ func Fetch{TypeName}Page(ctx context.Context, api {InterfaceName}, continuationT
 }
 ```
 
-### 2. Interface: `internal/aws/interfaces.go` (APPEND)
+### 2. Interface: `internal/aws/<service>_interfaces.go` (APPEND to the service's existing file)
 
 ```go
 // {TypeName}{APICall}API defines the interface for the {Service} {APICall} operation.

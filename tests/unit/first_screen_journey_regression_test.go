@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -28,7 +29,12 @@ func applyRootAndCmd(t *testing.T, m tui.Model, msg tea.Msg) tui.Model {
 
 // One-enter-away smoke: EC2 list -> Enter -> detail should immediately show RELATED.
 func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m = applyRootAndCmd(t, m, messages.NavigateMsg{
 		Target:       messages.TargetResourceList,
@@ -58,7 +64,12 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 // One-enter-away navigation flow: detail Enter on ImageId -> related ami detail
 // when there is exactly one related match; Esc must return to source detail in one hit.
 func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client2 := fakes.NewEC2()
@@ -104,7 +115,12 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 // Regression: if a detail route is invoked without ResourceType but with EC2-shaped
 // fields, detail must still render as EC2 (including RELATED column).
 func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client3 := fakes.NewEC2()
@@ -131,7 +147,12 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 // Bug reveal: real-image navigation can fall into an empty AMI list when the
 // target image exists in AWS but is not present in the owned-AMI list fetch.
 func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Res := resource.Resource{

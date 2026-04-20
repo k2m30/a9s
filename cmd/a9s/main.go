@@ -34,8 +34,8 @@ func init() {
 
 func main() {
 	var (
-		profile    string
-		region     string
+		profile     string
+		region      string
 		showVersion bool
 		showHelp    bool
 		demoMode    bool

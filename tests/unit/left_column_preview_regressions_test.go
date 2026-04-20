@@ -10,6 +10,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -147,7 +148,12 @@ func TestPreviewLeft_IamInstanceProfile_RendersArnOnIndentedSubFieldLine(t *test
 }
 
 func TestPreviewLeft_DetailTitleIncludesDetailContextAndResourceID(t *testing.T) {
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
 	m = m2.(tui.Model)
 

@@ -224,3 +224,83 @@ func TestResolveRelatedNavigate_FetchFilterHonoredForCtEvents(t *testing.T) {
 		t.Errorf("FetchFilter[%q] = %q, want %q", "Username", got.FetchFilter["Username"], "alice")
 	}
 }
+
+// TestResolveRelatedNavigate_TargetIDCacheHitWinsOverFetchFilter pins the
+// precedence rule from issue #278: when an exact target is already known
+// (TargetID is set and the resource is in the cache), the resolver must drill
+// in directly rather than run a filtered fetch, even if FetchFilter is also
+// present and the target type has a registered FilteredPaginatedFetcher.
+//
+// Going through a filtered fetch when the exact row is already visible wastes
+// an API call and loses the user's context.
+func TestResolveRelatedNavigate_TargetIDCacheHitWinsOverFetchFilter(t *testing.T) {
+	// ct-events has a registered FilteredPaginatedFetcher; construct a scenario
+	// where FetchFilter alone would return KindFilteredList but the exact
+	// TargetID is present in the cache.
+	msg := messages.RelatedNavigateMsg{
+		TargetType:  "ct-events",
+		TargetID:    "event-xyz",
+		FetchFilter: map[string]string{"Username": "alice"},
+	}
+	cache := map[string][]resource.Resource{
+		"ct-events": {{ID: "event-xyz", Name: "event-xyz"}},
+	}
+
+	got := tui.ResolveRelatedNavigate(msg, cache)
+
+	if got.Kind != tui.KindDetail {
+		t.Fatalf("Kind = %v, want KindDetail: exact TargetID cache hit must win over FetchFilter", got.Kind)
+	}
+	if got.TargetID != "event-xyz" {
+		t.Errorf("TargetID = %q, want %q", got.TargetID, "event-xyz")
+	}
+}
+
+// TestResolveRelatedNavigate_SingleRelatedIDCacheHitWinsOverFetchFilter pins
+// the same precedence rule for the single-RelatedIDs path — when the target
+// is already in cache, prefer the exact drill-in over FetchFilter.
+func TestResolveRelatedNavigate_SingleRelatedIDCacheHitWinsOverFetchFilter(t *testing.T) {
+	msg := messages.RelatedNavigateMsg{
+		TargetType:  "ct-events",
+		RelatedIDs:  []string{"event-xyz"},
+		FetchFilter: map[string]string{"Username": "alice"},
+	}
+	cache := map[string][]resource.Resource{
+		"ct-events": {{ID: "event-xyz", Name: "event-xyz"}},
+	}
+
+	got := tui.ResolveRelatedNavigate(msg, cache)
+
+	if got.Kind != tui.KindDetail {
+		t.Fatalf("Kind = %v, want KindDetail: single RelatedID cache hit must win over FetchFilter", got.Kind)
+	}
+	if len(got.RelatedIDs) != 1 || got.RelatedIDs[0] != "event-xyz" {
+		t.Errorf("RelatedIDs = %v, want [event-xyz]", got.RelatedIDs)
+	}
+}
+
+// TestResolveRelatedNavigate_TargetIDCacheMiss_FallsBackToFetchFilter verifies
+// the complement: when the exact target is NOT in cache, the resolver falls
+// back to the FetchFilter path so the live filtered fetch still runs. This
+// preserves existing behavior for ct-events where the cache is typically
+// empty.
+func TestResolveRelatedNavigate_TargetIDCacheMiss_FallsBackToFetchFilter(t *testing.T) {
+	msg := messages.RelatedNavigateMsg{
+		TargetType:  "ct-events",
+		TargetID:    "event-missing",
+		FetchFilter: map[string]string{"Username": "alice"},
+	}
+	// Cache has a different ID; TargetID miss.
+	cache := map[string][]resource.Resource{
+		"ct-events": {{ID: "event-xyz"}},
+	}
+
+	got := tui.ResolveRelatedNavigate(msg, cache)
+
+	if got.Kind != tui.KindFilteredList {
+		t.Fatalf("Kind = %v, want KindFilteredList: TargetID cache miss + FetchFilter with registered fetcher must fall back to filtered fetch", got.Kind)
+	}
+	if got.FetchFilter["Username"] != "alice" {
+		t.Errorf("FetchFilter[Username] = %q, want alice — filter must be preserved on fallback", got.FetchFilter["Username"])
+	}
+}

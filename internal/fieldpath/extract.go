@@ -263,6 +263,10 @@ func ToSafeValue(val reflect.Value) any {
 		if val.Len() == 0 {
 			return nil
 		}
+		// Detect []{Key, Value} pattern (AWS tag slices) and flatten to a map.
+		if flat := tryFlattenKeyValueSlice(val); flat != nil {
+			return flat
+		}
 		var result []any
 		for i := 0; i < val.Len(); i++ {
 			sv := ToSafeValue(val.Index(i))
@@ -311,6 +315,101 @@ func isZeroOrNil(v reflect.Value) bool {
 	default:
 		return v.IsZero()
 	}
+}
+
+// tryFlattenKeyValueSlice inspects a slice whose elements are all structs with
+// exactly two fields named "Key" and "Value". When that shape matches AND the
+// keys are unique, returns a map[string]any of Key→Value so YAML renders AWS
+// tag slices as a flat map (`TagList: { Component: eu, Name: main }`) instead
+// of the verbose struct-form (`TagList: [- Key: Component, Value: eu]`).
+// Returns nil when the shape does not match OR the slice contains duplicate
+// keys — callers fall back to the generic slice-of-any path.
+//
+// Duplicate-key rule: if two entries share a Key, the slice is left unflattened
+// so downstream consumers (detail view's `flattenTagItems`, YAML struct-form
+// output) preserve both values. A map cannot represent duplicate keys without
+// silently dropping data — the "degrade honestly" rule in docs/architecture.md
+// applies here. Duplicates are rare in AWS tag data but possible; when they
+// occur the honest answer is to not flatten.
+func tryFlattenKeyValueSlice(val reflect.Value) map[string]any {
+	// element type after pointer deref
+	et := val.Type().Elem()
+	for et.Kind() == reflect.Pointer {
+		et = et.Elem()
+	}
+	if et.Kind() != reflect.Struct {
+		return nil
+	}
+	// Count exported fields only — AWS SDK structs embed unexported noSmithyDocumentSerde.
+	exportedCount := 0
+	for _, f := range reflect.VisibleFields(et) {
+		if f.IsExported() {
+			exportedCount++
+		}
+	}
+	if exportedCount != 2 {
+		return nil
+	}
+	keyField, hasKey := et.FieldByName("Key")
+	valField, hasVal := et.FieldByName("Value")
+	if !hasKey || !hasVal {
+		return nil
+	}
+	// Require pointer-to-string fields (*string), not plain string.
+	// AWS SDK Go v2 tag types use *string consistently; plain string fields
+	// belong to user-defined structs that should not be flattened.
+	isPtrString := func(t reflect.Type) bool {
+		return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.String
+	}
+	if !isPtrString(keyField.Type) || !isPtrString(valField.Type) {
+		return nil
+	}
+
+	out := make(map[string]any, val.Len())
+	for i := 0; i < val.Len(); i++ {
+		ev := val.Index(i)
+		for ev.Kind() == reflect.Pointer {
+			if ev.IsNil() {
+				return nil
+			}
+			ev = ev.Elem()
+		}
+		k, ok := stringFieldValue(ev.FieldByName("Key"))
+		if !ok {
+			continue
+		}
+		if _, dup := out[k]; dup {
+			// Duplicate key — preserve both entries by refusing to flatten.
+			return nil
+		}
+		// Preserve nil Values as YAML null rather than silently coercing to
+		// the empty string — "no value set" and "value is empty string" are
+		// distinct and the struct-form output made the distinction visible.
+		if v, vok := stringFieldValue(ev.FieldByName("Value")); vok {
+			out[k] = v
+		} else {
+			out[k] = nil
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// stringFieldValue reads a string value from `string` or `*string` fields.
+// Returns ("", false) if the value is an unset pointer.
+func stringFieldValue(fv reflect.Value) (string, bool) {
+	for fv.Kind() == reflect.Pointer {
+		if fv.IsNil() {
+			return "", false
+		}
+		fv = fv.Elem()
+	}
+	if fv.Kind() != reflect.String {
+		return "", false
+	}
+	return fv.String(), true
 }
 
 // tryParseJSON attempts to parse s as JSON. Returns the parsed structure
@@ -491,10 +590,10 @@ type nestedFieldLine struct {
 // For array-indexed keys (e.g., SecurityGroups.GroupId.0), produces YAML
 // list-of-objects format with "- " markers and 2-space nesting per item:
 //
-//	- GroupId: sg-xxx
-//	  GroupName: my-group
-//	- GroupId: sg-yyy
-//	  GroupName: another-group
+//   - GroupId: sg-xxx
+//     GroupName: my-group
+//   - GroupId: sg-yyy
+//     GroupName: another-group
 //
 // For non-indexed keys (e.g., IamInstanceProfile.Arn), produces flat lines:
 //

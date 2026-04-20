@@ -151,11 +151,6 @@ func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{vpcID})
 }
 
-
-
-
-
-
 // checkENISubnet returns the subnet this ENI sits in (Pattern F).
 func checkENISubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)

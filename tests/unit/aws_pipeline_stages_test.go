@@ -43,9 +43,9 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 							ActionName: aws.String("GitHub"),
 							LatestExecution: &cptypes.ActionExecution{
 								Status:               cptypes.ActionExecutionStatusSucceeded,
-								LastStatusChange:      &lastChange1,
-								ExternalExecutionUrl:  aws.String("https://github.com/org/repo/commit/abc123"),
-								Token:                 aws.String("token-001"),
+								LastStatusChange:     &lastChange1,
+								ExternalExecutionUrl: aws.String("https://github.com/org/repo/commit/abc123"),
+								Token:                aws.String("token-001"),
 							},
 							CurrentRevision: &cptypes.ActionRevision{
 								RevisionId:       aws.String("abc123def456"),
@@ -55,7 +55,7 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 						{
 							ActionName: aws.String("S3Upload"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &lastChange2,
 							},
 						},
@@ -71,14 +71,14 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 							ActionName: aws.String("CodeBuild"),
 							LatestExecution: &cptypes.ActionExecution{
 								Status:               cptypes.ActionExecutionStatusSucceeded,
-								LastStatusChange:      &lastChange3,
-								ExternalExecutionUrl:  aws.String("https://console.aws.amazon.com/codebuild/home"),
+								LastStatusChange:     &lastChange3,
+								ExternalExecutionUrl: aws.String("https://console.aws.amazon.com/codebuild/home"),
 							},
 						},
 						{
 							ActionName: aws.String("ECS-Deploy"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusInProgress,
+								Status:           cptypes.ActionExecutionStatusInProgress,
 								LastStatusChange: &lastChange4,
 							},
 						},
@@ -223,21 +223,21 @@ func TestFetchPipelineStages_MultiAction(t *testing.T) {
 						{
 							ActionName: aws.String("CompileCode"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &lastChange,
 							},
 						},
 						{
 							ActionName: aws.String("RunTests"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &lastChange,
 							},
 						},
 						{
 							ActionName: aws.String("PackageArtifact"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusFailed,
+								Status:           cptypes.ActionExecutionStatusFailed,
 								LastStatusChange: &lastChange,
 							},
 						},
@@ -461,12 +461,13 @@ func TestFetchPipelineStages_NilActionStates(t *testing.T) {
 
 // TestFetchPipelineStages_StatusMapping verifies that action execution
 // statuses map correctly to resource Status values:
-//   Succeeded   → "running"
-//   Failed      → "failed"
-//   InProgress  → "pending"
-//   Stopped     → "terminated"
-//   Abandoned   → "terminated"
-//   ""          → "terminated"
+//
+//	Succeeded   → "running"
+//	Failed      → "failed"
+//	InProgress  → "pending"
+//	Stopped     → "terminated"
+//	Abandoned   → "terminated"
+//	""          → "terminated"
 func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -498,7 +499,7 @@ func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 								{
 									ActionName: aws.String("Action1"),
 									LatestExecution: &cptypes.ActionExecution{
-										Status:          tc.actionStatus,
+										Status:           tc.actionStatus,
 										LastStatusChange: &lastChange,
 									},
 								},
@@ -541,7 +542,7 @@ func TestFetchPipelineStages_ExternalURL(t *testing.T) {
 						{
 							ActionName: aws.String("CodeBuild"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:              cptypes.ActionExecutionStatusSucceeded,
+								Status:               cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange:     &lastChange,
 								ExternalExecutionUrl: aws.String(expectedURL),
 							},
@@ -581,7 +582,7 @@ func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 						{
 							ActionName: aws.String("Action1"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &ts,
 							},
 						},
@@ -622,9 +623,9 @@ func TestFetchPipelineStages_DetailFields(t *testing.T) {
 						{
 							ActionName: aws.String("ManualApproval"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &lastChange,
-								Token:           aws.String("approval-token-xyz"),
+								Token:            aws.String("approval-token-xyz"),
 							},
 							CurrentRevision: &cptypes.ActionRevision{
 								RevisionId:       aws.String("rev-12345"),
@@ -685,7 +686,7 @@ func TestFetchPipelineStages_ErrorDetails(t *testing.T) {
 						{
 							ActionName: aws.String("ECS-Deploy"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusFailed,
+								Status:           cptypes.ActionExecutionStatusFailed,
 								LastStatusChange: &lastChange,
 								ErrorDetails: &cptypes.ErrorDetails{
 									Code:    aws.String("JobFailed"),
@@ -762,7 +763,7 @@ func TestFetchPipelineStages_RawStruct(t *testing.T) {
 						{
 							ActionName: aws.String("GitHub"),
 							LatestExecution: &cptypes.ActionExecution{
-								Status:          cptypes.ActionExecutionStatusSucceeded,
+								Status:           cptypes.ActionExecutionStatusSucceeded,
 								LastStatusChange: &lastChange,
 							},
 						},

@@ -43,7 +43,7 @@ func (f *enrichRDSFake) DescribePendingMaintenanceActions(
 	}
 	return &rds.DescribePendingMaintenanceActionsOutput{
 		PendingMaintenanceActions: f.actions,
-		Marker:                   f.marker,
+		Marker:                    f.marker,
 	}, nil
 }
 
@@ -235,4 +235,3 @@ func TestEnrichRDSDocDBMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T
 		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
-

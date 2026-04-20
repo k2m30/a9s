@@ -260,11 +260,3 @@ func checkVPCEWAF(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	}
 	return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
 }
-
-
-
-
-
-
-
-

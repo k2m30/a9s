@@ -73,7 +73,7 @@ func init() {
 }
 
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
-// of instances. Used by existing tests and the legacy fetcher.
+// of instances. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

@@ -100,18 +100,18 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
 	// Temporarily replace the dbi enricher with one that always errors.
-	original := awsclient.EnricherRegistry["dbi"]
-	awsclient.EnricherRegistry["dbi"] = awsclient.Enricher{
-		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.EnricherResult, error) {
-			return awsclient.EnricherResult{}, fmt.Errorf("simulated enricher failure")
+	original := awsclient.IssueEnricherRegistry["dbi"]
+	awsclient.IssueEnricherRegistry["dbi"] = awsclient.IssueEnricher{
+		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.IssueEnricherResult, error) {
+			return awsclient.IssueEnricherResult{}, fmt.Errorf("simulated enricher failure")
 		},
 		Priority: original.Priority,
 	}
 	t.Cleanup(func() {
 		if original.Fn != nil {
-			awsclient.EnricherRegistry["dbi"] = original
+			awsclient.IssueEnricherRegistry["dbi"] = original
 		} else {
-			delete(awsclient.EnricherRegistry, "dbi")
+			delete(awsclient.IssueEnricherRegistry, "dbi")
 		}
 	})
 
@@ -168,11 +168,11 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	tui.Version = "test"
 
 	// Temporarily remove the dbi enricher.
-	original := awsclient.EnricherRegistry["dbi"]
-	delete(awsclient.EnricherRegistry, "dbi")
+	original := awsclient.IssueEnricherRegistry["dbi"]
+	delete(awsclient.IssueEnricherRegistry, "dbi")
 	t.Cleanup(func() {
 		if original.Fn != nil {
-			awsclient.EnricherRegistry["dbi"] = original
+			awsclient.IssueEnricherRegistry["dbi"] = original
 		}
 	})
 

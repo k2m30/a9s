@@ -23,22 +23,22 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 		output: &ecr.DescribeRepositoriesOutput{
 			Repositories: []ecrtypes.Repository{
 				{
-					RepositoryName: aws.String("my-app"),
-					RepositoryUri:  aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"),
-					RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/my-app"),
-					RegistryId:     aws.String("123456789012"),
-					CreatedAt:      &now,
+					RepositoryName:     aws.String("my-app"),
+					RepositoryUri:      aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"),
+					RepositoryArn:      aws.String("arn:aws:ecr:us-east-1:123456789012:repository/my-app"),
+					RegistryId:         aws.String("123456789012"),
+					CreatedAt:          &now,
 					ImageTagMutability: ecrtypes.ImageTagMutabilityMutable,
 					ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 						ScanOnPush: true,
 					},
 				},
 				{
-					RepositoryName: aws.String("nginx-proxy"),
-					RepositoryUri:  aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/nginx-proxy"),
-					RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/nginx-proxy"),
-					RegistryId:     aws.String("123456789012"),
-					CreatedAt:      &now,
+					RepositoryName:     aws.String("nginx-proxy"),
+					RepositoryUri:      aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/nginx-proxy"),
+					RepositoryArn:      aws.String("arn:aws:ecr:us-east-1:123456789012:repository/nginx-proxy"),
+					RegistryId:         aws.String("123456789012"),
+					CreatedAt:          &now,
 					ImageTagMutability: ecrtypes.ImageTagMutabilityImmutable,
 				},
 			},

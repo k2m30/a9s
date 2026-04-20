@@ -72,7 +72,7 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 	}
 	return &wafv2.GetLoggingConfigurationOutput{
 		LoggingConfiguration: &wafv2types.LoggingConfiguration{
-			ResourceArn:         input.ResourceArn,
+			ResourceArn:           input.ResourceArn,
 			LogDestinationConfigs: []string{"arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-acme"},
 		},
 	}, nil

@@ -191,8 +191,8 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 	}
 
 	return &CWLogsFixtures{
-		LogGroups: logGroups,
+		LogGroups:  logGroups,
 		LogStreams: logStreams,
-		LogEvents: logEvents,
+		LogEvents:  logEvents,
 	}
 }

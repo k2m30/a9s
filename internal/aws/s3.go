@@ -83,7 +83,7 @@ func init() {
 }
 
 // FetchS3Buckets calls the S3 ListBuckets API and returns all pages of buckets.
-// Used by existing tests and the legacy fetcher.
+// Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

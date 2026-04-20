@@ -27,8 +27,6 @@ func init() {
 	// are on DescribeStream's StreamDescriptionSummary, not the list summary used as RawStruct.
 }
 
-
-
 // checkKinesisAlarms checks the cache for CloudWatch alarms with StreamName dimension matching this stream.
 func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
@@ -62,7 +60,6 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 	}
 	return relatedResult("alarm", ids)
 }
-
 
 // checkKinesisLambda scans the Lambda cache for functions whose first
 // EventSourceArn (captured in Fields["event_source_arn"] at fetch time) matches
@@ -239,6 +236,3 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 	result.Approximate = entry.IsTruncated
 	return result
 }
-
-
-

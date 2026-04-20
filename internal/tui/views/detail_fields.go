@@ -3,6 +3,7 @@
 package views
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -232,14 +233,26 @@ func (m *DetailModel) buildFieldList() {
 	if m.resourceType == "ct-events" && m.res.Status != "" {
 		raw := extractRawCTEventJSON(m.res)
 		if raw != "" {
-			if event, err := ctdetail.Parse(raw); err == nil {
-				event.Status = m.res.Status // propagate severity status into the parsed event
-				sections := ctdetail.BuildSections(event)
-				m.fieldList = sectionsToFieldItems(sections)
+			event, err := ctdetail.Parse(raw)
+			if err != nil {
+				// A CT event resource arrived with a raw JSON blob that cannot be
+				// parsed — that's a broken contract (the fetcher guarantees valid
+				// JSON). Surface it explicitly instead of silently degrading to
+				// the flat Fields path and pretending the page is fine.
+				m.fieldList = []fieldpath.FieldItem{{
+					Key:   "Error",
+					Value: fmt.Sprintf("unable to parse CloudTrail event JSON: %v", err),
+				}}
 				return
 			}
+			event.Status = m.res.Status // propagate severity status into the parsed event
+			sections := ctdetail.BuildSections(event)
+			m.fieldList = sectionsToFieldItems(sections)
+			return
 		}
-		// Parse failure or missing JSON → fall through to legacy flat path
+		// raw == "" is still a soft fallback: the cache can hold a bare CT event
+		// stub (ID/Name/Status only) when the user drill-ins without the full
+		// event body. Render what Fields we have instead of erroring out.
 	}
 	// Extract detail field definitions; split into path-form and key-form.
 	var detailFields []config.DetailField

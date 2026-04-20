@@ -57,8 +57,8 @@ func TestCTDetailActor(t *testing.T) {
 		{
 			name: "IAMUser",
 			identity: ctdetail.UserIdentity{
-				Type:    "IAMUser",
-				ARN:     "arn:aws:iam::333333333333:user/bob",
+				Type:     "IAMUser",
+				ARN:      "arn:aws:iam::333333333333:user/bob",
 				UserName: "bob",
 			},
 			mustContain: []string{"bob"},
@@ -69,8 +69,8 @@ func TestCTDetailActor(t *testing.T) {
 		{
 			name: "AssumedRole",
 			identity: ctdetail.UserIdentity{
-				Type: "AssumedRole",
-				ARN:  "arn:aws:sts::111111111111:assumed-role/KarpenterNodeRole/karpenter-1759",
+				Type:           "AssumedRole",
+				ARN:            "arn:aws:sts::111111111111:assumed-role/KarpenterNodeRole/karpenter-1759",
 				SessionContext: sessionIssuer("KarpenterNodeRole"),
 			},
 			mustContain: []string{"KarpenterNodeRole", "karpenter-1759"},
@@ -180,8 +180,8 @@ func TestCTDetailActor(t *testing.T) {
 		{
 			name: "CrossAccount_DoesNotChangeActor",
 			identity: ctdetail.UserIdentity{
-				Type:    "IAMUser",
-				ARN:     "arn:aws:iam::333333333333:user/bob",
+				Type:     "IAMUser",
+				ARN:      "arn:aws:iam::333333333333:user/bob",
 				UserName: "bob",
 			},
 			mustContain: []string{"bob"},

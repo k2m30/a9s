@@ -11,3 +11,9 @@ coverage:
 ignore:
   - "cmd/**"
   - "tests/**"
+  # Demo mode SDK fake clients — interface-satisfying stubs that return
+  # fixture data or empty results. Unit-testing these methods directly
+  # is tautological (fake returns what fake literally returns); their
+  # real behavior is covered indirectly via TUI demo-mode integration
+  # tests. Exclude from coverage to avoid incentivizing busywork tests.
+  - "internal/demo/fakes/**"

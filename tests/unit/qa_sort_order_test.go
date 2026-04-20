@@ -118,7 +118,6 @@ func extractDataNames(rendered string) []string {
 	return names
 }
 
-
 // extractDataTimestamps parses rendered output and returns the launch_time
 // column values in the order they appear.
 func extractDataTimestamps(rendered string) []string {

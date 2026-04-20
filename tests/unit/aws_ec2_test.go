@@ -32,7 +32,7 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 								Name: ec2types.InstanceStateNameRunning,
 							},
 							PrivateIpAddress: aws.String("10.0.0.1"),
-							PublicIpAddress:   aws.String("54.1.2.3"),
+							PublicIpAddress:  aws.String("54.1.2.3"),
 							LaunchTime:       &launchTime,
 							Tags: []ec2types.Tag{
 								{Key: aws.String("Name"), Value: aws.String("web-server-1")},
@@ -61,7 +61,7 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 								Name: ec2types.InstanceStateNameRunning,
 							},
 							PrivateIpAddress: aws.String("10.0.1.1"),
-							PublicIpAddress:   aws.String("54.4.5.6"),
+							PublicIpAddress:  aws.String("54.4.5.6"),
 							LaunchTime:       &launchTime,
 							Tags: []ec2types.Tag{
 								{Key: aws.String("Name"), Value: aws.String("api-server")},

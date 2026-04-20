@@ -25,11 +25,11 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		output: &secretsmanager.ListSecretsOutput{
 			SecretList: []smtypes.SecretListEntry{
 				{
-					Name:              aws.String("prod/database/password"),
-					Description:       aws.String("Production database password"),
-					LastAccessedDate:  &lastAccessed,
-					LastChangedDate:   &lastChanged,
-					RotationEnabled:   aws.Bool(true),
+					Name:             aws.String("prod/database/password"),
+					Description:      aws.String("Production database password"),
+					LastAccessedDate: &lastAccessed,
+					LastChangedDate:  &lastChanged,
+					RotationEnabled:  aws.Bool(true),
 				},
 				{
 					Name:             aws.String("staging/api-key"),

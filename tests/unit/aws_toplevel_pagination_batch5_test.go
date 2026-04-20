@@ -504,7 +504,7 @@ func (m *mockPaginatedKinesisClient) ListStreams(
 	if m.callIdx >= len(m.outputs) {
 		return &kinesis.ListStreamsOutput{
 			HasMoreStreams: aws.Bool(false),
-			StreamNames:   []string{},
+			StreamNames:    []string{},
 		}, nil
 	}
 	out := m.outputs[m.callIdx]
@@ -517,8 +517,8 @@ func TestFetchKinesisStreams_Pagination(t *testing.T) {
 		outputs: []*kinesis.ListStreamsOutput{
 			{
 				HasMoreStreams: aws.Bool(true),
-				NextToken:     aws.String("page2-token"),
-				StreamNames:   []string{"page1-stream-1", "page1-stream-2"},
+				NextToken:      aws.String("page2-token"),
+				StreamNames:    []string{"page1-stream-1", "page1-stream-2"},
 				StreamSummaries: []kinesistypes.StreamSummary{
 					{
 						StreamName:   aws.String("page1-stream-1"),
@@ -534,7 +534,7 @@ func TestFetchKinesisStreams_Pagination(t *testing.T) {
 			},
 			{
 				HasMoreStreams: aws.Bool(false),
-				StreamNames:   []string{"page2-stream-1"},
+				StreamNames:    []string{"page2-stream-1"},
 				StreamSummaries: []kinesistypes.StreamSummary{
 					{
 						StreamName:   aws.String("page2-stream-1"),

@@ -126,7 +126,6 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("sqs", ids)
 }
 
-
 // snsSubRelatedResources returns the cached resource list for the given target type,
 // or fetches the first page via the registered paginated fetcher.
 func snsSubRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -138,5 +137,3 @@ func snsSubRelatedResources(ctx context.Context, clients any, cache resource.Res
 	}
 	return resources, isTruncated, err
 }
-
-

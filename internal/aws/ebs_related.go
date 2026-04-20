@@ -66,9 +66,6 @@ func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{arn[idx+1:]})
 }
 
-
-
-
 // checkEBSAlarm searches the alarm cache for alarms with a VolumeId dimension
 // matching this volume.
 func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

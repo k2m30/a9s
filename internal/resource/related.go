@@ -8,8 +8,8 @@ import (
 
 // RelatedDef defines one related resource class for a given resource type.
 type RelatedDef struct {
-	TargetType       string         // target resource short name (e.g., "tg", "alarm")
-	DisplayName      string         // right-column row label (e.g., "Target Groups")
+	TargetType  string // target resource short name (e.g., "tg", "alarm")
+	DisplayName string // right-column row label (e.g., "Target Groups")
 	// TODO(no-middle-state): a registered RelatedDef must have a real Checker.
 	// Treat nil as a structural bug, not as a supported "stub" state.
 	Checker          RelatedChecker // async checker function
@@ -82,8 +82,10 @@ type RelatedChecker func(ctx context.Context, clients any, res Resource, cache R
 //   - When Approximate is true, Count must be >= 0 (never paired with -1)
 //
 // This is intended for test invariants and optional debug-mode runtime checks,
-// not for production error returns. The drill-in path can additionally cross-
-// check that returned IDs exist in the target-type's cache (out of scope here).
+// not for production error returns.
+//
+// For cross-checking that returned IDs match the target type's canonical
+// Resource.ID, use ValidateRelatedResultAgainstCache.
 func ValidateRelatedResult(r RelatedCheckResult) error {
 	if r.TargetType == "" {
 		return fmt.Errorf("RelatedCheckResult: empty TargetType")
@@ -96,6 +98,53 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 	}
 	if r.Approximate && r.Count < 0 {
 		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true paired with Count=%d (must be >=0)", r.TargetType, r.Count)
+	}
+	return nil
+}
+
+// ValidateRelatedResultAgainstCache enforces the canonical-target-identity
+// contract (#279): every ResourceID returned by a checker for a given
+// TargetType MUST match the canonical Resource.ID that the TargetType's
+// fetcher emits. We prove this by cross-checking the returned IDs against the
+// target-type's cache entry.
+//
+// The check is deliberately opportunistic: it only runs when the cache has
+// a non-truncated entry for the target type. A truncated cache could miss a
+// legitimate ID, so we skip the check rather than produce false positives. If
+// the target type has no cache entry at all, the check also skips (nothing to
+// compare against). Shape invariants from ValidateRelatedResult are enforced
+// regardless.
+//
+// This is the hard contract that catches bugs where a checker returns an ARN,
+// name, or adjacent ID kind instead of the target type's canonical Resource.ID
+// — the class of drill-in regressions called out in the architecture audit.
+func ValidateRelatedResultAgainstCache(r RelatedCheckResult, cache ResourceCache) error {
+	if err := ValidateRelatedResult(r); err != nil {
+		return err
+	}
+	if len(r.ResourceIDs) == 0 {
+		return nil
+	}
+	entry, ok := cache[r.TargetType]
+	if !ok {
+		return nil
+	}
+	if entry.IsTruncated {
+		return nil
+	}
+	known := make(map[string]struct{}, len(entry.Resources))
+	for _, res := range entry.Resources {
+		known[res.ID] = struct{}{}
+	}
+	for _, id := range r.ResourceIDs {
+		if _, seen := known[id]; !seen {
+			return fmt.Errorf(
+				"RelatedCheckResult[%s]: ResourceID %q is not a canonical Resource.ID for target type %q "+
+					"(not found in target-type cache of %d resources); "+
+					"checker likely returned an ARN/name/adjacent-ID kind instead of the target's canonical ID",
+				r.TargetType, id, r.TargetType, len(entry.Resources),
+			)
+		}
 	}
 	return nil
 }

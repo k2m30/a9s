@@ -256,9 +256,9 @@ func TestResourcesLoadedMsg_LegacyNilPagination(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(msg.Resources))
 	}
 	if msg.Pagination != nil {
-		t.Error("Pagination should be nil for legacy fetchers")
+		t.Error("Pagination should be nil for unpaginated fetchers")
 	}
 	if msg.Append {
-		t.Error("Append should be false for legacy fetchers")
+		t.Error("Append should be false for unpaginated fetchers")
 	}
 }

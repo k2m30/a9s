@@ -59,11 +59,11 @@ func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 					Name: "ng-custom",
 					Fields: map[string]string{
 						"nodegroup_name": "ng-custom",
-						"cluster_name":  "prod-cluster",
-						"status":        "ACTIVE",
+						"cluster_name":   "prod-cluster",
+						"status":         "ACTIVE",
 						"instance_types": "m5.large",
-						"desired_size":  "2",
-						"image_id":      "ami-xyz", // resoled from custom LaunchTemplate
+						"desired_size":   "2",
+						"image_id":       "ami-xyz", // resoled from custom LaunchTemplate
 					},
 				},
 			},
@@ -113,11 +113,11 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 					Name: "ng-other",
 					Fields: map[string]string{
 						"nodegroup_name": "ng-other",
-						"cluster_name":  "prod-cluster",
-						"status":        "ACTIVE",
+						"cluster_name":   "prod-cluster",
+						"status":         "ACTIVE",
 						"instance_types": "t3.large",
-						"desired_size":  "3",
-						"image_id":      "ami-other", // different AMI
+						"desired_size":   "3",
+						"image_id":       "ami-other", // different AMI
 					},
 				},
 			},
@@ -163,11 +163,11 @@ func TestCheckAMING_ApproximateWhenCacheTruncatedAndNoMatch(t *testing.T) {
 					Name: "ng-page1",
 					Fields: map[string]string{
 						"nodegroup_name": "ng-page1",
-						"cluster_name":  "prod-cluster",
-						"status":        "ACTIVE",
+						"cluster_name":   "prod-cluster",
+						"status":         "ACTIVE",
 						"instance_types": "r5.large",
-						"desired_size":  "5",
-						"image_id":      "ami-other", // different AMI
+						"desired_size":   "5",
+						"image_id":       "ami-other", // different AMI
 					},
 				},
 			},

@@ -18,10 +18,10 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 		output: &ec2.DescribeTransitGatewaysOutput{
 			TransitGateways: []ec2types.TransitGateway{
 				{
-					TransitGatewayId:  aws.String("tgw-0123456789abcdef0"),
-					State:             ec2types.TransitGatewayStateAvailable,
-					OwnerId:           aws.String("123456789012"),
-					Description:       aws.String("Main transit gateway"),
+					TransitGatewayId: aws.String("tgw-0123456789abcdef0"),
+					State:            ec2types.TransitGatewayStateAvailable,
+					OwnerId:          aws.String("123456789012"),
+					Description:      aws.String("Main transit gateway"),
 					Tags: []ec2types.Tag{
 						{Key: aws.String("Name"), Value: aws.String("main-tgw")},
 					},

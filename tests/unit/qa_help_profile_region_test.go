@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -472,9 +474,11 @@ func TestQA_Region_FrameTitleWithCount(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// There are 27 regions in AllRegions()
-	if !strings.Contains(plain, "aws-regions(27)") {
-		t.Errorf("frame title should be 'aws-regions(27)', got: %s", plain)
+	// Frame title carries the live AllRegions() count so new SDK-sourced
+	// regions auto-appear without a test edit.
+	wantTitle := fmt.Sprintf("aws-regions(%d)", len(awsclient.AllRegions()))
+	if !strings.Contains(plain, wantTitle) {
+		t.Errorf("frame title should be %q, got: %s", wantTitle, plain)
 	}
 }
 
@@ -511,8 +515,16 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
 
-	// Move down to us-east-2
+	// Move down one row — the region selector is alphabetical by code, so the
+	// second row is AllRegions()[1] regardless of which regions are present.
+	// This keeps the test stable when the SDK adds new region codes (#285).
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
+
+	regions := awsclient.AllRegions()
+	if len(regions) < 2 {
+		t.Fatalf("need ≥2 regions in AllRegions() for this test, got %d", len(regions))
+	}
+	wantRegion := regions[1].Code
 
 	// Press Enter
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -527,8 +539,8 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 	if !ok {
 		t.Fatalf("Enter on region should produce RegionSelectedMsg, got %T", msg)
 	}
-	if regionMsg.Region != "us-east-2" {
-		t.Errorf("selected region should be us-east-2, got %s", regionMsg.Region)
+	if regionMsg.Region != wantRegion {
+		t.Errorf("selected region should be %q (AllRegions()[1]), got %q", wantRegion, regionMsg.Region)
 	}
 
 	// Process the RegionSelectedMsg
@@ -536,8 +548,8 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 
 	// Should pop back to main menu with updated region
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "us-east-2") {
-		t.Errorf("after region selection, header should show us-east-2, got: %s", plain)
+	if !strings.Contains(plain, wantRegion) {
+		t.Errorf("after region selection, header should show %q, got: %s", wantRegion, plain)
 	}
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("after region selection, should return to main menu, got: %s", plain)

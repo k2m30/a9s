@@ -39,7 +39,7 @@ func init() {
 }
 
 // FetchIAMPolicies calls the IAM ListPolicies API and returns all pages of
-// customer-managed policies. Used by existing tests and the legacy fetcher.
+// customer-managed policies. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

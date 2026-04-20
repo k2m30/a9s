@@ -97,8 +97,6 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 	return result
 }
 
-
-
 // iamUserRelatedResources returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func iamUserRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

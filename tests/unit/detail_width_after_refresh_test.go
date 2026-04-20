@@ -47,7 +47,12 @@ const narrowTerminalWidth = 80
 func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: narrowTerminalWidth, Height: 36})
 
 	m, _ = rootApplyMsg(m, messages.NavigateMsg{

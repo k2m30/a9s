@@ -10,7 +10,7 @@ package unit
 //
 // Fix: rename both "pipe" → "pipeline" in buildEnrichQueue's order slice
 // (internal/tui/app_fetchers.go:537) and in EnricherRegistry
-// (internal/aws/enrichment.go:40).
+// (internal/aws/pipeline_issue_enrichment.go).
 //
 // This test seeds probeResources["pipeline"] via AvailabilityCheckedMsg (the
 // same path that Wave 1 uses at the end of the availability-probe cycle), then

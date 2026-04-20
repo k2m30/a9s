@@ -84,8 +84,6 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 	return relatedResult("alarm", ids)
 }
 
-
-
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.
 // Pattern N — default: /aws/lambda/{function-name}, with custom override via LoggingConfig.
 func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -123,7 +121,6 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	return relatedResult("logs", ids)
 }
-
 
 // checkLambdaSG extracts security group IDs from the Lambda FunctionConfiguration's
 // VpcConfig.SecurityGroupIds (only present for VPC-attached functions).
@@ -380,23 +377,3 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	}
 	return relatedResult("eb-rule", ids)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

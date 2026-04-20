@@ -11,8 +11,8 @@ import (
 // webhookPattern holds a compiled regex and a function that decides whether
 // the captured groups represent a known-safe placeholder.
 type webhookPattern struct {
-	name        string
-	re          *regexp.Regexp
+	name          string
+	re            *regexp.Regexp
 	isPlaceholder func(groups []string) bool
 }
 

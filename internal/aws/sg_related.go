@@ -249,4 +249,3 @@ func sgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
-

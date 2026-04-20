@@ -31,7 +31,7 @@ func init() {
 }
 
 // FetchSecrets calls the SecretsManager ListSecrets API and returns all pages
-// of secrets. Used by existing tests and the legacy fetcher.
+// of secrets. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

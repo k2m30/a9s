@@ -3,6 +3,8 @@
 **Parent**: #196 (issue counts and attention filter)
 **Problem**: Wave 2 enrichment discovers hidden issues but the resource list shows no visual indicator. The menu says `issues:N` but all rows are green.
 
+> **Historical spec.** This document captures the design as implemented. Since then: `EnricherResult` was renamed to `IssueEnricherResult`, `EnricherFunc` to `IssueEnricherFunc`, and `NoOpEnricher` to `NoOpIssueEnricher`. The monolithic `internal/aws/enrichment.go` was split across `internal/aws/issue_enrichment.go` (infrastructure) + one `*_issue_enrichment.go` per resource short name. For the current architecture, see [`docs/architecture.md`](architecture.md).
+
 ## Approach: Derived Banner + Finding Snapshots + Row Marker
 
 ### 1. EnrichmentFinding type (neutral package)
@@ -17,20 +19,22 @@ type EnrichmentFinding struct {
 }
 ```
 
-Both `internal/aws/enrichment.go` (enricher return type) and `internal/tui/` (storage, display) import from `internal/resource/`.
+Both `internal/aws/issue_enrichment.go` (enricher return type) and `internal/tui/` (storage, display) import from `internal/resource/`.
 
 ### 2. Enricher return type
 
 ```go
-// internal/aws/enrichment.go
-type EnricherResult struct {
-    IssueCount int
-    Truncated  bool
-    Findings   map[string]resource.EnrichmentFinding // resourceID → finding
+// internal/aws/issue_enrichment.go
+type IssueEnricherResult struct {
+    IssueCount   int
+    Truncated    bool
+    TruncatedIDs map[string]bool
+    Findings     map[string]resource.EnrichmentFinding // resourceID → finding
+    FieldUpdates map[string]map[string]string
 }
 ```
 
-**Finding key normalization**: The `Findings` map is keyed by `resource.Resource.ID` — the same identifier used in list rows. Enrichers that receive identifiers from AWS APIs in a different form (e.g., ARNs from `DescribePendingMaintenanceActions`) MUST normalize to `Resource.ID` before storing the finding. The existing RDS enricher already does ARN-suffix matching (`enrichment.go:83`); the same pattern applies to all enrichers. The canonical rule: **extract the resource identifier that matches `Resource.ID` as populated by the type's fetcher**. If the enricher cannot determine the matching ID, it skips that resource (no finding stored).
+**Finding key normalization**: The `Findings` map is keyed by `resource.Resource.ID` — the same identifier used in list rows. Enrichers that receive identifiers from AWS APIs in a different form (e.g., ARNs from `DescribePendingMaintenanceActions`) MUST normalize to `Resource.ID` before storing the finding. The existing RDS enricher already does ARN-suffix matching; the same pattern applies to all enrichers. The canonical rule: **extract the resource identifier that matches `Resource.ID` as populated by the type's fetcher**. If the enricher cannot determine the matching ID, it skips that resource (no finding stored).
 
 ```go
 // Example: RDS maintenance ARN → Resource.ID
@@ -38,7 +42,7 @@ type EnricherResult struct {
 // Resource.ID: docdb-docdb-dev
 // Enricher extracts "docdb-docdb-dev" from the ARN suffix
 
-type EnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error)
+type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error)
 ```
 
 Enrichers return findings for every affected resource they inspect. For account-wide enrichers (RDS maintenance, EC2 status), findings cover all resources the API returns — not just those in the `resources` slice. This means findings can exist for resources that are off-page in `probeResources`.
@@ -306,7 +310,7 @@ ColStopped for `!`, ColPending for `~`. Absent when finding is nil.
 | IAM Groups | GetGroup + ListAttachedGroupPolicies | `!` | `"inline policies attached, no members"` |
 | CW Logs | DescribeMetricFilters | `!` | `"no metric filters (audit gap)"` |
 
-Types with Wave 2 = "None" (26 total) are registered as `NoOpEnricher` — returns zero findings, zero issues. Some types use in-fetcher Wave 2 (their fetcher already performs per-resource Describe calls and populates health fields; the `NoOpEnricher` entry exists for contract conformance).
+Types with Wave 2 = "None" (24 total) are registered as `NoOpIssueEnricher` — returns zero findings, zero issues. Some types use in-fetcher Wave 2 (their fetcher already performs per-resource Describe calls and populates health fields; the `NoOpIssueEnricher` entry exists for contract conformance).
 
 ### What This Does NOT Change
 
@@ -321,7 +325,7 @@ Types with Wave 2 = "None" (26 total) are registered as `NoOpEnricher` — retur
 ### Acceptance Criteria
 
 - [ ] `EnrichmentFinding` lives in `internal/resource/`, no import cycles
-- [ ] `EnricherFunc` returns `EnricherResult` with typed `Findings` map
+- [ ] `IssueEnricherFunc` returns `IssueEnricherResult` with typed `Findings` map
 - [ ] Findings keyed by `resource.Resource.ID` — enrichers normalize API identifiers (ARNs) to match
 - [ ] Findings cover all affected resources from the API, including off-page
 - [ ] `enrichmentRan` is separate from `issueKnown` — banner does NOT show on cold start
@@ -353,7 +357,7 @@ Types with Wave 2 = "None" (26 total) are registered as `NoOpEnricher` — retur
 | File | Change |
 |------|--------|
 | `internal/resource/enrichment.go` | NEW — `EnrichmentFinding` type |
-| `internal/aws/enrichment.go` | `EnricherResult` type; enrichers return findings |
+| `internal/aws/issue_enrichment.go` | `IssueEnricherResult` type; enrichers return findings (formerly `internal/aws/enrichment.go`, split per short name) |
 | `internal/tui/app.go` | Adds `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps. The existing `ResourcesLoadedMsg` case at `app.go:428` gets a small tail branch after its existing write-through block: `if msg.TypeGen != 0 && msg.TypeGen == m.enrichmentTypeGen[T] { seed probeResources; dispatch probeEnrichment }`. No helper extraction — the existing handler body already performs the unconditional list update. |
 | `internal/tui/app_handlers.go` | Clear all findings + `enrichmentTypeGen` on profile/region switch; on list Ctrl+R: bump `enrichmentTypeGen[T]`, clear `enrichmentFindings[T]`/`enrichmentRan[T]`, dispatch wrapped fetch command capturing the new gen as a token |
 | `internal/tui/app_handlers_navigate.go` | Store findings (validating BOTH session-wide `Gen` and per-type `TypeGen`); invalidate per-type on rerun start; update detail live; pass enrichment state to list |
@@ -369,8 +373,8 @@ Types with Wave 2 = "None" (26 total) are registered as `NoOpEnricher` — retur
 ### Implementation Order
 
 1. `EnrichmentFinding` in `internal/resource/enrichment.go`
-2. `EnricherResult` + update `EnricherFunc` signature in `internal/aws/enrichment.go`
-3. Update all enrichers to return `EnricherResult` with findings (40 real + 26 NoOpEnricher)
+2. `IssueEnricherResult` + update `IssueEnricherFunc` signature in `internal/aws/issue_enrichment.go`
+3. Update all enrichers to return `IssueEnricherResult` with findings (43 real + 24 `NoOpIssueEnricher`)
 4. `enrichmentFindings` + `enrichmentRan` + `enrichmentTypeGen` maps on Model; add `TypeGen` field to `EnrichmentCheckedMsg`; store findings from `EnrichmentCheckedMsg` only when BOTH session-wide `Gen` and per-type `TypeGen` match (drop stale)
 5. Clear all findings and `enrichmentTypeGen` on profile/region switch; invalidate per-type (bump `TypeGen`, clear findings/ran) when a rerun starts
 6. Add `TypeGen int` field to `ResourcesLoadedMsg`; build wrapped fetch command in `app_fetchers.go` that stamps the captured token onto the `ResourcesLoadedMsg` it forwards (passes `APIErrorMsg` through unchanged).

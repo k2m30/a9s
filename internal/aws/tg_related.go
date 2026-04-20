@@ -206,8 +206,6 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("alarm", ids)
 }
 
-
-
 // checkTGVPC returns the VPC this target group is scoped to (Pattern F).
 // Reads vpc_id from Fields which is populated by the target groups fetcher.
 func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -217,7 +215,6 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	return relatedResult("vpc", []string{vpcID})
 }
-
 
 // checkTGBackup reports backup plans that cover this target group.
 // TGs are not a protectable AWS Backup resource directly — the DevOps link is
@@ -423,13 +420,3 @@ func tgRelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
-
-
-
-
-
-
-
-
-
-

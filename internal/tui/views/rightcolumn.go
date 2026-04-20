@@ -75,14 +75,11 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 		return m.updateKeyMsg(msg)
 
 	case messages.RelatedCheckResultMsg:
-		// When multiple rows share the same TargetType (e.g. the 4 ct-events
-		// self-pivot rows all have TargetType="ct-events"), results arrive as
-		// separate messages. To resolve all rows, prefer the first STILL-LOADING
-		// row with the matching TargetType (FIFO). Only fall back to the first row
-		// of that type if all are already resolved (late-arriving duplicate).
-		// Match by DefDisplayName which is unique per def (multiple defs can share TargetType,
-		// e.g. the 4 ct-events self-pivots all have TargetType="ct-events" but distinct
-		// display names "CT events by AccessKeyId/Username/EventName/SharedEventId").
+		// Match rows by DefDisplayName: it is unique per RelatedDef and handles
+		// the ct-events self-pivot case where 4 rows all share
+		// TargetType="ct-events" but carry distinct DisplayNames ("CT events by
+		// AccessKeyId/Username/EventName/SharedEventId"). Production messages
+		// always carry DefDisplayName (app_related.go sets it in every dispatch).
 		targetIdx := -1
 		for i := range m.rows {
 			if m.rows[i].displayName == msg.DefDisplayName {
@@ -90,19 +87,26 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 				break
 			}
 		}
-		// Fallback for messages without DefDisplayName (legacy/test injection):
-		// use the old loading-first-match-by-TargetType logic.
+		// Tight unambiguous fallback for messages without DefDisplayName: match
+		// by TargetType ONLY when exactly one row carries that TargetType. If
+		// multiple rows share the TargetType, we refuse to bind rather than
+		// silently pick the wrong row — that ambiguity is a contract violation
+		// and must be surfaced, not hidden behind "whichever row happens to be
+		// loading first". Production code always populates DefDisplayName, so
+		// this branch is test-surface only.
 		if targetIdx < 0 && msg.DefDisplayName == "" {
+			matches := 0
+			firstIdx := -1
 			for i := range m.rows {
 				if m.rows[i].targetType == msg.Result.TargetType {
-					if m.rows[i].loading {
-						targetIdx = i
-						break
+					if firstIdx < 0 {
+						firstIdx = i
 					}
-					if targetIdx < 0 {
-						targetIdx = i
-					}
+					matches++
 				}
+			}
+			if matches == 1 {
+				targetIdx = firstIdx
 			}
 		}
 		if targetIdx >= 0 {

@@ -3,7 +3,7 @@ package unit
 // aws_ssm_reveal_test.go tests RevealSSMParameter() that will be added to
 // internal/aws/ssm.go as part of issue #104.
 // These tests will FAIL until the coder adds RevealSSMParameter and the
-// SSMGetParameterAPI interface to internal/aws/interfaces.go.
+// SSMGetParameterAPI interface to internal/aws/interfaces_ssm.go.
 
 import (
 	"context"

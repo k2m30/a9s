@@ -204,7 +204,6 @@ func newFakeIAMWithNoSuchEntityRole() *fakeIAMBatch3 {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // fakeASGBatch3 — extends fakeASGBatch2 pattern with controllable
 // DescribeAutoScalingGroups. Used by ng→ebs and eks→ec2 tests.

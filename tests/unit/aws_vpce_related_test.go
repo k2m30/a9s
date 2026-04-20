@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -211,5 +213,275 @@ func TestNavigableFields_VPCE(t *testing.T) {
 	}
 	if nav.TargetType != "vpc" {
 		t.Errorf("VpcId TargetType = %q, want %q", nav.TargetType, "vpc")
+	}
+}
+
+// --- VPC checker (Pattern F — reads vpc_id from Fields) ---
+
+// TestRelated_VPCE_VPC_HasVPCID verifies that Fields["vpc_id"] is returned.
+func TestRelated_VPCE_VPC_HasVPCID(t *testing.T) {
+	res := vpceSrcInterfaceResource() // vpc_id = "vpc-abc123"
+	checker := vpceCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_VPCE_VPC_EmptyVPCID verifies that an empty vpc_id returns Count=0.
+func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
+	res := resource.Resource{
+		ID:        "vpce-nofield",
+		Fields:    map[string]string{"vpc_id": ""},
+		RawStruct: ec2types.VpcEndpoint{},
+	}
+	checker := vpceCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count)
+	}
+}
+
+// --- ACM checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_ACM_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_ACM_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "acm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_ACM_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_ACM_NonEmptyID(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+	checker := vpceCheckerByTarget(t, "acm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (non-empty ID, cannot determine ACM from list API)", result.Count)
+	}
+}
+
+// --- CF checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_CF_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_CF_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "cf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_CF_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_CF_NonEmptyID(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+	checker := vpceCheckerByTarget(t, "cf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (CloudFront VPC Origins not in list response)", result.Count)
+	}
+}
+
+// --- R53 checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_R53_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_R53_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+	checker := vpceCheckerByTarget(t, "r53")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (private zones via ListHostedZonesByVPC not in list response)", result.Count)
+	}
+}
+
+// --- S3 checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_S3_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_S3_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "s3")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_S3_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_S3_NonEmptyID(t *testing.T) {
+	res := vpceSrcGatewayResource()
+	checker := vpceCheckerByTarget(t, "s3")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (policy interpretation not available from list)", result.Count)
+	}
+}
+
+// --- TG checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_TG_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_TG_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_TG_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_TG_NonEmptyID(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+	checker := vpceCheckerByTarget(t, "tg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (DescribeTargetHealth needed, not in cache)", result.Count)
+	}
+}
+
+// --- WAF checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+
+// TestRelated_VPCE_WAF_EmptyID verifies Count=0 for empty endpoint ID.
+func TestRelated_VPCE_WAF_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+	checker := vpceCheckerByTarget(t, "waf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_WAF_NonEmptyID verifies Count=-1 for a real endpoint ID.
+func TestRelated_VPCE_WAF_NonEmptyID(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+	checker := vpceCheckerByTarget(t, "waf")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (WAF associations resolved from WAF side)", result.Count)
+	}
+}
+
+// --- Alarm checker (Pattern C — cache scan, VpcEndpointId dimension) ---
+
+// TestRelated_VPCE_Alarm_MatchByDimension verifies that an alarm with
+// "VpcEndpointId" dimension matching the endpoint ID is returned.
+func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
+	alarmRes := resource.Resource{
+		ID: "vpce-packets-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("vpce-packets-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-abc123")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	res := vpceSrcInterfaceResource() // ID = "vpce-abc123"
+
+	checker := vpceCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-packets-alarm" {
+		t.Errorf("ResourceIDs = %v, want [vpce-packets-alarm]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_VPCE_Alarm_NoMatch verifies that alarms with a different
+// VpcEndpointId dimension return Count=0.
+func TestRelated_VPCE_Alarm_NoMatch(t *testing.T) {
+	alarmRes := resource.Resource{
+		ID: "other-vpce-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("other-vpce-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-different")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	res := vpceSrcInterfaceResource()
+
+	checker := vpceCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+// TestRelated_VPCE_Alarm_CacheMissNoClients verifies Count=-1 when the alarm
+// cache is empty and no clients are available.
+func TestRelated_VPCE_Alarm_CacheMissNoClients(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+
+	checker := vpceCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_Alarm_EmptyID verifies Count=0 for an empty endpoint ID.
+func TestRelated_VPCE_Alarm_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+
+	checker := vpceCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count)
+	}
+}
+
+// --- Logs checker (Pattern C — nil clients → -1) ---
+
+// TestRelated_VPCE_Logs_NilClients verifies Count=-1 when clients are nil
+// (cannot call DescribeFlowLogs).
+func TestRelated_VPCE_Logs_NilClients(t *testing.T) {
+	res := vpceSrcInterfaceResource()
+
+	checker := vpceCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+}
+
+// TestRelated_VPCE_Logs_EmptyID verifies Count=0 for an empty endpoint ID.
+func TestRelated_VPCE_Logs_EmptyID(t *testing.T) {
+	res := resource.Resource{ID: "", Fields: map[string]string{}}
+
+	checker := vpceCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty endpoint ID)", result.Count)
 	}
 }

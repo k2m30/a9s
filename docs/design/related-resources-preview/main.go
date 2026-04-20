@@ -69,7 +69,8 @@ var (
 	kStyle       = lipgloss.NewStyle().Foreground(colDetailKey)
 	vStyle       = lipgloss.NewStyle().Foreground(colDetailVal)
 	navStyle     = lipgloss.NewStyle().Foreground(colAccent).Underline(true) // navigable value
-	greenStyle   = lipgloss.NewStyle().Foreground(colGreen)                  //nolint:unused // design style — reserved for future use in preview
+	//lint:ignore U1000 design style — reserved for future use in preview
+	greenStyle   = lipgloss.NewStyle().Foreground(colGreen)
 	helpKeyStyle = lipgloss.NewStyle().Foreground(colHelpKey).Bold(true)
 	helpCatStyle = lipgloss.NewStyle().Foreground(colHelpCat).Bold(true)
 
@@ -327,7 +328,8 @@ func renderSearchField(key string, preMatch string, match string, postMatch stri
 }
 
 // renderSearchSectionField renders a section header with a search match in the key.
-func renderSearchSectionField(key string, preMatch string, match string, postMatch string, isCurrent bool, leftW int) string {
+// The key argument is unused — kept for signature parity with renderSearchKeyValueField.
+func renderSearchSectionField(_ string, preMatch string, match string, postMatch string, isCurrent bool, leftW int) string {
 	mStyle := matchStyle
 	if isCurrent {
 		mStyle = matchCurStyle

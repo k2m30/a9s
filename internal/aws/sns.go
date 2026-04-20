@@ -27,7 +27,7 @@ func init() {
 }
 
 // FetchSNSTopics calls the SNS ListTopics API and returns all pages of topics.
-// Used by existing tests and the legacy fetcher.
+// Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

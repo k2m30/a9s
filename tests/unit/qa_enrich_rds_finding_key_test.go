@@ -99,4 +99,3 @@ func TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
 		t.Errorf("len(Findings) = %d, want 2 (one finding per probed resource)", len(result.Findings))
 	}
 }
-

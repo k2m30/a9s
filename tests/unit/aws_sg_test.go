@@ -22,11 +22,11 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		output: &ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []ec2types.SecurityGroup{
 				{
-					GroupId:   aws.String("sg-0001"),
-					GroupName: aws.String("web-sg"),
-					VpcId:     aws.String("vpc-aaa"),
+					GroupId:     aws.String("sg-0001"),
+					GroupName:   aws.String("web-sg"),
+					VpcId:       aws.String("vpc-aaa"),
 					Description: aws.String("Web server security group"),
-					OwnerId:  aws.String("123456789012"),
+					OwnerId:     aws.String("123456789012"),
 					IpPermissions: []ec2types.IpPermission{
 						{
 							IpProtocol: aws.String("tcp"),
@@ -50,11 +50,11 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 					},
 				},
 				{
-					GroupId:   aws.String("sg-0002"),
-					GroupName: aws.String("db-sg"),
-					VpcId:     aws.String("vpc-bbb"),
+					GroupId:     aws.String("sg-0002"),
+					GroupName:   aws.String("db-sg"),
+					VpcId:       aws.String("vpc-bbb"),
 					Description: aws.String("Database security group"),
-					OwnerId:  aws.String("123456789012"),
+					OwnerId:     aws.String("123456789012"),
 					IpPermissions: []ec2types.IpPermission{
 						{
 							IpProtocol: aws.String("tcp"),
@@ -182,9 +182,9 @@ func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 		output: &ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []ec2types.SecurityGroup{
 				{
-					GroupId:   aws.String("sg-raw123"),
-					GroupName: aws.String("raw-test-sg"),
-					VpcId:     aws.String("vpc-raw"),
+					GroupId:     aws.String("sg-raw123"),
+					GroupName:   aws.String("raw-test-sg"),
+					VpcId:       aws.String("vpc-raw"),
 					Description: aws.String("Raw struct test"),
 				},
 			},
@@ -229,11 +229,11 @@ func TestFetchSecurityGroups_NilFieldsHandled(t *testing.T) {
 			SecurityGroups: []ec2types.SecurityGroup{
 				{
 					// All string pointer fields are nil
-					GroupId:   nil,
-					GroupName: nil,
-					VpcId:     nil,
+					GroupId:     nil,
+					GroupName:   nil,
+					VpcId:       nil,
 					Description: nil,
-					OwnerId:  nil,
+					OwnerId:     nil,
 				},
 			},
 		},

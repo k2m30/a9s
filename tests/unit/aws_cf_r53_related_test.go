@@ -36,7 +36,7 @@ func cfR53Checker(t *testing.T) resource.RelatedChecker {
 			return def.Checker
 		}
 	}
-	t.Fatal("cf related checker for r53 not found — checkCfR53 must be registered in cloudfront.go")
+	t.Fatal("cf related checker for r53 not found — checkCfR53 must be registered in cf.go")
 	return nil
 }
 

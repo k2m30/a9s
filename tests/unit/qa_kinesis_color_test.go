@@ -13,9 +13,9 @@ func TestKinesisColor(t *testing.T) {
 	}
 
 	streamStatusCases := []struct {
-		name          string
-		streamStatus  string
-		want          resource.Color
+		name         string
+		streamStatus string
+		want         resource.Color
 	}{
 		{name: "active", streamStatus: "ACTIVE", want: resource.ColorHealthy},
 		{name: "creating", streamStatus: "CREATING", want: resource.ColorWarning},

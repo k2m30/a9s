@@ -6,7 +6,7 @@ package unit
 //
 // These tests are DISTINCT from aws_nodegroups_image_id_test.go, which only exercises
 // the standalone FetchNodeGroups helper. This file targets the closure registered in
-// internal/aws/nodegroups.go:37 via resource.RegisterPaginated("ng", ...).
+// internal/aws/ng.go via resource.RegisterPaginated("ng", ...).
 
 import (
 	"context"

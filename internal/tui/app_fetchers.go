@@ -538,11 +538,12 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 	}
 }
 
-// buildEnrichQueue returns resource types that have registered enrichers AND
-// have retained probe resources, sorted by declarative priority from
-// EnricherRegistry[name].Priority (lower values first), then alphabetically
-// within the same priority tier. Priority is metadata on the registry entry:
-// 10 = batchable (cheap, run first), 100 = default per-resource enricher.
+// buildEnrichQueue returns resource types that have registered Wave 2 issue
+// enrichers AND have retained probe resources, sorted by declarative priority
+// from IssueEnricherRegistry[name].Priority (lower values first), then
+// alphabetically within the same priority tier. Priority is metadata on the
+// registry entry: 10 = batchable (cheap, run first), 100 = default
+// per-resource issue enricher.
 func (m *Model) buildEnrichQueue() []string {
 	type pair struct {
 		name     string
@@ -550,7 +551,7 @@ func (m *Model) buildEnrichQueue() []string {
 	}
 
 	var ps []pair
-	for name, e := range awsclient.EnricherRegistry {
+	for name, e := range awsclient.IssueEnricherRegistry {
 		if _, ok := m.probeResources[name]; !ok {
 			continue
 		}
@@ -577,7 +578,7 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
 	resources := m.probeResources[shortName]
-	enricherFn := awsclient.EnricherRegistry[shortName].Fn
+	enricherFn := awsclient.IssueEnricherRegistry[shortName].Fn
 	typeGen := m.enrichmentTypeGen[shortName]
 	if enricherFn == nil {
 		return nil
@@ -594,7 +595,7 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
 
-		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.EnricherResult, error) {
+		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
 			return enricherFn(ctx, clients, resources)
 		})
 		if err != nil {

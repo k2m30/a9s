@@ -35,8 +35,6 @@ func init() {
 	})
 }
 
-
-
 // checkMSKAlarms checks the cache for CloudWatch alarms with "Cluster Name" dimension matching this cluster.
 func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
@@ -296,7 +294,6 @@ func mskRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's
 // Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId field.
 // Pattern F — no cache needed.
@@ -311,7 +308,3 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }
-
-
-
-

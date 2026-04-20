@@ -17,16 +17,16 @@ func NewAPIGWFixtures() *APIGWFixtures {
 	return &APIGWFixtures{
 		APIs: []apigwtypes.Api{
 			{
-				ApiId:                        aws.String("abc123def4"),
-				Name:                         aws.String("acme-public-api"),
-				ProtocolType:                 apigwtypes.ProtocolTypeHttp,
-				ApiEndpoint:                  aws.String("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
-				Description:                  aws.String("Public REST API for Acme Corp mobile and web clients"),
-				RouteSelectionExpression:     aws.String("${request.method} ${request.path}"),
-				CreatedDate:                  aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
-				ApiKeySelectionExpression:    aws.String("$request.header.x-api-key"),
-				CorsConfiguration:            &apigwtypes.Cors{AllowMethods: []string{"GET", "POST", "PUT", "DELETE"}, AllowOrigins: []string{"https://app.acme-corp.com"}},
-				Tags:                         map[string]string{"Environment": "production"},
+				ApiId:                     aws.String("abc123def4"),
+				Name:                      aws.String("acme-public-api"),
+				ProtocolType:              apigwtypes.ProtocolTypeHttp,
+				ApiEndpoint:               aws.String("https://abc123def4.execute-api.us-east-1.amazonaws.com"),
+				Description:               aws.String("Public REST API for Acme Corp mobile and web clients"),
+				RouteSelectionExpression:  aws.String("${request.method} ${request.path}"),
+				CreatedDate:               aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
+				ApiKeySelectionExpression: aws.String("$request.header.x-api-key"),
+				CorsConfiguration:         &apigwtypes.Cors{AllowMethods: []string{"GET", "POST", "PUT", "DELETE"}, AllowOrigins: []string{"https://app.acme-corp.com"}},
+				Tags:                      map[string]string{"Environment": "production"},
 			},
 			{
 				ApiId:                    aws.String("efg567hij8"),

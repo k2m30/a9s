@@ -394,3 +394,146 @@ func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
 		t.Errorf("FetchFilter = %v, want empty (reverse-scan checkers must not set FetchFilter)", result.FetchFilter)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkKinesisCFN — ListTagsForStream + cfn cache lookup
+// ---------------------------------------------------------------------------
+
+// TestRelated_Kinesis_CFN_FoundViaTags verifies that when the stream has the
+// aws:cloudformation:stack-name tag and the matching stack is in the cfn cache,
+// the checker returns Count=1.
+func TestRelated_Kinesis_CFN_FoundViaTags(t *testing.T) {
+	const streamName = "clickstream-ingest"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{cfnStackName: "data-platform-stack"}
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "data-platform-stack", Name: "data-platform-stack", Fields: map[string]string{"stack_name": "data-platform-stack"}},
+			{ID: "unrelated-stack", Name: "unrelated-stack", Fields: map[string]string{"stack_name": "unrelated-stack"}},
+		}},
+	}
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-platform-stack" {
+		t.Errorf("ResourceIDs = %v, want [data-platform-stack]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Kinesis_CFN_NoMatchingStack verifies that when the stream has the
+// cfn tag but the named stack is not in the cache, Count=0 is returned.
+func TestRelated_Kinesis_CFN_NoMatchingStack(t *testing.T) {
+	const streamName = "clickstream-ingest"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{cfnStackName: "missing-stack"}
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "different-stack", Name: "different-stack", Fields: map[string]string{"stack_name": "different-stack"}},
+		}},
+	}
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (stack not in cache)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_CFN_NoTag verifies that when ListTagsForStream returns no
+// cfn tag, Count=0 is returned immediately without scanning the cfn cache.
+func TestRelated_Kinesis_CFN_NoTag(t *testing.T) {
+	const streamName = "clickstream-ingest"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{cfnStackName: ""} // no cfn tag
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-stack", Name: "some-stack"},
+		}},
+	}
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no cfn tag on stream)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkKinesisKMS — DescribeStreamSummary → KeyId extraction
+// ---------------------------------------------------------------------------
+
+// TestRelated_Kinesis_KMS_Present verifies that a stream with KMS encryption
+// has its KeyId extracted (stripping the alias prefix) and returned as Count=1.
+func TestRelated_Kinesis_KMS_Present(t *testing.T) {
+	const streamName = "clickstream-ingest"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{kmsKeyID: "alias/aws/kinesis/mrk-abc1234"}
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "kms")
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (KMS key present)", result.Count)
+	}
+	// KeyId after stripping last "/" prefix segment: "mrk-abc1234"
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-abc1234" {
+		t.Errorf("ResourceIDs = %v, want [mrk-abc1234]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Kinesis_KMS_Absent verifies that a stream with no KMS key returns Count=0.
+func TestRelated_Kinesis_KMS_Absent(t *testing.T) {
+	const streamName = "clickstream-ingest"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{kmsKeyID: ""} // no encryption
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "kms")
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count)
+	}
+}
+
+// TestRelated_Kinesis_KMS_BareKeyID verifies that a plain key ID (no "/" prefix)
+// is returned unchanged.
+func TestRelated_Kinesis_KMS_BareKeyID(t *testing.T) {
+	const streamName = "clickstream-ingest"
+	const bareKeyID = "mrk-00112233445566778899aabbccddeeff"
+
+	fakeKinesis := &fakeKinesisWithTagsAndDesc{kmsKeyID: bareKeyID}
+	clients := &awsclient.ServiceClients{Kinesis: fakeKinesis}
+
+	source := resource.Resource{ID: streamName, Name: streamName}
+
+	checker := kinesisCheckerByTarget(t, "kms")
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (bare key ID)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != bareKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, bareKeyID)
+	}
+}

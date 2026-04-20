@@ -1,31 +1,49 @@
 package resource
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
-// Enricher is the function signature for on-demand resource enrichers.
+// DetailEnricher is the function signature for on-demand detail enrichers.
 // It receives the current resource and returns an enriched copy with additional
 // fields populated (e.g., RawStruct updated with fetched data).
-type Enricher func(ctx context.Context, clients any, res Resource) (Resource, error)
+//
+// Detail enrichment runs synchronously when the user opens a detail, YAML, or
+// JSON view for a single resource. It is separate from Wave 2 issue enrichment
+// (see internal/aws/*_issue_enrichment.go), which scans the retained page in the
+// background to surface attention signals.
+type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
 
-var enricherRegistry = map[string]Enricher{}
+var detailEnricherRegistry = map[string]DetailEnricher{}
 
-// RegisterEnricher adds an enricher for the given resource short name.
-func RegisterEnricher(shortName string, f Enricher) {
-	enricherRegistry[shortName] = f
+// RegisterDetailEnricher adds a detail enricher for the given resource short name.
+// Panics on empty short name, nil function, or duplicate registration.
+func RegisterDetailEnricher(shortName string, f DetailEnricher) {
+	if shortName == "" {
+		panic("RegisterDetailEnricher: empty short name")
+	}
+	if f == nil {
+		panic(fmt.Sprintf("RegisterDetailEnricher: nil enricher func for short name %q", shortName))
+	}
+	if _, exists := detailEnricherRegistry[shortName]; exists {
+		panic(fmt.Sprintf("RegisterDetailEnricher: duplicate registration for short name %q", shortName))
+	}
+	detailEnricherRegistry[shortName] = f
 }
 
-// GetEnricher returns the enricher for the given resource short name, or nil.
-func GetEnricher(shortName string) Enricher {
-	return enricherRegistry[shortName]
+// GetDetailEnricher returns the detail enricher for the given resource short name, or nil.
+func GetDetailEnricher(shortName string) DetailEnricher {
+	return detailEnricherRegistry[shortName]
 }
 
-// HasEnricher returns true if an enricher is registered for the given short name.
-func HasEnricher(shortName string) bool {
-	_, ok := enricherRegistry[shortName]
+// HasDetailEnricher returns true if a detail enricher is registered for the given short name.
+func HasDetailEnricher(shortName string) bool {
+	_, ok := detailEnricherRegistry[shortName]
 	return ok
 }
 
-// UnregisterEnricher removes an enricher. Used only in tests for cleanup.
-func UnregisterEnricher(shortName string) {
-	delete(enricherRegistry, shortName)
+// UnregisterDetailEnricher removes a detail enricher. Used only in tests for cleanup.
+func UnregisterDetailEnricher(shortName string) {
+	delete(detailEnricherRegistry, shortName)
 }

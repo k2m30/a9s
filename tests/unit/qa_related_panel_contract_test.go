@@ -83,7 +83,8 @@ func goldenDocPath(t *testing.T) string {
 // docs/related-resources.md and returns shortName -> set of TargetTypes.
 //
 // The table rows look like:
-//   | `acm` | [API_…](url) | `apigw`, `cf`, `ct-events`, `elb`, `r53` |
+//
+//	| `acm` | [API_…](url) | `apigw`, `cf`, `ct-events`, `elb`, `r53` |
 //
 // Parsing is kept simple: find the section header, skip the table header
 // lines, then read rows until a blank line or the next H2.
@@ -303,7 +304,7 @@ func TestRelatedPanel_TargetTypesAreRegistered(t *testing.T) {
 //
 // Bullet format (within the section):
 //
-//	- `<parent>` → `<target>` — <rationale>
+//   - `<parent>` → `<target>` — <rationale>
 //
 // The three sub-sections ("Unanimous `no`", "Unanimous `sometimes`", "Majority `no`")
 // are parsed transparently — only the bullet pattern matters.

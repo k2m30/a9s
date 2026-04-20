@@ -35,8 +35,9 @@ Is the value already on the SDK list-API response (RawStruct path)?
          Does it require an additional AWS API call?
          ├─ YES → Tier B-enricher:
          │        ├─ Edit/add Wave-2 enricher to populate
-         │        │  EnricherResult.FieldUpdates[resourceID][<key>]
-         │        ├─ Register enricher in EnricherRegistry if new
+         │        │  IssueEnricherResult.FieldUpdates[resourceID][<key>]
+         │        ├─ Register via registerIssueEnricher(...) in the owning
+         │        │  <short>_issue_enrichment.go init() block
          │        └─ Add column with Key: in defaults_*.go
          └─ Multi-line text body? → Tier C: detail-only via DetailField{Key: ..., Label: ...}
 ```
@@ -114,16 +115,26 @@ Don't test the trivial round-trip; test the logic.
 
 ## Tier B-enricher — Wave-2 via FieldUpdates
 
-### File: `internal/aws/enrichment.go`
+### File: `internal/aws/<short>_issue_enrichment.go`
 
-Find or add the `Enrich<Name>` function. Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern:
+Every registered short name already has an `_issue_enrichment.go` file. Open it and replace the `NoOpIssueEnricher` registration (if currently a stub) with a real enricher, or edit the existing enricher body if one is already there.
+
+Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern:
 
 ```go
-func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (EnricherResult, error) {
+// <short>_issue_enrichment.go
+package aws
+
+func init() {
+    registerIssueEnricher("<short>", Enrich<Name>, 100)
+    resource.RegisterIssueEnricherFieldKeys("<short>", []string{"<key>"})
+}
+
+func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
     findings := make(map[string]resource.EnrichmentFinding)
     fieldUpdates := make(map[string]map[string]string)
     if clients.<Service> == nil {
-        return EnricherResult{Findings: findings}, nil
+        return IssueEnricherResult{Findings: findings}, nil
     }
     // Build set of resource IDs we know about; skip orphan responses
     known := make(map[string]struct{}, len(resources))
@@ -139,7 +150,7 @@ func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []reso
             "<key>": <value>,
         }
     }
-    return EnricherResult{
+    return IssueEnricherResult{
         IssueCount:   <real-count or 0 for ~ findings>,
         Truncated:    <bool>,
         Findings:     findings,
@@ -150,9 +161,9 @@ func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []reso
 
 If the enricher walks paginated results (e.g. ListPackages, ListSubscriptionsByTopic), follow `NextToken` to the end. **Don't `len(out.Page)` — that under-counts.**
 
-### Register in EnricherRegistry
+### Register via init()
 
-If new, add `"<short>": {Fn: Enrich<Name>, Priority: 100}`. If `<short>` is currently NoOpEnricher, replace.
+The `init()` in the same file calls `registerIssueEnricher(<short>, <fn>, <priority>)`. `registerIssueEnricher` panics on empty name, nil fn, duplicate short name, or non-positive priority. If the short name was previously a `NoOpIssueEnricher` stub, delete the stub's registration before adding the real one — two calls with the same short name will panic at package init.
 
 ### Then defaults_*.go and viewsgen as Tier A.
 

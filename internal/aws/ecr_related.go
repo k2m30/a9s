@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -127,7 +127,6 @@ func ecrCFNStackName(res resource.Resource) string {
 	return res.Fields["cfn_stack_name"]
 }
 
-
 // checkECRKMS extracts the KMS key from the ECR Repository's
 // EncryptionConfiguration.KmsKey field. Returns the key ID (last segment after "/").
 // Pattern F — no cache needed.
@@ -142,11 +141,6 @@ func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	return relatedResult("kms", []string{keyID})
 }
-
-
-
-
-
 
 // checkECREbRule is a reverse-scan checker for the ecr→eb-rule relationship.
 // Iterates cache["eb-rule"]; for each rule, checks if rule.EventPattern JSON
@@ -246,4 +240,3 @@ func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
 	// Source matches aws.ecr with no repository filter — treat as broad match.
 	return true
 }
-

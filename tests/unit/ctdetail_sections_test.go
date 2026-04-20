@@ -567,9 +567,9 @@ func TestCTDetailBuildSections_DroppedBoringKeys(t *testing.T) {
 
 	event := minimalEvent()
 	event.RequestParameters = map[string]any{
-		"param1":     "value1",
-		"Verb":       "W",
-		"Read only":  "false",
+		"param1":          "value1",
+		"Verb":            "W",
+		"Read only":       "false",
 		"SourceIPAddress": "10.0.0.1",
 	}
 	event.ResponseElements = map[string]any{"result": "ok"}
@@ -614,12 +614,12 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 		valueHint   string // empty means skip value check
 	}
 	type wireCase struct {
-		name             string
-		event            *ctdetail.Event
-		expectSections   []string   // must all be present
-		noSections       []string   // must not be present
-		firstSection     string     // if non-empty, sections[0].Name must match
-		checks           []sectionCheck
+		name           string
+		event          *ctdetail.Event
+		expectSections []string // must all be present
+		noSections     []string // must not be present
+		firstSection   string   // if non-empty, sections[0].Name must match
+		checks         []sectionCheck
 	}
 
 	cases := []wireCase{
@@ -754,9 +754,9 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 					InvokedBy: "kms.amazonaws.com",
 				},
 				RequestParameters: map[string]any{
-					"keyId":       "arn:aws:kms:us-east-1:444444444444:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b",
+					"keyId":        "arn:aws:kms:us-east-1:444444444444:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b",
 					"rotationType": "AUTOMATIC",
-					"backingKey":  true,
+					"backingKey":   true,
 				},
 			},
 			expectSections: []string{ctdetail.SectionActor, ctdetail.SectionAction, ctdetail.SectionContext},

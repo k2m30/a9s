@@ -61,9 +61,6 @@ func sesIdentityDomain(res resource.Resource) string {
 	return name
 }
 
-
-
-
 // SES identity list RawStruct (sesv2types.IdentityInfo) exposes only IdentityName,
 // IdentityType, SendingEnabled, VerificationStatus. Relationships to EventBridge,
 // Kinesis, Lambda, S3, and SNS require per-identity calls (GetEmailIdentity →
@@ -273,8 +270,3 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	return relatedResult("sns", ids)
 }
-
-
-
-
-

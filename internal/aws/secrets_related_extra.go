@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
-	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	ecspkg "github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
+	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"

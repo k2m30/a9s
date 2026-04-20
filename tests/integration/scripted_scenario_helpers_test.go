@@ -339,7 +339,6 @@ func (s *fullIntegrationScenario) SortByID() {
 	s.SortByColumn(2) // ID is typically column 2
 }
 
-
 func (s *fullIntegrationScenario) OpenYAML() {
 	s.t.Helper()
 	s.Press("y")

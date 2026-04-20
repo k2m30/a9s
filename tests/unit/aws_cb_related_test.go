@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -305,5 +306,444 @@ func TestRelated_CB_Pipeline_ReturnsUnknown(t *testing.T) {
 	}
 	if result.TargetType != "pipeline" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "pipeline")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbSG — Pattern F: VpcConfig.SecurityGroupIds
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_SG_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			VpcConfig: &cbtypes.VpcConfig{
+				SecurityGroupIds: []string{"sg-aaa111", "sg-bbb222"},
+			},
+		},
+	}
+	checker := cbCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+}
+
+func TestRelated_CB_SG_NoVPCConfig(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+	checker := cbCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	}
+}
+
+func TestRelated_CB_SG_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: "not-a-project",
+	}
+	checker := cbCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbVPC — Pattern F: VpcConfig.VpcId
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_VPC_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			VpcConfig: &cbtypes.VpcConfig{
+				VpcId: aws.String("vpc-abc123"),
+			},
+		},
+	}
+	checker := cbCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "vpc-abc123" {
+		t.Errorf("ResourceIDs = %v, want [vpc-abc123]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CB_VPC_NoVPCConfig(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+	checker := cbCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbKMS — Pattern F: EncryptionKey ARN last segment
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_KMS_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			EncryptionKey: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-abcd-ef01-234567890abc"),
+		},
+	}
+	checker := cbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "a1b2c3d4-5678-abcd-ef01-234567890abc" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4-5678-abcd-ef01-234567890abc]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CB_KMS_NoKey(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+	checker := cbCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionKey)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbSubnet — Pattern F: VpcConfig.Subnets
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_Subnet_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			VpcConfig: &cbtypes.VpcConfig{
+				Subnets: []string{"subnet-11111111", "subnet-22222222"},
+			},
+		},
+	}
+	checker := cbCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2", result.Count)
+	}
+}
+
+func TestRelated_CB_Subnet_NoVPCConfig(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+	checker := cbCheckerByTarget(t, "subnet")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no VpcConfig)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbAlarm — Pattern D: CW Alarm Namespace=AWS/CodeBuild + ProjectName dim
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_Alarm_Match(t *testing.T) {
+	const projectName = "my-project"
+	alarmRes := resource.Resource{
+		ID: "cb-build-failures",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("cb-build-failures"),
+			Namespace: aws.String("AWS/CodeBuild"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("ProjectName"), Value: aws.String(projectName)},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	res := resource.Resource{
+		ID:        projectName,
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{Name: aws.String(projectName)},
+	}
+
+	checker := cbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "cb-build-failures" {
+		t.Errorf("ResourceIDs = %v, want [cb-build-failures]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CB_Alarm_WrongNamespace(t *testing.T) {
+	alarmRes := resource.Resource{
+		ID: "other-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("other-alarm"),
+			Namespace: aws.String("AWS/EC2"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("ProjectName"), Value: aws.String("my-project")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+
+	checker := cbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong Namespace)", result.Count)
+	}
+}
+
+func TestRelated_CB_Alarm_NilCache(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{},
+	}
+	checker := cbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbECR — Pattern F+C: ECR URI parsing
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_ECR_Match(t *testing.T) {
+	const repoName = "my-app"
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Environment: &cbtypes.ProjectEnvironment{
+				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:latest"),
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: repoName, Name: repoName},
+		}},
+	}
+
+	checker := cbCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != repoName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, repoName)
+	}
+}
+
+func TestRelated_CB_ECR_NonECRImage(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Environment: &cbtypes.ProjectEnvironment{
+				Image: aws.String("ubuntu:22.04"),
+			},
+		},
+	}
+
+	checker := cbCheckerByTarget(t, "ecr")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (non-ECR image)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbS3 — Pattern F+C: S3 artifact/source bucket
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_S3_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Artifacts: &cbtypes.ProjectArtifacts{
+				Type:     cbtypes.ArtifactsTypeS3,
+				Location: aws.String("my-artifacts-bucket"),
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"s3": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-artifacts-bucket", Name: "my-artifacts-bucket"},
+		}},
+	}
+
+	checker := cbCheckerByTarget(t, "s3")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+}
+
+func TestRelated_CB_S3_NoS3Artifacts(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Artifacts: &cbtypes.ProjectArtifacts{
+				Type: cbtypes.ArtifactsTypeNoArtifacts,
+			},
+		},
+	}
+
+	checker := cbCheckerByTarget(t, "s3")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no S3 artifacts)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbSecrets — Pattern F: SECRETS_MANAGER env vars
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_Secrets_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Environment: &cbtypes.ProjectEnvironment{
+				EnvironmentVariables: []cbtypes.EnvironmentVariable{
+					{
+						Name:  aws.String("DB_PASSWORD"),
+						Value: aws.String("prod/db/password"),
+						Type:  cbtypes.EnvironmentVariableTypeSecretsManager,
+					},
+				},
+			},
+		},
+	}
+
+	checker := cbCheckerByTarget(t, "secrets")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "prod/db/password" {
+		t.Errorf("ResourceIDs = %v, want [prod/db/password]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CB_Secrets_NoSecretsVars(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Environment: &cbtypes.ProjectEnvironment{
+				EnvironmentVariables: []cbtypes.EnvironmentVariable{
+					{Name: aws.String("NODE_ENV"), Value: aws.String("prod"), Type: cbtypes.EnvironmentVariableTypePlaintext},
+				},
+			},
+		},
+	}
+
+	checker := cbCheckerByTarget(t, "secrets")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no SECRETS_MANAGER vars)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkCbSSM — Pattern F: PARAMETER_STORE env vars
+// ---------------------------------------------------------------------------
+
+func TestRelated_CB_SSM_Match(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-project",
+		Fields: map[string]string{},
+		RawStruct: cbtypes.Project{
+			Environment: &cbtypes.ProjectEnvironment{
+				EnvironmentVariables: []cbtypes.EnvironmentVariable{
+					{
+						Name:  aws.String("API_KEY"),
+						Value: aws.String("/prod/api/key"),
+						Type:  cbtypes.EnvironmentVariableTypeParameterStore,
+					},
+				},
+			},
+		},
+	}
+
+	checker := cbCheckerByTarget(t, "ssm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "/prod/api/key" {
+		t.Errorf("ResourceIDs = %v, want [/prod/api/key]", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CB_SSM_NoSSMVars(t *testing.T) {
+	res := resource.Resource{
+		ID:        "my-project",
+		Fields:    map[string]string{},
+		RawStruct: cbtypes.Project{Environment: &cbtypes.ProjectEnvironment{}},
+	}
+
+	checker := cbCheckerByTarget(t, "ssm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no PARAMETER_STORE vars)", result.Count)
 	}
 }

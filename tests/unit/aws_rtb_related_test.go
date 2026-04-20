@@ -455,3 +455,293 @@ func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// checkRTBVPC — Pattern F: reads vpc_id from Fields directly
+// ---------------------------------------------------------------------------
+
+// TestRelated_RTB_VPC_Present verifies that a route table with a vpc_id field
+// returns Count=1 with the VPC ID.
+func TestRelated_RTB_VPC_Present(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		Fields: map[string]string{
+			"vpc_id": "vpc-0123456789abcdef0",
+		},
+	}
+
+	checker := rtbCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (vpc_id present)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpc-0123456789abcdef0" {
+		t.Errorf("ResourceIDs = %v, want [vpc-0123456789abcdef0]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_RTB_VPC_Absent verifies that a route table with no vpc_id returns Count=0.
+func TestRelated_RTB_VPC_Absent(t *testing.T) {
+	source := resource.Resource{
+		ID:     "rtb-abc123",
+		Fields: map[string]string{},
+	}
+
+	checker := rtbCheckerByTarget(t, "vpc")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRTBENI — forward: Routes[].NetworkInterfaceId → eni cache
+// ---------------------------------------------------------------------------
+
+// TestRelated_RTB_ENI_Found verifies that a route with a NetworkInterfaceId matching
+// an ENI in the cache returns Count=1.
+func TestRelated_RTB_ENI_Found(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NetworkInterfaceId: aws.String("eni-0abc1234")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "eni-0abc1234", Name: "nat-eni"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "eni")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eni-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [eni-0abc1234]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_RTB_ENI_NotFound verifies that no matching ENI yields Count=0.
+func TestRelated_RTB_ENI_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NetworkInterfaceId: aws.String("eni-99999999")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "eni-0abc1234", Name: "nat-eni"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "eni")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (ENI not in cache)", result.Count)
+	}
+}
+
+// TestRelated_RTB_ENI_NoRoutes verifies that a route table with no routes referencing
+// ENIs returns Count=0.
+func TestRelated_RTB_ENI_NoRoutes(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.0.0.0/8"), GatewayId: aws.String("local")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "eni-0abc1234", Name: "nat-eni"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "eni")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId in routes)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRTBTGW — forward: Routes[].TransitGatewayId → tgw cache
+// ---------------------------------------------------------------------------
+
+// TestRelated_RTB_TGW_Found verifies that a route with a TransitGatewayId matching
+// a TGW in the cache returns Count=1.
+func TestRelated_RTB_TGW_Found(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.20.0.0/16"), TransitGatewayId: aws.String("tgw-0abc1234")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"tgw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "tgw-0abc1234", Name: "corp-tgw"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "tgw")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "tgw-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [tgw-0abc1234]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_RTB_TGW_NotFound verifies that no matching TGW in cache returns Count=0.
+func TestRelated_RTB_TGW_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.20.0.0/16"), TransitGatewayId: aws.String("tgw-99999999")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"tgw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "tgw-0abc1234", Name: "corp-tgw"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "tgw")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (TGW not in cache)", result.Count)
+	}
+}
+
+// TestRelated_RTB_TGW_NoRoutes verifies that a route table with no transit gateway
+// routes returns Count=0.
+func TestRelated_RTB_TGW_NoRoutes(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.0.0.0/8"), GatewayId: aws.String("local")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"tgw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "tgw-0abc1234", Name: "corp-tgw"},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "tgw")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no TransitGatewayId in routes)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRTBVPCE — reverse: vpce cache, VpcEndpoint.RouteTableIds contains rtbID
+// ---------------------------------------------------------------------------
+
+// TestRelated_RTB_VPCE_Found verifies that a Gateway VPC endpoint with
+// RouteTableIds containing this RTB ID is returned.
+func TestRelated_RTB_VPCE_Found(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:        "vpce-0abc1234",
+				Name:      "s3-endpoint",
+				RawStruct: ec2types.VpcEndpoint{VpcEndpointId: aws.String("vpce-0abc1234"), RouteTableIds: []string{"rtb-abc123", "rtb-other"}},
+			},
+			{
+				ID:        "vpce-9999",
+				Name:      "dynamo-endpoint",
+				RawStruct: ec2types.VpcEndpoint{VpcEndpointId: aws.String("vpce-9999"), RouteTableIds: []string{"rtb-other-only"}},
+			},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (one endpoint references this RTB)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0abc1234" {
+		t.Errorf("ResourceIDs = %v, want [vpce-0abc1234]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_RTB_VPCE_NotFound verifies that no VPC endpoint references this RTB → Count=0.
+func TestRelated_RTB_VPCE_NotFound(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:        "vpce-9999",
+				Name:      "s3-endpoint",
+				RawStruct: ec2types.VpcEndpoint{VpcEndpointId: aws.String("vpce-9999"), RouteTableIds: []string{"rtb-other"}},
+			},
+		}},
+	}
+
+	checker := rtbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no endpoint references this RTB)", result.Count)
+	}
+}
+
+// TestRelated_RTB_VPCE_CacheMiss verifies Count=-1 when vpce cache is absent.
+func TestRelated_RTB_VPCE_CacheMiss(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-abc123",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-abc123"),
+		},
+	}
+
+	checker := rtbCheckerByTarget(t, "vpce")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (vpce cache absent, nil clients)", result.Count)
+	}
+}

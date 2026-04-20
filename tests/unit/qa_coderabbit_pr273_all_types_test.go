@@ -16,7 +16,7 @@ package unit
 //                          or scheduled work (yellow)
 //   * brokenStatuses     — status values that indicate failure, stopped,
 //                          unreachable, or rejected (red)
-//   * hasEnricher        — true if awsclient.EnricherRegistry[shortName] is
+//   * hasEnricher        — true if awsclient.IssueEnricherRegistry[shortName] is
 //                          non-nil; Wave 2 enrichment is an additional
 //                          issue source for these types (e.g., tg has
 //                          unhealthy targets discovered by Wave 2, not by
@@ -297,7 +297,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 			})
 			// Wave 2 clean, if applicable.
 			if c.hasEnricher {
-				if _, ok := awsclient.EnricherRegistry[c.shortName]; ok {
+				if _, ok := awsclient.IssueEnricherRegistry[c.shortName]; ok {
 					m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
 						ResourceType: c.shortName,
 						Issues:       0,
@@ -337,8 +337,8 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 			if !c.hasEnricher {
 				t.Skipf("%s has no Wave 2 enricher — partial-error scenario N/A", c.shortName)
 			}
-			if _, ok := awsclient.EnricherRegistry[c.shortName]; !ok {
-				t.Skipf("%s declared hasEnricher=true but is not in EnricherRegistry", c.shortName)
+			if _, ok := awsclient.IssueEnricherRegistry[c.shortName]; !ok {
+				t.Skipf("%s declared hasEnricher=true but is not in IssueEnricherRegistry", c.shortName)
 			}
 
 			m := newRootSizedModel()

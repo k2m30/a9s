@@ -79,9 +79,26 @@ Available platforms:
 # Demo mode (no AWS credentials needed)
 docker run --rm -it ghcr.io/k2m30/a9s:latest --demo
 
-# Real AWS access
-docker run --rm -it -v ~/.aws/config:/home/a9s/.aws/config:ro ghcr.io/k2m30/a9s:latest
+# Real AWS access on a laptop — mount the whole ~/.aws directory so SSO
+# tokens and static credentials resolve, and set AWS_EC2_METADATA_DISABLED
+# so missing creds fail fast instead of timing out against the 169.254
+# IMDS endpoint.
+docker run --rm -it \
+  -v ~/.aws:/home/a9s/.aws:ro \
+  -e AWS_EC2_METADATA_DISABLED=true \
+  ghcr.io/k2m30/a9s:latest
+
+# On an EC2 host that should inherit the instance profile, omit the env
+# var so the SDK can reach IMDS and pick up the attached role.
+docker run --rm -it ghcr.io/k2m30/a9s:latest
 ```
+
+For SSO profiles, run `aws sso login --profile <name>` on the host before
+starting the container so the cached token exists in `~/.aws/sso/cache`.
+
+To persist per-user view / theme customization across runs, also mount
+`~/.a9s`: `-v ~/.a9s:/home/a9s/.a9s`. Without that mount the container
+ships with the built-in defaults only.
 
 ### Build from source
 

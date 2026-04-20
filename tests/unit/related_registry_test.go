@@ -136,7 +136,6 @@ func TestUnregisterNavigableFields_RemovesEntry(t *testing.T) {
 	}
 }
 
-
 func TestRelated_ACM_Registered(t *testing.T) {
 	defs := resource.GetRelated("acm")
 	if len(defs) == 0 {

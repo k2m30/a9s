@@ -72,8 +72,8 @@ const docdbSnapRecoveryARN2 = "arn:aws:backup:us-east-1:123456789012:recovery-po
 
 func docdbSnapSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:   "docdb-snap-abc123",
-		Name: "docdb-snap-abc123",
+		ID:     "docdb-snap-abc123",
+		Name:   "docdb-snap-abc123",
 		Fields: map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{
 			DBClusterSnapshotIdentifier: aws.String("docdb-snap-abc123"),

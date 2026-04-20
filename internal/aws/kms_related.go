@@ -136,7 +136,6 @@ func checkKMSS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 }
 
-
 // kmsIDMatches reports whether a KMS reference value (full ARN, bare key UUID,
 // or alias ARN) contains the given bare key UUID.
 // A full ARN has the form arn:aws:kms:region:account:key/{uuid}.

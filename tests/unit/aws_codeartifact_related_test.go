@@ -101,4 +101,3 @@ func TestRelated_Codeartifact_KMS_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
-

@@ -20,9 +20,9 @@ func TestR53Color(t *testing.T) {
 	}
 
 	cases := []struct {
-		name       string
+		name        string
 		recordCount string
-		want       resource.Color
+		want        resource.Color
 	}{
 		// A zone with exactly 2 records is a stub (SOA + NS only) — warn the operator.
 		{name: "empty_zone", recordCount: "2", want: resource.ColorWarning},

@@ -21,46 +21,78 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-
-		input := &eks.ListClustersInput{
-			MaxResults: aws.Int32(DefaultPageSize),
-		}
-		if continuationToken != "" {
-			input.NextToken = aws.String(continuationToken)
-		}
-
-		listOutput, err := c.EKS.ListClusters(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
-		}
-
-		var resources []resource.Resource
-		for _, name := range listOutput.Clusters {
-			descOutput, err := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
-				Name: aws.String(name),
-			})
-			if err != nil || descOutput.Cluster == nil {
-				continue
-			}
-			resources = append(resources, buildEKSResource(name, descOutput.Cluster))
-		}
-
-		isTruncated := listOutput.NextToken != nil
-		var nextToken string
-		if listOutput.NextToken != nil {
-			nextToken = *listOutput.NextToken
-		}
-
-		return resource.FetchResult{
-			Resources: resources,
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: isTruncated,
-				NextToken:   nextToken,
-				PageSize:    len(resources),
-				TotalHint:   -1,
-			},
-		}, nil
+		return FetchEKSClustersPage(ctx, c, continuationToken)
 	})
+}
+
+// FetchEKSClustersPage fetches a single page of EKS clusters using the registered
+// paginated fetcher pattern. For each cluster name returned by ListClusters,
+// DescribeCluster is called. If DescribeCluster fails or returns nil, the cluster
+// is included as an error row with Status="DescribeFailed" rather than being dropped.
+func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+	input := &eks.ListClustersInput{
+		MaxResults: aws.Int32(DefaultPageSize),
+	}
+	if continuationToken != "" {
+		input.NextToken = aws.String(continuationToken)
+	}
+
+	listOutput, err := c.EKS.ListClusters(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
+	}
+
+	var resources []resource.Resource
+	for _, name := range listOutput.Clusters {
+		descOutput, descErr := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
+			Name: aws.String(name),
+		})
+		if descErr != nil {
+			// Surface describe failure as an error row rather than silently dropping.
+			resources = append(resources, resource.Resource{
+				ID:     name,
+				Name:   name,
+				Status: "DescribeFailed",
+				Fields: map[string]string{
+					"cluster_name":        name,
+					"status":              "DescribeFailed",
+					"health_issues_count": "0",
+					"describe_error":      descErr.Error(),
+				},
+			})
+			continue
+		}
+		if descOutput.Cluster == nil {
+			resources = append(resources, resource.Resource{
+				ID:     name,
+				Name:   name,
+				Status: "DescribeFailed",
+				Fields: map[string]string{
+					"cluster_name":        name,
+					"status":              "DescribeFailed",
+					"health_issues_count": "0",
+				},
+			})
+			continue
+		}
+		resources = append(resources, buildEKSResource(name, descOutput.Cluster))
+	}
+
+	isTruncated := listOutput.NextToken != nil
+	var nextToken string
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   -1,
+		},
+	}, nil
 }
 
 // buildEKSResource constructs a Resource from a cluster name and EKS Cluster struct.

@@ -178,20 +178,20 @@ var expectedSecondColumn = map[string]struct {
 	typeDefTitle string
 	typeDefKey   string
 }{
-	"sg":    {configTitle: "Group ID", typeDefTitle: "Group ID", typeDefKey: "group_id"},
-	"vpc":   {configTitle: "VPC ID", typeDefTitle: "VPC ID", typeDefKey: "vpc_id"},
+	"sg":     {configTitle: "Group ID", typeDefTitle: "Group ID", typeDefKey: "group_id"},
+	"vpc":    {configTitle: "VPC ID", typeDefTitle: "VPC ID", typeDefKey: "vpc_id"},
 	"subnet": {configTitle: "Subnet ID", typeDefTitle: "Subnet ID", typeDefKey: "subnet_id"},
-	"rtb":   {configTitle: "Route Table ID", typeDefTitle: "Route Table ID", typeDefKey: "route_table_id"},
-	"nat":   {configTitle: "NAT Gateway ID", typeDefTitle: "NAT Gateway ID", typeDefKey: "nat_gateway_id"},
-	"igw":   {configTitle: "IGW ID", typeDefTitle: "IGW ID", typeDefKey: "igw_id"},
-	"eip":   {configTitle: "Allocation ID", typeDefTitle: "Allocation ID", typeDefKey: "allocation_id"},
-	"vpce":  {configTitle: "Endpoint ID", typeDefTitle: "Endpoint ID", typeDefKey: "vpce_id"},
-	"tgw":   {configTitle: "TGW ID", typeDefTitle: "TGW ID", typeDefKey: "tgw_id"},
-	"eni":   {configTitle: "ENI ID", typeDefTitle: "ENI ID", typeDefKey: "eni_id"},
-	"r53":   {configTitle: "Zone ID", typeDefTitle: "Zone ID", typeDefKey: "zone_id"},
-	"cf":    {configTitle: "Distribution ID", typeDefTitle: "Distribution ID", typeDefKey: "distribution_id"},
-	"apigw": {configTitle: "API ID", typeDefTitle: "API ID", typeDefKey: "api_id"},
-	"efs":   {configTitle: "File System ID", typeDefTitle: "File System ID", typeDefKey: "file_system_id"},
+	"rtb":    {configTitle: "Route Table ID", typeDefTitle: "Route Table ID", typeDefKey: "route_table_id"},
+	"nat":    {configTitle: "NAT Gateway ID", typeDefTitle: "NAT Gateway ID", typeDefKey: "nat_gateway_id"},
+	"igw":    {configTitle: "IGW ID", typeDefTitle: "IGW ID", typeDefKey: "igw_id"},
+	"eip":    {configTitle: "Allocation ID", typeDefTitle: "Allocation ID", typeDefKey: "allocation_id"},
+	"vpce":   {configTitle: "Endpoint ID", typeDefTitle: "Endpoint ID", typeDefKey: "vpce_id"},
+	"tgw":    {configTitle: "TGW ID", typeDefTitle: "TGW ID", typeDefKey: "tgw_id"},
+	"eni":    {configTitle: "ENI ID", typeDefTitle: "ENI ID", typeDefKey: "eni_id"},
+	"r53":    {configTitle: "Zone ID", typeDefTitle: "Zone ID", typeDefKey: "zone_id"},
+	"cf":     {configTitle: "Distribution ID", typeDefTitle: "Distribution ID", typeDefKey: "distribution_id"},
+	"apigw":  {configTitle: "API ID", typeDefTitle: "API ID", typeDefKey: "api_id"},
+	"efs":    {configTitle: "File System ID", typeDefTitle: "File System ID", typeDefKey: "file_system_id"},
 }
 
 func TestConfigDefaultViewDef_IDColumnSecond(t *testing.T) {

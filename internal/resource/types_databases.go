@@ -46,11 +46,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Prefer "status" (set by fetcher); fall back to legacy "db_instance_status".
 				status := r.Fields["status"]
-				if status == "" {
-					status = r.Fields["db_instance_status"]
-				}
 				base := rdsInstanceColor(status)
 				// Do not downgrade Broken.
 				if base == ColorBroken {
@@ -209,11 +205,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Prefer "status" (set by fetcher); fall back to legacy "table_status".
 				status := r.Fields["status"]
-				if status == "" {
-					status = r.Fields["table_status"]
-				}
 				switch status {
 				case "ACTIVE":
 					return ColorHealthy

@@ -197,7 +197,6 @@ func TestCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes(t *testing.T) {
 	}
 }
 
-
 // TestCtrlZ_EC2_27Rows12Issues reproduces a scenario with 27 EC2 rows
 // yielding 12 issues (per ec2.Color(r).IsIssue()). Pressing ctrl+z must
 // reveal exactly 12 rows. shutting-down is Warning (transitional state),

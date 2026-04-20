@@ -90,7 +90,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 				"domain":         domain,
 				"status":         eipStatus,
 			},
-			RawStruct:  addr,
+			RawStruct: addr,
 		}
 
 		resources = append(resources, r)

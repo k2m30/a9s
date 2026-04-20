@@ -44,7 +44,6 @@ type SearchModel struct {
 	content    string // cached plain text (ANSI-stripped)
 }
 
-
 // searchPasteMsg carries clipboard text pasted into a search query.
 type searchPasteMsg string
 

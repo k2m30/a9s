@@ -34,13 +34,6 @@ func newTestModelSized(t *testing.T, w, h int) tui.Model {
 	return m
 }
 
-// injectAvailabilityChecked sends an AvailabilityCheckedMsg to the model and
-// returns the updated model. Gen=0 is accepted unconditionally (test-injection
-// bypass, same pattern as handleAvailabilityChecked).
-func injectAvailabilityChecked(m tui.Model, shortName string, count int, truncated bool, issues int) tui.Model {
-	return injectAvailabilityCheckedWithResources(m, shortName, count, truncated, issues, nil)
-}
-
 // injectAvailabilityCheckedWithResources is like injectAvailabilityChecked but
 // allows the test to supply a Resources slice. This is required when Wave 2
 // will emit Findings keyed by IDs that must be recognised by unifiedIssueCount
@@ -86,37 +79,6 @@ func injectEnrichmentCheckedWithFindings(m tui.Model, shortName string, issues i
 		return tm
 	}
 	return m
-}
-
-// getMenuFromModel extracts the MainMenuModel from the first stack entry by
-// updating with a no-op to trigger a View() cycle, then reads issueTruncated
-// via the menu's GetIssueTruncated accessor.
-//
-// Because tui.Model does not expose the menu directly, we send a deliberate
-// AvailabilityCheckedMsg with Gen=0 (accepted unconditionally) that does NOT
-// change any state (unknown shortName) and then read the view output.
-//
-// For truncation state we use the public menu accessor via a menu-typed cast.
-// Since tui.Model.Update returns tea.Model we pattern-match back to tui.Model,
-// then call the exported View() to verify rendered output rather than inspecting
-// internal state. To check issueTruncated we have a helper below.
-func menuIssueTruncated(m tui.Model, shortName string) bool {
-	// Send a no-op update to retrieve a typed model reference. We use
-	// WindowSizeMsg because it is always handled without side effects when size
-	// is unchanged.
-	m2, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	if tm, ok := m2.(tui.Model); ok {
-		m = tm
-	}
-	// Render view and look for "issues:N+" which indicates issueTruncated=true
-	// for any type. For the targeted shortName we need to check the menu badge.
-	// We use a targeted AvailabilityCheckedMsg to sniff: inject an issue count
-	// of 1 with truncated, then read the view for "issues:1+".
-	// However, that would mutate state. Instead we query via the menu output.
-	_ = m
-	// This is a pure behavior test — we read the rendered view and assert on
-	// the "issues:N+" rendered badge, which is what the user sees.
-	return false // placeholder; replaced by view-based assertions in each test
 }
 
 // renderMenuView renders the full tui.Model view and returns the string

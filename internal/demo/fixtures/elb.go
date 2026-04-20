@@ -62,8 +62,8 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			State: &elbv2types.LoadBalancerState{
 				Code: elbv2types.LoadBalancerStateEnumActive,
 			},
-			VpcId:         aws.String(fixtELBProdVPCID),
-			IpAddressType: elbv2types.IpAddressTypeIpv4,
+			VpcId:          aws.String(fixtELBProdVPCID),
+			IpAddressType:  elbv2types.IpAddressTypeIpv4,
 			SecurityGroups: []string{"sg-0aaa111111111111a"},
 			CreatedTime:    aws.Time(time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)),
 			AvailabilityZones: []elbv2types.AvailabilityZone{
@@ -80,8 +80,8 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			State: &elbv2types.LoadBalancerState{
 				Code: elbv2types.LoadBalancerStateEnumActive,
 			},
-			VpcId:         aws.String(fixtELBProdVPCID),
-			IpAddressType: elbv2types.IpAddressTypeIpv4,
+			VpcId:          aws.String(fixtELBProdVPCID),
+			IpAddressType:  elbv2types.IpAddressTypeIpv4,
 			SecurityGroups: []string{"sg-0bbb222222222222b"},
 			CreatedTime:    aws.Time(time.Date(2025, 8, 20, 14, 0, 0, 0, time.UTC)),
 		},
@@ -124,8 +124,8 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			Code:   elbv2types.LoadBalancerStateEnumActiveImpaired,
 			Reason: aws.String("A registered instance is in an Availability Zone that is not enabled for the load balancer."),
 		},
-		VpcId:         aws.String(fixtELBProdVPCID),
-		IpAddressType: elbv2types.IpAddressTypeIpv4,
+		VpcId:          aws.String(fixtELBProdVPCID),
+		IpAddressType:  elbv2types.IpAddressTypeIpv4,
 		SecurityGroups: []string{"sg-0aaa111111111111a"},
 		CreatedTime:    aws.Time(time.Date(2025, 10, 5, 11, 0, 0, 0, time.UTC)),
 		AvailabilityZones: []elbv2types.AvailabilityZone{
@@ -144,8 +144,8 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			Code:   elbv2types.LoadBalancerStateEnumFailed,
 			Reason: aws.String("Load balancer creation failed due to subnet configuration error."),
 		},
-		VpcId:         aws.String(fixtELBProdVPCID),
-		IpAddressType: elbv2types.IpAddressTypeIpv4,
+		VpcId:          aws.String(fixtELBProdVPCID),
+		IpAddressType:  elbv2types.IpAddressTypeIpv4,
 		SecurityGroups: []string{"sg-0aaa111111111111a"},
 		CreatedTime:    aws.Time(time.Date(2026, 4, 10, 14, 30, 0, 0, time.UTC)),
 		AvailabilityZones: []elbv2types.AvailabilityZone{
@@ -358,8 +358,8 @@ func buildRules(f *ELBFixtures) {
 			IsDefault: aws.Bool(false),
 		},
 		{
-			RuleArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaaa1111bbbb2222/default"),
-			Priority: aws.String("default"),
+			RuleArn:    aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaaa1111bbbb2222/default"),
+			Priority:   aws.String("default"),
 			Conditions: []elbv2types.RuleCondition{},
 			Actions: []elbv2types.Action{
 				{

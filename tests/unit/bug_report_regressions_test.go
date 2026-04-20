@@ -76,7 +76,7 @@ func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 		t.Fatalf("when every related row resolves to zero, Tab should not move focus into the right column")
 	}
 
-	d, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		if _, ok := cmd().(messages.RelatedNavigateMsg); ok {
 			t.Fatal("when every related row resolves to zero, Enter should not navigate from the right column")

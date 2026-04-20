@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -268,7 +268,3 @@ func logsRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	}
 	return resources, isTruncated, err
 }
-
-
-
-

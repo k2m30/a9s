@@ -173,14 +173,14 @@ func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 				t.Skipf("no RelatedDefs registered for %q — skipping (check registration)", parent)
 			}
 
-				for _, def := range defs {
-					def := def
-					if def.Checker == nil {
-						// TODO(no-middle-state): nil Checker is not an acceptable steady
-						// state for a registered relation. This legacy skip should become
-						// a hard failure once the remaining allowances are removed.
-						continue
-					}
+			for _, def := range defs {
+				def := def
+				if def.Checker == nil {
+					// TODO(no-middle-state): nil Checker is not an acceptable steady
+					// state for a registered relation. This legacy skip should become
+					// a hard failure once the remaining allowances are removed.
+					continue
+				}
 
 				t.Run(def.TargetType, func(t *testing.T) {
 					result := def.Checker(context.Background(), nil, dummyRes, emptyCache)

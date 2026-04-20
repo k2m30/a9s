@@ -15,8 +15,16 @@ type RetryConfig struct {
 	Jitter      bool
 }
 
+// retryConfigOverrideForTest, when non-nil, overrides DefaultRetryConfig.
+// Populated only via SetRetryConfigForTest (see retry_testhelper.go) so
+// retry-exercising tests can run with a small BaseDelay.
+var retryConfigOverrideForTest *RetryConfig
+
 // DefaultRetryConfig returns the standard retry configuration.
 func DefaultRetryConfig() RetryConfig {
+	if retryConfigOverrideForTest != nil {
+		return *retryConfigOverrideForTest
+	}
 	return RetryConfig{
 		MaxAttempts: 3,
 		BaseDelay:   500 * time.Millisecond,

@@ -121,7 +121,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// Only bump enrichGen when the resource identity changes, so
 		// switching to YAML/JSON for the same resource doesn't invalidate
 		// an in-flight enrichment from the detail view open.
-		if resource.HasEnricher(resType) {
+		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
 			if key != m.enrichResKey {
 				m.enrichGen++
@@ -139,7 +139,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		if d.NeedsRelatedCheck() {
 			ck := relatedCacheKey(resType, msg.Resource.ID)
 			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(cached)
+				d.ApplyRelatedResults(relatedCacheReplay(resType, cached))
 			} else {
 				cmds = append(cmds, func() tea.Msg {
 					return messages.RelatedCheckStartedMsg{
@@ -175,7 +175,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		y.SetSize(m.innerSize())
 		m.pushView(&y)
 		// Dispatch enrichment so YAML view updates when result arrives.
-		if resource.HasEnricher(resType) {
+		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
 			if key != m.enrichResKey {
 				m.enrichGen++
@@ -210,7 +210,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		j.SetSize(m.innerSize())
 		m.pushView(&j)
 		// Dispatch enrichment so JSON view updates when result arrives.
-		if resource.HasEnricher(resType) {
+		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
 			if key != m.enrichResKey {
 				m.enrichGen++
@@ -356,8 +356,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
-		m.relatedGen++   // cancel in-flight results from previous batch
-		m.enrichGen++    // cancel in-flight enrichment from previous batch
+		m.relatedGen++      // cancel in-flight results from previous batch
+		m.enrichGen++       // cancel in-flight enrichment from previous batch
 		m.enrichResKey = "" // force gen bump on next enrichment dispatch
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -368,7 +368,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 				SourceResource: srcRes,
 			}
 		})
-		if resource.HasEnricher(rt) {
+		if resource.HasDetailEnricher(rt) {
 			cmds = append(cmds, func() tea.Msg {
 				return messages.EnrichDetailMsg{
 					ResourceType: rt,
@@ -392,7 +392,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		if _, hasEnricher := awsclient.EnricherRegistry[rt]; hasEnricher && !m.isDemo {
+		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher && !m.isDemo {
 			m.enrichmentTypeGen[rt]++
 			tok := m.enrichmentTypeGen[rt]
 			delete(m.enrichmentFindings, rt)

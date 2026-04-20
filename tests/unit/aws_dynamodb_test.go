@@ -13,9 +13,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
-//go:fix inline
-func int64Ptr(v int64) *int64 { return new(v) }
-
 // ---------------------------------------------------------------------------
 // DynamoDB - Test FetchDynamoDBTables response parsing (Pattern C: list+describe)
 // ---------------------------------------------------------------------------

@@ -290,9 +290,9 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	ctJSON := `{"eventVersion":"1.08","eventSource":"s3.amazonaws.com","eventName":"PutObject","requestParameters":{"bucketName":"my-bucket","key":"data.json","policy":"{\"Version\":\"2012-10-17\"}"},"responseElements":null}`
 	event := cloudtrailtypes.Event{
-		EventId:        aws.String("event-ct-scope-test"),
-		EventName:      aws.String("PutObject"),
-		EventSource:    aws.String("s3.amazonaws.com"),
+		EventId:         aws.String("event-ct-scope-test"),
+		EventName:       aws.String("PutObject"),
+		EventSource:     aws.String("s3.amazonaws.com"),
 		CloudTrailEvent: aws.String(ctJSON),
 	}
 	k := keys.Default()
