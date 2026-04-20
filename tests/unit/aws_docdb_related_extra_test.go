@@ -1,6 +1,6 @@
 package unit_test
 
-// aws_docdb_related_extra_test.go — additional coverage for docdb_related.go
+// aws_docdb_related_extra_test.go — additional coverage for dbc_related.go
 // Covers: checkDbcSG, checkDbcDBI, checkDbcDocdbSnap, checkDbcKMS.
 // checkDbcSubnet/VPC require a live docdb:DescribeDBSubnetGroups API call and
 // return -1 without a client — those nil-client branches are covered below.

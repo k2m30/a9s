@@ -1,4 +1,4 @@
-// ecs_services_related_batch4.go contains ECS service related-resource checkers
+// ecs_svc_related_batch4.go contains ECS service related-resource checkers
 // for eb-rule, ecr, secrets, and sfn targets (batch 4 of the related-panel).
 package aws
 

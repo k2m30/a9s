@@ -1,4 +1,4 @@
-// ecs_tasks_related_extra.go contains additional ECS task related-resource
+// ecs_task_related_extra.go contains additional ECS task related-resource
 // checkers required by docs/related-resources.md.
 package aws
 
@@ -168,7 +168,7 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 
 // checkECSTaskSecrets scans ContainerDefinitions[].Secrets[].ValueFrom for secretsmanager ARNs.
 // Pattern F — no AWS call needed; all data is in RawStruct (ecstypes.TaskDefinition).
-// NOTE: The registration in ecs_tasks_related.go passes ecstypes.Task, but the Secrets
+// NOTE: The registration in ecs_task_related.go passes ecstypes.Task, but the Secrets
 // field lives on TaskDefinition. The fetcher stores the TaskDefinition in the Resource
 // RawStruct (res.RawStruct may be *ecstypes.TaskDefinition). Try both types.
 func checkECSTaskSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

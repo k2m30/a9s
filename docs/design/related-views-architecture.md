@@ -89,7 +89,7 @@ adjacent and globbable:
 |---------|-------------|------|
 | Top-level fetcher | `internal/aws/ec2.go` | `ec2*.go` |
 | Related resolvers | `internal/aws/ec2_related.go` | `ec2*.go` |
-| Child fetcher | `internal/aws/ecs_tasks.go` | `ecs*.go` |
+| Child fetcher | `internal/aws/ecs_task.go` | `ecs*.go` |
 | Related tests | `tests/unit/aws_ec2_related_test.go` | `*ec2*` |
 
 ### Revisit Trigger

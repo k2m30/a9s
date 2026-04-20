@@ -1,4 +1,4 @@
-// routetables_related.go contains Route Table related-resource checker functions.
+// rtb_related.go contains Route Table related-resource checker functions.
 package aws
 
 import (

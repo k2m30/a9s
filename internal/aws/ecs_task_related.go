@@ -1,4 +1,4 @@
-// ecs_tasks_related.go contains ECS task related-resource checker functions.
+// ecs_task_related.go contains ECS task related-resource checker functions.
 package aws
 
 import (

@@ -1,6 +1,6 @@
-// ecs_clusters_related_extra.go contains additional ECS cluster related-
+// ecs_related_extra.go contains additional ECS cluster related-
 // resource checkers required by docs/related-resources.md beyond what is
-// already registered in ecs_clusters.go.
+// already registered in ecs.go.
 package aws
 
 import (

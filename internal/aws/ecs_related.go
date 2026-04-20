@@ -1,4 +1,4 @@
-// ecs_clusters_related.go contains ECS cluster related-resource checker functions.
+// ecs_related.go contains ECS cluster related-resource checker functions.
 package aws
 
 import (

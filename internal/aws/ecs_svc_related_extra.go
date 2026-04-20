@@ -1,4 +1,4 @@
-// ecs_services_related_extra.go contains additional ECS service related-
+// ecs_svc_related_extra.go contains additional ECS service related-
 // resource checkers required by docs/related-resources.md.
 package aws
 

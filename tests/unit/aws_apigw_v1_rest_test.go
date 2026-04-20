@@ -20,13 +20,13 @@ package unit
 //   3. New field in ServiceClients (internal/aws/client.go):
 //      APIGatewayV1 APIGatewayV1API
 //
-//   4. New exported function in internal/aws/apigateway.go:
+//   4. New exported function in internal/aws/apigw.go:
 //      // FetchAPIGatewaysPageMerged fetches a single page of API Gateways from both
 //      // APIGateway V2 (HTTP/WEBSOCKET) and APIGateway V1 (REST), merging results.
 //      // v1 REST APIs are returned with Fields["protocol"] == "REST".
 //      func FetchAPIGatewaysPageMerged(ctx context.Context, clients *ServiceClients, continuationToken string) (resource.FetchResult, error)
 //
-//   5. Update init() registration in internal/aws/apigateway.go to call
+//   5. Update init() registration in internal/aws/apigw.go to call
 //      FetchAPIGatewaysPageMerged instead of FetchAPIGatewaysPage.
 //
 //   6. v1 SDK types used in the test:

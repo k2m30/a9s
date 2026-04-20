@@ -3,7 +3,7 @@ package unit_test
 // aws_wave5_related_test.go — Wave 5 coverage fill for zero-hit branches in:
 //   - kms_related.go:      kmsRoleNamesFromPolicyJSON
 //   - opensearch_related.go: checkOpenSearchCFN, checkOpenSearchACM
-//   - docdb_related.go:    checkDbcSubnet
+//   - dbc_related.go:    checkDbcSubnet
 //   - vpc_related.go:      checkVPCENI, checkVPCTGW
 //   - lambda_related.go:   checkLambdaSQS, checkLambdaCFN, checkLambdaEBRule
 //   - efs_related.go:      checkEFSLambda
@@ -169,7 +169,7 @@ func TestRelated_OpenSearch_ACM_NilClients(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// docdb_related.go — checkDbcSubnet (37.5%)
+// dbc_related.go — checkDbcSubnet (37.5%)
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestRelated_DBC_Subnet_NilClientsW5 verifies checkDbcSubnet returns Count=-1

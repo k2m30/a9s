@@ -1,4 +1,4 @@
-// ecs_services_related.go contains ECS service related-resource checker functions.
+// ecs_svc_related.go contains ECS service related-resource checker functions.
 package aws
 
 import (

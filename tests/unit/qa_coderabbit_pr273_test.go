@@ -814,7 +814,7 @@ func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
 // Item 3: CloudWatch Alarms — Color reads wrong field key ("state_value" vs "state")
 // =============================================================================
 //
-// The fetcher at internal/aws/cloudwatch.go populates Fields["state"] (stateValue).
+// The fetcher at internal/aws/alarm.go populates Fields["state"] (stateValue).
 // The color resolver at types_monitoring.go:20 reads Fields["state_value"].
 // A resource built from real fetcher output has "state" populated but not
 // "state_value", so the switch never matches and the alarm defaults to ColorHealthy
