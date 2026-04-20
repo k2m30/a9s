@@ -158,9 +158,9 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"s3", "cfn"}:    "CloudFormation",
 
 		// ebs
-		{"ebs", "ec2"}:     "EC2 Instance",
+		{"ebs", "ec2"}:      "EC2 Instance",
 		{"ebs", "ebs-snap"}: "EBS Snapshots",
-		{"ebs", "kms"}:     "KMS Key",
+		{"ebs", "kms"}:      "KMS Key",
 
 		// ebs-snap
 		{"ebs-snap", "ami"}: "AMIs",
@@ -246,7 +246,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"role", "lambda"}: "Lambda Functions",
 		{"role", "glue"}:   "Glue Jobs",
 		{"role", "ng"}:     "Node Groups",
-		{"role", "policy"}:  "IAM Policies",
+		{"role", "policy"}: "IAM Policies",
 		{"role", "ec2"}:    "EC2 Instances",
 
 		// iam policies
@@ -289,12 +289,12 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"nat", "rtb"}:    "Route Tables",
 
 		// subnet
-		{"subnet", "ec2"}:  "EC2 Instances",
-		{"subnet", "eni"}:  "Network Interfaces",
-		{"subnet", "nat"}:  "NAT Gateways",
-		{"subnet", "elb"}:  "Load Balancers",
-		{"subnet", "rtb"}:  "Route Tables",
-		{"subnet", "cfn"}:  "CloudFormation",
+		{"subnet", "ec2"}: "EC2 Instances",
+		{"subnet", "eni"}: "Network Interfaces",
+		{"subnet", "nat"}: "NAT Gateways",
+		{"subnet", "elb"}: "Load Balancers",
+		{"subnet", "rtb"}: "Route Tables",
+		{"subnet", "cfn"}: "CloudFormation",
 
 		// glue
 		{"glue", "role"}:  "IAM Roles",
@@ -357,9 +357,9 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"redis", "sg"}:    "Security Groups",
 
 		// ami
-		{"ami", "ec2"}:     "EC2 Instances",
+		{"ami", "ec2"}:      "EC2 Instances",
 		{"ami", "ebs-snap"}: "EBS Snapshots",
-		{"ami", "asg"}:     "Auto Scaling Groups",
+		{"ami", "asg"}:      "Auto Scaling Groups",
 
 		// rds-snap
 		{"rds-snap", "dbi"}: "DB Instances",
@@ -381,7 +381,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 
 		// ct-events (CloudTrail Events)
 		{"ct-events", "role"}:     "IAM Roles",
-		{"ct-events", "iam-user"}:  "IAM Users",
+		{"ct-events", "iam-user"}: "IAM Users",
 		{"ct-events", "ec2"}:      "EC2 Instances",
 		{"ct-events", "s3"}:       "S3 Buckets",
 		{"ct-events", "lambda"}:   "Lambda Functions",

@@ -1848,8 +1848,8 @@ func TestQA_Pagination_FetchECRRepositoriesPage_FirstPage(t *testing.T) {
 			return &ecr.DescribeRepositoriesOutput{
 				Repositories: []ecrtypes.Repository{
 					{
-						RepositoryName:  aws.String("my-app-repo"),
-						RepositoryUri:   aws.String("111111111111.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"),
+						RepositoryName:     aws.String("my-app-repo"),
+						RepositoryUri:      aws.String("111111111111.dkr.ecr.us-east-1.amazonaws.com/my-app-repo"),
 						ImageTagMutability: ecrtypes.ImageTagMutabilityMutable,
 						ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
 							ScanOnPush: true,

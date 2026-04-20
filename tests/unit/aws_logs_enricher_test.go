@@ -63,8 +63,8 @@ func logsGroupResource(logGroupName string) resource.Resource {
 // cwMetricFilter builds a minimal MetricFilter for the given log group.
 func cwMetricFilter(logGroupName, filterName string) cwlogstypes.MetricFilter {
 	return cwlogstypes.MetricFilter{
-		LogGroupName: aws.String(logGroupName),
-		FilterName:   aws.String(filterName),
+		LogGroupName:  aws.String(logGroupName),
+		FilterName:    aws.String(filterName),
 		FilterPattern: aws.String("{ $.eventName = \"ConsoleLogin\" }"),
 	}
 }

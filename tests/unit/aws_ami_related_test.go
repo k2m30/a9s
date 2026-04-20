@@ -230,3 +230,249 @@ func TestRelated_AMI_ASG_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
+
+// --- checkAMICFN tests (Pattern F+C — AMI tag aws:cloudformation:stack-name → cfn cache) ---
+
+// TestRelated_AMI_CFN_MatchByTag verifies that an AMI tagged with
+// aws:cloudformation:stack-name is matched against the cfn cache.
+func TestRelated_AMI_CFN_MatchByTag(t *testing.T) {
+	const stackName = "acme-infra-stack"
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		Tags: []ec2types.Tag{
+			{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String(stackName)},
+		},
+	}
+	cfnRes := resource.Resource{ID: stackName, Name: stackName}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackName)
+	}
+}
+
+// TestRelated_AMI_CFN_NoTag verifies that an AMI without the CFN tag
+// returns Count=0.
+func TestRelated_AMI_CFN_NoTag(t *testing.T) {
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		Tags:    []ec2types.Tag{},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "some-stack", Name: "some-stack"},
+		}},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN tag)", result.Count)
+	}
+}
+
+// TestRelated_AMI_CFN_TagMatchMissCache verifies that when the CFN tag is
+// present but the stack name doesn't match any cached stack, Count=0.
+func TestRelated_AMI_CFN_TagMatchMissCache(t *testing.T) {
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		Tags: []ec2types.Tag{
+			{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("missing-stack")},
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "different-stack", Name: "different-stack"},
+		}},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (stack name not in cache)", result.Count)
+	}
+}
+
+// TestRelated_AMI_CFN_CacheMissNoClients verifies that when the tag is
+// present but there is no cache and no clients, Count=-1.
+func TestRelated_AMI_CFN_CacheMissNoClients(t *testing.T) {
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		Tags: []ec2types.Tag{
+			{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("some-stack")},
+		},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	}
+}
+
+// --- checkAMIKMS tests (Pattern F — reads EBS.KmsKeyId from block device mappings) ---
+
+// TestRelated_AMI_KMS_MatchByARN verifies that KMS key ARNs from EBS block
+// device mappings are extracted and returned.
+func TestRelated_AMI_KMS_MatchByARN(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abcd1234"
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
+			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
+		},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyARN)
+	}
+}
+
+// TestRelated_AMI_KMS_Deduplicated verifies that duplicate KMS key IDs (same
+// key on multiple EBS volumes) are returned only once.
+func TestRelated_AMI_KMS_Deduplicated(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abcd1234"
+	img := ec2types.Image{
+		ImageId: aws.String("ami-0abc1234def56789"),
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
+			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
+			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
+		},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count)
+	}
+}
+
+// TestRelated_AMI_KMS_NoEncryptedVolumes verifies that an AMI with no
+// KMS-encrypted EBS volumes returns Count=0.
+func TestRelated_AMI_KMS_NoEncryptedVolumes(t *testing.T) {
+	img := ec2types.Image{
+		ImageId:             aws.String("ami-0abc1234def56789"),
+		BlockDeviceMappings: []ec2types.BlockDeviceMapping{},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
+
+	checker := amiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no encrypted volumes)", result.Count)
+	}
+}
+
+// TestRelated_AMI_KMS_InvalidRawStruct verifies that a wrong RawStruct
+// returns Count=-1.
+func TestRelated_AMI_KMS_InvalidRawStruct(t *testing.T) {
+	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: "not-an-image"}
+
+	checker := amiCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
+	}
+}
+
+// --- checkAMING tests (Pattern C — ng cache, Fields["image_id"] match) ---
+
+// TestRelated_AMI_NG_MatchByImageIDField verifies that node groups whose
+// Fields["image_id"] matches the AMI ID are returned.
+func TestRelated_AMI_NG_MatchByImageIDField(t *testing.T) {
+	const amiID = "ami-0abc1234def56789"
+	ngRes := resource.Resource{
+		ID:     "acme-eks-ng",
+		Name:   "acme-eks-ng",
+		Fields: map[string]string{"image_id": amiID},
+	}
+	otherNg := resource.Resource{
+		ID:     "other-ng",
+		Name:   "other-ng",
+		Fields: map[string]string{"image_id": "ami-other"},
+	}
+	cache := resource.ResourceCache{
+		"ng": resource.ResourceCacheEntry{Resources: []resource.Resource{ngRes, otherNg}},
+	}
+	source := resource.Resource{ID: amiID}
+
+	checker := amiCheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-eks-ng" {
+		t.Errorf("ResourceIDs = %v, want [acme-eks-ng]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_AMI_NG_NoMatch verifies that an AMI with no matching node
+// groups returns Count=0.
+func TestRelated_AMI_NG_NoMatch(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ng": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "other-ng", Fields: map[string]string{"image_id": "ami-different"}},
+		}},
+	}
+	source := resource.Resource{ID: "ami-0abc1234def56789"}
+
+	checker := amiCheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
+	}
+}
+
+// TestRelated_AMI_NG_EmptyAMIID verifies that an empty AMI ID returns Count=0
+// without accessing the cache.
+func TestRelated_AMI_NG_EmptyAMIID(t *testing.T) {
+	source := resource.Resource{ID: ""}
+
+	checker := amiCheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty AMI ID)", result.Count)
+	}
+}
+
+// TestRelated_AMI_NG_CacheMissNoClients verifies that an absent ng cache
+// with no clients returns Count=-1.
+func TestRelated_AMI_NG_CacheMissNoClients(t *testing.T) {
+	source := resource.Resource{ID: "ami-0abc1234def56789"}
+
+	checker := amiCheckerByTarget(t, "ng")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+	}
+}

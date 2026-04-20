@@ -11,17 +11,17 @@ import (
 )
 
 // testdataDir returns the absolute path to a directory inside tests/testdata/.
-func testdataDir(name string) string {
+func testdataDir(parts ...string) string {
 	// tests/unit/ -> tests/testdata/
-	return filepath.Join("..", "testdata", name)
+	return filepath.Join(append([]string{"..", "testdata"}, parts...)...)
 }
 
 // ---------------------------------------------------------------------------
-// T015: Test YAML parsing — load views_valid/ directory
+// T015: Test YAML parsing — load views/valid/ directory
 // ---------------------------------------------------------------------------
 
 func TestConfigYAMLParsing(t *testing.T) {
-	dirs := []string{testdataDir("views_valid")}
+	dirs := []string{testdataDir("views", "valid")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
@@ -167,7 +167,7 @@ func TestConfigFallbackDefaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPartialOverride(t *testing.T) {
-	dirs := []string{testdataDir("views_partial")}
+	dirs := []string{testdataDir("views", "partial")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
@@ -227,7 +227,7 @@ func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 }
 
 func TestConfigYAMLParsing_S3Objects(t *testing.T) {
-	dirs := []string{testdataDir("views_s3_objects")}
+	dirs := []string{testdataDir("views", "s3_objects")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFrom failed: %v", err)
@@ -281,7 +281,7 @@ func TestGetViewDef_S3Objects_NilConfig(t *testing.T) {
 }
 
 func TestGetViewDef_S3Objects_FromConfig(t *testing.T) {
-	dirs := []string{testdataDir("views_s3_objects")}
+	dirs := []string{testdataDir("views", "s3_objects")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFromDirs failed: %v", err)
@@ -299,7 +299,7 @@ func TestGetViewDef_S3Objects_FromConfig(t *testing.T) {
 
 func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
 	// Config has s3 but not s3_objects — should fall back to defaults
-	dirs := []string{testdataDir("views_partial")}
+	dirs := []string{testdataDir("views", "partial")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
 		t.Fatalf("LoadFromDirs failed: %v", err)
@@ -391,7 +391,7 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigInvalidYAML(t *testing.T) {
-	dirs := []string{testdataDir("views_invalid")}
+	dirs := []string{testdataDir("views", "invalid")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML, got nil")

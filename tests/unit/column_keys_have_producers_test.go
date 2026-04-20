@@ -8,7 +8,7 @@ package unit
 // fetcher field-key registry and the enricher field-key registry).
 //
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// greps internal/aws/enrichment.go to verify the coder actually wired up
+// globs internal/aws/*_issue_enrichment.go to verify the coder actually wired up
 // RegisterEnricherFieldKeys calls rather than declaring the helper and leaving it
 // empty.
 
@@ -116,8 +116,9 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 }
 
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// greps internal/aws/enrichment.go for RegisterEnricherFieldKeys( calls.
-// Requiring at least 10 calls proves the coder actually wired up registrations
+// globs internal/aws/*_issue_enrichment.go and counts RegisterIssueEnricherFieldKeys(
+// calls across all per-resource files. Requiring at least 10 calls proves the
+// coder actually wired up registrations in the owning resource init() blocks
 // rather than declaring the helper and never calling it.
 func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	// Locate the repo root via the test file's own path.
@@ -127,23 +128,34 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	}
 	// tests/unit/ -> two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(filename), "..", "..")
-	enrichmentPath := filepath.Join(repoRoot, "internal", "aws", "enrichment.go")
 
-	data, err := os.ReadFile(enrichmentPath)
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "*_issue_enrichment.go"))
 	if err != nil {
-		t.Fatalf("cannot read %s: %v", enrichmentPath, err)
+		t.Fatalf("filepath.Glob failed: %v", err)
 	}
-	content := string(data)
+	if len(matches) == 0 {
+		t.Fatal("filepath.Glob returned zero matches for internal/aws/*_issue_enrichment.go — check repo layout")
+	}
 
-	const needle = "RegisterEnricherFieldKeys("
-	count := strings.Count(content, needle)
+	const needle = "RegisterIssueEnricherFieldKeys("
+	total := 0
+	for _, path := range matches {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("cannot read %s: %v", path, readErr)
+		}
+		total += strings.Count(string(data), needle)
+	}
 
 	const minExpected = 10
-	if count < minExpected {
+	if total < minExpected {
 		t.Errorf(
-			"found only %d call(s) to %s in internal/aws/enrichment.go, expected at least %d — "+
-				"the coder must register enricher field keys for each enriched type via an init() block",
-			count, needle, minExpected,
+			"found only %d call(s) to %s across internal/aws/*_issue_enrichment.go, expected at least %d — "+
+				"the coder must put RegisterIssueEnricherFieldKeys(...) in the owning resource's _issue_enrichment.go init() block",
+			total, needle, minExpected,
 		)
 	}
 }

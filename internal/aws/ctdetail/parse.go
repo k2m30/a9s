@@ -96,44 +96,44 @@ func Parse(rawJSON string) (*Event, error) {
 // ---------------------------------------------------------------------------
 
 type rawEvent struct {
-	EventVersion       string              `json:"eventVersion"`
-	EventID            string              `json:"eventID"`
-	EventTime          string              `json:"eventTime"`
-	EventSource        string              `json:"eventSource"`
-	EventName          string              `json:"eventName"`
-	EventCategory      string              `json:"eventCategory"`
-	EventType          string              `json:"eventType"`
-	AWSRegion          string              `json:"awsRegion"`
-	SourceIPAddress    string              `json:"sourceIPAddress"`
-	UserAgent          string              `json:"userAgent"`
-	RecipientAccountID string              `json:"recipientAccountId"`
-	RequestID          string              `json:"requestID"`
-	ReadOnly           bool                `json:"readOnly"`
-	ErrorCode          string              `json:"errorCode"`
-	ErrorMessage       string              `json:"errorMessage"`
-	UserIdentity       rawUserIdentity     `json:"userIdentity"`
-	RequestParameters  json.RawMessage     `json:"requestParameters"`
-	ResponseElements   json.RawMessage     `json:"responseElements"`
-	Resources          []rawResourceRef    `json:"resources"`
-	InsightDetails     *rawInsightDetails  `json:"insightDetails"`
+	EventVersion       string             `json:"eventVersion"`
+	EventID            string             `json:"eventID"`
+	EventTime          string             `json:"eventTime"`
+	EventSource        string             `json:"eventSource"`
+	EventName          string             `json:"eventName"`
+	EventCategory      string             `json:"eventCategory"`
+	EventType          string             `json:"eventType"`
+	AWSRegion          string             `json:"awsRegion"`
+	SourceIPAddress    string             `json:"sourceIPAddress"`
+	UserAgent          string             `json:"userAgent"`
+	RecipientAccountID string             `json:"recipientAccountId"`
+	RequestID          string             `json:"requestID"`
+	ReadOnly           bool               `json:"readOnly"`
+	ErrorCode          string             `json:"errorCode"`
+	ErrorMessage       string             `json:"errorMessage"`
+	UserIdentity       rawUserIdentity    `json:"userIdentity"`
+	RequestParameters  json.RawMessage    `json:"requestParameters"`
+	ResponseElements   json.RawMessage    `json:"responseElements"`
+	Resources          []rawResourceRef   `json:"resources"`
+	InsightDetails     *rawInsightDetails `json:"insightDetails"`
 }
 
 type rawUserIdentity struct {
-	Type          string             `json:"type"`
-	PrincipalID   string             `json:"principalId"`
-	ARN           string             `json:"arn"`
-	AccountID     string             `json:"accountId"`
-	UserName      string             `json:"userName"`
-	InvokedBy     string             `json:"invokedBy"`
-	AccessKeyID   string             `json:"accessKeyId"`
+	Type           string             `json:"type"`
+	PrincipalID    string             `json:"principalId"`
+	ARN            string             `json:"arn"`
+	AccountID      string             `json:"accountId"`
+	UserName       string             `json:"userName"`
+	InvokedBy      string             `json:"invokedBy"`
+	AccessKeyID    string             `json:"accessKeyId"`
 	SessionContext *rawSessionContext `json:"sessionContext"`
 }
 
 type rawSessionContext struct {
-	Attributes          rawSessionAttributes  `json:"attributes"`
-	SessionIssuer       *rawSessionIssuer     `json:"sessionIssuer"`
-	WebIDFederationData *rawWebIDFedData      `json:"webIdFederationData"`
-	SourceIdentity      string                `json:"sourceIdentity"`
+	Attributes          rawSessionAttributes `json:"attributes"`
+	SessionIssuer       *rawSessionIssuer    `json:"sessionIssuer"`
+	WebIDFederationData *rawWebIDFedData     `json:"webIdFederationData"`
+	SourceIdentity      string               `json:"sourceIdentity"`
 }
 
 type rawSessionAttributes struct {

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -295,5 +297,125 @@ func TestJSON_RawContent_PreservesZeroAndFalseValues(t *testing.T) {
 	}
 	if parsed["Active"] != false {
 		t.Errorf("parsed[\"Active\"] = %v, want %v", parsed["Active"], false)
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SearchInfo — 0% hit: input mode "/" prefix and inactive ""
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestJSON_SearchInfo_Inactive verifies that SearchInfo() returns "" when
+// search is not active (the default state after construction).
+func TestJSON_SearchInfo_Inactive(t *testing.T) {
+	res := resource.Resource{
+		ID:   "search-info-test",
+		Name: "search-info",
+		Fields: map[string]string{"state": "running"},
+	}
+	m := jsonModel(res, 80, 24)
+	got := m.SearchInfo()
+	if got != "" {
+		t.Errorf("SearchInfo() on inactive search = %q, want empty string", got)
+	}
+}
+
+// TestJSON_SearchInfo_InputMode verifies that SearchInfo() returns "/" when
+// search input mode is activated (before any query is typed).
+func TestJSON_SearchInfo_InputMode(t *testing.T) {
+	res := resource.Resource{
+		ID:   "search-info-mode-test",
+		Name: "search-info-mode",
+		Fields: map[string]string{"state": "stopped"},
+	}
+	k := keys.Default()
+	m := views.NewJSON(res, "", k)
+	m.SetSize(80, 24)
+
+	// Activate search input mode by pressing the search key ("/")
+	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "/"})
+
+	info := m.SearchInfo()
+	if !strings.HasPrefix(info, "/") {
+		t.Errorf("SearchInfo() in input mode = %q, want prefix '/'", info)
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// colorizeJSON — structural token pass-through path ({, }, [, ])
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestJSON_ColorizeStructuralTokens verifies that structural tokens ({, }, [, ])
+// in the JSON view are NOT colorized (they pass through unmodified as plain text),
+// while string, number, and bool values ARE colored.
+func TestJSON_ColorizeStructuralTokens(t *testing.T) {
+	type nested struct {
+		Tags   []string
+		Count  int
+		Active bool
+		Name   string
+	}
+	raw := nested{
+		Tags:   []string{"prod", "us-east-1"},
+		Count:  3,
+		Active: true,
+		Name:   "my-resource",
+	}
+	res := resource.Resource{
+		ID:        "struct-tokens-test",
+		Name:      "struct-tokens-test",
+		RawStruct: &raw,
+		Fields:    map[string]string{},
+	}
+	m := jsonModel(res, 120, 40)
+	out := m.View()
+	plain := stripANSI(out)
+
+	// Structural tokens must appear in the plain output (not stripped or replaced)
+	if !strings.Contains(plain, "{") {
+		t.Error("JSON view missing '{' structural token")
+	}
+	if !strings.Contains(plain, "}") {
+		t.Error("JSON view missing '}' structural token")
+	}
+	if !strings.Contains(plain, "[") {
+		t.Error("JSON view missing '[' structural token")
+	}
+	if !strings.Contains(plain, "]") {
+		t.Error("JSON view missing ']' structural token")
+	}
+
+	// Data values must also appear and be colored
+	if !strings.Contains(plain, "my-resource") {
+		t.Error("JSON view missing string value 'my-resource'")
+	}
+	if !strings.Contains(out, "\x1b[") {
+		t.Error("JSON view has no ANSI color codes — syntax coloring missing")
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SetSize — resize (second call) takes the else branch (SetWidth/SetHeight)
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestJSON_SetSize_Resize verifies that calling SetSize a second time (resize)
+// does not panic and that View() still returns valid content.
+func TestJSON_SetSize_Resize(t *testing.T) {
+	res := resource.Resource{
+		ID:     "resize-test",
+		Name:   "resize-test",
+		Fields: map[string]string{"region": "eu-west-1"},
+	}
+	k := keys.Default()
+	m := views.NewJSON(res, "", k)
+	m.SetSize(80, 24)   // first call — initializes viewport
+	m.SetSize(120, 40)  // second call — takes resize branch (SetWidth/SetHeight)
+
+	out := m.View()
+	if out == "" || out == "Initializing..." {
+		t.Errorf("View() after resize = %q, want rendered content", out)
+	}
+	plain := stripANSI(out)
+	if !strings.Contains(plain, "eu-west-1") {
+		t.Errorf("View() after resize should still contain field value 'eu-west-1', got:\n%s", plain)
 	}
 }

@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig(t *testing.T) {
 	// This simulates what happens BEFORE the fix: connectAWS calls
 	// NewAWSSession("", "") — the empty region parameter means no
 	// config.WithRegion option is added.
-	cfg, err := awsclient.NewAWSSession("", "")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "")
 	if err != nil {
 		// Profile error is acceptable in isolated env
 		t.Logf("NewAWSSession error (expected in isolated env): %v", err)
@@ -58,7 +59,7 @@ func TestBug82_NewAWSSession_ExplicitRegionPopulatesConfig(t *testing.T) {
 	}
 
 	// Now pass the resolved region to NewAWSSession
-	cfg, err := awsclient.NewAWSSession("", region)
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", region)
 	if err != nil {
 		t.Logf("NewAWSSession error (expected in isolated env): %v", err)
 		return

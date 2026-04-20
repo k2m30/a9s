@@ -31,11 +31,11 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 					State: &elbv2types.LoadBalancerState{
 						Code: elbv2types.LoadBalancerStateEnumActive,
 					},
-					VpcId:               aws.String("vpc-abc123"),
-					LoadBalancerArn:     aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abc123"),
+					VpcId:                 aws.String("vpc-abc123"),
+					LoadBalancerArn:       aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abc123"),
 					CanonicalHostedZoneId: aws.String("Z35SXDOTRQ7X7K"),
-					CreatedTime:         &createdTime,
-					IpAddressType:       elbv2types.IpAddressTypeIpv4,
+					CreatedTime:           &createdTime,
+					IpAddressType:         elbv2types.IpAddressTypeIpv4,
 				},
 				{
 					LoadBalancerName: aws.String("internal-nlb"),

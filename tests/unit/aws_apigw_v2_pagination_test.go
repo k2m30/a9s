@@ -244,8 +244,16 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 		t.Errorf("stages_count = %q, want \"0\"", updates["stages_count"])
 	}
 
-	// No per-stage findings — no stages to inspect
-	if len(result.Findings) != 0 {
-		t.Errorf("expected 0 findings for 0 stages, got %d: %v", len(result.Findings), result.Findings)
+	// A "no deployed stages" finding must be emitted per docs/attention-signals.md Wave 2.
+	f, ok := result.Findings[apiID]
+	if !ok {
+		t.Errorf("expected 1 finding for 0 stages (no deployed stages), got 0")
+	} else {
+		if f.Severity != "~" {
+			t.Errorf("finding Severity = %q, want \"~\"", f.Severity)
+		}
+		if !strings.Contains(strings.ToLower(f.Summary), "no deployed") {
+			t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Summary)
+		}
 	}
 }

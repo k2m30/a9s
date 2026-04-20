@@ -319,9 +319,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // handleProfileSelected switches the AWS profile, pops the profile selector,
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
-	m.relatedCache.clear() // always clear on profile switch
-	m.relatedGen++
-	m.enrichGen++
+	m.resetForSessionSwitch()
 	m.connectGen++
 	// Only save prev on first switch; rapid A→B→C keeps A as rollback target
 	if !m.hasPrevState {
@@ -332,15 +330,6 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 	m.profile = msg.Profile
 	m.region = "" // clear so handleClientsReady resolves the new profile's default region
 	m.identity = nil
-	m.availabilityGen++                                    // cancel in-flight Wave 1 probes
-	m.enrichmentGen++                                      // cancel in-flight Wave 2 probes
-	m.enrichQueue = nil                                    // clear pending enrichment queue
-	m.probeResources = nil                                 // clear retained resources (stale context)
-	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
-	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
-	m.enrichmentRan = make(map[string]bool)
-	m.enrichmentTypeGen = make(map[string]int)
-	m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}
@@ -357,9 +346,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // handleRegionSelected switches the AWS region, pops the region selector,
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
-	m.relatedCache.clear() // always clear on region switch
-	m.relatedGen++
-	m.enrichGen++
+	m.resetForSessionSwitch()
 	m.connectGen++
 	// Only save prev on first switch; rapid switches keep original as rollback target
 	if !m.hasPrevState {
@@ -369,15 +356,6 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 	}
 	m.region = msg.Region
 	m.identity = nil
-	m.availabilityGen++                                    // cancel in-flight Wave 1 probes
-	m.enrichmentGen++                                      // cancel in-flight Wave 2 probes
-	m.enrichQueue = nil                                    // clear pending enrichment queue
-	m.probeResources = nil                                 // clear retained resources (stale context)
-	m.resourceCache = make(map[string]*resourceCacheEntry) // clear all cached resource lists
-	m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
-	m.enrichmentRan = make(map[string]bool)
-	m.enrichmentTypeGen = make(map[string]int)
-	m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 		menu.ClearAvailability()
 	}

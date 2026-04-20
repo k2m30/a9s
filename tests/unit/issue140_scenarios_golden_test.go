@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -276,7 +276,12 @@ func scenarioEC2034CloudTrailLast(t *testing.T) string {
 
 func issue140DemoModel(t *testing.T, w, h int) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	return m2.(tui.Model)
 }
@@ -309,7 +314,7 @@ func sortedScenarioNames(m map[string]string) []string {
 func TestIssue140ScenarioCatalog(t *testing.T) {
 	// Human-readable, test output only (no assertions).
 	for _, sc := range issue140Scenarios() {
-		t.Log(fmt.Sprintf("scenario: %s", sc.name))
+		t.Logf("scenario: %s", sc.name)
 	}
 }
 

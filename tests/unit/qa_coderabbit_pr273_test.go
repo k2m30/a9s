@@ -110,7 +110,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 	})
 
 	// Wave 2 clean for every enricher-backed type.
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
 			ResourceType: shortName,
 			Issues:       0,
@@ -156,7 +156,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	issueCounts := map[string]int{}
 	issueTruncated := map[string]bool{}
 	issueKnown := map[string]bool{}
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		entries[shortName] = 1
 		issueCounts[shortName] = 0
 		issueTruncated[shortName] = true // Wave 1 lower bound
@@ -173,7 +173,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	})
 
 	// Wave 2: authoritative zero for every enricher-backed type.
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
 			ResourceType: shortName,
 			Issues:       0,
@@ -189,7 +189,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	plain := stripANSI(rootViewContent(m))
 
 	var stuckVisible []string
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		td := resource.FindResourceType(shortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
@@ -217,7 +217,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 // NOT appear under ctrl+z.
 //
 // Affected enrichers (per-resource callers that promote error to truncated):
-// every entry in awsclient.EnricherRegistry. This test iterates all of them.
+// every entry in awsclient.IssueEnricherRegistry. This test iterates all of them.
 func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -226,7 +226,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	issueCounts := map[string]int{}
 	issueTruncated := map[string]bool{}
 	issueKnown := map[string]bool{}
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		entries[shortName] = 1
 		issueCounts[shortName] = 0
 		issueTruncated[shortName] = false
@@ -244,7 +244,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 
 	// Wave 2: for each enricher-backed type, a sub-call errored → Truncated=true,
 	// but Findings={} and Issues=0 (no actual issue seen).
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
 			ResourceType: shortName,
 			Issues:       0,
@@ -260,7 +260,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	plain := stripANSI(rootViewContent(m))
 
 	var falsePositives []string
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		td := resource.FindResourceType(shortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
@@ -291,7 +291,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 	var falseNegatives []string
-	for shortName := range awsclient.EnricherRegistry {
+	for shortName := range awsclient.IssueEnricherRegistry {
 		td := resource.FindResourceType(shortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
@@ -593,7 +593,7 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 // manual abort). It is not a failure — treating it as one generates noise and
 // inflates the issue badge count.
 //
-// Currently FAILS: the switch at enrichment.go line 269 only skips SUCCEEDED and
+// Currently FAILS: the switch in EnrichCodeBuildBuilds only skips SUCCEEDED and
 // IN_PROGRESS; STOPPED falls through and produces a finding with severity "!".
 func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
@@ -814,7 +814,7 @@ func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
 // Item 3: CloudWatch Alarms — Color reads wrong field key ("state_value" vs "state")
 // =============================================================================
 //
-// The fetcher at internal/aws/cloudwatch.go populates Fields["state"] (stateValue).
+// The fetcher at internal/aws/alarm.go populates Fields["state"] (stateValue).
 // The color resolver at types_monitoring.go:20 reads Fields["state_value"].
 // A resource built from real fetcher output has "state" populated but not
 // "state_value", so the switch never matches and the alarm defaults to ColorHealthy
@@ -957,7 +957,7 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *test
 //   Item 11: isVisibleUnderIssueFilter returns true when m.issueTruncated[shortName]
 //            and !td.AlwaysHealthy — mainmenu.go:570-573.
 //
-//   Item 15: Per-resource API errors set truncated=true — enrichment.go:249,334,385.
+//   Item 15: Per-resource API errors set truncated=true in per-resource enrichers.
 //
 // Tests for these items would PASS today; no failing pins written.
 

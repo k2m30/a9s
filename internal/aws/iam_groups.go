@@ -31,7 +31,7 @@ func init() {
 }
 
 // FetchIAMGroups calls the IAM ListGroups API and returns all pages of groups.
-// Used by existing tests and the legacy fetcher.
+// Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

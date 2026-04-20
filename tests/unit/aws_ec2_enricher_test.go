@@ -138,9 +138,9 @@ func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *te
 				},
 				Events: []ec2types.InstanceStatusEvent{
 					{
-						Code:            ec2types.EventCodeSystemReboot,
-						Description:     aws.String("Scheduled reboot"),
-						NotBefore:       daysFromNow(3),
+						Code:        ec2types.EventCodeSystemReboot,
+						Description: aws.String("Scheduled reboot"),
+						NotBefore:   daysFromNow(3),
 					},
 				},
 			},

@@ -267,7 +267,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					if detail.NeedsRelatedCheck() {
 						ck := relatedCacheKey(msg.TargetType, r.ID)
 						if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-							detail.ApplyRelatedResults(cached)
+							detail.ApplyRelatedResults(relatedCacheReplay(msg.TargetType, cached))
 							return m, nil
 						}
 						srcRes := r
@@ -398,4 +398,3 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	}
 	return snap
 }
-

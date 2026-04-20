@@ -44,8 +44,6 @@ func init() {
 	// subscriptions, delivery policies are GetTopicAttributes results, not in the list RawStruct).
 }
 
-
-
 // checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,
 // or InsufficientDataActions reference this SNS topic ARN.
 // Pattern C — reverse lookup in alarm cache.
@@ -115,7 +113,6 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	return relatedResult("sns-sub", ids)
 }
-
 
 // checkSNSKMS resolves the KMS key used for at-rest encryption of this SNS topic
 // via GetTopicAttributes (Pattern C: 1 API call, attribute "KmsMasterKeyId").

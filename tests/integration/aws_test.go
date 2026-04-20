@@ -25,7 +25,7 @@ func skipIfNoAWSConfig(t *testing.T) {
 func TestQA_170_InvalidProfileNameError(t *testing.T) {
 	// This test verifies that using an invalid/nonexistent profile name
 	// results in a meaningful error rather than a panic.
-	_, err := awsclient.NewAWSSession("this-profile-definitely-does-not-exist-xyz123", "us-east-1")
+	_, err := awsclient.NewAWSSessionContext(context.Background(), "this-profile-definitely-does-not-exist-xyz123", "us-east-1")
 	// The AWS SDK may or may not error depending on configuration.
 	// The key assertion is that it does not panic.
 	if err != nil {
@@ -41,7 +41,7 @@ func TestQA_171_RegionNoServiceSupport(t *testing.T) {
 
 	// Use a real session but try to list EKS clusters in a region that may
 	// have limited service availability. The test verifies no panic occurs.
-	cfg, err := awsclient.NewAWSSession("", "af-south-1")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "af-south-1")
 	if err != nil {
 		t.Skipf("could not create AWS session: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestQA_173_InitConnectMsgFailure(t *testing.T) {
 	}()
 
 	// NewAWSSession with a profile that doesn't exist in the (nonexistent) config
-	_, err := awsclient.NewAWSSession("nonexistent-profile", "us-east-1")
+	_, err := awsclient.NewAWSSessionContext(context.Background(), "nonexistent-profile", "us-east-1")
 	// Should not panic, may or may not error
 	if err != nil {
 		t.Logf("NewAWSSession failed as expected: %v", err)
@@ -90,7 +90,7 @@ func TestQA_074_SSOExpiredToken(t *testing.T) {
 	}
 
 	ssoProfile := os.Getenv("A9S_TEST_SSO_PROFILE")
-	cfg, err := awsclient.NewAWSSession(ssoProfile, "us-east-1")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), ssoProfile, "us-east-1")
 	if err != nil {
 		t.Logf("NewAWSSession for SSO profile %q failed: %v", ssoProfile, err)
 		return
@@ -116,11 +116,11 @@ func TestQA_200_S3ListingGlobalRegardlessOfRegion(t *testing.T) {
 
 	// Create sessions in two different regions and compare S3 bucket lists.
 	// S3 ListBuckets is a global operation, so both should return the same buckets.
-	cfg1, err := awsclient.NewAWSSession("", "us-east-1")
+	cfg1, err := awsclient.NewAWSSessionContext(context.Background(), "", "us-east-1")
 	if err != nil {
 		t.Skipf("could not create AWS session for us-east-1: %v", err)
 	}
-	cfg2, err := awsclient.NewAWSSession("", "eu-west-1")
+	cfg2, err := awsclient.NewAWSSessionContext(context.Background(), "", "eu-west-1")
 	if err != nil {
 		t.Skipf("could not create AWS session for eu-west-1: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestIntegration_ListProfilesReal(t *testing.T) {
 func TestIntegration_NewAWSSessionDefaultProfile(t *testing.T) {
 	skipIfNoAWSConfig(t)
 
-	cfg, err := awsclient.NewAWSSession("", "us-east-1")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "us-east-1")
 	if err != nil {
 		t.Fatalf("NewAWSSession with default profile failed: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestIntegration_NewAWSSessionDefaultProfile(t *testing.T) {
 func TestIntegration_FetchEC2Instances(t *testing.T) {
 	skipIfNoAWSConfig(t)
 
-	cfg, err := awsclient.NewAWSSession("", "us-east-1")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "us-east-1")
 	if err != nil {
 		t.Skipf("could not create AWS session: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestIntegration_FetchEC2Instances(t *testing.T) {
 func TestIntegration_FetchS3Buckets(t *testing.T) {
 	skipIfNoAWSConfig(t)
 
-	cfg, err := awsclient.NewAWSSession("", "us-east-1")
+	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "us-east-1")
 	if err != nil {
 		t.Skipf("could not create AWS session: %v", err)
 	}

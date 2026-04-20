@@ -347,6 +347,41 @@ func TestLayoutRenderHeader_WithIdentityBadge_Width(t *testing.T) {
 // Help screen test — identity binding
 // ---------------------------------------------------------------------------
 
+// ════════════════════════════════════════════════════════════════════════════
+// GetHelpContext — 0% hit: returns HelpFromMainMenu
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestIdentityView_GetHelpContext verifies GetHelpContext returns HelpFromMainMenu.
+func TestIdentityView_GetHelpContext(t *testing.T) {
+	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
+	got := m.GetHelpContext()
+	if got != views.HelpFromMainMenu {
+		t.Errorf("GetHelpContext() = %v, want HelpFromMainMenu (%v)", got, views.HelpFromMainMenu)
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Update — unrecognized message type returns unchanged model
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestIdentityView_Update_UnknownMsg verifies that an unrecognized message type
+// leaves the model state unchanged and returns a nil command.
+func TestIdentityView_Update_UnknownMsg(t *testing.T) {
+	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
+	m.SetSize(80, 24)
+
+	type unknownMsg struct{ Value string }
+	m2, cmd := m.Update(unknownMsg{"ignored"})
+	if cmd != nil {
+		t.Error("Update(unknown msg) should return nil Cmd")
+	}
+	// State must remain loading (no identity data received)
+	plain := strings.ToLower(stripANSI(m2.View()))
+	if !strings.Contains(plain, "fetch") {
+		t.Errorf("after unknown msg, view should still show loading state, got:\n%s", plain)
+	}
+}
+
 // TestQA_Help_ShowsIdentityBinding verifies that the help screen shows
 // the 'i' / 'identity' key binding in all view contexts.
 func TestQA_Help_ShowsIdentityBinding(t *testing.T) {

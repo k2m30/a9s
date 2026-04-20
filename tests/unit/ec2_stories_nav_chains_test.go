@@ -24,6 +24,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -53,7 +54,12 @@ func chainStrip(s string) string {
 // newChainDemoModel creates a demo-mode tui.Model sized at 120×30.
 func newChainDemoModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1", tui.WithDemo(true))
+	m := tui.New("demo", "us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithIsDemo(true),
+		tui.WithNoCache(true),
+		tui.WithProfile(demo.DemoProfile),
+		tui.WithRegion(demo.DemoRegion))
 	m, _ = chainApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }
@@ -583,7 +589,8 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 // navigation chain and checks that the view stack supports that depth.
 //
 // Navigation sequence (depths assuming menu=1, ec2-list=2, ec2-detail=3):
-//   EC2 detail (3) → VPC detail (4) → Subnet list (5) → Subnet detail (6) → unwind.
+//
+//	EC2 detail (3) → VPC detail (4) → Subnet list (5) → Subnet detail (6) → unwind.
 //
 // FAILS AT RUNTIME until handleRelatedNavigate correctly manages deep stacks.
 func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
@@ -740,8 +747,9 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 
 // TestEC2_042_NavToMissingResource_FlashMessage verifies that navigating to a
 // resource ID that does not exist in the demo cache either:
-//   a) Keeps the user on the EC2 detail view, OR
-//   b) Shows a flash/error indicator in the rendered output.
+//
+//	a) Keeps the user on the EC2 detail view, OR
+//	b) Shows a flash/error indicator in the rendered output.
 //
 // Both outcomes are acceptable — the critical invariant is that the user is NOT
 // silently moved to an empty or broken view.

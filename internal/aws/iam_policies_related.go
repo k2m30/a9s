@@ -17,8 +17,8 @@ import (
 // Each entry stores the output and the time it was fetched. Entries older than
 // policyEntitiesTTL are evicted on the next read.
 var (
-	policyEntitiesCache   sync.Map
-	policyEntitiesTTL     = 5 * time.Second
+	policyEntitiesCache       sync.Map
+	policyEntitiesTTL         = 5 * time.Second
 	iamListEntitiesAPIForTest IAMListEntitiesForPolicyAPI
 )
 

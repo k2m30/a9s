@@ -46,12 +46,12 @@ type MainMenuModel struct {
 	availTotal   int
 
 	// Issue tracking — parallel to availability maps.
-	AttentionFilter                   // ctrl+z toggle for issue filter
-	issueCounts    map[string]int     // per-type issue counts (red/yellow statuses)
-	issueKnown     map[string]bool    // per-type: true = probed, absent = unknown
-	issueTruncated map[string]bool    // per-type: true = issue count is lower bound
-	enrichChecked  int                // Wave 2 enrichment progress
-	enrichTotal    int                // Wave 2 total enrichment probes
+	AttentionFilter                 // ctrl+z toggle for issue filter
+	issueCounts     map[string]int  // per-type issue counts (red/yellow statuses)
+	issueKnown      map[string]bool // per-type: true = probed, absent = unknown
+	issueTruncated  map[string]bool // per-type: true = issue count is lower bound
+	enrichChecked   int             // Wave 2 enrichment progress
+	enrichTotal     int             // Wave 2 total enrichment probes
 }
 
 // NewMainMenu returns an initialized MainMenuModel with all registered resource types.

@@ -26,8 +26,9 @@ import (
 
 // TestContract_CtrlR_ClearsRelatedCache_ThenRechecks is the full integration test
 // for issue #230. It verifies that Ctrl+R:
-//   (a) clears the stale cached data so the right column shows loading state, and
-//   (b) re-dispatches relatedcheckers (RelatedCheckStartedMsg appears in the chain).
+//
+//	(a) clears the stale cached data so the right column shows loading state, and
+//	(b) re-dispatches relatedcheckers (RelatedCheckStartedMsg appears in the chain).
 //
 // This test PASSES with current code (the LIVE path in app_handlers.go is correct).
 // It is a regression guard to ensure the live path continues to work after the

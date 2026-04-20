@@ -22,12 +22,12 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestCFNRegisteredInEnricherRegistry verifies that cfn has an explicit entry in
-// EnricherRegistry — either a real enricher or NoOpEnricher.
+// TestCFNRegisteredInIssueEnricherRegistry verifies that cfn has an explicit entry
+// in IssueEnricherRegistry — either a real Wave 2 issue enricher or NoOpIssueEnricher.
 // Every documented Wave 2 row must have a registry entry per docs/attention-signals.md.
-func TestCFNRegisteredInEnricherRegistry(t *testing.T) {
-	if _, ok := awsclient.EnricherRegistry["cfn"]; !ok {
-		t.Error("cfn must have an entry in EnricherRegistry per docs/attention-signals.md")
+func TestCFNRegisteredInIssueEnricherRegistry(t *testing.T) {
+	if _, ok := awsclient.IssueEnricherRegistry["cfn"]; !ok {
+		t.Error("cfn must have an entry in IssueEnricherRegistry per docs/attention-signals.md")
 	}
 }
 

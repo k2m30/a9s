@@ -536,11 +536,3 @@ func checkEC2Role(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	}
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
-
-
-
-
-
-
-
-

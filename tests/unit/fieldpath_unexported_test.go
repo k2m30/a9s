@@ -240,6 +240,3 @@ func assertNoScalarPanic(t *testing.T, obj any, path, expectedContains string) {
 		t.Errorf("ExtractScalar(%T, %q) = %q, want to contain %q", obj, path, result, expectedContains)
 	}
 }
-
-//go:fix inline
-func int64Ptr(i int64) *int64 { return new(i) }

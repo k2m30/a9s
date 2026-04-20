@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error"})
+	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"})
 
 	resource.RegisterPaginated("trail", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -102,15 +102,15 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			Name:   trailName,
 			Status: "",
 			Fields: map[string]string{
-				"trail_name":            trailName,
-				"trail_arn":             trailARN,
-				"s3_bucket":             s3Bucket,
-				"home_region":           homeRegion,
-				"multi_region":          multiRegion,
-				"org_trail":             orgTrail,
-				"log_validation":        logValidation,
-				"is_logging":            isLogging,
-				"latest_delivery_error": latestDeliveryError,
+				"trail_name":                  trailName,
+				"trail_arn":                   trailARN,
+				"s3_bucket":                   s3Bucket,
+				"home_region":                 homeRegion,
+				"multi_region":                multiRegion,
+				"org_trail":                   orgTrail,
+				"log_file_validation_enabled": logValidation,
+				"is_logging":                  isLogging,
+				"latest_delivery_error":       latestDeliveryError,
 			},
 			RawStruct: trail,
 		}

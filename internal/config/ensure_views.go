@@ -95,4 +95,3 @@ func EnsureViewsReference(configDir string) error {
 	dest := filepath.Join(configDir, "views_reference.yaml")
 	return os.WriteFile(dest, viewsReferenceData, 0644) //nolint:gosec // view YAML files are non-sensitive, world-readable is acceptable
 }
-

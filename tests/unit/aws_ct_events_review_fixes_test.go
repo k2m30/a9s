@@ -45,7 +45,7 @@ import (
 // ===========================================================================
 // Bug 1: sort uses display-formatted time string, breaking month boundaries.
 //
-// Default SortAge descending should produce C (Apr 07), A (Apr 02), B (Mar 28).
+// Default TIME-column descending sort should produce C (Apr 07), A (Apr 02), B (Mar 28).
 // The bug produces A (Apr 02), C (Apr 07), B (Mar 28) because "Apr 02" < "Apr 07"
 // < "Mar 28" lexicographically — March sorts AFTER April.
 // ===========================================================================
@@ -98,7 +98,8 @@ func TestCTSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 	m, _ = m.Init()
 
 	// ResourcesLoadedMsg triggers applySortAndFilter() with the default
-	// SortAge DESC that was set by NewResourceList (viewConfig != nil).
+	// TIME column descending sort that NewResourceList sets when the view
+	// config declares one (ct-events always does).
 	m, _ = m.Update(messages.ResourcesLoadedMsg{
 		ResourceType: "ct-events",
 		Resources:    resources,

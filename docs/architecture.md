@@ -1,13 +1,12 @@
 # a9s Architecture Guide
 
-> **DESCRIPTIVE GUIDE.** This document describes the current implementation state.
-> For normative architecture rules (how the system should be designed), see
-> [architecture-intended.md](./architecture-intended.md). When the two disagree,
-> architecture-intended.md is authoritative.
+> **SINGLE SOURCE OF TRUTH.** This document is both the descriptive guide
+> (how the system is built today) and the normative contract (how new
+> changes must behave). When the implementation diverges from this doc,
+> either the implementation is wrong or this doc must be amended in the
+> same PR.
 
-This document is the first thing you should read when joining the project. It covers the current runtime architecture.
-
-For the normative "how it should be" version used to compare intended design against implementation, see [`architecture-intended.md`](./architecture-intended.md).
+This document is the first thing you should read when joining the project. It covers the runtime architecture and the invariants new code must honor.
 
 ## What is a9s?
 
@@ -32,12 +31,41 @@ The current codebase is already organized around a useful separation of concerns
 
 ### Architectural Invariants
 
-- Views never call AWS directly.
-- Views communicate with the rest of the app by emitting typed messages.
-- The root `tui.Model` owns navigation, clients, session caches, and async result routing.
-- Every async result must carry enough context to reject stale or wrong-target updates.
-- Cache invalidation rules must be explicit for refresh, profile switch, region switch, and view-open flows.
-- `Esc` is the back/dismiss key. `q` is the quit key in normal mode; it is not the navigation primitive.
+The invariants below are normative. Code that violates them is wrong even
+if it "works" — the gen guards, registry completeness checks, and related
+validators in `tests/unit/architecture_conformance_test.go` fail loudly when
+any of these drift.
+
+1. **One root application model owns session state and orchestration.**
+   UI shell concerns and session-runtime state both live on `tui.Model`
+   (the latter via the embedded `sessionRuntime`), but the boundary between
+   them is explicit. No orchestration state leaks into view structs.
+2. **Views render state and emit typed messages.** Views never call AWS
+   directly. `m.clients` is passed to tea.Cmds created by the root model,
+   not consumed inside `View()`.
+3. **Registries are the declarative source of truth.** Supported resource
+   types, related defs, navigable fields, fetchers, detail enrichers, and
+   Wave 2 issue enrichers are all registered at package init. There is no
+   hand-maintained allowlist in dispatch code — background systems iterate
+   registry state and sort by declarative priority metadata.
+4. **AWS adapter code translates SDK types into `resource.Resource`.**
+   `internal/aws` does not own navigation or UI policy. It does not
+   import `internal/tui`.
+5. **Every async result carries enough identity to reject stale updates.**
+   Every Msg with a `Gen` or `TypeGen` field must be stamped at dispatch
+   time. Handlers MUST drop messages whose generation does not match the
+   current session-wide / per-type counter.
+6. **Cache invalidation is explicit.** Refresh, profile switch, and region
+   switch paths all rotate the session runtime via `resetForSessionSwitch`:
+   every gen counter is bumped and every map/queue is rebuilt in one place.
+7. **Feature-specific caches do not hang off transport objects.**
+   `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
+   caches (e.g. the IAM policy document cache) live on `sessionRuntime` and
+   reach detail enrichers via `*awsclient.DetailEnrichmentCtx`.
+8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
+   is the quit key in normal mode; it is not a navigation primitive.
+   Input-mode and search-mode semantics take precedence over view-local
+   bindings.
 
 ---
 
@@ -187,7 +215,7 @@ resource.RegisterPaginated("ec2", fetchEC2Instances)
 resource.RegisterPaginatedChild("role_policies", fetchRolePolicies)
 resource.RegisterRelated("ec2", []RelatedDef{...})
 resource.RegisterNavigableFields("ec2", []NavigableField{...})
-resource.RegisterEnricher("role_policies", enrichRolePolicy)
+resource.RegisterDetailEnricher("role_policies", enrichRolePolicy)
 resource.RegisterFieldKeys("ec2", []string{"instance_id", "state", "type", ...})
 resource.RegisterFieldAliases("ec2", map[string]string{"id": "instance_id", "az": "availability_zone"})
 ```
@@ -246,8 +274,8 @@ All registered in `internal/resource/registry.go`, implemented in `internal/aws/
 | **PaginatedChildFetcher** | `func(ctx, clients, parentCtx, token) (FetchResult, error)` | Child resource lists (S3 objects, role policies, ECS tasks) |
 | **FilteredPaginatedFetcher** | `func(ctx, clients, filter, token) (FetchResult, error)` | Server-side filtered queries (CloudTrail events) |
 | **RevealFetcher** | `func(ctx, clients, resourceID) (string, error)` | On-demand secret reveal (`x` key — Secrets Manager, SSM) |
-| **Enricher** | `func(ctx, clients, Resource) (Resource, error)` | On-demand detail enrichment (policy documents) |
-| **EnricherFunc** | `func(ctx, *ServiceClients, []Resource) (EnricherResult, error)` | Wave 2 issue enrichment; `EnricherResult` carries issue count, truncated flag, and per-resource `Findings` map |
+| **DetailEnricher** | `func(ctx, clients, Resource) (Resource, error)` | On-demand detail enrichment (policy documents) |
+| **IssueEnricherFunc** | `func(ctx, *ServiceClients, []Resource) (IssueEnricherResult, error)` | Wave 2 issue enrichment; `IssueEnricherResult` carries issue count, truncated flag, and per-resource `Findings` map |
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
 
@@ -258,7 +286,8 @@ Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` inter
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
 
 **Architecture:**
-- `internal/aws/enrichment.go` — 66 enricher entries in `EnricherRegistry` (40 real enricher functions + 26 `NoOpEnricher` entries for types with Wave 2 = "None" per `docs/attention-signals.md`)
+- `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
+- `internal/aws/*_issue_enrichment.go` — one file per registered short name (67 total: 43 real enricher functions + 24 `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`). Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
 - `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
 - `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
@@ -266,29 +295,29 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 
 ```text
 Wave 1 probes complete
-  → startEnrichment() builds queue from EnricherRegistry ∩ probeResources
-  → probeEnrichment() dispatches enrichers (4-at-a-time, same as Wave 1)
+  → startEnrichment() builds queue from IssueEnricherRegistry ∩ probeResources
+  → probeEnrichment() dispatches issue enrichers (4-at-a-time, same as Wave 1)
   → EnrichmentCheckedMsg arrives
     → only-increase guard: menu badge updated only if new count > current
     → progress indicator updated
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Registry**: All 66 registered resource types have an `EnricherRegistry` entry per `docs/attention-signals.md`. 40 entries are real enricher functions; the remaining 26 are `NoOpEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: All 67 registered resource types have an `IssueEnricherRegistry` entry per `docs/attention-signals.md`. 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpIssueEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpIssueEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
 **Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
 **Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
 
-**Golden contract**: [`docs/attention-signals.md`](attention-signals.md) is the single source of truth for Wave 1 (Color func) and Wave 2 (enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `EnricherRegistry` entry. Adding or removing enrichers requires updating the doc.
+**Golden contract**: [`docs/attention-signals.md`](attention-signals.md) is the single source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `IssueEnricherRegistry` entry. Adding or removing issue enrichers requires updating the doc.
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
 **Lifecycle**: `probeResources` is cleared after Wave 2 completes and on profile/region switch. On a top-level resource list with a registered enricher, Ctrl+R bumps `enrichmentTypeGen[rt]`, clears `enrichmentFindings[rt]` and `enrichmentRan[rt]`, calls `SetEnrichmentState(0, false, false, nil)` on the active list, and dispatches `refreshResourceListWithEnrichmentRerun` to rerun Wave 2 for that type. The main-menu Ctrl+R path invalidates Wave 2 for all types: it bumps `enrichmentGen` (the session-wide generation counter), resets `enrichmentTypeGen` to an empty map, clears `enrichmentFindings` and `enrichmentRan` — then reloads the cache from disk. Wave 2 re-runs when the user next navigates to a resource list.
 
-### Enrichment Visibility Subsystem
+### Issue-Enrichment Visibility Subsystem
 
-After Wave 2 enrichment runs, findings are surfaced in list and detail views.
+After Wave 2 issue enrichment runs, findings are surfaced in list and detail views.
 
 **Types:**
 - `resource.EnrichmentFinding` (`internal/resource/enrichment.go`) — `Severity string` (`"!"` broken/degraded, `"~"` scheduled/informational) + `Summary string` (human-readable description).
@@ -304,10 +333,13 @@ After Wave 2 enrichment runs, findings are surfaced in list and detail views.
 **Stacked-view live-update pattern:**
 - `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
 
-**Session-scoped state on root `Model`:**
+**Session-scoped state lives on the embedded `sessionRuntime` struct** (`internal/tui/session_runtime.go`), not on the UI shell portion of `Model`. The split makes ownership explicit: caches, Wave 1/Wave 2 queues, findings, and generation counters are all owned by `sessionRuntime`. Field promotion keeps the access syntax (`m.resourceCache`, `m.probeResources`, `m.enrichmentFindings`) unchanged. Profile/region switches call `m.resetForSessionSwitch()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
+
+Representative fields owned by `sessionRuntime`:
 - `enrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on profile/region switch.
 - `enrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
 - `enrichmentTypeGen map[string]int` — per-type generation counter; guards against stale in-flight rerun results.
+- `resourceCache`, `relatedCache`, `probeResources`, `availQueue`, `enrichQueue` — session-scoped caches and dispatch queues.
 
 ---
 
@@ -449,7 +481,7 @@ Resource lists support column-position sorting via keys `1`–`9` and `0` (tenth
 - Pressing a sort key sorts ascending; pressing the same key again toggles to descending
 - Sort indicator (▲/▼) appears in the column header
 
-The old named sort sentinels (`SortName`, `SortID`, `SortAge`) are deprecated and map to column indices 0, 1, 2 respectively. New code should use column-position sorting exclusively.
+Column-position sorting is the only sort model: the `SortField` alias and the `SortName` / `SortID` / `SortAge` sentinels were removed in #283. Sort state is a column index (`sortColIdx int`) plus a direction flag.
 
 ---
 
@@ -493,10 +525,10 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 
 ## Enrichment
 
-a9s has two distinct enrichment pipelines:
+a9s has two distinct enrichment pipelines with disjoint contracts:
 
-1. **Detail enrichment** (on-demand) — fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
-2. **Issue enrichment (Wave 2)** (background) — discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
+1. **Detail enrichment** (on-demand) — `resource.DetailEnricher` in `internal/resource/enricher.go`. Fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
+2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` registered in `awsclient.IssueEnricherRegistry` (infrastructure in `internal/aws/issue_enrichment.go`; one `*_issue_enrichment.go` file per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
 
 ### On-Demand Detail Enhancement
 
@@ -506,7 +538,7 @@ When a detail, YAML, or JSON view opens for a resource type with a registered en
 
 ```text
 View opens (detail, YAML, or JSON)
-  → resource.HasEnricher(resType)?
+  → resource.HasDetailEnricher(resType)?
     → increment enrichGen (invalidate prior in-flight results)
     → emit EnrichDetailMsg
       → handleEnrichDetail runs enricher in goroutine (10s timeout)
@@ -522,10 +554,10 @@ View opens (detail, YAML, or JSON)
 
 **Caching policy**:
 - **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session.
-- **If caching is justified**: use a session-scoped, feature-specific cache owned by session context (`ServiceClients` today). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
+- **If caching is justified**: use a session-scoped, feature-specific cache owned by `sessionRuntime` (passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
 - **Never**: use package-global cache state for enrichers.
 
-**Current example**: IAM policy document enrichment uses the session-scoped `PolicyDocCache` on `ServiceClients`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. When `ServiceClients` is replaced on profile/region switch, the old cache is garbage collected — no explicit invalidation hooks needed.
+**Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `sessionRuntime.policyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `resetForSessionSwitch` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
 
 ---
 
@@ -562,10 +594,10 @@ The app has four distinct caches, each serving a different purpose:
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
-| **Resource cache** | `app.go` `resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch |
-| **Related cache** | `app.go` `relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
-| **Enricher caches** | Feature-specific cache on `ServiceClients` (current example: `PolicyDocCache`) | In-memory, session-scoped | Automatically GC'd when ServiceClients is replaced on profile/region switch |
-| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` maps on root `Model` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
+| **Resource cache** | `sessionRuntime.resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch via `resetForSessionSwitch` |
+| **Related cache** | `sessionRuntime.relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
+| **Detail-enricher caches** | Feature-specific cache owned by `sessionRuntime` and delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `resetForSessionSwitch` on profile/region switch |
+| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` on `sessionRuntime` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
@@ -573,7 +605,7 @@ The app has four distinct caches, each serving a different purpose:
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
-**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `ServiceClients`, so cache lifetime matches session lifetime. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
+**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `sessionRuntime` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `resetForSessionSwitch`. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
 
 ---
 
@@ -626,7 +658,7 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 - `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
-**API note**: `tui.WithDemo(true)` is a compatibility shim retained for tests written before the 014-demo-transport-mock refactor. It is NOT equivalent to `WithClients(demo.NewServiceClients()) + WithIsDemo(true)` alone — it additionally hardcodes `profile = demo.DemoProfile` and `region = demo.DemoRegion`. It does NOT set `noCache`; disk persistence remains enabled unless you also pass `WithNoCache(true)`. New code should use explicit options rather than `WithDemo`. The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality. Removal of `WithDemo` is tracked in tasks T045–T049.
+The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality.
 
 Demo mode is the primary way to develop and test the TUI without AWS access.
 
@@ -660,9 +692,10 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 - `WithClients(c)` — pre-supply AWS clients (used by demo mode and tests)
 - `WithNoCache(true)` — disable disk cache persistence (availability probes still run via `demoPrefetchCounts()`)
 - `WithIsDemo(true)` — mark session as demo mode (skips Wave 2 enrichment; set by `--demo` CLI bootstrap)
+- `WithProfile(p)` — override the profile string (used in tests to set a specific profile without live AWS)
+- `WithRegion(r)` — override the region string (used in tests to set a specific region without live AWS)
 - `WithCommand("ec2")` — open directly to a resource type on startup
 - `WithActiveTheme(name)` — set the initial active theme filename for the theme selector (used by `--theme` CLI flag)
-- `WithDemo(true)` — compatibility shim for pre-014 tests: sets `preSuppliedClients = demo.NewServiceClients()`, `isDemo = true`, and hardcodes `profile = demo.DemoProfile` / `region = demo.DemoRegion`. Does NOT set `noCache`. See Demo Mode above and Known Compromises below.
 
 ---
 
@@ -736,7 +769,12 @@ Test the full message-driven flow. Construct a real `tui.Model`, drive it with m
 
 ```go
 // Pattern: create app → send messages → assert on View() output
-app := tui.New("demo", "us-east-1", tui.WithDemo(true))
+app := tui.New("demo", "us-east-1",
+    tui.WithClients(demo.NewServiceClients()),
+    tui.WithIsDemo(true),
+    tui.WithNoCache(true),
+    tui.WithProfile(demo.DemoProfile),
+    tui.WithRegion(demo.DemoRegion))
 m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 m, _ = rootApplyMsg(m, messages.NavigateMsg{...})
 content := stripANSI(rootViewContent(m))
@@ -781,10 +819,10 @@ Two mock layers serve different purposes:
 ### Writing New Tests
 
 1. **Test behavior, not implementation** — assert on what the user sees or what the function returns
-2. **Use demo fakes for TUI tests** — `tui.New("demo", "us-east-1", tui.WithDemo(true))`
+2. **Use demo fakes for TUI tests** — `tui.New("demo", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithIsDemo(true), tui.WithNoCache(true), tui.WithProfile(demo.DemoProfile), tui.WithRegion(demo.DemoRegion))`
 3. **Use narrow interface mocks for fetcher tests** — one mock per AWS API method
 4. **Always `stripANSI` before string assertions** — rendered output contains escape codes
-5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterEnricher(...) })` for temporary registrations
+5. **Clean up registries** — use `t.Cleanup(func() { resource.UnregisterDetailEnricher(...) })` for temporary registrations
 6. **If an enricher caches, test session scoping** — different `ServiceClients` instances must get independent caches automatically. If an enricher does not cache, no cache cleanup should be required.
 
 ### Integration Tests
@@ -794,15 +832,6 @@ Gated by `//go:build integration`. Two modes:
 - **Live AWS integration** — requires `A9S_CT_PROFILE=<profile>`. Tests real API calls against a live AWS account.
 
 Run: `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestName -count=1 -v -timeout 600s`
-
----
-
-## Known Compromises
-
-- `WithDemo(true)` still exists as a compatibility shim for older tests. It is NOT a simple composition — it hardcodes `profile`/`region` to demo values and sets `isDemo = true` but does NOT set `noCache`. New code should prefer explicit client injection (`WithClients(demo.NewServiceClients())`) plus `WithIsDemo(true)` (and `WithNoCache(true)` when disk persistence must also be off). Removal of `WithDemo(true)` is tracked in tasks T045–T049 (see the `//nolint:gocritic` banner above the function).
-- The root `tui.Model` intentionally does double duty as both UI shell and orchestration layer. That keeps Bubble Tea integration simple, but it also means some operational concerns still live in `internal/tui`.
-- When enrichers cache today, they do so via feature-specific fields on `ServiceClients`. This is correct for session lifetime management, but it does mean feature-specific state lives on a general-purpose struct.
-- Key handling is centralized and order-sensitive. This is pragmatic, but behavioral changes to global keys should always be reviewed against input-mode and search-mode semantics.
 
 ---
 

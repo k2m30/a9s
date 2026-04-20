@@ -5,12 +5,12 @@ package unit
 //
 // ── Coder note ─────────────────────────────────────────────────────────────────
 // ECRListImagesAPI and its embedding into ECRAPI already exist in
-// internal/aws/interfaces.go. The only coder action required is:
+// internal/aws/interfaces_ecr.go. The only coder action required is:
 //
 //  1. Add ListImages to internal/demo/fakes/ecr.go (ECRFake) so the demo fake
 //     satisfies the updated ECRAPI interface.
 //
-//  2. Implement EnrichECRRepository in internal/aws/enrichment.go:
+//  2. Implement EnrichECRRepository in internal/aws/ecr_issue_enrichment.go:
 //     ListImages (paginated) → cap at 10 per repo → DescribeImageScanFindings
 //     per digest → aggregate CRITICAL+HIGH → emit findings + FieldUpdates.
 //
@@ -55,12 +55,12 @@ import (
 // scanCallDigests records which image digests DescribeImageScanFindings was called for.
 type ecrEnrichFake struct {
 	awsclient.ECRAPI
-	listImagesByRepo      map[string][][]ecrtypes.ImageIdentifier // repo → pages
-	listImagesErrByRepo   map[string]error
-	scanCountsByDigest    map[string]map[string]int32 // digest → severity → count
-	scanErrByDigest       map[string]error
+	listImagesByRepo       map[string][][]ecrtypes.ImageIdentifier // repo → pages
+	listImagesErrByRepo    map[string]error
+	scanCountsByDigest     map[string]map[string]int32 // digest → severity → count
+	scanErrByDigest        map[string]error
 	listImagesCallsPerRepo map[string]int
-	scanCallDigests       []string
+	scanCallDigests        []string
 }
 
 func (f *ecrEnrichFake) ListImages(

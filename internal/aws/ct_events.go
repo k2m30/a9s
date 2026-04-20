@@ -284,16 +284,16 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		Status: status,
 		Fields: map[string]string{
 			// Existing keys (kept for backwards compat with related-checkers and tests).
-			"event_name":    eventName,
-			"time":          eventTimeDisplay,
-			"event_time":    eventTimeRaw,
+			"event_name":     eventName,
+			"time":           eventTimeDisplay,
+			"event_time":     eventTimeRaw,
 			"event_time_raw": eventTimeRaw,
-			"user":          iamUserName,
-			"source":        source,
-			"resource_type": resourceType,
-			"resource_name": resourceName,
-			"read_only":     readOnly,
-			"role_name":     roleName,
+			"user":           iamUserName,
+			"source":         source,
+			"resource_type":  resourceType,
+			"resource_name":  resourceName,
+			"read_only":      readOnly,
+			"role_name":      roleName,
 			// New _ct.* keys.
 			"_ct.verb":              verb,
 			"_ct.actor":             actor,
@@ -835,8 +835,8 @@ func cloudTrailResourceFields(resources []cloudtrailtypes.Resource) (string, str
 // or userIdentity.invokedBy for AWSService events.
 type ctEventJSONUserIdentity struct {
 	UserIdentity struct {
-		Type      string `json:"type"`
-		InvokedBy string `json:"invokedBy"`
+		Type           string `json:"type"`
+		InvokedBy      string `json:"invokedBy"`
 		SessionContext struct {
 			SessionIssuer struct {
 				UserName string `json:"userName"`

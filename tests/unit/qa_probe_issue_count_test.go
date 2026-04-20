@@ -90,7 +90,7 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "empty list",
+			name:      "empty list",
 			resources: []resource.Resource{},
 			want:      0,
 		},

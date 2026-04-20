@@ -35,23 +35,24 @@ func GetFieldKeys(shortName string) []string {
 	return fieldKeyRegistry[shortName]
 }
 
-// enricherFieldKeysRegistry stores field keys produced by enrichers
-// (Wave 2 FieldUpdates) per resource short name. Keys declared here are
-// additive to keys in fieldKeyRegistry (fetcher-produced).
+// issueEnricherFieldKeysRegistry stores field keys produced by Wave 2 issue
+// enrichers (IssueEnricherResult.FieldUpdates) per resource short name. Keys
+// declared here are additive to keys in fieldKeyRegistry (fetcher-produced).
 //
 // The test TestColumnKeysHaveProducers asserts every ResourceTypeDef.Columns[].Key
-// appears in at least one of: fetcher keys, enricher keys, or the documented
-// allowlist for intentionally-blank columns.
-var enricherFieldKeysRegistry = map[string][]string{}
+// appears in at least one of: fetcher keys, issue-enricher keys, or the
+// documented allowlist for intentionally-blank columns.
+var issueEnricherFieldKeysRegistry = map[string][]string{}
 
-// RegisterEnricherFieldKeys declares the set of Resource.Fields keys that an
-// enricher writes via EnricherResult.FieldUpdates for the given resource short
-// name. Multiple enrichers may target the same type; keys are unioned.
+// RegisterIssueEnricherFieldKeys declares the set of Resource.Fields keys that
+// a Wave 2 issue enricher writes via IssueEnricherResult.FieldUpdates for the
+// given resource short name. Multiple enrichers may target the same type; keys
+// are unioned.
 //
 // Call from enrichment.go package init() or from each Enrich* function body
 // (idempotent — duplicates are deduplicated).
-func RegisterEnricherFieldKeys(shortName string, keys []string) {
-	existing := enricherFieldKeysRegistry[shortName]
+func RegisterIssueEnricherFieldKeys(shortName string, keys []string) {
+	existing := issueEnricherFieldKeysRegistry[shortName]
 	seen := make(map[string]bool, len(existing))
 	for _, k := range existing {
 		seen[k] = true
@@ -62,20 +63,20 @@ func RegisterEnricherFieldKeys(shortName string, keys []string) {
 			seen[k] = true
 		}
 	}
-	enricherFieldKeysRegistry[shortName] = existing
+	issueEnricherFieldKeysRegistry[shortName] = existing
 }
 
-// GetEnricherFieldKeys returns the accumulated enricher field keys for the
-// given resource short name, or nil if none are registered.
-func GetEnricherFieldKeys(shortName string) []string {
-	return enricherFieldKeysRegistry[shortName]
+// GetIssueEnricherFieldKeys returns the accumulated Wave 2 issue-enricher
+// field keys for the given resource short name, or nil if none are registered.
+func GetIssueEnricherFieldKeys(shortName string) []string {
+	return issueEnricherFieldKeysRegistry[shortName]
 }
 
 // GetAllFieldKeys returns the union of fetcher-registered field keys and
-// enricher-registered field keys for the given short name.
+// Wave 2 issue-enricher-registered field keys for the given short name.
 func GetAllFieldKeys(shortName string) []string {
 	fetcher := GetFieldKeys(shortName)
-	enricher := GetEnricherFieldKeys(shortName)
+	enricher := GetIssueEnricherFieldKeys(shortName)
 	if len(enricher) == 0 {
 		return fetcher
 	}
