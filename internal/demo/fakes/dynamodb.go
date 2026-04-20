@@ -51,7 +51,7 @@ func (f *DynamoDBFake) DescribeKinesisStreamingDestination(_ context.Context, in
 		return &dynamodb.DescribeKinesisStreamingDestinationOutput{TableName: input.TableName}, nil
 	}
 	return &dynamodb.DescribeKinesisStreamingDestinationOutput{
-		TableName:                    input.TableName,
+		TableName:                     input.TableName,
 		KinesisDataStreamDestinations: dests,
 	}, nil
 }

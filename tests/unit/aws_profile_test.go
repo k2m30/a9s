@@ -13,7 +13,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestListProfiles_SampleFiles(t *testing.T) {
-	configPath := filepath.Join("..", "testdata", "aws_config_sample")
+	configPath := filepath.Join("..", "testdata", "aws_profile", "config_sample")
 
 	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
@@ -39,7 +39,7 @@ func TestListProfiles_MissingConfigFile(t *testing.T) {
 }
 
 func TestListProfiles_ConfigOnly(t *testing.T) {
-	configPath := filepath.Join("..", "testdata", "aws_config_sample")
+	configPath := filepath.Join("..", "testdata", "aws_profile", "config_sample")
 
 	profiles, err := awsclient.ListProfiles(configPath)
 	if err != nil {
@@ -123,7 +123,7 @@ func TestAllRegions_HasDisplayNames(t *testing.T) {
 }
 
 func TestGetDefaultRegion_FromConfigFile(t *testing.T) {
-	configPath := filepath.Join("..", "testdata", "aws_config_sample")
+	configPath := filepath.Join("..", "testdata", "aws_profile", "config_sample")
 
 	// "default" section has region = us-east-1
 	region := awsclient.GetDefaultRegion(configPath, "default")
@@ -152,7 +152,7 @@ func TestGetDefaultRegion_MissingFile(t *testing.T) {
 }
 
 func TestGetDefaultRegion_UnknownProfile(t *testing.T) {
-	configPath := filepath.Join("..", "testdata", "aws_config_sample")
+	configPath := filepath.Join("..", "testdata", "aws_profile", "config_sample")
 	region := awsclient.GetDefaultRegion(configPath, "nonexistent-profile")
 	if region != "us-east-1" {
 		t.Errorf("expected fallback region %q for unknown profile, got %q", "us-east-1", region)

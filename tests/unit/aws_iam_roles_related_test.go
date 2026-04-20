@@ -533,4 +533,294 @@ func TestRelated_Role_EC2_InstanceNoProfile(t *testing.T) {
 	}
 }
 
+// --- EKS checker (reverse-lookup: search eks cluster cache for RoleArn match) ---
+
+// TestRelated_Role_EKS_Found: an EKS cluster whose RoleArn matches the role ARN
+// (full ARN match) produces Count:1.
+func TestRelated_Role_EKS_Found(t *testing.T) {
+	const roleName = "eks-cluster-role"
+	const roleARN = "arn:aws:iam::123456789012:role/" + roleName
+	source := resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+			Arn:      aws.String(roleARN),
+		},
+	}
+
+	clusterRes := resource.Resource{
+		ID:   "my-cluster",
+		Name: "my-cluster",
+		RawStruct: ekstypes.Cluster{
+			Name:    aws.String("my-cluster"),
+			RoleArn: aws.String(roleARN),
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{clusterRes}},
+	}
+
+	checker := roleCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (RoleArn matches)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-cluster]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_Role_EKS_NameSegmentMatch: an EKS cluster whose RoleArn ends
+// with the role name (path-prefixed ARN) still matches via name-segment lookup.
+func TestRelated_Role_EKS_NameSegmentMatch(t *testing.T) {
+	const roleName = "eks-cluster-role"
+	// ARN with a service-role path prefix — ARN != roleARN but name segment matches.
+	const prefixedARN = "arn:aws:iam::123456789012:role/service-role/" + roleName
+	source := resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		// No RawStruct.Arn → roleARN will be "" → falls back to name-segment match.
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+		},
+	}
+
+	clusterRes := resource.Resource{
+		ID: "prefixed-cluster",
+		RawStruct: ekstypes.Cluster{
+			Name:    aws.String("prefixed-cluster"),
+			RoleArn: aws.String(prefixedARN),
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{clusterRes}},
+	}
+
+	checker := roleCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (name-segment match for prefixed ARN)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "prefixed-cluster" {
+		t.Errorf("ResourceIDs = %v, want [prefixed-cluster]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_Role_EKS_NotFound: an EKS cluster with a different role ARN
+// produces Count:0.
+func TestRelated_Role_EKS_NotFound(t *testing.T) {
+	const roleName = "eks-cluster-role"
+	source := resource.Resource{
+		ID: roleName,
+		RawStruct: iamtypes.Role{
+			RoleName: aws.String(roleName),
+			Arn:      aws.String("arn:aws:iam::123456789012:role/" + roleName),
+		},
+	}
+
+	clusterRes := resource.Resource{
+		ID: "unrelated-cluster",
+		RawStruct: ekstypes.Cluster{
+			Name:    aws.String("unrelated-cluster"),
+			RoleArn: aws.String("arn:aws:iam::123456789012:role/other-role"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{clusterRes}},
+	}
+
+	checker := roleCheckerByTarget(t, "eks")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (different role ARN)", result.Count)
+	}
+}
+
+// --- IamGroup checker (trust policy parse — offline, 0 API calls) ---
+
+// TestRelated_Role_IamGroup_Found: a trust policy with a Principal.AWS ARN
+// containing ":group/" yields the group name as a resource ID.
+func TestRelated_Role_IamGroup_Found(t *testing.T) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": "arn:aws:iam::123456789012:group/dev-team"
+			},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+	source := resource.Resource{
+		ID: "cross-account-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": trustPolicy,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-group")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (group principal in trust policy)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "dev-team" {
+		t.Errorf("ResourceIDs = %v, want [dev-team]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_Role_IamGroup_MultipleGroups: a trust policy with multiple
+// Principal.AWS ARNs containing ":group/" yields all group names.
+func TestRelated_Role_IamGroup_MultipleGroups(t *testing.T) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": [
+					"arn:aws:iam::123456789012:group/dev-team",
+					"arn:aws:iam::123456789012:group/ops-team"
+				]
+			},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+	source := resource.Resource{
+		ID: "multi-group-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": trustPolicy,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-group")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2 (two group principals)", result.Count)
+	}
+}
+
+// TestRelated_Role_IamGroup_NoGroupPrincipal: a trust policy with no ":group/"
+// ARN yields Count:0.
+func TestRelated_Role_IamGroup_NoGroupPrincipal(t *testing.T) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": "arn:aws:iam::123456789012:root"
+			},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+	source := resource.Resource{
+		ID: "root-assume-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": trustPolicy,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-group")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no group ARN in trust policy)", result.Count)
+	}
+}
+
+// --- IamUser checker (trust policy parse — offline, 0 API calls) ---
+
+// TestRelated_Role_IamUser_Found: a trust policy with a Principal.AWS ARN
+// containing ":user/" yields the user name as a resource ID.
+func TestRelated_Role_IamUser_Found(t *testing.T) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": "arn:aws:iam::123456789012:user/alice"
+			},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+	source := resource.Resource{
+		ID: "user-assume-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": trustPolicy,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (user principal in trust policy)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alice" {
+		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_Role_IamUser_NoUserPrincipal: a trust policy with no ":user/"
+// ARN (e.g. service principal) yields Count:0.
+func TestRelated_Role_IamUser_NoUserPrincipal(t *testing.T) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {
+				"Service": "lambda.amazonaws.com"
+			},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+	source := resource.Resource{
+		ID: "lambda-execution-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": trustPolicy,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no user ARN in trust policy)", result.Count)
+	}
+}
+
+// TestRelated_Role_IamUser_InvalidJSON: malformed trust policy JSON produces
+// Count:0 (parse error is silent, not a crash).
+func TestRelated_Role_IamUser_InvalidJSON(t *testing.T) {
+	source := resource.Resource{
+		ID: "broken-role",
+		Fields: map[string]string{
+			"assume_role_policy_document": `{ "Statement": [ invalid json`,
+		},
+	}
+
+	checker := roleCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (invalid JSON should not crash)", result.Count)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
 // --- Demo checker ---

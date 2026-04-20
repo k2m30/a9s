@@ -298,7 +298,7 @@ type enricherInvariantCase struct {
 	name      string
 	clients   *awsclient.ServiceClients
 	resources []resource.Resource
-	enrich    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.EnricherResult, error)
+	enrich    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.IssueEnricherResult, error)
 }
 
 // TestEnrichmentFinding_AllKeptEnrichersPopulateRows verifies that every enricher in

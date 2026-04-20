@@ -728,14 +728,14 @@ func TestQA_Pagination_FetchAMIsPage_FirstPage(t *testing.T) {
 			return &ec2.DescribeImagesOutput{
 				Images: []ec2types.Image{
 					{
-						ImageId:        aws.String("ami-0abc111222333444a"),
-						Name:           aws.String("my-golden-ami"),
-						State:          ec2types.ImageStateAvailable,
-						Architecture:   ec2types.ArchitectureValuesX8664,
+						ImageId:         aws.String("ami-0abc111222333444a"),
+						Name:            aws.String("my-golden-ami"),
+						State:           ec2types.ImageStateAvailable,
+						Architecture:    ec2types.ArchitectureValuesX8664,
 						PlatformDetails: aws.String("Linux/UNIX"),
-						RootDeviceType: ec2types.DeviceTypeEbs,
-						CreationDate:   aws.String("2025-01-15T10:30:00.000Z"),
-						Public:         aws.Bool(false),
+						RootDeviceType:  ec2types.DeviceTypeEbs,
+						CreationDate:    aws.String("2025-01-15T10:30:00.000Z"),
+						Public:          aws.Bool(false),
 					},
 				},
 				NextToken: aws.String("token-page-2"),
@@ -773,14 +773,14 @@ func TestQA_Pagination_FetchAMIsPage_Continuation(t *testing.T) {
 			return &ec2.DescribeImagesOutput{
 				Images: []ec2types.Image{
 					{
-						ImageId:        aws.String("ami-0xyz999888777666b"),
-						Name:           aws.String("my-arm64-ami"),
-						State:          ec2types.ImageStateAvailable,
-						Architecture:   ec2types.ArchitectureValuesArm64,
+						ImageId:         aws.String("ami-0xyz999888777666b"),
+						Name:            aws.String("my-arm64-ami"),
+						State:           ec2types.ImageStateAvailable,
+						Architecture:    ec2types.ArchitectureValuesArm64,
 						PlatformDetails: aws.String("Linux/UNIX"),
-						RootDeviceType: ec2types.DeviceTypeEbs,
-						CreationDate:   aws.String("2025-02-01T08:00:00.000Z"),
-						Public:         aws.Bool(true),
+						RootDeviceType:  ec2types.DeviceTypeEbs,
+						CreationDate:    aws.String("2025-02-01T08:00:00.000Z"),
+						Public:          aws.Bool(true),
 					},
 				},
 				NextToken: nil,

@@ -35,7 +35,7 @@ func eksCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 func TestNavigableFields_EKS(t *testing.T) {
 	expected := map[string]string{
-		"ResourcesVpcConfig.VpcId":                 "vpc",
+		"ResourcesVpcConfig.VpcId":                  "vpc",
 		"ResourcesVpcConfig.ClusterSecurityGroupId": "sg",
 	}
 	for path, wantTarget := range expected {
@@ -345,8 +345,8 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 
 func eksClusterSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:   "acme-services",
-		Name: "acme-services",
+		ID:     "acme-services",
+		Name:   "acme-services",
 		Fields: map[string]string{},
 		RawStruct: &ekstypes.Cluster{
 			Name: aws.String("acme-services"),
@@ -561,5 +561,156 @@ func TestRelated_EKS_EC2_WrongRawStruct(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkEKSKMS tests — Pattern F (no cache, reads EncryptionConfig[0].Provider.KeyArn)
+// ---------------------------------------------------------------------------
+
+// TestRelated_EKS_KMS_Match verifies that a cluster with a KMS encryption config
+// returns the key ID (last "/" segment of KeyArn) as a single ResourceID.
+func TestRelated_EKS_KMS_Match(t *testing.T) {
+	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-aabbcc112233"
+	const keyID = "mrk-aabbcc112233"
+
+	res := resource.Resource{
+		ID:   "acme-services",
+		Name: "acme-services",
+		RawStruct: &ekstypes.Cluster{
+			Name: aws.String("acme-services"),
+			EncryptionConfig: []ekstypes.EncryptionConfig{
+				{
+					Provider: &ekstypes.Provider{
+						KeyArn: aws.String(keyARN),
+					},
+					Resources: []string{"secrets"},
+				},
+			},
+		},
+	}
+
+	checker := eksCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.TargetType != "kms" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "kms")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_EKS_KMS_NoEncryptionConfig verifies that a cluster with no
+// EncryptionConfig slice returns Count:0.
+func TestRelated_EKS_KMS_NoEncryptionConfig(t *testing.T) {
+	res := resource.Resource{
+		ID:   "acme-services",
+		Name: "acme-services",
+		RawStruct: &ekstypes.Cluster{
+			Name:             aws.String("acme-services"),
+			EncryptionConfig: nil,
+		},
+	}
+
+	checker := eksCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no EncryptionConfig)", result.Count)
+	}
+}
+
+// TestRelated_EKS_KMS_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count:0 (assertStruct fails).
+func TestRelated_EKS_KMS_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "acme-services",
+		RawStruct: "not-a-cluster",
+	}
+
+	checker := eksCheckerByTarget(t, "kms")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkEKSRole tests — Pattern F (no cache, reads RoleArn)
+// ---------------------------------------------------------------------------
+
+// TestRelated_EKS_Role_Match verifies that a cluster with a RoleArn returns the
+// role name (last "/" segment of the ARN) as a single ResourceID.
+func TestRelated_EKS_Role_Match(t *testing.T) {
+	const roleARN = "arn:aws:iam::123456789012:role/eks-cluster-role"
+	const roleName = "eks-cluster-role"
+
+	res := resource.Resource{
+		ID:   "acme-services",
+		Name: "acme-services",
+		RawStruct: &ekstypes.Cluster{
+			Name:    aws.String("acme-services"),
+			RoleArn: aws.String(roleARN),
+		},
+	}
+
+	checker := eksCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.TargetType != "role" {
+		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != roleName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, roleName)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_EKS_Role_NoRoleArn verifies that a cluster with no RoleArn
+// returns Count:0.
+func TestRelated_EKS_Role_NoRoleArn(t *testing.T) {
+	res := resource.Resource{
+		ID:   "acme-services",
+		Name: "acme-services",
+		RawStruct: &ekstypes.Cluster{
+			Name:    aws.String("acme-services"),
+			RoleArn: nil,
+		},
+	}
+
+	checker := eksCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no RoleArn)", result.Count)
+	}
+}
+
+// TestRelated_EKS_Role_WrongRawStruct verifies that a wrong RawStruct type
+// returns Count:0 (assertStruct fails).
+func TestRelated_EKS_Role_WrongRawStruct(t *testing.T) {
+	res := resource.Resource{
+		ID:        "acme-services",
+		RawStruct: "not-a-cluster",
+	}
+
+	checker := eksCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, nil)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count)
 	}
 }

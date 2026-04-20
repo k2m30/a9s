@@ -339,14 +339,19 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 	return m.rightColAutoShown
 }
 
-// ApplyRelatedResults injects cached related check results into the right column,
-// avoiding re-dispatch of async checkers. Called by root model on detail re-entry.
-func (m *DetailModel) ApplyRelatedResults(results []resource.RelatedCheckResult) {
-	for _, r := range results {
-		m.rightCol, _ = m.rightCol.Update(messages.RelatedCheckResultMsg{
-			ResourceType: m.resourceType,
-			Result:       r,
-		})
+// ApplyRelatedResults injects cached related check result messages into the
+// right column, avoiding re-dispatch of async checkers. Called by root model
+// on detail re-entry.
+//
+// Callers pass the full RelatedCheckResultMsg values (including the per-row
+// DefDisplayName disambiguator) so rows with multiple defs sharing a
+// TargetType — e.g. the four ct-events self-pivot rows ("by AccessKeyId" /
+// "by Username" / "by EventName" / "by SharedEventId") — resolve to the
+// correct row on replay instead of leaving all four stuck in the loading
+// state.
+func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResultMsg) {
+	for _, msg := range msgs {
+		m.rightCol, _ = m.rightCol.Update(msg)
 	}
 }
 

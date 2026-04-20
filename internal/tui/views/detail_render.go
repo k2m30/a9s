@@ -185,4 +185,3 @@ func (m DetailModel) renderFromConfig(kv func(string, string) string) []string {
 	}
 	return lines
 }
-

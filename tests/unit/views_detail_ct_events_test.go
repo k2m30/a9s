@@ -70,13 +70,6 @@ const dangerCTJSON = `{
 	"eventType":"AwsApiCall"
 }`
 
-// awsStrPtr returns a *string pointing to s — helper for cloudtrailtypes.Event fields.
-//
-//go:fix inline
-func awsStrPtr(s string) *string {
-	return &s
-}
-
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
 // cloudtrailtypes.Event (the AWS SDK type), exactly as buildCTResource does in
 // internal/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
@@ -213,21 +206,18 @@ func TestDetailViewCTEvents_SeverityPropagation(t *testing.T) {
 // Test 4: Parse failure fallback — nil RawStruct should not crash
 // ---------------------------------------------------------------------------
 
-// TestDetailViewCTEvents_ParseFailureFallback verifies that when RawStruct is nil
-// (no CloudTrail JSON available), the view does not crash and still produces output.
-//
-// When RawStruct is nil and there are Fields, the legacy flat path renders them.
-// This tests the fallback guarantee from the scope: "falls through to the legacy
-// flat path when ctdetail.Parse returns an error".
-//
-// This test passes even before T027 — it is a regression guard.
-func TestDetailViewCTEvents_ParseFailureFallback(t *testing.T) {
+// TestDetailViewCTEvents_NoRawJSON_RendersFlatFields verifies that when the CT
+// event has no raw JSON (bare stub with just Fields — e.g. a cached drill-in
+// stub), the detail view still renders the flat Fields. This is not a fallback
+// hiding a contract failure — the fetcher legitimately produces such stubs
+// when the user drills in without the full event body.
+func TestDetailViewCTEvents_NoRawJSON_RendersFlatFields(t *testing.T) {
 	ensureNoColor(t)
 
-	// Resource with nil RawStruct but with Fields (no CloudTrailEvent JSON).
 	res := resource.Resource{
-		ID:   "evt-fallback-000",
-		Name: "FallbackEvent",
+		ID:     "evt-fallback-000",
+		Name:   "FallbackEvent",
+		Status: "ct-info",
 		Fields: map[string]string{
 			"event_name": "FallbackEvent",
 		},
@@ -235,10 +225,34 @@ func TestDetailViewCTEvents_ParseFailureFallback(t *testing.T) {
 	cfg := configForType("ct-events")
 	m := newDetailModel(res, "ct-events", cfg)
 
-	// Must not panic and must produce non-empty output.
 	view := m.View()
 	if view == "" {
-		t.Error("ct-events detail View() returned empty string for nil RawStruct resource")
+		t.Error("ct-events detail View() returned empty string for bare stub resource")
+	}
+}
+
+// TestDetailViewCTEvents_BrokenRawJSON_SurfacesExplicitError pins #280: when a
+// CT event arrives with a non-empty but unparseable raw JSON blob, the detail
+// view MUST surface the parse error explicitly rather than silently degrading
+// to the flat Fields path. Silent degradation would hide a real contract
+// violation (the fetcher guarantees valid JSON for non-stub events).
+func TestDetailViewCTEvents_BrokenRawJSON_SurfacesExplicitError(t *testing.T) {
+	ensureNoColor(t)
+
+	broken := `{"eventVersion":"1.08","eventName":` // truncated — parser should error
+	res := buildCTEventsResource(
+		"abc12345-0000-0000-0000-00000000bad1",
+		"BrokenEvent",
+		"ct-info",
+		broken,
+	)
+	cfg := configForType("ct-events")
+	m := newDetailModel(res, "ct-events", cfg)
+
+	view := stripAnsi(m.View())
+	lower := strings.ToLower(view)
+	if !strings.Contains(lower, "unable to parse") {
+		t.Errorf("expected explicit parse-failure message in view, got:\n%s", view)
 	}
 }
 

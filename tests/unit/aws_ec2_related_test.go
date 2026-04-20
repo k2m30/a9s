@@ -393,11 +393,11 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 
 func TestNavigableFields_EC2_Registered(t *testing.T) {
 	expected := map[string]string{
-		"VpcId":                             "vpc",
-		"SubnetId":                          "subnet",
-		"ImageId":                           "ami",
-		"BlockDeviceMappings.Ebs.VolumeId":  "ebs",
-		"SecurityGroups.GroupId":            "sg",
+		"VpcId":                            "vpc",
+		"SubnetId":                         "subnet",
+		"ImageId":                          "ami",
+		"BlockDeviceMappings.Ebs.VolumeId": "ebs",
+		"SecurityGroups.GroupId":           "sg",
 	}
 	for path, wantTarget := range expected {
 		nav := resource.IsFieldNavigable("ec2", path)

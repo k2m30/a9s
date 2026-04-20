@@ -26,13 +26,13 @@ func snsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 }
 
 const (
-	snsTopicARN     = "arn:aws:sns:us-east-1:123456789012:alarm-notifications"
+	snsTopicARN      = "arn:aws:sns:us-east-1:123456789012:alarm-notifications"
 	snsTopicARNOther = "arn:aws:sns:us-east-1:123456789012:other-topic"
 )
 
 func snsSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:   "alarm-notifications",
+		ID: "alarm-notifications",
 		Fields: map[string]string{
 			"topic_arn": snsTopicARN,
 		},

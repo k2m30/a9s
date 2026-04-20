@@ -2,15 +2,15 @@
 // Run with: go run ./docs/design/cloudtrail-search-preview/
 //
 // Renders all key states of the ct-search view using Lipgloss v2:
-//   1. Search Form (empty)
-//   2. Search Form (with filters filled in)
-//   3. Loading state
-//   4. Results List (write events, last 1h)
-//   5. Results List (error events only)
-//   6. Results List (root activity)
-//   7. Event Detail (normal write event)
-//   8. Event Detail (AccessDenied error)
-//   9. Event Detail (Root login)
+//  1. Search Form (empty)
+//  2. Search Form (with filters filled in)
+//  3. Loading state
+//  4. Results List (write events, last 1h)
+//  5. Results List (error events only)
+//  6. Results List (root activity)
+//  7. Event Detail (normal write event)
+//  8. Event Detail (AccessDenied error)
+//  9. Event Detail (Root login)
 //  10. Help Screens (form, results, detail)
 package main
 
@@ -167,9 +167,9 @@ var (
 	vStyle     = lipgloss.NewStyle().Foreground(colDetailVal)
 	dimStyle   = lipgloss.NewStyle().Foreground(colDim)
 	errStyle   = lipgloss.NewStyle().Foreground(colError)
-	errBold   = lipgloss.NewStyle().Foreground(colError).Bold(true)
-	greenBold = lipgloss.NewStyle().Foreground(colRunning).Bold(true)
-	svcStyle  = lipgloss.NewStyle().Foreground(colDim)
+	errBold    = lipgloss.NewStyle().Foreground(colError).Bold(true)
+	greenBold  = lipgloss.NewStyle().Foreground(colRunning).Bold(true)
+	svcStyle   = lipgloss.NewStyle().Foreground(colDim)
 	chipActive = lipgloss.NewStyle().
 			Foreground(colDarkBg).
 			Background(colAccent).
@@ -281,7 +281,7 @@ func renderSearchFormEmpty() string {
 
 	// Action hints
 	hintLine := lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top,
-		hintStyle.Render("Enter: search") + "  " + hintStyle.Render("Esc: cancel"))
+		hintStyle.Render("Enter: search")+"  "+hintStyle.Render("Esc: cancel"))
 	lines = append(lines, hintLine)
 
 	var sb strings.Builder
@@ -363,7 +363,7 @@ func renderSearchFormFilled() string {
 
 	// Action hints
 	hintLine := lipgloss.Place(w-2, 1, lipgloss.Center, lipgloss.Top,
-		hintStyle.Render("Enter: search") + "  " + hintStyle.Render("Esc: cancel"))
+		hintStyle.Render("Enter: search")+"  "+hintStyle.Render("Esc: cancel"))
 	lines = append(lines, hintLine)
 
 	var sb strings.Builder
@@ -427,7 +427,7 @@ func renderResultsWriteEvents() string {
 
 	type row struct {
 		time, event, user, source string
-		isError, isRoot, isRead  bool
+		isError, isRoot, isRead   bool
 	}
 	rows := []row{
 		{"2026-03-29 14:58:31", "DeleteBucket", "admin", "s3.amazonaws.com", false, false, false},

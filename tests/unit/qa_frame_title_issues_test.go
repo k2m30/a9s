@@ -193,7 +193,7 @@ func TestFrameTitleCtrlZAndTextFilter(t *testing.T) {
 			resources[i].Status = "running"
 		default:
 			resources[i].Name = fmt.Sprintf("web-%d", i) // matches text filter
-			resources[i].Status = "terminated"             // dim — filtered by ctrl+z
+			resources[i].Status = "terminated"           // dim — filtered by ctrl+z
 		}
 	}
 	// With text="web-" and attentionOnly=true:

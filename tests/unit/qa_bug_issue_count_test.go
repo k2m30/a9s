@@ -124,4 +124,3 @@ func TestEnrichRDSDocDBMaintenance_UnprobedResourcesAppearsAsArnSuffix(t *testin
 		t.Error("unrelated-instance must NOT appear in Findings — no matching maintenance action")
 	}
 }
-

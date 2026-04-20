@@ -68,13 +68,6 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
-
-
-
-
-
-
-
 // checkDdbBackup resolves AWS Backup recovery points for this DynamoDB table
 // via backup:ListRecoveryPointsByResource (Pattern C: 1 API call).
 // The table ARN is read from res.Fields["arn"]. Count = number of recovery points.

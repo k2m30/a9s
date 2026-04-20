@@ -8,7 +8,7 @@
 //  4. Filter active on truncated list
 //  5. Filter active, zero matches, truncated
 //  6. After refresh (Ctrl+R)
-//  7. Non-paginated list (legacy fetcher, no changes)
+//  7. Non-paginated list (unpaginated FetchXxx fetcher, no changes)
 //  8. Sorted truncated list
 package main
 
@@ -391,7 +391,7 @@ func renderAfterRefresh() string {
 	return sb.String()
 }
 
-// -- STATE 7: Non-paginated list (legacy fetcher) ----------------------------
+// -- STATE 7: Non-paginated list (unpaginated FetchXxx fetcher) -------------
 
 func renderNonPaginated() string {
 	const w = 84

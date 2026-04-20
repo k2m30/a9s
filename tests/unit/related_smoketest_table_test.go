@@ -1125,10 +1125,8 @@ func Test_RelatedSmoke(t *testing.T) {
 				_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 				if cmd != nil {
 					msg := cmd()
-					if msg != nil {
-						if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
-							t.Errorf("%s-S05: Enter on all-count=0 right column must not produce RelatedNavigateMsg", tc.shortName)
-						}
+					if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
+						t.Errorf("%s-S05: Enter on all-count=0 right column must not produce RelatedNavigateMsg", tc.shortName)
 					}
 				}
 			})

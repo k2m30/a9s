@@ -79,7 +79,7 @@ type UserIdentity struct {
 // SessionContext holds the sessionContext block within userIdentity.
 type SessionContext struct {
 	Attributes          SessionAttributes
-	SessionIssuer       *SessionIssuer      // present for AssumedRole — the underlying role
+	SessionIssuer       *SessionIssuer       // present for AssumedRole — the underlying role
 	WebIDFederationData *WebIDFederationData // present for IRSA/OIDC
 	SourceIdentity      string
 }
@@ -114,10 +114,10 @@ type ResourceRef struct {
 
 // InsightDetails holds the insightDetails block — populated only when EventCategory == "Insight".
 type InsightDetails struct {
-	State          string         // "Start" | "End"
+	State          string // "Start" | "End"
 	EventSource    string
 	EventName      string
-	InsightType    string         // e.g. "ApiCallRateInsight"
+	InsightType    string // e.g. "ApiCallRateInsight"
 	InsightContext map[string]any
 }
 
@@ -136,9 +136,9 @@ type Row struct {
 	TargetType  string // resource type to navigate to (e.g. "role", "ec2", "s3")
 	FieldPath   string // synthetic path for cursor identity (e.g. "ACTOR.Principal")
 	Severity    string // OPTIONAL: severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
-	             // Set ONLY on the Event row in ACTION (FR-002 single-cell exception).
-	             // All other rows leave this empty and render through neutral ColDetailVal.
-	NavID       string // Optional navigation identifier. When non-empty, navigation dispatch uses
-	             // this instead of Value. Used when the display Value (e.g. full ARN) differs
-	             // from the navigable ID (e.g. bare role name).
+	// Set ONLY on the Event row in ACTION (FR-002 single-cell exception).
+	// All other rows leave this empty and render through neutral ColDetailVal.
+	NavID string // Optional navigation identifier. When non-empty, navigation dispatch uses
+	// this instead of Value. Used when the display Value (e.g. full ARN) differs
+	// from the navigable ID (e.g. bare role name).
 }

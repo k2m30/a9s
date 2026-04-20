@@ -338,7 +338,6 @@ var (
 	yamlNullRe = regexp.MustCompile(`^(null|~)$`)
 )
 
-
 // colorizeYAML applies Tokyo Night syntax colors to YAML text line by line.
 func colorizeYAML(raw string) string {
 	keyStyle := styles.YAMLKeyStyle

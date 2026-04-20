@@ -52,13 +52,12 @@ func TestFetchSNSTopicSubscriptions_Basic(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
@@ -147,13 +146,12 @@ func TestFetchSNSTopicSubscriptions_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:empty-topic", "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:empty-topic", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
@@ -166,13 +164,12 @@ func TestFetchSNSTopicSubscriptions_APIError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: throttling exception"),
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:err-topic", "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:err-topic", "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 	if resources != nil {
 		t.Errorf("expected nil resources on error, got %d", len(resources))
 	}
@@ -196,13 +193,12 @@ func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
@@ -255,13 +251,12 @@ func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -438,13 +433,12 @@ func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "",
-)
+	result, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, "arn:aws:sns:us-east-1:123456789012:topic", "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-		resources := result.Resources
+	resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))

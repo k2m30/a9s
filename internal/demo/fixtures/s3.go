@@ -197,7 +197,7 @@ func buildS3Objects() map[string]map[string][]s3types.Object {
 				{Key: aws.String("images/hero-banner.jpg"), Size: aws.Int64(250880), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-03-19T15:30:00Z"))},
 				{Key: aws.String("images/favicon-32x32.png"), Size: aws.Int64(1434), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-01-15T12:00:00Z"))},
 			},
-			"2026/": {},
+			"2026/":    {},
 			"2026/04/": {},
 			"2026/04/07/": {
 				{Key: aws.String("2026/04/07/app.log"), Size: aws.Int64(5033164), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-07T22:15:09Z"))},

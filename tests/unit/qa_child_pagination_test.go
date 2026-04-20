@@ -1574,7 +1574,7 @@ func TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage(t *testing.T) {
 	listMock := &mockECSListTasksAPIChildPaginated{
 		PageFunc: func(_ int) (*ecs.ListTasksOutput, error) {
 			return &ecs.ListTasksOutput{
-				TaskArns: []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"},
+				TaskArns:  []string{"arn:aws:ecs:us-east-1:111122223333:task/my-cluster/taskid001"},
 				NextToken: aws.String("ecs-next-token-2"),
 			}, nil
 		},

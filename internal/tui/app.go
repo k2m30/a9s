@@ -13,7 +13,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -64,7 +63,18 @@ type resourceCacheEntry struct {
 
 // Model is the root Bubble Tea model. It owns the view stack, header state,
 // AWS clients, and routes all messages to the active child view.
+//
+// The Model pairs a UI shell (view stack, header, input mode, flash, theme)
+// with an embedded sessionRuntime that owns the in-memory orchestration state
+// tied to the active profile/region session. Field promotion means all access
+// sites like `m.resourceCache` resolve transparently to the embedded
+// sessionRuntime — see internal/tui/session_runtime.go for the ownership
+// contract. handleProfileSelected / handleRegionSelected rotate the
+// sessionRuntime to invalidate in-flight async results on switch.
 type Model struct {
+	sessionRuntime // embedded: session-scoped orchestration state
+
+	// --- UI shell state ---
 	width  int
 	height int
 
@@ -113,49 +123,29 @@ type Model struct {
 
 	preSuppliedClients *awsclient.ServiceClients
 
-	noCache         bool
-	isDemo          bool     // true when running in --demo mode (synthetic clients); controls Wave 2 skip
-	availabilityGen int      // incremented on profile/region switch to cancel stale probes
-	availQueue      []string // resource short names remaining to probe
-	availChecked    int      // number probed so far in current gen
-	availTotal      int      // total types to probe in current gen
-
-	// Issue count enrichment (Wave 2)
-	probeResources map[string][]resource.Resource // retained first-page resources from Wave 1 for Wave 2
-	enrichQueue    []string                       // resource types pending Wave 2 enrichment
-	enrichmentGen  int                            // session-wide generation counter for enrichment (profile/region switch)
-	enrichChecked  int                            // number of enrichment probes completed in current gen
-	enrichTotal    int                            // total enrichment probes to run in current gen
-
-	// Enrichment finding state (feature 018-enrichment-visibility).
-	// enrichmentFindings[shortName][resourceID] = EnrichmentFinding for resources
-	// with Wave 2 findings. Populated by handleEnrichmentChecked on success;
-	// cleared per-type when a rerun starts; cleared entirely on profile/region switch.
-	enrichmentFindings map[string]map[string]resource.EnrichmentFinding
-	// enrichmentRan[shortName] == true only after Wave 2 completed successfully
-	// for that type in this session. Distinct from menu.issueKnown (cached counts).
-	// Banner visibility keys off this signal.
-	enrichmentRan map[string]bool
-	// enrichmentTypeGen[shortName] is a per-type generation counter. Bumped on
-	// every rerun (startup Wave 2 dispatch, menu Ctrl+R, top-level list Ctrl+R).
-	// Stamped on EnrichmentCheckedMsg and (when non-zero) on ResourcesLoadedMsg
-	// from the wrapped Ctrl+R-for-rerun fetch. Handlers discard messages whose
-	// TypeGen doesn't match the current per-type gen.
-	enrichmentTypeGen map[string]int
-	// enrichmentTruncatedIDs[shortName][resourceID] = true when the enricher could
-	// not fully inspect that resource (per-resource API error or page cap).
-	enrichmentTruncatedIDs map[string]map[string]bool
-
-	resourceCache map[string]*resourceCacheEntry
-	relatedCache  *relatedCacheLRU
-	relatedGen    uint64 // incremented on refresh/profile/region switch to discard stale results
-	enrichGen     uint64 // incremented on refresh/profile/region switch to discard stale enrichment results
-	enrichResKey  string // "resourceType:resourceID" of last enrichment dispatch; gen only bumps on change
+	noCache bool
+	isDemo  bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 }
 
 // relatedCacheKey builds the map key for relatedCache lookups.
 func relatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID
+}
+
+// relatedCacheReplay converts cached related-check results into the
+// RelatedCheckResultMsg form the detail view expects, preserving both the
+// resourceType and the per-row DefDisplayName so rightcolumn replay can
+// match the correct row on detail re-entry.
+func relatedCacheReplay(resourceType string, cached []relatedCacheResult) []messages.RelatedCheckResultMsg {
+	out := make([]messages.RelatedCheckResultMsg, len(cached))
+	for i, c := range cached {
+		out[i] = messages.RelatedCheckResultMsg{
+			ResourceType:   resourceType,
+			DefDisplayName: c.DefDisplayName,
+			Result:         c.Result,
+		}
+	}
+	return out
 }
 
 // relatedCacheLRU is a simple LRU cache for related-resource check results.
@@ -170,9 +160,19 @@ type relatedCacheLRU struct {
 	order *list.List
 }
 
+// relatedCacheResult bundles the per-row DisplayName with the checker result
+// so that cache replay can reconstruct the full RelatedCheckResultMsg — the
+// rightcolumn view disambiguates multiple rows sharing a TargetType (e.g.
+// ct-events' 4 self-pivots) by DefDisplayName, and losing it on the first
+// replay would leave those rows stuck loading forever.
+type relatedCacheResult struct {
+	DefDisplayName string
+	Result         resource.RelatedCheckResult
+}
+
 type relatedCacheItem struct {
 	key     string
-	results []resource.RelatedCheckResult
+	results []relatedCacheResult
 }
 
 func newRelatedCacheLRU(cap int) *relatedCacheLRU {
@@ -183,7 +183,7 @@ func newRelatedCacheLRU(cap int) *relatedCacheLRU {
 	}
 }
 
-func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) {
+func (c *relatedCacheLRU) get(key string) ([]relatedCacheResult, bool) {
 	el, ok := c.index[key]
 	if !ok {
 		return nil, false
@@ -192,7 +192,7 @@ func (c *relatedCacheLRU) get(key string) ([]resource.RelatedCheckResult, bool) 
 	return el.Value.(*relatedCacheItem).results, true
 }
 
-func (c *relatedCacheLRU) set(key string, results []resource.RelatedCheckResult) {
+func (c *relatedCacheLRU) set(key string, results []relatedCacheResult) {
 	if el, ok := c.index[key]; ok {
 		c.order.MoveToFront(el)
 		el.Value.(*relatedCacheItem).results = results
@@ -228,21 +228,16 @@ func (c *relatedCacheLRU) len() int {
 // Option configures the root Model.
 type Option func(*Model)
 
-// WithDemo is a compatibility shim for tests written before the 014-demo-transport-mock
-// refactor. New code should use WithClients(demo.NewServiceClients()) + WithNoCache(true).
-// Will be removed after test files are migrated in T045–T049.
-//
-//nolint:gocritic // intentional compat shim; removal tracked in T045–T049
-func WithDemo(enabled bool) Option {
-	return func(m *Model) {
-		if !enabled {
-			return
-		}
-		m.preSuppliedClients = demo.NewServiceClients()
-		m.profile = demo.DemoProfile
-		m.region = demo.DemoRegion
-		m.isDemo = true
-	}
+// WithProfile overrides the profile field on the model. Used in tests that need
+// a specific profile string without going through the live AWS bootstrap path.
+func WithProfile(profile string) Option {
+	return func(m *Model) { m.profile = profile }
+}
+
+// WithRegion overrides the region field on the model. Used in tests that need
+// a specific region string without going through the live AWS bootstrap path.
+func WithRegion(region string) Option {
+	return func(m *Model) { m.region = region }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
@@ -301,24 +296,17 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		profile:            profile,
-		region:             region,
-		keys:               k,
-		stack:              []views.View{&menu},
-		cmdInput:           ti,
-		viewConfig:         cfg,
-		configErr:          cfgErr,
-		activeTheme:        "tokyo-night.yaml",
-		resourceCache:      make(map[string]*resourceCacheEntry),
-		relatedCache:       newRelatedCacheLRU(maxRelatedCacheEntries),
-		relatedGen:         1, // start at 1 so Generation=0 (unset) is always stale and rejected
-		enrichGen:          1, // same convention as relatedGen
-		enrichmentFindings:     make(map[string]map[string]resource.EnrichmentFinding),
-		enrichmentRan:          make(map[string]bool),
-		enrichmentTypeGen:      make(map[string]int),
-		enrichmentTruncatedIDs: make(map[string]map[string]bool),
-		appCtx:                 ctx,
-		appCancel:          cancel,
+		sessionRuntime: newSessionRuntime(),
+		profile:        profile,
+		region:         region,
+		keys:           k,
+		stack:          []views.View{&menu},
+		cmdInput:       ti,
+		viewConfig:     cfg,
+		configErr:      cfgErr,
+		activeTheme:    "tokyo-night.yaml",
+		appCtx:         ctx,
+		appCancel:      cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -555,7 +543,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if sourceID != "" {
 			ck := relatedCacheKey(msg.ResourceType, sourceID)
 			existing, _ := m.relatedCache.get(ck)
-			m.relatedCache.set(ck, append(existing, msg.Result))
+			m.relatedCache.set(ck, append(existing, relatedCacheResult{
+				DefDisplayName: msg.DefDisplayName,
+				Result:         msg.Result,
+			}))
 		}
 		// Write-back: persist pages fetched on cold miss so the next detail view
 		// for any resource type gets a cache hit instead of re-fetching.

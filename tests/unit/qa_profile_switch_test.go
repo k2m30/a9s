@@ -122,10 +122,9 @@ func TestBug_ProfileList_MatchesAWSCLI(t *testing.T) {
 	// This returns a NavigateMsg for TargetProfile
 	if cmd != nil {
 		msg := cmd()
-		m, cmd = rootApplyMsg(m, msg) //nolint:ineffassign,staticcheck // verify flow doesn't panic
-		// This triggers fetchProfiles which returns profilesLoadedMsg
-		// We can't easily test the actual profile list without filesystem access
-		// but we verify the flow doesn't crash
+		// Discard — this only verifies the flow does not panic; no further
+		// assertions are made on the returned model or command.
+		_, _ = rootApplyMsg(m, msg)
 	}
 }
 

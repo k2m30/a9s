@@ -179,12 +179,6 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResult("ec2", ids)
 }
 
-
-
-
-
-
-
 // checkEbAlarm scans the alarm cache for alarms tagged with this environment's name
 // via the "elasticbeanstalk:environment-name" dimension (standard Beanstalk alarm
 // convention). Falls back to substring match on alarm name if no dimension matches.
@@ -231,4 +225,3 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	return relatedResult("alarm", ids)
 }
-

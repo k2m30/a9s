@@ -87,7 +87,6 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("alarm", ids)
 }
 
-
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.
 // Pattern N — Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
 // regardless of job name (shared log groups across all Glue jobs in the account).
@@ -111,7 +110,6 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 	}
 	return relatedResult("logs", ids)
 }
-
 
 // checkGlueCFN calls glue:GetTags(resourceArn) and looks up the
 // aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
@@ -315,6 +313,3 @@ func glueRelatedResources(ctx context.Context, clients any, cache resource.Resou
 	}
 	return resources, isTruncated, err
 }
-
-
-

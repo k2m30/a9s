@@ -2,6 +2,23 @@
 // dispatching. handleRelatedNavigate (in app_related.go) uses this resolver to
 // determine what view should be pushed; the resolver itself has no side effects
 // and is independently testable.
+//
+// Related-navigation contract (#278):
+//
+//  1. Unknown target type          → KindFlash (error surfaced to the user).
+//  2. Child type                   → KindEnterChildView.
+//  3. Exact target already KNOWN   → KindDetail. "Known" means the row is in
+//     the cache. Covers TargetID cache hit and single RelatedIDs cache hit.
+//     This precedes FetchFilter deliberately — drilling into a row we already
+//     have wastes no API call and preserves user context.
+//  4. FetchFilter with a registered FilteredPaginatedFetcher for the target
+//     type → KindFilteredList with FetchFilter preserved. Checkers may set
+//     FetchFilter on types without a registered fetcher as a hint; the
+//     runtime ignores the filter in that case rather than failing.
+//  5. TargetID cache miss          → KindFilteredList with FilterText set to
+//     TargetID (the list filters by the ID string).
+//  6. RelatedIDs (one or many)     → KindFilteredList with RelatedIDs preserved.
+//  7. Otherwise                    → KindResourceList (fresh unfiltered list).
 
 package tui
 
@@ -46,6 +63,11 @@ type NavigationResult struct {
 // ResolveRelatedNavigate computes what view should be pushed for a related-navigation
 // message, without mutating any state. handleRelatedNavigate uses this resolver to
 // drive its actual view-stack push.
+//
+// Ordering follows the related-navigation contract documented at the top of
+// this file. Exact drill-ins (cache-known TargetID or single RelatedID) take
+// precedence over FetchFilter so we never issue a filtered fetch when the
+// target row is already visible.
 func ResolveRelatedNavigate(msg messages.RelatedNavigateMsg, cache map[string][]resource.Resource) NavigationResult {
 	_, isChild, found := resource.ResolveNavigationTarget(msg.TargetType)
 	if !found {
@@ -65,10 +87,30 @@ func ResolveRelatedNavigate(msg messages.RelatedNavigateMsg, cache map[string][]
 		}
 	}
 
-	// FetchFilter path: only honor when a filtered paginated fetcher is registered
-	// for the target type. Otherwise fall through to the standard RelatedIDs path
-	// — checker may have populated FetchFilter as a hint but the runtime cannot
-	// dispatch without a registered fetcher.
+	// Exact drill-in, TargetID cache hit → KindDetail.
+	// This precedes FetchFilter: when we already have the row cached, drilling
+	// in preserves user context and saves an API call.
+	if msg.TargetID != "" && cacheHit(cache, msg.TargetType, msg.TargetID) {
+		return NavigationResult{
+			Kind:       KindDetail,
+			TargetType: msg.TargetType,
+			TargetID:   msg.TargetID,
+		}
+	}
+
+	// Exact drill-in, single RelatedID cache hit → KindDetail.
+	if len(msg.RelatedIDs) == 1 && cacheHit(cache, msg.TargetType, msg.RelatedIDs[0]) {
+		return NavigationResult{
+			Kind:       KindDetail,
+			TargetType: msg.TargetType,
+			RelatedIDs: msg.RelatedIDs,
+		}
+	}
+
+	// FetchFilter path: only honor when a filtered paginated fetcher is
+	// registered for the target type. Otherwise fall through — checker may
+	// have populated FetchFilter as a hint but the runtime cannot dispatch
+	// without a registered fetcher.
 	if len(msg.FetchFilter) > 0 && resource.GetFilteredPaginatedFetcher(msg.TargetType) != nil {
 		return NavigationResult{
 			Kind:        KindFilteredList,
@@ -77,15 +119,8 @@ func ResolveRelatedNavigate(msg messages.RelatedNavigateMsg, cache map[string][]
 		}
 	}
 
-	// TargetID path: exact resource navigation.
+	// TargetID cache miss → KindFilteredList filtering by the ID string.
 	if msg.TargetID != "" {
-		if cacheHit(cache, msg.TargetType, msg.TargetID) {
-			return NavigationResult{
-				Kind:       KindDetail,
-				TargetType: msg.TargetType,
-				TargetID:   msg.TargetID,
-			}
-		}
 		return NavigationResult{
 			Kind:       KindFilteredList,
 			TargetType: msg.TargetType,
@@ -94,18 +129,7 @@ func ResolveRelatedNavigate(msg messages.RelatedNavigateMsg, cache map[string][]
 		}
 	}
 
-	// RelatedIDs path: single ID with cache hit → detail directly.
-	if len(msg.RelatedIDs) == 1 {
-		if cacheHit(cache, msg.TargetType, msg.RelatedIDs[0]) {
-			return NavigationResult{
-				Kind:       KindDetail,
-				TargetType: msg.TargetType,
-				RelatedIDs: msg.RelatedIDs,
-			}
-		}
-	}
-
-	// Multiple RelatedIDs (or single miss) → filtered list.
+	// Multiple RelatedIDs (or single miss with no FetchFilter) → filtered list.
 	if len(msg.RelatedIDs) > 0 {
 		return NavigationResult{
 			Kind:       KindFilteredList,

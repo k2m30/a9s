@@ -7,13 +7,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -525,8 +527,8 @@ func TestRelated_ASG_AMI_MatchByLaunchTemplate(t *testing.T) {
 		},
 	})
 	clients := &awsclient.ServiceClients{
-		EC2:          fakeEC2,
-		AutoScaling:  &fakeASGBatch2{},
+		EC2:         fakeEC2,
+		AutoScaling: &fakeASGBatch2{},
 	}
 
 	res := resource.Resource{
@@ -1046,5 +1048,183 @@ func TestRelated_ASG_VPC_WrongRawStruct(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkASGELB — TG ARN path: DescribeTargetGroups → LoadBalancerArns
+// ---------------------------------------------------------------------------
+
+// fakeELBv2WithTargetGroups implements ELBv2API and returns configurable TG output
+// from DescribeTargetGroups, used to test the ALB/NLB path in checkASGELB.
+type fakeELBv2WithTargetGroups struct {
+	fakeELBv2Batch2
+	describeTargetGroupsFn func(*elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error)
+}
+
+func (f *fakeELBv2WithTargetGroups) DescribeTargetGroups(_ context.Context, input *elbv2.DescribeTargetGroupsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTargetGroupsOutput, error) {
+	if f.describeTargetGroupsFn != nil {
+		return f.describeTargetGroupsFn(input)
+	}
+	return &elbv2.DescribeTargetGroupsOutput{}, nil
+}
+
+// TestRelated_ASG_ELB_MatchByTargetGroupARNs verifies that checkASGELB resolves
+// ALB/NLB ARNs from TargetGroupARNs via DescribeTargetGroups.LoadBalancerArns.
+func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
+	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/xyz987"
+
+	fakeELBv2 := &fakeELBv2WithTargetGroups{
+		describeTargetGroupsFn: func(_ *elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error) {
+			return &elbv2.DescribeTargetGroupsOutput{
+				TargetGroups: []elbv2types.TargetGroup{
+					{
+						TargetGroupArn:  aws.String(tgARN),
+						LoadBalancerArns: []string{lbARN},
+					},
+				},
+			}, nil
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		ELBv2: fakeELBv2,
+	}
+
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+		RawStruct: asgtypes.AutoScalingGroup{
+			AutoScalingGroupName: aws.String("my-asg"),
+			TargetGroupARNs:      []string{tgARN},
+		},
+	}
+
+	checker := asgCheckerByTarget(t, "elb")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (one ALB from TG ARN)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != lbARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, lbARN)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_ASG_ELB_TGARNs_BothClassicAndALB verifies that checkASGELB merges
+// classic ELB names and ALB ARNs resolved from TargetGroupARNs into a single result.
+func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
+	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/xyz987"
+	classicName := "my-classic-elb"
+
+	fakeELBv2 := &fakeELBv2WithTargetGroups{
+		describeTargetGroupsFn: func(_ *elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error) {
+			return &elbv2.DescribeTargetGroupsOutput{
+				TargetGroups: []elbv2types.TargetGroup{
+					{LoadBalancerArns: []string{lbARN}},
+				},
+			}, nil
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		ELBv2: fakeELBv2,
+	}
+
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+		RawStruct: asgtypes.AutoScalingGroup{
+			AutoScalingGroupName: aws.String("my-asg"),
+			LoadBalancerNames:    []string{classicName},
+			TargetGroupARNs:      []string{tgARN},
+		},
+	}
+
+	checker := asgCheckerByTarget(t, "elb")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2 (classic + ALB)", result.Count)
+	}
+	found := map[string]bool{classicName: false, lbARN: false}
+	for _, id := range result.ResourceIDs {
+		found[id] = true
+	}
+	for k, ok := range found {
+		if !ok {
+			t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs, k)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// asgResolveInstanceProfile — launch template path (no launch config)
+// ---------------------------------------------------------------------------
+
+// TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile verifies that
+// checkASGRole resolves the role from a launch template IamInstanceProfile.
+func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
+	roleARN := "arn:aws:iam::123456789012:role/ec2-role-from-lt"
+	ltID := "lt-0abc1234567890def"
+	profileARN := "arn:aws:iam::123456789012:instance-profile/ec2-instance-profile"
+
+	fakeEC2 := &fakeEC2Batch2{
+		describeLaunchTemplateVersionsFn: func(_ *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+			return &ec2.DescribeLaunchTemplateVersionsOutput{
+				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+					{
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							IamInstanceProfile: &ec2types.LaunchTemplateIamInstanceProfileSpecification{
+								Arn: aws.String(profileARN),
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	fakeIAM := newFakeIAMWithInstanceProfile([]iamtypes.Role{
+		{Arn: aws.String(roleARN), RoleName: aws.String("ec2-role-from-lt")},
+	})
+	clients := &awsclient.ServiceClients{
+		EC2:         fakeEC2,
+		IAM:         fakeIAM,
+		AutoScaling: &fakeASGBatch2{},
+	}
+
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+		RawStruct: asgtypes.AutoScalingGroup{
+			AutoScalingGroupName: aws.String("my-asg"),
+			LaunchTemplate: &asgtypes.LaunchTemplateSpecification{
+				LaunchTemplateId: aws.String(ltID),
+				Version:          aws.String("$Latest"),
+			},
+		},
+	}
+
+	checker := asgCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count < 1 {
+		t.Errorf("Count = %d, want >= 1 (role from LT instance profile ARN)", result.Count)
+	}
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == roleARN {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, roleARN)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
 	}
 }

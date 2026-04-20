@@ -455,8 +455,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			},
 		},
 		"secrets": {
-			ID:   "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret-abcdef",
-			Name: "test-secret",
+			ID:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret-abcdef",
+			Name:   "test-secret",
 			Fields: map[string]string{},
 		},
 		"s3": {
@@ -474,23 +474,23 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			},
 		},
 		"eb": {
-			ID:   "test-eb-app",
-			Name: "test-eb-app",
+			ID:     "test-eb-app",
+			Name:   "test-eb-app",
 			Fields: map[string]string{},
 		},
 		"ecr": {
-			ID:   "arn:aws:ecr:us-east-1:123456789012:repository/test-repo",
-			Name: "test-repo",
+			ID:     "arn:aws:ecr:us-east-1:123456789012:repository/test-repo",
+			Name:   "test-repo",
 			Fields: map[string]string{},
 		},
 		"sfn": {
-			ID:   "arn:aws:states:us-east-1:123456789012:stateMachine:test-sm",
-			Name: "test-sm",
+			ID:     "arn:aws:states:us-east-1:123456789012:stateMachine:test-sm",
+			Name:   "test-sm",
 			Fields: map[string]string{},
 		},
 		"sns": {
-			ID:   "arn:aws:sns:us-east-1:123456789012:test-topic",
-			Name: "test-topic",
+			ID:     "arn:aws:sns:us-east-1:123456789012:test-topic",
+			Name:   "test-topic",
 			Fields: map[string]string{},
 		},
 		"dynamo": {
@@ -522,8 +522,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			},
 		},
 		"ses": {
-			ID:   "test@example.com",
-			Name: "test@example.com",
+			ID:     "test@example.com",
+			Name:   "test@example.com",
 			Fields: map[string]string{},
 		},
 		"ssm": {
@@ -534,8 +534,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			},
 		},
 		"pipeline": {
-			ID:   "test-pipeline",
-			Name: "test-pipeline",
+			ID:     "test-pipeline",
+			Name:   "test-pipeline",
 			Fields: map[string]string{},
 		},
 		"ebs-snap": {
@@ -546,23 +546,23 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			},
 		},
 		"role": {
-			ID:   "arn:aws:iam::123456789012:role/test-role",
-			Name: "test-role",
+			ID:     "arn:aws:iam::123456789012:role/test-role",
+			Name:   "test-role",
 			Fields: map[string]string{},
 		},
 		"iam-user": {
-			ID:   "arn:aws:iam::123456789012:user/test-user",
-			Name: "test-user",
+			ID:     "arn:aws:iam::123456789012:user/test-user",
+			Name:   "test-user",
 			Fields: map[string]string{},
 		},
 		"alarm": {
-			ID:   "arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm",
-			Name: "test-alarm",
+			ID:     "arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm",
+			Name:   "test-alarm",
 			Fields: map[string]string{},
 		},
 		"backup": {
-			ID:   "arn:aws:backup:us-east-1:123456789012:backup-plan:test-plan",
-			Name: "test-plan",
+			ID:     "arn:aws:backup:us-east-1:123456789012:backup-plan:test-plan",
+			Name:   "test-plan",
 			Fields: map[string]string{},
 		},
 	}

@@ -1,6 +1,9 @@
 package resource
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 func dnsCdnResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
@@ -48,6 +51,9 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 				{Key: "price_class", Title: "Price Class", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if r.Fields["enabled"] == "false" {
+					return ColorDim
+				}
 				switch r.Fields["status"] {
 				case "Deployed":
 					return ColorHealthy
@@ -73,6 +79,24 @@ func dnsCdnResourceTypes() []ResourceTypeDef {
 			Color: func(r Resource) Color {
 				switch r.Fields["status"] {
 				case "ISSUED":
+					dl := r.Fields["days_left"]
+					if dl == "expired" {
+						return ColorBroken
+					}
+					if dl != "" {
+						var n int
+						if _, err := fmt.Sscanf(dl, "%d days", &n); err == nil {
+							if n < 7 {
+								return ColorBroken
+							}
+							if n < 30 {
+								return ColorWarning
+							}
+						}
+					}
+					if r.Fields["in_use"] == "false" {
+						return ColorWarning
+					}
 					return ColorHealthy
 				case "PENDING_VALIDATION":
 					return ColorWarning

@@ -77,7 +77,7 @@ func init() {
 }
 
 // FetchLambdaFunctions calls the Lambda ListFunctions API and returns all pages
-// of functions. Used by existing tests and the legacy fetcher.
+// of functions. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

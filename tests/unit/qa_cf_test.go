@@ -38,7 +38,7 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 						Origins: &cftypes.Origins{
 							Quantity: aws.Int32(1),
 						},
-						PriceClass: cftypes.PriceClassPriceClassAll,
+						PriceClass:  cftypes.PriceClassPriceClassAll,
 						HttpVersion: cftypes.HttpVersionHttp2,
 					},
 					{
@@ -55,7 +55,7 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 						Origins: &cftypes.Origins{
 							Quantity: aws.Int32(1),
 						},
-						PriceClass: cftypes.PriceClassPriceClass100,
+						PriceClass:  cftypes.PriceClassPriceClass100,
 						HttpVersion: cftypes.HttpVersionHttp2,
 					},
 				},

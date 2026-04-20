@@ -11,8 +11,8 @@ import (
 
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 

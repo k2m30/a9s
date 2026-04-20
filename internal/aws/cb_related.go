@@ -85,7 +85,6 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("logs", ids)
 }
 
-
 // checkCbSG extracts security group IDs from the CodeBuild Project's VpcConfig.
 // Pattern F — no cache needed.
 func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -133,12 +132,6 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	return relatedResult("kms", []string{keyID})
 }
-
-
-
-
-
-
 
 // checkCbSubnet extracts subnet IDs from cbtypes.Project.VpcConfig.Subnets.
 // Pattern F — no cache needed.

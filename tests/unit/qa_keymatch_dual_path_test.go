@@ -72,23 +72,6 @@ func makeDetailDualPath(t *testing.T) views.DetailModel {
 	return d
 }
 
-// makeDetailDualPathWide creates a DetailModel at width=140.
-func makeDetailDualPathWide(t *testing.T) views.DetailModel {
-	t.Helper()
-	res := resource.Resource{
-		ID:   "i-dual-path-wide",
-		Name: "dual-path-wide-instance",
-		Fields: map[string]string{
-			"InstanceId": "i-dual-path-wide",
-			"State":      "running",
-		},
-	}
-	k := keys.Default()
-	d := views.NewDetail(res, "i-dual-path-wide", nil, k)
-	d.SetSize(140, 30)
-	return d
-}
-
 // makeDetailDualPathWideEC2 creates a wide DetailModel with resourceType="ec2".
 func makeDetailDualPathWideEC2(t *testing.T) views.DetailModel {
 	t.Helper()
@@ -148,13 +131,6 @@ func pressSpecialKeyRelease(code rune) tea.KeyReleaseMsg {
 func makeExplicitlyVisibleDualPath(d views.DetailModel) views.DetailModel {
 	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
 	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-	return d
-}
-
-// focusRightColDualPath reaches focused state using KeyPressMsg (setup only).
-func focusRightColDualPath(d views.DetailModel) views.DetailModel {
-	d = makeExplicitlyVisibleDualPath(d)
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	return d
 }
 

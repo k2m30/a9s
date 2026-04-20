@@ -38,22 +38,6 @@ type testInstance struct {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-//go:fix inline
-func strPtr(s string) *string { return new(s) }
-
-//go:fix inline
-func boolPtr(b bool) *bool { return new(b) }
-
-//go:fix inline
-func timePtr(t time.Time) *time.Time { return new(t) }
-
-//go:fix inline
-func int32Ptr(i int32) *int32 { return new(i) }
-
-// ---------------------------------------------------------------------------
 // T004 — Dot-path extraction on simple structs
 // ---------------------------------------------------------------------------
 
