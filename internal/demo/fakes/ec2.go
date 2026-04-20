@@ -181,8 +181,8 @@ func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.D
 	return &ec2.DescribeLaunchTemplateVersionsOutput{
 		LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
 			{
-				LaunchTemplateId:   input.LaunchTemplateId,
-				VersionNumber:      aws.Int64(1),
+				LaunchTemplateId: input.LaunchTemplateId,
+				VersionNumber:    aws.Int64(1),
 				LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
 					ImageId:          aws.String("ami-0eks111111111111a"),
 					InstanceType:     ec2types.InstanceTypeM5Large,

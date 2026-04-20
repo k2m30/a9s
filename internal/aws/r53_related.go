@@ -27,8 +27,10 @@ func init() {
 	})
 }
 
-// errNoR53Client sentinel used to distinguish missing-client from API error.
-var errNoR53Client = errors.New("route53 client not initialized")
+// errClientMissing is a sentinel returned by related-resource checkers when
+// the service client required for the check is not initialized. Callers
+// should treat it as "unknown" (Count:-1) rather than a real API error.
+var errClientMissing = errors.New("AWS service client not initialized")
 
 // r53ListRecordsFirstPage makes a single ListResourceRecordSets call for the
 // given hosted zone via RetryOnThrottle. Zone ID may be in the raw form
@@ -36,7 +38,7 @@ var errNoR53Client = errors.New("route53 client not initialized")
 func r53ListRecordsFirstPage(ctx context.Context, clients any, zoneID string) ([]r53types.ResourceRecordSet, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return nil, errNoR53Client
+		return nil, errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
 		return c.Route53.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID})
@@ -76,7 +78,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
@@ -132,7 +134,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
@@ -181,7 +183,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
@@ -226,7 +228,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
@@ -275,7 +277,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errNoR53Client) {
+		if errors.Is(err, errClientMissing) {
 			return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
 		}
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}

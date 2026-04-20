@@ -205,8 +205,8 @@ const efsBackupRecoveryARN2 = "arn:aws:backup:us-east-1:123456789012:recovery-po
 
 func efsSrcResourceWithARN() resource.Resource {
 	return resource.Resource{
-		ID:   "fs-0a1b2c3d4e5f60001",
-		Name: "prod-shared-efs",
+		ID:     "fs-0a1b2c3d4e5f60001",
+		Name:   "prod-shared-efs",
 		Fields: map[string]string{},
 		RawStruct: efstypes.FileSystemDescription{
 			FileSystemId:  aws.String("fs-0a1b2c3d4e5f60001"),

@@ -264,7 +264,6 @@ func sqsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 	return resources, isTruncated, err
 }
 
-
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
 // triggered by this SQS queue (Pattern A — direct API call).
 func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -337,5 +336,3 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	return relatedResult("eb-rule", out.RuleNames)
 }
-
-

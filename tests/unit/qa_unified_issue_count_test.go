@@ -43,7 +43,7 @@ type allEnrichersCase struct {
 	name    string
 	clients *awsclient.ServiceClients
 	probes  []resource.Resource
-	call    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.EnricherResult, error)
+	call    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.IssueEnricherResult, error)
 }
 
 // TestAllEnrichers_IssueCountMatchesFindings verifies that every registered enricher

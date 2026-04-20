@@ -32,9 +32,9 @@ func TestFetchECRImages_Basic(t *testing.T) {
 			{
 				ImageDetails: []ecrtypes.ImageDetail{
 					{
-						ImageDigest:    aws.String("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-						ImageTags:      []string{"latest", "v1.0.0"},
-						ImagePushedAt:  &pushedAt1,
+						ImageDigest:      aws.String("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+						ImageTags:        []string{"latest", "v1.0.0"},
+						ImagePushedAt:    &pushedAt1,
 						ImageSizeInBytes: aws.Int64(52428800), // 50 MB
 						ImageScanStatus: &ecrtypes.ImageScanStatus{
 							Status: ecrtypes.ScanStatusComplete,
@@ -47,18 +47,18 @@ func TestFetchECRImages_Basic(t *testing.T) {
 						},
 					},
 					{
-						ImageDigest:    aws.String("sha256:bbbbbb1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-						ImageTags:      []string{"v0.9.0"},
-						ImagePushedAt:  &pushedAt2,
+						ImageDigest:      aws.String("sha256:bbbbbb1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+						ImageTags:        []string{"v0.9.0"},
+						ImagePushedAt:    &pushedAt2,
 						ImageSizeInBytes: aws.Int64(1048576), // 1 MB
 						ImageScanStatus: &ecrtypes.ImageScanStatus{
 							Status: ecrtypes.ScanStatusComplete,
 						},
 					},
 					{
-						ImageDigest:    aws.String("sha256:cccccc1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-						ImageTags:      []string{"dev"},
-						ImagePushedAt:  &pushedAt3,
+						ImageDigest:      aws.String("sha256:cccccc1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
+						ImageTags:        []string{"dev"},
+						ImagePushedAt:    &pushedAt3,
 						ImageSizeInBytes: aws.Int64(104857600), // 100 MB
 					},
 				},
@@ -75,8 +75,8 @@ func TestFetchECRImages_Basic(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -199,8 +199,8 @@ func TestFetchECRImages_Empty(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -224,8 +224,8 @@ func TestFetchECRImages_Error(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -265,8 +265,8 @@ func TestFetchECRImages_NilFields(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
 	}
@@ -333,8 +333,8 @@ func TestFetchECRImages_UntaggedImage(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -387,8 +387,8 @@ func TestFetchECRImages_DigestShort(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -441,8 +441,8 @@ func TestFetchECRImages_FindingCounts(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -490,8 +490,8 @@ func TestFetchECRImages_FindingCountsNil(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -547,8 +547,8 @@ func TestFetchECRImages_SizeFormatting(t *testing.T) {
 				context.Background(),
 				mock,
 				parentCtx,
-							"",
-)
+				"",
+			)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -765,8 +765,8 @@ func TestFetchECRImages_ImageURI(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -809,17 +809,17 @@ func TestFetchECRImages_StatusMapping(t *testing.T) {
 		expectedStatus string
 	}{
 		{
-			name:       "critical_findings",
-			tags:       []string{"latest"},
-			scanStatus: ecrtypes.ScanStatusComplete,
-			findings:   map[string]int32{"CRITICAL": 1, "HIGH": 3, "MEDIUM": 5},
+			name:           "critical_findings",
+			tags:           []string{"latest"},
+			scanStatus:     ecrtypes.ScanStatusComplete,
+			findings:       map[string]int32{"CRITICAL": 1, "HIGH": 3, "MEDIUM": 5},
 			expectedStatus: "failed",
 		},
 		{
-			name:       "high_findings_no_critical",
-			tags:       []string{"latest"},
-			scanStatus: ecrtypes.ScanStatusComplete,
-			findings:   map[string]int32{"HIGH": 3, "MEDIUM": 5},
+			name:           "high_findings_no_critical",
+			tags:           []string{"latest"},
+			scanStatus:     ecrtypes.ScanStatusComplete,
+			findings:       map[string]int32{"HIGH": 3, "MEDIUM": 5},
 			expectedStatus: "pending",
 		},
 		{
@@ -881,8 +881,8 @@ func TestFetchECRImages_StatusMapping(t *testing.T) {
 				context.Background(),
 				mock,
 				parentCtx,
-							"",
-)
+				"",
+			)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -916,8 +916,8 @@ func TestFetchECRImages_ParentContext(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -953,8 +953,8 @@ func TestFetchECRImages_RawStruct(t *testing.T) {
 		context.Background(),
 		mock,
 		parentCtx,
-			"",
-)
+		"",
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

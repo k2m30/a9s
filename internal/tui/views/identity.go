@@ -95,7 +95,6 @@ func (m *IdentityModel) SetError(msg string) {
 	m.state = identityError
 }
 
-
 // View renders the identity information.
 func (m IdentityModel) View() string {
 	switch m.state {

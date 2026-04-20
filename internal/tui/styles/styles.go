@@ -10,24 +10,24 @@ import (
 
 // Composed styles built from the Tokyo Night Dark palette.
 var (
-	HeaderStyle   lipgloss.Style
-	TableHeader   lipgloss.Style
-	RowSelected   lipgloss.Style
-	RowNormal     lipgloss.Style
-	RowAlt        lipgloss.Style
-	BorderNormal  lipgloss.Style
-	BorderFocused lipgloss.Style
-	DetailKey     lipgloss.Style
-	DetailVal     lipgloss.Style
-	DetailSection lipgloss.Style
-	FlashSuccess  lipgloss.Style
-	FlashError    lipgloss.Style
-	FilterActive  lipgloss.Style
-	DimText           lipgloss.Style
-	SpinnerStyle      lipgloss.Style
-	NavigableField    lipgloss.Style
-	ColSepDim         lipgloss.Style // │ separator when left column is focused
-	ColSepAccent      lipgloss.Style // │ separator when right column is focused
+	HeaderStyle    lipgloss.Style
+	TableHeader    lipgloss.Style
+	RowSelected    lipgloss.Style
+	RowNormal      lipgloss.Style
+	RowAlt         lipgloss.Style
+	BorderNormal   lipgloss.Style
+	BorderFocused  lipgloss.Style
+	DetailKey      lipgloss.Style
+	DetailVal      lipgloss.Style
+	DetailSection  lipgloss.Style
+	FlashSuccess   lipgloss.Style
+	FlashError     lipgloss.Style
+	FilterActive   lipgloss.Style
+	DimText        lipgloss.Style
+	SpinnerStyle   lipgloss.Style
+	NavigableField lipgloss.Style
+	ColSepDim      lipgloss.Style // │ separator when left column is focused
+	ColSepAccent   lipgloss.Style // │ separator when right column is focused
 
 	StatusCheckFailed lipgloss.Style // "!" glyph — RED bold (impaired)
 	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
@@ -54,7 +54,6 @@ var (
 	YAMLNullStyle        lipgloss.Style
 	SearchCurrentStyle   lipgloss.Style
 	SearchOtherStyle     lipgloss.Style
-
 )
 
 // NoColorActive reports whether NO_COLOR is set in the environment.

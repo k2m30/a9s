@@ -1607,22 +1607,22 @@ func buildSnapshots() []ec2types.Snapshot {
 		},
 		// Error state + unencrypted → CIS EC2.1 violation
 		{
-			SnapshotId:  aws.String("snap-error000000000b"), State: ec2types.SnapshotStateError,
-			VolumeId:    aws.String("vol-0a1b2c3d4e5f60003"), VolumeSize: aws.Int32(100),
-			Encrypted:   aws.Bool(false), Description: aws.String("Failed backup — disk I/O error during snapshot"),
-			StartTime:   aws.Time(time.Now().AddDate(0, 0, -3)),
-			Progress:    aws.String("0%"), OwnerId: aws.String("123456789012"),
-			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-backup-snap")}},
+			SnapshotId: aws.String("snap-error000000000b"), State: ec2types.SnapshotStateError,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60003"), VolumeSize: aws.Int32(100),
+			Encrypted: aws.Bool(false), Description: aws.String("Failed backup — disk I/O error during snapshot"),
+			StartTime: aws.Time(time.Now().AddDate(0, 0, -3)),
+			Progress:  aws.String("0%"), OwnerId: aws.String("123456789012"),
+			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-backup-snap")}},
 		},
 		// Orphan snap: references a deleted volume
 		{
 			SnapshotId: aws.String("snap-orphan00000000c"), State: ec2types.SnapshotStateCompleted,
-			VolumeId:   aws.String("vol-deleted-original"), VolumeSize: aws.Int32(200),
-			Encrypted:  aws.Bool(true), Description: aws.String("Snapshot of deleted volume — orphaned"),
-			StartTime:  aws.Time(time.Now().AddDate(0, -2, 0)),
-			Progress:   aws.String("100%"), OwnerId: aws.String("123456789012"),
-			KmsKeyId:   aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
-			Tags:       []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphan-snap")}},
+			VolumeId: aws.String("vol-deleted-original"), VolumeSize: aws.Int32(200),
+			Encrypted: aws.Bool(true), Description: aws.String("Snapshot of deleted volume — orphaned"),
+			StartTime: aws.Time(time.Now().AddDate(0, -2, 0)),
+			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphan-snap")}},
 		},
 	}
 }

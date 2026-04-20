@@ -67,18 +67,18 @@ func TestEnrichASGScalingActivities_AllSuccessfulProducesNoFindings(t *testing.T
 		activities: map[string][]asgtypes.Activity{
 			"my-web-asg": {
 				{
-					ActivityId:       aws.String("act-web-1"),
+					ActivityId:           aws.String("act-web-1"),
 					AutoScalingGroupName: aws.String("my-web-asg"),
-					StatusCode:       asgtypes.ScalingActivityStatusCodeSuccessful,
-					Description:      aws.String("Launching a new EC2 instance"),
+					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+					Description:          aws.String("Launching a new EC2 instance"),
 				},
 			},
 			"my-worker-asg": {
 				{
-					ActivityId:       aws.String("act-worker-1"),
+					ActivityId:           aws.String("act-worker-1"),
 					AutoScalingGroupName: aws.String("my-worker-asg"),
-					StatusCode:       asgtypes.ScalingActivityStatusCodeSuccessful,
-					Description:      aws.String("Launching a new EC2 instance"),
+					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+					Description:          aws.String("Launching a new EC2 instance"),
 				},
 			},
 		},
@@ -109,18 +109,18 @@ func TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang(t *testing.T
 		activities: map[string][]asgtypes.Activity{
 			"my-web-asg": {
 				{
-					ActivityId:       aws.String("act-web-1"),
+					ActivityId:           aws.String("act-web-1"),
 					AutoScalingGroupName: aws.String("my-web-asg"),
-					StatusCode:       asgtypes.ScalingActivityStatusCodeSuccessful,
-					Description:      aws.String("Launching a new EC2 instance"),
+					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+					Description:          aws.String("Launching a new EC2 instance"),
 				},
 			},
 			"my-failing-asg": {
 				{
-					ActivityId:       aws.String("act-fail-1"),
+					ActivityId:           aws.String("act-fail-1"),
 					AutoScalingGroupName: aws.String("my-failing-asg"),
-					StatusCode:       asgtypes.ScalingActivityStatusCodeFailed,
-					Description:      aws.String("Failed to launch instance: capacity unavailable"),
+					StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
+					Description:          aws.String("Failed to launch instance: capacity unavailable"),
 				},
 			},
 		},
@@ -177,10 +177,10 @@ func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.
 		activities: map[string][]asgtypes.Activity{
 			"my-ok-asg": {
 				{
-					ActivityId:       aws.String("act-ok-1"),
+					ActivityId:           aws.String("act-ok-1"),
 					AutoScalingGroupName: aws.String("my-ok-asg"),
-					StatusCode:       asgtypes.ScalingActivityStatusCodeFailed,
-					Description:      aws.String("Failed to launch: insufficient capacity"),
+					StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
+					Description:          aws.String("Failed to launch: insufficient capacity"),
 				},
 			},
 		},

@@ -234,6 +234,54 @@ func TestEnrichAPIGatewayStage_NilClientReturnsEmptyFindingsNoError(t *testing.T
 	}
 }
 
+// TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning verifies that when GetStages
+// returns 0 stages for an API, the enricher emits an EnrichmentFinding with
+// severity "~" and a summary containing "no deployed" for that API.
+//
+// Per docs/attention-signals.md Wave 2: "no deployed stage" is a signal worth
+// surfacing to the operator — a REST/HTTP API with no stage is inactive.
+//
+// CODER NOTE: Currently apigw_issue_enrichment.go `continue`s without
+// emitting any finding when stages == 0. This must change. After the fix,
+// TestEnrichAPIGatewayStage_ZeroStagesAcrossPages in aws_apigw_v2_pagination_test.go
+// (which asserts len(result.Findings)==0 for 0 stages) will need its expectation
+// updated to reflect the new behavior — that is the coder's responsibility.
+func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
+	const emptyAPIID = "empty-api-warn-001"
+
+	fake := &apigwGetStagesFake{
+		results: map[string][]apigwtypes.Stage{
+			// 0 stages for this API (key present but empty slice)
+			emptyAPIID: {},
+		},
+	}
+	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
+	resources := apigwResources(emptyAPIID)
+
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// A finding must be emitted for the API with 0 stages.
+	f, ok := result.Findings[emptyAPIID]
+	if !ok {
+		t.Fatalf(
+			"expected a finding keyed by %q when 0 stages, got none — "+
+				"per docs/attention-signals.md a deployed-stage check must emit sev \"~\"",
+			emptyAPIID,
+		)
+	}
+
+	if f.Severity != "~" {
+		t.Errorf("finding Severity = %q, want \"~\"", f.Severity)
+	}
+
+	if !strings.Contains(strings.ToLower(f.Summary), "no deployed") {
+		t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Summary)
+	}
+}
+
 // TestEnrichAPIGatewayStage_APIErrorSetsTruncatedNoError verifies that when the API
 // call for api-1 returns an error, the enricher sets Truncated=true, produces 0
 // findings for that API, and does not propagate the error.

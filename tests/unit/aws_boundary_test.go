@@ -9,6 +9,7 @@ package unit_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -18,8 +19,8 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws" // trigger init() registrations
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -128,14 +129,20 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 //   asg → vpc  (EC2.DescribeSubnets)
 //   ddb → backup (Backup.ListRecoveryPointsByResource)
 //
-// NOTE: DefaultRetryConfig() uses a 500ms base delay with jitter. The retry
-// delay for one retry is ~250–500ms, so these sub-tests may take up to
-// ~500ms each. This is intentional: we cannot override the checker's internal
-// retry config without changing production code, so we verify behavior at the
-// cost of a slightly slower test run.
+// NOTE: DefaultRetryConfig() uses a 500ms base delay with jitter. We override
+// with a 1ms delay via SetRetryConfigForTest so the retry path still executes
+// the full backoff-and-retry flow without taking ~500ms per sub-test.
 // ---------------------------------------------------------------------------
 
 func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
+	restore := awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
+		MaxAttempts: 3,
+		BaseDelay:   1 * time.Millisecond,
+		MaxDelay:    10 * time.Millisecond,
+		Jitter:      false,
+	})
+	t.Cleanup(restore)
+
 	t.Run("asg_vpc", func(t *testing.T) {
 		fakeEC2 := &fakeEC2BoundaryThrottle{
 			vpcIDs: []string{"vpc-0abc1234567890000"},

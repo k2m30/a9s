@@ -21,12 +21,12 @@ func TestFetchRedisClusters_FiltersOnlyRedis(t *testing.T) {
 		output: &elasticache.DescribeCacheClustersOutput{
 			CacheClusters: []ectypes.CacheCluster{
 				{
-					CacheClusterId:      aws.String("redis-prod-001"),
-					Engine:              aws.String("redis"),
-					EngineVersion:       aws.String("7.0.12"),
-					CacheNodeType:       aws.String("cache.r6g.large"),
-					CacheClusterStatus:  aws.String("available"),
-					NumCacheNodes:       aws.Int32(3),
+					CacheClusterId:     aws.String("redis-prod-001"),
+					Engine:             aws.String("redis"),
+					EngineVersion:      aws.String("7.0.12"),
+					CacheNodeType:      aws.String("cache.r6g.large"),
+					CacheClusterStatus: aws.String("available"),
+					NumCacheNodes:      aws.Int32(3),
 					ConfigurationEndpoint: &ectypes.Endpoint{
 						Address: aws.String("redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com"),
 					},

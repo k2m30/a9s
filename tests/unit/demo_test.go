@@ -14,4 +14,3 @@ func TestDemoConstants(t *testing.T) {
 		t.Errorf("DemoRegion: got %q, want %q", demo.DemoRegion, "us-east-1")
 	}
 }
-

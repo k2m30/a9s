@@ -245,13 +245,6 @@ func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 }
 
-
-
-
-
-
-
-
 // eksRelatedResources returns the resource list for target from cache or by fetching the first page.
 func eksRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

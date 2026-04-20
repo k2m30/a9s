@@ -21,21 +21,6 @@ import (
 // Helpers
 // ===========================================================================
 
-//go:fix inline
-func ptrString(s string) *string { return new(s) }
-
-//go:fix inline
-func ptrBool(b bool) *bool { return new(b) }
-
-//go:fix inline
-func ptrInt32(i int32) *int32 { return new(i) }
-
-//go:fix inline
-func ptrInt64(i int64) *int64 { return new(i) }
-
-//go:fix inline
-func ptrTime(t time.Time) *time.Time { return new(t) }
-
 var testTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 
 // ===========================================================================

@@ -5,7 +5,9 @@ package unit
 // Contract assertions:
 //   - retention_days set, stored_bytes>0, recent creation, kms_key_id set → ColorHealthy.
 //   - retention_days empty (no retention policy) → ColorWarning.
-//   - kms_key_id empty (no encryption) → ColorWarning.
+//   - kms_key_id empty alone (retention set, not orphan) → ColorHealthy per
+//     docs/attention-signals.md (KMS issue only triggers when key is PendingDeletion, a
+//     cross-ref check, not "missing"). Changed from ColorWarning per CodeRabbit PR-273 finding.
 //   - stored_bytes=0 with old creation_time (>90d orphan) → ColorWarning.
 //   - Empty fields → ColorWarning (multiple defaults trigger Warning).
 
@@ -51,13 +53,30 @@ func TestLogsColor(t *testing.T) {
 			want: resource.ColorWarning,
 		},
 		{
+			// CodeRabbit PR-273 finding: internal/resource/types_monitoring.go:68-69
+			// currently returns ColorWarning when kms_key_id is empty, but
+			// docs/attention-signals.md only raises a KMS issue when the referenced
+			// key is PendingDeletion (a cross-ref check). Missing KMS alone is not
+			// enough to warn. This test will FAIL until the production colorer is fixed.
 			name: "no_kms",
 			fields: map[string]string{
 				"retention_days": "30",
 				"stored_bytes":   "1024",
 				"kms_key_id":     "",
 			},
-			want: resource.ColorWarning,
+			want: resource.ColorHealthy,
+		},
+		{
+			// Explicit regression: a log group with retention set, data stored, and
+			// no KMS key must not be flagged as Warning (kms_key_id alone is not an
+			// actionable signal per docs/attention-signals.md).
+			name: "kms_alone_should_not_warn",
+			fields: map[string]string{
+				"retention_days": "30",
+				"stored_bytes":   "1024",
+				"kms_key_id":     "",
+			},
+			want: resource.ColorHealthy,
 		},
 		{
 			name: "orphan",

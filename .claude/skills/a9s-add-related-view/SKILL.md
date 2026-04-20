@@ -329,7 +329,7 @@ func {source}RelatedResources(ctx context.Context, clients interface{}, cache re
 
 **There is no `Available bool` field.**
 
-### 3. Interfaces: `internal/aws/interfaces.go` (APPEND if needed)
+### 3. Interfaces: `internal/aws/<service>_interfaces.go` (APPEND if needed)
 
 Only needed if the checker's live-fetch fallback calls an API not already
 covered by existing interfaces. Cache-only checkers that never call live APIs
@@ -708,8 +708,8 @@ Files to create:
 Files to modify:
   internal/aws/{source}.go -- append RegisterRelated + RegisterNavigableFields in init()
   internal/demo/fixtures/<service>.go -- ensure target resource fixtures contain matching IDs
-  internal/aws/interfaces.go -- append new interfaces (only if live-fetch fallback needs them)
-    Append point: last interface in file
+  internal/aws/{service}_interfaces.go -- append new interfaces (only if live-fetch fallback needs them)
+    Append point: after last narrow interface, before the aggregate {Service}API
 Context files (read-only):
   internal/aws/{source}.go -- verify Fields keys exist
   internal/aws/ec2_related.go -- canonical checker pattern

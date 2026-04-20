@@ -125,7 +125,7 @@ the column set fails to discriminate the cause.
 |---|---|---|---|---|---|
 | `alarm` | ✓ | Alarm Name, **State**, Metric, Namespace, Threshold | `ActionsEnabled==false` (muted) hidden. Zombie alarm (sibling missing) needs cross-ref. | **A** | Add `Actions` column (Yes/No from ActionsEnabled and len(AlarmActions)>0) |
 | `logs` | ✓ | Log Group Name, Size, **Retention**, Metric Filters, Created | Stale log group (no events recent) hidden. KMS-pending-delete cross-ref hidden. | **A** | Add `Last Event` column from Wave 2 DescribeLogStreams (most recent timestamp or "stale") |
-| `trail` | ✗ | Trail Name, S3 Bucket, Home Region, Multi-Region | **`IsLogging==false`** — trail stopped capturing! Critical. `LatestDeliveryError` hidden. | **A** | Add `Logging` column from Wave 2 GetTrailStatus and `Last Delivery` column |
+| `trail` | ✓ | Trail Name, S3 Bucket, Home Region, Multi-Region | `LatestDeliveryTime >1h` on logging trail hidden. | **B** | Fetcher already reads `GetTrailStatus` and colors on `is_logging==false`, `latest_delivery_error!=""`, `log_file_validation_enabled==false`. Remaining: add `Logging` and `Last Delivery` columns (presentation-only). |
 | `ct-events` | n/a | V, TIME, ACTOR, ORIGIN, EVENT, TARGET, OUTCOME | OUTCOME column already shows pass/fail | None | Adequate |
 
 ## CI/CD
@@ -158,7 +158,7 @@ the column set fails to discriminate the cause.
 
 1. **`sg`** — Open dangerous ports invisible. Critical security signal. Tier B, computed Risk column.
 2. **`s3`** — Public access risk invisible (only color). Tier A, Public Access column.
-3. **`trail`** — `IsLogging==false` (trail stopped) invisible. Tier A, Logging column.
+3. **`trail`** — now colored on `IsLogging==false` / delivery error / no log-file validation; remaining gap is presentation (Logging + Last Delivery columns). Tier B.
 4. **`eip`** — Unattached (billed hourly) invisible. Tier B, Status column.
 5. **`opensearch`** — No status column at all. Tier A, add Status.
 6. **`tg`** — No health column. Tier B, computed Health column.

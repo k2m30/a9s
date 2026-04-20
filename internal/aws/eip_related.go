@@ -101,14 +101,6 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("nat", ids)
 }
 
-
-
-
-
-
-
-
-
 // checkEIPCFN returns the CloudFormation stack that owns this EIP via
 // aws:cloudformation:stack-name tag on the Address Tags slice.
 func checkEIPCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

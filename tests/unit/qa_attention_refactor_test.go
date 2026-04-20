@@ -42,8 +42,8 @@ func newAttentionListFromCache(t *testing.T, attentionOnly bool, resources []res
 	t.Helper()
 	return views.NewResourceListFromCache(
 		attentionEC2TypeDef(),
-		nil,               // viewConfig
-		keys.Default(),    // keys
+		nil,            // viewConfig
+		keys.Default(), // keys
 		resources,
 		nil,               // pagination
 		"",                // filterText

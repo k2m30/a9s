@@ -7,19 +7,19 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestEnricherRegistry_RegisterAndGet(t *testing.T) {
+func TestDetailEnricherRegistry_RegisterAndGet(t *testing.T) {
 	called := false
 	enricher := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		called = true
 		res.Fields["enriched"] = "yes"
 		return res, nil
 	}
-	resource.RegisterEnricher("test-enrich-type", enricher)
-	t.Cleanup(func() { resource.UnregisterEnricher("test-enrich-type") })
+	resource.RegisterDetailEnricher("test-enrich-type", enricher)
+	t.Cleanup(func() { resource.UnregisterDetailEnricher("test-enrich-type") })
 
-	got := resource.GetEnricher("test-enrich-type")
+	got := resource.GetDetailEnricher("test-enrich-type")
 	if got == nil {
-		t.Fatal("expected enricher to be registered")
+		t.Fatal("expected detail enricher to be registered")
 	}
 
 	res := resource.Resource{ID: "r1", Fields: map[string]string{}}
@@ -28,94 +28,103 @@ func TestEnricherRegistry_RegisterAndGet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
-		t.Fatal("enricher was not called")
+		t.Fatal("detail enricher was not called")
 	}
 	if result.Fields["enriched"] != "yes" {
-		t.Fatal("enricher did not modify resource")
+		t.Fatal("detail enricher did not modify resource")
 	}
 }
 
-func TestEnricherRegistry_GetUnregistered_ReturnsNil(t *testing.T) {
-	got := resource.GetEnricher("nonexistent-enrich-type")
+func TestDetailEnricherRegistry_GetUnregistered_ReturnsNil(t *testing.T) {
+	got := resource.GetDetailEnricher("nonexistent-enrich-type")
 	if got != nil {
 		t.Fatal("expected nil for unregistered type")
 	}
 }
 
-func TestEnricherRegistry_HasEnricher(t *testing.T) {
-	if resource.HasEnricher("has-enrich-test") {
+func TestDetailEnricherRegistry_HasDetailEnricher(t *testing.T) {
+	if resource.HasDetailEnricher("has-enrich-test") {
 		t.Fatal("expected false before registration")
 	}
-	resource.RegisterEnricher("has-enrich-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
+	resource.RegisterDetailEnricher("has-enrich-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
 	})
-	t.Cleanup(func() { resource.UnregisterEnricher("has-enrich-test") })
+	t.Cleanup(func() { resource.UnregisterDetailEnricher("has-enrich-test") })
 
-	if !resource.HasEnricher("has-enrich-test") {
+	if !resource.HasDetailEnricher("has-enrich-test") {
 		t.Fatal("expected true after registration")
 	}
 }
 
-func TestEnricherRegistry_UnregisterEnricher(t *testing.T) {
-	resource.RegisterEnricher("unregister-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
+func TestDetailEnricherRegistry_UnregisterDetailEnricher(t *testing.T) {
+	resource.RegisterDetailEnricher("unregister-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
 	})
 
-	if !resource.HasEnricher("unregister-test") {
-		t.Fatal("expected enricher to be registered before unregister")
+	if !resource.HasDetailEnricher("unregister-test") {
+		t.Fatal("expected detail enricher to be registered before unregister")
 	}
 
-	resource.UnregisterEnricher("unregister-test")
+	resource.UnregisterDetailEnricher("unregister-test")
 
-	if resource.HasEnricher("unregister-test") {
-		t.Fatal("expected enricher to be absent after unregister")
+	if resource.HasDetailEnricher("unregister-test") {
+		t.Fatal("expected detail enricher to be absent after unregister")
 	}
-	if resource.GetEnricher("unregister-test") != nil {
-		t.Fatal("GetEnricher should return nil after unregister")
+	if resource.GetDetailEnricher("unregister-test") != nil {
+		t.Fatal("GetDetailEnricher should return nil after unregister")
 	}
 }
 
-func TestEnricherRegistry_OverwriteExisting(t *testing.T) {
-	firstCalled := false
-	secondCalled := false
-
-	resource.RegisterEnricher("overwrite-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-		firstCalled = true
+func TestDetailEnricherRegistry_PanicsOnDuplicate(t *testing.T) {
+	stub := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
-	})
-	t.Cleanup(func() { resource.UnregisterEnricher("overwrite-test") })
-
-	// Overwrite with a second enricher
-	resource.RegisterEnricher("overwrite-test", func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-		secondCalled = true
+	}
+	stub2 := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 		return res, nil
-	})
-
-	got := resource.GetEnricher("overwrite-test")
-	if got == nil {
-		t.Fatal("expected enricher to be registered after overwrite")
 	}
 
-	res := resource.Resource{ID: "r1", Fields: map[string]string{}}
-	if _, err := got(context.Background(), nil, res); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	resource.RegisterDetailEnricher("overwrite-test", stub)
+	t.Cleanup(func() { resource.UnregisterDetailEnricher("overwrite-test") })
 
-	if firstCalled {
-		t.Error("first enricher should NOT have been called after overwrite")
-	}
-	if !secondCalled {
-		t.Error("second enricher should have been called after overwrite")
-	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on duplicate registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("overwrite-test", stub2)
 }
 
-func TestEnricherRegistry_RolePolicies_IsRegistered(t *testing.T) {
-	// Verify the role_policies enricher is registered via init() in role_policies_enrich.go.
+func TestDetailEnricherRegistry_PanicsOnEmptyName(t *testing.T) {
+	stubFn := func(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
+		return res, nil
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on empty name registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("", stubFn)
+}
+
+func TestDetailEnricherRegistry_PanicsOnNilFn(t *testing.T) {
+	t.Cleanup(func() { resource.UnregisterDetailEnricher("nil-fn-test") })
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on nil function registration")
+		}
+	}()
+	resource.RegisterDetailEnricher("nil-fn-test", nil)
+}
+
+func TestDetailEnricherRegistry_RolePolicies_IsRegistered(t *testing.T) {
+	// Verify the role_policies detail enricher is registered via init() in role_policies_enrich.go.
 	// This acts as a smoke test that the init() ran and wired up the enricher.
-	if !resource.HasEnricher("role_policies") {
-		t.Fatal("expected role_policies enricher to be registered via init()")
+	if !resource.HasDetailEnricher("role_policies") {
+		t.Fatal("expected role_policies detail enricher to be registered via init()")
 	}
-	if resource.GetEnricher("role_policies") == nil {
-		t.Fatal("GetEnricher(role_policies) returned nil but HasEnricher returned true")
+	if resource.GetDetailEnricher("role_policies") == nil {
+		t.Fatal("GetDetailEnricher(role_policies) returned nil but HasDetailEnricher returned true")
 	}
 }

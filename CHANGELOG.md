@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- API Gateway REST v1 APIs now appear in the `apigw` list alongside HTTP/WebSocket APIs (previously only v2 APIs were shown)
+- API Gateway detail view resolves ACM certificates attached via custom domain mappings (previously showed a permanent "?")
+
+### Fixed
+- EKS clusters whose `DescribeCluster` call fails now surface as a `DescribeFailed` row instead of silently vanishing from the list
+- KMS paginated fetcher fully paginates `ListAliases` so customer-managed keys on later alias pages no longer render with a blank alias
+- API Gateway enricher emits the documented "no deployed stages" warning when `GetStages` returns empty, matching `docs/attention-signals.md`
+
 ## [3.42.0] - 2026-04-14
 
 ### Added

@@ -41,8 +41,8 @@ func buildDynamoDBKinesisDestinations() map[string][]ddbtypes.KinesisDataStreamD
 	return map[string][]ddbtypes.KinesisDataStreamDestination{
 		"acme-orders": {
 			{
-				StreamArn:                   aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/acme-orders-stream"),
-				DestinationStatus:           ddbtypes.DestinationStatusActive,
+				StreamArn:                    aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/acme-orders-stream"),
+				DestinationStatus:            ddbtypes.DestinationStatusActive,
 				DestinationStatusDescription: aws.String("Stream is active"),
 			},
 		},

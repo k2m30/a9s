@@ -193,4 +193,3 @@ func TestFullRelatedViewValidation(t *testing.T) {
 		})
 	}
 }
-

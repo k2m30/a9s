@@ -55,4 +55,3 @@ func TestRelatedNavigate_KnownTargetType(t *testing.T) {
 		t.Error("FindResourceType(\"ec2\") should return a non-nil ResourceTypeDef")
 	}
 }
-

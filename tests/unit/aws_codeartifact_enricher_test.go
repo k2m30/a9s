@@ -95,8 +95,8 @@ func codeArtifactResourcePolicy(document string) *codeartifacttypes.ResourcePoli
 }
 
 const (
-	caRepo1 = "my-npm-registry"
-	caRepo2 = "my-pypi-registry"
+	caRepo1  = "my-npm-registry"
+	caRepo2  = "my-pypi-registry"
 	caDomain = "my-domain"
 	// specificPrincipalPolicy is a minimal policy granting access to a specific account (not wildcard).
 	specificPrincipalPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"codeartifact:GetPackageVersionAsset","Resource":"*"}]}`

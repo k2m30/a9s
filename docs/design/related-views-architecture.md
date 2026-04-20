@@ -44,7 +44,7 @@ Go equates directories with packages. `internal/aws/ec2/` would be
 - **66+ blank imports**: A registration file must import all sub-packages
   to trigger init(). This is fragile and noisy.
 
-- **Interface visibility**: `interfaces.go` defines all AWS API interfaces
+- **Interface visibility**: `<service>_interfaces.go` (one file per AWS service) defines all AWS API interfaces
   in package `aws`. Sub-packages need these for type assertions. The
   interfaces would need to stay in the parent package, creating an
   asymmetry where some code is in `aws/` and some in `aws/ec2/`.
@@ -89,7 +89,7 @@ adjacent and globbable:
 |---------|-------------|------|
 | Top-level fetcher | `internal/aws/ec2.go` | `ec2*.go` |
 | Related resolvers | `internal/aws/ec2_related.go` | `ec2*.go` |
-| Child fetcher | `internal/aws/ecs_tasks.go` | `ecs*.go` |
+| Child fetcher | `internal/aws/ecs_task.go` | `ecs*.go` |
 | Related tests | `tests/unit/aws_ec2_related_test.go` | `*ec2*` |
 
 ### Revisit Trigger

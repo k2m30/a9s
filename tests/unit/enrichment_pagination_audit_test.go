@@ -11,7 +11,7 @@ package unit
 //  1. Pins the required multi-page contract so the coder can implement it (tests
 //     fail before the fix, pass after).
 //  2. Caps the walk at EnrichmentCap pages to avoid unbounded API calls.
-//  3. Provides a structural meta-test (AST walk of enrichment.go) that flags any
+//  3. Provides a structural meta-test (AST walk of *_issue_enrichment.go files) that flags any
 //     future regression: a new enricher that calls a paginated API without a loop.
 //
 // # Covered enrichers
@@ -637,8 +637,8 @@ var nonPaginatedAPIs = []string{
 	"ListResourcesForWebACL",
 }
 
-// TestNoSingleCallListAPIEnrichers walks internal/aws/enrichment.go via go/ast
-// and flags any Enrich* function that:
+// TestNoSingleCallListAPIEnrichers walks internal/aws/*_issue_enrichment.go via
+// go/ast and flags any Enrich* function that:
 //
 //  1. Contains a 3-level selector call (clients.X.Op(...)) to an AWS SDK
 //     list/describe operation that is NOT in the nonPaginatedAPIs allowlist, AND
@@ -657,14 +657,15 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 		t.Fatal("runtime.Caller(0) failed — cannot locate test file")
 	}
 	// thisFile = .../tests/unit/enrichment_pagination_audit_test.go
-	// We need .../internal/aws/enrichment.go
+	// two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	enrichmentPath := filepath.Join(repoRoot, "internal", "aws", "enrichment.go")
 
-	fset := token.NewFileSet()
-	src, err := parser.ParseFile(fset, enrichmentPath, nil, 0)
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "*_issue_enrichment.go"))
 	if err != nil {
-		t.Fatalf("parse error in %s: %v", enrichmentPath, err)
+		t.Fatalf("filepath.Glob failed: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("filepath.Glob returned zero matches for internal/aws/*_issue_enrichment.go — check repo layout")
 	}
 
 	// Build a skip-set from nonPaginatedAPIs for O(1) lookup.
@@ -673,54 +674,72 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 		skipSet[op] = true
 	}
 
+	// Share one FileSet across all files so fset.Position(pos).Line gives the
+	// right per-file line number.
+	fset := token.NewFileSet()
+
 	var violations []string
 
-	for _, decl := range src.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok {
-			continue
-		}
-		if fn.Name == nil || fn.Body == nil {
-			continue
-		}
-		if !strings.HasPrefix(fn.Name.Name, "Enrich") {
+	for _, filePath := range matches {
+		// Defensive: skip any _test.go files that the glob might pick up.
+		if strings.HasSuffix(filePath, "_test.go") {
 			continue
 		}
 
-		funcName := fn.Name.Name
+		src, parseErr := parser.ParseFile(fset, filePath, nil, 0)
+		if parseErr != nil {
+			t.Fatalf("parse error in %s: %v", filePath, parseErr)
+		}
 
-		// Check whether the function body contains any pagination identifier.
-		hasPaginationRef := bodyContainsAny(fn.Body, "NextToken", "Marker", "ContinuationToken")
+		baseName := filepath.Base(filePath)
 
-		// Collect all 3-level selector calls: clients.Service.Op(...)
-		// A 3-level selector is: SelectorExpr{ X: SelectorExpr{ X: Ident("clients") } }
-		calls := collectThreeLevelCalls(fn.Body, "clients")
-
-		for _, callInfo := range calls {
-			opName := callInfo.opName
-			line := fset.Position(callInfo.pos).Line
-
-			// If the function already references a pagination token anywhere,
-			// we assume the author intends to paginate and don't flag it.
-			if hasPaginationRef {
+		for _, decl := range src.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			if fn.Name == nil || fn.Body == nil {
+				continue
+			}
+			if !strings.HasPrefix(fn.Name.Name, "Enrich") {
 				continue
 			}
 
-			// If the op is on the allowlist, it's legitimately non-paginated.
-			if skipSet[opName] {
-				continue
-			}
+			funcName := fn.Name.Name
 
-			// We only flag operations that look like list/describe calls —
-			// these are the ones likely to paginate.
-			if !looksLikeListOrDescribe(opName) {
-				continue
-			}
+			// Check whether the function body contains any pagination identifier.
+			hasPaginationRef := bodyContainsAny(fn.Body, "NextToken", "Marker", "ContinuationToken")
 
-			violations = append(violations, fmt.Sprintf(
-				"enrichment.go:%d: %s calls %s without pagination (NextToken/Marker absent); add to skip-list with justification or paginate",
-				line, funcName, opName,
-			))
+			// Collect all 3-level selector calls: clients.Service.Op(...)
+			// A 3-level selector is: SelectorExpr{ X: SelectorExpr{ X: Ident("clients") } }
+			calls := collectThreeLevelCalls(fn.Body, "clients")
+
+			for _, callInfo := range calls {
+				opName := callInfo.opName
+				line := fset.Position(callInfo.pos).Line
+
+				// If the function already references a pagination token anywhere,
+				// we assume the author intends to paginate and don't flag it.
+				if hasPaginationRef {
+					continue
+				}
+
+				// If the op is on the allowlist, it's legitimately non-paginated.
+				if skipSet[opName] {
+					continue
+				}
+
+				// We only flag operations that look like list/describe calls —
+				// these are the ones likely to paginate.
+				if !looksLikeListOrDescribe(opName) {
+					continue
+				}
+
+				violations = append(violations, fmt.Sprintf(
+					"%s:%d: %s calls %s without pagination (NextToken/Marker absent); add to skip-list with justification or paginate",
+					baseName, line, funcName, opName,
+				))
+			}
 		}
 	}
 

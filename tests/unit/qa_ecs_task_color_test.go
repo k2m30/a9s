@@ -13,11 +13,11 @@ func TestEcsTaskColor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name        string
-		lastStatus  string
-		stopCode    string
+		name         string
+		lastStatus   string
+		stopCode     string
 		healthStatus string
-		want        resource.Color
+		want         resource.Color
 	}{
 		{
 			name:       "running",

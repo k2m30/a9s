@@ -28,3 +28,18 @@ func (f *APIGWFake) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ .
 func (f *APIGWFake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
 	return &apigatewayv2.GetStagesOutput{}, nil
 }
+
+// GetDomainNames returns an empty domain name list for demo mode.
+func (f *APIGWFake) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
+	return &apigatewayv2.GetDomainNamesOutput{}, nil
+}
+
+// GetApiMappings returns an empty mapping list for demo mode.
+func (f *APIGWFake) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	return &apigatewayv2.GetApiMappingsOutput{}, nil
+}
+
+// GetIntegrations returns an empty integrations list for demo mode.
+func (f *APIGWFake) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
+	return &apigatewayv2.GetIntegrationsOutput{}, nil
+}

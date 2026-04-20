@@ -1,0 +1,84 @@
+// sqs_issue_enrichment.go — Wave 2 issue enrichment for the sqs resource type.
+package aws
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+func init() {
+	registerIssueEnricher("sqs", EnrichSQSAttributes, 100)
+	resource.RegisterIssueEnricherFieldKeys("sqs", []string{"dlq"})
+}
+
+// EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
+// to surface missing DLQ and missing KMS encryption as Wave 2 findings.
+// Per-queue errors are treated as truncated (skip silently).
+func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	fieldUpdates := make(map[string]map[string]string)
+	truncatedIDs := make(map[string]bool)
+	if clients.SQS == nil {
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+	}
+	truncated := len(resources) > EnrichmentCap
+	for i, r := range resources {
+		if i >= EnrichmentCap {
+			break
+		}
+		queueURL := r.Fields["queue_url"]
+		if queueURL == "" {
+			continue
+		}
+		out, err := clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
+			QueueUrl: aws.String(queueURL),
+			AttributeNames: []sqstypes.QueueAttributeName{
+				sqstypes.QueueAttributeNameRedrivePolicy,
+				sqstypes.QueueAttributeNameVisibilityTimeout,
+				sqstypes.QueueAttributeNameKmsMasterKeyId,
+			},
+		})
+		if err != nil {
+			truncated = true
+			truncatedIDs[r.ID] = true
+			continue
+		}
+		_, hasDLQ := out.Attributes["RedrivePolicy"]
+		dlqVal := "no"
+		if hasDLQ {
+			dlqVal = "yes"
+		}
+		fieldUpdates[r.ID] = map[string]string{
+			"dlq": dlqVal,
+		}
+		var rows []resource.FindingRow
+		if !hasDLQ {
+			rows = append(rows, resource.FindingRow{
+				Label: "DLQ",
+				Value: "no DLQ configured",
+				Tier:  "~",
+			})
+		}
+		if _, ok := out.Attributes["KmsMasterKeyId"]; !ok {
+			rows = append(rows, resource.FindingRow{
+				Label: "Encryption",
+				Value: "no KMS encryption configured",
+				Tier:  "~",
+			})
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		findings[r.ID] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  rows[0].Value,
+			Rows:     rows,
+		}
+	}
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+}

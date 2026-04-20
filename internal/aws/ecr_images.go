@@ -226,8 +226,8 @@ func formatFindingCounts(counts map[string]int32) string {
 
 	// Severity order with abbreviations
 	severityOrder := []struct {
-		key   string
-		abbr  string
+		key  string
+		abbr string
 	}{
 		{"CRITICAL", "C"},
 		{"HIGH", "H"},

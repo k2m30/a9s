@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -276,5 +278,81 @@ func TestRelated_S3_CFN_Unknown(t *testing.T) {
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
+	}
+}
+
+// TestRelated_S3_CFN_Found verifies that a bucket with the aws:cloudformation:stack-name
+// tag matching a CFN stack in cache returns Count:1.
+func TestRelated_S3_CFN_Found(t *testing.T) {
+	const stackName = "webapp-stack"
+	const bucketName = "webapp-assets-prod"
+
+	fakeS3 := newFakeS3CRWithTagging("aws:cloudformation:stack-name", stackName)
+	clients := &awsclient.ServiceClients{S3: fakeS3}
+
+	cfnRes := resource.Resource{
+		ID:   stackName,
+		Name: stackName,
+		RawStruct: cfntypes.Stack{
+			StackName: aws.String(stackName),
+		},
+	}
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
+	}
+	source := resource.Resource{
+		ID:   bucketName,
+		Name: bucketName,
+	}
+
+	checker := s3CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != stackName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, stackName)
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_S3_CFN_NoTag verifies that a bucket with no aws:cloudformation:stack-name
+// tag returns Count:0.
+func TestRelated_S3_CFN_NoTag(t *testing.T) {
+	// GetBucketTagging returns tags, but none is the CFN stack-name tag.
+	fakeS3 := newFakeS3CRWithTagging("Environment", "prod", "Team", "platform")
+	clients := &awsclient.ServiceClients{S3: fakeS3}
+
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{ID: "some-stack", Name: "some-stack"}},
+		},
+	}
+	source := resource.Resource{
+		ID:   "untagged-bucket",
+		Name: "untagged-bucket",
+	}
+
+	checker := s3CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no CFN stack-name tag)", result.Count)
+	}
+}
+
+// TestRelated_S3_CFN_EmptyBucketID verifies that an empty bucket ID returns Count:0
+// without making any API calls.
+func TestRelated_S3_CFN_EmptyBucketID(t *testing.T) {
+	// No real clients needed — empty ID short-circuits before API call.
+	source := resource.Resource{ID: "", Name: ""}
+	checker := s3CheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (empty bucket ID)", result.Count)
 	}
 }

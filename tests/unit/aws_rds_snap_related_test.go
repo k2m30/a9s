@@ -8,8 +8,8 @@ import (
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -327,5 +327,109 @@ func TestRelated_RDSSnap_Backup_WrongRawStruct(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRDSSnapDBC — two-hop: snap→dbi→dbc
+// ---------------------------------------------------------------------------
+
+// TestRelated_RDSSnap_DBC_InvalidRawStruct verifies Count=-1 when the
+// RawStruct is not a DBSnapshot.
+func TestRelated_RDSSnap_DBC_InvalidRawStruct(t *testing.T) {
+	src := resource.Resource{ID: "rds:mydb-snap", RawStruct: "not-a-snapshot"}
+	checker := rdsSnapCheckerByTarget(t, "dbc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_DBC_NoInstanceIDReturnsZero verifies Count=0 when the
+// snapshot has no DBInstanceIdentifier (manual/shared snapshot).
+func TestRelated_RDSSnap_DBC_NoInstanceIDReturnsZero(t *testing.T) {
+	src := resource.Resource{
+		ID:        "rds:mydb-snap",
+		RawStruct: rdstypes.DBSnapshot{DBSnapshotIdentifier: aws.String("rds:mydb-snap")},
+	}
+	checker := rdsSnapCheckerByTarget(t, "dbc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no instance ID)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_DBC_StandaloneInstanceReturnsZero verifies Count=0 when
+// the DBI cache contains the source instance but it has no DBClusterIdentifier
+// (standalone instance, not part of an Aurora cluster).
+func TestRelated_RDSSnap_DBC_StandaloneInstanceReturnsZero(t *testing.T) {
+	dbiRes := resource.Resource{
+		ID:   "mydb",
+		Name: "mydb",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("mydb"),
+			// DBClusterIdentifier intentionally nil — standalone instance.
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{dbiRes}},
+	}
+	src := resource.Resource{
+		ID: "rds:mydb-snap",
+		RawStruct: rdstypes.DBSnapshot{
+			DBInstanceIdentifier: aws.String("mydb"),
+		},
+	}
+	checker := rdsSnapCheckerByTarget(t, "dbc")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (standalone instance, no cluster)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_DBC_ClusterInstanceFoundViaCache verifies Count=1 when
+// the DBI cache resolves the instance's DBClusterIdentifier.
+func TestRelated_RDSSnap_DBC_ClusterInstanceFoundViaCache(t *testing.T) {
+	const clusterID = "acme-aurora-cluster"
+	dbiRes := resource.Resource{
+		ID:   "mydb",
+		Name: "mydb",
+		RawStruct: rdstypes.DBInstance{
+			DBInstanceIdentifier: aws.String("mydb"),
+			DBClusterIdentifier:  aws.String(clusterID),
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{dbiRes}},
+	}
+	src := resource.Resource{
+		ID: "rds:mydb-snap",
+		RawStruct: rdstypes.DBSnapshot{
+			DBInstanceIdentifier: aws.String("mydb"),
+		},
+	}
+	checker := rdsSnapCheckerByTarget(t, "dbc")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != clusterID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, clusterID)
+	}
+}
+
+// TestRelated_RDSSnap_DBC_CacheMissNoClients verifies Count=-1 when the
+// DBI cache is empty and no clients are available to fetch it.
+func TestRelated_RDSSnap_DBC_CacheMissNoClients(t *testing.T) {
+	src := resource.Resource{
+		ID: "rds:mydb-snap",
+		RawStruct: rdstypes.DBSnapshot{
+			DBInstanceIdentifier: aws.String("mydb"),
+		},
+	}
+	checker := rdsSnapCheckerByTarget(t, "dbc")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }

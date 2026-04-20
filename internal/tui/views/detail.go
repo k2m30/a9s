@@ -17,25 +17,25 @@ import (
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
 type DetailModel struct {
-	res                 resource.Resource
-	resourceType        string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
-	viewConfig          *config.ViewsConfig
-	viewport            viewport.Model
-	ready               bool
-	wrap                bool
-	width               int
-	height              int
-	keys                keys.Map
-	search              SearchModel
-	rightCol            rightColumnModel
-	rightColVisible          bool // true when explicitly toggled on
-	rightColAutoShown        bool // true when right column was auto-shown on SetSize (wide terminal + registered defs)
-	rightColUserToggled      bool // true after user explicitly toggles related visibility
-	rightColWidth            int  // width of right column panel (default 32)
-	pendingRelatedDispatch   bool // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
-	fieldList           []fieldpath.FieldItem // structured field data; nil = not yet computed
-	fieldCursor         int                   // index into fieldList for navigable cursor
-	enrichmentFinding   *resource.EnrichmentFinding // nil when no finding; rendered at top of detail view when non-nil
+	res                    resource.Resource
+	resourceType           string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
+	viewConfig             *config.ViewsConfig
+	viewport               viewport.Model
+	ready                  bool
+	wrap                   bool
+	width                  int
+	height                 int
+	keys                   keys.Map
+	search                 SearchModel
+	rightCol               rightColumnModel
+	rightColVisible        bool                        // true when explicitly toggled on
+	rightColAutoShown      bool                        // true when right column was auto-shown on SetSize (wide terminal + registered defs)
+	rightColUserToggled    bool                        // true after user explicitly toggles related visibility
+	rightColWidth          int                         // width of right column panel (default 32)
+	pendingRelatedDispatch bool                        // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
+	fieldList              []fieldpath.FieldItem       // structured field data; nil = not yet computed
+	fieldCursor            int                         // index into fieldList for navigable cursor
+	enrichmentFinding      *resource.EnrichmentFinding // nil when no finding; rendered at top of detail view when non-nil
 }
 
 // NewDetail creates a DetailModel for the given resource.
@@ -421,4 +421,3 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	}
 	return m, nil
 }
-
