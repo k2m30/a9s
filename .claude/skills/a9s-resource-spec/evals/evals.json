@@ -1,0 +1,23 @@
+{
+  "skill_name": "a9s-resource-spec",
+  "evals": [
+    {
+      "id": "ec2",
+      "prompt": "Generate the a9s UX/UI resource spec for shortName `ec2`. Save to docs/resources/ec2.md.",
+      "expected_output": "Uniform spec with all seven sections, S1-S5 surfaces mapped, AWS-sourced cause text (StateReason.Message / StateTransitionReason), and no internal jargon in S4/S5.",
+      "tests": "Dense happy path: many related targets, rich Wave 1, Wave 2 via DescribeInstanceStatus, non-empty Wave 3."
+    },
+    {
+      "id": "dbi",
+      "prompt": "Generate the a9s UX/UI resource spec for shortName `dbi`. Save to docs/resources/dbi.md.",
+      "expected_output": "Correctly models the canonical `~` case: `available` + maintenance scheduled = green row + `~` glyph, NOT counted in issues:N.",
+      "tests": "Healthy-with-background-concern path. Tests that `~` does not bump S1."
+    },
+    {
+      "id": "s3",
+      "prompt": "Generate the a9s UX/UI resource spec for shortName `s3`. Save to docs/resources/s3.md.",
+      "expected_output": "Correctly applies 'No Wave 1 signals' clause and blank-healthy-Status rule. Wave 2 per-bucket via GetPublicAccessBlock.",
+      "tests": "Wave 1 is None; tests the silence-is-UX rule at scale."
+    }
+  ]
+}
