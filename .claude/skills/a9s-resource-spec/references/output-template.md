@@ -111,11 +111,43 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
+- Any column in the list view that is not listed in §7 (Authorized list columns). The spec's §7 is the closed set.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
-## 6. Citations
+## 7. Authorized list columns
 
-One bullet per claim in §§2–4.1. Citation sources, in order of authority:
+The **closed set** of columns the list view for this resource type may render. Anything in `.a9s/views/<shortName>.yaml` that is not in this table is invented UI and must be deleted in implementation. Every column must be individually justified from a golden doc or an a9s-devops citation; anything that looks like an internal-only jargon code (`UNENC`, `NOBKP`, `PUB`, severity codes, wave labels) is banned — use the §4 human phrase in the Status column instead of a parallel code column.
+
+| # | Column title | Backing field key | Data source | Notes |
+|---|---|---|---|---|
+| 1 | `<short header shown in list, e.g. "DB Identifier">` | `<field key used by RegisterFieldKeys, e.g. db_identifier>` | `<AWS field path on the list response, e.g. DBInstance.DBInstanceIdentifier>` | `<why it's useful at 3am — or "identity, always present">` |
+| 2 | `<next column>` | `<key>` | `<path>` | `<note>` |
+| 3 | `Status` | `status` | §4 List text derived per state bucket | Must render the phrases in §4. Healthy rows render blank. |
+| … | … | … | … | … |
+
+Rules:
+
+- The `Status` column (S4 surface) MUST be present and MUST be backed by derivation from §4. It is the only S4 carrier.
+- No parallel "flags" / "policy" / "CIS" / "issues" column. All policy warnings ride in the `Status` column per §4 precedence.
+- No "Age" column unless §4 specifically calls out a timestamp-based signal.
+- Total column count ≤ 6 (list rows must remain readable at 80 columns; scroll is allowed but discouraged).
+
+## 8. Visual acceptance rules
+
+Rules the implementation's scenario-harness test (phase 8 of `a9s-implement-resource`) asserts against the rendered list view in `./a9s --demo`:
+
+1. **Column set exactness**. The rendered list view contains **exactly** the columns in §7, in that order. No extra column. No missing column.
+2. **Healthy rows render blank S4**. For every fixture whose state bucket is Healthy and that has no active `!`/`~` finding, the Status column renders empty. Banned strings: `OK`, `ACTIVE`, `available`, `running`, `healthy`, `-`.
+3. **Warning/Broken rows render the §4 phrase**. For every fixture whose state bucket is Warning or Broken, the Status column renders the exact phrase in the §4 "List text (S4)" column for that signal. No bare state keyword unless §4 explicitly approves it for that row.
+4. **`!`/`~` glyph prefix on Healthy rows only**. For every fixture whose `!` or `~` finding applies, the list row renders `! ` or `~ ` prefixed to the identity column. For every Warning/Broken/Dim row, no glyph prefix appears regardless of what the finding says.
+5. **S1 menu count bumps only on `!`**. The menu badge `issues:N` equals the count of fixtures whose finding severity is `!` — `~` fixtures do not bump.
+6. **Related panel non-zero**. For every fixture, every related pivot in §2 renders a non-zero count except pivots whose §2 entry explicitly says `count shown: unknown` (e.g. `ct-events` windowed pivots).
+
+The scenario test fails loud if any of these 6 rules is violated for any fixture.
+
+## 9. Citations
+
+One bullet per claim in §§2–4.1 and §7. Citation sources, in order of authority:
 
 - a9s golden doc — `<short claim>` — `docs/<file>.md` § `<heading or table row>`.
 - AWS Go SDK v2 — `<short claim>` — `AWS SDK Go v2 — <package>/types.<Shape> § <Field>`.
