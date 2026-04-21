@@ -1,7 +1,7 @@
 // aws_dbi_related_wave2_test.go — coverage wave 2 for dbi_related.go checkers.
 // Covers: checkDBILogs, checkDbiVPC, checkDbiDBC, checkDbiRole, checkDbiENI.
 // checkDbiENI requires a live EC2 client — only nil-client path is tested here.
-package unit
+package unit_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -311,11 +312,6 @@ func TestRelated_DBI_ENI_NilClientReturnsNegOne(t *testing.T) {
 	src := resource.Resource{
 		ID: "my-postgres-db",
 		RawStruct: rdstypes.DBInstance{
-			// DBSubnetGroup.VpcId must be non-empty so the nil-client guard is
-			// reached (the checker returns Count=0 early when VpcId is absent).
-			DBSubnetGroup: &rdstypes.DBSubnetGroup{
-				VpcId: aws.String("vpc-0a1b2c3d4e5f60001"),
-			},
 			VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
 				{VpcSecurityGroupId: aws.String("sg-0a1b2c3d4e5f60001")},
 			},

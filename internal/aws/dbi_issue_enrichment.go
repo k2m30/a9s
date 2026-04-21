@@ -2,5 +2,5 @@
 package aws
 
 func init() {
-	registerIssueEnricher("dbi", EnrichDbiMaintenance, 10)
+	registerIssueEnricher("dbi", EnrichRDSDocDBMaintenance, 10)
 }
