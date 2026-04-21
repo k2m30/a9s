@@ -24,6 +24,7 @@ skills:
   - a9s-common
   - a9s-bt-v2
   - a9s-add-resource
+  - a9s-create-demo-fixture
 ---
 
 You are a senior Go developer implementing **a9s** — an AWS resource manager TUI built with Bubble Tea v2.
