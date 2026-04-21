@@ -260,7 +260,7 @@ AWS API: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_S
 AWS API: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html
 
 - **`ct-events`** — Audit trail for repo policy/package events.
-- **`kms`** — Repo EncryptionKey.
+- **`kms`** — Domain `EncryptionKey` (resolved via `DescribeDomain` using the repo's `DomainName` + `DomainOwner`); CodeArtifact encryption is a domain-level, not repository-level, property. <!-- amended by a9s-resource-spec during codeartifact gen: AWS SDK Go v2 shows EncryptionKey lives on DomainDescription/DomainSummary, not RepositoryDescription/RepositorySummary -->
 
 ### `ct-events`
 
@@ -423,7 +423,7 @@ AWS API: https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repositor
 - **`cfn`** — CloudFormation stack that created the repo.
 - **`ct-events`** — Audit trail for image push/pull, policy changes.
 - **`eb-rule`** — Image-scan EventBridge events.
-- **`ecs`** — ECS services pulling from this repo.
+<!-- amended by a9s-resource-spec during ecr gen: removed stale `ecs` bullet — contradicts the per-type contract row (line 66) and the explicit non-match at line 1092 (`ecr → ecs` has no first-class API; use `ecr → ecs-task`). -->
 - **`ecs-task`** — Task defs pull from repo.
 - **`kms`** — EncryptionConfiguration.KmsKey.
 - **`lambda`** — Lambda functions using container image from this repo.
@@ -681,10 +681,12 @@ AWS API: https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html
 - **`lambda`** — Lambdas consuming from MSK topics (event source mapping).
 - **`logs`** — LoggingInfo BrokerLogs.CloudWatchLogs.
 - **`s3`** — LoggingInfo BrokerLogs.S3.
-- **`secrets`** — ClientAuthentication.Sasl.Scram.
+<!-- amended by a9s-resource-spec during msk gen: SDK Sasl.Scram carries only an `Enabled` bool, not secret ARNs; the attached SCRAM-secret ARNs are returned by ListScramSecrets(ClusterArn=...). -->
+- **`secrets`** — ClientAuthentication.Sasl.Scram (enabled flag) + `ListScramSecrets(ClusterArn)` returning `SecretArnList[]` — the Secrets Manager secrets attached for SASL/SCRAM auth.
 - **`sg`** — BrokerNodeGroupInfo.SecurityGroups — broker SGs.
 - **`subnet`** — BrokerNodeGroupInfo.ClientSubnets — broker subnets.
-- **`vpc`** — BrokerNodeGroupInfo.ClientVpcIpAddresses → VPC.
+<!-- amended by a9s-resource-spec during msk gen: SDK BrokerNodeGroupInfo has no `ClientVpcIpAddresses` field; the VPC is derived from the ClientSubnets by cross-referencing the loaded `subnet` list (Subnet.VpcId). -->
+- **`vpc`** — derived from BrokerNodeGroupInfo.ClientSubnets → cross-reference subnet list → Subnet.VpcId.
 
 ### `nat`
 

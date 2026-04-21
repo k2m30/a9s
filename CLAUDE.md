@@ -92,6 +92,9 @@ specs/           # feature specifications
 | `a9s-add-child-view` | Coder (phase 3), QA (phase 2) | Split blueprint: architect scopes, QA tests, coder implements |
 | `a9s-add-related-view` | Coder (steps 1-6), QA (steps 7-11) | Split blueprint: add related-resource views per resource type |
 | `a9s-implement-issue` | Architect (orchestrator) | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
+| `a9s-resource-spec` | Main session | Generate `docs/resources/<shortName>.md` implementation-blind from the four golden docs |
+| `a9s-implement-resource` | Main session (orchestrator) | Implement resource from its spec: TBDs → impl-plan → fixtures → QA + coder handoff |
+| `a9s-create-demo-fixture` | Coder (during impl-resource 6a) | Build the single-source fixture file at `internal/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
 
 ## Agents
 

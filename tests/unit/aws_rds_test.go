@@ -60,8 +60,11 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	if r0.ID != "prod-db-01" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-db-01", r0.ID)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	// Per docs/resources/dbi.md §4: Healthy rows render Status blank —
+	// silence is the UX. The underlying keyword ("available") remains in
+	// Fields["status"] for the detail view and filters.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (Healthy silence), got %q", "", r0.Status)
 	}
 
 	// Verify required fields exist and have correct values

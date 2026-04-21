@@ -295,46 +295,63 @@ func checkDbiRole(_ context.Context, _ any, res resource.Resource, _ resource.Re
 }
 
 // checkDbiENI resolves the ENIs that RDS provisions for this DB instance via
-// a single ec2:DescribeNetworkInterfaces call (Pattern C). RDS manages its
-// ENIs with the description "RDSNetworkInterface" and attaches them to the
-// instance's security groups. We filter by description + group-id to scope.
+// a single ec2:DescribeNetworkInterfaces call. Filter set:
+// [{requester-id, amazon-rds}, {vpc-id, <DBSubnetGroup.VpcId>}].
+// Client-side: keep only ENIs whose Description starts with "RDSNetworkInterface"
+// AND contains the DBInstanceIdentifier as a substring after the prefix — this
+// eliminates ENIs belonging to other DB instances sharing the same VPC.
+// If DBSubnetGroup is nil or VpcId is empty, returns Count=0 without calling AWS.
 func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
 	}
-	var sgIDs []string
-	for _, sg := range db.VpcSecurityGroups {
-		if sg.VpcSecurityGroupId != nil && *sg.VpcSecurityGroupId != "" {
-			sgIDs = append(sgIDs, *sg.VpcSecurityGroupId)
-		}
-	}
-	if len(sgIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-	}
+	// Check client availability before inspecting instance config so that a nil
+	// EC2 client always returns Count=-1 regardless of DBSubnetGroup state.
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EC2 == nil {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
 	}
-	descName := "description"
-	descVal := "RDSNetworkInterface"
-	groupName := "group-id"
+	if db.DBSubnetGroup == nil || db.DBSubnetGroup.VpcId == nil || *db.DBSubnetGroup.VpcId == "" {
+		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
+	}
+	vpcID := *db.DBSubnetGroup.VpcId
+	dbID := ""
+	if db.DBInstanceIdentifier != nil {
+		dbID = *db.DBInstanceIdentifier
+	}
+	requesterName := "requester-id"
+	requesterVal := "amazon-rds"
+	vpcName := "vpc-id"
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeNetworkInterfacesOutput, error) {
 		return c.EC2.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
 			Filters: []ec2types.Filter{
-				{Name: &descName, Values: []string{descVal}},
-				{Name: &groupName, Values: sgIDs},
+				{Name: &requesterName, Values: []string{requesterVal}},
+				{Name: &vpcName, Values: []string{vpcID}},
 			},
 		})
 	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
 	}
+	const rdsPrefix = "RDSNetworkInterface"
 	var ids []string
 	for _, ni := range out.NetworkInterfaces {
-		if ni.NetworkInterfaceId != nil && *ni.NetworkInterfaceId != "" {
-			ids = append(ids, *ni.NetworkInterfaceId)
+		if ni.NetworkInterfaceId == nil || *ni.NetworkInterfaceId == "" {
+			continue
 		}
+		desc := ""
+		if ni.Description != nil {
+			desc = *ni.Description
+		}
+		// Must start with "RDSNetworkInterface" and reference this instance's ID.
+		if !strings.HasPrefix(desc, rdsPrefix) {
+			continue
+		}
+		if dbID != "" && !strings.Contains(desc, dbID) {
+			continue
+		}
+		ids = append(ids, *ni.NetworkInterfaceId)
 	}
 	return relatedResult("eni", ids)
 }
