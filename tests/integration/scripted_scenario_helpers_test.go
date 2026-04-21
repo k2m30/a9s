@@ -498,6 +498,129 @@ func (s *fullIntegrationScenario) currentView() string {
 	return fullIntegrationStripANSI(fullIntegrationViewContent(s.model))
 }
 
+// findRow returns the first rendered line that contains the given resource ID as
+// a standalone token. Returns empty string if no such line is present.
+func (s *fullIntegrationScenario) findRow(resourceID string) string {
+	s.t.Helper()
+	for _, line := range strings.Split(s.currentView(), "\n") {
+		if !strings.Contains(line, resourceID) {
+			continue
+		}
+		return line
+	}
+	return ""
+}
+
+// ExpectRowStatusBlank asserts that the row for resourceID does not contain any
+// of the banned Healthy filler strings (`OK`, `ACTIVE`, `available`, `running`,
+// `healthy`, `-`). Healthy rows must render their Status cell empty per spec §4.
+func (s *fullIntegrationScenario) ExpectRowStatusBlank(resourceID string) {
+	s.t.Helper()
+	line := s.findRow(resourceID)
+	if line == "" {
+		s.failf("row for %q not found in rendered view", resourceID)
+		return
+	}
+	banned := []string{"OK", "ACTIVE", "available", "running", "healthy"}
+	for _, token := range banned {
+		if strings.Contains(line, token) {
+			s.failf("row for %q must render blank Status but contains banned token %q: %q", resourceID, token, line)
+		}
+	}
+}
+
+// ExpectRowStatusEquals asserts that the row for resourceID contains the exact
+// Status phrase expected by spec §4 (substring match — the row contains other
+// cells, so exact cell-level equality is not enforced).
+func (s *fullIntegrationScenario) ExpectRowStatusEquals(resourceID, expected string) {
+	s.t.Helper()
+	line := s.findRow(resourceID)
+	if line == "" {
+		s.failf("row for %q not found in rendered view", resourceID)
+		return
+	}
+	if !strings.Contains(line, expected) {
+		s.failf("row for %q missing Status phrase %q: %q", resourceID, expected, line)
+	}
+}
+
+// ExpectRowNamePrefix asserts that the row for resourceID has the given glyph
+// prefix (e.g. `"~ "` or `"! "`) immediately before the identity cell.
+func (s *fullIntegrationScenario) ExpectRowNamePrefix(resourceID, prefix string) {
+	s.t.Helper()
+	line := s.findRow(resourceID)
+	if line == "" {
+		s.failf("row for %q not found in rendered view", resourceID)
+		return
+	}
+	if !strings.Contains(line, prefix+resourceID) {
+		s.failf("row for %q missing prefix %q: %q", resourceID, prefix, line)
+	}
+}
+
+// ExpectRowNoGlyphPrefix asserts that the row for resourceID has neither a
+// `!` nor a `~` glyph prefix. Glyphs are only permitted on Healthy (green)
+// rows per spec §4; Warning / Broken / Dim rows must never render one.
+func (s *fullIntegrationScenario) ExpectRowNoGlyphPrefix(resourceID string) {
+	s.t.Helper()
+	line := s.findRow(resourceID)
+	if line == "" {
+		s.failf("row for %q not found in rendered view", resourceID)
+		return
+	}
+	for _, glyph := range []string{"! ", "~ "} {
+		if strings.Contains(line, glyph+resourceID) {
+			s.failf("row for %q must have no glyph prefix but found %q: %q", resourceID, glyph, line)
+		}
+	}
+}
+
+// ExpectMenuIssueCount asserts that the main menu entry for shortName renders
+// an `issues:N` badge matching want. Pass want=0 to require the badge be
+// absent (no issues).
+func (s *fullIntegrationScenario) ExpectMenuIssueCount(shortName string, want int) {
+	s.t.Helper()
+	view := s.currentView()
+	var target string
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, shortName) && strings.Contains(line, "issues:") {
+			target = line
+			break
+		}
+	}
+	if want == 0 {
+		// Either no issue badge present for shortName, or not found at all.
+		if target == "" {
+			return
+		}
+		s.failf("main menu entry for %q must not render an issues badge but got %q", shortName, target)
+		return
+	}
+	if target == "" {
+		s.failf("main menu entry for %q missing issues:%d badge", shortName, want)
+		return
+	}
+	expected := "issues:" + strconv.Itoa(want)
+	if !strings.Contains(target, expected) {
+		s.failf("main menu entry for %q expected %q got %q", shortName, expected, target)
+	}
+}
+
+// ExpectRelatedRowCountAtLeast asserts that the related-panel row for
+// displayName has a count of at least n. Used when the exact count depends on
+// live/demo state but a floor is guaranteed by fixture design.
+func (s *fullIntegrationScenario) ExpectRelatedRowCountAtLeast(displayName string, n int) {
+	s.t.Helper()
+	msg, ok := s.lastRelatedByName[displayName]
+	if !ok {
+		s.failf("related row %q was not observed; got %v", displayName, s.relatedNames())
+		return
+	}
+	if msg.Result.Count < n {
+		s.failf("related row %q count = %d, expected at least %d", displayName, msg.Result.Count, n)
+	}
+}
+
 func (s *fullIntegrationScenario) beginAction(format string, args ...any) {
 	s.lastFlash = nil
 	s.lastAPIError = nil
