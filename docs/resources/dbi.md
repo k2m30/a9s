@@ -173,14 +173,27 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `modifying` (or current keyword) | `Instance is modifying — pending changes in progress.` |
-| failure status (`failed`, `storage-full`, `incompatible-*`, `restore-error`) | 1 | Broken | n/a | S2, S4 | `storage-full` (or current keyword) | `Instance storage full — scale up or free space to recover.` — a9s-devops: RDS does not expose a structured reason field for primary instances (`StatusInfos` is read-replica-scoped), so the status keyword itself is the cause and the S5 sentence names the remedy. |
+| transitional status (`modifying`/`rebooting`/etc.) | 1 | Warning | n/a | S2, S4 | `<status>: <PendingModifiedValues first non-empty key>` when available, else bare `<status>` (e.g. `modifying: DBInstanceClass`, `rebooting`) | `Instance is <status> — pending changes in progress.` |
+| `failed` | 1 | Broken | n/a | S2, S4 | `failed` | `Instance is in a failed state — contact AWS support or restore from snapshot.` |
+| `storage-full` | 1 | Broken | n/a | S2, S4 | `storage-full` | `Instance storage full — scale up or free space to recover.` |
+| `incompatible-network` | 1 | Broken | n/a | S2, S4 | `incompatible-network` | `Network config incompatible — check DB subnet group AZ coverage.` |
+| `incompatible-option-group` | 1 | Broken | n/a | S2, S4 | `incompatible-option-group` | `Option group incompatible — remove or update options.` |
+| `incompatible-parameters` | 1 | Broken | n/a | S2, S4 | `incompatible-parameters` | `Parameter group incompatible — review custom parameters.` |
+| `incompatible-restore` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` | `Restore failed — check snapshot compatibility and engine version.` |
+| `restore-error` | 1 | Broken | n/a | S2, S4 | `restore-error` | `Restore error — review source snapshot and target engine version.` |
 | `inaccessible-encryption-credentials` | 1 | Broken | n/a | S2, S4 | `encryption key unavailable` | `KMS key for storage is unavailable — check key state and grants.` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` | `Automated backups disabled (BackupRetentionPeriod=0).` |
 | `PubliclyAccessible == true` | 1 | Warning | n/a | S2, S4 | `publicly accessible` | `Instance is reachable from the public internet (CIS RDS.2).` |
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted storage` | `Storage encryption at rest is disabled (CIS RDS.3).` |
 | `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `deletion protection off` | `Deletion protection is disabled — instance can be deleted in one API call.` |
 | Pending maintenance overdue | 2 | Warning on Healthy row | `~` | S3, S4, S5 | `maintenance scheduled` | `Pending maintenance action overdue: <ActionType> (<Description>).` |
+
+Notes on the table:
+
+- **Transitional S4 suffix**: when `DBInstanceStatus` is in the transitional set and `PendingModifiedValues` has at least one non-empty field, S4 = `<status>: <first-non-empty key>`. Key iteration order is the field order on `types.PendingModifiedValues` (deterministic via reflection or explicit priority list). When no pending value is set, S4 = bare status keyword. Rationale: §4.1 + §6 a9s-devops (2026-04-20, possible=yes, worth=yes); user decision (2026-04-21).
+- **Per-failure S5 sentences**: each failure status has its own remedy sentence. Rationale: §4 groups them for brevity but operators need the specific remedy at 3am; user decision (2026-04-21).
+- **Broken precedence**: when `DBInstanceStatus` is itself broken (`failed`, `storage-full`, `incompatible-*`, `restore-error`, `inaccessible-encryption-credentials`), the status-based S4/S5 takes precedence over configuration warnings (no-backups, publicly-accessible, unencrypted, deletion-protection-off). The row renders red, not yellow, and does not stack a second S4 string.
+- **Warning precedence when available**: when `DBInstanceStatus == "available"` but one or more configuration warnings apply, S4 = the first one in this order: `no automated backups` > `publicly accessible` > `unencrypted storage` > `deletion protection off`. Rationale: operators want the highest-severity policy miss surfaced; only one line fits S4.
 
 Rules for filling list and detail text:
 
@@ -223,3 +236,5 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Pending maintenance S4 text (`maintenance scheduled`) and S5 sentence shape — a9s-devops (2026-04-20): possible=yes, worth=yes. `PendingMaintenanceAction.Action` + `.Description` + `.ForcedApplyDate`/`.AutoAppliedAfterDate` from `DescribePendingMaintenanceActions` provide the fields needed for a short human-readable summary.
 - Transitional-status UX gap (bare `modifying`) and recommended fix — a9s-devops (2026-04-20): possible=yes, worth=yes. `PendingModifiedValues` on `DBInstance` carries the actual pending change set (e.g. `DBInstanceClass`, `AllocatedStorage`, `EngineVersion`); surfacing the first non-empty key gives the operator a readable "what's being changed" without opening detail.
 - Wave 3 exclusions — a9s-devops (2026-04-20): possible=yes, worth=no as list-row signals. CloudWatch per-resource metrics scale per-datapoint per-minute; they belong in a metrics view, not on the resource list.
+- user decision (2026-04-21): transitional S4 shape is `<status>: <first non-empty PendingModifiedValues key>` when available, else bare status. Pins the §4.1 recommendation into §4 so the coder has no latitude.
+- user decision (2026-04-21): each Broken failure status renders its own S5 remedy sentence (per the table in §4), rather than a single generic "in a failed state" sentence.
