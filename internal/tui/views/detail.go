@@ -389,8 +389,8 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Down):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor < len(m.fieldList)-1 {
 				m.fieldCursor++
-				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
-				for m.fieldCursor < len(m.fieldList)-1 && m.fieldList[m.fieldCursor].IsSection {
+				// Skip non-selectable rows (section headers, spacers).
+				for m.fieldCursor < len(m.fieldList)-1 && (m.fieldList[m.fieldCursor].IsSection || m.fieldList[m.fieldCursor].IsSpacer) {
 					m.fieldCursor++
 				}
 				m.syncViewportToCursor()
@@ -401,8 +401,8 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Up):
 			if !m.rightCol.IsFocused() && m.fieldList != nil && m.fieldCursor > 0 {
 				m.fieldCursor--
-				// Skip IsSection rows (section headers for ct-events should not receive cursor focus).
-				for m.fieldCursor > 0 && m.fieldList[m.fieldCursor].IsSection {
+				// Skip non-selectable rows (section headers, spacers).
+				for m.fieldCursor > 0 && (m.fieldList[m.fieldCursor].IsSection || m.fieldList[m.fieldCursor].IsSpacer) {
 					m.fieldCursor--
 				}
 				m.syncViewportToCursor()
