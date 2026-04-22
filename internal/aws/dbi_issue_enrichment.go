@@ -3,7 +3,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -84,10 +83,10 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			continue
 		}
 
-		// Build Summary from the first detail's Action + Description.
-		summary := buildDBIMaintenanceSummary(action.PendingMaintenanceActionDetails)
-
-		// Build Rows.
+		// Summary is the short S5 phrase; every concrete fact (Action,
+		// Description, Earliest Target, Apply Method) lives only in Rows so
+		// the Attention section does not render duplicated content. See the
+		// contract on resource.EnrichmentFinding.
 		var rows []resource.FindingRow
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil && *pa.Action != "" {
@@ -108,7 +107,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 
 		findings[key] = resource.EnrichmentFinding{
 			Severity: "~",
-			Summary:  summary,
+			Summary:  "pending maintenance",
 			Rows:     rows,
 		}
 
@@ -135,34 +134,3 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}, nil
 }
 
-// buildDBIMaintenanceSummary formats the spec §4 S5 sentence:
-//
-//	"Pending maintenance action overdue: <Action> (<Description>)."
-//
-// When Description is empty, collapse the parenthetical:
-//
-//	"Pending maintenance action overdue: <Action>."
-func buildDBIMaintenanceSummary(details []rdstypes.PendingMaintenanceAction) string {
-	if len(details) == 0 {
-		return "Pending maintenance action overdue."
-	}
-	d := details[0]
-	action := ""
-	if d.Action != nil {
-		action = *d.Action
-	}
-	desc := ""
-	if d.Description != nil {
-		desc = *d.Description
-	}
-	if action == "" && desc == "" {
-		return "Pending maintenance action overdue."
-	}
-	if desc == "" {
-		return fmt.Sprintf("Pending maintenance action overdue: %s.", action)
-	}
-	if action == "" {
-		return fmt.Sprintf("Pending maintenance action overdue: %s.", desc)
-	}
-	return fmt.Sprintf("Pending maintenance action overdue: %s (%s).", action, desc)
-}
