@@ -10,7 +10,7 @@ func ExpectedTopLevelCounts() map[string]int {
 	ecs := NewECSFixtures()
 	eks := NewEKSFixtures()
 	rds := NewRDSFixtures()
-	docdb := NewDocDBFixtures()
+	docdb := NewDBCFixtures()
 	iam := NewIAMFixtures()
 	kms := NewKMSFixtures()
 	s3 := NewS3Fixtures()
