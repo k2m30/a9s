@@ -57,7 +57,7 @@ var allAttentionColumns = []attentionColumnCase{
 	{resourceType: "rtb", key: "blackhole_routes_count", description: "Route table blackhole count"},
 	{resourceType: "eip", key: "status", description: "EIP attachment status"},
 	{resourceType: "dbi", key: "status", description: "derived status phrase"},
-	{resourceType: "dbc", key: "cis_flags", description: "DocumentDB CIS compliance flags"},
+	{resourceType: "dbc", key: "status", description: "DocumentDB cluster derived status phrase (docs/resources/dbc.md §4)"},
 	{resourceType: "secrets", key: "status", description: "Secrets Manager OVERDUE status"},
 	{resourceType: "ssm", key: "risk", description: "SSM parameter staleness risk"},
 

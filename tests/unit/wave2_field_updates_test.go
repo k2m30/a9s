@@ -15,6 +15,7 @@ package unit
 import (
 	"context"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -1085,9 +1086,9 @@ func TestFetchEIP_WritesStatus(t *testing.T) {
 	}
 }
 
-// Test #20 — dbc: cis_flags field
+// Test #20 — dbc: multi-warning §4 status phrase (formerly cis_flags)
 
-// docdbFake implements DocDBDescribeDBClustersAPI for cis_flags test.
+// docdbFake implements DocDBDescribeDBClustersAPI for dbc tests.
 type docdbFake struct {
 	awsclient.DocDBDescribeDBClustersAPI
 	clusters []docdbtypes.DBCluster
@@ -1101,11 +1102,13 @@ func (f *docdbFake) DescribeDBClusters(
 	return &docdb.DescribeDBClustersOutput{DBClusters: f.clusters}, nil
 }
 
-// TestFetchDBC_WritesCISFlags verifies that FetchDocDBClustersPage populates
-// Fields["cis_flags"] with relevant CIS failure tokens for a cluster with
-// all CIS-failing attributes.
-func TestFetchDBC_WritesCISFlags(t *testing.T) {
-	clusterID := "docdb-cis-fail-cluster"
+// TestFetchDBC_MultiWarningStatusPhrase verifies that FetchDocDBClustersPage
+// collapses a cluster with multiple Wave-1 warnings into a single §4 status
+// phrase with a (+N) suffix — the post-refactor replacement for the legacy
+// `cis_flags` column (removed per universal rule U10, no jargon columns).
+// See docs/resources/dbc.md §4.
+func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
+	clusterID := "docdb-multi-warn-cluster"
 	fake := &docdbFake{
 		clusters: []docdbtypes.DBCluster{
 			{
@@ -1114,6 +1117,9 @@ func TestFetchDBC_WritesCISFlags(t *testing.T) {
 				StorageEncrypted:      aws.Bool(false),
 				BackupRetentionPeriod: aws.Int32(0),
 				DeletionProtection:    aws.Bool(false),
+				DBClusterMembers: []docdbtypes.DBClusterMember{
+					{IsClusterWriter: aws.Bool(true)},
+				},
 			},
 		},
 	}
@@ -1128,17 +1134,27 @@ func TestFetchDBC_WritesCISFlags(t *testing.T) {
 	}
 
 	r := result.Resources[0]
-	cisFlags := r.Fields["cis_flags"]
-	if cisFlags == "" {
-		t.Errorf("cis_flags is empty — coder must compute CIS flag field in FetchDocDBClustersPage")
-		return
+
+	// Jargon column gone — no cis_flags anywhere.
+	if _, ok := r.Fields["cis_flags"]; ok {
+		t.Error("Fields[\"cis_flags\"] unexpectedly present — universal rule U10 requires its removal")
 	}
 
-	// At minimum expect UNENC, NOBKP, NOPROT tokens.
-	for _, token := range []string{"UNENC", "NOBKP", "NOPROT"} {
-		if !strings.Contains(cisFlags, token) {
-			t.Errorf("dbc cis_flags = %q missing token %q", cisFlags, token)
-		}
+	// §4 top phrase for delete-protection off + unencrypted + no backups:
+	// precedence order = delete-protection first, then not-encrypted, then
+	// no-automated-backups — so the top is "delete-protection off" with (+2).
+	const want = "delete-protection off (+2)"
+	if r.Status != want {
+		t.Errorf("Status = %q, want %q (spec §4 multi-warning top phrase)", r.Status, want)
+	}
+	if r.Fields["status"] != want {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
+	}
+
+	// Issues slice enumerates every active warning (rule 7 — detail view renders each individually).
+	wantIssues := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
+	if !reflect.DeepEqual(r.Issues, wantIssues) {
+		t.Errorf("Issues = %v, want %v", r.Issues, wantIssues)
 	}
 }
 

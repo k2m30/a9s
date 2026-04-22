@@ -767,9 +767,8 @@ func TestCR273_Item2_RDS_ColorReadsStatusKey(t *testing.T) {
 }
 
 // TestCR273_Item2_DocDB_ColorReadsStatusKey asserts that a DB cluster (DocDB)
-// with Fields["status"]="failed" is classified as ColorBroken.
-//
-// Currently FAILS: rdsInstanceColor shared by dbc has no case for "failed".
+// in Status=failed renders broken. Post-refactor, Fields["status"] carries the
+// §4 phrase ("failed: cluster operation"), not the raw AWS keyword.
 func TestCR273_Item2_DocDB_ColorReadsStatusKey(t *testing.T) {
 	td := resource.FindResourceType("dbc")
 	if td == nil {
@@ -778,13 +777,13 @@ func TestCR273_Item2_DocDB_ColorReadsStatusKey(t *testing.T) {
 	r := resource.Resource{
 		ID:     "cluster-test-1",
 		Name:   "acme-docdb-cluster",
-		Status: "failed",
-		Fields: map[string]string{"status": "failed"},
+		Status: "failed: cluster operation",
+		Fields: map[string]string{"status": "failed: cluster operation"},
 	}
 	got := td.Color(r)
 	if got != resource.ColorBroken {
-		t.Errorf("dbc Color(status=failed) = %v, want ColorBroken (%v): cluster-level failure state must not appear healthy in issue badges or ctrl+z filtering",
-			got, resource.ColorBroken)
+		t.Errorf("dbc Color(status=%q) = %v, want ColorBroken (%v): cluster-level failure state must not appear healthy in issue badges or ctrl+z filtering",
+			r.Status, got, resource.ColorBroken)
 	}
 }
 
@@ -1020,6 +1019,11 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		"EXPIRED", "REVOKED", "VALIDATION_TIMED_OUT",
 		"rebooting cluster nodes",
 		"false", "true", "0", "1", "No",
+		// dbc phrase-based statuses (see docs/resources/dbc.md §4).
+		"failed: cluster operation", "encryption key unreachable",
+		"parameter group incompatible", "no writer: reads only",
+		"modifying: in progress", "delete-protection off",
+		"not encrypted at rest", "no automated backups",
 	}
 
 	fieldKeys := []string{

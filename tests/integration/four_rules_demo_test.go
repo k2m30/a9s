@@ -188,7 +188,7 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 		"EBS Snapshots (4) issues:1",
 		"EKS Clusters (3) issues:1",
 		"ElastiCache Redis (4) issues:1",
-		"DB Clusters (3) issues:1",
+		"DB Clusters (13) issues:10",
 		"EFS File Systems (3) issues:1",
 		"NAT Gateways (3) issues:1",
 		"AMIs (4) issues:1",

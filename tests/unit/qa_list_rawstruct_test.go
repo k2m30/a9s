@@ -927,7 +927,9 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"ec2", realisticEC2Instance(), []string{"i-0abcdef1234567890", "running", "t3.medium"}},
 		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "db.r5.large"}},
 		{"redis", realisticRedisCacheCluster(), []string{"redis-prod-001", "7.0.12", "cache.r6g.large"}},
-		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0", "available"}},
+		// dbc: Status column now uses Key:"status" (reads from Fields, not RawStruct) so the
+		// raw AWS keyword "available" no longer appears in the list. Identity columns remain.
+		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0"}},
 		{"eks", realisticEKSCluster(), []string{"prod-cluster", "1.28"}},
 		{"secrets", realisticSecretListEntry(), []string{"prod/database/password", "Production database password"}},
 		{"s3", realisticS3Bucket(), []string{"my-production-bucket", "2025-06-15"}},

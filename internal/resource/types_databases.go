@@ -5,28 +5,6 @@ import (
 	"time"
 )
 
-// rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
-// Used by dbi and dbc types which share the same status vocabulary.
-func rdsInstanceColor(status string) Color {
-	switch status {
-	case "available":
-		return ColorHealthy
-	case "creating", "modifying", "backing-up", "rebooting", "upgrading",
-		"renaming", "resetting-master-credentials", "storage-optimization",
-		"starting", "stopping":
-		return ColorWarning
-	case "stopped", "restore-error", "storage-full", "failed":
-		return ColorBroken
-	case "deleting":
-		return ColorWarning
-	}
-	// incompatible-* and inaccessible-encryption-credentials patterns
-	if strings.HasPrefix(status, "incompatible-") || strings.HasPrefix(status, "inaccessible-") {
-		return ColorBroken
-	}
-	return ColorHealthy
-}
-
 func databasesResourceTypes() []ResourceTypeDef {
 	return []ResourceTypeDef{
 		{
@@ -193,41 +171,37 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
-				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				{Key: "status", Title: "Status", Width: 32, Sortable: true},
 				{Key: "instances", Title: "Instances", Width: 10, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				base := rdsInstanceColor(r.Fields["status"])
-				// No writer member → cluster cannot accept writes → Broken.
-				// has_writer == "false" is populated by the fetcher; "" (legacy/unset)
-				// is treated as unknown and not penalised.
-				if r.Fields["has_writer"] == "false" {
-					base = ColorBroken
-				}
-				// Do not downgrade Broken.
-				if base == ColorBroken {
+				// Strip (+N) suffix so phrase matching works regardless of stacking.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				switch phrase {
+				case "":
+					return ColorHealthy
+				// Broken phrases (§4 "List text" column).
+				case "failed: cluster operation",
+					"encryption key unreachable",
+					"parameter group incompatible",
+					"no writer: reads only":
 					return ColorBroken
+				// Warning phrases (§4 "List text" column).
+				case "delete-protection off",
+					"not encrypted at rest",
+					"no automated backups":
+					return ColorWarning
+				// Wave 2 phrase on a Healthy row — stays green so the `!` glyph renders.
+				case "maintenance overdue":
+					return ColorHealthy
 				}
-				// No deletion protection → Warning.
-				if r.Fields["deletion_protection"] == "false" {
-					if base < ColorWarning {
-						base = ColorWarning
-					}
+				// Transitional — format is "<status>: in progress".
+				if strings.HasSuffix(phrase, ": in progress") {
+					return ColorWarning
 				}
-				// Unencrypted storage → Warning.
-				if r.Fields["storage_encrypted"] == "false" {
-					if base < ColorWarning {
-						base = ColorWarning
-					}
-				}
-				// No automated backups → Warning.
-				if r.Fields["backup_retention_period"] == "0" {
-					if base < ColorWarning {
-						base = ColorWarning
-					}
-				}
-				return base
+				// Unknown phrase → treat as Healthy (future-proof for new AWS statuses).
+				return ColorHealthy
 			},
 		},
 		{

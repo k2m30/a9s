@@ -753,6 +753,12 @@ func TestQA_ListViewColumns_DocDB(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			// Columns with an empty Path read from the Resource.Fields map via
+			// Key (fetcher-computed values like the §4 status phrase). ExtractScalar
+			// cannot derive a value from the raw SDK struct for these.
+			if col.Path == "" {
+				return
+			}
 			result := fieldpath.ExtractScalar(cluster, col.Path)
 			// DBClusterMembers is a slice, so ExtractScalar returns "" (non-scalar)
 			if col.Path == "DBClusterMembers" {

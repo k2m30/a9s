@@ -436,20 +436,26 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 		}
 	}
 
-	availableStyle := styles.ColorStyle(td.Color(dbcRes("available")))
+	// Post-refactor Fields["status"] carries the §4 PHRASE, not the raw AWS
+	// keyword. Healthy = blank; transitional = "<status>: in progress"; Broken
+	// phrases are spelled out per spec §4.
+	availableStyle := styles.ColorStyle(td.Color(dbcRes("")))
 	if availableStyle.GetForeground() != styles.ColRunning {
-		t.Errorf("dbc 'available': expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
+		t.Errorf("dbc healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.ColorStyle(td.Color(dbcRes("creating")))
+	creatingStyle := styles.ColorStyle(td.Color(dbcRes("creating: in progress")))
 	if creatingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("dbc 'creating': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
+		t.Errorf("dbc 'creating: in progress': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
-	// Per spec: docdb deleting → Warning (not Broken).
-	deletingStyle := styles.ColorStyle(td.Color(dbcRes("deleting")))
-	if deletingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("dbc 'deleting': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
+	// deleting is not in the transitional set per spec §3.1 — only creating,
+	// modifying, backing-up, maintenance, upgrading, starting, stopping,
+	// resetting-master-credentials, renaming are. Use 'modifying' as the
+	// transitional-warning probe.
+	modifyingStyle := styles.ColorStyle(td.Color(dbcRes("modifying: in progress")))
+	if modifyingStyle.GetForeground() != styles.ColPending {
+		t.Errorf("dbc 'modifying: in progress': expected ColPending (Warning per spec), got %v", modifyingStyle.GetForeground())
 	}
 }
 
