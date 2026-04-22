@@ -925,7 +925,7 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 	}{
 		// -- Already covered individually above, included for completeness --
 		{"ec2", realisticEC2Instance(), []string{"i-0abcdef1234567890", "running", "t3.medium"}},
-		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "available"}},
+		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "db.r5.large"}},
 		{"redis", realisticRedisCacheCluster(), []string{"redis-prod-001", "7.0.12", "cache.r6g.large"}},
 		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0", "available"}},
 		{"eks", realisticEKSCluster(), []string{"prod-cluster", "1.28"}},

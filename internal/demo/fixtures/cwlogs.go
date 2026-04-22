@@ -58,6 +58,23 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1706000000000),
 		},
+		// prod-dbi-1 log groups — required for dbi→logs related-panel pivot.
+		// Matches EnabledCloudwatchLogsExports = ["postgresql", "upgrade"] on prod-dbi-1.
+		{
+			LogGroupName:    aws.String("/aws/rds/instance/prod-dbi-1/postgresql"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/rds/instance/prod-dbi-1/postgresql:*"),
+			StoredBytes:     aws.Int64(104857600),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1710000000000),
+			KmsKeyId:        aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		{
+			LogGroupName:    aws.String("/aws/rds/instance/prod-dbi-1/upgrade"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/rds/instance/prod-dbi-1/upgrade:*"),
+			StoredBytes:     aws.Int64(1048576),
+			RetentionInDays: aws.Int32(7),
+			CreationTime:    aws.Int64(1710000100000),
+		},
 		// Issue: RetentionInDays=nil → Warning (log group never expires, unbounded cost)
 		{
 			LogGroupName: aws.String("/app/custom/no-retention"),

@@ -108,6 +108,22 @@ func NewKMSFixtures() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
 			Enabled:      false,
 		},
+		// PendingDeletion key — referenced by broken-dbi-encryption-locked fixture (KmsKeyId).
+		// This key was deleted while still in use by an RDS instance, causing
+		// the instance to enter the inaccessible-encryption-credentials state.
+		{
+			KeyId:                aws.String("deadbeef-0000-0000-0000-000000000000"),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/deadbeef-0000-0000-0000-000000000000"),
+			Description:          aws.String("Deleted RDS encryption key — caused DB instance access failure"),
+			KeyState:             kmstypes.KeyStatePendingDeletion,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2024, 1, 10, 8, 0, 0, 0, time.UTC)),
+			Enabled:              false,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 	}
 
 	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata))
@@ -156,6 +172,11 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/unavailable-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/unavailable-key"),
 			TargetKeyId: aws.String("a7b8c9d0-ef01-4567-89ab-ddeeff001122"),
+		},
+		{
+			AliasName:   aws.String("alias/deleted-rds-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/deleted-rds-key"),
+			TargetKeyId: aws.String("deadbeef-0000-0000-0000-000000000000"),
 		},
 	}
 

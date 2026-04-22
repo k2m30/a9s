@@ -36,6 +36,20 @@ var secretDescPool = []string{
 // NewSecretsFixtures constructs SecretsFixtures from the canonical demo data.
 func NewSecretsFixtures() *SecretsFixtures {
 	secrets := []smtypes.SecretListEntry{
+		// RDS-managed secret for prod-dbi-1 — required for dbi→secrets related-panel pivot.
+		// ARN matches DBIFixtures.ProdDbiMasterSecretARN (MasterUserSecret.SecretArn on prod-dbi-1).
+		{
+			Name:             aws.String("rds!db-prod-dbi-1-ABCDEF"),
+			ARN:              aws.String(ProdDbiMasterSecretARN),
+			Description:      aws.String("RDS-managed master user password for prod-dbi-1"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
+			Tags:             []smtypes.Tag{{Key: aws.String("aws:rds:primaryDBInstanceArn"), Value: aws.String(ProdDbiARN)}},
+		},
 		{
 			Name:              aws.String("prod/docdb/acme-docdb-prod"),
 			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),

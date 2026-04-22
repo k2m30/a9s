@@ -298,11 +298,16 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 		// painted by the base row style so cursor highlight is uninterrupted.
 		if i == markerColIdx {
 			if finding, ok := m.findingsByID[r.ID]; ok {
-				switch finding.Severity {
-				case "!":
-					val = "! " + val
-				case "~":
-					val = "~ " + val
+				// Spec rule 3: glyph only on Healthy (green) rows. On yellow /
+				// red / dim rows the color is itself the signal; a glyph would
+				// be duplicate noise, and spec §4 explicitly forbids it.
+				if m.typeDef.ResolveColor(r) == resource.ColorHealthy {
+					switch finding.Severity {
+					case "!":
+						val = "! " + val
+					case "~":
+						val = "~ " + val
+					}
 				}
 			} else if m.truncatedByID[r.ID] {
 				val = "? " + val

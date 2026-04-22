@@ -450,6 +450,59 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"eks.amazonaws.com","eventName":"DescribeCluster","requestParameters":{"name":"acme-prod"}}`),
 		},
+		// prod-dbi-1 events — required for dbi→ct-events related-panel pivot.
+		// ResourceName matches prod-dbi-1 DBInstanceIdentifier (checkDbiCTEvents looks
+		// for fields["resource_name"] == res.ID).
+		{
+			EventId:     aws.String("evt-rds-dbi1-modify-001"),
+			EventName:   aws.String("ModifyDBInstance"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 15, 14, 30, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String("prod-dbi-1")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","awsRegion":"us-east-1","requestParameters":{"dBInstanceIdentifier":"prod-dbi-1","dBInstanceClass":"db.r6g.xlarge","applyImmediately":false},"responseElements":{"dBInstanceIdentifier":"prod-dbi-1","dBInstanceStatus":"modifying"},"requestID":"req-rds-mod-001","eventID":"evt-rds-dbi1-modify-001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"` + ProdDbiARN + `","accountId":"123456789012","type":"AWS::RDS::DBInstance"}]}`),
+		},
+		{
+			EventId:     aws.String("evt-rds-dbi1-reboot-001"),
+			EventName:   aws.String("RebootDBInstance"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 10, 9, 15, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String("prod-dbi-1")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"RebootDBInstance","awsRegion":"us-east-1","requestParameters":{"dBInstanceIdentifier":"prod-dbi-1","forceFailover":false},"responseElements":{"dBInstanceIdentifier":"prod-dbi-1","dBInstanceStatus":"rebooting"},"requestID":"req-rds-reboot-001","eventID":"evt-rds-dbi1-reboot-001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"` + ProdDbiARN + `","accountId":"123456789012","type":"AWS::RDS::DBInstance"}]}`),
+		},
+		// warn-dbi-multi events — required for dbi→ct-events related-panel pivot.
+		{
+			EventId:     aws.String("evt-rds-warn-multi-modify-001"),
+			EventName:   aws.String("ModifyDBInstance"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 18, 10, 5, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String(WarnDbiMultiID)},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","awsRegion":"us-east-1","requestParameters":{"dBInstanceIdentifier":"warn-dbi-multi","backupRetentionPeriod":0},"responseElements":{"dBInstanceIdentifier":"warn-dbi-multi","dBInstanceStatus":"available"},"requestID":"req-rds-mod-multi-001","eventID":"evt-rds-warn-multi-modify-001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"` + WarnDbiMultiARN + `","accountId":"123456789012","type":"AWS::RDS::DBInstance"}]}`),
+		},
+		// warn-dbi-public-maint events — required for dbi→ct-events related-panel pivot.
+		{
+			EventId:     aws.String("evt-rds-warn-public-maint-001"),
+			EventName:   aws.String("ModifyDBInstance"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 18, 11, 30, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String(WarnDbiPublicMaintID)},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","awsRegion":"us-east-1","requestParameters":{"dBInstanceIdentifier":"warn-dbi-public-maint","publiclyAccessible":true},"responseElements":{"dBInstanceIdentifier":"warn-dbi-public-maint","dBInstanceStatus":"available"},"requestID":"req-rds-mod-pubmaint-001","eventID":"evt-rds-warn-public-maint-001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"` + WarnDbiPublicMaintARN + `","accountId":"123456789012","type":"AWS::RDS::DBInstance"}]}`),
+		},
 		// CloudFormation event
 		{
 			EventId:     aws.String("evt-cfn-update-001"),

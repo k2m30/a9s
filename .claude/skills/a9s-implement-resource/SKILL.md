@@ -111,6 +111,30 @@ These rules are invariant across all resource types. They are enforced by phase 
 
    This matters for resources like ECR: a repo with `scanOnPush=false` (Wave 1 Warning) AND `CRITICAL>0` (Wave 2 Broken) renders **red** with the Wave 2 Broken phrase in S4, because Broken severity beats Warning severity regardless of wave origin.
 
+## Universal coverage matrix (mandatory before phase 3)
+
+Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` suffix + stacking) is a cross-signal invariant and will be missed if each signal is tested in isolation. Before writing the phase 3 pseudocode, produce this coverage table in the impl-plan doc. Every row MUST point to at least one fixture ID and one test case. If the table can't be filled, phase 3 is blocked.
+
+| ID | Invariant | Required fixture shape | Required test |
+|----|-----------|-----------------------|---------------|
+| U1 | Healthy blank S4 | 1 Healthy fixture | `ExpectRowStatusBlank` |
+| U2 | Warning/Broken §4 phrase | ≥1 fixture per §3.1 signal | `ExpectRowStatusEquals` per signal |
+| U3 | `~` glyph on Healthy+~ finding | 1 Healthy + Wave-2 ~ fixture | `ExpectRowNamePrefix("~ ")` |
+| U4 | `!` glyph on Healthy+! finding | 1 Healthy + Wave-2 ! fixture (skip if spec has no `!`) | `ExpectRowNamePrefix("! ")` |
+| U5 | No glyph on non-green rows | any Warning / Broken fixture | `ExpectRowNoGlyphPrefix` |
+| U6 | S1 badge counts `!`-severity instances | all fixtures | `ExpectMenuIssueCount` |
+| **U7a** | **Multi Wave-1: `<top> (+N-1)` suffix** | **1 fixture with ≥2 coexisting Wave-1 warnings** | **`ExpectRowStatusEquals(id, "<top> (+N)")`** |
+| **U7b** | **Wave-1 + Wave-2 stack: bumps suffix** | **1 fixture with Wave-1 Warning AND a Wave-2 finding** | **`ExpectRowStatusEquals(id, "<w1phrase> (+1)")`** |
+| **U7c** | **S5 lists every Wave-2 finding in full** | **same fixture as U7b** | **`ExpectViewContains(<w2 cause>)` on detail** |
+| **U7e** | **S5 lists every Wave-1 phrase as well — `Resource.Issues` surfaces in detail, not just in the Status column** | **multi-W1 fixture (`warn-<short>-multi`)** | **`ExpectViewContains(<phrase>)` on detail for each entry in `Resource.Issues`; the bare `<top phrase>` must appear without its `(+N)` suffix because the detail enumerates the entries, not the rolled-up Status string** |
+| **U7f** | **`Resource.Issues` is populated in §4 precedence order by the fetcher — one entry per active signal** | **every `warn-*` and `broken-*` fixture** | **unit test: `got.Issues` deep-equals the expected ordered slice** |
+| U7d | `!` beats `~` in multi-finding precedence | 1 fixture with both ! and ~ (if spec has both) | `ExpectRowNamePrefix("! ")` on Healthy stack |
+| U8 | Broken severity > Warning > `~` | fixture with Wave-1 Warning + Wave-2 Broken (if spec has it) | phrase precedence test |
+| U9 | Related pivot counts (`count shown: yes`) | 1 graph-root fixture | `ExpectRelatedRowCountAtLeast` per pivot |
+| U10 | No jargon columns | all fixtures | `ExpectViewNotContains("CIS", "Flags", …)` |
+
+Demo mode runs Wave 2 enrichment end-to-end against typed fakes (the `!m.isDemo` guard was removed 2026-04-22 after it was caught hiding the `(+N)` / `~` / "maintenance scheduled" rendering in the actual demo). Every row in this table is therefore reachable via the scripted scenario harness without message injection, provided the harness drains the `AvailabilityPrefetchedMsg` → `EnrichmentCheckedMsg` chain (it does as of 2026-04-22).
+
 ### Phase 1 — Read the spec doc
 
 Load `docs/resources/<shortName>.md` end to end. Extract:
@@ -158,6 +182,50 @@ One case per row in §4 of the spec. Additionally:
 
 - A **silence test** for the Healthy happy path: row green, S4 blank, no finding, no count.
 - One **anti-test** per Wave 3 OUT OF SCOPE item: if a fixture includes this condition, the spec must NOT surface anything.
+- **Mandatory multi-finding cases (rule 7)** — one test per coverage-matrix row U7a/U7b/U7c. These never emerge naturally from enumerating §3 signals; the skill runner inserts them explicitly:
+
+```text
+TEST: multi_w1_<top>_plus_<hidden>_suffix   (covers U7a)
+GIVEN: a fixture with §3.1 warning <top> AND §3.1 warning <hidden> both present
+WHEN:  the list is fetched
+THEN:  Resource.Status == "<top> (+1)"
+       — suffix increments by 1 per hidden warning
+       — the top phrase is the §4 precedence winner, not the later one
+
+TEST: w1_plus_w2_bumps_suffix   (covers U7b)
+GIVEN: a fixture with §3.1 warning <w1> AND a Wave-2 finding
+WHEN:  the enricher runs over a resource slice whose Status is already "<w1>"
+THEN:  FieldUpdates[id]["status"] == "<w1> (+1)"
+       — NOT "<w2cause>" (Wave-1 wins severity precedence)
+       — NOT "<w1> (+1) (+1)" (double-suffix must not accumulate across runs)
+
+TEST: w1_multi_plus_w2_bumps_existing_suffix
+GIVEN: a fixture with N≥2 Wave-1 warnings (Status = "<top> (+N-1)") AND a Wave-2 finding
+WHEN:  the enricher runs
+THEN:  FieldUpdates[id]["status"] == "<top> (+N)"
+       — the existing suffix increments; the phrase does not change
+
+TEST: detail_view_shows_all_findings   (covers U7c)
+GIVEN: the same fixture as w1_plus_w2_bumps_suffix
+WHEN:  OpenDetailResource on it
+THEN:  rendered detail contains the Wave-2 finding's Action/Description rows
+       — "no finding silently disappears" per rule 7
+
+TEST: detail_view_surfaces_every_wave1_phrase   (covers U7e)
+GIVEN: the multi-W1 fixture (`warn-<short>-multi`) with N≥2 coexisting §3.1 warnings
+WHEN:  OpenDetailResource on it
+THEN:  rendered detail contains EACH entry of `Resource.Issues` verbatim
+       — the list Status shows "<top> (+N-1)", the detail enumerates
+         every phrase so the operator never has to infer hidden warnings.
+
+TEST: fetcher_populates_resource_issues   (covers U7f)
+GIVEN: each §3 fixture (Healthy, single warning, multi warning, transitional, broken)
+WHEN:  FetchXxxPage runs on the fixture
+THEN:  got.Issues deep-equals the expected ordered slice
+       — Healthy → nil / empty
+       — N warnings → N phrases in §4 precedence order
+       — broken / transitional → single-entry slice matching the §4 phrase
+```
 
 Keep cases plain. The QA agent turns them into Go tests in phase 6; the pseudocode stays as the human-readable contract in the impl-plan doc.
 
@@ -174,6 +242,14 @@ All other fields use sensible defaults from a typical t3.medium in us-east-1.
 ```
 
 Group fixtures by reuse — e.g. one baseline "healthy instance" fixture that several tests mutate. The QA agent uses this list to build typed fakes; the coder does not read it directly.
+
+**Mandatory multi-finding fixtures (rule 7):** the per-signal list above covers §3 but not rule 7. Append these to §2 before dispatching phase 6a:
+
+- **Multi-W1 fixture** — an instance with ≥2 coexisting §3.1 warnings (e.g. `warn-<short>-multi`). Concrete values for every field the §3.1 signals read. Expected `Resource.Status` = `"<top §4 phrase> (+N-1)"` where N is the warning count.
+- **W1 + W2 stacking fixture** — an instance with one §3.1 Warning AND a Wave-2 finding (e.g. `warn-<short>-<w1>-plus-<w2>`). Both the matching §3.2 API response entry AND the fetcher-side fields that trigger the §3.1 Warning. Expected `FieldUpdates[id]["status"]` after enrichment = `"<w1 phrase> (+1)"`.
+- **Wave-3-exclusive fixture** (when applicable) — when the resource has both `!` and `~` Wave-2 signals, add one fixture with both. Verifies U7d precedence (`!` beats `~`).
+
+Skip any fixture whose preconditions are unreachable for this resource (e.g. U7d is skipped when the resource has only `~` Wave-2 signals). Record the skip in the impl-plan with a one-line justification — do NOT silently omit.
 
 ### Phase 5 — Contract surface read + view-config audit
 
@@ -333,6 +409,44 @@ Parallelization: parallel-safe with 6b QA (both run after 6a)
 - Wave 2 enricher populates resource.EnrichmentFinding with the exact Summary from §4 "Detail text" column.
 - No invented UI. No row `·` dot. No `⚠ Background Check` header. No derived banner. See spec §"Allowed visualization surfaces".
 
+### Rule-7 implementation (multi-finding `(+N)` suffix) — MANDATORY:
+
+Rule 7 is NOT wired by any universal infrastructure; each resource emits the `(+N)` suffix itself through its fetcher + enricher pair. Missing this is the most common implementation bug — verified against dbi on 2026-04-22.
+
+1. **Fetcher — multi-W1 suffix**: when the resource has multiple §3.1 warnings that can coexist (e.g. `available` + `BackupRetentionPeriod=0` + `PubliclyAccessible=true`), collect ALL applicable warnings in §4 precedence order, then emit:
+   - 0 warnings → `""` (Healthy silence).
+   - 1 warning → `"<phrase>"` (single, no suffix).
+   - N≥2 → `"<top phrase> (+N-1)"`.
+   The top phrase is the first-in-precedence (per §4), the suffix is `(+<count of hidden warnings>)`. Never collapse silently to just the top phrase when >1 warning exists.
+
+2. **Enricher — W1+W2 suffix bumping**: when a Wave-2 finding lands on a row whose fetcher-produced `Resource.Status` is non-empty, the enricher MUST append/bump a `(+N)` suffix in `FieldUpdates[id]["status"]` — NOT overwrite with the Wave-2 phrase (Wave-1 wins severity precedence), NOT leave Status alone (the operator loses the finding-count signal). Implement a helper like:
+   ```go
+   func bumpFindingSuffix(s string) string {
+       // "publicly accessible" → "publicly accessible (+1)"
+       // "publicly accessible (+1)" → "publicly accessible (+2)"
+       re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
+       m := re.FindStringSubmatch(s)
+       if m == nil { return s + " (+1)" }
+       n, _ := strconv.Atoi(m[2])
+       return fmt.Sprintf("%s (+%d)", m[1], n+1)
+   }
+   ```
+   On Healthy rows (Status == ""), set `"maintenance scheduled"` (or the spec's Wave-2 short cause) verbatim — no suffix, single finding.
+
+3. **Color function (`internal/resource/types_<service>.go`) — MUST strip `(+N)` before matching**: the shared helper `stripFindingSuffix` already exists in `internal/resource/types_databases.go`. Every per-type Color func that pattern-matches on `Resource.Fields["status"]` MUST strip the suffix first, OR match phrase prefix. Failing this, `"publicly accessible (+1)"` falls through all Warning switches and color-bucket-ends up Healthy — a spec-§4 violation.
+
+4. **Wave-2 short-cause phrase must NOT be in the Warning color switch**: a Wave-2 `~` finding renders on a HEALTHY (green) row. If the Color func lists `"maintenance scheduled"` among Warning phrases, the row turns yellow and the glyph is suppressed — spec rule 3 violation. The enricher sets the Status phrase; the Color func must treat it as Healthy (the row color is driven by the Wave-1 bucket, not by the Wave-2 phrase).
+
+5. **Fetcher MUST populate `Resource.Issues`** — an ordered slice of every active §4 phrase for this row (in precedence order). The common pattern is to split `computeXxxStatus` into `computeXxxStatusAndIssues(raw) (topPhrase string, allIssues []string)`, then:
+   - Healthy → empty slice.
+   - Single warning → one entry matching the top phrase.
+   - N≥2 warnings → N entries; the first is the top, the rest are the ones hidden behind the `(+N-1)` suffix.
+   - Broken / transitional → a single entry with the §4 phrase.
+
+   Dropping this populates `Resource.Issues == nil`; the detail view silently hides every hidden warning; universal rule U7e fails. This is the bug that leaked through on 2026-04-22 — spec rule 7 violation revealed when the user opened a row that listed `(+3)` on the list but showed no individual issues in detail. The integration test `TestScenario_DBIVisual_DetailSurfacesAllIssues` is the regression pin.
+
+6. **Detail view universally renders `Resource.Issues` via `injectIssuesSection`** (already wired in `detail_fields.go` — no per-resource work needed). Confirm the section appears at the top of the detail view when `len(Issues) > 0`. If a future resource's fetcher forgets to populate Issues, this section silently collapses — the QA unit test for `Resource.Issues` is the only upstream check.
+
 ### Forbidden inputs:
 - Do not read tests/** — you write against contract, not test machinery.
 
@@ -394,6 +508,29 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 4. **Glyph presence/absence**: for each fixture whose Wave 2 finding severity is `~` on a Healthy row, `scenario.ExpectRowNamePrefix(<fixture ID>, "~ ")`. For `!`, `"! "`. For any non-Healthy row, `scenario.ExpectRowNoGlyphPrefix(<fixture ID>)` regardless of finding presence.
 5. **S1 menu count**: `scenario.ExpectMenuIssueCount(<shortName>, <expected N>)` where N = count of distinct fixtures that have at least one `!` severity finding (NOT total finding count — a fixture with 3 `!` findings counts as 1). Must satisfy `N ≤ total fixture count for this type`. When the spec §3.2 has no Wave 2 `!` signals at all, N = 0 and the helper treats that as "badge absent" (no `issues:` string in the menu entry for this type).
 6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped.
+7. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
+8. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
+9. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
+10. **Non-green rows no glyph (rule 3)**: `scenario.ExpectRowNoGlyphPrefix(<w1+w2 id>)` — the row has a Wave-2 finding but is Warning-colored; the color is the signal, no glyph.
+11. **S5 Wave-2 finding-row visibility (U7c)**: `scenario.OpenDetailResource(<shortName>, <w1+w2 fixture>)`; then `scenario.ExpectViewContains(<w2 finding Action or Description string>)`. Verifies no Wave-2 finding silently disappears when Status shows the Wave-1 phrase.
+12. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every entry of `Resource.Issues` verbatim:
+    ```go
+    multi := selectXxxByID(t, scenario, <multiW1 id>)
+    scenario.OpenDetailResource("<short>", multi)
+    for _, phrase := range multi.Issues {
+        scenario.ExpectViewContains(phrase)
+    }
+    ```
+    The `(+N)` suffix itself is NOT expected in the detail — the detail enumerates phrases, one per row. This is the U7e regression pin that caught the 2026-04-22 bug.
+
+**Wave-2 in demo mode is native** — no injection required. The phase-8 scenario test drives `fullIntegrationNewDemoScenario`, calls `OpenList`, and asserts every rule above directly. The harness's `shouldDrainFollowups` includes `AvailabilityPrefetchedMsg` / `AvailabilityCheckedMsg` / `EnrichmentCheckedMsg` so the enrichment chain cascades end-to-end.
+
+If a new resource's enricher does not produce expected findings in demo:
+1. Verify the resource's typed fake implements every AWS API the enricher calls (e.g. `DescribePendingMaintenanceActions`, `GetStages`, `GetPolicyVersion`). Missing fake methods cause the enricher to error and findings never land.
+2. Verify the fake's response matches what the enricher expects — empty slices vs error vs missing field all cascade differently.
+3. Verify `handleAvailabilityPrefetched` seeds `resourceCache` from `msg.Resources` so `FieldUpdates` merged by `handleEnrichmentChecked` survive the first `OpenList`.
+
+The scenario test no longer needs a Part-A-then-Part-B structure — all assertions run after `OpenList` returns, with the enrichment having already merged.
 
 The test file runs inside the existing integration test target:
 
@@ -419,12 +556,31 @@ If `scenario.ExpectRowStatusBlank` / `ExpectRowNamePrefix` / `ExpectMenuIssueCou
 - glyphs: ~<N> / !<N> prefixes verified; <N> non-green rows glyph-free
 - S1 menu badge: expected issues:<N>, got issues:<N>
 - related pivots non-zero: <M>/<total> (skipped: <N> unknown-count)
+- rule-7 U7a (multi-W1 +N suffix): <fixture-id> → "<expected>" OK
+- rule-7 U7b (W1+W2 suffix bump): <fixture-id> → "<expected>" OK (via injection)
+- rule-7 U7c (S5 all findings): <fixture-id> detail contains <w2 cause> OK
+- rule-7 U7d (! beats ~):        <skipped because no ! signals in spec | OK>
+- rule-7 U7e (S5 every Wave-1 phrase): <fixture> → all <N> entries verbatim in detail OK
+- rule-7 U7f (Resource.Issues population): <N> fixtures, <N> deep-equals OK
+- Wave-2 native in demo:         yes (enrichment chain drains end-to-end)
 - unit tests: <N> passing, 0 failing
 - stubs: 0 / TBDs resolved: <N> / deferred: <N> / out-of-scope: <N>
 Implementation approved — ready for review at internal/aws/<shortName>*.go and tests/integration/scenario_<shortName>_visual_test.go.
 ```
 
+Rule-7 lines are **required** — "N/A" is only valid when the spec has at most one §3.1 signal AND no Wave-2 signals (extremely rare). Omitting them = render-gate FAIL.
+
 If any rule fails, report the exact failure and the fixture that triggered it. Do NOT summarize as "mostly passing" — a single failed render-gate rule is a blocking defect.
+
+#### 8.4 User-observable visual sanity — MANDATORY before claiming done
+
+Run the scenario test with `-v` and paste the rendered output of ONE multi-warning detail view in the final report. The scenario harness captures the rendered frame via `scenario.currentView()`; emit it to the test log before the assertions so the reader can see exactly what an `./a9s --demo` user would see on that row:
+
+```go
+t.Log("\n" + scenario.currentView())  // just before the ExpectViewContains assertions
+```
+
+This is the regression pin for the 2026-04-22 class of bugs where unit tests green, render-gate green, and the actual user screenshot shows that phrases are silently missing. Ship the rendered detail alongside the PASS report. If the rendered frame lacks any phrase asserted above, the gate fails regardless of what the `Expect*` calls returned.
 
 ## What this skill never does
 

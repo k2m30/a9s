@@ -147,6 +147,34 @@ func buildDocDBClusters() []docdbtypes.DBCluster {
 			DBSubnetGroup:     aws.String("acme-docdb-subnet-group"),
 			ClusterCreateTime: aws.Time(mustTime("2025-09-01T08:00:00Z")),
 		},
+		// prod-aurora-cluster — Aurora PostgreSQL cluster.
+		// Required for dbi→dbc related-panel pivot: prod-dbi-aurora-1's
+		// DBClusterIdentifier references this cluster.
+		{
+			DBClusterIdentifier:        aws.String("prod-aurora-cluster"),
+			DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster"),
+			Engine:                     aws.String("aurora-postgresql"),
+			EngineVersion:              aws.String("16.4"),
+			Status:                     aws.String("available"),
+			Endpoint:                   aws.String("prod-aurora-cluster.cluster-c9xyz123.us-east-1.rds.amazonaws.com"),
+			ReaderEndpoint:             aws.String("prod-aurora-cluster.cluster-ro-xyz.us-east-1.rds.amazonaws.com"),
+			Port:                       aws.Int32(5432),
+			StorageEncrypted:           aws.Bool(true),
+			KmsKeyId:                   aws.String(docdbKMSKeyID),
+			DeletionProtection:         aws.Bool(true),
+			BackupRetentionPeriod:      aws.Int32(7),
+			PreferredMaintenanceWindow: aws.String("sun:05:00-sun:06:00"),
+			DBSubnetGroup:              aws.String(rdsSubnetGroup),
+			VpcSecurityGroups: []docdbtypes.VpcSecurityGroupMembership{
+				{VpcSecurityGroupId: aws.String(docdbSGID), Status: aws.String("active")},
+			},
+			DBClusterMembers: []docdbtypes.DBClusterMember{
+				{DBInstanceIdentifier: aws.String("prod-dbi-aurora-1"), IsClusterWriter: aws.Bool(true)},
+			},
+			MasterUsername:    aws.String("pgadmin"),
+			MultiAZ:           aws.Bool(true),
+			ClusterCreateTime: aws.Time(mustTime("2025-03-01T12:00:00Z")),
+		},
 	}
 }
 

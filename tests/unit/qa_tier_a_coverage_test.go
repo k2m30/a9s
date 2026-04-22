@@ -56,7 +56,7 @@ var allAttentionColumns = []attentionColumnCase{
 	// Group 3: Fetcher-computed Wave-1 field additions
 	{resourceType: "rtb", key: "blackhole_routes_count", description: "Route table blackhole count"},
 	{resourceType: "eip", key: "status", description: "EIP attachment status"},
-	{resourceType: "dbi", key: "cis_flags", description: "RDS CIS compliance flags"},
+	{resourceType: "dbi", key: "status", description: "derived status phrase"},
 	{resourceType: "dbc", key: "cis_flags", description: "DocumentDB CIS compliance flags"},
 	{resourceType: "secrets", key: "status", description: "Secrets Manager OVERDUE status"},
 	{resourceType: "ssm", key: "risk", description: "SSM parameter staleness risk"},

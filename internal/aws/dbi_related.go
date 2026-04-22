@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -337,4 +338,48 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	return relatedResult("eni", ids)
+}
+
+// checkDbiCTEvents checks cached CloudTrail events for references to the DB instance.
+// Returns Count=-1 (unknown) when the cache is truncated or a cache miss occurs.
+// FetchFilter["ResourceName"] is always set so the caller can do a filtered re-fetch.
+func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	dbID := res.ID
+	if dbID == "" {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+	}
+	fetchFilter := map[string]string{"ResourceName": dbID}
+	eventList, truncated, err := dbiRelatedResources(ctx, clients, cache, "ct-events")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+	}
+	if eventList == nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	var ids []string
+	for _, eventRes := range eventList {
+		raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct)
+		if ok {
+			matched := false
+			for _, rr := range raw.Resources {
+				if rr.ResourceName != nil && *rr.ResourceName == dbID {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				ids = append(ids, eventRes.ID)
+			}
+			continue
+		}
+		if eventRes.Fields["resource_name"] == dbID {
+			ids = append(ids, eventRes.ID)
+		}
+	}
+	if truncated {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
 }

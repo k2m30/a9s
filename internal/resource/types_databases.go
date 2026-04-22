@@ -1,9 +1,21 @@
 package resource
 
 import (
+	"regexp"
 	"strings"
 	"time"
 )
+
+// findingSuffixRe matches the universal-rule-7 " (+N)" suffix. Used by Color
+// funcs to strip the hidden-finding-count suffix before matching the base
+// phrase — the color is driven by the top (shown) phrase, not the count.
+var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
+
+// stripFindingSuffix removes the universal-rule-7 " (+N)" suffix from a Status
+// phrase:  "publicly accessible (+1)" → "publicly accessible".
+func stripFindingSuffix(s string) string {
+	return findingSuffixRe.ReplaceAllString(s, "")
+}
 
 // rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
 // Used by dbi and dbc types which share the same status vocabulary.
@@ -40,18 +52,57 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
 				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
 				{Key: "status", Title: "Status", Width: 14, Sortable: true},
-				{Key: "cis_flags", Title: "CIS", Width: 24, Sortable: false},
 				{Key: "class", Title: "Class", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
 				status := r.Fields["status"]
-				base := rdsInstanceColor(status)
-				// Do not downgrade Broken.
-				if base == ColorBroken {
+				// Strip the universal-rule-7 (+N) suffix before matching:
+				//   "publicly accessible (+1)" → "publicly accessible"
+				//   "no automated backups (+2)" → "no automated backups"
+				// The suffix only records hidden-finding count for the operator;
+				// color precedence is driven by the TOP (shown) phrase.
+				stripped := stripFindingSuffix(status)
+				// Broken statuses (including remapped "encryption key unavailable").
+				switch stripped {
+				case "failed", "storage-full", "restore-error", "stopped",
+					"incompatible-network", "incompatible-option-group",
+					"incompatible-parameters", "incompatible-restore",
+					"encryption key unavailable":
 					return ColorBroken
 				}
+				if strings.HasPrefix(stripped, "incompatible-") || strings.HasPrefix(stripped, "inaccessible-") {
+					return ColorBroken
+				}
+				// Config-warning phrases encoded by the new fetcher → Warning.
+				// NOTE: "maintenance scheduled" is NOT here — it is the Wave-2 `~`
+				// text rendered on a Healthy (green) row per spec §4 rule 3.
+				switch stripped {
+				case "no automated backups", "publicly accessible",
+					"unencrypted storage", "deletion protection off":
+					return ColorWarning
+				}
+				// Transitional statuses → Warning (including "keyword: pending-key" suffix form).
+				if stripped != "" && stripped != "available" && stripped != "maintenance scheduled" {
+					if strings.Contains(stripped, ":") {
+						return ColorWarning
+					}
+					switch stripped {
+					case "creating", "modifying", "backing-up", "rebooting",
+						"renaming", "resetting-master-credentials", "starting",
+						"stopping", "upgrading", "maintenance",
+						"configuring-enhanced-monitoring", "configuring-iam-database-auth",
+						"configuring-log-exports", "converting-to-vpc", "moving-to-vpc",
+						"storage-optimization", "deleting":
+						return ColorWarning
+					}
+				}
+				// status == "" (healthy silence from new fetcher), "available"
+				// (legacy / backward-compat), or "maintenance scheduled" (Wave-2
+				// on Healthy row). All are base-healthy, but individual
+				// field-level checks may upgrade to Warning.
+				base := ColorHealthy
 				// CIS RDS.2: publicly accessible → Warning.
 				if r.Fields["publicly_accessible"] == "true" {
 					if base < ColorWarning {

@@ -42,8 +42,6 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/aws/aws-sdk-go-v2/service/rds"
-	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretsmanagertypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
@@ -1084,63 +1082,6 @@ func TestFetchEIP_WritesStatus(t *testing.T) {
 	status := r.Fields["status"]
 	if status != "UNATTACHED" {
 		t.Errorf("eip status = %q, want %q — coder must compute status field in FetchElasticIPs", status, "UNATTACHED")
-	}
-}
-
-// Test #19 — dbi: cis_flags field
-
-// rdsFake implements RDSDescribeDBInstancesAPI for cis_flags test.
-type rdsFake struct {
-	awsclient.RDSDescribeDBInstancesAPI
-	instances []rdstypes.DBInstance
-}
-
-func (f *rdsFake) DescribeDBInstances(
-	_ context.Context,
-	_ *rds.DescribeDBInstancesInput,
-	_ ...func(*rds.Options),
-) (*rds.DescribeDBInstancesOutput, error) {
-	return &rds.DescribeDBInstancesOutput{DBInstances: f.instances}, nil
-}
-
-// TestFetchDBI_WritesCISFlags verifies that FetchRDSInstancesPage populates
-// Fields["cis_flags"] with tokens "PUB", "UNENC", "NOBKP", "NOPROT" for an
-// instance with all CIS-failing attributes.
-func TestFetchDBI_WritesCISFlags(t *testing.T) {
-	dbID := "db-cis-fail-instance"
-	fake := &rdsFake{
-		instances: []rdstypes.DBInstance{
-			{
-				DBInstanceIdentifier:  aws.String(dbID),
-				DBInstanceStatus:      aws.String("available"),
-				PubliclyAccessible:    aws.Bool(true),
-				StorageEncrypted:      aws.Bool(false),
-				BackupRetentionPeriod: aws.Int32(0),
-				DeletionProtection:    aws.Bool(false),
-			},
-		},
-	}
-
-	result, err := awsclient.FetchRDSInstancesPage(context.Background(), fake, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-
-	r := result.Resources[0]
-	cisFlags := r.Fields["cis_flags"]
-	if cisFlags == "" {
-		t.Errorf("cis_flags is empty — coder must compute CIS flag field in FetchRDSInstancesPage")
-		return
-	}
-
-	for _, token := range []string{"PUB", "UNENC", "NOBKP", "NOPROT"} {
-		if !strings.Contains(cisFlags, token) {
-			t.Errorf("cis_flags = %q missing token %q", cisFlags, token)
-		}
 	}
 }
 

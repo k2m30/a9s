@@ -1,6 +1,188 @@
-// dbi_issue_enrichment.go — Wave 2 issue enrichment for the dbi resource type.
+// dbi_issue_enrichment.go — Wave 2 enrichment for dbi: DescribePendingMaintenanceActions.
 package aws
 
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
 func init() {
-	registerIssueEnricher("dbi", EnrichRDSDocDBMaintenance, 10)
+	registerIssueEnricher("dbi", EnrichDBIMaintenance, 10)
+}
+
+// EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
+// and emits one Finding per dbi instance with pending maintenance. Severity "~" —
+// IssueCount is always 0 (Wave 2 ~ does not bump the S1 menu badge). When the
+// resource is Healthy (fetcher Status == ""), the enricher sets
+// FieldUpdates[id]["status"] = "maintenance scheduled" so the S4 column shows
+// the short cause. When Wave 1 already populated Status, the enricher bumps the
+// (+N) suffix on the existing phrase (universal rule 7) so the operator sees
+// there is more to open for.
+func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+	findings := make(map[string]resource.EnrichmentFinding)
+	truncatedIDs := make(map[string]bool)
+	fieldUpdates := make(map[string]map[string]string)
+
+	if clients == nil || clients.RDS == nil {
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, nil
+	}
+
+	// Paginate with a cap.
+	var allActions []rdstypes.ResourcePendingMaintenanceActions
+	var marker *string
+	truncated := false
+	pages := 0
+	for {
+		if pages >= EnrichmentCap {
+			truncated = true
+			break
+		}
+		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
+		pages++
+		if err != nil {
+			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, err
+		}
+		allActions = append(allActions, out.PendingMaintenanceActions...)
+		if out.Marker == nil || *out.Marker == "" {
+			break
+		}
+		marker = out.Marker
+	}
+
+	// Deterministic ARN-suffix matching via ordered probeIDs.
+	probeIDs := make([]string, 0, len(resources))
+	statusByID := make(map[string]string, len(resources))
+	for _, r := range resources {
+		if r.ID != "" {
+			probeIDs = append(probeIDs, r.ID)
+			statusByID[r.ID] = r.Status
+		}
+	}
+
+	for _, action := range allActions {
+		if action.ResourceIdentifier == nil {
+			continue
+		}
+		arn := *action.ResourceIdentifier
+		if !isInstanceARN(arn) {
+			continue // dbc / other RDS resources — not dbi
+		}
+		// Find the longest matching probeID (specificity wins over prefix).
+		key := ""
+		for _, id := range probeIDs {
+			if strings.HasSuffix(arn, ":"+id) && len(id) > len(key) {
+				key = id
+			}
+		}
+		if key == "" {
+			continue
+		}
+
+		// Build Summary from the first detail's Action + Description.
+		summary := buildDBIMaintenanceSummary(action.PendingMaintenanceActionDetails)
+
+		// Build Rows.
+		var rows []resource.FindingRow
+		for _, pa := range action.PendingMaintenanceActionDetails {
+			if pa.Action != nil && *pa.Action != "" {
+				rows = append(rows, resource.FindingRow{Label: "Action", Value: *pa.Action, Tier: "~"})
+			}
+			if pa.OptInStatus != nil && *pa.OptInStatus != "" {
+				rows = append(rows, resource.FindingRow{Label: "Apply Method", Value: *pa.OptInStatus})
+			}
+			if pa.AutoAppliedAfterDate != nil {
+				rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "~"})
+			} else if pa.ForcedApplyDate != nil {
+				rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "~"})
+			}
+			if pa.Description != nil && *pa.Description != "" {
+				rows = append(rows, resource.FindingRow{Label: "Description", Value: *pa.Description})
+			}
+		}
+
+		findings[key] = resource.EnrichmentFinding{
+			Severity: "~",
+			Summary:  summary,
+			Rows:     rows,
+		}
+
+		// Emit S4 FieldUpdate: if Healthy, set "maintenance scheduled"; if Wave 1 already
+		// populated Status, bump the (+N) suffix so the operator sees there's more to open for.
+		existing := statusByID[key]
+		var newStatus string
+		if existing == "" {
+			// Healthy + Wave 2 → sole finding, no suffix
+			newStatus = "maintenance scheduled"
+		} else {
+			// Wave 1 + Wave 2 stack → bump (+N) suffix on existing phrase
+			newStatus = bumpFindingSuffix(existing)
+		}
+		fieldUpdates[key] = map[string]string{"status": newStatus}
+	}
+
+	return IssueEnricherResult{
+		IssueCount:   0, // "~" findings never bump the S1 badge
+		Truncated:    truncated,
+		TruncatedIDs: truncatedIDs,
+		Findings:     findings,
+		FieldUpdates: fieldUpdates,
+	}, nil
+}
+
+// bumpFindingSuffix increments the (+N) suffix on a Status phrase, or adds
+// (+1) when no suffix is present. Returns "<phrase> (+N)".
+//
+//	"publicly accessible"          → "publicly accessible (+1)"
+//	"no automated backups (+1)"    → "no automated backups (+2)"
+//	"no automated backups (+2)"    → "no automated backups (+3)"
+//	""                             → "(+1)"   // never called on "" in practice
+func bumpFindingSuffix(s string) string {
+	// Match trailing " (+N)" — N is non-negative integer.
+	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
+	m := re.FindStringSubmatch(s)
+	if m == nil {
+		return s + " (+1)"
+	}
+	n, _ := strconv.Atoi(m[2])
+	return fmt.Sprintf("%s (+%d)", m[1], n+1)
+}
+
+// buildDBIMaintenanceSummary formats the spec §4 S5 sentence:
+//
+//	"Pending maintenance action overdue: <Action> (<Description>)."
+//
+// When Description is empty, collapse the parenthetical:
+//
+//	"Pending maintenance action overdue: <Action>."
+func buildDBIMaintenanceSummary(details []rdstypes.PendingMaintenanceAction) string {
+	if len(details) == 0 {
+		return "Pending maintenance action overdue."
+	}
+	d := details[0]
+	action := ""
+	if d.Action != nil {
+		action = *d.Action
+	}
+	desc := ""
+	if d.Description != nil {
+		desc = *d.Description
+	}
+	if action == "" && desc == "" {
+		return "Pending maintenance action overdue."
+	}
+	if desc == "" {
+		return fmt.Sprintf("Pending maintenance action overdue: %s.", action)
+	}
+	if action == "" {
+		return fmt.Sprintf("Pending maintenance action overdue: %s.", desc)
+	}
+	return fmt.Sprintf("Pending maintenance action overdue: %s (%s).", action, desc)
 }
