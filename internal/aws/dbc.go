@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period", "cis_flags"})
+	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period"})
 
 	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -92,11 +92,6 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			engineVersion = *cluster.EngineVersion
 		}
 
-		status := ""
-		if cluster.Status != nil {
-			status = *cluster.Status
-		}
-
 		instances := fmt.Sprintf("%d", len(cluster.DBClusterMembers))
 
 		endpoint := ""
@@ -130,27 +125,17 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		// Compute CIS compliance flags.
-		var cisFlags []string
-		if storageEncrypted == "false" {
-			cisFlags = append(cisFlags, "UNENC")
-		}
-		if backupRetentionPeriod == "0" {
-			cisFlags = append(cisFlags, "NOBKP")
-		}
-		if deletionProtection == "false" {
-			cisFlags = append(cisFlags, "NOPROT")
-		}
-		cisFlagsVal := strings.Join(cisFlags, "|")
+		computedStatus, computedIssues := computeDBCStatusAndIssues(cluster)
 
 		r := resource.Resource{
 			ID:     clusterID,
 			Name:   clusterID,
-			Status: status,
+			Status: computedStatus,
+			Issues: computedIssues,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
 				"engine_version":          engineVersion,
-				"status":                  status,
+				"status":                  computedStatus,
 				"instances":               instances,
 				"endpoint":                endpoint,
 				"arn":                     aws.ToString(cluster.DBClusterArn),
@@ -159,7 +144,6 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 				"deletion_protection":     deletionProtection,
 				"storage_encrypted":       storageEncrypted,
 				"backup_retention_period": backupRetentionPeriod,
-				"cis_flags":               cisFlagsVal,
 			},
 			RawStruct: cluster,
 		}
@@ -188,4 +172,83 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// brokenDBCStatusPhrase maps DocumentDB cluster statuses that represent hard failures
+// to their display phrases per spec §4.
+var brokenDBCStatusPhrase = map[string]string{
+	"failed":                              "failed: cluster operation",
+	"inaccessible-encryption-credentials": "encryption key unreachable",
+	"incompatible-parameters":             "parameter group incompatible",
+}
+
+// transitionalDBCStatusSet contains DocumentDB cluster statuses that indicate a
+// transitional (Warning) state. These show a ": in progress" suffix.
+var transitionalDBCStatusSet = map[string]struct{}{
+	"creating": {}, "modifying": {}, "backing-up": {}, "maintenance": {},
+	"upgrading": {}, "starting": {}, "stopping": {}, "resetting-master-credentials": {},
+	"renaming": {},
+}
+
+// countWriters returns the number of DBClusterMembers with IsClusterWriter == true.
+func countWriters(members []docdbtypes.DBClusterMember) int {
+	n := 0
+	for _, m := range members {
+		if m.IsClusterWriter != nil && *m.IsClusterWriter {
+			n++
+		}
+	}
+	return n
+}
+
+// computeDBCStatusAndIssues returns the top S4 phrase (with `(+N)` suffix when
+// multiple warnings stack) AND the full ordered list of every active issue phrase.
+// The second return feeds Resource.Issues so the detail view can render all
+// active warnings individually (spec rule 7). Broken / transitional / healthy
+// states each produce at most one phrase.
+func computeDBCStatusAndIssues(cluster docdbtypes.DBCluster) (string, []string) {
+	status := aws.ToString(cluster.Status)
+
+	// Broken statuses — first match wins; no warning stacking.
+	if phrase, ok := brokenDBCStatusPhrase[status]; ok {
+		return phrase, []string{phrase}
+	}
+
+	// No writer on an available cluster — reads only (Broken; beats warnings).
+	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
+		const phrase = "no writer: reads only"
+		return phrase, []string{phrase}
+	}
+
+	// Transitional statuses.
+	if _, ok := transitionalDBCStatusSet[status]; ok {
+		phrase := status + ": in progress"
+		return phrase, []string{phrase}
+	}
+
+	// Healthy available — collect Wave-1 warnings in spec §4 table order.
+	if status == "available" {
+		var warnings []string
+		// §4 order: delete-protection off, not encrypted at rest, no automated backups.
+		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
+			warnings = append(warnings, "delete-protection off")
+		}
+		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
+			warnings = append(warnings, "not encrypted at rest")
+		}
+		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
+			warnings = append(warnings, "no automated backups")
+		}
+		switch len(warnings) {
+		case 0:
+			return "", nil
+		case 1:
+			return warnings[0], warnings
+		default:
+			return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
+		}
+	}
+
+	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
+	return status, []string{status}
 }

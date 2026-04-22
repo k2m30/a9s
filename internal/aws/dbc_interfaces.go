@@ -22,10 +22,17 @@ type DocDBDescribeDBSubnetGroupsAPI interface {
 	DescribeDBSubnetGroups(ctx context.Context, params *docdb.DescribeDBSubnetGroupsInput, optFns ...func(*docdb.Options)) (*docdb.DescribeDBSubnetGroupsOutput, error)
 }
 
+// DocDBDescribePendingMaintenanceActionsAPI defines the interface for the DocumentDB
+// DescribePendingMaintenanceActions operation.
+type DocDBDescribePendingMaintenanceActionsAPI interface {
+	DescribePendingMaintenanceActions(ctx context.Context, params *docdb.DescribePendingMaintenanceActionsInput, optFns ...func(*docdb.Options)) (*docdb.DescribePendingMaintenanceActionsOutput, error)
+}
+
 // DocDBAPI is the aggregate interface covering all DocumentDB operations used by a9s fetchers.
 // *docdb.Client structurally satisfies this interface.
 type DocDBAPI interface {
 	DocDBDescribeDBClustersAPI
 	DocDBDescribeDBClusterSnapshotsAPI
 	DocDBDescribeDBSubnetGroupsAPI
+	DocDBDescribePendingMaintenanceActionsAPI
 }
