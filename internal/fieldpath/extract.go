@@ -443,6 +443,7 @@ type FieldItem struct {
 	// Set only on the Event row in ACTION by ct-events. Empty string falls through to neutral DetailVal.
 	NavID string // Navigation ID override — used by ct-events Principal rows where the display Value is the
 	// full ARN but navigation needs the bare name. Inert when empty.
+	IsSpacer bool // when true, render as a blank line; all other fields ignored.
 }
 
 // ToSnakeCase converts PascalCase to snake_case: "InstanceId" → "instance_id".

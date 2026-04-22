@@ -640,6 +640,9 @@ func (m *DetailModel) injectAttentionSection() {
 			})
 		}
 	}
+	// Blank line below the Attention block so the section is visually separated
+	// from identity / AWS fields that follow.
+	items = append(items, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
 	m.fieldList = append(items, m.fieldList...)
 }
 
@@ -737,6 +740,12 @@ func (m DetailModel) renderFromFieldList() string {
 	for idx, item := range m.fieldList {
 		isCursorRow := leftFocused && idx == m.fieldCursor
 		var line string
+		if item.IsSpacer {
+			// Blank-line visual separator — skip all styling; the cursor is
+			// also skipped on spacers by the detail cursor navigation.
+			lines = append(lines, "")
+			continue
+		}
 		if isCursorRow {
 			// Render selected rows without nested foreground/underline styles so
 			// labels remain legible on selection background across themes.
