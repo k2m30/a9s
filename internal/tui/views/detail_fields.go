@@ -310,6 +310,7 @@ func (m *DetailModel) buildFieldList() {
 		}
 		sort.Strings(keys)
 		m.fieldList = expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil)))
+		m.injectIssuesSection()
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
@@ -426,6 +427,7 @@ func (m *DetailModel) buildFieldList() {
 		}
 	}
 	m.fieldList = items
+	m.injectIssuesSection()
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()
 	}
@@ -556,6 +558,67 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	result = append(result, inject...)
 	result = append(result, m.fieldList[insertAt:]...)
 	m.fieldList = result
+}
+
+// injectIssuesSection prepends an "Issues" section to the field list when the
+// resource has one or more active issue phrases. Spec universal rule 7: "every
+// finding individually visible across S2–S5". The list view's Status column
+// shows only the top phrase (with optional `(+N)` suffix); this section
+// surfaces every entry so the operator can tell at a glance what's wrong,
+// without hunting through raw SDK fields.
+//
+// The section appears at the very top of the field list (above identity / AWS
+// fields) because issues are the 3am-glance information. Rendered items reuse
+// the existing fieldpath.FieldItem shape (section header + sub-fields) so
+// styling, color tiers, and navigation behave identically to other sections.
+func (m *DetailModel) injectIssuesSection() {
+	if len(m.res.Issues) == 0 {
+		return
+	}
+	items := make([]fieldpath.FieldItem, 0, 1+len(m.res.Issues))
+	items = append(items, fieldpath.FieldItem{
+		IsSection: true,
+		Key:       "Issues",
+		Path:      "Issues",
+		ColorTier: issuesSectionTier(m.res),
+	})
+	for _, phrase := range m.res.Issues {
+		items = append(items, fieldpath.FieldItem{
+			IsSubField:  true,
+			IndentLevel: 1,
+			Key:         phrase,
+			Value:       phrase,
+			Path:        "Issues",
+			ColorTier:   issuesSectionTier(m.res),
+		})
+	}
+	// Prepend: issues at the TOP, before identity / AWS fields.
+	m.fieldList = append(items, m.fieldList...)
+}
+
+// issuesSectionTier classifies the issues block for colouring. "!" for Broken
+// resources, "~" otherwise (Warning / transitional / Dim all render as "~").
+// Healthy rows never reach this code path because len(Issues) == 0.
+func issuesSectionTier(r resource.Resource) string {
+	// Any issue phrase that exactly matches a broken-bucket phrase promotes
+	// the section to "!" severity. Otherwise it is informational ("~").
+	brokenPhrases := map[string]bool{
+		"failed":                    true,
+		"storage-full":              true,
+		"restore-error":             true,
+		"stopped":                   true,
+		"incompatible-network":      true,
+		"incompatible-option-group": true,
+		"incompatible-parameters":   true,
+		"incompatible-restore":      true,
+		"encryption key unavailable": true,
+	}
+	for _, p := range r.Issues {
+		if brokenPhrases[p] {
+			return "!"
+		}
+	}
+	return "~"
 }
 
 // injectEnrichmentSection dispatches to the per-type enrichment injector based on
