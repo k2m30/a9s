@@ -54,6 +54,19 @@ func detailRenderOutput(m views.DetailModel) string {
 	return m.PlainContent()
 }
 
+// capitalizeFirstForTest mirrors the view-layer presentation helper so tests
+// can assert the rendered form without coupling to the internal function.
+func capitalizeFirstForTest(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	if r[0] >= 'a' && r[0] <= 'z' {
+		r[0] -= 'a' - 'A'
+	}
+	return string(r)
+}
+
 // ---------------------------------------------------------------------------
 // T046-a: No "Background Check" section when finding is nil
 // ---------------------------------------------------------------------------
@@ -92,7 +105,7 @@ func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 	if !strings.Contains(output, "Attention") {
 		t.Errorf("detail view must show 'Pending Maintenance' section when finding is set, got:\n%s", output)
 	}
-	if !strings.Contains(output, "pending maintenance: system-update (New OS patch)") {
+	if !strings.Contains(output, "Pending maintenance: system-update (New OS patch)") {
 		t.Errorf("detail view must show finding summary text, got:\n%s", output)
 	}
 }
@@ -143,7 +156,9 @@ func TestDetailView_FindingSeverityBangRendersWithSummary(t *testing.T) {
 	// Must not panic.
 	output := detailRenderOutput(m)
 
-	if !strings.Contains(output, "latest build FAILED") {
+	// The Attention section capitalizes the first letter of each entry for
+	// presentation; the underlying Summary stays canonical lowercase.
+	if !strings.Contains(output, "Latest build FAILED") {
 		t.Errorf("severity '!' finding must render its summary, got:\n%s", output)
 	}
 }
@@ -164,7 +179,7 @@ func TestDetailView_FindingSeverityTildeRendersWithSummary(t *testing.T) {
 	// Must not panic.
 	output := detailRenderOutput(m)
 
-	if !strings.Contains(output, "pending maintenance: os-upgrade") {
+	if !strings.Contains(output, "Pending maintenance: os-upgrade") {
 		t.Errorf("severity '~' finding must render its summary, got:\n%s", output)
 	}
 }
@@ -281,8 +296,11 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 			if !strings.Contains(output, tc.sectionHeader) {
 				t.Errorf("[%s] detail view must show '%s' section, got:\n%s", tc.resourceType, tc.sectionHeader, output)
 			}
-			if !strings.Contains(output, tc.summary) {
-				t.Errorf("[%s] detail view must show summary '%s', got:\n%s", tc.resourceType, tc.summary, output)
+			// The Attention section capitalizes the first letter for presentation;
+			// the canonical Summary stored on the finding is unchanged.
+			wantRendered := capitalizeFirstForTest(tc.summary)
+			if !strings.Contains(output, wantRendered) {
+				t.Errorf("[%s] detail view must show summary '%s', got:\n%s", tc.resourceType, wantRendered, output)
 			}
 		})
 	}

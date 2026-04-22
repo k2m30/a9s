@@ -113,7 +113,8 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 
 	output := stripANSI(renderRootModel(m))
 
-	if !strings.Contains(output, "pending maintenance: system-update — live update test") {
+	// Attention capitalizes the first letter for presentation; Summary data is unchanged.
+	if !strings.Contains(output, "Pending maintenance: system-update — live update test") {
 		t.Errorf("after live EnrichmentCheckedMsg, detail view must show finding summary, got:\n%s", output)
 	}
 	if !strings.Contains(output, "Attention") {
@@ -148,7 +149,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m, _ = m2.(tui.Model)
 
 	withFinding := stripANSI(renderRootModel(m))
-	if !strings.Contains(withFinding, "pending maintenance: system-update — will recover") {
+	if !strings.Contains(withFinding, "Pending maintenance: system-update — will recover") {
 		t.Skip("pre-condition failed: finding was not set; skipping recovery check")
 	}
 
@@ -168,7 +169,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m, _ = m3.(tui.Model)
 
 	withoutFinding := stripANSI(renderRootModel(m))
-	if strings.Contains(withoutFinding, "pending maintenance: system-update — will recover") {
+	if strings.Contains(withoutFinding, "Pending maintenance: system-update — will recover") {
 		t.Errorf("after recovery EnrichmentCheckedMsg, old finding summary must be cleared from detail view, got:\n%s", withoutFinding)
 	}
 }

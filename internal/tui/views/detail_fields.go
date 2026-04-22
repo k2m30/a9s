@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	lipgloss "charm.land/lipgloss/v2"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
@@ -615,7 +616,7 @@ func (m *DetailModel) injectAttentionSection() {
 		if glyph != "!" && glyph != "~" {
 			glyph = "~"
 		}
-		line := glyph + " " + e.primary
+		line := glyph + " " + capitalizeFirst(e.primary)
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
@@ -631,7 +632,7 @@ func (m *DetailModel) injectAttentionSection() {
 			}
 			items = append(items, fieldpath.FieldItem{
 				IsSubField:  true,
-				IndentLevel: 2,
+				IndentLevel: 3,
 				Key:         row.Label,
 				Value:       row.Value,
 				Path:        "Attention",
@@ -640,6 +641,19 @@ func (m *DetailModel) injectAttentionSection() {
 		}
 	}
 	m.fieldList = append(items, m.fieldList...)
+}
+
+// capitalizeFirst returns s with its first rune uppercased. Used for
+// presentation in the Attention section — the underlying data (Resource.Issues
+// phrases, EnrichmentFinding.Summary) stays canonical lowercase to match §4
+// spec vocabulary; only the rendered entry is capitalized for readability.
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
 }
 
 // phraseTier classifies a Wave 1 S4 phrase into "!" (broken) or "~" (warning

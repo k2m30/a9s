@@ -209,29 +209,33 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 		id     string
 		issues []string // nil or empty = truly silent; Attention header must be absent
 	}
+	// The Attention section capitalizes the first letter of each entry for
+	// presentation; the underlying data (Resource.Issues, finding Summary) is
+	// unchanged. Expected phrases below reflect the rendered form.
 	cases := []issueCase{
 		// Healthy rows with no Wave 2 finding — Attention section must be absent.
 		{demofixtures.ProdDbiID, nil},
 		{demofixtures.ProdDbiAuroraID, nil},
 		// Transitional (Wave-1 single phrase).
-		{demofixtures.StagingDbiModifyingID, []string{"modifying: DBInstanceClass"}},
-		{demofixtures.StagingDbiRebootingID, []string{"rebooting"}},
+		{demofixtures.StagingDbiModifyingID, []string{"Modifying: DBInstanceClass"}},
+		{demofixtures.StagingDbiRebootingID, []string{"Rebooting"}},
 		// Broken (Wave-1 single phrase).
-		{demofixtures.BrokenDbiStorageFullID, []string{"storage-full"}},
-		{demofixtures.BrokenDbiEncryptionLockedID, []string{"encryption key unavailable"}},
+		{demofixtures.BrokenDbiStorageFullID, []string{"Storage-full"}},
+		{demofixtures.BrokenDbiEncryptionLockedID, []string{"Encryption key unavailable"}},
 		// Single Config Warnings.
-		{demofixtures.WarnDbiNoBackupsID, []string{"no automated backups"}},
-		{demofixtures.WarnDbiPublicID, []string{"publicly accessible"}},
-		{demofixtures.WarnDbiUnencryptedID, []string{"unencrypted storage"}},
-		{demofixtures.WarnDbiUnprotectedID, []string{"deletion protection off"}},
-		// Multi Config Warnings.
-		{demofixtures.WarnDbiMultiID, []string{"no automated backups", "publicly accessible", "unencrypted storage"}},
+		{demofixtures.WarnDbiNoBackupsID, []string{"No automated backups"}},
+		{demofixtures.WarnDbiPublicID, []string{"Publicly accessible"}},
+		{demofixtures.WarnDbiUnencryptedID, []string{"Unencrypted storage"}},
+		{demofixtures.WarnDbiUnprotectedID, []string{"Deletion protection off"}},
+		// Multi Config Warnings — first entry capitalized, rest stay lowercase (only
+		// the first rune of each entry line is capitalized; these are separate entries).
+		{demofixtures.WarnDbiMultiID, []string{"No automated backups", "Publicly accessible", "Unencrypted storage"}},
 		// Wave-1 warning + Wave-2 maintenance — both must appear under Attention.
-		{demofixtures.WarnDbiPublicMaintID, []string{"publicly accessible", "os-upgrade"}},
+		{demofixtures.WarnDbiPublicMaintID, []string{"Publicly accessible", "os-upgrade"}},
 		// Wave-2 only on Healthy row — Attention section present, Wave-2 Summary visible.
 		{demofixtures.MaintDbiScheduledID, []string{"system-update"}},
 		// Legacy fixture: all 4 Wave-1 warnings.
-		{"db-public-no-encryption", []string{"no automated backups", "publicly accessible", "unencrypted storage", "deletion protection off"}},
+		{"db-public-no-encryption", []string{"No automated backups", "Publicly accessible", "Unencrypted storage", "Deletion protection off"}},
 	}
 
 	for _, tc := range cases {
