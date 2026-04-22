@@ -5,7 +5,9 @@ package unit
 // Tests drive aws.EnrichDBIMaintenance (the dbi-specific enricher) and assert:
 //   - Findings keyed by Resource.ID (ARN suffix-matched).
 //   - Severity "~" (informational, no S1 badge bump).
-//   - Summary format: "Pending maintenance action overdue: <Action> (<Description>)."
+//   - Summary is the short S5 phrase "pending maintenance" — Action and
+//     Description never appear in Summary (they belong in Rows per the
+//     resource.EnrichmentFinding contract).
 //   - FieldUpdates["status"] == "maintenance scheduled" only on Healthy rows.
 //   - Non-healthy rows get the finding but NOT the status field update.
 //   - nil RDS client returns empty result gracefully.
@@ -13,7 +15,7 @@ package unit
 
 import (
 	"context"
-	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,9 +113,28 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
 	}
 
-	wantSummaryRE := regexp.MustCompile(`^Pending maintenance action overdue: system-update \(New minor engine patch 16\.2\.3\)\.$`)
-	if !wantSummaryRE.MatchString(finding.Summary) {
-		t.Errorf("Summary = %q, does not match %s", finding.Summary, wantSummaryRE)
+	// Summary is the short S5 phrase — concrete details (Action, Description)
+	// must NOT appear here; they belong in Rows. See the contract on
+	// resource.EnrichmentFinding.
+	if finding.Summary != "pending maintenance" {
+		t.Errorf("Summary = %q, want %q", finding.Summary, "pending maintenance")
+	}
+	if strings.Contains(finding.Summary, "system-update") || strings.Contains(finding.Summary, "New minor engine patch") {
+		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	}
+	// The same facts must be present in Rows.
+	wantRows := map[string]string{
+		"Action":      "system-update",
+		"Description": "New minor engine patch 16.2.3",
+	}
+	gotRows := map[string]string{}
+	for _, r := range finding.Rows {
+		gotRows[r.Label] = r.Value
+	}
+	for label, val := range wantRows {
+		if gotRows[label] != val {
+			t.Errorf("Rows[%q] = %q, want %q", label, gotRows[label], val)
+		}
 	}
 
 	if updates, ok := result.FieldUpdates[fixtures.MaintDbiScheduledID]; !ok {
@@ -128,7 +149,9 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 }
 
 // TestDBI_Enrich_MaintenancePending_NilDescription verifies that when the
-// PendingMaintenanceAction.Description is nil, the summary omits empty parens.
+// PendingMaintenanceAction.Description is nil, Summary stays the short phrase
+// and the Description Row is simply omitted (rather than the Summary mutating
+// to reflect missing details — see resource.EnrichmentFinding contract).
 func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	const resourceID = "inline-no-desc"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
@@ -158,9 +181,17 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q", resourceID)
 	}
-	want := "Pending maintenance action overdue: os-upgrade."
-	if finding.Summary != want {
-		t.Errorf("Summary = %q, want %q (empty parens must be collapsed)", finding.Summary, want)
+	if finding.Summary != "pending maintenance" {
+		t.Errorf("Summary = %q, want %q", finding.Summary, "pending maintenance")
+	}
+	var labels []string
+	for _, r := range finding.Rows {
+		labels = append(labels, r.Label)
+	}
+	for _, l := range labels {
+		if l == "Description" {
+			t.Errorf("Rows must omit Description when source field is nil; got labels=%v", labels)
+		}
 	}
 }
 

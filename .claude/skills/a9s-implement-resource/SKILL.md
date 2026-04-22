@@ -111,6 +111,17 @@ These rules are invariant across all resource types. They are enforced by phase 
 
    This matters for resources like ECR: a repo with `scanOnPush=false` (Wave 1 Warning) AND `CRITICAL>0` (Wave 2 Broken) renders **red** with the Wave 2 Broken phrase in S4, because Broken severity beats Warning severity regardless of wave origin.
 
+## Wave 2 enricher output contract
+
+Every Wave 2 enricher emits `resource.EnrichmentFinding` objects whose shape must obey this contract. The contract is codified in `internal/resource/enrichment.go`; the skill restates it here because violating it produces visible duplication in the Attention section.
+
+- **Summary is the short S5 phrase.** Lowercase, ≈1–4 words, matching a §4-style phrase (e.g. `"pending maintenance"`, `"unhealthy targets 2/5"`, `"latest build failed"`). This is what renders beside the glyph on the Attention primary entry row, and it is also what may be promoted verbatim into the S4 Status column via `FieldUpdates["status"]` (so it has to fit there).
+- **Rows are the structured facts that support Summary.** Concrete values — the specific Action, Description, Earliest Target, failing-target names, failure timestamp — go in Rows as `Label: Value` pairs. Rows render beneath the primary entry as indented context.
+- **Never embed Row content in Summary.** Every fact lives in exactly ONE place. If the enricher sets `Summary = fmt.Sprintf("pending maintenance: %s (%s)", action, description)` while also emitting `Action` and `Description` as Rows, that's the anti-pattern — the Attention section will render both and the duplication is visible to the user. The test `TestDBI_Enrich_MaintenancePending_HealthyRow` asserts Summary does not contain any Row value as a substring; copy that shape for every new enricher.
+- **Summary is stable across instances of the same finding type.** It should not mutate based on the specific facts of one instance (that's what Rows are for). dbi's "pending maintenance" is the same phrase for every instance regardless of which action is pending; the Action row carries the per-instance detail.
+
+Phase 6b QA must include a test per enricher that asserts both `Summary == <short-phrase>` AND `!strings.Contains(Summary, rowValue)` for every Row value the enricher emits. Phase 7 coder rejects tasks that build Summary from concatenation of Row fields.
+
 ## Universal coverage matrix (mandatory before phase 3)
 
 Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` suffix + stacking) is a cross-signal invariant and will be missed if each signal is tested in isolation. Before writing the phase 3 pseudocode, produce this coverage table in the impl-plan doc. Every row MUST point to at least one fixture ID and one test case. If the table can't be filled, phase 3 is blocked.
@@ -132,6 +143,7 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | U8 | Broken severity > Warning > `~` | fixture with Wave-1 Warning + Wave-2 Broken (if spec has it) | phrase precedence test |
 | U9 | Related pivot counts (`count shown: yes`) | 1 graph-root fixture | `ExpectRelatedRowCountAtLeast` per pivot |
 | U10 | No jargon columns | all fixtures | `ExpectViewNotContains("CIS", "Flags", …)` |
+| **U11** | **Summary ≠ Rows content (EnrichmentFinding contract)** | **every fixture with a Wave-2 finding that has Rows** | **unit test: `finding.Summary == <short-phrase>` AND `!strings.Contains(finding.Summary, row.Value)` for every Row** |
 
 Demo mode runs Wave 2 enrichment end-to-end against typed fakes (the `!m.isDemo` guard was removed 2026-04-22 after it was caught hiding the `(+N)` / `~` / "maintenance scheduled" rendering in the actual demo). Every row in this table is therefore reachable via the scripted scenario harness without message injection, provided the harness drains the `AvailabilityPrefetchedMsg` → `EnrichmentCheckedMsg` chain (it does as of 2026-04-22).
 
