@@ -3,16 +3,16 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period", "cis_flags"})
+	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period"})
 
 	resource.RegisterRelated("dbi", []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
@@ -26,6 +26,7 @@ func init() {
 		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true},
 	})
 
 	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
@@ -97,11 +98,6 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			engineVersion = *db.EngineVersion
 		}
 
-		status := ""
-		if db.DBInstanceStatus != nil {
-			status = *db.DBInstanceStatus
-		}
-
 		class := ""
 		if db.DBInstanceClass != nil {
 			class = *db.DBInstanceClass
@@ -137,31 +133,18 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
 		}
 
-		// Compute CIS compliance flags.
-		var cisFlags []string
-		if publiclyAccessible == "true" {
-			cisFlags = append(cisFlags, "PUB")
-		}
-		if storageEncrypted == "false" {
-			cisFlags = append(cisFlags, "UNENC")
-		}
-		if backupRetentionPeriod == "0" {
-			cisFlags = append(cisFlags, "NOBKP")
-		}
-		if deletionProtection == "false" {
-			cisFlags = append(cisFlags, "NOPROT")
-		}
-		cisFlagsVal := strings.Join(cisFlags, "|")
+		computedStatus, computedIssues := computeDBIStatusAndIssues(db)
 
 		r := resource.Resource{
 			ID:     dbIdentifier,
 			Name:   dbIdentifier,
-			Status: status,
+			Status: computedStatus,
+			Issues: computedIssues,
 			Fields: map[string]string{
 				"db_identifier":           dbIdentifier,
 				"engine":                  engine,
 				"engine_version":          engineVersion,
-				"status":                  status,
+				"status":                  computedStatus,
 				"class":                   class,
 				"endpoint":                endpoint,
 				"multi_az":                multiAZ,
@@ -170,7 +153,6 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 				"storage_encrypted":       storageEncrypted,
 				"deletion_protection":     deletionProtection,
 				"backup_retention_period": backupRetentionPeriod,
-				"cis_flags":               cisFlagsVal,
 			},
 			RawStruct: db,
 		}
@@ -199,4 +181,148 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// brokenStatusPhrase maps RDS instance statuses that represent hard failures to
+// their display phrases. "inaccessible-encryption-credentials" is remapped per spec §4.
+var brokenStatusPhrase = map[string]string{
+	"failed":                              "failed",
+	"storage-full":                        "storage-full",
+	"incompatible-network":                "incompatible-network",
+	"incompatible-option-group":           "incompatible-option-group",
+	"incompatible-parameters":             "incompatible-parameters",
+	"incompatible-restore":                "incompatible-restore",
+	"restore-error":                       "restore-error",
+	"inaccessible-encryption-credentials": "encryption key unavailable",
+}
+
+// transitionalStatusSet contains RDS instance statuses that indicate a
+// transitional (Warning) state. These show a pending modification key suffix when applicable.
+var transitionalStatusSet = map[string]struct{}{
+	"creating": {}, "modifying": {}, "backing-up": {}, "rebooting": {},
+	"renaming": {}, "resetting-master-credentials": {}, "starting": {},
+	"stopping": {}, "upgrading": {}, "maintenance": {},
+	"configuring-enhanced-monitoring": {}, "configuring-iam-database-auth": {},
+	"configuring-log-exports": {}, "converting-to-vpc": {}, "moving-to-vpc": {},
+	"storage-optimization": {},
+}
+
+// computeDBIStatusAndIssues returns the top S4 phrase (with `(+N)` suffix when
+// multiple warnings stack) AND the full ordered list of every active issue
+// phrase. The second return feeds Resource.Issues so the detail view can
+// render all active warnings individually (spec rule 7: "every finding
+// individually visible"). Broken / transitional / healthy states each produce
+// at most one phrase.
+func computeDBIStatusAndIssues(db rdstypes.DBInstance) (string, []string) {
+	status := aws.ToString(db.DBInstanceStatus)
+	if phrase, ok := brokenStatusPhrase[status]; ok {
+		return phrase, []string{phrase}
+	}
+	if _, ok := transitionalStatusSet[status]; ok {
+		key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues)
+		if key == "" {
+			return status, []string{status}
+		}
+		phrase := status + ": " + key
+		return phrase, []string{phrase}
+	}
+	if status == "available" {
+		var warnings []string
+		if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
+			warnings = append(warnings, "no automated backups")
+		}
+		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
+			warnings = append(warnings, "publicly accessible")
+		}
+		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
+			warnings = append(warnings, "unencrypted storage")
+		}
+		if db.DeletionProtection != nil && !*db.DeletionProtection {
+			warnings = append(warnings, "deletion protection off")
+		}
+		switch len(warnings) {
+		case 0:
+			return "", nil
+		case 1:
+			return warnings[0], warnings
+		default:
+			return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
+		}
+	}
+	return status, []string{status} // unknown status — pass through
+}
+
+// firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in spec-defined order
+// and returns the name of the first non-nil/non-empty field.
+func firstNonEmptyPendingModifiedValueKey(pmv *rdstypes.PendingModifiedValues) string {
+	if pmv == nil {
+		return ""
+	}
+	if pmv.DBInstanceClass != nil && *pmv.DBInstanceClass != "" {
+		return "DBInstanceClass"
+	}
+	if pmv.AllocatedStorage != nil {
+		return "AllocatedStorage"
+	}
+	if pmv.MasterUserPassword != nil && *pmv.MasterUserPassword != "" {
+		return "MasterUserPassword"
+	}
+	if pmv.Port != nil {
+		return "Port"
+	}
+	if pmv.BackupRetentionPeriod != nil {
+		return "BackupRetentionPeriod"
+	}
+	if pmv.MultiAZ != nil {
+		return "MultiAZ"
+	}
+	if pmv.EngineVersion != nil && *pmv.EngineVersion != "" {
+		return "EngineVersion"
+	}
+	if pmv.LicenseModel != nil && *pmv.LicenseModel != "" {
+		return "LicenseModel"
+	}
+	if pmv.Iops != nil {
+		return "Iops"
+	}
+	if pmv.DBInstanceIdentifier != nil && *pmv.DBInstanceIdentifier != "" {
+		return "DBInstanceIdentifier"
+	}
+	if pmv.StorageType != nil && *pmv.StorageType != "" {
+		return "StorageType"
+	}
+	if pmv.CACertificateIdentifier != nil && *pmv.CACertificateIdentifier != "" {
+		return "CACertificateIdentifier"
+	}
+	if pmv.DBSubnetGroupName != nil && *pmv.DBSubnetGroupName != "" {
+		return "DBSubnetGroupName"
+	}
+	if pmv.PendingCloudwatchLogsExports != nil {
+		return "PendingCloudwatchLogsExports"
+	}
+	if len(pmv.ProcessorFeatures) > 0 {
+		return "ProcessorFeatures"
+	}
+	if pmv.IAMDatabaseAuthenticationEnabled != nil {
+		return "IAMDatabaseAuthenticationEnabled"
+	}
+	if pmv.AutomationMode != "" {
+		return "AutomationMode"
+	}
+	if pmv.ResumeFullAutomationModeTime != nil {
+		return "ResumeFullAutomationModeTime"
+	}
+	if pmv.StorageThroughput != nil {
+		return "StorageThroughput"
+	}
+	if pmv.Engine != nil && *pmv.Engine != "" {
+		return "Engine"
+	}
+	if pmv.DedicatedLogVolume != nil {
+		return "DedicatedLogVolume"
+	}
+	if pmv.MultiTenant != nil {
+		return "MultiTenant"
+	}
+	return ""
 }

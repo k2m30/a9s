@@ -11,6 +11,7 @@ import (
 // RDSFixtures holds all RDS domain objects served by the fake.
 type RDSFixtures struct {
 	// DBInstances is the full list returned by DescribeDBInstances.
+	// Sources: NewDBIFixtures().Instances (canonical fixtures) + legacy pool instances.
 	DBInstances []rdstypes.DBInstance
 	// DBSnapshots is the full list returned by DescribeDBSnapshots.
 	DBSnapshots []rdstypes.DBSnapshot
@@ -19,9 +20,14 @@ type RDSFixtures struct {
 }
 
 // NewRDSFixtures builds and returns a fully-populated RDSFixtures struct.
+// DBInstances are sourced from DBIFixtures (single source of truth) plus the
+// legacy bulk-generated pool. Callers that only need DBInstances should use
+// NewDBIFixtures() directly.
 func NewRDSFixtures() *RDSFixtures {
+	dbi := NewDBIFixtures()
+	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances: buildRDSInstances(),
+		DBInstances: append(dbi.Instances, legacy...),
 		DBSnapshots: buildRDSSnapshots(),
 		Events:      buildRDSEvents(),
 	}
@@ -439,6 +445,45 @@ func buildRDSInstances() []rdstypes.DBInstance {
 
 func buildRDSSnapshots() []rdstypes.DBSnapshot {
 	return []rdstypes.DBSnapshot{
+		// Snapshots for prod-dbi-1 — required for the dbi→rds-snap related-panel pivot.
+		{
+			DBSnapshotIdentifier: aws.String("rds:" + ProdDbiID + "-2026-04-15"),
+			DBInstanceIdentifier: aws.String(ProdDbiID),
+			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:" + ProdDbiID + "-2026-04-15"),
+			Status:               aws.String("available"),
+			Engine:               aws.String("postgres"),
+			EngineVersion:        aws.String("16.2"),
+			SnapshotType:         aws.String("automated"),
+			SnapshotCreateTime:   aws.Time(mustTime("2026-04-15T03:00:00Z")),
+			AllocatedStorage:     aws.Int32(100),
+			StorageType:          aws.String("gp3"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(100),
+			SourceRegion:         aws.String("us-east-1"),
+		},
+		{
+			DBSnapshotIdentifier: aws.String("pre-migration-" + ProdDbiID),
+			DBInstanceIdentifier: aws.String(ProdDbiID),
+			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:pre-migration-" + ProdDbiID),
+			Status:               aws.String("available"),
+			Engine:               aws.String("postgres"),
+			EngineVersion:        aws.String("16.2"),
+			SnapshotType:         aws.String("manual"),
+			SnapshotCreateTime:   aws.Time(mustTime("2026-04-10T22:00:00Z")),
+			AllocatedStorage:     aws.Int32(100),
+			StorageType:          aws.String("gp3"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(100),
+			SourceRegion:         aws.String("us-east-1"),
+		},
 		{
 			DBSnapshotIdentifier: aws.String("rds:prod-api-primary-2026-03-20"),
 			DBInstanceIdentifier: aws.String("prod-api-primary"),

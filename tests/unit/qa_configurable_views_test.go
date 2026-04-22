@@ -567,6 +567,15 @@ func TestQA_ListViewColumns_RDS(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			if col.Path == "" && col.Key != "" {
+				// Key-backed column: value comes from Resource.Fields[key] populated by the
+				// fetcher, not from a raw-struct path. ExtractScalar is not applicable here.
+				return
+			}
+			if col.Path == "" && col.Key == "" {
+				t.Errorf("column %q has neither Path nor Key", col.Title)
+				return
+			}
 			result := fieldpath.ExtractScalar(db, col.Path)
 			if result == "" {
 				t.Errorf("ExtractScalar(%q) returned empty for realistic RDS Instance", col.Path)

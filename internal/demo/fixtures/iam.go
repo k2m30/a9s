@@ -168,6 +168,27 @@ func buildIAMRoles() []iamtypes.Role {
 		},
 	}
 
+	// RDS monitoring roles — required for dbi→role related-panel pivot.
+	// Matched by checkDbiRole via AssociatedRoles[].RoleArn and MonitoringRoleArn on prod-dbi-1.
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("rds-monitoring-role"),
+		RoleId:      aws.String("AROAEXAMPLERDSMON001"),
+		Arn:         aws.String("arn:aws:iam::123456789012:role/rds-monitoring-role"),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+		Description: aws.String("IAM role for RDS Enhanced Monitoring (associated via AssociatedRoles)"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"monitoring.rds.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("rds-enhanced-monitoring"),
+		RoleId:      aws.String("AROAEXAMPLERDSMON002"),
+		Arn:         aws.String("arn:aws:iam::123456789012:role/rds-enhanced-monitoring"),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 2, 10, 9, 5, 0, 0, time.UTC)),
+		Description: aws.String("IAM role for RDS Enhanced Monitoring (referenced via MonitoringRoleArn)"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"monitoring.rds.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
 	// Issue: AssumeRolePolicyDocument with Principal="*" without condition → Broken (wildcard trust)
 	roles = append(roles, iamtypes.Role{
 		RoleName:                 aws.String("wildcard-trust-role"),

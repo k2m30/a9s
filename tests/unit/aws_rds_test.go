@@ -60,8 +60,8 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	if r0.ID != "prod-db-01" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-db-01", r0.ID)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (healthy silence), got %q", "", r0.Status)
 	}
 
 	// Verify required fields exist and have correct values
@@ -84,8 +84,8 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	if r0.Fields["engine_version"] != "8.0.35" {
 		t.Errorf("resource[0].Fields[\"engine_version\"]: expected %q, got %q", "8.0.35", r0.Fields["engine_version"])
 	}
-	if r0.Fields["status"] != "available" {
-		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "available", r0.Fields["status"])
+	if r0.Fields["status"] != "" {
+		t.Errorf("resource[0].Fields[\"status\"]: expected %q (healthy silence), got %q", "", r0.Fields["status"])
 	}
 	if r0.Fields["class"] != "db.r5.large" {
 		t.Errorf("resource[0].Fields[\"class\"]: expected %q, got %q", "db.r5.large", r0.Fields["class"])

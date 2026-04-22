@@ -32,9 +32,12 @@ func (f *RDSFake) DescribeEvents(_ context.Context, _ *rds.DescribeEventsInput, 
 	return &rds.DescribeEventsOutput{Events: f.fix.Events}, nil
 }
 
-// DescribePendingMaintenanceActions is a stub for the Wave 2 enrichment interface.
+// DescribePendingMaintenanceActions returns the maintenance actions from fixture data.
 func (f *RDSFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error) {
-	return &rds.DescribePendingMaintenanceActionsOutput{}, nil
+	dbi := fixtures.NewDBIFixtures()
+	return &rds.DescribePendingMaintenanceActionsOutput{
+		PendingMaintenanceActions: dbi.PendingMaintenanceActions,
+	}, nil
 }
 
 // DescribeDBSubnetGroups returns an empty list — demo mode does not model
