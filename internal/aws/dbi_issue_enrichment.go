@@ -4,8 +4,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -123,7 +121,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			newStatus = "maintenance scheduled"
 		} else {
 			// Wave 1 + Wave 2 stack → bump (+N) suffix on existing phrase
-			newStatus = bumpFindingSuffix(existing)
+			newStatus = resource.BumpFindingSuffix(existing)
 		}
 		fieldUpdates[key] = map[string]string{"status": newStatus}
 	}
@@ -135,24 +133,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
 	}, nil
-}
-
-// bumpFindingSuffix increments the (+N) suffix on a Status phrase, or adds
-// (+1) when no suffix is present. Returns "<phrase> (+N)".
-//
-//	"publicly accessible"          → "publicly accessible (+1)"
-//	"no automated backups (+1)"    → "no automated backups (+2)"
-//	"no automated backups (+2)"    → "no automated backups (+3)"
-//	""                             → "(+1)"   // never called on "" in practice
-func bumpFindingSuffix(s string) string {
-	// Match trailing " (+N)" — N is non-negative integer.
-	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
-	m := re.FindStringSubmatch(s)
-	if m == nil {
-		return s + " (+1)"
-	}
-	n, _ := strconv.Atoi(m[2])
-	return fmt.Sprintf("%s (+%d)", m[1], n+1)
 }
 
 // buildDBIMaintenanceSummary formats the spec §4 S5 sentence:

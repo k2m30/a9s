@@ -1,21 +1,9 @@
 package resource
 
 import (
-	"regexp"
 	"strings"
 	"time"
 )
-
-// findingSuffixRe matches the universal-rule-7 " (+N)" suffix. Used by Color
-// funcs to strip the hidden-finding-count suffix before matching the base
-// phrase — the color is driven by the top (shown) phrase, not the count.
-var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
-
-// stripFindingSuffix removes the universal-rule-7 " (+N)" suffix from a Status
-// phrase:  "publicly accessible (+1)" → "publicly accessible".
-func stripFindingSuffix(s string) string {
-	return findingSuffixRe.ReplaceAllString(s, "")
-}
 
 // rdsInstanceColor maps RDS/DocDB instance and cluster status strings to a Color.
 // Used by dbi and dbc types which share the same status vocabulary.
@@ -63,7 +51,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				//   "no automated backups (+2)" → "no automated backups"
 				// The suffix only records hidden-finding count for the operator;
 				// color precedence is driven by the TOP (shown) phrase.
-				stripped := stripFindingSuffix(status)
+				stripped := StripFindingSuffix(status)
 				// Broken statuses (including remapped "encryption key unavailable").
 				switch stripped {
 				case "failed", "storage-full", "restore-error", "stopped",

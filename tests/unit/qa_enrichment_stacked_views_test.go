@@ -25,7 +25,7 @@ package unit
 //   T068 — Wave 2 completes while DetailModel is active: stacked ResourceListModel
 //           must reflect findings after pop.
 //   T069 — Wave 2 completes while DetailModel-B is active: stacked DetailModel-A
-//           must show "Pending Maintenance" section after pop-to-A.
+//           must show "Attention" section after pop-to-A.
 
 import (
 	"strings"
@@ -130,11 +130,11 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 // TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive verifies that when
 // the user has two detail views stacked (detail-A below, detail-B active), and
 // Wave 2 enrichment completes with findings for BOTH resources, detail-A must also
-// receive its finding. After popping to detail-A, the "Pending Maintenance" section
+// receive its finding. After popping to detail-A, the "Attention" section
 // must appear.
 //
 // Pre-fix: only detail-B (active) is updated. Detail-A is never updated. After pop
-// to detail-A, no "Pending Maintenance" section appears.
+// to detail-A, no "Attention" section appears.
 //
 // Post-fix: handleEnrichmentChecked iterates m.stack and calls SetEnrichmentFinding
 // on every *DetailModel whose ResourceType() matches.
@@ -205,7 +205,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 
 	// Verify detail-B (currently active) shows its finding (this should work pre-fix too).
 	plainB2 := stripANSI(rootViewContent(m))
-	if !strings.Contains(plainB2, "Pending Maintenance") {
+	if !strings.Contains(plainB2, "Attention") {
 		// Detail-B not updated either — something more fundamental is broken.
 		t.Logf("note: detail-B (active) also missing Pending Maintenance; model may not have enrichment configured correctly")
 	}
@@ -216,13 +216,13 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 
 	plainA2 := stripANSI(rootViewContent(m))
 
-	// ASSERTION: detail-A must show "Pending Maintenance" section with the finding
+	// ASSERTION: detail-A must show "Attention" section with the finding
 	// for db-stacked-a-001.
 	// Pre-fix: absent because handleEnrichmentChecked only updated detail-B (the
 	// active view). Detail-A (stacked below) was never called with SetEnrichmentFinding.
 	// Post-fix: the stack iteration calls SetEnrichmentFinding on every *DetailModel
 	// of matching type, so detail-A is updated even while not active.
-	if !strings.Contains(plainA2, "Pending Maintenance") {
+	if !strings.Contains(plainA2, "Attention") {
 		t.Errorf("after pop from detail-B to detail-A, the 'Pending Maintenance' section must appear "+
 			"in detail-A's view because enrichment found an issue for db-stacked-a-001. "+
 			"Pre-fix: absent because handleEnrichmentChecked only updates activeView() (detail-B), "+

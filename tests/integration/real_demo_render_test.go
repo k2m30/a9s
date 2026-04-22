@@ -53,17 +53,17 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 		{
 			id:          demofixtures.WarnDbiMultiID,
 			mustContain: []string{"no automated backups", "publicly accessible", "unencrypted storage"},
-			mustBeAfter: "Issues",
+			mustBeAfter: "Attention",
 		},
 		{
 			id:          "db-public-no-encryption",
 			mustContain: []string{"no automated backups", "publicly accessible", "unencrypted storage", "deletion protection off"},
-			mustBeAfter: "Issues",
+			mustBeAfter: "Attention",
 		},
 		{
 			id:          demofixtures.WarnDbiPublicMaintID,
 			mustContain: []string{"publicly accessible"},
-			mustBeAfter: "Issues",
+			mustBeAfter: "Attention",
 		},
 	}
 
@@ -81,10 +81,10 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 			view := fullIntegrationStripANSI(fullIntegrationViewContent(m2))
 			t.Logf("\n--- rendered detail for %s ---\n%s\n--- end ---", tc.id, view)
 
-			// Check Issues section header is present.
-			hdrIdx := findIssuesHeaderLine(view)
+			// Check Attention section header is present.
+			hdrIdx := findAttentionHeaderLine(view)
 			if hdrIdx < 0 {
-				t.Fatalf("Issues section header NOT FOUND in rendered detail for %s. This is the bug the user sees.", tc.id)
+				t.Fatalf("Attention section header NOT FOUND in rendered detail for %s. This is the bug the user sees.", tc.id)
 			}
 
 			// Every expected phrase must appear AFTER the header.
@@ -98,7 +98,7 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 					}
 				}
 				if found < 0 {
-					t.Fatalf("phrase %q NOT FOUND in rendered detail for %s (Issues header at line %d)", phrase, tc.id, hdrIdx)
+					t.Fatalf("phrase %q NOT FOUND in rendered detail for %s (Attention header at line %d)", phrase, tc.id, hdrIdx)
 				}
 			}
 		})
@@ -123,14 +123,16 @@ func drainAll(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	return m
 }
 
-// findIssuesHeaderLine returns the index of the first line whose content
-// (stripped of box-drawing `│` and whitespace) equals "Issues". Returns -1 when
-// the Issues section header is absent.
-func findIssuesHeaderLine(view string) int {
+// findAttentionHeaderLine returns the index of the first line whose content
+// (stripped of box-drawing `│` and whitespace) is "Attention" or starts with
+// "Attention (" (the header includes a count). Returns -1 when the Attention
+// section header is absent.
+func findAttentionHeaderLine(view string) int {
 	for i, line := range strings.Split(view, "\n") {
 		parts := strings.Split(line, "│")
 		for _, p := range parts {
-			if strings.TrimSpace(p) == "Issues" {
+			cell := strings.TrimSpace(p)
+			if cell == "Attention" || strings.HasPrefix(cell, "Attention (") {
 				return i
 			}
 		}

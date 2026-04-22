@@ -310,11 +310,10 @@ func (m *DetailModel) buildFieldList() {
 		}
 		sort.Strings(keys)
 		m.fieldList = expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil)))
-		m.injectIssuesSection()
 		if m.resourceType == "ec2" {
 			m.injectEC2StatusChecks()
 		}
-		m.injectEnrichmentSection()
+		m.injectAttentionSection()
 		return
 	}
 	// Build items from path-form fields.
@@ -427,11 +426,10 @@ func (m *DetailModel) buildFieldList() {
 		}
 	}
 	m.fieldList = items
-	m.injectIssuesSection()
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()
 	}
-	m.injectEnrichmentSection()
+	m.injectAttentionSection()
 }
 
 // extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
@@ -560,159 +558,114 @@ func (m *DetailModel) injectEC2StatusChecks() {
 	m.fieldList = result
 }
 
-// injectIssuesSection prepends an "Issues" section to the field list when the
-// resource has one or more active issue phrases. Spec universal rule 7: "every
-// finding individually visible across S2–S5". The list view's Status column
-// shows only the top phrase (with optional `(+N)` suffix); this section
-// surfaces every entry so the operator can tell at a glance what's wrong,
-// without hunting through raw SDK fields.
+// injectAttentionSection prepends a unified "Attention" section to the field
+// list when the resource has one or more active signals — either a Wave 1
+// phrase in m.res.Issues or a Wave 2 m.enrichmentFinding. Spec §4 universal
+// rule 7: every finding must remain individually visible across S2–S5. The
+// list view's Status column shows only the top phrase (with optional `(+N)`
+// suffix for multi-finding rows); this section surfaces the full set so the
+// operator sees everything at a 3am glance without hunting through raw SDK
+// fields.
 //
-// The section appears at the very top of the field list (above identity / AWS
-// fields) because issues are the 3am-glance information. Rendered items reuse
-// the existing fieldpath.FieldItem shape (section header + sub-fields) so
-// styling, color tiers, and navigation behave identically to other sections.
-func (m *DetailModel) injectIssuesSection() {
-	if len(m.res.Issues) == 0 {
+// Entry order: "!" (broken) first, then "~" and others. Within a tier,
+// m.res.Issues retains §4 precedence order, with the Wave 2 finding appended
+// last at its own tier.
+//
+// Section header: "Attention (N)" where N is the total entry count. Omitted
+// when N == 0 (truly healthy rows).
+func (m *DetailModel) injectAttentionSection() {
+	type entry struct {
+		tier    string
+		primary string
+		rows    []resource.FindingRow
+	}
+	var entries []entry
+	for _, phrase := range m.res.Issues {
+		entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
+	}
+	if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
+		entries = append(entries, entry{
+			tier:    m.enrichmentFinding.Severity,
+			primary: m.enrichmentFinding.Summary,
+			rows:    m.enrichmentFinding.Rows,
+		})
+	}
+	if len(entries) == 0 {
 		return
 	}
-	items := make([]fieldpath.FieldItem, 0, 1+len(m.res.Issues))
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].tier == "!" && entries[j].tier != "!"
+	})
+	headerTier := "~"
+	for _, e := range entries {
+		if e.tier == "!" {
+			headerTier = "!"
+			break
+		}
+	}
+	items := make([]fieldpath.FieldItem, 0, 1+len(entries)*2)
 	items = append(items, fieldpath.FieldItem{
 		IsSection: true,
-		Key:       "Issues",
-		Path:      "Issues",
-		ColorTier: issuesSectionTier(m.res),
+		Key:       fmt.Sprintf("Attention (%d)", len(entries)),
+		Path:      "Attention",
+		ColorTier: headerTier,
 	})
-	for _, phrase := range m.res.Issues {
+	for _, e := range entries {
+		glyph := e.tier
+		if glyph != "!" && glyph != "~" {
+			glyph = "~"
+		}
+		line := glyph + " " + e.primary
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
-			Key:         phrase,
-			Value:       phrase,
-			Path:        "Issues",
-			ColorTier:   issuesSectionTier(m.res),
+			Key:         line,
+			Value:       line,
+			Path:        "Attention",
+			ColorTier:   e.tier,
 		})
+		for _, row := range e.rows {
+			tier := row.Tier
+			if tier == "" {
+				tier = e.tier
+			}
+			items = append(items, fieldpath.FieldItem{
+				IsSubField:  true,
+				IndentLevel: 2,
+				Key:         row.Label,
+				Value:       row.Value,
+				Path:        "Attention",
+				ColorTier:   tier,
+			})
+		}
 	}
-	// Prepend: issues at the TOP, before identity / AWS fields.
 	m.fieldList = append(items, m.fieldList...)
 }
 
-// issuesSectionTier classifies the issues block for colouring. "!" for Broken
-// resources, "~" otherwise (Warning / transitional / Dim all render as "~").
-// Healthy rows never reach this code path because len(Issues) == 0.
-func issuesSectionTier(r resource.Resource) string {
-	// Any issue phrase that exactly matches a broken-bucket phrase promotes
-	// the section to "!" severity. Otherwise it is informational ("~").
-	brokenPhrases := map[string]bool{
-		"failed":                    true,
-		"storage-full":              true,
-		"restore-error":             true,
-		"stopped":                   true,
-		"incompatible-network":      true,
-		"incompatible-option-group": true,
-		"incompatible-parameters":   true,
-		"incompatible-restore":      true,
-		"encryption key unavailable": true,
+// phraseTier classifies a Wave 1 S4 phrase into "!" (broken) or "~" (warning
+// or info) by delegating to the resource type's Color function. Each type
+// owns its broken-vocabulary — dbi knows about "storage-full", ec2 about
+// "stopped", etc. — so this dispatcher stays universal.
+//
+// The phrase is injected as both r.Status and r.Fields["status"] because
+// some Color funcs read one, some read the other. Trailing "(+N)" suffix is
+// stripped inside the Color funcs themselves (via resource.StripFindingSuffix).
+//
+// Unknown resource types default to "~" (warning) — safe for info-only
+// rendering without false-positive "!" coloring.
+func phraseTier(resourceType, phrase string) string {
+	td := resource.FindResourceType(resourceType)
+	if td == nil {
+		return "~"
 	}
-	for _, p := range r.Issues {
-		if brokenPhrases[p] {
-			return "!"
-		}
+	probe := resource.Resource{
+		Status: phrase,
+		Fields: map[string]string{"status": phrase},
+	}
+	if td.ResolveColor(probe) == resource.ColorBroken {
+		return "!"
 	}
 	return "~"
-}
-
-// injectEnrichmentSection dispatches to the per-type enrichment injector based on
-// m.resourceType. Types without a Wave 2 enricher (e.g. ec2, ddb) are not dispatched.
-func (m *DetailModel) injectEnrichmentSection() {
-	switch m.resourceType {
-	case "dbi", "rds":
-		m.injectRDSPendingMaintenance()
-	case "ebs":
-		m.injectEBSVolumeStatus()
-	case "cb":
-		m.injectCodeBuildLatestBuild()
-	case "tg":
-		m.injectTargetGroupHealth()
-	case "pipeline":
-		m.injectPipelineStageFailure()
-	case "sfn":
-		m.injectSFNLatestExecution()
-	case "glue":
-		m.injectGlueLatestRun()
-	default:
-		// Generic fallback: any non-zero finding gets a "Background Check" section
-		// so users see something for resource types whose enricher exists in the
-		// registry but doesn't have a per-type renderer here.
-		if m.enrichmentFinding != nil {
-			m.appendFindingSection("Background Check", "BackgroundCheck")
-		}
-	}
-}
-
-// appendFindingSection appends a named section header and one row per FindingRow
-// to m.fieldList. Returns immediately when finding is nil. When Rows is empty
-// but Summary is set, falls back to rendering Summary as a single data row.
-func (m *DetailModel) appendFindingSection(header, pathKey string) {
-	if m.enrichmentFinding == nil {
-		return
-	}
-	rows := m.enrichmentFinding.Rows
-	if len(rows) == 0 {
-		if m.enrichmentFinding.Summary == "" {
-			return
-		}
-		rows = []resource.FindingRow{{Label: "Summary", Value: m.enrichmentFinding.Summary}}
-	}
-	items := make([]fieldpath.FieldItem, 0, 1+len(rows))
-	items = append(items, fieldpath.FieldItem{
-		IsSection: true,
-		Key:       header,
-		Path:      pathKey,
-		ColorTier: m.enrichmentFinding.Severity,
-	})
-	for _, row := range rows {
-		tier := row.Tier
-		if tier == "" {
-			tier = m.enrichmentFinding.Severity
-		}
-		items = append(items, fieldpath.FieldItem{
-			IsSubField:  true,
-			IndentLevel: 1,
-			Key:         row.Label,
-			Value:       row.Value,
-			Path:        pathKey,
-			ColorTier:   tier,
-		})
-	}
-	m.fieldList = append(m.fieldList, items...)
-}
-
-func (m *DetailModel) injectRDSPendingMaintenance() {
-	m.appendFindingSection("Pending Maintenance", "PendingMaintenance")
-}
-
-func (m *DetailModel) injectEBSVolumeStatus() {
-	m.appendFindingSection("Volume Health", "VolumeHealth")
-}
-
-func (m *DetailModel) injectCodeBuildLatestBuild() {
-	m.appendFindingSection("Latest Build", "LatestBuild")
-}
-
-func (m *DetailModel) injectTargetGroupHealth() {
-	m.appendFindingSection("Target Health", "TargetHealth")
-}
-
-func (m *DetailModel) injectPipelineStageFailure() {
-	m.appendFindingSection("Pipeline State", "PipelineState")
-}
-
-func (m *DetailModel) injectSFNLatestExecution() {
-	m.appendFindingSection("Latest Execution", "LatestExecution")
-}
-
-func (m *DetailModel) injectGlueLatestRun() {
-	m.appendFindingSection("Latest Run", "LatestRun")
 }
 
 // subFieldIndent returns the left margin for a sub-field at the given indent level.
@@ -823,7 +776,12 @@ func (m DetailModel) renderFromFieldList() string {
 					break
 				}
 				// General sub-field: YAML-style colorization preserving hierarchy.
-				line = subFieldIndent(item.IndentLevel) + colorizeDetailLine(item.Value)
+				// When ColorTier is set (Attention entries), apply tier coloring to the whole line.
+				if item.ColorTier != "" {
+					line = subFieldIndent(item.IndentLevel) + styles.TierColorStyle(item.ColorTier).Render(item.Value)
+				} else {
+					line = subFieldIndent(item.IndentLevel) + colorizeDetailLine(item.Value)
+				}
 			case item.IsNavigable:
 				line = " " + styles.DetailKey.Render(text.PadOrTrunc(item.Key+":", keyW)) + styles.NavigableField.Render(item.Value)
 			default:

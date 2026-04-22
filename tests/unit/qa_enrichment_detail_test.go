@@ -60,13 +60,13 @@ func detailRenderOutput(m views.DetailModel) string {
 
 // TestDetailView_NoBackgroundCheckSection_WhenNoFinding asserts that a DetailModel
 // with no enrichment finding (the default state) does NOT render a
-// "Pending Maintenance" section.
+// "Attention" section.
 func TestDetailView_NoBackgroundCheckSection_WhenNoFinding(t *testing.T) {
 	m := newRDSDetailModel(t)
 
 	output := detailRenderOutput(m)
 
-	if strings.Contains(output, "Pending Maintenance") {
+	if strings.Contains(output, "Attention") {
 		t.Errorf("detail view must not show 'Pending Maintenance' section when no finding set, got:\n%s", output)
 	}
 }
@@ -77,7 +77,7 @@ func TestDetailView_NoBackgroundCheckSection_WhenNoFinding(t *testing.T) {
 
 // TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet asserts that after
 // SetEnrichmentFinding is called with a non-nil finding, the detail view renders
-// a section containing "Pending Maintenance" and the finding's Summary text.
+// a section containing "Attention" and the finding's Summary text.
 func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 	m := newRDSDetailModel(t)
 
@@ -89,7 +89,7 @@ func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 
 	output := detailRenderOutput(m)
 
-	if !strings.Contains(output, "Pending Maintenance") {
+	if !strings.Contains(output, "Attention") {
 		t.Errorf("detail view must show 'Pending Maintenance' section when finding is set, got:\n%s", output)
 	}
 	if !strings.Contains(output, "pending maintenance: system-update (New OS patch)") {
@@ -110,7 +110,7 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 
 	// First render: no finding.
 	first := detailRenderOutput(m)
-	if strings.Contains(first, "Pending Maintenance") {
+	if strings.Contains(first, "Attention") {
 		t.Error("pre-condition failed: initial render should not contain 'Pending Maintenance'")
 	}
 
@@ -119,7 +119,7 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 	m.SetEnrichmentFinding(&finding)
 
 	second := detailRenderOutput(m)
-	if !strings.Contains(second, "Pending Maintenance") {
+	if !strings.Contains(second, "Attention") {
 		t.Errorf("after SetEnrichmentFinding, render must show 'Pending Maintenance', got:\n%s", second)
 	}
 	if !strings.Contains(second, "minor-version-upgrade") {
@@ -184,7 +184,7 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	m.SetEnrichmentFinding(&finding)
 
 	withFinding := detailRenderOutput(m)
-	if !strings.Contains(withFinding, "Pending Maintenance") {
+	if !strings.Contains(withFinding, "Attention") {
 		t.Error("pre-condition failed: finding should appear after SetEnrichmentFinding")
 	}
 
@@ -192,7 +192,7 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	m.SetEnrichmentFinding(nil)
 
 	withoutFinding := detailRenderOutput(m)
-	if strings.Contains(withoutFinding, "Pending Maintenance") {
+	if strings.Contains(withoutFinding, "Attention") {
 		t.Errorf("after SetEnrichmentFinding(nil), 'Pending Maintenance' must not appear, got:\n%s", withoutFinding)
 	}
 }
@@ -239,7 +239,7 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 	cases := []tc{
 		{
 			resourceType:  "rds",
-			sectionHeader: "Pending Maintenance",
+			sectionHeader: "Attention",
 			res: resource.Resource{
 				ID: "db-prod", Name: "prod-db",
 				Fields: map[string]string{"db_instance_id": "db-prod", "status": "available"},
@@ -248,7 +248,7 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 		},
 		{
 			resourceType:  "cb",
-			sectionHeader: "Latest Build",
+			sectionHeader: "Attention",
 			res: resource.Resource{
 				ID: "my-project", Name: "my-project",
 				Fields: map[string]string{"project_name": "my-project"},
@@ -257,7 +257,7 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 		},
 		{
 			resourceType:  "sfn",
-			sectionHeader: "Latest Execution",
+			sectionHeader: "Attention",
 			res: resource.Resource{
 				ID: "arn:aws:states:us-east-1:111:stateMachine:my-machine", Name: "my-machine",
 				Fields: map[string]string{"name": "my-machine"},
