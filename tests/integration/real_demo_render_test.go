@@ -50,19 +50,20 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 		mustContain  []string
 		mustBeAfter  string
 	}{
+		// Attention entries capitalize the first letter for presentation.
 		{
 			id:          demofixtures.WarnDbiMultiID,
-			mustContain: []string{"no automated backups", "publicly accessible", "unencrypted storage"},
+			mustContain: []string{"No automated backups", "Publicly accessible", "Unencrypted storage"},
 			mustBeAfter: "Attention",
 		},
 		{
 			id:          "db-public-no-encryption",
-			mustContain: []string{"no automated backups", "publicly accessible", "unencrypted storage", "deletion protection off"},
+			mustContain: []string{"No automated backups", "Publicly accessible", "Unencrypted storage", "Deletion protection off"},
 			mustBeAfter: "Attention",
 		},
 		{
 			id:          demofixtures.WarnDbiPublicMaintID,
-			mustContain: []string{"publicly accessible"},
+			mustContain: []string{"Publicly accessible"},
 			mustBeAfter: "Attention",
 		},
 	}
