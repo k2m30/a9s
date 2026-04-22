@@ -91,6 +91,22 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(7),
 			CreationTime:    aws.Int64(1688169600000), // 2023-07-01 — no data written in months
 		},
+		// acme-docdb-prod log groups — required for dbc→logs related-panel pivot.
+		// Naming convention: /aws/docdb/<clusterID>/<logType>.
+		{
+			LogGroupName:    aws.String("/aws/docdb/acme-docdb-prod/audit"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/docdb/acme-docdb-prod/audit:*"),
+			StoredBytes:     aws.Int64(209715200),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
+		},
+		{
+			LogGroupName:    aws.String("/aws/docdb/acme-docdb-prod/profiler"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/docdb/acme-docdb-prod/profiler:*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

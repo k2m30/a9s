@@ -62,10 +62,8 @@ func databasesDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
 				{Title: "Version", Path: "EngineVersion", Width: 10},
-				{Title: "Status", Path: "Status", Width: 14},
-				{Title: "CIS", Path: "Status", Key: "cis_flags", Width: 18},
+				{Title: "Status", Key: "status", SortPath: "Status", Width: 32},
 				{Title: "Instances", Path: "DBClusterMembers", Width: 10},
-				{Title: "Writer", Path: "EngineVersion", Key: "writer_count", Width: 7},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 			},
 			Detail: []DetailField{
