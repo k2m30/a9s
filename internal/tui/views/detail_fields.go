@@ -574,6 +574,14 @@ func (m *DetailModel) injectEC2StatusChecks() {
 //
 // Section header: "Attention (N)" where N is the total entry count. Omitted
 // when N == 0 (truly healthy rows).
+//
+// Color-cap invariant: the glyph (`!`/`~`) carries severity, the color carries
+// state. An Attention entry's rendered color must not exceed the row's S2
+// color bucket — a Healthy (green) row with a `!` Wave-2 finding keeps the
+// `!` glyph but renders in `~` yellow, never red. Otherwise the detail view
+// contradicts the list: row-green in S2 and entry-red in S5 tells the operator
+// conflicting things about the same resource. The cap applies uniformly
+// across resource types (dbc, ec2, ecr, …) — no per-type branching.
 func (m *DetailModel) injectAttentionSection() {
 	type entry struct {
 		tier    string
@@ -597,6 +605,8 @@ func (m *DetailModel) injectAttentionSection() {
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].tier == "!" && entries[j].tier != "!"
 	})
+	// Resolve the row's S2 color bucket once; used to cap entry colors below.
+	rowBucket := resolveRowColorBucket(m.resourceType, m.res)
 	headerTier := "~"
 	for _, e := range entries {
 		if e.tier == "!" {
@@ -609,7 +619,7 @@ func (m *DetailModel) injectAttentionSection() {
 		IsSection: true,
 		Key:       fmt.Sprintf("Attention (%d)", len(entries)),
 		Path:      "Attention",
-		ColorTier: headerTier,
+		ColorTier: capTierToRowBucket(headerTier, rowBucket),
 	})
 	for _, e := range entries {
 		glyph := e.tier
@@ -617,13 +627,14 @@ func (m *DetailModel) injectAttentionSection() {
 			glyph = "~"
 		}
 		line := glyph + " " + capitalizeFirst(e.primary)
+		entryColor := capTierToRowBucket(e.tier, rowBucket)
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
 			Key:         line,
 			Value:       line,
 			Path:        "Attention",
-			ColorTier:   e.tier,
+			ColorTier:   entryColor,
 		})
 		for _, row := range e.rows {
 			tier := row.Tier
@@ -636,7 +647,7 @@ func (m *DetailModel) injectAttentionSection() {
 				Key:         row.Label,
 				Value:       row.Value,
 				Path:        "Attention",
-				ColorTier:   tier,
+				ColorTier:   capTierToRowBucket(tier, rowBucket),
 			})
 		}
 	}
@@ -657,6 +668,40 @@ func capitalizeFirst(s string) string {
 	r := []rune(s)
 	r[0] = unicode.ToUpper(r[0])
 	return string(r)
+}
+
+// resolveRowColorBucket returns the row's S2 color bucket for the given
+// resource. Used by the Attention renderer to cap per-entry colors so the
+// detail view never shows severity beyond what the list row already signaled.
+// Falls back to ColorHealthy when the resource type is unregistered — an
+// unregistered type is by definition "we don't know how to classify", which
+// means the safest default is to cap any entry to `~`.
+func resolveRowColorBucket(resourceType string, r resource.Resource) resource.Color {
+	td := resource.FindResourceType(resourceType)
+	if td == nil {
+		return resource.ColorHealthy
+	}
+	return td.ResolveColor(r)
+}
+
+// capTierToRowBucket returns the effective color-tier string for an Attention
+// entry given its severity tier and the row's S2 color bucket.
+//
+// Rule: `!` (red) is only permitted when the row itself is Broken. On any
+// other row (Healthy / Warning / Dim), a `!` severity tier is capped to `~`
+// (yellow) for COLOR purposes only — the glyph in front of the phrase still
+// shows `!` so the operator sees "important to open" vs "informational".
+// The glyph carries severity, the color carries state; this function is the
+// seam between them.
+//
+// Non-`!` tiers are passed through unchanged — `~`, `ok`, `ct-danger`,
+// `ct-attention`, `ct-info`, and unknown tiers remain as-is. Unknown tiers
+// render as neutral via TierColorStyle's default branch.
+func capTierToRowBucket(tier string, rowBucket resource.Color) string {
+	if tier == "!" && rowBucket != resource.ColorBroken {
+		return "~"
+	}
+	return tier
 }
 
 // phraseTier classifies a Wave 1 S4 phrase into "!" (broken) or "~" (warning
