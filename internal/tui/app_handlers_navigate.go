@@ -392,7 +392,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher && !m.isDemo {
+		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher {
 			m.enrichmentTypeGen[rt]++
 			tok := m.enrichmentTypeGen[rt]
 			delete(m.enrichmentFindings, rt)
@@ -574,13 +574,32 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 			m.probeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
 		maps.Copy(m.probeResources, msg.Resources)
-	}
-	// Start Wave 2 enrichment for live --no-cache sessions (skip in demo mode).
-	if !m.isDemo {
-		enrichCmd := m.startEnrichment()
-		if enrichCmd != nil {
-			return m, enrichCmd
+		// Seed resourceCache from the prefetch too. Without this, Wave 2
+		// FieldUpdates that the enricher merges into the cache entry
+		// (handleEnrichmentChecked tail) have no entry to land on when the
+		// user hasn't opened the list yet — the enrichment runs before any
+		// OpenList, so FieldUpdates would otherwise die in probeResources
+		// and vanish on the first fetch. Seeding here keeps the cache
+		// entry alive so FieldUpdates survive across navigation.
+		if m.resourceCache == nil {
+			m.resourceCache = make(map[string]*resourceCacheEntry, len(msg.Resources))
 		}
+		for rt, resources := range msg.Resources {
+			if _, exists := m.resourceCache[rt]; exists {
+				continue
+			}
+			m.resourceCache[rt] = &resourceCacheEntry{
+				resources: resources,
+			}
+		}
+	}
+	// Start Wave 2 enrichment. Demo mode's typed fakes implement the enricher
+	// APIs (DescribePendingMaintenanceActions, etc.), so enrichment runs the
+	// same production code path against fixture data — this is what gives the
+	// demo its `~` glyphs, `(+N)` suffix, and "maintenance scheduled" status.
+	enrichCmd := m.startEnrichment()
+	if enrichCmd != nil {
+		return m, enrichCmd
 	}
 	return m, nil
 }
@@ -637,12 +656,11 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 	// Save cache to disk
 	saveCmd := m.saveAvailabilityCache()
 
-	// Start Wave 2 enrichment (skip in demo mode — no real AWS to query).
-	if !m.isDemo {
-		enrichCmd := m.startEnrichment()
-		if enrichCmd != nil {
-			return m, tea.Batch(saveCmd, enrichCmd)
-		}
+	// Start Wave 2 enrichment. Demo mode's typed fakes implement the enricher
+	// APIs, so enrichment runs identically against fixture data.
+	enrichCmd := m.startEnrichment()
+	if enrichCmd != nil {
+		return m, tea.Batch(saveCmd, enrichCmd)
 	}
 	return m, saveCmd
 }

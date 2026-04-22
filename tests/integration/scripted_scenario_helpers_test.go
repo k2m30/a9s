@@ -679,6 +679,17 @@ func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 		return true
 	case messages.ValueRevealedMsg:
 		return true
+	// Wave 1 + Wave 2 enrichment chain: availability → enrichment → field updates.
+	// Without these, demo-mode Wave 2 findings never reach the ResourceList,
+	// and the `~` glyph / `(+N)` suffix / "maintenance scheduled" invariants
+	// cannot be exercised end-to-end. Added 2026-04-22 after the dbi render
+	// gate surfaced the gap.
+	case messages.AvailabilityPrefetchedMsg:
+		return true
+	case messages.AvailabilityCheckedMsg:
+		return true
+	case messages.EnrichmentCheckedMsg:
+		return true
 	default:
 		return false
 	}

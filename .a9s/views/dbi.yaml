@@ -9,12 +9,8 @@ list:
     path: EngineVersion
     width: 10
   Status:
-    path: DBInstanceStatus
-    width: 14
-  CIS:
-    path: DBInstanceStatus
-    key: cis_flags
-    width: 24
+    key: status
+    width: 28
   Class:
     path: DBInstanceClass
     width: 16
