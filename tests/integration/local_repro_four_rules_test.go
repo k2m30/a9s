@@ -336,7 +336,7 @@ func firstLines(s string, n int) string {
 
 // TestLiveR_DBIDetailShowsPendingMaintenance verifies the end-to-end finding
 // surfacing path: with Wave 2 drained, a dbi detail view opened on a resource
-// that has a pending-maintenance finding must render the "Pending Maintenance"
+// that has a pending-maintenance finding must render the "Attention"
 // section. This pins the path the user observed as broken in the original bug
 // report.
 //
@@ -394,7 +394,7 @@ func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {
 	scenario.OpenDetailFromCurrentListByID(targetID)
 
 	detailView := scenario.currentView()
-	if !strings.Contains(detailView, "Pending Maintenance") {
+	if !strings.Contains(detailView, "Attention") {
 		t.Errorf("detail view for dbi %q does not contain \"Pending Maintenance\" section.\nView excerpt:\n%s",
 			targetID, firstLines(detailView, 60))
 	}
