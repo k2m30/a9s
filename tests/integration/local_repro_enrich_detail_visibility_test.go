@@ -33,5 +33,5 @@ func TestEnrichDetailBackgroundCheckVisible(t *testing.T) {
 
 	scenario.OpenDetailResource("rds", instance)
 
-	scenario.ExpectViewContains("Background Check")
+	scenario.ExpectViewContains("Attention")
 }

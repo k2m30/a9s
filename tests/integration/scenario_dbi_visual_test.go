@@ -131,37 +131,38 @@ func TestScenario_DBIVisual(t *testing.T) {
 	scenario.ExpectViewContains("Kernel security patch") // Wave 2 Description row
 }
 
-// issuesSectionHeaderLine returns the index of the "Issues" section header
-// line within the ANSI-stripped rendered frame, or -1 if absent.
+// attentionSectionHeaderLine returns the index of the "Attention (N)"
+// section header line within the ANSI-stripped rendered frame, or -1 if
+// absent.
 //
-// The detail view renders the header inside a box: "│ Issues    │ RELATED │".
-// Matching on TrimSpace(l) == "Issues" misses this because the line also
-// contains box-drawing characters and the related-panel column. Instead we
-// split on "│" and check that the first content cell trims to exactly "Issues".
-func issuesSectionHeaderLine(lines []string) int {
+// The detail view renders the header inside a box: "│ Attention (3)  │ RELATED │".
+// We split on "│" and check that the first content cell, trimmed, begins
+// with "Attention " (the header includes a count — "Attention (3)" etc).
+func attentionSectionHeaderLine(lines []string) int {
 	for i, l := range lines {
 		parts := strings.Split(l, "│")
-		// The box has at least 3 parts: ["", " Issues  ...", " RELATED  ...", ""]
 		if len(parts) < 2 {
 			continue
 		}
-		if strings.TrimSpace(parts[1]) == "Issues" {
+		cell := strings.TrimSpace(parts[1])
+		if cell == "Attention" || strings.HasPrefix(cell, "Attention (") {
 			return i
 		}
 	}
 	return -1
 }
 
-// expectIssuesSection asserts that the rendered view contains an "Issues" section
-// header and that every expected phrase appears after that header, in the given
-// order (§4 precedence). Fails with the full rendered frame on any violation so
-// that regressions in the renderer are immediately visible in test output.
-func expectIssuesSection(t *testing.T, view string, phrases []string) {
+// expectAttentionSection asserts that the rendered view contains an
+// "Attention (N)" section header and that every expected phrase appears
+// after that header, in the given order (§4 precedence). Fails with the
+// full rendered frame on any violation so that regressions in the renderer
+// are immediately visible in test output.
+func expectAttentionSection(t *testing.T, view string, phrases []string) {
 	t.Helper()
 	lines := strings.Split(view, "\n")
-	hdr := issuesSectionHeaderLine(lines)
+	hdr := attentionSectionHeaderLine(lines)
 	if hdr < 0 {
-		t.Fatalf("Issues section header not found. view:\n%s", view)
+		t.Fatalf("Attention section header not found. view:\n%s", view)
 	}
 	prev := hdr
 	for _, phrase := range phrases {
@@ -173,7 +174,7 @@ func expectIssuesSection(t *testing.T, view string, phrases []string) {
 			}
 		}
 		if found < 0 {
-			t.Fatalf("phrase %q not found after Issues header (header at line %d). view:\n%s", phrase, hdr, view)
+			t.Fatalf("phrase %q not found after Attention header (header at line %d). view:\n%s", phrase, hdr, view)
 		}
 		if found <= prev {
 			t.Fatalf("phrase %q at line %d appears before previous phrase at line %d (§4 precedence violated). view:\n%s", phrase, found, prev, view)
@@ -182,13 +183,14 @@ func expectIssuesSection(t *testing.T, view string, phrases []string) {
 	}
 }
 
-// expectNoIssuesSection asserts that the rendered view does NOT contain an
-// "Issues" section header — i.e. the row is Healthy (spec §4 "Healthy silence").
-func expectNoIssuesSection(t *testing.T, view string) {
+// expectNoAttentionSection asserts that the rendered view does NOT contain
+// an "Attention" section header — i.e. the row has no active signals at all
+// (spec §4 "Healthy silence" AND no Wave 2 finding).
+func expectNoAttentionSection(t *testing.T, view string) {
 	t.Helper()
 	lines := strings.Split(view, "\n")
-	if hdr := issuesSectionHeaderLine(lines); hdr >= 0 {
-		t.Fatalf("Issues section header unexpectedly present on Healthy row (line %d). view:\n%s", hdr, view)
+	if hdr := attentionSectionHeaderLine(lines); hdr >= 0 {
+		t.Fatalf("Attention section header unexpectedly present (line %d). view:\n%s", hdr, view)
 	}
 }
 
@@ -197,7 +199,7 @@ func expectNoIssuesSection(t *testing.T, view string) {
 // already renders warning phrases correctly; this test guards against S5 regressions.
 //
 // Assertions are tighter than plain ExpectViewContains: phrases must appear AFTER
-// the "Issues" section header and in §4 precedence order.
+// the "Attention (N)" section header and in §4 precedence order.
 func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -205,10 +207,10 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 
 	type issueCase struct {
 		id     string
-		issues []string // nil or empty = Healthy; Issues header must be absent
+		issues []string // nil or empty = truly silent; Attention header must be absent
 	}
 	cases := []issueCase{
-		// Healthy rows — Issues section must be absent.
+		// Healthy rows with no Wave 2 finding — Attention section must be absent.
 		{demofixtures.ProdDbiID, nil},
 		{demofixtures.ProdDbiAuroraID, nil},
 		// Transitional (Wave-1 single phrase).
@@ -224,10 +226,10 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.WarnDbiUnprotectedID, []string{"deletion protection off"}},
 		// Multi Config Warnings.
 		{demofixtures.WarnDbiMultiID, []string{"no automated backups", "publicly accessible", "unencrypted storage"}},
-		// Wave-1 warning + Wave-2 maintenance (Issues carries only Wave-1 phrases).
-		{demofixtures.WarnDbiPublicMaintID, []string{"publicly accessible"}},
-		// Wave-2 only on Healthy row — Issues section must be absent (Issues is Wave-1 only).
-		{demofixtures.MaintDbiScheduledID, nil},
+		// Wave-1 warning + Wave-2 maintenance — both must appear under Attention.
+		{demofixtures.WarnDbiPublicMaintID, []string{"publicly accessible", "os-upgrade"}},
+		// Wave-2 only on Healthy row — Attention section present, Wave-2 Summary visible.
+		{demofixtures.MaintDbiScheduledID, []string{"system-update"}},
 		// Legacy fixture: all 4 Wave-1 warnings.
 		{"db-public-no-encryption", []string{"no automated backups", "publicly accessible", "unencrypted storage", "deletion protection off"}},
 	}
@@ -242,9 +244,9 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 			t.Log("\n" + view)
 
 			if len(tc.issues) == 0 {
-				expectNoIssuesSection(t, view)
+				expectNoAttentionSection(t, view)
 			} else {
-				expectIssuesSection(t, view, tc.issues)
+				expectAttentionSection(t, view, tc.issues)
 			}
 			scenario.Back()
 		})
@@ -277,11 +279,11 @@ func TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 			view := scenario.currentView()
 			t.Log("\n" + view)
 
-			expectNoIssuesSection(t, view)
+			expectNoAttentionSection(t, view)
 			for _, phrase := range wave1Phrases {
 				for _, line := range strings.Split(view, "\n") {
-					// The phrase must not appear in any line after any Issues-like header.
-					// Since there must be no Issues header (checked above), any occurrence
+					// The phrase must not appear in any line after any Attention-like header.
+					// Since there must be no Attention header (checked above), any occurrence
 					// would be a spurious embedding — flag it.
 					if strings.Contains(line, phrase) {
 						t.Errorf("Healthy row %q unexpectedly contains Wave-1 phrase %q in line: %q\nfull view:\n%s", id, phrase, line, view)

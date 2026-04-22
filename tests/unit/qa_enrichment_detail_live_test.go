@@ -116,7 +116,7 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 	if !strings.Contains(output, "pending maintenance: system-update — live update test") {
 		t.Errorf("after live EnrichmentCheckedMsg, detail view must show finding summary, got:\n%s", output)
 	}
-	if !strings.Contains(output, "Pending Maintenance") {
+	if !strings.Contains(output, "Attention") {
 		t.Errorf("after live EnrichmentCheckedMsg, detail view must show 'Pending Maintenance' section, got:\n%s", output)
 	}
 }
