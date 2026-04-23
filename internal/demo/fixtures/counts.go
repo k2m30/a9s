@@ -45,7 +45,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"s3":           len(s3.Buckets),
 		"redis":        len(NewRedisFixtures().ReplicationGroups),
 		"dbc":          len(docdb.DBClusters),
-		"ddb":          len(NewDynamoDBFixtures().TableNames),
+		"ddb":          len(NewDDBFixtures().Tables),
 		"opensearch":   len(NewOpenSearchFixtures().Domains),
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),

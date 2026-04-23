@@ -956,7 +956,9 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
 		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
 		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "String"}},
-		{"ddb", realisticDDBTable(), []string{"users-table", "ACTIVE"}},
+		// ddb: Fields["status"] carries the §4 phrase (blank for Healthy/ACTIVE) —
+		// the raw AWS enum no longer surfaces in the list view. Spec: docs/resources/ddb.md §4.
+		{"ddb", realisticDDBTable(), []string{"users-table"}},
 		{"acm", realisticACMCertificate(), []string{"example.com", "ISSUED"}},
 		{"asg", realisticASG(), []string{"my-app-asg"}},
 		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},

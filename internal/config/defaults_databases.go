@@ -81,11 +81,10 @@ func databasesDefaultViews() map[string]ViewDef {
 		"ddb": {
 			List: []ListColumn{
 				{Title: "Table Name", Path: "TableName", Width: 36},
-				{Title: "Status", Path: "TableStatus", Width: 12},
+				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Items", Path: "ItemCount", Width: 12},
 				{Title: "Size", Key: "size_bytes", SortPath: "TableSizeBytes", Width: 14},
 				{Title: "Billing", Path: "BillingModeSummary.BillingMode", Width: 16},
-				{Title: "PITR", Key: "pitr_enabled", Width: 6},
 			},
 			Detail: []DetailField{
 				{Path: "TableName"}, {Path: "TableArn"}, {Path: "TableId"}, {Path: "TableStatus"},

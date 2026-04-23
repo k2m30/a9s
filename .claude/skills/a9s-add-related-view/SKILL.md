@@ -93,7 +93,9 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
         return resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}
     }
     if targetList == nil {
-        return resource.RelatedCheckResult{TargetType: "{target}", Count: -1}
+        // Target fetcher not registered / nothing loaded yet — honest lower
+        // bound is zero, NOT an error. See "Count: -1 vs ApproximateZero" below.
+        return resource.ApproximateZero("{target}")
     }
 
     // 3. Match against source
@@ -104,9 +106,9 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
             ids = append(ids, targetRes.ID)
         }
     }
-    // Truncation guard: partial page with 0 matches → unknown, not zero
+    // Truncation guard: partial page with 0 matches → honest lower bound, not an error.
     if len(ids) == 0 && truncated {
-        return resource.RelatedCheckResult{TargetType: "{target}", Count: -1}
+        return resource.ApproximateZero("{target}")
     }
     return relatedResult("{target}", ids)
 }
@@ -130,9 +132,26 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 ```
 
 **Count semantics:**
-- `Count: 0` -- confirmed none
-- `Count: -1` -- unknown (cache miss with no clients, or error)
-- `Count: N` (N > 0) -- confirmed N found, ResourceIDs populated
+- `Count: 0` -- confirmed none (exhaustive scan produced no matches)
+- `Count: N` (N > 0) -- confirmed N found, `ResourceIDs` populated
+- `Count: -1` -- **error state**. Something went wrong: AWS API returned an
+  error, required client is nil, `assertStruct` failed, or we lack the identity
+  needed to run the query. The UI renders this as `"?"` and it contributes to
+  the per-resource truncation bucket.
+- `resource.ApproximateZero("{target}")` -- **honest lower bound of zero**. Not
+  an error. Returned when the target list comes back nil (fetcher not
+  registered, nothing loaded yet) or when a truncated target page produced zero
+  matches so far. The UI renders this as `"0+"`.
+
+### Count: -1 vs ApproximateZero -- common regression
+
+This distinction is load-bearing. Three rules:
+
+1. **Error path** (real failure): `return resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}` -- AWS call returned an error, required client is nil, `assertStruct` failed, or the source resource does not expose the identity the query needs.
+2. **Nil target list** (fetcher not registered / nothing loaded yet): `return resource.ApproximateZero("{target}")`. This is the `if targetList == nil { ... }` branch in every cache-backed checker. It is NOT an error -- zero registered targets is an honest zero.
+3. **Truncated target page with zero matches** (partial data, no hits yet): `return resource.ApproximateZero("{target}")`. The pagination cursor may produce matches on later pages; the current view is an honest lower bound.
+
+Returning bare `Count: -1` in case 2 or 3 is a regression caught in redis/dbi/dbc/s3 on 2026-04-23 — originally fixed in commit `51b6646` ("fix: 8 review findings — attention signals, pagination, approximate-zero contract"), then silently regressed by subsequent rewrites that copied the old pattern. Verify every nil-list and truncated-empty branch in any new checker uses `resource.ApproximateZero`, not `Count: -1`.
 
 ### Pattern N: Naming-Convention (reverse lookup by name pattern)
 
@@ -277,7 +296,8 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
         return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1, Err: err}
     }
     if targetList == nil {
-        return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
+        // Honest zero — fetcher not registered or nothing loaded yet.
+        return resource.ApproximateZero("{target1}")
     }
 
     var ids []string
@@ -287,9 +307,9 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
             ids = append(ids, r.ID)
         }
     }
-    // Truncation guard: partial page with 0 matches → unknown, not zero
+    // Truncation guard: partial page with 0 matches → honest lower bound.
     if len(ids) == 0 && truncated {
-        return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
+        return resource.ApproximateZero("{target1}")
     }
     return relatedResult("{target1}", ids)
 }

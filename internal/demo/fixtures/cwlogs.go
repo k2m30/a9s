@@ -126,6 +126,16 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
 		},
+		// orders-prod DynamoDB Contributor Insights log group — DDB→logs pivot.
+		// checkDdbLogs matches log groups whose ID contains the table name.
+		// Naming convention: /aws/dynamodb/tables/<name>/insights/default.
+		{
+			LogGroupName:    aws.String("/aws/dynamodb/tables/" + OrdersProdID + "/insights/default"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/dynamodb/tables/" + OrdersProdID + "/insights/default:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
 		// Redis prod slow-log group — required for redis→logs related-panel pivot.
 		// The prod-redis-sessions RG LogDeliveryConfigurations destination points here.
 		{

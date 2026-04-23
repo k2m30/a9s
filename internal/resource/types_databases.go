@@ -226,14 +226,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				status := r.Fields["status"]
-				switch status {
-				case "ACTIVE":
+				// Strip the universal-rule-7 (+N) suffix before matching so that
+				// "archived: kms key lost (+1)" still maps to ColorBroken.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				switch phrase {
+				case "":
 					return ColorHealthy
-				case "CREATING", "UPDATING", "DELETING":
+				case "creating", "updating", "deleting", "archiving":
 					return ColorWarning
-				case "INACCESSIBLE_ENCRYPTION_CREDENTIALS", "ARCHIVED", "ARCHIVING":
+				case "kms key inaccessible", "archived: kms key lost":
 					return ColorBroken
+				case "PITR off":
+					// Wave-2 ~ finding on a Healthy row — the `~` glyph does the
+					// signaling; the row color stays green so the glyph renders.
+					return ColorHealthy
 				}
 				return ColorHealthy
 			},

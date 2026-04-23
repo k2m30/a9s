@@ -355,6 +355,32 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
+	// orders-projector: triggered by orders-prod DynamoDB stream (DDB→lambda pivot).
+	// checkDdbLambda calls ListEventSourceMappings(EventSourceArn=<LatestStreamArn>);
+	// the fake filters ESMs by EventSourceArn so this ESM is returned only for that query.
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String(OrdersProdLambdaName),
+		FunctionArn:      aws.String(OrdersProdLambdaARN),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimeGo1x,
+		MemorySize:       aws.Int32(256),
+		Timeout:          aws.Int32(60),
+		Handler:          aws.String("main"),
+		Description:      aws.String("Projects orders-prod DynamoDB stream events to the read model"),
+		LastModified:     aws.String("2026-01-15T08:00:00+00:00"),
+		CodeSize:         4194304,
+		State:            lambdatypes.StateActive,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModeActive},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/" + OrdersProdLambdaName),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// S3 notifier: invoked by healthy-bucket S3 event notification (checkS3Lambda pivot).
 	fns = append(fns, lambdatypes.FunctionConfiguration{
 		FunctionName:     aws.String(S3NotifierLambdaName),
@@ -419,10 +445,11 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 }
 
 func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []lambdatypes.EventSourceMappingConfiguration {
-	// Only process-orders has an SQS trigger in the demo scenario.
 	var mappings []lambdatypes.EventSourceMappingConfiguration
 	for _, fn := range fns {
-		if aws.ToString(fn.FunctionName) == lambdaProcessOrders {
+		switch aws.ToString(fn.FunctionName) {
+		case lambdaProcessOrders:
+			// process-orders is triggered by SQS.
 			mappings = append(mappings, lambdatypes.EventSourceMappingConfiguration{
 				UUID:                 aws.String("esm-process-orders-01"),
 				FunctionArn:          fn.FunctionArn,
@@ -431,7 +458,19 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 				BatchSize:            aws.Int32(10),
 				LastProcessingResult: aws.String("OK"),
 			})
-			break
+		case OrdersProdLambdaName:
+			// orders-projector is triggered by the orders-prod DynamoDB stream
+			// (DDB→lambda pivot). checkDdbLambda filters by EventSourceArn =
+			// table.LatestStreamArn, so this ESM must use OrdersProdStreamARN.
+			mappings = append(mappings, lambdatypes.EventSourceMappingConfiguration{
+				UUID:                 aws.String("esm-orders-projector-ddb-01"),
+				FunctionArn:          fn.FunctionArn,
+				EventSourceArn:       aws.String(OrdersProdStreamARN),
+				State:                aws.String("Enabled"),
+				BatchSize:            aws.Int32(100),
+				StartingPosition:     lambdatypes.EventSourcePositionTrimHorizon,
+				LastProcessingResult: aws.String("OK"),
+			})
 		}
 	}
 	return mappings

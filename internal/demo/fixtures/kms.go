@@ -137,6 +137,21 @@ func NewKMSFixtures() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// orders-prod-cmk-0001 — DDB→kms pivot: matched by checkDdbKMS stripping the ARN
+		// suffix from SSEDescription.KMSMasterKeyArn on the orders-prod table.
+		{
+			KeyId:                aws.String(OrdersProdKMSKeyID),
+			Arn:                  aws.String(OrdersProdKMSKeyARN),
+			Description:          aws.String("Customer-managed CMK for orders-prod DynamoDB table encryption"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// PendingDeletion key — referenced by broken-dbi-encryption-locked fixture (KmsKeyId).
 		// This key was deleted while still in use by an RDS instance, causing
 		// the instance to enter the inaccessible-encryption-credentials state.
@@ -218,6 +233,12 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-redis-prod-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-redis-prod-key"),
 			TargetKeyId: aws.String(ProdRedisKMSKeyID),
+		},
+		// orders-prod DynamoDB CMK alias.
+		{
+			AliasName:   aws.String("alias/orders-prod-cmk"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/orders-prod-cmk"),
+			TargetKeyId: aws.String(OrdersProdKMSKeyID),
 		},
 	}
 

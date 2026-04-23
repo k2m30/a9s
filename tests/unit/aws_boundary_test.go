@@ -62,23 +62,10 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		}
 	})
 
-	t.Run("ddb_backup", func(t *testing.T) {
-		parent := resource.Resource{
-			ID:     "my-table",
-			Fields: map[string]string{"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/my-table"},
-		}
-		clients := &awsclient.ServiceClients{
-			Backup: fakeBackupBoundaryAccessDenied{},
-		}
-		checker := boundaryCheckerByTarget(t, "ddb", "backup")
-		got := checker(context.Background(), clients, parent, nil)
-		if got.Count != -1 {
-			t.Errorf("Count = %d, want -1 (AccessDenied on ListRecoveryPointsByResource)", got.Count)
-		}
-		if got.Err == nil {
-			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
-		}
-	})
+	// ddb_backup removed: per docs/resources/ddb.md §2, backup discovery is a
+	// reverse-scan of the already-loaded backup plan cache, NOT a
+	// ListRecoveryPointsByResource call. No live Backup API is invoked, so no
+	// AccessDenied path to propagate.
 
 	t.Run("ddb_kinesis", func(t *testing.T) {
 		parent := resource.Resource{
@@ -174,32 +161,8 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 		}
 	})
 
-	t.Run("ddb_backup", func(t *testing.T) {
-		rpARN := "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-0001"
-		fakeBackup := &fakeBackupBoundaryThrottle{
-			recoveryPoint: rpARN,
-		}
-		parent := resource.Resource{
-			ID:     "my-table",
-			Fields: map[string]string{"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/my-table"},
-		}
-		clients := &awsclient.ServiceClients{
-			Backup: fakeBackup,
-		}
-		checker := boundaryCheckerByTarget(t, "ddb", "backup")
-		got := checker(context.Background(), clients, parent, nil)
-
-		calls := fakeBackup.calls.Load()
-		if calls < 2 {
-			t.Errorf("ListRecoveryPointsByResource call count = %d, want >= 2 (retry must have fired)", calls)
-		}
-		if got.Count != 1 {
-			t.Errorf("Count = %d, want 1 (successful retry returned one recovery point)", got.Count)
-		}
-		if got.Err != nil {
-			t.Errorf("Err = %v, want nil (successful retry should clear error)", got.Err)
-		}
-	})
+	// ddb_backup removed: reverse-scan checkers do not hit the live AWS API,
+	// so retry-on-throttle has no surface to wrap here.
 }
 
 // ---------------------------------------------------------------------------

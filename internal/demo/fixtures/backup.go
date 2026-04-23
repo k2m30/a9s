@@ -41,6 +41,17 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T03:00:00+00:00")),
 			},
 		},
+		// orders-prod DynamoDB table recovery point (checkDdbBackup pivot).
+		// The current checkDdbBackup calls ListRecoveryPointsByResource; after phase-7
+		// rewrites it to a cache scan, this entry remains as belt-and-suspenders.
+		OrdersProdARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-ddb-weekly-20260420"),
+				BackupVaultName:  aws.String("Default"),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00+00:00")),
+			},
+		},
 		efsARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-efs-daily-20260416"),
@@ -61,6 +72,7 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
 func NewBackupFixtures() *BackupFixtures {
 	dailyPlanID := "1a2b3c4d-5e6f-7890-abcd-111111111111"
+	weeklyPlanID := "1a2b3c4d-5e6f-7890-abcd-222222222222"
 	return &BackupFixtures{
 		RecoveryPoints: buildBackupRecoveryPoints(),
 		Selections: map[string][]backuptypes.BackupSelection{
@@ -74,6 +86,18 @@ func NewBackupFixtures() *BackupFixtures {
 					Resources: []string{
 						HealthyBucketARN,
 						"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a",
+					},
+				},
+			},
+			// The weekly plan covers the orders-prod DynamoDB table so the
+			// ddb→backup pivot resolves via cache scan of Fields["resources"]
+			// (after phase-7 rewrites checkDdbBackup to cache-scan mode).
+			weeklyPlanID: {
+				{
+					SelectionName: aws.String("acme-weekly-ddb-selection"),
+					IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
+					Resources: []string{
+						OrdersProdARN,
 					},
 				},
 			},
