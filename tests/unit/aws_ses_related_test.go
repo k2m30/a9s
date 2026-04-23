@@ -21,9 +21,12 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ses"
+	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -454,5 +457,354 @@ func TestRelated_SES_R53_EmailIdentityExtractsDomain(t *testing.T) {
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (email address: domain extracted after '@')", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SES v1 mock — used by Target #2 and Target #3 tests below.
+// Implements SESV1API (single method: DescribeActiveReceiptRuleSet).
+// ---------------------------------------------------------------------------
+
+// fakeSESV1 implements awsclient.SESV1API for receipt-rule-set tests.
+type fakeSESV1 struct {
+	calls  int
+	// responses is a slice of (output, error) pairs returned in order.
+	// After exhausting responses the last entry is repeated.
+	responses []sesV1Response
+}
+
+type sesV1Response struct {
+	output *ses.DescribeActiveReceiptRuleSetOutput
+	err    error
+}
+
+func (f *fakeSESV1) DescribeActiveReceiptRuleSet(
+	_ context.Context,
+	_ *ses.DescribeActiveReceiptRuleSetInput,
+	_ ...func(*ses.Options),
+) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	f.calls++
+	idx := f.calls - 1
+	if idx >= len(f.responses) {
+		idx = len(f.responses) - 1
+	}
+	return f.responses[idx].output, f.responses[idx].err
+}
+
+// Compile-time check: fakeSESV1 satisfies SESV1API.
+var _ awsclient.SESV1API = (*fakeSESV1)(nil)
+
+// sesV1Clients returns a *awsclient.ServiceClients with the given SESV1API wired.
+// Each call returns a fresh pointer so the sesRuleSetCaches key is distinct.
+func sesV1Clients(v1 awsclient.SESV1API) *awsclient.ServiceClients {
+	return &awsclient.ServiceClients{SES: v1}
+}
+
+// sesLambdaARN returns a plausible Lambda ARN string for test data.
+func sesLambdaARN(name string) string {
+	return "arn:aws:lambda:us-east-1:123456789012:function:" + name
+}
+
+// sesBucketName returns a plausible S3 bucket name for test data.
+func sesBucketName(name string) string {
+	return "ses-inbound-" + name
+}
+
+// buildReceiptRule builds a sestypes.ReceiptRule with optional recipients and Lambda action.
+func buildLambdaReceiptRule(name string, recipients []string, lambdaARN string) sestypes.ReceiptRule {
+	return sestypes.ReceiptRule{
+		Name:       aws.String(name),
+		Recipients: recipients,
+		Actions: []sestypes.ReceiptAction{
+			{LambdaAction: &sestypes.LambdaAction{FunctionArn: aws.String(lambdaARN)}},
+		},
+	}
+}
+
+// buildS3ReceiptRule builds a sestypes.ReceiptRule with optional recipients and S3 action.
+func buildS3ReceiptRule(name string, recipients []string, bucketName string) sestypes.ReceiptRule {
+	return sestypes.ReceiptRule{
+		Name:       aws.String(name),
+		Recipients: recipients,
+		Actions: []sestypes.ReceiptAction{
+			{S3Action: &sestypes.S3Action{BucketName: aws.String(bucketName)}},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Target #2 — checkSESLambda must scope results by Recipients
+//
+// Problem: current code ignores the resource argument — returns the union of
+// Lambda ARNs from all rules regardless of Recipients field. AWS semantics:
+//   - Empty Recipients → applies to all (global catch-all).
+//   - Non-empty Recipients → only matched identities receive those actions.
+//   - "example.com" matches any @example.com address AND the domain itself.
+//   - Domain identity matches subdomain rules (left-extensible per AWS docs).
+//
+// These tests will FAIL until the coder implements recipient-scoped filtering.
+// ---------------------------------------------------------------------------
+
+// TestCheckSESLambda_ScopesByRecipient verifies that checkSESLambda returns only
+// the Lambda ARNs whose recipient filter includes the queried identity.
+// Rule A (global): empty Recipients → always matches.
+// Rule B: Recipients=["support@acme.com"] → matches support@acme.com.
+// Rule C: Recipients=["sales.acme.com"] → matches sales.acme.com domain.
+func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
+	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{
+			buildLambdaReceiptRule("global-catch-all", nil, sesLambdaARN("global-router")),
+			buildLambdaReceiptRule("support-rule", []string{"support@acme.com"}, sesLambdaARN("support-router")),
+			buildLambdaReceiptRule("sales-rule", []string{"sales.acme.com"}, sesLambdaARN("sales-router")),
+		},
+	}
+
+	checker := sesCheckerByTarget(t, "lambda")
+
+	subtests := []struct {
+		name        string
+		resource    resource.Resource
+		wantARNs    []string
+		unwantedARN string
+	}{
+		{
+			name: "support@acme.com → global + support-router only",
+			resource: resource.Resource{
+				ID:     "support@acme.com",
+				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+			},
+			wantARNs:    []string{sesLambdaARN("global-router"), sesLambdaARN("support-router")},
+			unwantedARN: sesLambdaARN("sales-router"),
+		},
+		{
+			name: "billing@acme.com → global only (no specific rule matches)",
+			resource: resource.Resource{
+				ID:     "billing@acme.com",
+				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+			},
+			wantARNs:    []string{sesLambdaARN("global-router")},
+			unwantedARN: sesLambdaARN("support-router"),
+		},
+		{
+			// DOMAIN identity matches both domain-level recipient rules AND
+			// email-address recipients under that domain.
+			name: "acme.com (DOMAIN) → global + support + sales (domain owns all subdomains/addresses)",
+			resource: resource.Resource{
+				ID:     "acme.com",
+				Fields: map[string]string{"identity_type": "DOMAIN"},
+			},
+			wantARNs:    []string{sesLambdaARN("global-router"), sesLambdaARN("support-router"), sesLambdaARN("sales-router")},
+			unwantedARN: "",
+		},
+		{
+			name: "sales.acme.com (DOMAIN subdomain) → global + sales-router only",
+			resource: resource.Resource{
+				ID:     "sales.acme.com",
+				Fields: map[string]string{"identity_type": "DOMAIN"},
+			},
+			wantARNs:    []string{sesLambdaARN("global-router"), sesLambdaARN("sales-router")},
+			unwantedARN: sesLambdaARN("support-router"),
+		},
+	}
+
+	for _, st := range subtests {
+		st := st
+		t.Run(st.name, func(t *testing.T) {
+			// Fresh pointer per subtest: sesRuleSetCaches uses pointer as key,
+			// so a new pointer starts with no cached entry.
+			clients := sesV1Clients(&fakeSESV1{
+				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
+			})
+			result := checker(context.Background(), clients, st.resource, resource.ResourceCache{})
+			if result.Err != nil {
+				t.Fatalf("unexpected error: %v", result.Err)
+			}
+			// Verify all expected ARNs are present.
+			for _, wantARN := range st.wantARNs {
+				found := false
+				for _, id := range result.ResourceIDs {
+					if id == wantARN {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs, wantARN)
+				}
+			}
+			// Verify unwanted ARN is absent.
+			if st.unwantedARN != "" {
+				for _, id := range result.ResourceIDs {
+					if id == st.unwantedARN {
+						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs, st.unwantedARN)
+					}
+				}
+			}
+			// Count must equal len(wantARNs).
+			if result.Count != len(st.wantARNs) {
+				t.Errorf("Count = %d, want %d", result.Count, len(st.wantARNs))
+			}
+		})
+	}
+}
+
+// TestCheckSESS3_ScopesByRecipient is the mirror of TestCheckSESLambda_ScopesByRecipient
+// using S3Action.BucketName instead of LambdaAction.FunctionArn.
+func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
+	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{
+			buildS3ReceiptRule("global-catch-all", nil, sesBucketName("global")),
+			buildS3ReceiptRule("support-rule", []string{"support@acme.com"}, sesBucketName("support")),
+			buildS3ReceiptRule("sales-rule", []string{"sales.acme.com"}, sesBucketName("sales")),
+		},
+	}
+
+	checker := sesCheckerByTarget(t, "s3")
+
+	subtests := []struct {
+		name          string
+		resource      resource.Resource
+		wantBuckets   []string
+		unwantedBucket string
+	}{
+		{
+			name: "support@acme.com → global + support bucket only",
+			resource: resource.Resource{
+				ID:     "support@acme.com",
+				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+			},
+			wantBuckets:    []string{sesBucketName("global"), sesBucketName("support")},
+			unwantedBucket: sesBucketName("sales"),
+		},
+		{
+			name: "billing@acme.com → global bucket only",
+			resource: resource.Resource{
+				ID:     "billing@acme.com",
+				Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+			},
+			wantBuckets:    []string{sesBucketName("global")},
+			unwantedBucket: sesBucketName("support"),
+		},
+		{
+			name: "acme.com (DOMAIN) → all buckets",
+			resource: resource.Resource{
+				ID:     "acme.com",
+				Fields: map[string]string{"identity_type": "DOMAIN"},
+			},
+			wantBuckets:    []string{sesBucketName("global"), sesBucketName("support"), sesBucketName("sales")},
+			unwantedBucket: "",
+		},
+		{
+			name: "sales.acme.com (DOMAIN) → global + sales bucket only",
+			resource: resource.Resource{
+				ID:     "sales.acme.com",
+				Fields: map[string]string{"identity_type": "DOMAIN"},
+			},
+			wantBuckets:    []string{sesBucketName("global"), sesBucketName("sales")},
+			unwantedBucket: sesBucketName("support"),
+		},
+	}
+
+	for _, st := range subtests {
+		st := st
+		t.Run(st.name, func(t *testing.T) {
+			// Fresh pointer per subtest avoids sesRuleSetCaches leaking between subtests.
+			clients := sesV1Clients(&fakeSESV1{
+				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
+			})
+			result := checker(context.Background(), clients, st.resource, resource.ResourceCache{})
+			if result.Err != nil {
+				t.Fatalf("unexpected error: %v", result.Err)
+			}
+			for _, wantBucket := range st.wantBuckets {
+				found := false
+				for _, id := range result.ResourceIDs {
+					if id == wantBucket {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs, wantBucket)
+				}
+			}
+			if st.unwantedBucket != "" {
+				for _, id := range result.ResourceIDs {
+					if id == st.unwantedBucket {
+						t.Errorf("ResourceIDs = %v, must NOT contain %q (wrong recipient scope)", result.ResourceIDs, st.unwantedBucket)
+					}
+				}
+			}
+			if result.Count != len(st.wantBuckets) {
+				t.Errorf("Count = %d, want %d", result.Count, len(st.wantBuckets))
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Target #3 — sesActiveReceiptRuleSet sync.Once must not cache errors
+//
+// Problem: sync.Once freezes both success and error. A transient error on the
+// first call prevents all subsequent calls from ever succeeding, even after
+// the upstream API recovers. This test will FAIL until the coder replaces the
+// sync.Once with a guard that only seals on success.
+// ---------------------------------------------------------------------------
+
+// TestSESActiveReceiptRuleSet_RetriesAfterTransientError verifies that:
+//   - First checkSESLambda call with an erroring SES v1 API → Count=-1.
+//   - Second call on the SAME *ServiceClients → Count=1 (error retried, rule fetched).
+//   - Third call → Count=1, but mock call counter is 2 (success sealed, no 3rd API call).
+func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
+	// One Lambda rule in the rule set.
+	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{
+			buildLambdaReceiptRule("inbound", nil, sesLambdaARN("inbound-handler")),
+		},
+	}
+
+	// fakeSESV1 with two responses: first is a transient error, second is success.
+	v1Mock := &fakeSESV1{
+		responses: []sesV1Response{
+			{output: nil, err: errors.New("ses: temporary connection error")},
+			{output: ruleSetOutput, err: nil},
+		},
+	}
+	// Use a fixed *ServiceClients pointer for all three calls — must be the same
+	// pointer for the sesRuleSetCaches key to be consistent.
+	clients := sesV1Clients(v1Mock)
+
+	src := resource.Resource{
+		ID:     "support@acme.com",
+		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+	}
+
+	checker := sesCheckerByTarget(t, "lambda")
+
+	// Call 1: expect error (Count=-1) — transient API failure.
+	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	if result1.Count != -1 {
+		t.Errorf("call 1: Count = %d, want -1 (transient API error)", result1.Count)
+	}
+
+	// Call 2: expect success (Count=1) — error must NOT be cached by sync.Once.
+	// This is the regression pin: current code freezes the error so Count stays -1.
+	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	if result2.Count != 1 {
+		t.Errorf("call 2: Count = %d, want 1 (error should not be cached — must retry after transient failure)", result2.Count)
+	}
+	if result2.Err != nil {
+		t.Errorf("call 2: unexpected error: %v", result2.Err)
+	}
+
+	// Call 3: success is memoized — no additional API call.
+	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	if result3.Count != 1 {
+		t.Errorf("call 3: Count = %d, want 1 (success cached from call 2)", result3.Count)
+	}
+	// The mock was called exactly twice: once for the error, once for the success.
+	// A third API call would indicate the success is NOT being cached.
+	if v1Mock.calls != 2 {
+		t.Errorf("mock.calls = %d, want 2 (success must be memoized — call 3 must not hit the API again)", v1Mock.calls)
 	}
 }

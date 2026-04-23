@@ -845,6 +845,9 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
 // Two findings on the same instance count as one.
 //
+// Only `!`-severity findings contribute to the S1 badge. `~`-severity findings
+// are informational and must not bump the count.
+//
 // Invariant: result ≤ len(wave1Resources). Findings keyed by IDs not present
 // in wave1Resources are skipped (orphans) — they would otherwise inflate the
 // badge above the visible row count, e.g. an enricher dispatched for cluster
@@ -863,7 +866,10 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 			ids[r.ID] = struct{}{}
 		}
 	}
-	for id := range findings {
+	for id, finding := range findings {
+		if finding.Severity != "!" {
+			continue
+		}
 		if _, ok := knownIDs[id]; ok {
 			ids[id] = struct{}{}
 		}

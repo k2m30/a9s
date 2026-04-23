@@ -183,13 +183,19 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 36, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Color is driven by the top Wave-1 phrase stored in r.Status.
-				// Strip the `(+N)` suffix before matching so "verification failed (+1)"
-				// maps to Broken just like "verification failed".
-				// Wave-2 account-level phrases ("account PROBATION", "account SHUTDOWN",
-				// "quota 80%+ used") arrive in r.Status via FieldUpdates;
-				// PROBATION/SHUTDOWN map to Broken, quota stays Healthy (~ finding).
-				phrase := StripFindingSuffix(r.Status)
+				// Color is driven by the enriched phrase for this identity.
+				// Wave-1: Status is set by the fetcher for non-Healthy identities
+				// (e.g. "verification failed", "pending verification").
+				// Wave-2: ApplyFieldUpdates writes account-level phrases into
+				// Fields["status"] (not r.Status), so for Healthy identities whose
+				// r.Status is empty, fall back to Fields["status"].
+				// Strip the `(+N)` suffix before matching so "account SHUTDOWN (+1)"
+				// maps to Broken just like "account SHUTDOWN".
+				statusSource := r.Status
+				if statusSource == "" {
+					statusSource = r.Fields["status"]
+				}
+				phrase := StripFindingSuffix(statusSource)
 				switch phrase {
 				case "verification failed", "verify: temp failure", "verification not started",
 					"account SHUTDOWN", "account PROBATION":

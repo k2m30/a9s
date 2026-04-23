@@ -627,3 +627,93 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 		t.Errorf("IssueCount = %d, want 0 for fixture healthy account", result.IssueCount)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Target #1 — SES Color func must fall back to Fields["status"] when Status=""
+// ---------------------------------------------------------------------------
+
+// TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN verifies that the SES
+// Color function returns ColorBroken when r.Status is empty but Fields["status"]
+// carries the Wave-2 phrase "account SHUTDOWN".
+//
+// Regression pin: ApplyFieldUpdates writes to Fields["status"], not r.Status.
+// Before fix: Color checks r.Status only → stays green (ColorHealthy).
+// After fix:  Color falls back to Fields["status"] when r.Status is empty.
+func TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN(t *testing.T) {
+	td := resource.FindResourceType("ses")
+	if td == nil {
+		t.Fatal("ses resource type not registered")
+	}
+
+	cases := []struct {
+		name      string
+		r         resource.Resource
+		wantColor resource.Color
+	}{
+		{
+			name: "SHUTDOWN in Fields[status] with empty Status → ColorBroken",
+			r: resource.Resource{
+				ID:     "acme-corp.com",
+				Status: "",
+				Fields: map[string]string{
+					"verification_status": "SUCCESS",
+					"sending_enabled":     "true",
+					"status":              "account SHUTDOWN",
+				},
+			},
+			wantColor: resource.ColorBroken,
+		},
+		{
+			name: "PROBATION in Fields[status] with empty Status → ColorBroken",
+			r: resource.Resource{
+				ID:     "noreply@acme-corp.com",
+				Status: "",
+				Fields: map[string]string{
+					"verification_status": "SUCCESS",
+					"sending_enabled":     "true",
+					"status":              "account PROBATION",
+				},
+			},
+			wantColor: resource.ColorBroken,
+		},
+		{
+			name: "quota 80%+ used in Fields[status] → ColorHealthy (informational, stays green)",
+			r: resource.Resource{
+				ID:     "acme-corp.com",
+				Status: "",
+				Fields: map[string]string{
+					"verification_status": "SUCCESS",
+					"sending_enabled":     "true",
+					"status":              "quota 80%+ used",
+				},
+			},
+			wantColor: resource.ColorHealthy,
+		},
+		{
+			// Wave-1 precedence guard: when Status is non-empty, Fields["status"]
+			// fallback must NOT override — Wave-1 status wins.
+			name: "non-empty Status with SHUTDOWN in Fields[status] → Wave-1 wins (ColorBroken from Status)",
+			r: resource.Resource{
+				ID:     "broken.acme-corp.com",
+				Status: "verification failed",
+				Fields: map[string]string{
+					"verification_status": "FAILED",
+					"sending_enabled":     "true",
+					"status":              "account SHUTDOWN",
+				},
+			},
+			wantColor: resource.ColorBroken,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := td.ResolveColor(tc.r)
+			if got != tc.wantColor {
+				t.Errorf("ResolveColor(%q, Status=%q, Fields[status]=%q) = %v, want %v",
+					tc.r.ID, tc.r.Status, tc.r.Fields["status"], got, tc.wantColor)
+			}
+		})
+	}
+}

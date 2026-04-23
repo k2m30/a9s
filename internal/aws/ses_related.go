@@ -110,13 +110,12 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 }
 
 // sesReceiptRuleSetCache is a per-ServiceClients cache for the SES v1
-// DescribeActiveReceiptRuleSet call. It is populated once per fetch batch and
-// shared across all N identity checkers so the API is called at most once
-// regardless of how many identities are in the list.
+// DescribeActiveReceiptRuleSet call. Successful responses are memoized per
+// *ServiceClients; errors are not memoized so transient failures retry on the
+// next call instead of locking the client for its lifetime.
 type sesReceiptRuleSetCache struct {
-	once   sync.Once
+	mu     sync.Mutex
 	output *ses.DescribeActiveReceiptRuleSetOutput
-	err    error
 }
 
 // sesRuleSetCacheMu protects sesRuleSetCaches map access.
@@ -127,9 +126,10 @@ var sesRuleSetCacheMu sync.Mutex
 // hit the same cached result.
 var sesRuleSetCaches = map[*ServiceClients]*sesReceiptRuleSetCache{}
 
-// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet exactly once
-// per ServiceClients instance, caching the result for reuse across all identity
-// rows in the batch.
+// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet at most once
+// per ServiceClients instance when the call succeeds. Errors are not cached: a
+// follow-up call after an error retries the API. A follow-up call after a
+// successful response returns the cached output without a network round-trip.
 func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
@@ -143,10 +143,17 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 	}
 	sesRuleSetCacheMu.Unlock()
 
-	cache.once.Do(func() {
-		cache.output, cache.err = c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
-	})
-	return cache.output, cache.err
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.output != nil {
+		return cache.output, nil
+	}
+	out, err := c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
+	if err != nil {
+		return nil, err
+	}
+	cache.output = out
+	return out, nil
 }
 
 // checkSESEbRule checks the SES identity's configuration-set event destinations for
@@ -228,11 +235,86 @@ func checkSESKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 	return relatedResult("kinesis", ids)
 }
 
-// checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt rules.
-// Calls ses:DescribeActiveReceiptRuleSet (SES v1) once per fetch batch and walks
-// Rules[].Actions[].LambdaAction.FunctionArn. Returns Count: 0 for accounts with
-// no active receipt rule set (pure outbound SES) — operator-honest absence.
-func checkSESLambda(ctx context.Context, clients any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// sesRuleAppliesToIdentity reports whether a receipt rule should be considered
+// when computing related resources for the given SES identity.
+//
+// Scoping rules:
+//   - len(rule.Recipients) == 0 → rule applies to all identities.
+//   - For EMAIL_ADDRESS identities (identityType == "EMAIL_ADDRESS"):
+//     a recipient matches if it equals the identity exactly, equals the
+//     identity's domain, or is a parent domain of the identity's domain.
+//   - For DOMAIN identities: a recipient matches if it equals the domain
+//     exactly, is a subdomain of it, or is an email address whose domain
+//     equals or is a subdomain of the identity domain.
+//
+// Empty-string recipient entries are skipped conservatively. If every entry
+// is an empty string (rare data corruption), the rule is treated as applying
+// to all (AWS normalises absent Recipients to nil; a non-nil all-empty slice
+// is anomalous).
+func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityType string) bool {
+	if len(rule.Recipients) == 0 {
+		return true
+	}
+
+	// Collect non-empty recipients.
+	var valid []string
+	for _, r := range rule.Recipients {
+		trimmed := strings.TrimSpace(r)
+		if trimmed != "" {
+			valid = append(valid, trimmed)
+		}
+	}
+	// All entries are empty strings — treat conservatively as "applies to all".
+	if len(valid) == 0 {
+		return true
+	}
+
+	switch identityType {
+	case "EMAIL_ADDRESS":
+		// Derive domain from identity (e.g. "billing@sub.acme.com" → "sub.acme.com").
+		domain := ""
+		if idx := strings.LastIndex(identityName, "@"); idx >= 0 {
+			domain = identityName[idx+1:]
+		}
+		for _, r := range valid {
+			// Exact email match.
+			if strings.EqualFold(r, identityName) {
+				return true
+			}
+			// Recipient is the identity's domain or a parent domain.
+			if domain != "" {
+				rLower := strings.ToLower(r)
+				dLower := strings.ToLower(domain)
+				if rLower == dLower || strings.HasSuffix(dLower, "."+rLower) {
+					return true
+				}
+			}
+		}
+	default:
+		// DOMAIN identity.
+		domainLower := strings.ToLower(identityName)
+		for _, r := range valid {
+			rLower := strings.ToLower(r)
+			// Recipient is an email address — check its domain.
+			rDomain := rLower
+			if idx := strings.LastIndex(rLower, "@"); idx >= 0 {
+				rDomain = rLower[idx+1:]
+			}
+			// rDomain equals the identity domain or is a subdomain of it.
+			if rDomain == domainLower || strings.HasSuffix(rDomain, "."+domainLower) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt
+// rules that apply to the given identity. Calls ses:DescribeActiveReceiptRuleSet
+// (SES v1) once per fetch batch, filters by Recipients scoping, then walks
+// Rules[].Actions[].LambdaAction.FunctionArn. Returns Count: 0 for accounts
+// with no active receipt rule set (pure outbound SES) — operator-honest absence.
+func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
@@ -245,15 +327,22 @@ func checkSESLambda(ctx context.Context, clients any, _ resource.Resource, _ res
 		// No active rule set — pure outbound account. Operator-honest 0.
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-	arns := sesLambdaARNsFromRules(out.Rules)
+	var filtered []sestypes.ReceiptRule
+	for _, rule := range out.Rules {
+		if sesRuleAppliesToIdentity(rule, res.ID, res.Fields["identity_type"]) {
+			filtered = append(filtered, rule)
+		}
+	}
+	arns := sesLambdaARNsFromRules(filtered)
 	return relatedResult("lambda", arns)
 }
 
-// checkSESS3 discovers S3 buckets where SES v1 inbound receipt rules deposit received mail.
-// Calls ses:DescribeActiveReceiptRuleSet (SES v1) once per fetch batch and walks
-// Rules[].Actions[].S3Action.BucketName. Returns Count: 0 for accounts with no active
-// receipt rule set — operator-honest absence.
-func checkSESS3(ctx context.Context, clients any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkSESS3 discovers S3 buckets where SES v1 inbound receipt rules deposit
+// received mail for the given identity. Calls ses:DescribeActiveReceiptRuleSet
+// (SES v1) once per fetch batch, filters by Recipients scoping, then walks
+// Rules[].Actions[].S3Action.BucketName. Returns Count: 0 for accounts with no
+// active receipt rule set — operator-honest absence.
+func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
@@ -266,7 +355,13 @@ func checkSESS3(ctx context.Context, clients any, _ resource.Resource, _ resourc
 		// No active rule set — pure outbound account. Operator-honest 0.
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
-	buckets := sesS3BucketsFromRules(out.Rules)
+	var filtered []sestypes.ReceiptRule
+	for _, rule := range out.Rules {
+		if sesRuleAppliesToIdentity(rule, res.ID, res.Fields["identity_type"]) {
+			filtered = append(filtered, rule)
+		}
+	}
+	buckets := sesS3BucketsFromRules(filtered)
 	return relatedResult("s3", buckets)
 }
 
