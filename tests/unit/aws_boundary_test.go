@@ -356,13 +356,18 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 // ---------------------------------------------------------------------------
 // T114 — TestChecker_NilClients_ReturnsMinusOne
 //
-// For 3 representative forward checkers (different parent types), call with
-// clients == nil and a valid parent. Assert Count == -1 and no panic.
+// For representative forward checkers that make a LIVE AWS API call, call
+// with clients == nil and a valid parent. Assert Count == -1 and no panic.
 //
 // Covered checkers:
 //   asg → vpc  (checkASGVPC)
-//   ddb → backup (checkDdbBackup)
 //   ddb → kinesis (checkDdbKinesis)
+//
+// ddb → backup is intentionally NOT covered here — checkDdbBackup is a pure
+// cache-scan (no live API call), so its nil-client semantics fall into the
+// "nil target list → ApproximateZero" rule, not the "nil client = error = -1"
+// rule. See the four-category classifier in
+// .claude/skills/a9s-add-related-view/SKILL.md.
 // ---------------------------------------------------------------------------
 
 func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
@@ -377,18 +382,6 @@ func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		// Ensure no panic occurs when clients is nil.
-		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if got.Count != -1 {
-			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
-		}
-	})
-
-	t.Run("ddb_backup", func(t *testing.T) {
-		parent := resource.Resource{
-			ID:     "my-table",
-			Fields: map[string]string{"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/my-table"},
-		}
-		checker := boundaryCheckerByTarget(t, "ddb", "backup")
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
 		if got.Count != -1 {
 			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
