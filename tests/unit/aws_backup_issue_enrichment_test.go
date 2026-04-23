@@ -727,13 +727,21 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			require.Equal(t, tc.wantMsg, finding.Summary,
 				"state %s Summary must be %q", tc.state, tc.wantMsg)
 
-			// U11 for every case.
+			// U11 for every case. Skip pure-integer row values — counts are
+			// allowed to appear inside the Summary phrase (e.g. "2 jobs failed
+			// in last 24h" legitimately contains "2"), and U11 is meant to
+			// catch Summaries concatenated from descriptive Row values, not
+			// numeric match-ups.
 			for _, row := range finding.Rows {
-				if row.Value != "" {
-					require.NotContains(t, finding.Summary, row.Value,
-						"U11: [%s] Summary %q must not contain Row value %q",
-						tc.state, finding.Summary, row.Value)
+				if row.Value == "" {
+					continue
 				}
+				if _, convErr := strconv.Atoi(row.Value); convErr == nil {
+					continue
+				}
+				require.NotContains(t, finding.Summary, row.Value,
+					"U11: [%s] Summary %q must not contain Row value %q",
+					tc.state, finding.Summary, row.Value)
 			}
 		})
 	}

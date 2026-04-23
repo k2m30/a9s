@@ -249,13 +249,8 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Compile-time interface guard
-// ---------------------------------------------------------------------------
-
-// TestBackup_FakeImplementsBackupAPI is a compile-time guard that fakes.BackupFake
-// satisfies the awsclient.BackupAPI aggregate interface.
-func TestBackup_FakeImplementsBackupAPI(t *testing.T) {
-	t.Helper()
-	var _ awsclient.BackupAPI = fakes.NewBackup()
-}
+// Compile-time guard that fakes.BackupFake satisfies awsclient.BackupAPI.
+// Package-level var is the correct idiom (the former Test* wrapper was
+// busywork — t.Helper is a no-op inside a Test function and the guard
+// runs at compile time, not test time).
+var _ awsclient.BackupAPI = fakes.NewBackup()

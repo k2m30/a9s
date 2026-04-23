@@ -41,7 +41,15 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 
 	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
 	if err != nil {
-		return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+		// Symmetric with the no-error paths below — always return fully
+		// initialized maps so a caller that writes into result.Findings or
+		// result.FieldUpdates cannot panic on a nil map. Range over nil is
+		// safe, but writes would not be.
+		return IssueEnricherResult{
+			Findings:     findings,
+			FieldUpdates: fieldUpdates,
+			TruncatedIDs: truncatedIDs,
+		}, err
 	}
 
 	// Decide the single account-level finding using §4 precedence.

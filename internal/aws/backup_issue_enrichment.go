@@ -36,13 +36,19 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 	var nextToken *string
 	truncated := false
 	pages := 0
+	// Spec §3.2 — filter to the 24h window server-side so AWS returns only
+	// the jobs we care about. Without this, accounts with months of job
+	// history scan far more pages than needed and hit EnrichmentCap early,
+	// setting truncated=true even when zero issues exist in the window.
+	cutoff := time.Now().Add(-24 * time.Hour)
 	for {
 		if pages >= EnrichmentCap {
 			truncated = true
 			break
 		}
 		out, err := clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{
-			NextToken: nextToken,
+			ByCreatedAfter: &cutoff,
+			NextToken:      nextToken,
 		})
 		pages++
 		if err != nil {
@@ -54,8 +60,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		}
 		nextToken = out.NextToken
 	}
-
-	cutoff := time.Now().Add(-24 * time.Hour)
 
 	// Bucket jobs by plan ID. Each plan tracks all in-window jobs.
 	type planBucket struct {
