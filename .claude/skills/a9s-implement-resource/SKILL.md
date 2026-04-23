@@ -529,7 +529,13 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 3. **Warning/Broken rows show §4 phrase**: for each fixture whose bucket ≠ Healthy, `scenario.ExpectRowStatusEquals(<fixture ID>, <exact §4 "List text" phrase>)`.
 4. **Glyph presence/absence**: for each fixture whose Wave 2 finding severity is `~` on a Healthy row, `scenario.ExpectRowNamePrefix(<fixture ID>, "~ ")`. For `!`, `"! "`. For any non-Healthy row, `scenario.ExpectRowNoGlyphPrefix(<fixture ID>)` regardless of finding presence.
 5. **S1 menu count**: `scenario.ExpectMenuIssueCount(<shortName>, <expected N>)` where N = count of distinct fixtures that have at least one `!` severity finding (NOT total finding count — a fixture with 3 `!` findings counts as 1). Must satisfy `N ≤ total fixture count for this type`. When the spec §3.2 has no Wave 2 `!` signals at all, N = 0 and the helper treats that as "badge absent" (no `issues:` string in the menu entry for this type).
-6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped. Additionally, for each pivot with `count shown: yes` and actual Count ≥ 1, call `scenario.DrillRelated(<pivot display name>)` and assert the returned slice is non-empty. For each `RegisterNavigableFields` entry, call `scenario.FollowNavigableField(<fieldPath>)` and assert a resource lands. These drill-through assertions go in a dedicated test file (`tests/integration/scenario_related_drill_through_test.go` for pivots, or an in-file sub-test for navigable fields) so they survive as regression pins independent of the visual render gate.
+6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped.
+
+   **Drill-through pins** live in a separate table-driven file — `tests/integration/scenario_related_drill_through_test.go`. Do NOT add a new test function per resource; add ONE row per graph-root fixture to the `drillThroughFixtures` table:
+   ```go
+   {"<label>", "<shortName>", <graphRootID constant or literal>},
+   ```
+   Multiple rows per `shortName` are allowed when a resource has more than one graph-root-equivalent fixture (e.g. `dbi/prod-dbi-1` and `dbi/prod-dbi-aurora`). The shared loops run `DrillRelated` on every pivot with Count ≥ 1 and `FollowNavigableField` on every registered navigable field, asserting non-empty landings and enforcing the `resource.NavIDFromValue` bare-ID contract via `assertBareIDs`. No per-resource assertion code needed.
 7. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
 8. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
 9. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
@@ -666,17 +672,17 @@ Report format:
     <N>/<total> registered `count shown: yes` pivots ≥ 1 — PASS
     (ct-events and other `count shown: unknown` pivots exempt)
     graph-root Count ≥ 2 ratio: <ratio>/<total> ≥ 50% — PASS/FAIL
-    drill-through test: TestScenario_RelatedDrillThrough_<Short> — PASS
-    navigable-field drill-through test: TestScenario_NavigableFieldDrillThrough_<Short> (if navigable fields registered) — PASS
+    drill-through: TestScenario_RelatedDrillThrough_All/<label> — PASS
+    navigable-field drill-through: TestScenario_NavigableFieldDrillThrough_All/<label> — PASS (or SKIP if no navigable fields registered)
 ```
 
 FAIL if any registered `count shown: yes` pivot is 0 on the nominated graph-root. Fix the fixture (or the sibling fetcher enrichment) until it's non-zero — do NOT accept a "best attempt" graph-root that covers 9 of 10 pivots.
 
 FAIL if the Count ≥ 2 ratio falls below 50%. A trivially-connected graph-root (every pivot exactly 1) does not exercise the multi-resource disambiguation path.
 
-FAIL if the drill-through test (`TestScenario_RelatedDrillThrough_<Short>`) does not PASS — a Count ≥ 1 that does not land a resource means the checker's ID format does not match the target's `Resource.ID` (the SES/DDB bug class).
+FAIL if the drill-through subtest (`TestScenario_RelatedDrillThrough_All/<label>`) does not PASS — a Count ≥ 1 that does not land a resource means the checker's ID format does not match the target's `Resource.ID` (the SES/DDB bug class). The subtest is generated automatically from the row you add to `drillThroughFixtures`; no test function to write.
 
-FAIL if navigable fields are registered (`resource.GetNavigableFields`) and the navigable-field drill-through test (`TestScenario_NavigableFieldDrillThrough_<Short>`) does not PASS — a navigable field whose Enter navigation produces an empty landing means `NavIDFromValue` is not applied or the wrong extractor is registered.
+FAIL if navigable fields are registered (`resource.GetNavigableFields`) and the navigable-field drill-through subtest (`TestScenario_NavigableFieldDrillThrough_All/<label>`) does not PASS — a navigable field whose Enter navigation produces an empty landing means `NavIDFromValue` is not applied, the wrong extractor is registered, or (as with dbc's DBSubnetGroup.VpcId or redis's SecurityGroups.SecurityGroupId) the path does not resolve against the fetcher's RawStruct at all and the registration is structurally invalid — remove the stale entry from `RegisterNavigableFields(...)` and route through the related-panel checker instead.
 
 #### 9.4 Detail view surfaces every finding — with a test
 
