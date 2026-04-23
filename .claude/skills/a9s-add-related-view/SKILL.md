@@ -143,15 +143,19 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
   registered, nothing loaded yet) or when a truncated target page produced zero
   matches so far. The UI renders this as `"0+"`.
 
-### Count: -1 vs ApproximateZero -- common regression
+### Return-value classifier for a checker -- load-bearing
 
-This distinction is load-bearing. Three rules:
+A related checker must choose one of four return values per code path. Getting this wrong misleads the UI: `Count: -1` renders as `"?"` and feeds the truncation bucket; `ApproximateZero` renders as `"0+"`; `Count: 0` renders as plain `"0"`. The operator reads those three differently. Classify every branch:
 
-1. **Error path** (real failure): `return resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}` -- AWS call returned an error, required client is nil, `assertStruct` failed, or the source resource does not expose the identity the query needs.
-2. **Nil target list** (fetcher not registered / nothing loaded yet): `return resource.ApproximateZero("{target}")`. This is the `if targetList == nil { ... }` branch in every cache-backed checker. It is NOT an error -- zero registered targets is an honest zero.
-3. **Truncated target page with zero matches** (partial data, no hits yet): `return resource.ApproximateZero("{target}")`. The pagination cursor may produce matches on later pages; the current view is an honest lower bound.
+1. **Error path** -- AWS call returned an error, required client is nil, an `assertStruct` failed, the source resource lacks the identity needed to form the query, or an intermediate helper returned a sentinel meaning "unknown, could not determine". Return `resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}` (attach `Err` when a real `error` value is in hand). If an intermediate helper's documented contract is "nil return = error distinct from empty", propagate its nil as `Count: -1`; do NOT collapse it into `ApproximateZero`.
 
-Returning bare `Count: -1` in case 2 or 3 is a regression caught in redis/dbi/dbc/s3 on 2026-04-23 — originally fixed in commit `51b6646` ("fix: 8 review findings — attention signals, pagination, approximate-zero contract"), then silently regressed by subsequent rewrites that copied the old pattern. Verify every nil-list and truncated-empty branch in any new checker uses `resource.ApproximateZero`, not `Count: -1`.
+2. **Complete-answer API** -- the checker makes a single bounded AWS call (not cache-backed, not paginated) that returns an exhaustive answer. `out == nil && err == nil` (or an empty output slice with no error) means the AWS service reported zero authoritatively. Return `Count: 0`. This is NOT `ApproximateZero` -- no lower bound is involved because no pagination cursor remains.
+
+3. **Nil target list from the cache-backed helper** -- the checker uses the standard `{source}RelatedResources(ctx, clients, cache, "{target}")` (or equivalent `FetchRelatedTarget` wrapper) and the returned list is `nil` because the target fetcher is not registered or nothing has been loaded yet. Return `resource.ApproximateZero("{target}")`. Zero registered targets is an honest lower bound of zero, not an error.
+
+4. **Truncated target page with zero matches so far** -- the cache-backed helper returned a partial page (`truncated == true`) and this checker's match loop produced no IDs. Return `resource.ApproximateZero("{target}")`. Later pages may produce matches; the current view is a lower bound.
+
+**Decision order when reviewing a new or rewritten checker:** for each `return` statement, ask (in order) -- Is an AWS call or helper erroring? Is this a one-shot exhaustive API with `out == nil && err == nil`? Is this the `if targetList == nil` branch from a cache-backed helper? Is this the truncated-and-no-matches branch? The first "yes" determines the return. Returning `Count: -1` on a nil-list-from-cache or truncated-empty branch is the regression this section exists to prevent.
 
 ### Pattern N: Naming-Convention (reverse lookup by name pattern)
 
