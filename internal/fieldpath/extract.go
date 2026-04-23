@@ -104,6 +104,104 @@ func ExtractScalar(obj any, dotPath string) string {
 	return FormatValue(val)
 }
 
+// ExtractFirstListScalar walks dotPath and returns the first scalar found,
+// transparently indexing into slices (picking element 0 at each list
+// segment). Returns "" on nil pointers, empty slices, or missing fields.
+//
+// Intended for operators of scalar-on-list navigable field paths like
+// "VpcSecurityGroups.VpcSecurityGroupId" where the slice always has ≥ 1
+// element carrying the target ID. For multi-element coverage, callers
+// can iterate all elements with ExtractListScalars (future extension).
+//
+// CONTRACT: This function returns only the FIRST element of any slice
+// encountered. It must not be used where all list elements are needed.
+func ExtractFirstListScalar(obj any, dotPath string) string {
+	segments := strings.Split(dotPath, ".")
+	current := reflect.ValueOf(obj)
+
+	for _, seg := range segments {
+		// Dereference pointers
+		for current.Kind() == reflect.Pointer {
+			if current.IsNil() {
+				return ""
+			}
+			current = current.Elem()
+		}
+		// Index into slices (pick element 0)
+		for current.Kind() == reflect.Slice || current.Kind() == reflect.Array {
+			if current.Len() == 0 {
+				return ""
+			}
+			current = current.Index(0)
+			// Re-deref if slice elements are pointers
+			for current.Kind() == reflect.Pointer {
+				if current.IsNil() {
+					return ""
+				}
+				current = current.Elem()
+			}
+		}
+		if current.Kind() != reflect.Struct {
+			return ""
+		}
+
+		// Field lookup: JSON tag first, then case-insensitive field name.
+		// AWS SDK Go v2 structs have no JSON tags, so name matching is essential.
+		t := current.Type()
+		found := false
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			tag := field.Tag.Get("json")
+			if tag != "" {
+				jsonName := strings.Split(tag, ",")[0]
+				if jsonName == seg {
+					current = current.Field(i)
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			for i := 0; i < t.NumField(); i++ {
+				field := t.Field(i)
+				if strings.EqualFold(field.Name, seg) {
+					current = current.Field(i)
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return ""
+		}
+	}
+
+	// Final: dereference any remaining pointers, index any remaining slices,
+	// then format as scalar.
+	for current.Kind() == reflect.Pointer {
+		if current.IsNil() {
+			return ""
+		}
+		current = current.Elem()
+	}
+	for current.Kind() == reflect.Slice || current.Kind() == reflect.Array {
+		if current.Len() == 0 {
+			return ""
+		}
+		current = current.Index(0)
+		for current.Kind() == reflect.Pointer {
+			if current.IsNil() {
+				return ""
+			}
+			current = current.Elem()
+		}
+	}
+	if !isScalar(current) {
+		return ""
+	}
+	return FormatValue(current)
+}
+
 // ExtractSubtree extracts a value and returns it as a formatted string (scalar)
 // or YAML (struct/slice/map).
 func ExtractSubtree(obj any, dotPath string) string {

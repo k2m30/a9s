@@ -28,25 +28,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// listFieldPaths are navigable field paths whose target lives inside a list
-// (e.g. []VpcSecurityGroupMembership), which the harness's scalar fieldpath
-// extractor cannot traverse. Production renders each list element as its
-// own navigable row; the harness does not yet iterate. Tracked in #298.
-// Keyed by "<shortName>.<fieldPath>" for precise matching.
-var listFieldPaths = map[string]bool{
-	"dbi.VpcSecurityGroups.VpcSecurityGroupId":      true,
-	"dbi.DBSubnetGroup.VpcId":                       true,
-	"dbi.DBSubnetGroup.Subnets.SubnetIdentifier":    true,
-	"dbc.VpcSecurityGroups.VpcSecurityGroupId":      true,
-	"dbc.DBSubnetGroup.VpcId":                       true,
-	"dbc.DBSubnetGroup.Subnets.SubnetIdentifier":    true,
-	"redis.SecurityGroups.SecurityGroupId":          true,
-}
-
-func isListFieldNavigable(shortName, fieldPath string) bool {
-	return listFieldPaths[shortName+"."+fieldPath]
-}
-
 // ---------------------------------------------------------------------------
 // TestScenario_RelatedDrillThrough_SES
 // ---------------------------------------------------------------------------
@@ -313,16 +294,12 @@ func TestScenario_RelatedDrillThrough_DBI(t *testing.T) {
 
 	scenario.OpenList("dbi")
 
-	// Only one fixture iteration until harness issue #298 is fixed: multi-iter
-	// cache-hit drilling of the same pivot doesn't update harness observer state
-	// on the second iter, so the prod-dbi-aurora-1 iteration cannot currently be
-	// asserted. The single-fixture drill still pins the core contract: every
-	// pivot's Count >= 1 lands on a non-empty list for that fixture.
 	for _, tc := range []struct {
 		label  string
 		rootID string
 	}{
 		{"prod-dbi-1", demofixtures.ProdDbiID},
+		{"prod-dbi-aurora-1", demofixtures.ProdDbiAuroraID},
 	} {
 		root := fullIntegrationMustFindResourceByID(t, scenario.clients, "dbi", tc.rootID)
 		scenario.OpenDetailResource("dbi", root)
@@ -380,10 +357,6 @@ func TestScenario_NavigableFieldDrillThrough_DBI(t *testing.T) {
 	// Flat loop — no t.Run to avoid scenario.failf (outer t.Fatalf) inside a
 	// subtest goroutine, which causes runtime.Goexit on the outer test.
 	for _, nf := range navFields {
-		if isListFieldNavigable("dbi", nf.FieldPath) {
-			t.Logf("FollowNavigableField(%q): list-field path — harness limitation tracked in #298; skipping", nf.FieldPath)
-			continue
-		}
 		// Open detail fresh before each navigable-field follow so the
 		// resource's RawStruct is present and the stack is at detail level.
 		scenario.OpenDetailResource("dbi", root)
@@ -417,15 +390,12 @@ func TestScenario_RelatedDrillThrough_DBC(t *testing.T) {
 
 	scenario.OpenList("dbc")
 
-	// Only one fixture iteration until harness issue #298 is fixed: multi-iter
-	// cache-hit drilling of the same pivot doesn't update harness observer state
-	// on the second iter, so the prod-aurora-cluster iteration cannot currently
-	// be asserted. Manual drilling in ./a9s --demo confirms navigation works.
 	for _, tc := range []struct {
 		label  string
 		rootID string
 	}{
 		{"acme-docdb-prod", demofixtures.ProdDbcID},
+		{"prod-aurora-cluster", "prod-aurora-cluster"},
 	} {
 		root := fullIntegrationMustFindResourceByID(t, scenario.clients, "dbc", tc.rootID)
 		scenario.OpenDetailResource("dbc", root)
@@ -483,10 +453,6 @@ func TestScenario_NavigableFieldDrillThrough_DBC(t *testing.T) {
 	// Flat loop — no t.Run to avoid scenario.failf (outer t.Fatalf) inside a
 	// subtest goroutine, which causes runtime.Goexit on the outer test.
 	for _, nf := range navFields {
-		if isListFieldNavigable("dbc", nf.FieldPath) {
-			t.Logf("FollowNavigableField(%q): list-field path — harness limitation tracked in #298; skipping", nf.FieldPath)
-			continue
-		}
 		scenario.OpenDetailResource("dbc", root)
 		scenario.ExpectNoAPIError()
 		landed := scenario.FollowNavigableField(nf.FieldPath)
@@ -578,10 +544,6 @@ func TestScenario_NavigableFieldDrillThrough_Redis(t *testing.T) {
 	// Flat loop — no t.Run to avoid scenario.failf (outer t.Fatalf) inside a
 	// subtest goroutine, which causes runtime.Goexit on the outer test.
 	for _, nf := range navFields {
-		if isListFieldNavigable("redis", nf.FieldPath) {
-			t.Logf("FollowNavigableField(%q): list-field path — harness limitation tracked in #298; skipping", nf.FieldPath)
-			continue
-		}
 		scenario.OpenDetailResource("redis", root)
 		scenario.ExpectNoAPIError()
 		landed := scenario.FollowNavigableField(nf.FieldPath)

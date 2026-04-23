@@ -956,6 +956,27 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 		return result
 	}
 
+	// Case 4: detail-view pushed without a NavigateMsg.
+	// handleRelatedNavigate's KindDetail + cache-hit branch pushes a detail view
+	// and returns nil Cmd — no NavigateMsg is emitted, so currentResource stays
+	// pointed at the parent. Detect the push via the rendered frame title:
+	// "detail -- <id>" or "detail -- <id> (<name>)".
+	if strings.Contains(rendered, "detail -- ") {
+		// Extract the ID from the title. The format is "detail -- <id>" or
+		// "detail -- <id> (<name>)". The ID stops at " (" or end-of-line.
+		after := rendered[strings.Index(rendered, "detail -- ")+len("detail -- "):]
+		if nlIdx := strings.IndexAny(after, "\n│"); nlIdx >= 0 {
+			after = after[:nlIdx]
+		}
+		if parIdx := strings.Index(after, " ("); parIdx >= 0 {
+			after = after[:parIdx]
+		}
+		id := strings.TrimSpace(after)
+		if id != "" {
+			return []resource.Resource{{ID: id}}
+		}
+	}
+
 	// Neither a list nor a detail landed — the resolver either flashed or produced nothing.
 	if s.lastFlash != nil {
 		s.failf("DrillRelated(%q): navigation resulted in a flash instead of a resource view: %q", displayName, s.lastFlash.Text)
@@ -999,6 +1020,11 @@ func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resourc
 	rawValue := ""
 	if s.currentResource.RawStruct != nil {
 		rawValue = fieldpath.ExtractScalar(s.currentResource.RawStruct, fieldPath)
+		if rawValue == "" {
+			// Fall back to list-aware extraction for paths that traverse
+			// slices (e.g. VpcSecurityGroups.VpcSecurityGroupId).
+			rawValue = fieldpath.ExtractFirstListScalar(s.currentResource.RawStruct, fieldPath)
+		}
 	}
 	// Fall back to the Fields map if RawStruct extraction yielded nothing.
 	if rawValue == "" {

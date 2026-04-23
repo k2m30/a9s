@@ -33,14 +33,13 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC, NeedsTargetCache: false},
 	})
 
-	// KmsKeyId is on ReplicationGroup directly.
-	// SecurityGroups is on individual MemberCluster structs (not on ReplicationGroup);
-	// the field path is registered for the NavigableFields contract — the fieldpath
-	// resolver will return empty string at runtime since RawStruct is ReplicationGroup.
-	// The actual SG lookup is performed by checkRedisSG via DescribeCacheClusters.
+	// ReplicationGroup.KmsKeyId is a scalar — the only navigable path that
+	// resolves against this RawStruct. Security Groups live on MemberCluster
+	// objects returned by DescribeCacheClusters, not on ReplicationGroup, so
+	// SG navigation is surfaced via the checkRedisSG related-panel checker,
+	// not via a navigable field.
 	resource.RegisterNavigableFields("redis", []resource.NavigableField{
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
-		{FieldPath: "SecurityGroups.SecurityGroupId", TargetType: "sg"},
 	})
 }
 
